@@ -121,4 +121,72 @@ end
             @test any(startswith.(String.(s["extraction_error"]), "open_result"))
         end
     end
+    @testset "provenance stamp: commit, dirty flag, and honest absence" begin
+        mktempdir() do dir
+            jld = joinpath(dir, "point_001.jld2")
+            jldopen(jld, "w") do f
+                local p = zeros(ComplexF64, 8, 8, 3)
+                p[1, 1, 1] = 1.0 + 0im
+                f["psi"] = p
+                f["grid_n_points"] = [8, 8]
+                f["grid_box_size"] = [4.0, 4.0]
+                f["energy"] = -6.0
+            end
+            write_run_summary(dir, jld; source="finish_hook")
+            s = JSON.parsefile(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME))
+            # Assert the VALUE against an independently obtained HEAD, not just
+            # that the key exists. `haskey` alone passed while the first version
+            # of the stamp was recording an ANCESTOR repo's commit (git -C walks
+            # up), which is exactly the lying hash the -dirty flag exists to
+            # avoid. Skip only where git genuinely is not available.
+            root = pkgdir(SpinorBEC)
+            head = try
+                readchomp(Cmd(`git -C $root rev-parse HEAD`; ignorestatus=true))
+            catch
+                ""
+            end
+            if occursin(r"^[0-9a-f]{40}$", head)
+                @test haskey(s, "_repo_commit")
+                c = s["_repo_commit"]
+                @test occursin(r"^[0-9a-f]{40}(-dirty)?$", c)
+                @test startswith(c, head)          # the package's OWN HEAD
+            else
+                @info "git unavailable — commit stamp is absent by design"
+                @test !haskey(s, "_repo_commit")
+            end
+
+            pr = summary_provenance(dir)
+            @test pr.extractor_version == SpinorBEC.RUN_SUMMARY_EXTRACTOR_VERSION
+            if occursin(r"^[0-9a-f]{40}$", head)
+                @test pr.stamped
+                @test pr.commit == head
+                @test pr.dirty == endswith(s["_repo_commit"], "-dirty")
+            else
+                @test pr.stamped == false
+            end
+        end
+    end
+
+    @testset "provenance of an unstamped or missing summary is not 'current'" begin
+        # A summary written before stamping cannot be retro-dated. The query must
+        # say so rather than imply the run matches HEAD — that distinction is the
+        # whole point of the field.
+        mktempdir() do dir
+            @test summary_provenance(dir).stamped == false        # no file at all
+            @test summary_provenance(dir).commit === nothing
+
+            open(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME), "w") do io
+                JSON.print(io, Dict("energy" => -1.0, "_extractor_version" => "2"), 2)
+            end
+            pr = summary_provenance(dir)
+            @test pr.stamped == false
+            @test pr.commit === nothing
+            @test pr.extractor_version == "2"                     # still readable
+        end
+        # Corrupt JSON must not throw out of a triage loop.
+        mktempdir() do dir
+            write(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME), "{not json")
+            @test summary_provenance(dir).stamped == false
+        end
+    end
 end

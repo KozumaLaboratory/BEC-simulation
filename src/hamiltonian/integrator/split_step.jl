@@ -81,7 +81,7 @@ function split_step!(ws::Workspace{N}) where {N}
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 
@@ -290,6 +290,19 @@ function _half_potential_step!(
         end
     gpu = _is_gpu(ws.state.psi)
 
+    # `diag · SM · DDI · SM · diag` is the WHOLE half-step whenever nothing else
+    # is active, and it then fits in one pass over ψ — bit-identical, not a
+    # different splitting. See spin_chain.jl; `_spin_chain_reason` is the list
+    # of everything that would otherwise be silently dropped.
+    if _spin_chain_reason(ws, ip, psi_mf) === nothing &&
+        _spin_chain_available(ws.state.psi, ws)
+        @timeit_debug TIMER "spin_chain" _apply_spin_chain!(
+            ws.state.psi, ws, dt_half, ndim, imaginary_time, ip, psi_mf,
+            zeeman_diag_fwd, zeeman_diag_bwd,
+        )
+        return nothing
+    end
+
     # Forward outer chain — shared with ITP via `_outer_operators_fwd!`.
     _outer_operators_fwd!(
         ws, dt_half / 2, ndim, imaginary_time;
@@ -360,7 +373,7 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 

@@ -31,11 +31,13 @@ const FAST_TESTS = [
     # "analysis/test_dipole_field.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
+    "workflow/test_seed_from.jl",
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
+    "workflow/test_interactions_roundtrip.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -67,6 +69,8 @@ const FAST_TESTS = [
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
     "foundation/test_atoms.jl",
+    "foundation/test_fft_nyquist_null.jl",
+    "foundation/test_no_unguarded_fft_derivative.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
     "foundation/test_noise_waveform.jl",
@@ -177,6 +181,9 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
+    # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
+    "oracles/test_jz_conservation_ddi.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
@@ -307,6 +314,9 @@ const CI_EXTRA = [
     # is gated" was true while three of its faces were broken at once.
     # Driven by LHY_SCHEMA["kind"].enum, so a new mode cannot ship ungated.
     "oracles/test_lhy_mode_face_coverage.jl",
+    # Magnitude sibling of the above: the closed forms had a consistency oracle
+    # and no SI anchor, and were exactly N_atoms too large in that gap.
+    "oracles/test_lhy_magnitude_si_anchor.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
@@ -387,6 +397,10 @@ const FULL_EXTRA = [
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
     "gpu/test_superfluid_fraction_gpu.jl",
+    # Same bug class: a public analysis entry point that scalar-indexed a
+    # device array and threw. Lz is the observable the EdH/Barnett J_z ledger
+    # is written in, and those runs are on GPU.
+    "gpu/test_gpu_orbital_angular_momentum.jl",
     # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
@@ -395,6 +409,11 @@ const FULL_EXTRA = [
     # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
+    # operator-by-operator one, plus one arm per eligibility rule. GPU-only
+    # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
+    "oracles/test_spin_chain_fusion_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -412,6 +431,9 @@ const FULL_EXTRA = [
     # rotating-frame inertial term was ~1.8e-3 off; the unified path matches
     # the exact dynamics to ~1e-5.
     "rotating_basis/test_magnetostir_rotating_field_analytic.jl",
+    # rotating_basis ⇄ standard-path parity, and the pin that their `Fz` fields
+    # are DIFFERENT quantities (⟨F·B̂(t)⟩ vs lab ⟨F_z⟩).
+    "rotating_basis/test_rotating_basis_standard_parity.jl",
     "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
@@ -430,6 +452,7 @@ const FULL_EXTRA = [
     "gpu/test_mixed_precision.jl",
     "gpu/test_mixed_precision_phase3.jl",
     "hamiltonian/test_combined_spin_step.jl",
+    "solvers/test_rtp_combined_step_selection.jl",
     "hamiltonian/test_light_shift.jl",
     "solvers/test_conservation_properties.jl",
     "solvers/test_itp_ddi_strang_save_every.jl",      # Bug-4 ITP regression pin
@@ -489,6 +512,7 @@ const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.

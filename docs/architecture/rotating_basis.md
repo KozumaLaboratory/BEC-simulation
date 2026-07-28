@@ -1,146 +1,128 @@
 # Rotating-basis (Klaus-regime) support — layer map
 
-**Architecture note (2026-06-02):** The rotating-basis code used to
-live as a vertical slice at `src/rotating_basis/` (workspace +
-propagators + integrators + analysis + analyzers + scalar-eGPE all in
-one directory). That split disagreed with the codebase's
-foundation→hamiltonian→analysis→solvers→workflow horizontal layering
-and made cross-layer drift bugs (the Coriolis-sign class) harder to
-spot. The code was dispersed into the appropriate layers:
+**There is no rotating-basis engine.** It was retired 2026-06-21
+(`refactor(rotating_basis)!: retire the RotatingBasisWS engine`, −2580 lines).
+`kind: rotating_basis` is now a *pipeline step kind* that runs on the standard
+lab-frame split-step path; only the setup conventions and the reporting frame
+are its own.
 
-  | Old path | New path | Layer |
-  |---|---|---|
-  | `src/rotating_basis/workspace.jl` | `src/foundation/rotating_basis_workspace.jl` | foundation |
-  | `src/rotating_basis/propagators.jl` | `src/hamiltonian/integrator/rotating_basis_propagators.jl` | hamiltonian/integrator |
-  | `src/rotating_basis/integrators.jl` | `src/hamiltonian/integrator/rotating_basis_integrators.jl` | hamiltonian/integrator |
-  | `src/rotating_basis/analysis.jl` | `src/analysis/rotating_basis.jl` | analysis |
-  | `src/rotating_basis/analyzers.jl` | `src/workflow/experiments/analyzers/rotating_basis.jl` | workflow/experiments/analyzers |
-  | `src/rotating_basis/scalar_egpe.jl` | `src/solvers/scalar_egpe.jl` | solvers |
+Everything below describes the code as it exists. For the design history — the
+Phase I/II/III decomposition, `RotatingBasisWS`, `split_step_rotating!`,
+`find_ground_state_rotating!` — see `docs/design/option_gamma_rotating_basis.md`
+and `docs/design/rotating_basis_unification.md`. Those names no longer exist in
+`src/`.
 
-The public API (function names, struct names, export surface) is
-unchanged.
+## Why the engine was retired
 
----
+The rotating basis removed Larmor precession analytically via the gauge
+transform $|\psi\rangle = \hat U_B(t)|\tilde\psi\rangle$ with
+$\hat U_B(t) = e^{-i\varphi(t) F_z} e^{-i\theta F_y}$, at the cost of a
+rotating-frame inertial term $-\dot\varphi F_z$.
 
-## What the rotating-basis path does
+That term is exactly where a sign/coefficient drift hides, and one was there.
+The arbitration (`test/rotating_basis/test_magnetostir_rotating_field_analytic.jl`):
+with `c1 = c_dd = 0` the spin sector is a single-particle problem, so per-m
+populations must equal the exact evolution of $H(t) = -p\,(\hat B(t)\cdot F)$.
+Measured against that reference,
 
-Specialised solver path for the **strong-field / fast-Larmor regime**:
-roughly `B ≳ 0.1 G` (Eu) or `ω_L / ω_trap ≳ 100`. Used for Klaus 2022
-magnetostir reproduction, $\phi_\omega$ scans, and any future
-high-$p$ Eu / Dy work.
-
-The standard `split_step.jl` solver can in principle handle the same
-physics, but at prohibitive cost: at $|p \cdot F \cdot dt| > \pi$ the
-Larmor sub-cycling forces `dt ~ 10⁻⁵` and `epsilon ~ 1e-6` (see memory
-`eps_threshold_finding.md`). The rotating-basis path **removes Larmor
-analytically** via the gauge transform $|\psi\rangle = \hat U_B(t)|\tilde\psi\rangle$,
-allowing `dt ~ 10⁻³` while preserving spin excitations.
-
-For low-field / standard-trap work (LHY closed forms, TWA, polyhedral
-phase studies, F=2/F=6/F=10 LHY papers), use the **plain `split_step!`**
-path — none of the recent Round 1–7 work goes through this directory.
-
-## Files
-
-| File | Purpose |
+| path | error |
 |---|---|
-| `workspace.jl` | `RotatingBasisWS` struct, `make_rotating_basis_ws` factory, Lima-Pelster $Q_5$ helper, `U_B` ↔ tilde basis transforms |
-| `propagators.jl` | Per-substep operators in the rotating basis: kinetic, spatial-diagonal, local-spin, DDI, gauge. Plus lab-basis reference operators for Phase III equivalence checks. |
-| `integrators.jl` | Time-stepping drivers: `split_step_rotating!`, Yoshida 4 / 6, CFET 4, `find_ground_state_rotating!`. |
-| `analysis.jl` | Post-evolution diagnostics: per-m norms, total density, $L_z$, coordinate buffers. |
-| `analyzers.jl` | Higher-level analyzers for the pipeline `:rotating_basis_dynamics` Dict (population dynamics, EdH conservation, spin texture, per-m vortices, Berry connection). |
-| `scalar_egpe.jl` | Alternative adiabatic-elimination path: scalar GPE with time-dependent dipole axis $\hat B(t)$. Serves as the Phase-II reference for the rotating-basis Phase-III equivalence check, and as an option for the deep adiabatic limit where `tilde_psi_{m≠−F} → 0`. |
+| retired rotating engine | **1.8e-3** (dt-independent, DDI-independent ⇒ a Hamiltonian difference) |
+| unified lab-frame path | **6.2e-6** |
 
-Pipeline integration lives outside this dir:
+The migration was a correctness improvement, not just a refactor. Meanwhile
+`split_step_midpoint!` reproduces the rotating `yoshida6` magnetostir to ~1e-5
+per-m at the same dt and step count, so the cost argument for a separate engine
+had also gone.
 
-* `src/workflow/experiments/pipeline/run_step_rotating.jl` — `_run_step(::RotatingBasisGroundStateStep)` etc. and chirp-phase helpers.
-* `src/workflow/io/save_rotating_result.jl` — canonical JLD2 layout for the rotating-basis history.
+## What `kind: rotating_basis` does now
 
-## Public API (commonly used externally)
+| step | file | behaviour |
+|---|---|---|
+| `ground_state` | `pipeline/run_step_rotating/ground_state.jl` | standard ITP (`split_step!`) from a Gaussian seed under a **static** tilted field $\hat B=(\theta_0,\varphi_0)$, built as a `TimeDependentZeeman` with constant waveforms |
+| `dynamics` | `pipeline/run_step_rotating/dynamics.jl` | standard `split_step_midpoint!` under a lab-frame `TimeDependentZeeman` with $\hat B(t)=(\theta(t),\varphi(t))$ |
+| waveforms | `pipeline/run_step_rotating/waveforms.jl` | concrete callable structs for const / ramp / chirp $\theta$ and $\varphi$ (not closures — see `pitfall_pipeline_inference`) |
+| dispatch | `pipeline/run_step_rotating/dispatch.jl` | `_run_step(::RotatingBasis*Step)` |
+| analyzers | `workflow/experiments/analyzers/rotating_basis.jl` | operate on the `:rotating_basis_dynamics` Dict |
+| save | `workflow/io/save_rotating_result.jl` | JLD2 layout for that Dict |
 
-Workspace + mode dispatch:
+The GS hands off a plain `NamedTuple` (couplings + `sm` + tilde-basis ψ), not a
+workspace object.
 
-* `make_rotating_basis_ws(grid, F, V_trap; ...)` → `RotatingBasisWS`
-* `make_scalar_ws(grid, V_trap; ...)` → `ScalarSimWS` (adiabatic alternative)
-* `lima_pelster_Q5(ε_dd)`, `compute_gamma_lhy(a_s/a_ho, ε_dd, N_atoms)`
+## The reporting frame — the one real trap
 
-Time stepping (rotating basis):
+`kind: rotating_basis` records observables in the **tilde (field-following)**
+frame, $\tilde\psi = \hat U_B(t)^\dagger \psi_{\text{lab}}$:
 
-* `split_step_rotating!(ws, dt, t)`
-* `evolve_rotating!(ws, n_steps, dt; t0, on_step)`
-* `evolve_rotating_yoshida4!`, `_yoshida6!`, `_cfet4_real!`
-* `find_ground_state_rotating!(ws, n_steps, dt; tol, ...)`
-* `normalize_rotating!(ws)`, `rotating_norm(ws)`
+* `:per_m_history` — populations along the **instantaneous field**.
+* `:Fz` — $\sum_m m\,|\tilde\psi_m|^2 = \langle F\cdot\hat B(t)\rangle$.
+* `:psi_snapshots` — $\tilde\psi$, not $\psi_{\text{lab}}$.
+* `:Lz` — lab-frame, computed on $\psi_{\text{lab}}$ (⟨L_z⟩ is invariant under
+  the spatially uniform spin rotation $\hat U_B$, so no transform is needed).
 
-Lab-basis equivalence path:
+**`:Fz` is not the axial magnetisation.** For a field rotating in the xy-plane
+the tilde z-axis is perpendicular to the lab z-axis, and the two numbers differ
+by a large factor — in the parity fixture, +1.95 versus +0.44. Any study whose
+observable is magnetisation *along the rotation axis* (Einstein-de Haas,
+Barnett) must transform back: `_apply_UB!(psi, sm, θ(t), φ(t), ndim)` on a saved
+snapshot, then `spin_density_vector`. Both facts are pinned by
+`test/rotating_basis/test_rotating_basis_standard_parity.jl`.
 
-* `evolve_lab!(ws, n_steps, dt; ...)`
-* `split_step_lab!(ws, dt, t)`
+`:Fx` and `:Fy` in that Dict are **placeholders written as 0.0** — they are not
+measured. Do not read them.
 
-Post-evolution observables:
+## rotating_basis vs the standard spinor path
 
-* `rotating_per_m_norms(ws)` → `Vector{T}` length 2F+1
-* `rotating_total_density(ws)` → 3D array
-* `rotating_Lz(ws)` (3D only)
-* From the pipeline-history Dict (`:rotating_basis_dynamics`):
-  * `population_dynamics`, `edh_conservation`, `spin_texture_xy`,
-    `per_m_column_density`, `detect_per_m_vortices`,
-    `berry_connection_trajectory`.
+Same Hamiltonian, same lab-frame time-dependent Zeeman. Differences:
 
-Scalar (adiabatic-elim) path:
+| | `kind: rotating_basis` | `kind: spinor` |
+|---|---|---|
+| propagator | `split_step_midpoint!` | leapfrog loop → `split_step!` |
+| field spec | `B: {p, q}` + `B_direction: {theta, phi}` (constant magnitude, direction rotates) | `B: {Bx, By, Bz}` in Gauss, each a waveform |
+| observables | tilde frame (above) | lab frame |
+| ψ snapshots | $\tilde\psi$ | $\psi_{\text{lab}}$ |
 
-* `split_step_scalar!`, `evolve_scalar!`, `find_ground_state_scalar!`
-* `compute_tilted_dipole_potential!`
-* `scalar_norm`, `scalar_com`, `scalar_aspect_ratio`,
-  `scalar_energies`, `scalar_Lz`
+Measured agreement (parity gate, F=2, with and without DDI): per-m to **<1e-6**,
+lab ⟨F_z⟩ to **<1e-6**. A term-level drift would land far above that.
 
-## YAML config integration
+Equivalent field specs: `theta: π/2, phi: {rate: Ω}` on the rotating path equals
+`Bx: sin(Ωt + π/2)`, `By: sin(Ωt)` on the standard path — note
+`SinusoidalWaveform` is **sin**, so a `+π/2` phase on Bx gives $\hat B(0)=+\hat x$.
 
-```yaml
-defaults:
-  kind: rotating_basis      # routes to _run_step(::RotatingBasis*Step)
-  backend: gpu
+## When to use which
 
-pipeline:
-  - ground_state:
-      atom: Eu151
-      grid: {...}
-      interactions: {...}
-      B: {magnitude_G: 1.0, theta_deg: 35}
-      integrator: yoshida6
-      epsilon: 1.0e-6   # ε_threshold for high-p; see memory note
-      ...
-  - dynamics:
-      duration: ...
-      phi_omega: 4.524        # stir frequency / ω_ref
-      phi_chirp: {from: ..., to: ...}
-      ...
-```
+Use **`kind: spinor`** by default, including for rotating fields. Its
+observables are already in the lab frame, which is the frame nearly every
+physical claim is stated in.
 
-See `runs/klaus_baseline/`, `runs/phi_omega_scan/`,
-`runs/berry_crossover_scan/`, `runs/eu151_phase_diagram_lbfgs/` for
-worked examples.
+Use **`kind: rotating_basis`** when the natural question is about the spin
+relative to the field — per-m populations along $\hat B(t)$, adiabaticity,
+Klaus-style magnetostir spin-up — or to reuse its analyzers.
+
+Note the standard dynamics path takes plain `split_step!`, which is only
+1st-order in time once the DDI is active. Pass `integrator: midpoint` for
+2nd order at ~1.5–2× per-step cost.
+
+## Related paths
+
+`solvers/scalar_egpe.jl` — scalar GPE with a time-dependent dipole axis
+$\hat B(t)$ (adiabatic elimination). The deep-adiabatic alternative when
+$\tilde\psi_{m\neq -F} \to 0$.
 
 ## Tests
 
-* `test/test_rotating_basis_gpe.jl` — Phase I + II core
-* `test/test_rotating_basis_phase_ii.jl` — static-tilt regression
-* `test/test_rotating_basis_phase_iii.jl` — lab-frame agreement
-* `test/test_rotating_basis_pipeline_parsing.jl` — YAML parsing + ε threshold
-* `test/test_rotating_basis_f32.jl` — Float32 mixed-precision pin
-* `test/test_rotating_basis_analyzers.jl` — modular analyzer dispatch
-* `test/test_rotating_basis_gpu.jl` — CUDA equivalence
-* `test/test_rotating_frame_regression.jl` — `secular_ddi=true` regression
-* `test/test_scalar_egpe_smoke.jl`, `test/test_scalar_egpe_dipole_kernel.jl`
-  — scalar-eGPE smoke + DDI kernel
+| file | what it gates |
+|---|---|
+| `test_magnetostir_rotating_field_analytic.jl` | φ̇≠0 vs exact single-spin reference (the engine-retirement arbiter) |
+| `test_rotating_basis_standard_parity.jl` | rotating_basis ⇄ standard equivalence + the `Fz` frame distinction |
+| `test_magnetostir_pipeline_physics.jl` | self-contained pipeline physics |
+| `test_rotating_basis_pipeline_parsing.jl` | YAML parsing + ε threshold |
+| `test_rotating_basis_analyzers.jl` | analyzer dispatch on the history Dict |
+| `test_rotating_frame_regression.jl` | `secular_ddi=true` round-by-round pins |
+| `test_scalar_egpe_smoke.jl`, `test_scalar_egpe_dipole_kernel.jl` | scalar-eGPE |
 
 ## See also
 
-* `docs/design/option_gamma_rotating_basis.md` — full design doc with phase
-  decomposition (Phase I CPU GPE → II static tilt → III lab agreement).
-* `docs/archive/AUDIT_BUG4.md` — DDI integration rate fix (2026-05-02);
-  rotating-basis runs were not affected since they use their own
-  `apply_ddi_step_rotating!`.
-* `memory/option_gamma_rotating_basis.md`, `memory/option_gamma_gpu_optimization.md`,
-  `memory/eps_threshold_finding.md`, `memory/klaus_adiabatic_elimination.md`
-  for the design history.
+* `docs/design/rotating_basis_unification.md` — the retirement plan and its execution.
+* `docs/design/option_gamma_rotating_basis.md` — original design (historical).
+* `docs/conventions/hamiltonian_sign_audit.md` — where the Zeeman sign is declared.

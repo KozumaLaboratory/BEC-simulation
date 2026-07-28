@@ -1,5 +1,10 @@
 # Eu F=6 EdH post-quench collapse: LHY-insufficiency negative result
 
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md) before quoting a number from here.
+
 **Status**: ablation complete, conclusion confirmed across 5 LHY treatments **Date**: 2026-05-07 **Code path**: `runs/eu151_edh_postfix_local/`, post-Bug-4-fix Julia `main`
 
 ## TL;DR

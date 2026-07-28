@@ -1,0 +1,39 @@
+# Geometry-probe variant table — the single declaration, sourced by both the
+# local runner (probe_leak.sh) and the UGE job script (tsubame_probe.sh).
+#
+# dx is held at ~0.435 on every axis of every variant, so only the named knob
+# moves. Fields: n | box | pad | dt
+#
+# The table lives here, and the job script looks a variant up by name, because
+# `qsub -v` splits its argument on commas: `-v BR_N=64,64,28` reaches the job as
+# BR_N=64 and the run dies on a tuple-length error.
+
+# Round 1 measured base / pad / dtx and ruled all three explanations out: the
+# leak is 736% of the conversion with the edge fraction at 1e-8..1e-6, the
+# image-free convolution moves it to 652%, and halving dt reproduces the base
+# number to six digits. Round 2 therefore attacks the discretisation itself.
+#
+# Fields: n | box | pad | dt | trunc      (trunc: NaN = none, 0 = auto radius)
+declare -A BR_VARIANTS=(
+  [base]="64,64,28|28,28,12|0|1.0e-3|NaN"    # the 2026-07-28 production geometry, at probe resolution
+  [pad]="64,64,28|28,28,12|1|1.0e-3|NaN"     # image-free DDI, box unchanged
+  [zbox]="64,64,56|28,28,24|0|1.0e-3|NaN"    # z half-box 6 -> 12
+  [xybox]="92,92,28|40,40,12|0|1.0e-3|NaN"   # xy half-box 14 -> 20
+  [dtx]="64,64,28|28,28,12|0|5.0e-4|NaN"     # dt halved, box unchanged
+  [fine]="96,96,42|28,28,12|0|1.0e-3|NaN"    # dx 0.44 -> 0.29 at a FIXED box: resolution, not geometry
+  # dx-convergence series at a FIXED box and FIXED stage lengths. The stir
+  # output itself is not converged: the same protocol gives Jz(t=10) = 7.75 at
+  # dx 0.44 and 12.21 at dx 0.29, a 58% difference in the state that ENTERS the
+  # quench. Comparing conversions across resolutions is meaningless until this
+  # converges, so `finer` is the third point (dx 0.22, 128x128x56).
+  [finer]="128,128,56|28,28,12|0|1.0e-3|NaN"  # dx 0.29 -> 0.22 at a fixed box
+  [trunc]="64,64,28|28,28,12|1|1.0e-3|0"     # image-free AND a real-space cutoff on the kernel
+)
+
+# Export BR_N / BR_BOX / BR_PAD / BR_DT / BR_TRUNC for one variant name.
+br_select_variant() {
+  local tag=$1
+  [[ -n "${BR_VARIANTS[$tag]:-}" ]] || { echo "unknown variant: $tag" >&2; return 1; }
+  IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_VARIANTS[$tag]}"
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_probe_$tag"
+}

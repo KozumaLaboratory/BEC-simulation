@@ -53,6 +53,7 @@ function compute_spatial_lhy(;
     n_bins::Int=12,
     rtol::Float64=1e-4,
     min_spread::Float64=0.05,
+    n_atoms::Int=1,
 ) where {M}
     n_bins >= 2 || throw(ArgumentError("n_bins must be ≥ 2"))
     N = M - 1
@@ -66,8 +67,11 @@ function compute_spatial_lhy(;
 
     e1 = similar(ps)
     for i in eachindex(reps)
-        e1[i] = _lhy_bdg_energy_density(reps[i], 1.0, F, interactions, zeeman,
-            c_dd, nothing, nothing, nothing; rtol)
+        # Same 1/N as `_tabulate_lhy`: the closed/BdG forms are in physical
+        # units, the repo's n = |ψ|² is normalised to 1 and c₀ already carries N.
+        e1[i] =
+            _lhy_bdg_energy_density(reps[i], 1.0, F, interactions, zeeman,
+                c_dd, nothing, nothing, nothing; rtol) / n_atoms
     end
     SpatialLHY(ps, e1, F, [fp_ladder_coeff(F, F - (c - 1)) for c in 1:D])
 end

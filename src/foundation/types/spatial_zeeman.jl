@@ -396,6 +396,31 @@ function apply_spatial_zeeman_step!(
         end
     end
 
+    # IT overflow guard for the rotation, matching what the diagonal fast path
+    # and `_spatial_q_halfstep!` already do — without it this branch was the one
+    # place in the function that propagated `exp(-dt·H)` unshifted, so a large
+    # |B| overflowed here and nowhere else.
+    #
+    # With q split off, the rotated operator is H_rot(r) = -(B(r)·F), whose
+    # eigenvalues are -|B(r)|·m. The guard subtracts the GLOBAL minimum over
+    # (voxel, m), = -max_r|B(r)|·F, so the surviving factor exp(+dt·gshift) is
+    # one spatially-CONSTANT scalar. That distinction is the whole point of the
+    # "no per-voxel shift" note in `_apply_euler_spin_rotation`: a per-voxel
+    # shift is a density reweighting that survives normalization and biases the
+    # ITP fixed point, while a global one factors out of it exactly.
+    if imaginary_time
+        b_max = 0.0
+        @inbounds for I in CartesianIndices(n_pts)
+            b2 = bx[I]^2 + by[I]^2 + bz[I]^2
+            b2 > b_max && (b_max = b2)
+        end
+        gshift = -sqrt(b_max) * F
+        if gshift != 0.0
+            scale = exp(dtf * gshift)
+            @inbounds psi .*= scale
+        end
+    end
+
     has_q && _spatial_q_halfstep!(psi, q, m_vals, dtf / 2, imaginary_time, n_pts, Val(D))
     nothing
 end
