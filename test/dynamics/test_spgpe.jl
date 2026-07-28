@@ -334,6 +334,39 @@ end
         @test spgpe_rates(fixed, 0.0).M == 0.4
     end
 
+    @testset "a FIXED cutoff decouples the reservoir as T falls (the 80³ null result)" begin
+        # This is the failure that produced no condensate on 2026-07-28. Both
+        # coefficients depend on the cutoff only through (ϵ_cut−μ)/T, so holding
+        # ϵ_cut fixed in absolute energy while T falls drives that ratio up and
+        # collapses them exponentially. Gate the mechanism, not the anecdote.
+        T_hot, T_cold, mu = 40.5, 4.7, 1.0
+        pinned = SPGPEReservoir(;
+            T=PiecewiseLinearWaveform([0.0, 1.0], [T_hot, T_cold]),
+            mu=mu, a_s=0.0148, k_cut=10.6)
+        r_hot, r_cold = spgpe_rates(pinned, 0.0), spgpe_rates(pinned, 1.0)
+        @test r_cold.gamma < 1e-6 * r_hot.gamma       # γ collapses by >10⁶
+        @test r_cold.M < 1e-3 * r_hot.M
+
+        # The tracking cutoff holds (ϵ_cut−μ)/T fixed, so both rates stay O(1)
+        # relative to each other across the same temperature drop.
+        tracked = SPGPEReservoir(;
+            T=PiecewiseLinearWaveform([0.0, 1.0], [T_hot, T_cold]),
+            mu=mu, a_s=0.0148,
+            k_cut=tracking_cutoff([0.0, 1.0], [mu, mu], [T_hot, T_cold]; n_T=2.5))
+        t_hot, t_cold = spgpe_rates(tracked, 0.0), spgpe_rates(tracked, 1.0)
+        @test t_cold.k_cut < t_hot.k_cut                       # the cutoff really moves
+        @test isapprox((t_hot.eps_cut - t_hot.mu) / t_hot.T,
+            (t_cold.eps_cut - t_cold.mu) / t_cold.T; rtol=1e-9)  # ratio held fixed
+        # γ ∝ γ₀ ∝ T at fixed ratio, so it tracks T rather than collapsing. Only
+        # the j=1 Lerch term depends on (ϵ_cut−μ)/T alone; j≥2 carry a residual
+        # fugacity dependence through z^{1−j}, hence sub-percent rather than exact.
+        @test isapprox(t_cold.gamma / t_hot.gamma, T_cold / T_hot; rtol=1e-2)
+        @test isapprox(t_cold.M, t_hot.M; rtol=1e-9)           # ℳ̄ depends only on the ratio
+        # The contrast that matters: pinning the cutoff loses >5 decades of γ
+        # relative to tracking it, over the same temperature drop.
+        @test (r_cold.gamma / r_hot.gamma) < 1e-5 * (t_cold.gamma / t_hot.gamma)
+    end
+
     @testset "ramped reservoir moves the rates" begin
         # This is the evaporation lever: cooling and depleting the reservoir over
         # the ramp must change γ and ℳ̄, not just relabel time.

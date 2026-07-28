@@ -113,7 +113,7 @@ timescale it is about to run (and notice if it is about to run a millisecond).
 """
 function spgpe_reservoir(
     r::EvapBecResult, trap::EvapTrap, ramp::FortRamp;
-    omega_ref::Real, a_s::Real, k_cut::Real,
+    omega_ref::Real, a_s::Real, k_cut=nothing, cutoff_n_T::Real=1.5,
     t_start=nothing, t_end=nothing, omega_mult=(t -> 1.0),
     number_damping::Bool=true, energy_damping::Bool=true,
     gamma=nothing, M=nothing,
@@ -122,7 +122,6 @@ function spgpe_reservoir(
     ωref = Float64(omega_ref)
     m = trap.mass
     a_ho = sqrt(Units.HBAR / (m * ωref))
-    eps_cut = 0.5 * Float64(k_cut)^2
 
     t0 = t_start === nothing ? r.t[1] : Float64(t_start)
     t1 = t_end === nothing ? r.t[end] : Float64(t_end)
@@ -170,24 +169,39 @@ function spgpe_reservoir(
         push!(ωbar, ω̄)
     end
 
-    μ_max = maximum(mu_int)
-    μ_max < eps_cut || throw(
+    # Cutoff. The DEFAULT tracks the reservoir, ϵ_cut − μ = cutoff_n_T·k_BT, because
+    # a cutoff fixed in absolute energy across a ramp with dynamic range in T drives
+    # (ϵ_cut−μ)/T up and collapses both rates exponentially — see `tracking_cutoff`.
+    # Passing a Number pins it, which is what the earlier run did and why it froze.
+    k_cut_wave = if k_cut === nothing
+        tracking_cutoff(t_int, mu_int, T_int; n_T=cutoff_n_T)
+    else
+        _as_waveform(k_cut)
+    end
+    k_cut_series = [evaluate(k_cut_wave, t) for t in t_int]
+    eps_cut_series = 0.5 .* k_cut_series .^ 2
+
+    bad = findall(i -> eps_cut_series[i] <= mu_int[i], eachindex(t_int))
+    isempty(bad) || throw(
         ArgumentError(
-            "spgpe_reservoir: μ reaches $(round(μ_max; sigdigits=4)) but ϵ_cut = " *
-            "½k_cut² = $(round(eps_cut; sigdigits=4)); the C region must extend above μ. " *
-            "Raise k_cut to > $(round(sqrt(2 * μ_max); sigdigits=4)) (and the grid with it)."),
+            "spgpe_reservoir: ϵ_cut ≤ μ at $(length(bad)) of $(length(t_int)) trajectory " *
+            "points (worst: ϵ_cut=$(round(eps_cut_series[bad[1]]; sigdigits=4)) vs " *
+            "μ=$(round(mu_int[bad[1]]; sigdigits=4))); the C region must extend above μ " *
+            "everywhere. Raise k_cut above $(round(sqrt(2 * maximum(mu_int)); sigdigits=4)) " *
+            "(and the grid with it), or leave k_cut=nothing to track the reservoir."),
     )
 
     res = SPGPEReservoir(;
         T=PiecewiseLinearWaveform(t_int, T_int),
         mu=PiecewiseLinearWaveform(t_int, mu_int),
-        a_s=Float64(a_s) / a_ho, k_cut=Float64(k_cut),
+        a_s=Float64(a_s) / a_ho, k_cut=k_cut_wave,
         number_damping, energy_damping, gamma, M,
     )
 
     # duration is the span actually COVERED by trajectory samples, not the span
     # requested — so a caller that prints it is printing what will be simulated.
     (; reservoir=res, t_internal=t_int, T_int, mu_int,
+        k_cut=k_cut_series, eps_cut=eps_cut_series, k_cut_max=maximum(k_cut_series),
         N0_ref=r.N0[sel], N_ref=r.N[sel], omega_bar=ωbar,
         duration_s=r.t[sel[end]] - t_ref, duration_internal=t_int[end])
 end

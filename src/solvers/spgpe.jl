@@ -35,7 +35,7 @@
 # `dψ = γ(μ − L)ψ dt + dW` with ⟨dW*dW⟩ = 2γT δ_C dt.
 
 export SPGPEReservoir, spgpe_growth_rate, spgpe_scattering_rate, spgpe_rates
-export apply_spgpe_step!, apply_energy_damping_step!, spgpe_callback
+export apply_spgpe_step!, apply_energy_damping_step!, spgpe_callback, tracking_cutoff
 
 using Random
 
@@ -170,12 +170,13 @@ All quantities are in internal units (`T = k_BT/ℏω_ref`, `mu = μ/ℏω_ref`,
   giving the growth SPGPE (Eq. 20) or the scattering SPGPE (Eq. 27) as
   sub-theories.
 """
-struct SPGPEReservoir{WT <: Waveform, WM <: Waveform, WE <: Waveform}
+struct SPGPEReservoir{WT <: Waveform, WM <: Waveform, WE <: Waveform, WK <: Waveform}
     T::WT
     mu::WM
     eps_cut::WE
+    k_cut::WK
+    derive_eps_cut::Bool    # true ⇒ ϵ_cut = ½k_cut(t)², recomputed each step
     a_s::Float64
-    k_cut::Float64
     number_damping::Bool
     energy_damping::Bool
     gamma::Float64          # NaN ⇒ derive from the reservoir
@@ -186,20 +187,63 @@ _as_waveform(x::Waveform) = x
 _as_waveform(x::Number) = ConstantWaveform(Float64(x))
 
 function SPGPEReservoir(;
-    T, mu, a_s::Real, k_cut::Real,
+    T, mu, a_s::Real, k_cut,
     eps_cut=nothing,
     number_damping::Bool=true, energy_damping::Bool=true,
     gamma=nothing, M=nothing,
 )
-    isfinite(k_cut) && k_cut > 0 ||
-        throw(ArgumentError("SPGPEReservoir: k_cut must be finite and > 0, got $k_cut"))
-    ec = eps_cut === nothing ? ConstantWaveform(0.5 * Float64(k_cut)^2) : _as_waveform(eps_cut)
+    kw = _as_waveform(k_cut)
+    if k_cut isa Number
+        isfinite(k_cut) && k_cut > 0 ||
+            throw(ArgumentError("SPGPEReservoir: k_cut must be finite and > 0, got $k_cut"))
+    end
+    derive = eps_cut === nothing
+    ec = derive ? ConstantWaveform(NaN) : _as_waveform(eps_cut)
     SPGPEReservoir(
-        _as_waveform(T), _as_waveform(mu), ec, Float64(a_s), Float64(k_cut),
+        _as_waveform(T), _as_waveform(mu), ec, kw, derive, Float64(a_s),
         number_damping, energy_damping,
         gamma === nothing ? NaN : Float64(gamma),
         M === nothing ? NaN : Float64(M),
     )
+end
+
+"""
+    tracking_cutoff(t_internal, mu, T; n_T=2.5) -> PiecewiseLinearWaveform
+
+`k_cut(t) = √(2(μ(t) + n_T·T(t)))` — the projector cutoff that keeps the C region
+a FIXED number of thermal energies deep, `ϵ_cut − μ = n_T·k_BT`.
+
+This is the standard prescription, and holding `k_cut` constant instead is a
+mistake with teeth when the ramp has dynamic range in `T`. Both coefficients
+depend on the cutoff only through `(ϵ_cut − μ)/T`:
+
+    γ ~ γ_0·(ln(1 − e^{−(ϵ_cut−μ)/T}))²,   ℳ̄ = 16πa²/(e^{(ϵ_cut−μ)/T} − 1)
+
+so a cutoff fixed in absolute energy while `T` falls drives `(ϵ_cut−μ)/T` up and
+**both rates collapse exponentially** — the reservoir silently decouples and the
+c-field freezes mid-ramp. On the ¹⁵¹Eu evaporation window (`T` falling 8.6×) a
+fixed cutoff took γ from 4.8×10⁻⁴ to 6×10⁻¹⁴ and no condensate formed.
+
+`n_T` is set by the standard c-field criterion: the Rayleigh–Jeans occupation at
+the cutoff, `T/(ϵ_cut−μ) = 1/n_T`, should be of order 1 — that is what makes a
+classical field the right description up to there. `n_T = 1.5` (occupation 0.67)
+is the default. Going deeper is not free: `n_T = 2.5` drops occupation to 0.4,
+cuts γ by ~9×, and demands a finer grid, so a ramp of fixed length gets fewer
+growth times. Since `n_T` is a genuine free parameter of the method, any result
+read off a single value should be checked against a second one.
+
+Note the projector is *shrinking*, so it removes atoms from the C region as the
+ramp proceeds. That is physically the reverse flow into the I region, and
+[`apply_spgpe_step!`](@ref) reports it as `projected_out` so the budget stays
+visible rather than silently leaking.
+"""
+function tracking_cutoff(
+    t_internal::AbstractVector, mu::AbstractVector, T::AbstractVector; n_T::Real=1.5
+)
+    length(t_internal) == length(mu) == length(T) ||
+        throw(ArgumentError("tracking_cutoff: t, mu, T must have equal length"))
+    k = [sqrt(max(2 * (mu[i] + Float64(n_T) * T[i]), 1e-6)) for i in eachindex(t_internal)]
+    PiecewiseLinearWaveform(collect(Float64, t_internal), k)
 end
 
 """
@@ -213,7 +257,8 @@ function spgpe_rates(res::SPGPEReservoir, t::Real)
     tf = Float64(t)
     T = evaluate(res.T, tf)
     mu = evaluate(res.mu, tf)
-    eps_cut = evaluate(res.eps_cut, tf)
+    k_cut = evaluate(res.k_cut, tf)
+    eps_cut = res.derive_eps_cut ? 0.5 * k_cut^2 : evaluate(res.eps_cut, tf)
     γ = if !res.number_damping
         0.0
     elseif isnan(res.gamma)
@@ -228,7 +273,7 @@ function spgpe_rates(res::SPGPEReservoir, t::Real)
     else
         res.M
     end
-    (; T, mu, eps_cut, gamma=γ, M)
+    (; T, mu, eps_cut, k_cut, gamma=γ, M)
 end
 
 # ---------------------------------------------------------------------------
@@ -275,8 +320,14 @@ function apply_spgpe_step!(
             seed=seed === nothing ? nothing : seed + 7_919, noise=noise,
         )
     end
-    apply_projected_gp!(ws, res.k_cut)
-    r
+    # Projection last, so both noises are projected within the same step. When
+    # k_cut(t) is shrinking this also carries atoms OUT of the C region (back to
+    # the I region) — report how many so the caller can keep a budget instead of
+    # discovering a silent leak.
+    n_before = real(sum(abs2, ws.state.psi))
+    apply_projected_gp!(ws, r.k_cut)
+    projected_out = (n_before - real(sum(abs2, ws.state.psi))) * cell_volume(ws.grid)
+    merge(r, (; projected_out))
 end
 
 """

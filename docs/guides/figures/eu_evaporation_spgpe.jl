@@ -140,6 +140,10 @@ function spgpe_trajectory!(
     sidx = Ref(0)
     ω_prev = Ref(-1.0)
     rates_log = Tuple{Float64, Float64, Float64, Float64, Float64}[]
+    # A tracking cutoff SHRINKS, so the projector carries atoms out of the C
+    # region (back to the I region). Keep the running total so the atom budget is
+    # explicit rather than a silent leak.
+    proj_out = Ref(0.0)
 
     cb = SimulationCallbacks(
         on_step=(w, step, times, energies) -> begin
@@ -159,6 +163,7 @@ function spgpe_trajectory!(
                 @views for c in 1:(D - 1)
                     w.state.psi[:, :, :, c] .= 0
                 end
+                proj_out[] += rr.projected_out
                 push!(rates_log, (t, rr.T, rr.mu, rr.gamma, rr.M))
             end
             if step % save_every == 0
@@ -176,7 +181,7 @@ function spgpe_trajectory!(
         end,
     )
     run_simulation!(ws; callbacks=cb)
-    rates_log
+    (; rates_log, projected_out=proj_out[])
 end
 
 """
@@ -212,10 +217,12 @@ function run_spgpe_ensemble(
     rates = nothing
     out = nothing
     for tr in 1:n_traj
-        rl = spgpe_trajectory!(u, grid, psi0, reservoir, omega_internal_of,
+        tj = spgpe_trajectory!(u, grid, psi0, reservoir, omega_internal_of,
             T_internal, dt, save_every, spgpe_every, backend,
             seed0 + tr * 1_000_003, accum, D)
-        tr == 1 && (rates = rl)
+        tr == 1 && (rates = tj.rates_log)
+        verbose && @printf("  trajectory %d: %.4g atoms left the C region via the projector\n",
+            tr, tj.projected_out)
         # Reduce and hand over after EVERY trajectory: a long ensemble that is
         # killed part-way then still leaves a valid (smaller-M) result on disk
         # instead of nothing.
@@ -260,6 +267,7 @@ SPGPE ensemble over the real ramp → CSV.
 function evap_spgpe(;
     grid_n::Int=48, box_scale::Float64=2.6, n_traj::Int=4, dt::Float64=0.002,
     spgpe_every::Int=5, f_start::Float64=1.2, equilibrate::Float64=40.0,
+    cutoff_n_T::Float64=1.5,
     n_save::Int=120, backend=CPUBackend(), tag::String="spgpe",
     duration_cap::Float64=Inf,
 )
@@ -267,22 +275,23 @@ function evap_spgpe(;
     win = cfield_window(traj; f_start)
     ωref = win.omega_ref
 
-    # Grid: the classical region must resolve k_cut, and the box must hold the
-    # thermal cloud (R_th = √(2T) in a_ho units at the hottest point).
-    k_cut = 1.05 * win.k_cut_min
+    # Box holds the thermal cloud (R_th = √(2T) in a_ho units at the hottest point).
     box = box_scale * sqrt(2 * win.T_max)
     k_max = π / (box / grid_n)
+
+    # The cutoff TRACKS the reservoir (ϵ_cut − μ = cutoff_n_T·k_BT). It is largest
+    # at the start, where T is largest, so that is what the grid must resolve.
+    resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
+        omega_ref=ωref, a_s=Eu151.a_s, cutoff_n_T=cutoff_n_T, t_start=win.t_start)
+    k_cut = resv.k_cut_max
     if k_max < k_cut
         n_req = ceil(Int, k_cut * box / π / 2) * 2
         error("grid_n=$grid_n cannot resolve the classical region: k_max=" *
-              "$(round(k_max; digits=2)) < k_cut=$(round(k_cut; digits=2)) at box=" *
+              "$(round(k_max; digits=2)) < max k_cut=$(round(k_cut; digits=2)) at box=" *
               "$(round(box; digits=1)). Need grid_n ≥ $n_req. Silently lowering " *
               "k_cut would make the GRID define the C region instead of the " *
-              "physics, and would then push ϵ_cut below μ.")
+              "physics; pinning it would decouple the reservoir as T falls.")
     end
-
-    resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
-        omega_ref=ωref, a_s=Eu151.a_s, k_cut=k_cut, t_start=win.t_start)
 
     T_internal = min(resv.duration_internal, duration_cap)
     @printf("=== SPGPE evaporation ===\n")
@@ -299,7 +308,9 @@ function evap_spgpe(;
     r1 = spgpe_rates(resv.reservoir, resv.duration_internal)
     @printf("  rates           γ %.3g → %.3g,  ℳ̄ %.3g → %.3g\n",
         r0.gamma, r1.gamma, r0.M, r1.M)
-    @printf("  grid            %d³, box %.1f, k_cut %.2f (k_max %.2f)\n",
+    @printf("  cutoff          k_cut %.2f → %.2f (ϵ_cut−μ = %.1f k_BT, tracking)\n",
+        resv.k_cut[1], resv.k_cut[end], cutoff_n_T)
+    @printf("  grid            %d³, box %.1f, max k_cut %.2f (k_max %.2f)\n",
         grid_n, box, k_cut, k_max)
     @printf("  steps           %.3g × %d trajectories\n", T_internal / dt, n_traj)
     flush(stdout)
@@ -314,7 +325,7 @@ function evap_spgpe(;
     # — the condensate has to GROW from the reservoir.
     psi_seed = zeros(ComplexF64, grid.config.n_points..., D)
     static_res = SPGPEReservoir(; T=resv.T_int[1], mu=resv.mu_int[1],
-        a_s=Eu151.a_s / a_ho(u), k_cut=k_cut)
+        a_s=Eu151.a_s / a_ho(u), k_cut=resv.k_cut[1])
     eq = run_spgpe_ensemble(u, grid, psi_seed, static_res, (_ -> 1.0);
         n_traj=1, T_internal=equilibrate, dt=dt,
         save_every=max(1, round(Int, equilibrate / dt / 4)),
@@ -392,10 +403,11 @@ function smoke(; backend=CPUBackend())
     win = cfield_window(traj; f_start=1.05)
     resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
         omega_ref=win.omega_ref, a_s=Eu151.a_s,
-        k_cut=1.05 * win.k_cut_min, t_start=win.t_start)
-    @printf("[smoke] bridge OK: %.3f s of real ramp = %.0f internal units, T %.1f→%.1f, μ %.2f→%.2f\n",
+        t_start=win.t_start)
+    @printf("[smoke] bridge OK: %.3f s of real ramp = %.0f internal units, T %.1f→%.1f, μ %.2f→%.2f, k_cut %.2f→%.2f\n",
         resv.duration_s, resv.duration_internal,
-        resv.T_int[1], resv.T_int[end], resv.mu_int[1], resv.mu_int[end])
+        resv.T_int[1], resv.T_int[end], resv.mu_int[1], resv.mu_int[end],
+        resv.k_cut[1], resv.k_cut[end])
 
     # Synthetic small reservoir: same code path, toy numbers.
     u = EuUnits(; omega_ref=win.omega_ref, a_s=Eu151.a_s, K3_si=1.61e-40, N=1e4)
@@ -425,7 +437,7 @@ function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
     elseif mode == "production"
-        evap_spgpe(; grid_n=80, n_traj=4, f_start=1.05, n_save=40, backend, tag="spgpe")
+        evap_spgpe(; grid_n=96, n_traj=4, f_start=1.05, n_save=40, backend, tag="spgpe")
     elseif mode == "preflight"
         traj = zero_d_trajectory()
         for f in (1.05, 1.2, 1.5)
