@@ -378,6 +378,7 @@ const FULL_EXTRA = [
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
     "gpu/test_projected_gp_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
