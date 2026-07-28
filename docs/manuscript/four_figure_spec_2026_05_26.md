@@ -1,5 +1,10 @@
 # Thesis / manuscript 4-figure spec — 2026-05-26
 
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md) before quoting a number from here.
+
 Companion to `docs/validation/weekly_presentation_outline.md` (which
 specifies the **6-slide presentation** view).  This document specifies
 the **manuscript / thesis** view of the same body of work: a 4-figure

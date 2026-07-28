@@ -1,5 +1,10 @@
 # Self-contained validation report
 
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](stored_results_vintage_audit.md) before quoting a number from here.
+
 **As of 2026-05-26.** Replaces the Ueda-comparison-gated framing
 documented in `validation_ladder_2026_05_22.md` (Level 10). See
 `docs/validation/ueda_status.md` for the BLOCKED_EXTERNAL declaration.

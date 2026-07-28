@@ -1,5 +1,10 @@
 # Day inventory — 2026-05-26
 
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](stored_results_vintage_audit.md) before quoting a number from here.
+
 End-of-day manifest of artifacts produced during the
 2026-05-26 BEC-simulation validation session. Provides a single
 audit point: commit hash, environment, paths, cell census, and the
