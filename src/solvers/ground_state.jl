@@ -150,6 +150,7 @@ function find_ground_state(;
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     method::Symbol=:strang,
     m_lbfgs::Int=20,   # keep in sync with find_ground_state_lbfgs default
     sobolev_alpha::Union{Float64, Symbol}=:auto,
@@ -304,6 +305,7 @@ function find_ground_state(;
         light_shift,
         dtype=dtype,
         spinor_lhy,
+        lhy_opts,
     )
 
     n_comp = ws.spin_matrices.system.n_components

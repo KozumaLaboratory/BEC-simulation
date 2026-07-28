@@ -150,6 +150,37 @@ end
 # an AbstractLHY. Dropped in C2 once all callers route through types.
 @inline _lhy_V(n::AbstractFloat, c_lhy::AbstractFloat) = c_lhy * n * sqrt(n)
 
+"""
+    _lhy_is_active(c_lhy) -> Bool
+
+Whether this LHY contributes at all. `NoLHY` and a zero scalar do not; a table
+does — and a table cannot be summarised by one coefficient, which is the
+distinction the broadcast propagator below used to lose.
+"""
+@inline _lhy_is_active(::Nothing) = false
+@inline _lhy_is_active(::NoLHY) = false
+@inline _lhy_is_active(c::Float64) = c != 0.0
+@inline _lhy_is_active(l::ScalarLHY) = l.c_lhy != 0.0
+@inline _lhy_is_active(::AbstractLHY) = true
+
+"""
+    _lhy_potential_field(lhy, density_buf, ::Type{RT}) -> array
+
+`V_LHY(r)` materialised for the broadcast (non-fused) propagator path.
+
+The fused `::Array` kernel calls `_lhy_V` per voxel inside its own loop; this
+path is broadcast-based and needs the same quantity as an array. Both route
+through `_lhy_V`, so the two cannot disagree about what the LHY is — which they
+did before, this path having assumed every LHY has the scalar shape `c·n^(3/2)`.
+
+`RT` keeps F32 grids in F32.
+"""
+function _lhy_potential_field(lhy, density_buf, ::Type{RT}) where {RT}
+    out = similar(density_buf)
+    out .= RT.(_lhy_V.(Float64.(density_buf), Ref(lhy)))
+    out
+end
+
 # --- spatially-varying LHY ---------------------------------------------------
 #
 # `SpatialLHY` needs the local POLARISATION as well as the local density, so it
@@ -184,13 +215,38 @@ call site serve both.
 end
 
 """
+    _lhy_de1_dp(l::SpatialLHY, p) -> de₁/dp
+
+Slope of the SAME piecewise-linear `e₁(p)` interpolant `_lhy_V` above evaluates,
+so the two cannot describe different tables. Zero outside the tabulated range,
+matching the flat extrapolation of the interpolant.
+
+`ε_LHY = n^(5/2) e₁(p)` depends on ψ through `p` as well as through `n`, so this
+is the second half of `δε/δψ̄` — see `_grad_lhy!`, which is the only caller and
+where the measured size of the piece is recorded.
+"""
+@inline function _lhy_de1_dp(l::SpatialLHY, p::Float64)
+    xs, ys = l.polarisations, l.e1_values
+    n = length(xs)
+    (n < 2 || p <= xs[1] || p >= xs[n]) && return 0.0
+    i = searchsortedlast(xs, p)
+    i >= n && return 0.0
+    @inbounds (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
+end
+
+"""
     _local_polarisation(Pmf, i, n_local, F, fp_coeffs, ::Val{D})
 
-`|⟨F⟩|/F` for the spinor at flat voxel index `i`, from the SAME component reads
-the density loop already performs. Uses the O(D) ladder form (F₊ tridiagonal,
-Fz diagonal) rather than 13×13 matrix products.
+`|⟨F⟩|/F` for the spinor at voxel index `i`, from the SAME component reads the
+density loop already performs. Uses the O(D) ladder form (F₊ tridiagonal, Fz
+diagonal) rather than 13×13 matrix products.
+
+`i` is left untyped so the one body serves both index conventions in use: a flat
+index into a reshaped `Ns × D` array, and a `CartesianIndex` for the kernels
+that walk the grid directly. `Pmf[i, c]` is the same expression either way, and
+the formula stays declared once.
 """
-@inline function _local_polarisation(Pmf, i::Int, n_local::Float64, F::Int,
+@inline function _local_polarisation(Pmf, i, n_local::Float64, F::Int,
     fp_coeffs, ::Val{D}) where {D}
     n_local < 1e-30 && return 0.0
     @inbounds begin
@@ -207,6 +263,63 @@ Fz diagonal) rather than 13×13 matrix products.
         end
     end
     sqrt(fre * fre + fim * fim + fz * fz) / (n_local * F)
+end
+
+"""
+    _polarisation_field(::Val{N}, psi_mf, density_buf, lhy, ::Val{D}) -> array
+
+`|⟨F⟩|/F` as a FIELD, for the broadcast (non-fused) propagator path.
+
+The counterpart of `_local_polarisation`, which scalar-indexes and therefore
+cannot run on a device array. Built by accumulating over the same component
+views the density sum uses, so it stays a pure broadcast.
+"""
+function _polarisation_field(::Val{N}, psi_mf, density_buf, lhy, ::Val{D}) where {N, D}
+    n_pts = ntuple(d -> size(psi_mf, d), Val(N))
+    F, fp = _lhy_spin_consts(lhy, Val(D))
+    RT = eltype(density_buf)
+    fz = similar(density_buf)
+    fre = similar(density_buf)
+    fim = similar(density_buf)
+    v1 = view(psi_mf, _component_slice(N, n_pts, 1)...)
+    fz .= RT(F) .* abs2.(v1)
+    fill!(fre, zero(RT))
+    fill!(fim, zero(RT))
+    for c in 2:D
+        vc = view(psi_mf, _component_slice(N, n_pts, c)...)
+        vp = view(psi_mf, _component_slice(N, n_pts, c - 1)...)
+        fz .+= RT(F - (c - 1)) .* abs2.(vc)
+        fre .+= RT(fp[c]) .* real.(conj.(vp) .* vc)
+        fim .+= RT(fp[c]) .* imag.(conj.(vp) .* vc)
+    end
+    out = similar(density_buf)
+    out .= ifelse.(
+        density_buf .< RT(1e-30),
+        zero(RT),
+        sqrt.(fre .* fre .+ fim .* fim .+ fz .* fz) ./ (density_buf .* RT(F)),
+    )
+    out
+end
+
+# Spin-aware overload: `SpatialLHY` needs the local polarisation as well, and
+# the broadcast path would otherwise have no method at all for it. Same
+# `_lhy_V` the fused kernel calls, so the two paths still cannot disagree.
+function _lhy_potential_field(lhy, density_buf, p_buf, ::Type{RT}) where {RT}
+    out = similar(density_buf)
+    out .= RT.(_lhy_V.(Float64.(density_buf), Float64.(p_buf), Ref(lhy)))
+    out
+end
+
+# One place decides how V_LHY becomes a field, so the two broadcast call sites
+# (with and without a light shift) cannot drift apart. `_lhy_needs_spin` is a
+# compile-time trait, so the polarisation branch is deleted for every LHY that
+# does not need it.
+function _lhy_field_for_broadcast(
+    ::Val{N}, lhy, psi_mf, density_buf, ::Type{RT}, ::Val{D}
+) where {N, RT, D}
+    _lhy_needs_spin(lhy) || return _lhy_potential_field(lhy, density_buf, RT)
+    p_buf = _polarisation_field(Val(N), psi_mf, density_buf, lhy, Val(D))
+    _lhy_potential_field(lhy, density_buf, p_buf, RT)
 end
 
 function _diagonal_step_svec!(
@@ -337,8 +450,23 @@ function _diagonal_step_svec!(
     RT = eltype(V_trap)
     dt_t = RT(dt_frac)
     c0_t = RT(c0)
-    _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
-    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    # V_LHY as a FIELD, not a coefficient. The previous form collapsed the LHY
+    # to a single `c_lhy` scalar and used `c·n^(3/2)`, which is only the shape
+    # of `ScalarLHY`: every TabulatedLHY fell to `c = 0.0` while `_has_lhy`
+    # still read `true`, so the branch ran with the LHY silently removed.
+    # `PolarContactLHY` on this path differed from the fused `::Array` kernel by
+    # 5.7 in ψ after one step, with V_LHY(n=1) = 50.5 simply missing.
+    #
+    # This path is what a `CuArray` falls back to — the GPU kernel's `c_lhy`
+    # bound admits only Nothing / NoLHY / Float64 / ScalarLHY — so every GPU run
+    # using `polar_contact`, `fm_contact`, `icosahedral`, `polar_dipolar`,
+    # `fm_dipolar`, `polar_two_channel` or `full_bdg` was running with NO LHY.
+    _has_lhy = _lhy_is_active(c_lhy)
+    lhy_buf = if _has_lhy
+        _lhy_field_for_broadcast(Val(N), c_lhy, psi_mf_eff, density_buf, RT, Val(D))
+    else
+        density_buf
+    end
     zee_shift = RT(minimum(zeeman_diag))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
@@ -349,23 +477,13 @@ function _diagonal_step_svec!(
             if !_has_lhy
                 @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf) * dt_t)
             else
-                @. psi_c *= exp(
-                    -(
-                        V_trap + zee_rel + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
-                    ) * dt_t,
-                )
+                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf + lhy_buf) * dt_t)
             end
         else
             if !_has_lhy
                 @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf) * dt_t)
             else
-                @. psi_c *= cis(
-                    -(
-                        V_trap + zee_c + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
-                    ) * dt_t,
-                )
+                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf + lhy_buf) * dt_t)
             end
         end
     end
@@ -388,6 +506,8 @@ function _diagonal_step_with_ls!(
 ) where {N, D}
     n_pts = ntuple(d -> size(psi, d), Val(N))
     psi_mf_eff = psi_mf === nothing ? psi : psi_mf
+    need_spin = _lhy_needs_spin(c_lhy)
+    F_spin, fp_c = _lhy_spin_consts(c_lhy, Val(D))
 
     @inbounds for I in CartesianIndices(n_pts)
         s = 0.0
@@ -401,7 +521,9 @@ function _diagonal_step_with_ls!(
         zee_shift = minimum(zeeman_diag)
         @inbounds for I in CartesianIndices(n_pts)
             n = density_buf[I]
-            V_int = c0 * n + _lhy_V(n, c_lhy)
+            p_loc = need_spin ?
+                    _local_polarisation(psi_mf_eff, I, n, F_spin, fp_c, Val(D)) : 0.0
+            V_int = c0 * n + _lhy_V(n, p_loc, c_lhy)
             exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
             intensity = ls_profile[I]
             for c in 1:D
@@ -413,7 +535,9 @@ function _diagonal_step_with_ls!(
     else
         @inbounds for I in CartesianIndices(n_pts)
             n = density_buf[I]
-            V_int = c0 * n + _lhy_V(n, c_lhy)
+            p_loc = need_spin ?
+                    _local_polarisation(psi_mf_eff, I, n, F_spin, fp_c, Val(D)) : 0.0
+            V_int = c0 * n + _lhy_V(n, p_loc, c_lhy)
             cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
             intensity = ls_profile[I]
             for c in 1:D
@@ -449,8 +573,13 @@ function _diagonal_step_with_ls!(
     RT = eltype(V_trap)
     dt_t = RT(dt_frac)
     c0_t = RT(c0)
-    _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
-    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    # Same V_LHY-as-a-field fix as the plain diagonal step above.
+    _has_lhy = _lhy_is_active(c_lhy)
+    lhy_buf = if _has_lhy
+        _lhy_field_for_broadcast(Val(N), c_lhy, psi_mf_eff, density_buf, RT, Val(D))
+    else
+        density_buf
+    end
     zee_shift = RT(minimum(zeeman_diag))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
@@ -465,7 +594,7 @@ function _diagonal_step_with_ls!(
                 @. psi_c *= exp(
                     -(
                         V_trap + zee_rel + ls_c * ls_profile + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
+                        lhy_buf
                     ) * dt_t,
                 )
             end
@@ -476,7 +605,7 @@ function _diagonal_step_with_ls!(
                 @. psi_c *= cis(
                     -(
                         V_trap + zee_c + ls_c * ls_profile + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
+                        lhy_buf
                     ) * dt_t,
                 )
             end

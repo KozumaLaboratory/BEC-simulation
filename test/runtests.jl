@@ -30,14 +30,17 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 # on what counts as a failure.
 #
 #   SPINORBEC_TEST_WORKERS=1  (default)  serial, in-process — easiest to debug.
-#   SPINORBEC_TEST_WORKERS=N|auto  (N>1)  LPT-balance the files into N chunks
-#       (by _COST, so the heavy poles spread out) and run each chunk in its OWN
-#       independent julia process (run_chunk.jl), then aggregate by exit code.
+#   SPINORBEC_TEST_WORKERS=N|auto  (N>1)  start N independent julia processes
+#       (run_chunk.jl) that take files ON DEMAND from a shared claim queue,
+#       heaviest first (_COST as the ordering), then aggregate by exit code.
 #       Independent processes — not Distributed workers — are deliberate: each
 #       loads SpinorBEC exactly once in a clean session. A shared-worker pool
 #       can reload the package mid-run (cache race), giving two copies of a type
 #       so `x isa CheckResult` flakes to false; separate processes cannot.
-#       `auto` = one chunk per CPU thread.
+#       `auto` = one worker per CPU thread.
+#       On-demand rather than pre-assigned: measured on CI, per-file times swing
+#       ±30 % run to run, so static bin-packing left the makespan 8-21 % above
+#       the perfect-balance floor no matter how well _COST was fitted.
 #
 # SPINORBEC_TEST_SKIP: comma-separated relative paths to omit (e.g. the
 # CUDA-importing oracles on a machine whose driver probe crashes the
@@ -47,28 +50,23 @@ const _SKIP = Set(filter(!isempty, split(get(ENV, "SPINORBEC_TEST_SKIP", ""), ",
 const _NWORKERS = let w = get(ENV, "SPINORBEC_TEST_WORKERS", "1")
     w == "auto" ? max(1, Sys.CPU_THREADS) : parse(Int, w)
 end
-# Per-chunk wall-clock cap (seconds) under parallelism; 0 disables. Generous by
-# default — catches a genuine hang, not a merely-slow chunk (cold F32 ≈ 600 s).
+# Per-worker wall-clock cap (seconds) under parallelism; 0 disables. Generous by
+# default — catches a genuine hang, not a merely-slow file (cold F32 ≈ 600 s).
 const _TIMEOUT = parse(Float64, get(ENV, "SPINORBEC_TEST_TIMEOUT", "1800"))
 
 # _DEFAULT_COST / _COST / _cost (the per-file balance model) + warn_cost_drift
 # live in _tiers.jl, shared with the chunk processes (run_chunk.jl) so the
 # drift guard runs against the same numbers everywhere.
 
-# Greedy longest-processing-time bin-packing: assign each file (heaviest first)
-# to the currently-lightest chunk. Minimises makespan for the skewed full-tier
-# cost distribution (a 161 s BO test next to many ~3 s units), which plain
-# round-robin handles poorly.
-function _balance(files, n)
-    chunks = [String[] for _ in 1:n]
-    loads = zeros(Float64, n)
-    for f in sort(collect(files); by=_cost, rev=true)
-        i = argmin(loads)
-        push!(chunks[i], f)
-        loads[i] += _cost(f)
-    end
-    return chunks
-end
+# Longest-processing-time ORDER: hand the heaviest files out first, so the tail
+# of the run is short files that can pad any worker that finishes early. This is
+# only an ordering heuristic — the workers take files on demand (see the claim
+# queue in run_chunk.jl), so a wrong `_cost` costs a little ordering quality and
+# never leaves one worker holding a chunk nobody can help with. Static LPT
+# bin-packing did the latter: measured on CI, per-file times swing ±30 % run to
+# run, which left the makespan 8-21 % above the perfect-balance floor however
+# well the estimates were fitted.
+_lpt_order(files) = sort(collect(files); by=_cost, rev=true)
 
 const _FILES = filter(f -> !(f in _SKIP), select_tests(TEST_TIER))
 
@@ -84,27 +82,27 @@ if _NWORKERS <= 1
     failed && error("SpinorBEC test suite (tier=$TEST_TIER): failures above")
     println("\nSpinorBEC ($(length(_FILES)) files, tier=$TEST_TIER): all passed")
 else
-    # LPT-balance the files into N chunks, then run each chunk in its own
-    # process via run_chunk.jl. `--pkgimages=existing` reuses the already-built
-    # image rather than racing N children to rebuild it; the package must be
-    # precompiled beforehand (CI buildpkg / Pkg.test guarantees it). A stacked
-    # JULIA_LOAD_PATH (local dev) is inherited by the children and still wins
-    # over --project.
-    chunks = _balance(_FILES, _NWORKERS)
+    # Publish the ordered file list, then start N independent worker processes
+    # that pull from it on demand (run_chunk.jl `--queue`). `--pkgimages=existing`
+    # reuses the already-built image rather than racing N children to rebuild it;
+    # the package must be precompiled beforehand (CI buildpkg / Pkg.test
+    # guarantees it). A stacked JULIA_LOAD_PATH (local dev) is inherited by the
+    # children and still wins over --project.
+    ordered = _lpt_order(_FILES)
+    qdir = mktempdir()
+    write(joinpath(qdir, "queue.txt"), join(ordered, "\n"))
     runner = joinpath(@__DIR__, "run_chunk.jl")
     jl = Base.julia_cmd()
     proj = Base.active_project()
-    println("Running $(length(_FILES)) files in $_NWORKERS parallel chunks (tier=$TEST_TIER)…")
+    println("Running $(length(_FILES)) files across $_NWORKERS parallel workers (tier=$TEST_TIER)…")
 
-    results = asyncmap(eachindex(chunks); ntasks=_NWORKERS) do k
-        files = chunks[k]
-        isempty(files) && return (k, 0, "")
-        cmd = `$jl --startup-file=no --project=$proj --pkgimages=existing $runner $files`
+    results = asyncmap(1:_NWORKERS; ntasks=_NWORKERS) do k
+        cmd = `$jl --startup-file=no --project=$proj --pkgimages=existing $runner --queue $qdir`
         buf = IOBuffer()
         p = run(pipeline(ignorestatus(cmd); stdout=buf, stderr=buf); wait=false)
-        # Per-chunk wall-clock guard: a hung test (non-converging ITP, deadlock)
+        # Per-worker wall-clock guard: a hung test (non-converging ITP, deadlock)
         # would otherwise stall the whole suite until the CI job timeout. Kill
-        # the chunk and report it as failed (exit 124) instead.
+        # the worker and report it as failed (exit 124) instead.
         t0 = time()
         timed_out = false
         while process_running(p)
@@ -119,18 +117,28 @@ else
         end
         wait(p)
         out = String(take!(buf))
-        timed_out && (out *= "\n⏱  chunk $k TIMED OUT after $(_TIMEOUT)s — killed\n")
+        timed_out && (out *= "\n⏱  worker $k TIMED OUT after $(_TIMEOUT)s — killed\n")
         (k, timed_out ? 124 : p.exitcode, out)
     end
 
     for (k, code, out) in results
-        println("\n──── chunk $k ($(length(chunks[k])) files, exit $code) ────")
+        println("\n──── worker $k (exit $code) ────")
         print(out)
     end
+
+    # A worker killed (timeout) or crashed between claiming a file and finishing
+    # it leaves a claim with no `done_` marker. Without this check that file
+    # would simply not have run — a silently-skipped test, the one failure mode
+    # an on-demand queue can have that static assignment cannot.
+    unrun = [f for (i, f) in enumerate(ordered) if !isfile(joinpath(qdir, "done_$i"))]
     nfail = count(r -> r[2] != 0, results)
+    if !isempty(unrun)
+        println("\n✗ $(length(unrun)) file(s) never completed: ", join(unrun, ", "))
+        error("SpinorBEC test suite: unrun files (tier=$TEST_TIER) — see above")
+    end
     nfail > 0 &&
-        error("SpinorBEC test suite: $nfail/$_NWORKERS chunks had failures (tier=$TEST_TIER)")
+        error("SpinorBEC test suite: $nfail/$_NWORKERS workers had failures (tier=$TEST_TIER)")
     println(
-        "\nSpinorBEC ($(length(_FILES)) files in $_NWORKERS chunks, tier=$TEST_TIER): all passed"
+        "\nSpinorBEC ($(length(_FILES)) files across $_NWORKERS workers, tier=$TEST_TIER): all passed"
     )
 end

@@ -354,13 +354,31 @@ end
 """
     compute_lhy_2d_params(c0_2d, l_z) → Quasi2DLHY
 
-Quasi-2D LHY correction: ε_LHY ∝ n² ln(n a²_2d).
-Ref: Petrov & Astrakharchik, PRL 117, 100401 (2016).
+Quasi-2D LHY correction, as the ENERGY DENSITY coefficient:
+
+    ε_LHY = c_lhy_2d · n² · (ln(n a²_2d) + log_const)
+    V_LHY = dε/dn = c_lhy_2d · n · (2(ln(n a²_2d) + log_const) + 1)
+
+`c_lhy_2d = c₀²/(8π)` is the prefactor of the beyond-mean-field term in
+Petrov & Astrakharchik, PRL **117**, 100401 (2016) [arXiv:1605.07535],
+Eq. (5) — `(1/8π)(g̃↑↑n↑ + g̃↓↓n↓)² ln[(g̃↑↑n↑+g̃↓↓n↓)√e/Δ]` — read here in
+the single-component reduction.
+
+It was `c₀²/(4π)` with a compensating `0.5` written into the energy face
+(twice: `_lhy_energy` and the CUDA `gpu_energy.jl`) and NOT into `_lhy_V`, so
+**the propagator applied exactly twice the correct quasi-2D LHY potential**
+while the reported energy was right. Two statements of one coefficient, which
+is the bug class the HamTerm protocol exists to remove; the factor now lives
+here once and both faces derive from it. `dE/dn == V` is gated by
+`oracles/test_lhy_mode_face_coverage.jl`, which is what caught it.
+
+No committed config under `runs/` selects `kind: quasi_2d`, so no stored
+result is affected.
 """
 function compute_lhy_2d_params(c0_2d::Float64, l_z::Float64)
     γ_E = 0.5772156649015329
     log_const = 2.0 * γ_E - 1.0 - log(2.0)
-    c_lhy_2d = c0_2d^2 / (4.0 * Float64(π))
+    c_lhy_2d = c0_2d^2 / (8.0 * Float64(π))
     a_2d_sq = l_z^2
     Quasi2DLHY(c_lhy_2d, a_2d_sq, log_const)
 end
