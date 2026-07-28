@@ -243,83 +243,25 @@ end
 # Lane → (voxel, spin component) for the width-16 subgroup layout. Two voxels
 # per warp; lanes at or above D are idle passengers (their `b_c` is multiplied
 # by sxu[D] = syu[D] = 0 at the top edge, so they cannot contaminate c = D).
-#
-# `vb` is the voxel's index WITHIN the block, which the shared-memory staging
-# below uses; `vox` is the global one.
 @inline function _rot_lane_map(::Val{D}) where {D}
     tib = CUDA.threadIdx().x
     lane0 = (tib - 1) & 31
     sl = lane0 & 15
-    vb = ((tib - 1) >> 5) * 2 + (lane0 >> 4)
-    vox = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 4) + vb + 1
+    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + ((tib - 1) >> 5)
+    vox = gwarp * 2 + (lane0 >> 4) + 1
     active = sl < D
     c = active ? sl + 1 : 1
-    (vox, vb, c, c > 1 ? c - 1 : 1, active)
-end
-
-# --- Coalesced ψ staging ---
-#
-# The compute layout wants one spin COMPONENT per lane, so a lane reads
-# `P[vox, c]` with the D components N·16 B apart: a warp issues 13 scattered
-# 32-byte transactions where a thread-per-voxel kernel issues four 128-byte
-# ones. Measured on an H100 at 64³ D=13 (bench/micro_spin_taylor.jl): 894 GB/s
-# against the ~2.2 TB/s the diagonal kernel reaches on the same array.
-#
-# Staging fixes that without giving up the layout: the block moves ψ through
-# shared memory with CONSECUTIVE THREADS ON CONSECUTIVE VOXELS, so each warp
-# moves contiguous runs, and the scattered part becomes a shared-memory
-# transpose. `VPB = blockDim ÷ 16` voxels per block ⇒ VPB·D·16 B of shared.
-#
-# Whether it wins is architecture-dependent and both answers have been
-# measured: on a consumer card with 1/64-rate FP64 the kernel is
-# COMPUTE-bound (time exactly linear in the Horner degree) and staging is
-# 5-15 % slower; on an H100 with 1/2-rate FP64 it is purely memory-bound
-# (time flat in the degree). Hence the toggle rather than a hard choice.
-const SPIN_STAGE_SHARED = Ref(false)
-
-@inline function _stage_load!(shm, P, vox0, N, ::Val{D}, ::Val{VPB}) where {D, VPB}
-    CT = eltype(shm)
-    idx = CUDA.threadIdx().x
-    n = VPB * D
-    while idx <= n
-        v = (idx - 1) % VPB
-        cc = (idx - 1) ÷ VPB + 1
-        g = vox0 + v + 1
-        @inbounds shm[idx] = g <= N ? P[g, cc] : zero(CT)
-        idx += CUDA.blockDim().x
-    end
-    CUDA.sync_threads()
-    nothing
-end
-
-@inline function _stage_store!(shm, P, vox0, N, ::Val{D}, ::Val{VPB}) where {D, VPB}
-    CUDA.sync_threads()
-    idx = CUDA.threadIdx().x
-    n = VPB * D
-    while idx <= n
-        v = (idx - 1) % VPB
-        cc = (idx - 1) ÷ VPB + 1
-        g = vox0 + v + 1
-        g <= N && (@inbounds P[g, cc] = shm[idx])
-        idx += CUDA.blockDim().x
-    end
-    nothing
+    (vox, c, c > 1 ? c - 1 : 1, active)
 end
 
 @inline function _spin_taylor_warp_kernel!(
-    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2,
-    ::Val{D}, ::Val{RT}, ::Val{VPB}, ::Val{STAGE},
-) where {D, RT, VPB, STAGE}
+    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
+) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
-    vox, vb, c, cdn, active = _rot_lane_map(Val(D))
-    N = size(P, 1)
-    vox0 = (CUDA.blockIdx().x - 1) * VPB
-    in_range = vox <= N
+    vox, c, cdn, active = _rot_lane_map(Val(D))
+    in_range = vox <= size(P, 1)
     live = active && in_range
-
-    shm = CUDA.CuDynamicSharedArray(CT, STAGE ? VPB * D : 1)
-    STAGE && _stage_load!(shm, P, vox0, N, Val(D), Val(VPB))
 
     Vx = in_range ? (@inbounds vx[vox]) : zero(T)
     Vy = in_range ? (@inbounds vy[vox]) : zero(T)
@@ -328,20 +270,10 @@ end
     diag_c, b_c, bmc, g = _rot_generator(Vx, Vy, Vz, mz, sxu, syu, c, cdn, F2, Val(16))
     h, sh, kv = _rot_schedule(g, rk, K, tol2, rsafe2)
 
-    psi0 = if STAGE
-        live ? (@inbounds shm[(c - 1) * VPB + vb + 1]) : zero(CT)
-    else
-        live ? (@inbounds P[vox, c]) : zero(CT)
-    end
+    psi0 = live ? (@inbounds P[vox, c]) : zero(CT)
     w = _horner_rot(psi0, diag_c, b_c, bmc, c, cdn, rk, kv, h, sh, Val(16), Val(RT))
 
-    if STAGE
-        CUDA.sync_threads()
-        live && (@inbounds shm[(c - 1) * VPB + vb + 1] = w)
-        _stage_store!(shm, P, vox0, N, Val(D), Val(VPB))
-    else
-        live && (@inbounds P[vox, c] = w)
-    end
+    live && (@inbounds P[vox, c] = w)
     nothing
 end
 
@@ -357,26 +289,16 @@ function _apply_spin_rotation_taylor!(
     imaginary_time::Bool=false, F::T=one(T),
 ) where {T, D}
     N = size(P, 1)
-    threads, vpb, stage, shmem = _rot_launch_geometry(Val(D), Complex{T})
-    blocks = cld(N, vpb)
+    voxels_per_block = 16
+    threads = 256
+    blocks = cld(N, voxels_per_block)
     rk = _get_spin_rk(P, scale)
     tol2 = T(_SPIN_TAYLOR_TOL[])^2
     rsafe2 = T(_SPIN_TAYLOR_RSAFE[])^2
-    CUDA.@cuda threads = threads blocks = blocks shmem = shmem _spin_taylor_warp_kernel!(
+    CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
         P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(_SPIN_RK_MAX),
-        tol2, F * F, rsafe2, Val(D), Val(!imaginary_time), Val(vpb), Val(stage))
+        tol2, F * F, rsafe2, Val(D), Val(!imaginary_time))
     nothing
-end
-
-"""
-Launch geometry shared by the single-rotation and fused-half-step kernels:
-`(threads, voxels_per_block, stage_through_shared, shared_bytes)`.
-"""
-@inline function _rot_launch_geometry(::Val{D}, ::Type{CT}) where {D, CT}
-    threads = 256
-    vpb = threads ÷ 16
-    stage = SPIN_STAGE_SHARED[]
-    (threads, vpb, stage, (stage ? vpb * D : 1) * sizeof(CT))
 end
 
 """

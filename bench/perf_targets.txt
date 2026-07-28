@@ -122,9 +122,23 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   (test/oracles/test_spin_chain_fusion_parity.jl — which caught a 1-ulp
 #   multiply-association slip a tolerance would have passed).
 #
-# rejected 2026-07-29: staging ψ through shared memory to coalesce the rotation
-#   kernel's load/store. 5-15 % SLOWER at 64³ D=13. `CUDA.registers` = 48 with
-#   no spill, so it is neither access-pattern- nor occupancy-limited.
+# rejected(measured on BOTH architectures) 2026-07-29: staging ψ through shared
+#   memory to coalesce the rotation kernel's load/store — the fix Round 8 named
+#   as the untried option after thread-per-voxel failed on register pressure.
+#     5070 Ti (compute-bound there): 5-15 % SLOWER at 64³ D=13; `CUDA.registers`
+#       = 48 with no spill, so not access-pattern- or occupancy-limited either.
+#     H100 (purely memory-bound there — t(16)/t(4) = 1.00): the ISOLATED kernel
+#       gains only 890 → 929 GB/s at 64³ and 996 → 1050 GB/s at 128³ (1.04-1.05×),
+#       and the whole RTP step gets 2 % SLOWER (2.016 → 2.045 ms at 64³,
+#       14.210 → 14.527 at 128³) because the two `sync_threads` cost more than
+#       the coalescing saves.
+#   The lesson for the next attempt: the ~900 GB/s ceiling is NOT the 32-byte
+#   transactions. Those carry full 32-byte sectors already (two voxels of a
+#   warp are adjacent), so byte efficiency was never the problem. The limit is
+#   memory-level parallelism — one warp has only 2 voxels in flight — and/or
+#   the serial shfl dependency chain in the Horner. Attack THOSE, not the
+#   addressing. Deleted rather than left behind a toggle: it is off on every
+#   machine measured.
 #
 # done 2026-07-29 (4): the Horner coefficient table is cached by SCALE and the
 #   Zeeman phase vector by value, so a fixed-dt run stops relaunching a

@@ -23,18 +23,13 @@
 
 @inline function _spin_chain_warp_kernel!(
     P, fx, fy, fz, px, py, pz, vph, zph_fwd, zph_bwd, mz, sxu, syu, rk_sm, rk_dd,
-    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT}, ::Val{VPB}, ::Val{STAGE},
-) where {D, RT, VPB, STAGE}
+    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
+) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
-    vox, vb, c, cdn, active = _rot_lane_map(Val(D))
-    N = size(P, 1)
-    vox0 = (CUDA.blockIdx().x - 1) * VPB
-    in_range = vox <= N
+    vox, c, cdn, active = _rot_lane_map(Val(D))
+    in_range = vox <= size(P, 1)
     live = active && in_range
-
-    shm = CUDA.CuDynamicSharedArray(CT, STAGE ? VPB * D : 1)
-    STAGE && _stage_load!(shm, P, vox0, N, Val(D), Val(VPB))
 
     Fx = in_range ? (@inbounds fx[vox]) : zero(T)
     Fy = in_range ? (@inbounds fy[vox]) : zero(T)
@@ -52,24 +47,12 @@
     # (`P[i, c] *= vph * zph[c]`). Floating-point multiplication is not
     # associative, and this gate demands bit-identity.
     vp = in_range ? (@inbounds vph[vox]) : one(CT)
-    p0 = if STAGE
-        live ? (@inbounds shm[(c - 1) * VPB + vb + 1]) : zero(CT)
-    else
-        live ? (@inbounds P[vox, c]) : zero(CT)
-    end
-    w = live ? p0 * (vp * (@inbounds zph_fwd[c])) : zero(CT)
+    w = live ? (@inbounds P[vox, c]) * (vp * (@inbounds zph_fwd[c])) : zero(CT)
     w = _horner_rot(w, ds, bs, bms, c, cdn, rk_sm, kvs, hs, shs, Val(16), Val(RT))
     w = _horner_rot(w, dd, bd, bmd, c, cdn, rk_dd, kvd, hd, shd, Val(16), Val(RT))
     w = _horner_rot(w, ds, bs, bms, c, cdn, rk_sm, kvs, hs, shs, Val(16), Val(RT))
 
-    out = w * (vp * (@inbounds zph_bwd[c]))
-    if STAGE
-        CUDA.sync_threads()
-        live && (@inbounds shm[(c - 1) * VPB + vb + 1] = out)
-        _stage_store!(shm, P, vox0, N, Val(D), Val(VPB))
-    else
-        live && (@inbounds P[vox, c] = out)
-    end
+    live && (@inbounds P[vox, c] = w * (vp * (@inbounds zph_bwd[c])))
     nothing
 end
 
@@ -121,11 +104,10 @@ function SpinorBEC._apply_spin_chain!(
     _gpu_phi_vec(bufs.Phi_y, n_pts, N),
     _gpu_phi_vec(bufs.Phi_z, n_pts, N)
 
-    threads, vpb, stage, shmem = _rot_launch_geometry(Val(D), Complex{T})
-    CUDA.@cuda threads = threads blocks = cld(N, vpb) shmem = shmem _spin_chain_warp_kernel!(
+    CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fv..., pv..., vph, zf, zb, coef.mz, coef.sxu, coef.syu, rk_sm, rk_dd,
         Int32(_SPIN_RK_MAX), T(_SPIN_TAYLOR_TOL[])^2, F * F,
-        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it), Val(vpb), Val(stage))
+        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it))
     nothing
 end
 
