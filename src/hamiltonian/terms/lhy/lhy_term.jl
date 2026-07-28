@@ -266,15 +266,16 @@ The first term is `_lhy_V(n, p, lhy)·ψ`, the diagonal potential the propagator
 applies. The second is not diagonal — `ŝ = ⟨F⟩/|⟨F⟩|` — so it exists only here.
 Verified against a finite difference of `_lhy_energy(::SpatialLHY)` to 8e-10.
 
-**The propagator omits the second term**, because its diagonal step has no place
-to put a spin operator. Measured on a random F=6 spinor with the ~20% `e₁(p)`
-variation `spatial.jl` reports at F=6, the omission is **2.3%** of the gradient
-norm; `test_lhy_gradient_all_modes.jl` pins that number so it cannot drift
-unnoticed. ITP and LBFGS therefore minimise slightly different functionals for
-`SpatialLHY` alone — LBFGS the true energy, ITP the diagonal approximation to
-it. Closing the gap belongs in the propagator — issue #131, which needs a
-per-voxel spin substep — not in a gradient that would then stop being the
-energy's derivative.
+The diagonal propagator step has no place to put a spin operator, so until issue
+#131 it simply omitted the second term — a measured **2.3%** of the gradient
+norm on a random F=6 spinor with the ~20% `e₁(p)` variation `spatial.jl` reports
+at F=6, which left ITP and LBFGS minimising different functionals for this one
+mode. `apply_spatial_lhy_spin_step!` now applies it as its own substep, a
+per-voxel rotation about the local ⟨F⟩ axis, and
+`test_spatial_lhy_spin_substep.jl` pins that the propagator and this gradient
+agree. `test_lhy_gradient_all_modes.jl` still pins the 2.3% as a statement about
+the DIAGONAL potential in isolation — which is what keeps the substep's
+contribution measured rather than assumed.
 
 `ŝ·F` uses the ladder form, from the SAME `fp_coeffs` and component convention
 as `_local_polarisation`: `(F₊ψ)_c = fp[c+1]·ψ_{c+1}`, `(F₋ψ)_c = fp[c]·ψ_{c-1}`,
