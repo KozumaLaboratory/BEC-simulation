@@ -438,7 +438,7 @@ end
     g_uniform = Dict(S => c0 for S in (0, 2, 4, 6, 8, 10, 12))
 
     table = SpinorBEC._build_spinor_lhy(
-        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true)
+        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true, LHYTableOpts())
     expected = compute_spinor_lhy_fm_dipolar(;
         F=6, g_dict=g_uniform, eps_dd=expected_eps)
 
