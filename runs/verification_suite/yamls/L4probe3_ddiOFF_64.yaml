@@ -31,7 +31,7 @@ pipeline:
         enabled: false
         secular: false
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

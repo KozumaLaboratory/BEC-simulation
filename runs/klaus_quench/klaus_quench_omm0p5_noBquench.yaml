@@ -9,10 +9,10 @@
 #   rotation kept in hold : false
 #
 # Pipeline:
-#   GS (Ω=0, B=-0.01 G, DDI on)
-#   → rotation_prep (10.0 ms, B=-0.01 G, Ω=-0.5, DDI=true)
+#   GS (Ω=0, B=0.01 G, DDI on)
+#   → rotation_prep (10.0 ms, B=0.01 G, Ω=-0.5, DDI=true)
 #   → B_quench (1.0 ms, B ramp false, Ω=0.0, DDI=true)
-#   → weak_field_hold (10.0 ms, B=-0.01 G, Ω=0.0, DDI=true)
+#   → weak_field_hold (10.0 ms, B=0.01 G, Ω=0.0, DDI=true)
 
 metadata:
   suite: klaus_quench
@@ -42,7 +42,7 @@ pipeline:
         c1_ratio: 0.02778
       ddi: {enabled: true, secular: true}
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -54,7 +54,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: -0.5
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       seed_amplitude: 1.0e-6
@@ -68,7 +68,7 @@ pipeline:
       duration: 0.69115
       dt: 0.001
       rotating_frame_omega: 0.0
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:
@@ -80,7 +80,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.0
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:
