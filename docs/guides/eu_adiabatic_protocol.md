@@ -305,11 +305,63 @@ spin→orbital conversion at fixed $J_z$**, and the prediction is experimentally
 checkable — at fixed field, opening the trap aspect ratio depolarises the
 Stern-Gerlach distribution monotonically, with no vortex nucleation.
 
-**The fix is not a better ramp; it is a protocol that applies a torque about $z$** —
-a large or rotating transverse field, or a rotating anisotropic trap (the same
-mechanism as magnetostriction vortex nucleation). How much of the +0.32 is
-"wrong sector" versus "excited within the sector" is answerable with a
-$J_z$-constrained ground-state solve.
+## The torque works, and it still does not get there
+
+A transverse field does not commute with $F_z$, so it can move $J_z$. It does —
+no new code was needed, since `TimeDependentZeeman` already carries `bx_wf`/`by_wf`
+and the propagator reads `transverse_b(ws.zeeman, t)` every step. Rotating
+$b_x = \varepsilon\cos\Omega t$, $b_y = \varepsilon\sin\Omega t$ for 145 ms at fixed
+$\kappa = 1.8$, $B = 20\ \mu$G, starting from the state the κ ramp actually produces:
+
+| ε [µG] | Ω [Hz] | $\Delta J_z$ | $J_z$ end | $E$ end |
+|---:|---:|---:|---:|---:|
+| 3.38 | **11** | **+2.570** | −0.585 | 11.304 |
+| 3.38 | 33 | +0.508 | −2.646 | 11.191 |
+| 3.38 | 110 | +0.205 | −2.949 | 11.220 |
+| 3.38 | −33 | −0.133 | −3.288 | 11.094 |
+| 1.35 | **11** | **+1.595** | −1.560 | 11.208 |
+| 1.35 | 33 | +0.064 | −3.091 | 11.073 |
+| 1.35 | −33 | −0.002 | −3.156 | 11.055 |
+
+The sector opens wide — $\Delta J_z = +2.57$ against the +2.07 required, and the
+strongest cell crosses into the ground state's $J_z$ at $t = 57.9$ ms. Note that the
+efficient drive is the **low-frequency** one, 11 Hz, not the Larmor-resonant 33 Hz:
+the mechanism is quasi-static dragging of the transverse spin, not a resonant flip.
+The sense of rotation matters — $\Omega < 0$ moves $J_z$ the wrong way.
+
+![torque landscape](figures/eu_torque_landscape.png)
+
+**But the energy never falls.** Along every trajectory the minimum energy is at
+$t = 0$; at the moment the strongest drive reaches the ground state's sector,
+$E = 11.261$, i.e. $+0.530$ above the ground state — worse than the $+0.322$ it
+started with — and $\langle F_\perp\rangle = 3.05$ against the ground state's 5.14.
+
+That is not a tuning failure, it is the structure of the problem. On a closed
+Hamiltonian system at $T = 0$ there are only two moves and each is blocked:
+
+- **ramp a parameter** — every axially symmetric knob (κ, $B_z$) conserves $J_z$, and
+  the target is 2.07 ħ/atom away in it;
+- **drive** — a drive that breaks the symmetry does positive work, so it moves right
+  in the figure and up, never down.
+
+Dissipation alone does not rescue it either, and that was already visible in the
+reference solves: imaginary-time relaxation *is* perfect dissipation, and started
+from the polarised anchor it converges to the polarised branch at $E = 10.864$, not
+to the flower at 10.731. It falls into the nearest local minimum.
+
+### What this says to the experiment
+
+**The flower ground state is not reachable by transforming a state prepared
+elsewhere. It has to be nucleated in place** — cooled through the transition at the
+target $(\kappa, B)$, with fluctuations available to select the flower texture,
+rather than adiabatically transported into it.
+
+The simulation counterpart is SGPE (`src/solvers/sgpe.jl`) with finite temperature,
+optionally driven by the field-noise waveform layer, started above the transition at
+$\kappa = 1.8$, $B = 20\ \mu$G and cooled through it. The question it answers is not
+"can we get there" — ITP from a flower anchor already shows the state exists and is
+the ground state — but "does a realistic cooling trajectory select it, or does it get
+caught on the polarised branch". That is the experiment's actual risk.
 
 Trap compression is not the culprit: the trap period is
 $\sim 1\ \omega_{ref}^{-1} = 1.45$ ms, so even the 145 ms ramp is 100× slower than
