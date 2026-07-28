@@ -52,10 +52,13 @@ const OMEGA_REF = 628.3                  # rad/s
 const B_GAUSS = 9.216e-4                 # |p| = 15 (magnetostriction regime)
 const OMEGA   = CELL == "zero" ? 0.0 : 0.74
 const DDI_ON  = CELL != "plus_nodd"
-const GS_STEPS = SMOKE ? 200 : 4000
+# Overridable so a short job can measure s/step on the PRODUCTION grid and set
+# the batch walltime from a number instead of an estimate. A 20-minute probe
+# schedules in minutes where a 6-hour job waits over an hour.
+const GS_STEPS = parse(Int, get(ENV, "BR_GS_STEPS", SMOKE ? "200" : "4000"))
 const GS_DT    = 0.004
-const T_STIR   = SMOKE ? 0.4 : 30.0
-const T_QUENCH = SMOKE ? 0.4 : 50.0
+const T_STIR   = parse(Float64, get(ENV, "BR_T_STIR", SMOKE ? "0.4" : "30.0"))
+const T_QUENCH = parse(Float64, get(ENV, "BR_T_QUENCH", SMOKE ? "0.4" : "50.0"))
 const DT       = SMOKE ? 0.004 : 4.0e-4
 const REC_EVERY = SMOKE ? 10 : 250
 const PSI_FRAMES = 8                     # sparse full frames, for the vortex figure
