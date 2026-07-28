@@ -56,10 +56,12 @@ const LHY_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, default="none",
         enum=["none", "scalar", "quasi_2d", "polar_two_channel", "full_bdg",
             "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
-            "icosahedral"]),
+            "icosahedral", "spatial"]),
     "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
     "n_max" => FieldSpec(; type=Number),       # null → 3 × max(|psi_init|²)
     "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
+    # `spatial` only: |⟨F⟩|/F bins, one BdG solve per OCCUPIED bin. A cost knob.
+    "n_bins" => FieldSpec(; type=Integer, default=12, range=(2, 64)),
 )
 
 # Unified `B:` Zeeman block (replaces the legacy step-level `zeeman:` /

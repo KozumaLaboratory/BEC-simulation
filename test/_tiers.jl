@@ -35,6 +35,7 @@ const FAST_TESTS = [
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_lhy_texture_warning.jl",
+    "workflow/test_lhy_block_wiring.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -484,6 +485,7 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "test_level2_strang_convergence.jl" => 24.0,   # measured 24.1s
     "hamiltonian/test_spatial_lhy.jl" => 20.0,     # e₁(p) table = one BdG solve per bin
+    "workflow/test_lhy_block_wiring.jl" => 13.0,   # 7 modes x table builds
     "workflow/test_infrastructure.jl" => 15.0,
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
