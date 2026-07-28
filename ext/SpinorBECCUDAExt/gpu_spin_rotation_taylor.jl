@@ -98,10 +98,41 @@ function _spin_rotation_R(vx, vy, vz, scale::T, F::T) where {T <: AbstractFloat}
     scale * sqrt(maximum(s)) * F
 end
 
+# --- Horner coefficient table ---
+# `w ← ψ + (z/k)(A·w)` needs z/k for k = K…1. Computed per call as a device
+# vector rather than in the loop body: `z/T(k)` is TWO FP64 divisions, and the
+# kernel is compute-bound (bench/micro_spin_taylor.jl measures time exactly
+# linear in K with a zero memory intercept, so every op in the body is on the
+# critical path). `z` is purely imaginary in real time and purely real in
+# imaginary time, so the table is REAL — `scale/k`, sign included — and the
+# multiply by ∓i is folded into the body as a component swap. That removes
+# 2 divisions + 2 multiplies + 2 additions per degree per lane.
+#
+# Values are identical to what the in-body expression produced: for real time
+# `Complex(0,-scale/k)·(a+bi) = (scale/k)·(b - ai)` exactly, and likewise for
+# imaginary time. Filled by a device kernel (no host allocation, no HtoD).
+const _SPIN_RK_MAX = 40
+const _SPIN_RK_CACHE = Dict{DataType, Any}()
+
+function _fill_rk_kernel!(rk, scale::T, K::Int32) where {T}
+    k = CUDA.threadIdx().x
+    k <= K && (@inbounds rk[k] = scale / T(k))
+    nothing
+end
+
+function _get_spin_rk(::CuArray{Complex{T}}, scale::T, K::Integer) where {T}
+    rk = get!(() -> CUDA.zeros(T, _SPIN_RK_MAX), _SPIN_RK_CACHE, T)::CuArray{T, 1}
+    CUDA.@cuda threads = _SPIN_RK_MAX blocks = 1 _fill_rk_kernel!(rk, scale, Int32(K))
+    rk
+end
+
 # --- Taylor–Horner warp kernel (one spin component per lane) ---
+# `RT` selects the real-time (multiply by -i) vs imaginary-time (real weight)
+# form of the Horner coefficient; both read the same real `rk` table.
 @inline function _spin_taylor_warp_kernel!(
-    P, vx, vy, vz, mz, sxu, syu, z::Complex{T}, K::Int32, ::Val{D},
-) where {T, D}
+    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, ::Val{D}, ::Val{RT},
+) where {D, RT}
+    T = real(eltype(P))
     CT = Complex{T}
     W = 16
     tib = CUDA.threadIdx().x
@@ -128,14 +159,17 @@ end
     bm = c > 1 ? bm_raw : zero(CT)
 
     psi0 = (active && in_range) ? (@inbounds P[vox, c]) : zero(CT)
+    bmc = conj(bm)
     w = psi0
     k = K
     while k >= one(Int32)
         wup = _shfl_c(w, c + 1, Val(W))                  # w_{c+1} (idle→0 at c=D)
         wdn_raw = _shfl_c(w, cdn, Val(W))
         wdn = c > 1 ? wdn_raw : zero(CT)
-        Aw = diag_c * w + b_c * wup + conj(bm) * wdn
-        w = psi0 + (z / T(k)) * Aw
+        Aw = diag_c * w + b_c * wup + bmc * wdn
+        a = @inbounds rk[k]
+        # RT: (0 - i·a)·Aw = a·(imag(Aw) - i·real(Aw));  IT: (-a)·Aw
+        w = RT ? psi0 + a * CT(imag(Aw), -real(Aw)) : psi0 - a * Aw
         k -= one(Int32)
     end
 
@@ -146,34 +180,38 @@ end
 end
 
 """
-    _apply_spin_rotation_taylor!(P, vx, vy, vz, coef, z, K, Val(D))
+    _apply_spin_rotation_taylor!(P, vx, vy, vz, coef, scale, K, Val(D); imaginary_time)
 
 `P[vox, :] ← exp(z · (v(vox)·F)) · P[vox, :]` for every voxel, degree-`K`
-Taylor–Horner. `P` is the `(N_spatial, D)` reshape of ψ.
+Taylor–Horner, with `z = -i·scale` (real time) or `-scale` (imaginary time).
+`P` is the `(N_spatial, D)` reshape of ψ.
 """
 function _apply_spin_rotation_taylor!(
-    P, vx, vy, vz, coef::SpinTridiagCoef{T}, z::Complex{T}, K::Integer, ::Val{D},
+    P, vx, vy, vz, coef::SpinTridiagCoef{T}, scale::T, K::Integer, ::Val{D};
+    imaginary_time::Bool=false,
 ) where {T, D}
     N = size(P, 1)
     voxels_per_block = 16
     threads = 256
     blocks = cld(N, voxels_per_block)
+    rk = _get_spin_rk(P, scale, K)
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
-        P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, z, Int32(K), Val(D))
+        P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(K), Val(D),
+        Val(!imaginary_time))
     nothing
 end
 
 """
     _spin_taylor_plan(psi, sm, vx, vy, vz, scale, imaginary_time)
-        -> (coef, z, K) or nothing
+        -> (coef, scale, K) or nothing
 
 Shared entry decision for the three call sites. Returns `nothing` when the
 Taylor path is disabled or `R` exceeds `_SPIN_TAYLOR_RMAX[]`, in which case the
 caller must use its exact Euler realization.
 
 `scale` is the real prefactor multiplying `(v·F)` in the exponent — `dt` for
-DDI, `c₁·dt` for spin-mixing — and carries its own sign, so `z` is built here
-and the caller never re-derives it.
+DDI, `c₁·dt` for spin-mixing — and carries its own sign; it is returned
+unchanged so the caller passes it straight to `_apply_spin_rotation_taylor!`.
 """
 function _spin_taylor_plan(
     psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
@@ -190,7 +228,7 @@ function _spin_taylor_plan(
     K = _taylor_degree(R, _SPIN_TAYLOR_TOL[])
     # Real-time: exp(-i·scale·(v·F)). Imaginary time: exp(-scale·(v·F)) — a real
     # weight, so no overflow shift is needed (scale·|v|·F = R ≲ 1 by the branch
-    # condition above).
-    z = imaginary_time ? Complex{T}(-scale, zero(T)) : Complex{T}(zero(T), -scale)
-    (_get_spin_tridiag_coef(psi, sm), z, K)
+    # condition above). Both forms are carried by the real `scale`; the kernel's
+    # `Val{RT}` picks which one it means.
+    (_get_spin_tridiag_coef(psi, sm), scale, K)
 end

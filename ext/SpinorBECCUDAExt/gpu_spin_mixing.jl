@@ -118,8 +118,9 @@ function SpinorBEC.apply_spin_mixing_step!(
     # 2.85 ms per call, and this substep runs 8× per RTP step.
     plan = _spin_taylor_plan(psi, sm, fx, fy, fz, c1_t * dt_t, imaginary_time)
     if plan !== nothing
-        coef, z, K = plan
-        _apply_spin_rotation_taylor!(psi_2d, fx, fy, fz, coef, z, K, Val(D))
+        coef, scale, K = plan
+        _apply_spin_rotation_taylor!(
+            psi_2d, fx, fy, fz, coef, scale, K, Val(D); imaginary_time)
         return nothing
     end
 

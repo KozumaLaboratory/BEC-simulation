@@ -70,8 +70,9 @@ function SpinorBEC._apply_ddi_rotation!(
 
     plan = _spin_taylor_plan(psi, sm, px, py, pz, T(dt_frac), imaginary_time)
     if plan !== nothing
-        coef, z, K = plan
-        _apply_spin_rotation_taylor!(P, px, py, pz, coef, z, K, Val(D))
+        coef, scale, K = plan
+        _apply_spin_rotation_taylor!(
+            P, px, py, pz, coef, scale, K, Val(D); imaginary_time)
         return nothing
     end
 
