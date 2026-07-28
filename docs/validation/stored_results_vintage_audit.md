@@ -87,34 +87,57 @@ pointer here, which is the part a date cannot supply.
 - Claims that turn on a coefficient identity rather than a run — e.g. the SI
   round-trip oracles, $Q_5$ closed forms, $a_{dd}$ values.
 
-## First re-derivation, and it overturned a conclusion
+## First re-derivation: the conclusion held, the evidence was vacuous
 
 `research_notes/eu_collapse_lhy_insufficient.md` claimed all five LHY treatments
 give identical density profiles for the Eu F=6 EdH post-quench collapse, hence
-"LHY is sub-leading vs the mean-field DDI attraction". Re-run in current code on
-the same GPU backend:
+"LHY is sub-leading vs the mean-field DDI attraction".
+
+**The conclusion survives.** Re-run in current code, same GPU backend, the four
+usable modes agree to 4.7 % in peak density:
 
 | mode | $E$ | peak $n$ | FWHM$_z$ | $M_z$ |
 |---|---:|---:|---:|---:|
-| off | −881.09 | 0.01014 | 10 | −5.410 |
-| scalar | −880.99 | 0.00968 | 10 | −5.457 |
-| **polar_contact** | −851.47 | **0.00066** | **20** | −5.995 |
-| **fm_contact** | −851.45 | **0.00068** | **20** | −5.994 |
-| **full_bdg** | −847.32 | **0.00054** | **22** | −5.996 |
+| off | −881.086 | 0.01014 | 10 | −5.4104 |
+| scalar | −880.993 | 0.00968 | 10 | −5.4567 |
+| polar_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+| fm_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+| *full_bdg* | *−847.324* | *0.00054* | *22* | *−5.9955* |
 
-The F-aware closed forms cut the peak density **15×** and double the axial width.
+**Its evidence did not.** Three of the original five rows ran with `c_lhy = 0` —
+that config is `backend: gpu` and until #125 every tabulated LHY was silently
+zeroed on the GPU broadcast path — and a fourth ran 2.34× too weak. "All five
+identical" was four flavours of *off*: the observation was guaranteed regardless
+of the physics. The closed forms are active now (all three differ from each other
+and from `off`), so the comparison could have come out otherwise, which is what
+makes it evidence.
 
-The mechanism is one of the corrections in the table above: that config is
-`backend: gpu`, and until 2026-07-28 every *tabulated* LHY was silently collapsed
-to `c_lhy = 0` on the GPU broadcast path. Three of the five compared rows
-therefore ran with no LHY at all, a fourth ran 2.34× too weak, and the fifth was
-LHY-off by construction. "All five identical" was four flavours of *off*.
+`full_bdg` is excluded: it self-reports "mean field is dynamically unstable
+(max Im ω = 213), ε_LHY is scheme-dependent here", and its ITP returned
+`conv=false`.
 
-What survives is narrower and still useful: a **scalar** Lima-Pelster treatment
-is insufficient for F=6. Generalising that to "LHY is sub-leading" was the error.
+**This is the pattern to expect from the rest of the list.** Not "the numbers
+moved a little" but "the comparison was between things that were secretly the
+same". A stale null result is the dangerous kind, because a broken knob and a
+knob that does not matter look identical.
 
-This is the pattern to expect from the rest: not "the numbers moved a little"
-but "the comparison was between things that were secretly the same".
+### Two false starts, recorded because they are the same trap
+
+Both were mine, both caught before they shipped, both by checking the code's own
+report rather than by reasoning:
+
+1. First re-run reported the closed forms cutting peak density **15×** and
+   arresting the collapse. That was #158 — closed-form tables $N_{atoms}$ too
+   large — which merged **22 minutes after** the run. Caught with
+   `git merge-base --is-ancestor`, i.e. by asking whether the run contained the
+   fix rather than assuming it did.
+2. The surviving 19× outlier was nearly quoted as "LHY can arrest this collapse".
+   It was `full_bdg`, which prints a warning saying its ε_LHY is
+   scheme-dependent for exactly this state, and did not converge.
+
+Generalisation for anyone re-deriving from this list: **check the run's commit
+against the fix list above, and read the run's own warnings, before comparing
+numbers.**
 
 ## Recommended order
 
