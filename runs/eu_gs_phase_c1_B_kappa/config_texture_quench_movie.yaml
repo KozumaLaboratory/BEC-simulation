@@ -24,7 +24,19 @@
 metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
-dealias: {enabled: true, k_cut: 5.0}
+# DEALIAS OFF, and this is measured, not a preference. Single-variable probe on
+# this exact cell (duration 0.1, 200 steps, everything else identical):
+#
+#   enabled: false -> column sum 18.963 at EVERY saved frame (conserved to 5 s.f.)
+#   enabled: true  -> 18.963 -> 1.202 -> 1.028 -> ... -> 0.669
+#
+# i.e. turning the block on destroys 94% of the atoms in 20 steps and the run
+# reports norm_rel_drift = 0.993. It is not `k_cut` (removing it reproduces the
+# loss to 3 s.f.) and it is not the psi filter, which is an exact no-op on this
+# state on BOTH backends when called directly. The remaining suspect is the
+# DDI F-filter path that `DEALIAS_2_3_ENABLED[]` also gates
+# (convolution.jl:183) — unverified, so stated as a suspect, not a cause.
+dealias: {enabled: false}
 pipeline:
   # Prepared above the crossover — axial flux-closure texture.
   - ground_state:
