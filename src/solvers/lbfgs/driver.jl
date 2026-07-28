@@ -32,7 +32,7 @@ function find_ground_state_lbfgs(;
     grid::Union{Nothing, Grid}=nothing,
     atom::Union{Nothing, AtomSpecies}=nothing,
     interactions::InteractionParams=InteractionParams(Dict{Int, Float64}()),
-    zeeman::Union{ZeemanParams, TimeDependentZeeman}=ZeemanParams(0.0, 0.0),
+    zeeman::AbstractZeemanField=ZeemanParams(0.0, 0.0),
     potential::AbstractPotential=NoPotential(),
     n_steps::Int=1000,
     tol::Float64=1e-8,
