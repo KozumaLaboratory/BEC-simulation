@@ -59,7 +59,7 @@ function _make_ddi_params_quasi2d(
         U(l_z),
     )
 
-    DDIParams(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    DDIParams(c_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, grid.config.box_size)
 end
 
 function _make_ddi_params_full(
@@ -120,7 +120,7 @@ function _make_ddi_params_full(
         trunc_radius,
     )
 
-    DDIParams(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
+    DDIParams(C_dd, Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz, grid.config.box_size)
 end
 
 function _ddi_params_to_device(ddi::DDIParams, backend::CPUBackend)
@@ -136,6 +136,7 @@ function _ddi_params_to_device(ddi::DDIParams, backend::AbstractBackend)
         _to_device(backend, ddi.Q_yy),
         _to_device(backend, ddi.Q_yz),
         _to_device(backend, ddi.Q_zz),
+        ddi.box_size,
     )
 end
 
@@ -181,9 +182,9 @@ function _compute_and_convolve_ddi!(
     # Full Orszag 2/3 rule companion (see dealias.jl + ddi_padded.jl). Filter
     # bilinear F to (2/3)·k_Nyq to suppress aliased fold-back into low-k F.
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_F_filter!(bufs.Fx_r, n_pts)
-        apply_orszag_2_3_F_filter!(bufs.Fy_r, n_pts)
-        apply_orszag_2_3_F_filter!(bufs.Fz_r, n_pts)
+        apply_orszag_2_3_F_filter!(bufs.Fx_r, n_pts, ddi.box_size)
+        apply_orszag_2_3_F_filter!(bufs.Fy_r, n_pts, ddi.box_size)
+        apply_orszag_2_3_F_filter!(bufs.Fz_r, n_pts, ddi.box_size)
     end
 
     rp = bufs.rfft_plans

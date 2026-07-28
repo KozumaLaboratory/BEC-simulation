@@ -93,7 +93,8 @@ function _run_simulation_leapfrog!(
     cc = ws.coriolis_cache
 
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+            ws.grid.config.box_size)
     end
 
     _half_potential!(
@@ -103,7 +104,8 @@ function _run_simulation_leapfrog!(
     try
         for step in 1:(sp.n_steps)
             if DEALIAS_2_3_ENABLED[]
-                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+                    ws.grid.config.box_size)
             end
 
             apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
