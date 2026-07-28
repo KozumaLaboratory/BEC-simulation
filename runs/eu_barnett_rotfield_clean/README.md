@@ -20,6 +20,14 @@
 > What survives unconditionally is the **tooling** — the runners, the TSUBAME
 > NVMe-scratch guards, the analysis scripts, and the J_z-ledger diagnostics —
 > which is most of what this directory is for.
+>
+> **The five `edh_*.yaml` configs here were sign-corrected before landing**, so
+> they no longer reproduce the archived numbers. They had `Bz: "-0.01 Gauss"` in
+> the ground state against `from: 0.01` in the dynamics ramp — the field flipped
+> sign at t=0 — and the negative ground-state value selects m=+F under current
+> code anyway (measured; see the Zeeman-convention gate). Leaving them as-is
+> would have preserved the archive at the cost of shipping five configs that are
+> wrong to re-run, which is the worse trade.
 
 ¹⁵¹Eu (F=6) dipolar BEC, 32³, N=30000, a_s=110a₀ (ε_dd<1, no collapse),
 full DDI (non-secular), scalar LHY, GPU, unitary (no loss). All angular
