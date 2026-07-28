@@ -518,6 +518,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             psi_host = _to_host(result.psi)
             energy = get(result, :ground_state_energy, NaN)
             converged = get(result, :ground_state_converged, true)
+            grad_norm = get(result, :ground_state_grad_norm, NaN)
 
             # Mz measurement
             grid = result.grid
@@ -552,6 +553,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     f["duration_seconds"] = duration
                     f["energy"] = energy
                     f["converged"] = converged
+                    f["grad_norm"] = grad_norm
                     f["mz_actual"] = mz_actual
                     # Embed grid geometry — see single-run path for rationale.
                     f["grid_box_size"] = collect(Float64, grid.config.box_size)

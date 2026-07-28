@@ -194,6 +194,9 @@ __pycache__/
 *.out
 *.aux
 *.toc
+# result CSVs are regenerable (extract from jld2); keep figures (png), not data
+runs/**/*.csv
+
 # figure data lives on TSUBAME (runs/eu_shape_optimization/data/); repo keeps figures+code
 docs/guides/figures/*.csv
 docs/guides/figures/__pycache__/

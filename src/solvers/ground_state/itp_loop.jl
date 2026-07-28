@@ -74,7 +74,8 @@ function _run_itp_loop!(
     # even after the dynamics filter is applied; see L4 cross-grid probe
     # 2026-05-24).
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim,
+            ws.grid.config.box_size)
     end
 
     # Open: V(dt/2)
@@ -87,7 +88,8 @@ function _run_itp_loop!(
             on_step !== nothing && on_step(ws, step, n_steps)
 
             if DEALIAS_2_3_ENABLED[]
-                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim,
+                    ws.grid.config.box_size)
             end
 
             # Kinetic step K(dt)

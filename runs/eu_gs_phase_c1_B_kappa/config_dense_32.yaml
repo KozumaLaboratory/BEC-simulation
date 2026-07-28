@@ -1,0 +1,41 @@
+# DENSE (B × κ) map at physical Eu (c1=+1/36) for SMOOTH order-parameter contours
+# (Kawaguchi-style curves): 21 Bz × 15 κ = 315 cells × 2 seeds. Each warm-starts
+# (seed_from nearest) off the 32³ recon winner and is polished with
+# newton_polish (escapes the mid-field metastable traps). 32³: the flux-closure
+# order parameter is resolution-robust, so the contour SHAPE is faithful while
+# the map stays cheap (~4 GB). Post-process with eu_phase_fingerprint →
+# eu_phase_contour.py for smooth flux-closure / |⟨F⟩| curves.
+metadata: {owner: anko, project: Eu151 GS — dense flux-closure map for smooth contours}
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true          # escape mid-field metastable traps
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      seed_from: {run: runs/config_recon_335a2216, upsample: false, nearest: true}
+      n_steps: 1000
+      tol: 1.0e-8
+
+  - analyze:
+      - phase_classify_distance: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.B.Bz: {from: "0.0 Gauss", to: "1.2e-4 Gauss", n: 21}
+    pipeline.0.potential.omega.2: {from: 1.0, to: 2.2, n: 15}
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

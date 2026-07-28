@@ -31,6 +31,7 @@ const FAST_TESTS = [
     # "analysis/test_dipole_field.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
+    "workflow/test_seed_from.jl",
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
@@ -67,6 +68,8 @@ const FAST_TESTS = [
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
     "foundation/test_atoms.jl",
+    "foundation/test_fft_nyquist_null.jl",
+    "foundation/test_no_unguarded_fft_derivative.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
     "foundation/test_noise_waveform.jl",
@@ -387,6 +390,7 @@ const FULL_EXTRA = [
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
     "gpu/test_projected_gp_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -421,6 +425,7 @@ const FULL_EXTRA = [
     "gpu/test_mixed_precision.jl",
     "gpu/test_mixed_precision_phase3.jl",
     "hamiltonian/test_combined_spin_step.jl",
+    "solvers/test_rtp_combined_step_selection.jl",
     "hamiltonian/test_light_shift.jl",
     "solvers/test_conservation_properties.jl",
     "solvers/test_itp_ddi_strang_save_every.jl",      # Bug-4 ITP regression pin
