@@ -29,6 +29,7 @@ const FAST_TESTS = [
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
+    "workflow/test_spinor_gs_from_jld2.jl",
     "workflow/test_run_root_env.jl",
     "workflow/test_config_zeeman_seed_agreement.jl",
     "workflow/test_calibration_edge_cases.jl",
