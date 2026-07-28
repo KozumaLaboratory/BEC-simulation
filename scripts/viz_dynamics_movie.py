@@ -4,12 +4,14 @@
 Reads what the `vortex_density_movie` analyzer wrote (frames.jld2 +
 manifest.json) and lays out four panels per frame:
 
-  1. column density n(x,y) — where the atoms are
-  2. mid-plane PHASE of the tracked component, with the MASS-CURRENT vortices
-     marked (o = +1, x = -1). The markers come from the circulation of the
-     total current, not from this panel's phase — that phase is shown because
-     it is where a core is visible, but per-component winding is not a vortex.
-  3. mid-plane density of the same component — the holes the defects sit in
+  1. top view: column density n(x,y), looking ALONG the field axis
+  2. SIDE view: column density n(x,z). This is the panel that shows the DDI
+     magnetostriction — the top view integrates along the elongated axis and is
+     a circular blob however prolate the cloud is (measured z/x = 1.42 on the Eu
+     ground state, and completely invisible in panel 1).
+  3. mid-plane TOTAL density with the mass-current vortices marked
+     (o = +1, x = -1). A vortex core is a hole in the TOTAL density; if the
+     markers are not sitting in holes, they are not cores.
   4. running history: vortex count and net charge vs time, with a cursor
 
 Vortex count and net charge are plotted separately on purpose. A count that
@@ -64,6 +66,8 @@ qerr = np.asarray(man.get("quantisation_error", np.zeros(len(times))), dtype=flo
 mstrict = np.asarray(man.get("mass_vortex_counts_strict", mcounts), dtype=int)
 has_mass = "mass_vortex_counts" in man
 ext_x, ext_y = (float(v) for v in man["extent"])
+side_ext = [float(v) for v in man.get("side_extent", man["extent"])]
+has_side = "side_extent" in man
 
 # Resample to the requested duration, so the movie is SECONDS long whatever the
 # run saved: 400 snapshots should not become a 13-second movie, and 40 should
@@ -92,7 +96,10 @@ def rd(prefix, i):
 # cloud look constant and a growing excitation look like nothing happened.
 probe = sel[:: max(1, len(sel) // 12)]
 n_hi = max(float(rd("n_col", i).max()) for i in probe)
-dm_hi = max(float(rd("dens_mid", i).max()) for i in probe)
+_mid_key = "n_mid" if has_side else "dens_mid"
+_side_key = "n_side" if has_side else "n_col"
+dm_hi = max(float(rd(_mid_key, i).max()) for i in probe)
+sd_hi = max(float(rd(_side_key, i).max()) for i in probe)
 
 fig, axes = plt.subplots(2, 2, figsize=(11.5, 8.6))
 fig.subplots_adjust(hspace=0.30, wspace=0.34, top=0.90, left=0.07, right=0.97)
@@ -104,16 +111,19 @@ im_n = axn.imshow(rd("n_col", sel[0]).T, origin="lower", extent=half,
 axn.set_title("column density $n(x,y)$")
 fig.colorbar(im_n, ax=axn, fraction=0.046)
 
-im_p = axp.imshow(rd("phase", sel[0]).T, origin="lower", extent=half,
-                  cmap="twilight_shifted", vmin=-np.pi, vmax=np.pi, aspect="equal")
-axp.set_title(f"mid-plane phase, component {man['component']}")
-(vpos,) = axp.plot([], [], "o", mfc="none", mec="w", ms=11, mew=1.8)
-(vneg,) = axp.plot([], [], "x", mec="cyan", ms=11, mew=1.8)
+side_half = [-side_ext[0] / 2, side_ext[0] / 2, -side_ext[1] / 2, side_ext[1] / 2]
+im_p = axp.imshow(rd(_side_key, sel[0]).T, origin="lower", extent=side_half,
+                  cmap="inferno", vmin=0, vmax=sd_hi, aspect="equal")
+axp.set_title("side view $n(x,z)$ — the elongated axis")
+axp.set_xlabel("x")
+axp.set_ylabel("z")
 fig.colorbar(im_p, ax=axp, fraction=0.046)
 
-im_d = axd.imshow(rd("dens_mid", sel[0]).T, origin="lower", extent=half,
+im_d = axd.imshow(rd(_mid_key, sel[0]).T, origin="lower", extent=half,
                   cmap="viridis", vmin=0, vmax=dm_hi, aspect="equal")
-axd.set_title("mid-plane density (same component)")
+axd.set_title("mid-plane TOTAL density + vortex cores")
+(vpos,) = axd.plot([], [], "o", mfc="none", mec="w", ms=11, mew=1.8)
+(vneg,) = axd.plot([], [], "x", mec="cyan", ms=11, mew=1.8)
 fig.colorbar(im_d, ax=axd, fraction=0.046)
 
 axh.plot(times, mcounts, lw=1.4, color="crimson", alpha=0.45,
@@ -143,14 +153,14 @@ def pix_to_phys(px, py, shape):
 def draw(k):
     i = sel[k]
     im_n.set_data(rd("n_col", i).T)
-    ph = rd("phase", i)
-    im_p.set_data(ph.T)
-    im_d.set_data(rd("dens_mid", i).T)
+    im_p.set_data(rd(_side_key, i).T)
+    mid = rd(_mid_key, i)
+    im_d.set_data(mid.T)
 
     pre = "mvortex" if has_mass else "vortex"
     vx, vy, vq = rd(f"{pre}_x", i), rd(f"{pre}_y", i), rd(f"{pre}_q", i)
     if len(vq):
-        px, py = pix_to_phys(vx, vy, ph.shape)
+        px, py = pix_to_phys(vx, vy, mid.shape)
         vpos.set_data(px[vq > 0], py[vq > 0])
         vneg.set_data(px[vq < 0], py[vq < 0])
     else:
