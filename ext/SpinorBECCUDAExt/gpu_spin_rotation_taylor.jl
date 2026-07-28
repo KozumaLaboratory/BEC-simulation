@@ -86,10 +86,12 @@ const _SPIN_TAYLOR_TOL = Ref(1.0e-13)  # backward-error target
 #   1e-9  → 9.6e-13 / 4.3e-12      1e-11 → 2.1e-15 / 3.8e-14
 #   1e-13 → 2.2e-16 / 3.0e-15      1e-15 → 2.2e-16 / 3.0e-15  (saturated)
 # so 1e-13 buys machine precision — better than the pre-per-voxel code — and
-# tightening past it buys nothing. It costs 1.088× on a card where the Horner
-# is FP64-compute-bound, and ~nothing on an H100 where the kernel is
-# memory-bound (time flat in the degree). The parity gate is the safety net:
-# relax this and it goes red.
+# tightening past it buys nothing. Measured cost of the extra degrees: 1.088×
+# at 64³ on a card where the Horner is FP64-compute-bound, and 1.024× at 128³
+# on an H100 (14.224 → 14.566 ms/step) where the kernel is memory-bound and the
+# degree is nearly free. The parity gate is the safety net: relax this and the
+# machine-precision norm bound in
+# `test/gpu/test_gpu_spin_rotation_taylor_parity.jl` goes red.
 #
 # Angle above which a voxel halves its rotation and applies it twice (repeated
 # squaring). Production R is 0.01–0.2 so no voxel ever halves; the branch exists

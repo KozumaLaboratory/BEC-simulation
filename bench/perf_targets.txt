@@ -103,6 +103,11 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   64³   4.394 → 2.028 ms/step   2.17×      GPU busy 3.87 → 1.87 ms
 #   128³ 29.755 → 14.224 ms/step  2.09×      GPU busy 29.2 → 14.19 ms
 #
+# and after tightening _SPIN_TAYLOR_TOL to 1e-13 (which the per-voxel degree
+# made binding — see gpu_spin_rotation_taylor.jl), 128³ is 14.566 ms/step, i.e.
+# 2.04× for machine-precision rotations. The tolerance costs 1.024× there and
+# 1.088× on the consumer card.
+#
 # The fused half-step alone, in-process A/B (bench/rtp_fusion_ab.jl):
 #   64³  3.585 → 2.024 ms/step  1.77×
 #   128³ 26.145 → 14.252       1.83×
