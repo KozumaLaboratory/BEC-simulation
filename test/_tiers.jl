@@ -486,6 +486,9 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_ddi.jl" => 33.6,
     "dynamics/test_tdhfb_f1_validation.jl" => 30.3,
     "oracles/test_bdg_fd_hessian.jl" => 23.8,
+    # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
+    # SpatialLHY table build (BdG solves) — measured 22.2s.
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "oracles/test_imag_time_propagator_generator.jl" => 22.8,
     "validation/test_L5_operator_rhs_compare.jl" => 22.6,
     "hamiltonian/test_ddi_padded.jl" => 22.1,
@@ -551,9 +554,6 @@ const _COST = Dict{String, Float64}(
     "test_dealias_2_3.jl" => 76.0,
     "solvers/test_continuation.jl" => 58.0,
     "workflow/test_pipeline.jl" => 17.0,
-    # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
-    # SpatialLHY table build (BdG solves) — measured 22.2s.
-    "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "workflow/test_infrastructure.jl" => 15.0,
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "analysis/test_tof_multiframe.jl" => 9.5,
