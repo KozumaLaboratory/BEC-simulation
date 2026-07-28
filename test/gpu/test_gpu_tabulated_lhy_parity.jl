@@ -65,6 +65,43 @@ else
             @test maximum(abs.(outs[1] .- outs[2])) > 1e-3
         end
 
+        @testset "SpatialLHY reaches the device too" begin
+            # `SpatialLHY <: AbstractLHY`, NOT `<: TabulatedLHY`, so the device
+            # method above does not cover it — and it takes the four-argument
+            # (density, polarisation) form, which is a second method again. With
+            # neither, the host-`Vector` CPU broadcast is what a CuArray lands on.
+            #
+            # Its nodes are the centres of the OCCUPIED bins, so they are not
+            # uniformly spaced and the device lookup has to scan rather than
+            # index — which is also why this must be compared, not assumed.
+            psi_tex = zeros(ComplexF64, n, n, n, D)
+            c = (n + 1) / 2
+            for i in 1:n, j in 1:n, k in 1:n
+                r = clamp(sqrt((i - c)^2 + (j - c)^2 + (k - c)^2) / (n / 2), 0.0, 1.0)
+                a = exp(-2r^2)
+                psi_tex[i, j, k, 1] = a * (1 - r)
+                psi_tex[i, j, k, F + 1] = a * r
+            end
+            lhy = SpinorBEC.compute_spatial_lhy(; psi_init=psi_tex, F,
+                interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.02)),
+                n_bins=8)
+            @test lhy isa SpinorBEC.SpatialLHY
+
+            for it in (false, true)
+                pc, mc = copy(psi0), copy(psi0)
+                _diagonal_step_svec!(Val(3), pc, zeros(Float64, n, n, n), zd, 10.0,
+                    lhy, 0.001, zeros(Float64, n, n, n), it; psi_mf=mc)
+
+                pg, mg = CUDA.CuArray(psi0), CUDA.CuArray(psi0)
+                _diagonal_step_svec!(Val(3), pg, CUDA.zeros(Float64, n, n, n), zd,
+                    10.0, lhy, 0.001, CUDA.zeros(Float64, n, n, n), it; psi_mf=mg)
+                CUDA.synchronize()
+
+                @test maximum(abs.(Array(pg) .- pc)) < 1e-13
+                @test maximum(abs.(pc .- psi0)) > 1e-6
+            end
+        end
+
         @testset "a non-uniform density grid is refused, not mis-indexed" begin
             # The device lookup is O(1) index arithmetic, which is only valid on
             # the uniform grid the tabulators build.

@@ -56,3 +56,57 @@ function SpinorBEC._lhy_potential_field(l::SpinorBEC.TabulatedLHY,
     out .= _lhy_interp_uniform.(density_buf, x0, dx, Ref(ys), m)
     out
 end
+
+# --- SpatialLHY -------------------------------------------------------------
+#
+# `SpatialLHY` is NOT a `TabulatedLHY`: it tabulates `e₁` against the local
+# POLARISATION, so it arrives at the four-argument `(density, polarisation)`
+# form of `_lhy_potential_field` and the method above never sees it. Without a
+# device method here the generic CPU broadcast is what runs, closing over host
+# `Vector`s from a device kernel — the same failure mode this file exists to
+# fix, one level up the type tree.
+#
+# The nodes are the centres of the OCCUPIED bins (`_bin_local_spinors` drops
+# empty ones), so unlike every density table they are NOT uniformly spaced and
+# the O(1) index arithmetic above does not apply. The scan below reproduces
+# `_interpolate_1d`'s `searchsortedlast` exactly instead; with at most `n_bins`
+# nodes (12 by default) a linear scan is cheaper than a search anyway, and
+# being exact is what keeps GPU and CPU bit-identical.
+@inline function _lhy_interp_scan(x::Float64, xs, ys, m::Int)
+    @inbounds x <= xs[1] && return @inbounds ys[1]
+    @inbounds x >= xs[m] && return @inbounds ys[m]
+    i = 1
+    @inbounds for k in 1:m
+        xs[k] <= x && (i = k)
+    end
+    @inbounds ys[i] + ((x - xs[i]) / (xs[i + 1] - xs[i])) * (ys[i + 1] - ys[i])
+end
+
+# Same expression as `_lhy_V(n, p, ::SpatialLHY)`, in the same order, so the
+# two paths agree to the last bit rather than to a tolerance.
+@inline function _spatial_lhy_V(n::Float64, p::Float64, xs, ys, m::Int)
+    n < 1e-30 && return 0.0
+    e1 = _lhy_interp_scan(clamp(p, 0.0, 1.0), xs, ys, m)
+    2.5 * e1 * n * sqrt(n)
+end
+
+const _SPATIAL_LHY_CACHE = Dict{UInt64, Any}()
+
+function _device_spatial_table(l::SpinorBEC.SpatialLHY)
+    get!(_SPATIAL_LHY_CACHE, objectid(l)) do
+        (CUDA.CuArray(l.polarisations), CUDA.CuArray(l.e1_values))
+    end::Tuple{CUDA.CuArray{Float64, 1}, CUDA.CuArray{Float64, 1}}
+end
+
+function SpinorBEC._lhy_potential_field(l::SpinorBEC.SpatialLHY,
+    density_buf::CUDA.CuArray{RT}, p_buf::CUDA.CuArray,
+    ::Type{RT2}) where {RT, RT2}
+    xs, ys = _device_spatial_table(l)
+    m = length(l.polarisations)
+    out = similar(density_buf)
+    # Float64 throughout, like the CPU method — the conversions fuse into this
+    # one broadcast, so an F32 grid still costs no extra array.
+    out .= RT2.(_spatial_lhy_V.(Float64.(density_buf), Float64.(p_buf),
+        Ref(xs), Ref(ys), m))
+    out
+end

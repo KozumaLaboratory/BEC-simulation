@@ -26,11 +26,25 @@ using Test
 using LinearAlgebra
 using StaticArrays
 using SpinorBEC
-using SpinorBEC: _diagonal_step_svec!, _lhy_V, _lhy_is_active, _lhy_potential_field,
-    _c0c1_to_gS
+using SpinorBEC: _diagonal_step_svec!, _diagonal_step_with_ls!, _lhy_V, _lhy_is_active,
+    _lhy_potential_field, _c0c1_to_gS, compute_spatial_lhy
 
 const _F = 6
 const _D = 13
+
+# A cloud whose polarisation runs 1 (centre) → 0 (edge), so `compute_spatial_lhy`
+# has a spread to tabulate against and does not abstain.
+function _textured_state(n::Int=6)
+    psi = zeros(ComplexF64, n, n, n, _D)
+    c = (n + 1) / 2
+    for i in 1:n, j in 1:n, k in 1:n
+        r = clamp(sqrt((i - c)^2 + (j - c)^2 + (k - c)^2) / (n / 2), 0.0, 1.0)
+        a = exp(-2r^2)
+        psi[i, j, k, 1] = a * (1 - r)
+        psi[i, j, k, _F + 1] = a * r
+    end
+    psi
+end
 
 function _lhy_zoo()
     g = _c0c1_to_gS(_F, 10.0, 0.1)
@@ -69,6 +83,51 @@ end
                 0.001, db, it; psi_mf=view(mb, :, :, :, :))
 
             @test maximum(abs.(pa .- pb)) < 1e-13
+        end
+    end
+
+    @testset "SpatialLHY too — it is not a TabulatedLHY" begin
+        # `SpatialLHY <: AbstractLHY` directly, so every method written for
+        # `TabulatedLHY` misses it. It also reads the local polarisation, which
+        # the broadcast path has to build as a field rather than per voxel, and
+        # the light-shift step repeats the whole arrangement. Each of those is a
+        # separate chance for the two statements of V_LHY to part ways.
+        lhy = compute_spatial_lhy(; psi_init=_textured_state(), F=_F,
+            interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.02)), n_bins=8)
+        @test lhy isa SpinorBEC.SpatialLHY
+        @test SpinorBEC._lhy_needs_spin(lhy)
+
+        ls_amp = SVector{_D, Float64}(range(-0.3, 0.3; length=_D))
+        ls_prof = ones(n, n, n)
+
+        for it in (false, true)
+            pa, ma = copy(psi0), copy(psi0)
+            Va, da = zeros(n, n, n), zeros(n, n, n)
+            _diagonal_step_svec!(Val(3), pa, Va, zd, 10.0, lhy, 0.001, da, it;
+                psi_mf=ma)
+
+            pb, mb = copy(psi0), copy(psi0)
+            Vb, db = zeros(n, n, n), zeros(n, n, n)
+            _diagonal_step_svec!(Val(3), view(pb, :, :, :, :), Vb, zd, 10.0, lhy,
+                0.001, db, it; psi_mf=view(mb, :, :, :, :))
+            @test maximum(abs.(pa .- pb)) < 1e-13
+
+            pc, mc = copy(psi0), copy(psi0)
+            Vc, dc = zeros(n, n, n), zeros(n, n, n)
+            _diagonal_step_with_ls!(Val(3), pc, Vc, zd, 10.0, lhy, 0.001, dc, it,
+                ls_amp, ls_prof; psi_mf=mc)
+
+            pd, md = copy(psi0), copy(psi0)
+            Vd, dd = zeros(n, n, n), zeros(n, n, n)
+            _diagonal_step_with_ls!(Val(3), view(pd, :, :, :, :), Vd, zd, 10.0,
+                lhy, 0.001, dd, it, ls_amp, ls_prof;
+                psi_mf=view(md, :, :, :, :))
+            @test maximum(abs.(pc .- pd)) < 1e-13
+
+            # Agreeing on nothing is how the original bug hid, so assert the
+            # term is present at all — on BOTH paths.
+            @test maximum(abs.(pa .- psi0)) > 1e-6
+            @test maximum(abs.(pb .- psi0)) > 1e-6
         end
     end
 
