@@ -34,10 +34,28 @@ source scripts/tsubame_setup.sh
 . /etc/profile.d/modules.sh
 module load "${SPINORBEC_TSUBAME_CUDA_MODULE:-cuda/12.8.0}"
 
-# Compute nodes do NOT inherit the login depot; point at the shared depot
-# (where packages were instantiated) or every job fails "Package not installed".
-export JULIA_DEPOT_PATH=${SPINORBEC_TSUBAME_DEPOT:-/gs/fs/tga-kozuma-kouhi/shared/.julia}
+# Depot as a LIST: node-local NVMe first, shared Lustre depot second.
+#
+# Compute nodes do not inherit the login depot, so the shared depot has to be on
+# the path or every job fails "Package not installed". But pointing at it ALONE
+# makes Julia write precompile output to Lustre, and the group is at 985/1000 GB
+# — a run died with `LLVM ERROR: IO failure on output stream: Disk quota
+# exceeded` mid-precompile (2026-07-29). Julia writes new caches to the FIRST
+# writable depot and reads packages from all of them, so this puts compile
+# output on per-job NVMe and keeps the installed packages readable, without
+# deleting anyone's data. Cost: precompile runs once per job (~2-3 min).
+SHARED_DEPOT=${SPINORBEC_TSUBAME_DEPOT:-/gs/fs/tga-kozuma-kouhi/shared/.julia}
+if [ -n "${T4_TMPDIR:-}" ] && [ -w "${T4_TMPDIR}" ]; then
+    mkdir -p "$T4_TMPDIR/.julia"
+    export JULIA_DEPOT_PATH="$T4_TMPDIR/.julia:$SHARED_DEPOT"
+else
+    export JULIA_DEPOT_PATH="$SHARED_DEPOT"
+fi
+echo "[eu_spgpe_evap] JULIA_DEPOT_PATH=$JULIA_DEPOT_PATH"
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
+
+# Fail loudly and early if the group quota cannot absorb this job's output.
+t4-user-info disk group -g tga-kozuma-kouhi 2>/dev/null | tail -2 || true
 
 MODE=${SBEC_SPGPE_MODE:-production}
 export SBEC_SPGPE_BACKEND=gpu
