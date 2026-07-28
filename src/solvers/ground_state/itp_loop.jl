@@ -159,11 +159,7 @@ function _run_itp_loop!(
 
             if step % sp.save_every == 0
                 E = total_energy(ws)
-                # Relative energy-change convergence: scale-invariant so a
-                # single `tol` works across systems whose E spans orders of
-                # magnitude. Falls back to the absolute change when E ≈ 0.
-                dE_abs = abs(E - E_prev)
-                dE = abs(E) > 0 ? dE_abs / abs(E) : dE_abs
+                dE = _relative_energy_change(E, E_prev)
 
                 # drho = max_r |ρ(r,now) - ρ(r,prev)| / max_r ρ(r,now)
                 # where ρ(r) = Σ_c |ψ_c(r)|² is the total density.
@@ -173,9 +169,9 @@ function _run_itp_loop!(
                 # GPU-compatible: broadcasting + reductions only, no scalar
                 # indexing on the device array.
                 psi_now = ws.state.psi
-                rho_now  = dropdims(sum(abs2, psi_now;  dims=N_dim+1); dims=N_dim+1)
+                rho_now = dropdims(sum(abs2, psi_now; dims=N_dim+1); dims=N_dim+1)
                 rho_prev_arr = dropdims(sum(abs2, psi_prev; dims=N_dim+1); dims=N_dim+1)
-                rho_max  = Float64(maximum(rho_now))
+                rho_max = Float64(maximum(rho_now))
                 drho_max = Float64(maximum(abs.(rho_now .- rho_prev_arr)))
                 drho = rho_max > 0 ? drho_max / rho_max : 0.0
 
