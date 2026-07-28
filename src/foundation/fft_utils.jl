@@ -31,8 +31,11 @@ function _fft_partial_derivative(
     end
     buf .= f
     local_plans.forward * buf
+    # Null the Nyquist mode: ik is aliased/ill-defined at k=±N/2 for even N, so it
+    # emits a checkerboard artifact in odd (first) derivatives. Standard convention.
+    nyq = iseven(n_pts[dim]) ? n_pts[dim] ÷ 2 + 1 : 0
     @inbounds for I in CartesianIndices(n_pts)
-        buf[I] = im * grid.k[dim][I[dim]] * buf[I]
+        buf[I] = I[dim] == nyq ? zero(ComplexF64) : im * grid.k[dim][I[dim]] * buf[I]
     end
     local_plans.inverse * buf
     result = Array{Float64, N}(undef, n_pts)
@@ -67,8 +70,9 @@ function _fft_gradient(
     local_plans.forward * f_k
 
     ntuple(N) do dim
+        nyq = iseven(n_pts[dim]) ? n_pts[dim] ÷ 2 + 1 : 0   # null Nyquist (see above)
         @inbounds for I in CartesianIndices(n_pts)
-            buf[I] = im * grid.k[dim][I[dim]] * f_k[I]
+            buf[I] = I[dim] == nyq ? zero(ComplexF64) : im * grid.k[dim][I[dim]] * f_k[I]
         end
         local_plans.inverse * buf
         result = Array{Float64, N}(undef, n_pts)
@@ -77,4 +81,38 @@ function _fft_gradient(
         end
         result
     end
+end
+
+"""
+    _null_nyquist_modes!(psi, grid) -> psi
+
+Zero the Nyquist Fourier mode (k=±N/2 along each even spatial dim) of every
+spinor component, then renormalise. Removes the checkerboard-generating Nyquist
+content that L-BFGS / Newton (which do NOT re-dealias) can accumulate in ψ. The
+split-step dealias already strips it during ITP, so this is a no-op there. Kills
+the artifact at the SOURCE (ψ), complementing the derivative-level Nyquist null.
+"""
+function _null_nyquist_modes!(psi::AbstractArray{<:Complex}, grid::Grid{N}) where {N}
+    n_spatial = ntuple(d -> size(psi, d), N)
+    D = size(psi, N + 1)
+    nrm0 = sqrt(sum(abs2, psi))
+    buf = Array{ComplexF64, N}(undef, n_spatial)
+    local_plans = make_fft_plans(n_spatial; flags=FFTW.ESTIMATE)
+    for c in 1:D
+        comp = @view psi[ntuple(_ -> Colon(), N)..., c]
+        buf .= comp
+        local_plans.forward * buf
+        @inbounds for d in 1:N
+            iseven(n_spatial[d]) || continue
+            nyq = n_spatial[d] ÷ 2 + 1
+            for I in CartesianIndices(n_spatial)
+                I[d] == nyq && (buf[I] = zero(ComplexF64))
+            end
+        end
+        local_plans.inverse * buf
+        comp .= buf
+    end
+    nrm1 = sqrt(sum(abs2, psi))
+    nrm1 > 0 && (psi .*= nrm0 / nrm1)
+    psi
 end

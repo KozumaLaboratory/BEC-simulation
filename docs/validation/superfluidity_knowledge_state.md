@@ -1,6 +1,6 @@
 # Superfluidity & dipolar supersolidity — what we know, what we don't
 
-**As of 2026-07-28** (revised same day: four open questions closed). Knowledge-state map for one domain: measures of
+**As of 2026-07-29.** Revised twice since first written; six open questions closed, two corrections to earlier numbers. Knowledge-state map for one domain: measures of
 superfluidity in this simulator (`superfluid_fraction`) and the dipolar
 supersolid physics they are used on. Organised by *claim*, each with the
 evidence that supports it and the confidence that evidence buys — followed by
@@ -33,7 +33,9 @@ Confidence vocabulary, used strictly:
 | $f_s \approx 0$ for a trapped cloud is geometry, not state | **proven** | no phase rigidity across a box with vacuum at the edge; the code warns rather than returning a bare 0 |
 | `:relaxed` costs 1.8 s at 128³ and is flat in density contrast | **measured** | 0.21 → 0.25 s from contrast 0.2 to 0.99 at 64³; no preconditioner needed |
 | For an **untextured** spinor, the scalar $f_s$ is the whole story | **measured** | 1D spin-1 GP, twisting all components together (mass) vs $+q,0,-q$ (spin): both agree with the density-only $f_s$ to 4 digits across polar, ferro and $c_1=0$ |
-| For a **textured** spinor it is not: the density-only $f_s$ overestimates by ~2.6× | **measured** | winding field $B(x)=B(\cos kx,\sin kx,0)$: mass-twist $f_s = 0.136$ vs density-only $0.351$ |
+| For a **textured** spinor it is not: the density-only $f_s$ overestimates by up to **~20×** | **measured** | direction spread swept on a cone $B=(b_\perp\cos kx, b_\perp\sin kx, b_z)$ and on a full winding. Ratio density-only / true mass-flow: 1.000 at spread 0, 1.010 at 0.015, 1.040 at 0.057, 1.16 at 0.18, **19.9 at 0.80**. `figs/superfluid_fraction/texture_calibration.png` |
+| The error tracks the **direction** spread, not the magnitude spread | **measured** | a spinor with uniform direction but varying $|\langle F\rangle|$ and density gives spread 0 and ratio 1.000 — the case the LHY guard flags and this one must not |
+| `superfluid_fraction` now warns above direction spread 0.05 | — | threshold calibrated from the table above: below it the silent error is ≤ 4 %, the tolerance the LHY texture guard also settles for |
 | A textured state carries a **spin current**, so a scalar "spin $f_s$" is not even defined by the twist formula | **proven** | $E(q)$ for the $+q,0,-q$ twist is *linear*, not quadratic: $+2.53, +1.26, 0, -1.25, -2.50$ (×10⁻³) — perfectly antisymmetric. $2(E(q)-E(0))/q^2$ then diverges as $q\to0$ |
 
 The practical upshot: **an $f_s$ from a GP ground state may be quoted as *the*
@@ -71,15 +73,16 @@ statement than the metric shipped with, and it is gated.
 | $Q_5(\epsilon_{dd})$ is correct | **proven** | $Q_5(0)=1$, $Q_5(1)=3^{5/2}/6$ analytic, $1+\tfrac32\epsilon^2$ small-$\epsilon$ |
 | **11 droplets is the energy minimum**, not just the wavelength noise selects | **measured** | period imposed at $L/n_d$ for $n_d = 8\ldots14$, each converged separately: $E$ has a clean minimum at $n_d=11$, rising $+3.3\times10^{-3}$ at 12 and $+1.2\times10^{-3}$ at 10 |
 | The preferred droplet count **drops as $\epsilon_{dd}$ rises** | **measured** | minimum moves 11 → 9 going from $\epsilon_{dd}=1.45$ to 1.55; the paper's 11 is quoted at 1.45 |
+| The modulated ground state is robust in **shape**, not only in period | **measured** | six deliberately broken seeds at $\epsilon_{dd}=1.45$ — alternating amplitude, dimerised, one droplet suppressed, uneven spacing, broadband noise — all relax to the *same* even 11-droplet array: $E = 4.541833$ to 9 digits, contrast 0.778, $f_s$ 0.598, peak-height spread 0.011. Only the uneven-spacing seed stops short, $2.4\times10^{-4}$ high and not fully relaxed |
 | Tube images converge as $1/L_t^{2}$, not $1/L_t^{3}$ | **measured** | three ratios match $1/p^2$ to four decimals, exclude $1/p^3$; physically, images are parallel *lines* of dipoles and line–line energy per unit length falls as $1/R^2$ (#118) |
 | Transverse padding by $p$ is exactly a box $p$ times wider | **proven** | agreement to $\le3\times10^{-12}$ across FFTs of different sizes |
 
 ### Not known
 
 - ~~Whether the droplet count is the ground state or a local minimum in droplet
-  number.~~ **Answered 2026-07-28** — moved to "known" below. What remains open is
-  narrower: the scan varies the period at fixed *shape*, so a qualitatively
-  different modulated state (unequal droplets, a defect) is still not excluded.
+  number.~~ **Answered 2026-07-28** — moved to "known" below.
+- ~~Whether a qualitatively different modulated *shape* beats the even array.~~
+  **Answered 2026-07-29: no**, also moved below.
 - **Absolute $E_{dd}$ for the isolated tube** is extrapolated ($1/L_t^2$
   Richardson), not exact. The unpadded $L_t=16$ value is 3.6 % low. *Would settle
   it:* a cylindrically truncated kernel — which has no closed-form Fourier
@@ -193,6 +196,7 @@ Recorded because each cost time, and each is a trap independent of the code.
 | $f_s$ on device arrays (F64 + F32) | `test/gpu/test_superfluid_fraction_gpu.jl` | full, gated |
 | scalar $c_{lhy}$ vs SI | `test/oracles/test_scalar_lhy_si_roundtrip.jl` | fast |
 | padding ≡ box enlargement, $1/L^2$ exponent | `test/solvers/test_scalar_ddi_transverse_pad.jl` | fast |
+| direction-texture guard fires / stays silent | `test/analysis/test_superfluid_fraction.jl` | fast |
 | supersolid regime + species + $Q_5$ (type C) | `test/validation/test_dipolar_supersolid_tube.jl` | ci |
 | every derived dimensionless coupling vs SI | `test/oracles/test_dimensionless_coefficient_si_roundtrip.jl` | fast |
 
@@ -205,16 +209,16 @@ Figures: `figs/dipolar_supersolid/fs_curve.png` ($f_s$ vs $\epsilon_{dd}$),
 The four listed on 2026-07-28 were all executed; see the "Answered" entries
 above. What they left:
 
-1. **Decide what `superfluid_fraction` should return for a spinor.** The scalar
-   is now known to be wrong by ~2.6× on a textured state, and the spin channel
-   needs a definition that minimises over the twist first (a state with a texture
-   carries a current, so $E(0)$ is not the parabola's vertex). Until then, the
-   function should arguably refuse — or at least warn — on a spinor whose local
-   spin direction varies. **Nothing warns today.**
-2. **Audit which stored `runs/` verdicts still hold** in current code, or stamp
-   each stored summary with its producing commit. The May results differ from
-   current code by far more than the coefficient fix.
-3. **Vary the modulated state's shape, not just its period** (unequal droplets, a
-   defect) — the period scan fixes the shape and so does not exclude those.
-4. **A cylindrically truncated dipolar kernel** to remove the residual $1/L_t^2$
-   tail in absolute $E_{dd}$ (§2).
+1. ~~Warn on a textured spinor.~~ **Done** — `spin_direction_spread` plus a
+   calibrated warning above 0.05. What remains is the *positive* half: a
+   spin-flow $f_s$ needs a definition that minimises over the twist before taking
+   the curvature, since a textured state carries a spin current and $E(0)$ is not
+   the parabola's vertex. The function currently returns the mass-flow answer and
+   says so; it does not offer the spin channel at all.
+2. **Audit which stored `runs/` verdicts still hold** in current code. Summaries
+   now carry `_repo_commit` and `summary_provenance` reports it, but the 230
+   files that predate stamping cannot be retro-dated — for those the only
+   answer is to re-run. Nothing has done that.
+3. **A cylindrically truncated dipolar kernel** to remove the residual
+   $1/L_t^2$ tail in absolute $E_{dd}$ (§2). The only remaining item on the
+   type-C result.

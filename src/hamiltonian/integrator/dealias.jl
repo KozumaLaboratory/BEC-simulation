@@ -106,12 +106,16 @@ mode: pick `k_cut` below the smallest grid's Nyquist so every grid
 yields the same effective physics window.
 
 Usage:
-    SpinorBEC.DEALIAS_K_CUTOFF[] = 11.0   # for L=12 box, gives same
-                                          # bandwidth as N=64 default
+    SpinorBEC.DEALIAS_K_CUTOFF[] = 11.0   # on an L=12 box, the same
+                                          # bandwidth as the N=64 default
     SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # back to (n_d ÷ 3) default
 
 The cutoff is per-axis (|k_x| and |k_y| and |k_z| each ≤ k_cut),
-matching the (n_d ÷ 3) default's per-axis structure.
+matching the (n_d ÷ 3) default's per-axis structure. Being stated in
+physical k, it is meaningful only against a box: the same number is a
+different fraction of the band on a different `box_size`, so the box
+travels to the mask builder from the `Grid` (ψ filter) and from
+`DDIParams.box_size` (F filter) rather than being assumed.
 """
 const DEALIAS_K_CUTOFF = Ref{Union{Nothing, Float64}}(nothing)
 
@@ -121,22 +125,29 @@ const DEALIAS_K_CUTOFF = Ref{Union{Nothing, Float64}}(nothing)
 const _ORSZAG_MASK_CACHE = Dict{Tuple, Any}()
 
 """
-    _get_orszag_mask(n_pts::NTuple{N,Int}) -> Array{Float64,N}
+    _get_orszag_mask(n_pts::NTuple{N,Int}, box::NTuple{N,Float64}) -> Array{Float64,N}
 
 Return a cached real-valued mask of shape `n_pts`. Value 1.0 at modes
 that should be KEPT, 0.0 at modes that should be zeroed. Per axis the
 cutoff is `n_d ÷ 3`: any axis index with `min(i-1, n-i+1) > n_d ÷ 3`
 zeros the full slab along that axis.
+
+`box` is the physical box length per axis. It is unused by the default
+`n_d ÷ 3` rule (that cutoff lives in index space and is box-independent)
+and load-bearing for the `DEALIAS_K_CUTOFF[]` override, which is stated
+in physical k and therefore only means something against a box.
 """
-function _get_orszag_mask(n_pts::NTuple{N, Int}) where {N}
-    _get_orszag_mask(n_pts, DEALIAS_K_CUTOFF[])
+function _get_orszag_mask(n_pts::NTuple{N, Int}, box::NTuple{N, Float64}) where {N}
+    _get_orszag_mask(n_pts, DEALIAS_K_CUTOFF[], box)
 end
 
 function _get_orszag_mask(n_pts::NTuple{N, Int},
-    k_cut_override::Union{Nothing, Float64}) where {N}
-    # The cache key includes k_cut_override so the mask rebuilds when
-    # DEALIAS_K_CUTOFF[] changes.
-    key = (n_pts, k_cut_override)
+    k_cut_override::Union{Nothing, Float64},
+    box::NTuple{N, Float64}) where {N}
+    # The cache key includes k_cut_override and the box so the mask rebuilds
+    # when DEALIAS_K_CUTOFF[] changes or the same grid shape is used on a
+    # different box.
+    key = (n_pts, k_cut_override, box)
     haskey(_ORSZAG_MASK_CACHE, key) && return _ORSZAG_MASK_CACHE[key]::Array{Float64, N}
     mask = ones(Float64, n_pts)
     if k_cut_override === nothing
@@ -155,15 +166,11 @@ function _get_orszag_mask(n_pts::NTuple{N, Int},
             end
         end
     else
-        # Fixed physical-k cutoff: zero modes with |k_d| > k_cut_override.
-        # Assume box L = 12.0 (the L4 verification suite box). This is a
-        # diagnostic mode; physical-k threading from the Grid is deferred
-        # to a follow-up commit (would require passing grid info through
-        # the filter call chain).
-        L_assumed = 12.0
+        # Fixed physical-k cutoff: zero modes with |k_d| > k_cut_override,
+        # where |k_d| is measured against the ACTUAL box length on that axis.
         for d in 1:N
             n = n_pts[d]
-            dk = 2π / L_assumed
+            dk = 2π / box[d]
             for i in 1:n
                 k_idx = i - 1 <= n ÷ 2 ? (i - 1) : (i - 1 - n)
                 k_val = abs(k_idx) * dk
@@ -181,7 +188,7 @@ function _get_orszag_mask(n_pts::NTuple{N, Int},
 end
 
 """
-    apply_orszag_2_3_filter!(psi, fft_plans, n_components, ndim)
+    apply_orszag_2_3_filter!(psi, fft_plans, n_components, ndim, box)
 
 Apply the Orszag 2/3-rule k-space filter to `psi` in place. Per axis,
 zeros all Fourier modes with `|k_idx| > n_d ÷ 3`. Cost per call:
@@ -200,9 +207,10 @@ function apply_orszag_2_3_filter!(
     fft_plans::FFTPlans,
     n_components::Int,
     ndim::Int,
-)
+    box::NTuple{M, Float64},
+) where {M}
     n_pts = ntuple(d -> size(psi, d), ndim)
-    mask = _get_orszag_mask(n_pts)
+    mask = _get_orszag_mask(n_pts, box)
     # Match the device of `psi` (CPU Array → CPU mask; CuArray → device mask).
     # The mask is per-grid-shape cached; we promote to device via similar+copy.
     mask_dev = _to_psi_device(psi, mask)
@@ -248,7 +256,7 @@ function _get_orszag_F_filter_resources(F_pad_template::AbstractArray{T, N},
 end
 
 """
-    apply_orszag_2_3_F_filter!(F_pad, n_pts) -> nothing
+    apply_orszag_2_3_F_filter!(F_pad, n_pts, box) -> nothing
 
 Apply the Orszag 2/3-rule k-space filter to the first `n_pts` entries
 of the bilinear spin-density buffer `F_pad`. The remainder (the
@@ -259,11 +267,11 @@ Call once per spin component (Fx, Fy, Fz) after the bilinear
 `_compute_spin_density!` and before the rfft convolution.
 """
 function apply_orszag_2_3_F_filter!(
-    F_pad::AbstractArray{T, N}, n_pts::NTuple{N, Int}
+    F_pad::AbstractArray{T, N}, n_pts::NTuple{N, Int}, box::NTuple{N, Float64}
 ) where {T <: Real, N}
-    _check_safe_k_cut(n_pts)
+    _check_safe_k_cut(n_pts, box)
     buf, plans = _get_orszag_F_filter_resources(F_pad, n_pts)
-    mask = _get_orszag_mask(n_pts)
+    mask = _get_orszag_mask(n_pts, box)
     mask_dev = _to_psi_device(buf, mask)
     idx = ntuple(d -> 1:n_pts[d], N)
     @views buf .= F_pad[idx...]
@@ -280,19 +288,21 @@ Runtime check: if `DEALIAS_K_CUTOFF[]` exceeds the safe boundary
 bilinear aliasing — the result will be contaminated and (per L4
 k-scan data) non-monotonic in `k_cut`. Emit a single `@warn` on first
 violation so the user sees it without spam.
+
+The binding axis is the one with the smallest `k_Nyq_d = π·n_d/L_d`,
+which is a property of the RATIO `n_d/L_d` — not of `n_d` alone. A
+long axis with many points can still be the loose one.
 """
-function _check_safe_k_cut(n_pts::NTuple{N, Int}) where {N}
+function _check_safe_k_cut(n_pts::NTuple{N, Int}, box::NTuple{N, Float64}) where {N}
     k_cut = DEALIAS_K_CUTOFF[]
     k_cut === nothing && return nothing
-    # Use the smallest axis as the binding constraint; per-axis cutoff
-    # in physical k is the same across axes for cubic boxes (assumed
-    # L=12 here; see DEALIAS_K_CUTOFF docstring for the box assumption).
-    n_min = minimum(n_pts)
-    k_safe = safe_k_cut_boundary(n_min, 12.0)
+    d_bind = argmin(ntuple(d -> n_pts[d] / box[d], N))
+    k_safe = safe_k_cut_boundary(n_pts[d_bind], box[d_bind])
     if k_cut > k_safe + 1e-9
         @warn "DEALIAS_K_CUTOFF[] = $k_cut exceeds safe boundary $(round(k_safe; digits=4)) " *
-            "(= 2·k_Nyq/3 at n=$n_min, L=12); F-filter cannot fully suppress bilinear " *
-            "aliasing — answer will be contaminated. Reduce k_cut or use a larger grid." maxlog=1
+            "(= 2·k_Nyq/3 on the binding axis $d_bind: n=$(n_pts[d_bind]), " *
+            "L=$(box[d_bind])); F-filter cannot fully suppress bilinear aliasing — " *
+            "answer will be contaminated. Reduce k_cut or use a larger grid." maxlog=1
     end
     nothing
 end

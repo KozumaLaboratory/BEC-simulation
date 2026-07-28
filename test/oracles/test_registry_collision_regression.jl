@@ -93,7 +93,8 @@ end
 
     @testset "DDI / Loss / LightShift parameter types" begin
         @test DDIParams(1.0, zeros(3, 3, 3), zeros(3, 3, 3), zeros(3, 3, 3),
-            zeros(3, 3, 3), zeros(3, 3, 3), zeros(3, 3, 3)) isa DDIParams
+            zeros(3, 3, 3), zeros(3, 3, 3), zeros(3, 3, 3),
+            (12.0, 12.0, 12.0)) isa DDIParams
         @test LossParams(0.0, 0.0, [0.0, 0.0, 0.0], 0.0, [0.0, 0.0, 0.0], 0.0, 0.0) isa LossParams
         # LightShift positional 4-arg ctor — was broken by HamTerm shadow
         profile = rand(8, 8, 8)

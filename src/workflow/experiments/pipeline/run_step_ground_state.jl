@@ -78,6 +78,136 @@ end
     end
 end
 
+# --- seed_from: warm-start a GS solve from a prior run's converged ψ, spectrally
+#     upsampled to this step's grid. Cost-compressed continuation
+#     (docs/design/eu_phase_diagram_adaptive_mapping.md, Pillar 1): a cheap
+#     coarse multi-seed recon is promoted to a fine grid by seed + short polish
+#     instead of a fresh fine ITP per cell. The source point is matched by the
+#     RESOLVED cell signature (c1 / Bz / κ / initial_state), so a scan auto-pairs
+#     each cell to its own recon winner with no index coupling. Fails loud when
+#     nothing matches — never silently falls back to a Gaussian seed.
+
+_seed_bz_gauss(x::Real) = Float64(x)
+_seed_bz_gauss(x::AbstractString) = parse(Float64, split(String(x))[1])
+
+# Resolved (post-override) cell signature read off the step params dict.
+@noinline function _seed_cell_signature(p::Dict{String, Any})
+    c1 = haskey(p, "interactions") ? Float64(get(p["interactions"], "c1_ratio", NaN)) : NaN
+    bz = haskey(p, "B") ? _seed_bz_gauss(get(p["B"], "Bz", 0.0)) : 0.0
+    om = haskey(p, "potential") ? get(p["potential"], "omega", nothing) : nothing
+    kap = (om isa AbstractVector && length(om) >= 3) ? Float64(om[3]) : NaN
+    st = String(get(p, "initial_state", "polar"))
+    (c1, bz, kap, st)
+end
+
+# Same signature read from a source point's saved `override` dict (dotted keys).
+@noinline function _seed_override_signature(ov)
+    c1 = Float64(get(ov, "pipeline.0.interactions.c1_ratio", NaN))
+    bz = _seed_bz_gauss(get(ov, "pipeline.0.B.Bz", 0.0))
+    kap = Float64(get(ov, "pipeline.0.potential.omega.2", NaN))
+    st = String(get(ov, "pipeline.0.initial_state", "polar"))
+    (c1, bz, kap, st)
+end
+
+_seed_sig_match(a, b) =
+    a[4] == b[4] &&
+    isapprox(a[1], b[1]; atol=1e-9, rtol=1e-6) &&
+    isapprox(a[2], b[2]; atol=1e-12, rtol=1e-6) &&
+    isapprox(a[3], b[3]; atol=1e-9, rtol=1e-6)
+
+@noinline function _resolve_seed_from(sf, p::Dict{String, Any}, grid, atom)::Array{ComplexF64, 4}
+    sf isa AbstractDict ||
+        throw(ArgumentError("seed_from must be a mapping {run: <dir>, upsample: <bool>}"))
+    run = get(sf, "run", get(sf, "path", nothing))
+    run === nothing &&
+        throw(ArgumentError("seed_from requires 'run' (a directory of point_*.jld2)"))
+    isdir(run) || throw(ArgumentError("seed_from.run is not a directory: $run"))
+    do_upsample = get(sf, "upsample", true) == true
+    # `nearest: true` seeds from the CLOSEST computed point (same initial_state +
+    # same c1, nearest in (Bz, κ)) instead of requiring an exact cell match. This
+    # is what lets a boundary-refinement scan warm-start off a coarser map's
+    # winners at brand-new (Bz, κ) points that have no exact seed.
+    nearest = get(sf, "nearest", false) == true
+    sig = _seed_cell_signature(p)
+    match = nothing
+    best_d = Inf
+    for f in readdir(run)
+        (startswith(f, "point_") && endswith(f, ".jld2")) || continue
+        path = joinpath(run, f)
+        ov = try
+            JLD2.load(path, "override")
+        catch
+            continue
+        end
+        osig = _seed_override_signature(ov)
+        if nearest
+            # discrete axes (initial_state, c1) must match; minimise scaled
+            # distance in the continuous (Bz [µG-ish], κ) plane.
+            osig[4] == sig[4] || continue
+            isapprox(osig[1], sig[1]; atol=1e-9, rtol=1e-6) || continue
+            d = ((osig[2] - sig[2]) / 100)^2 + ((osig[3] - sig[3]) / 1.2)^2
+            if d < best_d
+                best_d = d
+                match = path
+            end
+        elseif _seed_sig_match(osig, sig)
+            match = path
+            break
+        end
+    end
+    match === nothing &&
+        throw(
+            ArgumentError(
+                "seed_from: no point in $run matches cell (c1=$(sig[1]), Bz=$(sig[2]) G, κ=$(sig[3]), state=$(sig[4]))"
+            ),
+        )
+    psi = load_point_psi(match)   # resolves a light point's gs_ref from the stage store
+    n = grid.config.n_points[1]
+    if size(psi, 1) != n
+        do_upsample ||
+            throw(
+                ArgumentError(
+                    "seed_from: seed side $(size(psi, 1)) ≠ grid side $n and upsample=false"
+                ),
+            )
+        psi = upsample_spinor(psi, n)
+    end
+    _to_host(psi)::Array{ComplexF64, 4}
+end
+
+# --- pin: symmetry-breaking ε-continuation for the weak-field soft manifold.
+#     Reads the cell's DIMENSIONLESS linear/quadratic Zeeman (p, q) — NOT lab
+#     Gauss (static_zeeman's `Bz` kwarg is the p slot) — and builds the built-in
+#     transverse conjugate-field pin b_x=ε. find_ground_state_lbfgs warm-ramps
+#     ε→0 and returns the ε→0-extrapolated certified energy. Empty ramp ⇒ no pin.
+# Unified accessors cover ZeemanParams / TimeDependentZeeman / ZeemanField{…}
+# (the last is what a GS step inherits from a prior step's workspace).
+_zeeman_pq(z) = (linear_p(z), quadratic_q(z))
+
+@noinline function _resolve_pin_block(pin_block, zeeman)
+    pin_block === nothing && return (nothing, Float64[])
+    pin_block isa AbstractDict ||
+        throw(ArgumentError("pin: must be a mapping {kind: transverse, epsilon_ramp: [...]}"))
+    ramp = get(pin_block, "epsilon_ramp", nothing)
+    ramp === nothing &&
+        throw(
+            ArgumentError(
+                "pin: requires epsilon_ramp (descending εs, e.g. [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4])"
+            ),
+        )
+    eps = Float64.(collect(ramp))
+    isempty(eps) && throw(ArgumentError("pin.epsilon_ramp is empty"))
+    kind = Symbol(get(pin_block, "kind", "transverse"))
+    kind === :transverse ||
+        throw(
+            ArgumentError(
+                "pin.kind=$kind unsupported via yaml (only :transverse — conjugate field b_x=ε)"
+            ),
+        )
+    p_lin, q_quad = _zeeman_pq(zeeman)
+    (pin_transverse_field(; Bz=p_lin, q=q_quad), eps)
+end
+
 # --- Automatic content-addressed GS stage cache -------------------------------
 # The expensive ITP/LBFGS ground-state solve is a pure function of its RESOLVED
 # physics inputs, not of the downstream `analyze:` block or the enclosing
@@ -252,6 +382,10 @@ function _run_step(
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
     psi_init = psi_prev
+    if psi_init === nothing && haskey(p, "seed_from")
+        psi_init = _resolve_seed_from(p["seed_from"], p, grid, atom)
+        verbose && println("  seed_from: loaded + upsampled warm seed (skips fresh init)")
+    end
     if psi_init !== nothing
         D = 2 * atom.F + 1
         expected = (grid.config.n_points..., D)
@@ -365,14 +499,17 @@ function _run_step(
     elseif method === :lbfgs
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
         newton_polish = get(p, "newton_polish", false) == true
+        residual_polish = get(p, "residual_polish", false) == true
+        pin_closure, pin_eps = _resolve_pin_block(get(p, "pin", nothing), zeeman)
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
-        # Skip reuse when backend is explicitly overridden (e.g. GPU ITP → CPU LBFGS).
-        if ws_prev !== nothing && !haskey(p, "backend") &&
+        # Skip reuse when backend is overridden OR a pin is active (the pin
+        # ε-continuation builds its own bare workspace and needs grid/atom).
+        if pin_closure === nothing && ws_prev !== nothing && !haskey(p, "backend") &&
             !haskey(p, "interactions") && !haskey(p, "ddi") &&
             !haskey(p, "potential") && !haskey(p, "B")
             find_ground_state_lbfgs(;
                 ws_init=ws_prev, psi_init,
-                n_steps, tol, m_lbfgs, newton_polish,
+                n_steps, tol, m_lbfgs, newton_polish, residual_polish,
                 target_magnetization=target_mz,
                 verbose,
             )
@@ -387,13 +524,21 @@ function _run_step(
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,
+                pin=pin_closure, epsilon_ramp=pin_eps,
+                residual_polish,
             )
         end
     else
         throw(ArgumentError("Unknown ground_state method: $method. Supported: itp, lbfgs"))
     end
 
-    psi_out = copy(gs.workspace.state.psi)
+    # Strip any Nyquist-mode junk the LBFGS/Newton path can accumulate (ITP is
+    # already dealiased) — kills the checkerboard artifact at the source in the
+    # saved/analysed ψ. Host copy: the null uses a CPU FFT.
+    psi_out = _null_nyquist_modes!(_to_host(copy(gs.workspace.state.psi)), grid)
+    # With a pin ε-continuation the certified energy is the ε→0 extrapolation,
+    # not the last pinned-rung value.
+    gs_energy = hasproperty(gs, :E0_extrap) ? gs.E0_extrap : gs.energy
     verbose && _print_gs_summary(psi_out, grid, atom, gs)
 
     # Save to cache if specified
@@ -404,7 +549,7 @@ function _run_step(
         try
             jldopen(tmp, "w") do f
                 f["psi"] = psi_host
-                f["energy"] = gs.energy
+                f["energy"] = gs_energy
                 f["converged"] = gs.converged
             end
             mv(tmp, cache_path; force=true)
@@ -416,8 +561,9 @@ function _run_step(
     end
 
     step_result = Dict{Symbol, Any}(
-        :ground_state_energy => gs.energy,
+        :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
+        :ground_state_grad_norm => Float64(get(gs, :grad_norm, NaN)),
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,
     )

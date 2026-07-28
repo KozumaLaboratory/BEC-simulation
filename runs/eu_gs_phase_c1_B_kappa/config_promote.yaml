@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────
+#  STAGE B — 128³ PROMOTION of the (c1 × Bz × κ) Eu F=6 GS phase diagram,
+#  cost-compressed per docs/design/eu_phase_diagram_adaptive_mapping.md.
+#
+#  Each cell warm-starts from its OWN 32³ recon winner (config_recon result,
+#  runs/config_recon_335a2216), spectrally upsampled 32³→128³, then a short
+#  L-BFGS polish converges it at the fine grid. No fresh ITP per cell:
+#  which-phase is resolution-robust, so the expensive multi-seed basin search
+#  already happened at 32³; here we only refine on the fine grid.
+#
+#  seed_from matches each cell to its recon point by the resolved signature
+#  (c1/Bz/κ/initial_state) — the scan below is IDENTICAL to config_recon.yaml,
+#  so every (cell × seed) auto-pairs. Two seeds (stretched, polar) → min-E GS.
+#
+#  Scan: 3 (c1) × 8 (Bz) × 5 (κ) = 120 points × 2 seeds = 240 polishes @ 128³.
+#  UGE array: -t 1-120, SPINORBEC_SCAN_ONLY_INDEX per task (2 seeds inner).
+# ─────────────────────────────────────────────────────────────────────
+
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — Stage B promotion (128³, seed+polish)
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 20.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [128, 128, 128], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs                       # polish from the upsampled recon seed
+      m_lbfgs: 20                          # measured best for Eu F=6 + DDI
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      seed_from:
+        run: runs/config_recon_335a2216   # 32³ Stage-A recon CAS outdir
+        upsample: true                     # spectral 32³ → 128³
+      n_steps: 800                         # polish budget (seed is already close)
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+# IDENTICAL scan to config_recon.yaml so seed_from pairs each cell 1:1.
+# Override paths OMIT `.ground_state` (auto-unwrapped single-key step).
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio:
+      - -0.015
+      -  0.0
+      -  0.0277777778
+    pipeline.0.B.Bz:
+      - "0.0 Gauss"
+      - "2.5e-5 Gauss"
+      - "4.0e-5 Gauss"
+      - "4.8e-5 Gauss"
+      - "5.5e-5 Gauss"
+      - "6.2e-5 Gauss"
+      - "7.5e-5 Gauss"
+      - "1.0e-4 Gauss"
+    pipeline.0.potential.omega.2:
+      from: 1.0
+      to:   2.2
+      n:    5
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}
