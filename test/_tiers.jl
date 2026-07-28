@@ -35,6 +35,7 @@ const FAST_TESTS = [
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_lhy_texture_warning.jl",
+    "workflow/test_lhy_block_wiring.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -563,6 +564,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_continuation.jl" => 58.0,
     "workflow/test_pipeline.jl" => 17.0,
     "workflow/test_infrastructure.jl" => 15.0,
+    "workflow/test_lhy_block_wiring.jl" => 13.0,   # 7 modes x table builds
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "analysis/test_tof_multiframe.jl" => 9.5,

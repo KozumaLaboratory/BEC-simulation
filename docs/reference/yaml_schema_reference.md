@@ -252,10 +252,39 @@ the top of the aggregated waveform.
 
 | key | type / enum | default | notes |
 |---|---|---|---|
-| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` | none | — |
+| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` / `spatial` | none | — |
 | `c_lhy` | Number | auto | `scalar` / `quasi_2d` Lima-Pelster auto-derivation |
 | `n_max` | Number | `3 × max(\|ψ_init\|²)` | LHY table density-cap |
 | `n_points` | Int [3, 10000] | 200 | tabulation resolution |
+| `n_bins` | Int [2, 64] | 12 | `spatial` only — $|\langle F\rangle|/F$ bins |
+
+Every kind other than `spatial` builds ONE table for ONE spinor and applies it
+at every voxel — exact for a uniform cloud, measured at ~5% on converged
+weak-field Eu textures, with a sign that flips along a B-scan. `make_workspace`
+warns above a $|\langle F\rangle|/F$ spread of 0.3.
+
+`kind: spatial` is the answer to that warning: it tabulates $e_1(p)$ against the
+local polarisation $p = |\langle F\rangle|/F$, from the spinors actually present
+in `psi_init`, at one BdG solve per **occupied** bin (so `n_bins` is a cost knob
+and the cost is independent of grid size). When the cloud turns out uniform
+enough that a single-spinor table is already right, it falls back to `full_bdg`
+rather than returning nothing.
+
+Two caveats for `spatial`:
+
+- The propagator applies only the diagonal $\partial\varepsilon/\partial n$. The
+  polarisation piece of $\delta E/\delta\bar\psi$ is a spin operator, which the
+  LBFGS gradient carries and the diagonal split-step cannot — a measured 2.3%
+  difference, so ITP and LBFGS minimise slightly different functionals here
+  (issue #131).
+- Expect `full_bdg`'s dynamic-instability warning. A bin's representative
+  spinor is lifted out of the cloud and is not a solution of the *uniform*
+  mean-field problem at its own density; the warning is about that fictitious
+  uniform system, not about your state.
+
+`n_max` and `n_points` reached nothing before 2026-07-28 — they were declared
+here and normalised by no one, so `n_points: 4000` silently stayed 200. Any
+config predating that fix ran at the defaults regardless of what it asked for.
 
 ### `loss` — three- / two-body loss, evaporation
 

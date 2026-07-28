@@ -54,12 +54,18 @@ _g() = _c0c1_to_gS(_FF, 10.0, 0.1)          # c1 > 0 ⇒ polar-stable
 _gfm() = _c0c1_to_gS(_FF, 10.0, -0.02)      # c1 < 0 ⇒ FM-stable
 
 # A textured state, for the one mode that reads the local spinor.
+#
+# m=+F mixed with m=0, NOT with m=+F-1. Adjacent components stay spin-coherent:
+# at F=6 a (m=6, m=5) mixture holds |⟨F⟩|/F ≈ 0.92 across the whole cloud, which
+# `compute_spatial_lhy` correctly reports as "no texture" (one occupied bin,
+# spread 0) and returns `nothing` for. Mixing in m=0 sweeps p over 0…1, which is
+# the axis the table is built against.
 function _textured(n=6)
     psi = zeros(ComplexF64, n, n, n, _DD)
     for I in CartesianIndices((n, n, n))
         t = (I[1] - 1) / (n - 1)
-        psi[I, 1] = sqrt(1 - t)
-        psi[I, 2] = sqrt(t)
+        psi[I, 1] = sqrt(1 - t)                 # m = +F
+        psi[I, _FF + 1] = sqrt(t)               # m =  0
     end
     psi .* 0.9
 end
