@@ -125,6 +125,8 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
+    "hamiltonian/test_lhy_energy_convention.jl",
     "hamiltonian/test_spatial_lhy.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
@@ -378,6 +380,7 @@ const FULL_EXTRA = [
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
     "gpu/test_projected_gp_parity.jl",
+    "gpu/test_gpu_tabulated_lhy_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -478,6 +481,9 @@ const _COST = Dict{String, Float64}(
     "test_quality.jl" => 48.0,           # Aqua/JET static analysis (warm-measured)
     "workflow/test_active_learning.jl" => 41.0,  # GP/BO, no spinor workspace — real file cost
     "workflow/test_pipeline.jl" => 17.0,
+    # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
+    # SpatialLHY table build (BdG solves) — measured 22.2s.
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "workflow/test_infrastructure.jl" => 15.0,
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "test_level10_hpsi_self_consistency.jl" => 12.0,
