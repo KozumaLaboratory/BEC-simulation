@@ -35,6 +35,8 @@ const FAST_TESTS = [
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
+    "workflow/test_lhy_texture_warning.jl",
+    "workflow/test_lhy_block_wiring.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -59,6 +61,8 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_scalar_lhy_si_roundtrip.jl",
+    "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
     "validation/test_k3_unit_audit.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
@@ -68,6 +72,8 @@ const FAST_TESTS = [
     "foundation/test_no_unguarded_fft_derivative.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
+    "foundation/test_noise_waveform.jl",
+    "foundation/test_waveform_bandwidth.jl",
     "hamiltonian/test_zeeman_builders.jl",
     "analysis/test_spin_snapshot.jl",
     "foundation/test_spin_matrices.jl",
@@ -115,9 +121,17 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_superfluid_fraction.jl",
+    "analysis/test_superfluid_fraction_gp_twist.jl",
+    "solvers/test_scalar_ddi_transverse_pad.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
+    "hamiltonian/test_lhy_energy_convention.jl",
+    "hamiltonian/test_spatial_lhy.jl",
+    "hamiltonian/test_spatial_lhy_spin_substep.jl",
+    "hamiltonian/test_lhy_gradient_all_modes.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
@@ -166,6 +180,7 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    "validation/test_dipolar_supersolid_tube.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -235,6 +250,7 @@ const CI_EXTRA = [
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
     "oracles/test_lhy_analytic.jl",
+    "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
     "oracles/test_magnetic_gradient_analytic.jl",
     "oracles/test_tensor_analytic.jl",
@@ -289,6 +305,11 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
+    # registry term with ten interchangeable tables behind it, so "the term
+    # is gated" was true while three of its faces were broken at once.
+    # Driven by LHY_SCHEMA["kind"].enum, so a new mode cannot ship ungated.
+    "oracles/test_lhy_mode_face_coverage.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
@@ -363,6 +384,12 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    "gpu/test_superfluid_fraction_gpu.jl",
+    # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
+    # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
+    # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
+    "gpu/test_projected_gp_parity.jl",
+    "gpu/test_gpu_tabulated_lhy_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -445,9 +472,9 @@ const MANUAL_TESTS_ALLOWLIST = [
 const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA))
 
 # ── Parallel-balance cost model ───────────────────────────────────────
-# Per-file cost estimate (seconds), measured on the full tier, used only to
-# balance the parallel chunks (LPT bin-packing in runtests.jl). Only the heavy
-# outliers need an entry; the long tail defaults to _DEFAULT_COST. A wrong
+# Per-file cost estimate (seconds) on the GitHub 4-vCPU runner, used only to
+# balance the parallel chunks (LPT bin-packing in runtests.jl). Only files above
+# ~6 s need an entry; the long tail defaults to _DEFAULT_COST. A wrong
 # estimate costs balance, never correctness — but a silently-stale estimate lets
 # CI wall-time regress unnoticed, which `warn_cost_drift` (below) guards against.
 # Lives here (not runtests.jl) so the chunk processes (run_chunk.jl) can run the
@@ -456,32 +483,104 @@ const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
+    # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
+    # medianing the per-file timing tables that each chunk prints.
+    "oracles/test_propagator_references.jl" => 91.5,
+    "oracles/test_master_oracle.jl" => 84.2,
+    "test_reference_rhs.jl" => 59.4,
+    "oracles/test_hamiltonian_sign_oracles.jl" => 52.0,
+    "oracles/test_lhy_full_bdg_closed_form_parity.jl" => 51.8,
+    "workflow/test_autopilot.jl" => 49.1,
+    "test_level10_hpsi_self_consistency.jl" => 47.7,
+    "test_quality.jl" => 45.7,
+    "workflow/test_active_learning.jl" => 35.7,
+    "hamiltonian/test_ddi.jl" => 33.6,
+    "dynamics/test_tdhfb_f1_validation.jl" => 30.3,
+    "oracles/test_bdg_fd_hessian.jl" => 23.8,
+    # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
+    # SpatialLHY table build (BdG solves) — measured 22.2s.
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
+    "oracles/test_imag_time_propagator_generator.jl" => 22.8,
+    "validation/test_L5_operator_rhs_compare.jl" => 22.6,
+    "hamiltonian/test_ddi_padded.jl" => 22.1,
+    "analysis/test_diagnostics.jl" => 21.3,
+    "oracles/test_zeeman_diagonal_analytic.jl" => 19.9,
+    "hamiltonian/test_ddi_convention_factorial.jl" => 18.2,
+    "analysis/test_superfluid_fraction.jl" => 16.6,
+    "workflow/test_dynamics_lhy_plumbing.jl" => 16.1,
+    "foundation/test_property_based.jl" => 16.0,
+    "oracles/test_stability_indeterminate.jl" => 15.5,
+    "oracles/test_term_properties.jl" => 15.5,
+    "hamiltonian/test_lhy.jl" => 15.2,
+    "analysis/test_phase_classification_polyhedral.jl" => 15.1,
+    "oracles/test_registry_completeness.jl" => 14.4,
+    "hamiltonian/test_spatial_lhy.jl" => 13.7,   # single run (landed 2026-07-27)
+    "manuscript/test_f12_icosahedral.jl" => 13.1,
+    "oracles/test_bdg_low_modes_lobpcg.jl" => 12.9,
+    "workflow/validation/test_save_operator_rhs.jl" => 12.8,
+    "test_level2_strang_convergence.jl" => 12.4,
+    "oracles/test_fisher_identifiability.jl" => 12.1,
+    "oracles/test_meanfield_energy_half.jl" => 11.7,
+    "workflow/test_schema_validation_edge_cases.jl" => 10.9,
+    "workflow/test_lhy_texture_warning.jl" => 10.9,
+    "oracles/test_hamiltonian_hermiticity.jl" => 10.8,
+    "manuscript/test_f9_f11_polyhedral.jl" => 10.7,
+    "analysis/test_paper3_validation.jl" => 10.6,
+    "oracles/test_trapped_bdg_spectrum.jl" => 10.6,
+    "oracles/test_apply_operator_accumulates.jl" => 10.3,
+    "oracles/test_stability_sneaky_prover.jl" => 10.3,
+    "oracles/test_path_coverage.jl" => 10.0,
+    "oracles/test_lhy_mode_face_coverage.jl" => 17.0,  # 9 modes x 3 faces + FD
+    "analysis/test_texture_observables.jl" => 9.8,
+    "foundation/test_noise_waveform.jl" => 9.6,
+    "manuscript/test_f5_f7_polyhedral.jl" => 9.5,
+    "workflow/test_calibration_edge_cases.jl" => 9.3,
+    "analysis/test_forward_image.jl" => 9.3,
+    "analysis/test_spinor_fingerprint.jl" => 9.2,
+    "oracles/test_global_phase_covariance.jl" => 8.7,
+    "test_level1_scalar_exact.jl" => 8.5,
+    "workflow/validation/test_scalar_summary.jl" => 8.4,
+    "analysis/test_vorticity_berry.jl" => 8.4,
+    "analysis/test_physics_level1.jl" => 7.8,
+    "workflow/test_inspect_config.jl" => 7.7,
+    "analysis/test_observables.jl" => 7.7,
+    "oracles/test_physics_aware_sign_oracles.jl" => 7.6,
+    "workflow/test_catalog_index.jl" => 7.4,
+    "analysis/test_bogoliubov.jl" => 7.3,
+    "analysis/test_superfluid_fraction_gp_twist.jl" => 7.3,
+    "oracles/test_energy_operator_identity.jl" => 7.3,
+    "hamiltonian/test_ddi_truncated_kernel.jl" => 7.0,
+    "solvers/test_condensate.jl" => 6.8,
+    "oracles/test_light_shift_analytic.jl" => 6.8,
+    "workflow/test_checkpoint.jl" => 6.7,
+    "foundation/test_spherical_harmonics.jl" => 6.6,
+    "oracles/test_energy_decomposition_sum.jl" => 6.4,
+    "oracles/test_spin_c1_analytic.jl" => 6.2,
+    "analysis/test_physics_level0.jl" => 6.1,
+    "oracles/test_gpu_cpu_per_term_parity.jl" => 6.1,
+    "analysis/test_imaging.jl" => 6.0,
+    # ── Heavy `ci`/`full`-tier files, not exercised by the per-push CI jobs;
+    # estimates carried over from the full-tier measurement.
     "workflow/test_multi_fidelity_bo.jl" => 161.0,
     "workflow/test_triple_point.jl" => 127.0,
     "test_dealias_2_3.jl" => 76.0,
     "solvers/test_continuation.jl" => 58.0,
-    "test_quality.jl" => 48.0,           # Aqua/JET static analysis (warm-measured)
-    "workflow/test_active_learning.jl" => 41.0,  # GP/BO, no spinor workspace — real file cost
     "workflow/test_pipeline.jl" => 17.0,
     "workflow/test_infrastructure.jl" => 15.0,
+    "workflow/test_lhy_block_wiring.jl" => 13.0,   # 7 modes x table builds
+    "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
-    "test_level10_hpsi_self_consistency.jl" => 12.0,
-    "workflow/test_autopilot.jl" => 12.0,
-    "oracles/test_propagator_references.jl" => 11.0,
-    "oracles/test_master_oracle.jl" => 11.0,
-    "oracles/test_path_coverage.jl" => 10.0,
     "analysis/test_tof_multiframe.jl" => 9.5,
     "gpu/test_mixed_precision.jl" => 9.0,
-    "dynamics/test_tdhfb_f1_validation.jl" => 8.5,
     "analysis/test_physics_invariants.jl" => 8.0,
     "solvers/test_simulation.jl" => 8.0,
-    "test_reference_rhs.jl" => 7.5,
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
+    "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
     "solvers/test_3d.jl" => 5.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
-    "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)

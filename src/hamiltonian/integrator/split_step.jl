@@ -577,6 +577,16 @@ function _outer_operators_fwd!(
         )
     end
 
+    # The spin half of a spatially-varying LHY (issue #131). No-op for every
+    # other LHY — `_lhy_needs_spin` is a compile-time trait, so nothing else
+    # pays for it. Mirrored in the reverse half below to keep Strang symmetric.
+    if _lhy_needs_spin(ws.lhy)
+        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
+            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
+        )
+    end
+
     c2 = get_cn(ip, 2)
     if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
@@ -643,6 +653,13 @@ function _outer_operators_bwd!(
     if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
+        )
+    end
+
+    if _lhy_needs_spin(ws.lhy)
+        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
+            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
         )
     end
 

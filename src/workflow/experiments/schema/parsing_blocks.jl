@@ -323,9 +323,18 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # Auto-derive c_lhy for scalar / quasi_2d when user omitted it.
     if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
         if !isnan(c_dd_val) && c_dd_val > 0
-            a_s_dl = atom.a_s / a_ho
-            c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_dl)^3) * N_atoms
-            lhy_block["c_lhy"] = c_lhy_scalar * lima_pelster_Q5(eps_dd)
+            # Dimensionless scalar LHY coefficient for the repo's per-particle
+            # convention (∫|ψ|²dV = 1, E_LHY/N = (2/5)·c_lhy·∫n^{5/2}dV,
+            # c₀ = 4π(a_s/a_ho)N). Fixed by SI alone — no convention freedom:
+            #
+            #   γ_QF = (32/3)·g·√(a_s³/π),  g = 4πℏ²a_s/m
+            #        = (128√π/3)(ℏ²/m)·a_s^{5/2}
+            #   ⇒ c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+            #
+            # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces
+            # the textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
+            # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
+            lhy_block["c_lhy"] = scalar_lhy_coefficient(atom.a_s / a_ho, N_atoms; eps_dd)
         end
     end
     # Normalise to internal fields for downstream consumers.
@@ -335,6 +344,14 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     if haskey(lhy_block, "c_lhy")
         inter["c_lhy"] = lhy_block["c_lhy"]
     end
+    # Table-resolution knobs. `n_max` / `n_points` were in LHY_SCHEMA from the
+    # start but normalised nowhere, so `_build_spinor_lhy` never saw them and a
+    # user's `n_points: 4000` silently stayed 200. They ride in one internal
+    # slot as an `LHYTableOpts`, which is what `make_workspace` takes.
+    p["lhy_opts"] = LHYTableOpts(;
+        n_max=haskey(lhy_block, "n_max") ? Float64(lhy_block["n_max"]) : NaN,
+        n_points=Int(get(lhy_block, "n_points", 200)),
+        n_bins=Int(get(lhy_block, "n_bins", 12)))
     return nothing
 end
 
