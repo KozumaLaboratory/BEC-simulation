@@ -122,6 +122,7 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
@@ -374,6 +375,7 @@ const FULL_EXTRA = [
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
     "gpu/test_projected_gp_parity.jl",
+    "gpu/test_gpu_tabulated_lhy_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",

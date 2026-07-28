@@ -150,6 +150,37 @@ end
 # an AbstractLHY. Dropped in C2 once all callers route through types.
 @inline _lhy_V(n::AbstractFloat, c_lhy::AbstractFloat) = c_lhy * n * sqrt(n)
 
+"""
+    _lhy_is_active(c_lhy) -> Bool
+
+Whether this LHY contributes at all. `NoLHY` and a zero scalar do not; a table
+does — and a table cannot be summarised by one coefficient, which is the
+distinction the broadcast propagator below used to lose.
+"""
+@inline _lhy_is_active(::Nothing) = false
+@inline _lhy_is_active(::NoLHY) = false
+@inline _lhy_is_active(c::Float64) = c != 0.0
+@inline _lhy_is_active(l::ScalarLHY) = l.c_lhy != 0.0
+@inline _lhy_is_active(::AbstractLHY) = true
+
+"""
+    _lhy_potential_field(lhy, density_buf, ::Type{RT}) -> array
+
+`V_LHY(r)` materialised for the broadcast (non-fused) propagator path.
+
+The fused `::Array` kernel calls `_lhy_V` per voxel inside its own loop; this
+path is broadcast-based and needs the same quantity as an array. Both route
+through `_lhy_V`, so the two cannot disagree about what the LHY is — which they
+did before, this path having assumed every LHY has the scalar shape `c·n^(3/2)`.
+
+`RT` keeps F32 grids in F32.
+"""
+function _lhy_potential_field(lhy, density_buf, ::Type{RT}) where {RT}
+    out = similar(density_buf)
+    out .= RT.(_lhy_V.(Float64.(density_buf), Ref(lhy)))
+    out
+end
+
 function _diagonal_step_svec!(
     ::Val{N},
     psi::Array,
@@ -267,8 +298,23 @@ function _diagonal_step_svec!(
     RT = eltype(V_trap)
     dt_t = RT(dt_frac)
     c0_t = RT(c0)
-    _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
-    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    # V_LHY as a FIELD, not a coefficient. The previous form collapsed the LHY
+    # to a single `c_lhy` scalar and used `c·n^(3/2)`, which is only the shape
+    # of `ScalarLHY`: every TabulatedLHY fell to `c = 0.0` while `_has_lhy`
+    # still read `true`, so the branch ran with the LHY silently removed.
+    # `PolarContactLHY` on this path differed from the fused `::Array` kernel by
+    # 5.7 in ψ after one step, with V_LHY(n=1) = 50.5 simply missing.
+    #
+    # This path is what a `CuArray` falls back to — the GPU kernel's `c_lhy`
+    # bound admits only Nothing / NoLHY / Float64 / ScalarLHY — so every GPU run
+    # using `polar_contact`, `fm_contact`, `icosahedral`, `polar_dipolar`,
+    # `fm_dipolar`, `polar_two_channel` or `full_bdg` was running with NO LHY.
+    _has_lhy = _lhy_is_active(c_lhy)
+    lhy_buf = if _has_lhy
+        _lhy_potential_field(c_lhy, density_buf, RT)
+    else
+        density_buf
+    end
     zee_shift = RT(minimum(zeeman_diag))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
@@ -279,23 +325,13 @@ function _diagonal_step_svec!(
             if !_has_lhy
                 @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf) * dt_t)
             else
-                @. psi_c *= exp(
-                    -(
-                        V_trap + zee_rel + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
-                    ) * dt_t,
-                )
+                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf + lhy_buf) * dt_t)
             end
         else
             if !_has_lhy
                 @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf) * dt_t)
             else
-                @. psi_c *= cis(
-                    -(
-                        V_trap + zee_c + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
-                    ) * dt_t,
-                )
+                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf + lhy_buf) * dt_t)
             end
         end
     end
@@ -379,8 +415,13 @@ function _diagonal_step_with_ls!(
     RT = eltype(V_trap)
     dt_t = RT(dt_frac)
     c0_t = RT(c0)
-    _has_lhy = c_lhy isa AbstractLHY || (c_lhy isa Float64 && c_lhy != 0.0)
-    c_lhy_val_t = RT(c_lhy isa Float64 ? c_lhy : (c_lhy isa ScalarLHY ? c_lhy.c_lhy : 0.0))
+    # Same V_LHY-as-a-field fix as the plain diagonal step above.
+    _has_lhy = _lhy_is_active(c_lhy)
+    lhy_buf = if _has_lhy
+        _lhy_potential_field(c_lhy, density_buf, RT)
+    else
+        density_buf
+    end
     zee_shift = RT(minimum(zeeman_diag))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
@@ -395,7 +436,7 @@ function _diagonal_step_with_ls!(
                 @. psi_c *= exp(
                     -(
                         V_trap + zee_rel + ls_c * ls_profile + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
+                        lhy_buf
                     ) * dt_t,
                 )
             end
@@ -406,7 +447,7 @@ function _diagonal_step_with_ls!(
                 @. psi_c *= cis(
                     -(
                         V_trap + zee_c + ls_c * ls_profile + c0_t * density_buf +
-                        c_lhy_val_t * density_buf * sqrt(density_buf)
+                        lhy_buf
                     ) * dt_t,
                 )
             end
