@@ -322,6 +322,7 @@ function _run_step(
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
         extra_on_step=extra_cb,
+        stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
     )
 
     if verbose
@@ -343,6 +344,40 @@ function _run_step(
 end
 
 """
+    _resolve_dynamics_stepper(spec) -> Union{Nothing, Function}
+
+Map the `integrator:` key of a standard `dynamics:` step onto a per-step
+propagator. `nothing` keeps the historical leapfrog loop (merged V blocks).
+
+`integrator:` used to be accepted by `DYNAMICS_SCHEMA` and then never read —
+`run_simulation!` always took the leapfrog branch, so `integrator: yoshida` on a
+standard dynamics step was a silent no-op. Silently ignoring an accuracy knob is
+worse than not offering it, so unsupported values now raise.
+
+`midpoint` is the one that matters for dipolar dynamics: plain `split_step!`
+freezes the DDI mean field at each V(dt/2) boundary and is only 1st-order in
+time when `c_dd > 0`, while `split_step_midpoint!` restores 2nd order at ~1.5-2×
+the per-step cost.
+"""
+function _resolve_dynamics_stepper(spec)
+    spec === nothing && return nothing
+    name = lowercase(strip(string(spec isa AbstractDict ? get(spec, "name", "") : spec)))
+    isempty(name) && return nothing
+    if name in ("strang", "leapfrog", "default")
+        return nothing
+    elseif name == "midpoint"
+        return split_step_midpoint!
+    else
+        throw(
+            ArgumentError(
+                "dynamics integrator \"$name\" is not implemented on the standard " *
+                "path. Supported: \"strang\" (default leapfrog) or \"midpoint\" " *
+                "(2nd-order with DDI). The rotating_basis path has its own set."),
+        )
+    end
+end
+
+"""
     _run_dynamics_with_optional_streaming!(ws, save_psi, compress)
         -> (result, tmp_path_or_nothing, snapshot_count)
 
@@ -357,11 +392,12 @@ function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
     snap_type::Type{<:Complex}=ComplexF32;
     extra_on_step::Union{Nothing, Function}=nothing,
+    stepper::Union{Nothing, Function}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
              SimulationCallbacks(; on_step=extra_on_step)
-        return (run_simulation!(ws; callbacks=cb), nothing, 0)
+        return (run_simulation!(ws; callbacks=cb, stepper), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -392,6 +428,7 @@ function _run_dynamics_with_optional_streaming!(
                 on_step=extra_on_step,
             ),
             stream_snapshots=true,
+            stepper,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]
