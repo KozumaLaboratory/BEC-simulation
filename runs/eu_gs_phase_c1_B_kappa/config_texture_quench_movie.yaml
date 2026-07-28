@@ -24,18 +24,28 @@
 metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
-# DEALIAS OFF, and this is measured, not a preference. Single-variable probe on
-# this exact cell (duration 0.1, 200 steps, everything else identical):
+# DEALIAS OFF here, but do NOT read that as "off is correct" — the question is
+# open and the reasoning that led here was partly wrong.
 #
-#   enabled: false -> column sum 18.963 at EVERY saved frame (conserved to 5 s.f.)
-#   enabled: true  -> 18.963 -> 1.202 -> 1.028 -> ... -> 0.669
+# Measured on this exact cell (duration 0.1, everything else identical):
+#   enabled: false -> column sum 18.963 at EVERY frame (conserved to 5 s.f.)
+#   enabled: true  -> 18.963 -> 1.202 -> ... -> 0.669, norm_rel_drift = 0.993
 #
-# i.e. turning the block on destroys 94% of the atoms in 20 steps and the run
-# reports norm_rel_drift = 0.993. It is not `k_cut` (removing it reproduces the
-# loss to 3 s.f.) and it is not the psi filter, which is an exact no-op on this
-# state on BOTH backends when called directly. The remaining suspect is the
-# DDI F-filter path that `DEALIAS_2_3_ENABLED[]` also gates
-# (convolution.jl:183) — unverified, so stated as a suspect, not a cause.
+# I first blamed `k_cut` (wrong: removing it reproduces the loss to 3 s.f.) and
+# then the DDI F-filter (also wrong: F enters as a unitary spin rotation, so
+# filtering it cannot change the norm at all).
+#
+# The resolution landed separately: the psi filter is an EXACT SPECTRAL
+# PROJECTOR, so the norm it removes IS the above-cut weight, and a large drift
+# measures how much weight the dynamics push past 2/3 k_Nyq rather than
+# indicating a bug. On that reading, disabling the filter does not fix anything
+# — the content aliases back into low k and the clean norm is a trap.
+#
+# UNRESOLVED for these configs: the dealias-OFF states measured here carry
+# 0.0% of their weight above the 2/3 cut at t=0.1 AND at t=20, which does not
+# fit "the dynamics generate several % per step". Until that is reconciled,
+# treat BOTH settings as suspect and quote `norm_rel_drift` with any result.
+# See memory gotcha_dealias_block_destroys_norm_in_ddi_dynamics_2026_07_28.
 dealias: {enabled: false}
 pipeline:
   # Prepared above the crossover — axial flux-closure texture.

@@ -5,15 +5,18 @@ Reads what the `vortex_density_movie` analyzer wrote (frames.jld2 +
 manifest.json) and lays out four panels per frame:
 
   1. column density n(x,y) — where the atoms are
-  2. mid-plane PHASE of the tracked component, with detected defects marked
-     (o = +1, x = -1). The phase panel is the one that shows a vortex; the
-     column density integrates the core away.
+  2. mid-plane PHASE of the tracked component, with the MASS-CURRENT vortices
+     marked (o = +1, x = -1). The markers come from the circulation of the
+     total current, not from this panel's phase — that phase is shown because
+     it is where a core is visible, but per-component winding is not a vortex.
   3. mid-plane density of the same component — the holes the defects sit in
   4. running history: vortex count and net charge vs time, with a cursor
 
 Vortex count and net charge are plotted separately on purpose. A count that
 climbs while the net stays 0 is pair production; a net that moves is
-circulation actually entering the cloud.
+circulation actually entering the cloud. The grey dashed trace is the
+per-component phase winding, kept visible precisely because it is NOT the
+vortex count — on a spin-rotating state it runs an order of magnitude high.
 
   python scripts/viz_dynamics_movie.py <movie_dir> [out.mp4]
 
@@ -48,8 +51,18 @@ if n_frames == 0:
     sys.exit(f"{D}: manifest reports 0 frames — did the dynamics step set save_every?")
 
 times = np.asarray(man["times"], dtype=float)
+# THE vortex trace: circulation of the total mass current. `vortex_counts` is
+# per-component phase winding, which during spin dynamics is mostly not
+# vortices — it fires on the amplitude zeros a component develops while its
+# population is rotated away. Both are plotted, labelled for what they are.
+mcounts = np.asarray(man.get("mass_vortex_counts", man["vortex_counts"]), dtype=int)
+mnetq = np.asarray(man.get("mass_net_charges", man["net_charges"]), dtype=int)
 counts = np.asarray(man["vortex_counts"], dtype=int)
-netq = np.asarray(man["net_charges"], dtype=int)
+qerr = np.asarray(man.get("quantisation_error", np.zeros(len(times))), dtype=float)
+# Circulations actually close to an integer. On a clean vortex |w - n| ~ 0.02;
+# on disordered flow it saturates at 0.5 and the loose count means little.
+mstrict = np.asarray(man.get("mass_vortex_counts_strict", mcounts), dtype=int)
+has_mass = "mass_vortex_counts" in man
 ext_x, ext_y = (float(v) for v in man["extent"])
 
 # Resample to the requested duration, so the movie is SECONDS long whatever the
@@ -94,8 +107,8 @@ fig.colorbar(im_n, ax=axn, fraction=0.046)
 im_p = axp.imshow(rd("phase", sel[0]).T, origin="lower", extent=half,
                   cmap="twilight_shifted", vmin=-np.pi, vmax=np.pi, aspect="equal")
 axp.set_title(f"mid-plane phase, component {man['component']}")
-(vpos,) = axp.plot([], [], "o", mfc="none", mec="w", ms=7, mew=1.4)
-(vneg,) = axp.plot([], [], "x", mec="cyan", ms=7, mew=1.4)
+(vpos,) = axp.plot([], [], "o", mfc="none", mec="w", ms=11, mew=1.8)
+(vneg,) = axp.plot([], [], "x", mec="cyan", ms=11, mew=1.8)
 fig.colorbar(im_p, ax=axp, fraction=0.046)
 
 im_d = axd.imshow(rd("dens_mid", sel[0]).T, origin="lower", extent=half,
@@ -103,8 +116,14 @@ im_d = axd.imshow(rd("dens_mid", sel[0]).T, origin="lower", extent=half,
 axd.set_title("mid-plane density (same component)")
 fig.colorbar(im_d, ax=axd, fraction=0.046)
 
-axh.plot(times, counts, lw=1.6, label="vortices")
-axh.plot(times, netq, lw=1.6, label="net charge")
+axh.plot(times, mcounts, lw=1.4, color="crimson", alpha=0.45,
+         label="mass circ. (all)")
+axh.plot(times, mstrict, lw=2.0, color="crimson",
+         label="mass circ., $|w-n|<0.25$")
+axh.plot(times, mnetq, lw=1.7, color="darkorange", label="net charge")
+if has_mass:
+    axh.plot(times, counts, lw=1.0, color="0.55", ls="--",
+             label="per-component winding\n(NOT vortices)")
 axh.axhline(0, color="0.7", lw=0.8)
 cursor = axh.axvline(times[sel[0]], color="crimson", lw=1.4)
 axh.set_xlabel("t  [$1/\\omega_{ref}$]")
@@ -128,7 +147,8 @@ def draw(k):
     im_p.set_data(ph.T)
     im_d.set_data(rd("dens_mid", i).T)
 
-    vx, vy, vq = rd("vortex_x", i), rd("vortex_y", i), rd("vortex_q", i)
+    pre = "mvortex" if has_mass else "vortex"
+    vx, vy, vq = rd(f"{pre}_x", i), rd(f"{pre}_y", i), rd(f"{pre}_q", i)
     if len(vq):
         px, py = pix_to_phys(vx, vy, ph.shape)
         vpos.set_data(px[vq > 0], py[vq > 0])
@@ -137,8 +157,10 @@ def draw(k):
         vpos.set_data([], [])
         vneg.set_data([], [])
     cursor.set_xdata([times[i], times[i]])
-    title.set_text(f"t = {times[i]:.3f}   vortices = {counts[i]}   "
-                   f"net charge = {netq[i]:+d}")
+    extra = f"   |w-n|max = {qerr[i]:.2f}" if has_mass and mcounts[i] else ""
+    title.set_text(f"t = {times[i]:.3f}   vortices = {mstrict[i]} "
+                   f"(of {mcounts[i]} candidates)   "
+                   f"net charge = {mnetq[i]:+d}{extra}")
     return im_n, im_p, im_d, vpos, vneg, cursor, title
 
 
