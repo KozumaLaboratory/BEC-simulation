@@ -44,6 +44,18 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 export SPINORBEC_STAGE_CACHE=1
 export SPINORBEC_LIGHT_POINTS=1
 
+# Output goes to /gs/bs, not /gs/fs. The group's /gs/fs quota is 1 TB and was
+#100% full on 2026-07-29 — five of this job's eight tasks died there, with
+# EDQUOT (sendfile -122) and three SIGBUS from mmap on files that could not be
+# extended. Neither looks like a disk error in the log, which is why it cost a
+# whole run to diagnose. /gs/bs is the large work filesystem (33 PB free).
+#
+# ONE variable moves the whole output tree — run dirs, _stage/gs and the CAS
+# store all read SPINORBEC_STORE.
+export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/runs}"
+mkdir -p "$SPINORBEC_STORE"
+echo "[store] $SPINORBEC_STORE  ($(df -h --output=avail "$SPINORBEC_STORE" 2>/dev/null | tail -1 | tr -d ' ') avail)"
+
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"
 echo "[src] $(git rev-parse HEAD) $(git status --porcelain -- src | wc -l) dirty src files"
 nvidia-smi -L || true
