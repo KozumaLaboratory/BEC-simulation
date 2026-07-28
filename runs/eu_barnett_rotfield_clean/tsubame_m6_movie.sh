@@ -2,9 +2,11 @@
 # Movie version of the m=-6 imprint + quench (fig_m6_spatial, but in time).
 # SMOKE=1 shrinks it to a ~2 min sanity pass first.
 #
-# Only small per-frame arrays reach /gs (~72 MB/arm); psi stays on node-local
-# NVMe. The group filesystem was at 99% (16 GB free) when this was written —
-# check `df -h /gs/fs` before raising RB_SAVE_EVERY resolution.
+# Only small per-frame arrays reach /gs (~29 MB/arm); psi stays on the per-job
+# /tmp. TWO independent limits, both hit for real:
+#   * /gs was at 99% (16 GB free) — psi must never be written there.
+#   * per-job /tmp on gpu_1 is small — 250 streamed 80x80x40 frames (~6.6 GB)
+#     SIGBUSed the snapshot mmap mid-dynamics. Keep RB_SAVE_EVERY >= 1000.
 #
 #$ -cwd
 #$ -N eu_m6_movie
@@ -30,10 +32,14 @@ export RB_LOSS="${RB_LOSS:-1}"
 # whenever the physics code changes.
 export RB_TAG="${RB_TAG:-movie1}"
 if [ "${SMOKE:-0}" = "1" ]; then
-  export RB_GS_STEPS="50"; export RB_DUR="2.0"; export RB_SAVE_EVERY="20"
+  export RB_GS_STEPS="50"; export RB_DUR="2.0"; export RB_SAVE_EVERY="200"
   export RB_TAG="${RB_TAG}smoke"
 else
-  export RB_GS_STEPS="2500"; export RB_DUR="50.0"; export RB_SAVE_EVERY="400"
+  # save_every=1000 -> 125 frames, which is 4.2 s at 30 fps and is the setting
+  # the original m6 job is known to survive. Lower values overflow the per-job
+  # /tmp on gpu_1 and the snapshot mmap SIGBUSes mid-dynamics: measured, 250
+  # streamed frames at 80x80x40 (~6.6 GB) core-dumped twice.
+  export RB_GS_STEPS="2500"; export RB_DUR="50.0"; export RB_SAVE_EVERY="1000"
 fi
 
 source scripts/tsubame_setup.sh
