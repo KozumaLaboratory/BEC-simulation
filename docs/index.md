@@ -59,6 +59,8 @@ docs/
 | Single TWA scan, raw data | `research_notes/twa_*_result.md` |
 | F=6 phase boundary scan | `research_notes/F6_phase_boundaries.md` |
 | Eu collapse + LHY ablation | `research_notes/eu_collapse_lhy_insufficient.md` |
+| Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
+| Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
 | Closed-form theory derivations | `theory/*.md` |
 
 ## Documentation philosophy
