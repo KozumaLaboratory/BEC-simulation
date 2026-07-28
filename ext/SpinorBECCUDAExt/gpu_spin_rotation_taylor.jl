@@ -15,13 +15,13 @@
 # `exp(zA)ψ` is evaluated by Taylor–Horner: w ← ψ; for k = K..1, w ← ψ + (z/k)(A·w).
 # `A·w` is a nearest-neighbour `shfl` matvec, warp-cooperative with one spin
 # component per lane, so there is no local-memory spill at D = 13, no D×D
-# eigenvector matrices, and no atan/acos. The degree K is chosen per call from
-# the backward-error bound R^{K+1}/(K+1)! ≤ tol with R = |z|·max|v|·F; at the Eu
-# production R ≈ 0.01–0.2 that is K ≈ 4–9.
+# eigenvector matrices, and no atan/acos. The degree is chosen PER VOXEL from
+# the backward-error bound R^{K+1}/(K+1)! ≤ tol with that voxel's own
+# R = |z|·|v(r)|·F; at the Eu production peak R ≈ 0.01–0.2 that is K ≈ 2–6.
 #
 # The alternative realization — the exact Euler 5-stage
 # (`apply_ddi_euler_fused_kernel!` / `apply_euler_5stage_fused_kernel!`) — stays
-# as the fallback above `_SPIN_TAYLOR_RMAX[]` and as the parity reference. It is
+# as the D > 16 fallback and as the parity reference. It is
 # machine-precision at every R, and ~3.6× slower at D = 13 (measured 64³ Eu:
 # 10.3 ms vs 2.85 ms per call), because it moves ψ through HBM nine times
 # (5 phase stages + 4 gemms) where Horner moves it twice.
@@ -58,45 +58,32 @@ function _get_spin_tridiag_coef(
     coef
 end
 
-# --- Adaptive degree selection ---
+# --- Accuracy contract ---
+#
+# The degree and, above `_SPIN_TAYLOR_RSAFE[]`, the angle halving are decided
+# PER VOXEL inside the kernel from that voxel's own `R = |scale|·|v(r)|·F`.
+# Nothing about the field is needed on the host.
+#
+# That is a performance property, not a cosmetic one. The previous design read
+# `R = max_r |v(r)|` back to the host to pick one degree for the whole array —
+# a device-to-host reduction, i.e. a full stream drain, once per rotation and so
+# 12× per RTP step. Measured on an RTX 5070 Ti at 64³ (bench/rtp_sync_ab.jl):
+# 50.4 → 27.3 ms/step, 46 % of the step spent with the GPU idle waiting for the
+# host. It was also pessimistic in the other direction — a trapped cloud is
+# mostly dilute tail, and paying the peak's degree everywhere is most of the
+# arithmetic (bench/micro_spin_taylor.jl).
 const _SPIN_TAYLOR_ENABLED = Ref(true)
-const _SPIN_TAYLOR_RMAX = Ref(1.0)     # R above which we fall back to Euler
 const _SPIN_TAYLOR_TOL = Ref(1.0e-9)   # backward-error target
 # 1e-9 measured: parity vs the Euler-exact CPU rotation 3.5e-13, ≈300× under the
 # 1e-10 GPU=CPU gate. The first omitted term R^{K+1}/(K+1)! is ~2e-12 per
 # rotation at production R, i.e. 6-7 orders below the split-step's own O(dt²)
 # error. The parity gate is the safety net: relax too far and it goes red.
-const _SPIN_TAYLOR_R_OVERRIDE = Ref(NaN)   # set to skip the max|v| reduction
-
-# smallest K with R^K/K! ≤ tol (⇒ omitted term R^{K+1}/(K+1)! < tol), K ≥ 2.
-function _taylor_degree(R::Real, tol::Real)
-    t = 1.0
-    k = 0
-    while k < 40
-        k += 1
-        t *= R / k
-        t <= tol && return max(k, 2)
-    end
-    return 40
-end
-
-# Reused scratch for the |v|² max-reduction, keyed by (length, T). Avoids the
-# ~N·8 B temporary that `maximum(vx.*vx .+ …)` allocates on every rotation call
-# (16.7 MB × 2/step at 128³). R is bit-identical → K unchanged → gates trivially
-# pass; this only removes transient allocation (gpu_allocs_bytes ratchet).
-const _SPIN_R_SCRATCH = Dict{Tuple{Int, DataType}, Any}()
-
-"""
-    _spin_rotation_R(vx, vy, vz, scale, F) -> R
-
-Spectral radius of `scale·(v·F)`: `scale · max_r|v(r)| · F`. Drives the Taylor
-degree; `scale` is `|z|` (i.e. dt for DDI, |c₁|·dt for spin-mixing).
-"""
-function _spin_rotation_R(vx, vy, vz, scale::T, F::T) where {T <: AbstractFloat}
-    s = get!(() -> similar(vx, T, length(vx)), _SPIN_R_SCRATCH, (length(vx), T))
-    s .= vx .* vx .+ vy .* vy .+ vz .* vz   # in-place into reused scratch, no temp
-    scale * sqrt(maximum(s)) * F
-end
+#
+# Angle above which a voxel halves its rotation and applies it twice (repeated
+# squaring). Production R is 0.01–0.2 so no voxel ever halves; the branch exists
+# so that the Taylor path is exact at ANY R and the caller never has to ask.
+# 1.0 keeps the degree at ≤ 12 for tol = 1e-9, comfortably inside the table.
+const _SPIN_TAYLOR_RSAFE = Ref(1.0)
 
 # --- Horner coefficient table ---
 # `w ← ψ + (z/k)(A·w)` needs z/k for k = K…1. Computed per call as a device
@@ -111,26 +98,52 @@ end
 # Values are identical to what the in-body expression produced: for real time
 # `Complex(0,-scale/k)·(a+bi) = (scale/k)·(b - ai)` exactly, and likewise for
 # imaginary time. Filled by a device kernel (no host allocation, no HtoD).
+#
+# `_SPIN_RK_MAX = 40` is the degree ceiling. With the halving above it is never
+# approached: R ≤ 1 needs 12 terms at tol = 1e-9 and 24 at tol = 1e-24.
 const _SPIN_RK_MAX = 40
 const _SPIN_RK_CACHE = Dict{DataType, Any}()
 
-function _fill_rk_kernel!(rk, scale::T, K::Int32) where {T}
+function _fill_rk_kernel!(rk, scale::T) where {T}
     k = CUDA.threadIdx().x
-    k <= K && (@inbounds rk[k] = scale / T(k))
+    @inbounds rk[k] = scale / T(k)
     nothing
 end
 
-function _get_spin_rk(::CuArray{Complex{T}}, scale::T, K::Integer) where {T}
+function _get_spin_rk(::CuArray{Complex{T}}, scale::T) where {T}
     rk = get!(() -> CUDA.zeros(T, _SPIN_RK_MAX), _SPIN_RK_CACHE, T)::CuArray{T, 1}
-    CUDA.@cuda threads = _SPIN_RK_MAX blocks = 1 _fill_rk_kernel!(rk, scale, Int32(K))
+    CUDA.@cuda threads = _SPIN_RK_MAX blocks = 1 _fill_rk_kernel!(rk, scale)
     rk
 end
 
 # --- Taylor–Horner warp kernel (one spin component per lane) ---
 # `RT` selects the real-time (multiply by -i) vs imaginary-time (real weight)
 # form of the Horner coefficient; both read the same real `rk` table.
+#
+# Each voxel sizes its own rotation from its own R = |scale|·|v(r)|·F:
+#
+#   1. halve the angle `s` times until R/2^s ≤ √rsafe2, then apply the halved
+#      rotation 2^s times (repeated squaring — exact, and s = 0 in production);
+#   2. take the smallest degree k ≥ 2 with (R/2^s)^k/k! ≤ tol.
+#
+# Both tests run on SQUARES so no FP64 sqrt is needed: (R/2^s/k)² = (rk[k]·h)²·g
+# with g = |v|²F² and h = 2^-s. `h` is then folded ONCE into the generator
+# (diag_c, b_c, bm) instead of into every Horner coefficient, so the inner loop
+# is byte-for-byte the loop it was before and the h = 1 case is bit-identical.
+#
+# `s` and the degree are raised to the WARP maximum first. `_shfl_c` carries a
+# full-warp mask, so the two voxels sharing a warp must execute the same trip
+# count or the `shfl_sync` deadlocks; neighbouring voxels pick near-identical
+# values, so rounding up costs almost nothing.
+# The load/store keeps the compute layout's addressing — a lane reads P[vox, c]
+# with the D components N·16 B apart. Staging ψ through shared memory so the
+# load/store run over consecutive VOXELS instead was tried and measured 5-15 %
+# SLOWER at 64³ D=13 (1.21 → 1.27-1.37 ms): the kernel is not actually limited
+# by that pattern. `CUDA.registers` says 48 with no spill, so it is not
+# occupancy-limited either — at production degrees ~74 % of this card's FP64
+# peak is in the Horner body itself.
 @inline function _spin_taylor_warp_kernel!(
-    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, ::Val{D}, ::Val{RT},
+    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
 ) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
@@ -160,17 +173,63 @@ end
 
     psi0 = (active && in_range) ? (@inbounds P[vox, c]) : zero(CT)
     bmc = conj(bm)
+
+    # rk[1] = scale, so `r2` starts as R² = (scale·|v|·F)².
+    g = (Vx * Vx + Vy * Vy + Vz * Vz) * F2
+    scale1 = @inbounds rk[1]
+    r2 = scale1 * scale1 * g
+
+    # (1) angle halving — exact, `h` stays a power of two.
+    sh = zero(Int32)
+    while r2 > rsafe2 && sh < Int32(30)
+        r2 *= T(0.25)
+        sh += one(Int32)
+    end
+    sh = max(sh, CUDA.shfl_xor_sync(0xffffffff, sh, 16))
+    h = one(T)
+    for _ in one(Int32):sh
+        h *= T(0.5)
+    end
+    gh = g * h * h
+
+    # (2) degree — smallest k ≥ 2 with ((R/2^s)^k/k!)² ≤ tol².
+    kv = K
+    u = one(T)
+    kk = one(Int32)
+    while kk < K
+        a = @inbounds rk[kk]
+        u *= a * a * gh
+        if kk >= Int32(2) && u <= tol2
+            kv = kk
+            break
+        end
+        kk += one(Int32)
+    end
+    kv = max(kv, CUDA.shfl_xor_sync(0xffffffff, kv, 16))
+
+    # Fold the halving into the generator once; `h == 1` leaves these exact.
+    diag_c *= h
+    b_c *= h
+    bmc *= h
+
     w = psi0
-    k = K
-    while k >= one(Int32)
-        wup = _shfl_c(w, c + 1, Val(W))                  # w_{c+1} (idle→0 at c=D)
-        wdn_raw = _shfl_c(w, cdn, Val(W))
-        wdn = c > 1 ? wdn_raw : zero(CT)
-        Aw = diag_c * w + b_c * wup + bmc * wdn
-        a = @inbounds rk[k]
-        # RT: (0 - i·a)·Aw = a·(imag(Aw) - i·real(Aw));  IT: (-a)·Aw
-        w = RT ? psi0 + a * CT(imag(Aw), -real(Aw)) : psi0 - a * Aw
-        k -= one(Int32)
+    rep = one(Int32) << sh
+    while rep >= one(Int32)
+        base = w
+        wk = base
+        k = kv
+        while k >= one(Int32)
+            wup = _shfl_c(wk, c + 1, Val(W))             # w_{c+1} (idle→0 at c=D)
+            wdn_raw = _shfl_c(wk, cdn, Val(W))
+            wdn = c > 1 ? wdn_raw : zero(CT)
+            Aw = diag_c * wk + b_c * wup + bmc * wdn
+            a = @inbounds rk[k]
+            # RT: (0 - i·a)·Aw = a·(imag(Aw) - i·real(Aw));  IT: (-a)·Aw
+            wk = RT ? base + a * CT(imag(Aw), -real(Aw)) : base - a * Aw
+            k -= one(Int32)
+        end
+        w = wk
+        rep -= one(Int32)
     end
 
     if active && in_range
@@ -180,55 +239,48 @@ end
 end
 
 """
-    _apply_spin_rotation_taylor!(P, vx, vy, vz, coef, scale, K, Val(D); imaginary_time)
+    _apply_spin_rotation_taylor!(P, vx, vy, vz, coef, scale, Val(D); imaginary_time)
 
 `P[vox, :] ← exp(z · (v(vox)·F)) · P[vox, :]` for every voxel, degree-`K`
 Taylor–Horner, with `z = -i·scale` (real time) or `-scale` (imaginary time).
 `P` is the `(N_spatial, D)` reshape of ψ.
 """
 function _apply_spin_rotation_taylor!(
-    P, vx, vy, vz, coef::SpinTridiagCoef{T}, scale::T, K::Integer, ::Val{D};
-    imaginary_time::Bool=false,
+    P, vx, vy, vz, coef::SpinTridiagCoef{T}, scale::T, ::Val{D};
+    imaginary_time::Bool=false, F::T=one(T),
 ) where {T, D}
     N = size(P, 1)
     voxels_per_block = 16
     threads = 256
     blocks = cld(N, voxels_per_block)
-    rk = _get_spin_rk(P, scale, K)
+    rk = _get_spin_rk(P, scale)
+    tol2 = T(_SPIN_TAYLOR_TOL[])^2
+    rsafe2 = T(_SPIN_TAYLOR_RSAFE[])^2
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
-        P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(K), Val(D),
-        Val(!imaginary_time))
+        P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(_SPIN_RK_MAX),
+        tol2, F * F, rsafe2, Val(D), Val(!imaginary_time))
     nothing
 end
 
 """
-    _spin_taylor_plan(psi, sm, vx, vy, vz, scale, imaginary_time)
-        -> (coef, scale, K) or nothing
+    _spin_taylor_plan(psi, sm, scale) -> (coef, F) or nothing
 
-Shared entry decision for the three call sites. Returns `nothing` when the
-Taylor path is disabled or `R` exceeds `_SPIN_TAYLOR_RMAX[]`, in which case the
-caller must use its exact Euler realization.
+Shared entry decision for the three call sites. Returns `nothing` only when the
+Taylor path is switched off or the spinor is too wide for the warp layout, in
+which case the caller uses its exact Euler realization. It does NOT inspect the
+field: degree and angle halving are per-voxel decisions made inside the kernel,
+so this costs no device reduction and no host stall.
 
 `scale` is the real prefactor multiplying `(v·F)` in the exponent — `dt` for
-DDI, `c₁·dt` for spin-mixing — and carries its own sign; it is returned
-unchanged so the caller passes it straight to `_apply_spin_rotation_taylor!`.
+DDI, `c₁·dt` for spin-mixing. Real time means `exp(-i·scale·(v·F))` and
+imaginary time `exp(-scale·(v·F))`; the kernel's `Val{RT}` picks which.
 """
 function _spin_taylor_plan(
     psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
-    vx, vy, vz, scale::T, imaginary_time::Bool,
 ) where {T <: AbstractFloat, D}
     _SPIN_TAYLOR_ENABLED[] || return nothing
     # The warp layout puts one spin component per lane of a width-16 subgroup,
     # so D > 16 (F ≥ 8) has no lane to hold the upper components. Fall back.
     D <= 16 || return nothing
-    F = T(sm.system.F)
-    R = isnan(_SPIN_TAYLOR_R_OVERRIDE[]) ?
-        _spin_rotation_R(vx, vy, vz, abs(scale), F) : T(_SPIN_TAYLOR_R_OVERRIDE[])
-    R <= T(_SPIN_TAYLOR_RMAX[]) || return nothing
-    K = _taylor_degree(R, _SPIN_TAYLOR_TOL[])
-    # Real-time: exp(-i·scale·(v·F)). Imaginary time: exp(-scale·(v·F)) — a real
-    # weight, so no overflow shift is needed (scale·|v|·F = R ≲ 1 by the branch
-    # condition above). Both forms are carried by the real `scale`; the kernel's
-    # `Val{RT}` picks which one it means.
-    (_get_spin_tridiag_coef(psi, sm), scale, K)
+    (_get_spin_tridiag_coef(psi, sm), T(sm.system.F))
 end

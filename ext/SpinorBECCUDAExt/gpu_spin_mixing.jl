@@ -116,11 +116,11 @@ function SpinorBEC.apply_spin_mixing_step!(
     # second realization. That path also skips the α/β/θ trigonometry below —
     # it needs only the raw vector field. Measured 64³ Eu151 D=13: 10.3 ms →
     # 2.85 ms per call, and this substep runs 8× per RTP step.
-    plan = _spin_taylor_plan(psi, sm, fx, fy, fz, c1_t * dt_t, imaginary_time)
+    plan = _spin_taylor_plan(psi, sm)
     if plan !== nothing
-        coef, scale, K = plan
+        coef, F = plan
         _apply_spin_rotation_taylor!(
-            psi_2d, fx, fy, fz, coef, scale, K, Val(D); imaginary_time)
+            psi_2d, fx, fy, fz, coef, c1_t * dt_t, Val(D); imaginary_time, F)
         return nothing
     end
 

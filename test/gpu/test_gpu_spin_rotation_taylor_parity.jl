@@ -87,6 +87,53 @@ else
         end
     end
 
+    # The Horner degree is picked PER VOXEL from that voxel's own |v|, so a
+    # field with a wide dynamic range is the case that separates it from the
+    # global-max degree: the centre keeps every term while the tails stop after
+    # two. The flat random fields above cannot see a defect there — every voxel
+    # would agree on the degree. This is a trapped-cloud field (peak-to-tail
+    # ~1e14) at the largest R the Taylor branch accepts, so the centre needs the
+    # full degree while most of the box needs the minimum.
+    @testset "per-voxel Taylor degree: wide-dynamic-range field" begin
+        sm = spin_matrices(6)
+        n = 24
+        ax = range(-3.0, 3.0; length=n)
+        env = [exp(-(ax[i]^2 + ax[j]^2 + ax[k]^2)) for i in 1:n, j in 1:n, k in 1:n]
+        psi0 = CUDA.CuArray(randn(ComplexF64, n, n, n, 13))
+        for scale in (6.0, 30.0), it in (false, true)
+            f() = CUDA.CuArray(scale .* env .* randn(Float64, n, n, n))
+            vx, vy, vz = f(), f(), f()
+            eul = _rotate(false, sm, psi0, vx, vy, vz, 0.005, it)
+            tay = _rotate(true, sm, psi0, vx, vy, vz, 0.005, it)
+            @test norm(Array(tay) .- Array(eul)) / norm(Array(eul)) < 1e-10
+            # Dynamic range is really present: without it this test is the flat
+            # case again and proves nothing about per-voxel selection.
+            m = Array(vx) .^ 2 .+ Array(vy) .^ 2 .+ Array(vz) .^ 2
+            @test maximum(m) / max(minimum(m), 1e-300) > 1e10
+        end
+    end
+
+    # Above `_SPIN_TAYLOR_RSAFE[]` a voxel halves its angle and applies the
+    # rotation 2^s times. Production R is 0.01-0.2 so that branch never fires
+    # there; it is what makes the Taylor path valid at ANY R, which is in turn
+    # what lets the degree be chosen on the device with no max|v| read-back.
+    # Round-off accumulates over the 2^s repetitions, hence the looser bound.
+    @testset "angle halving holds at R far past the production range" begin
+        sm = spin_matrices(6)
+        n = 4096
+        psi0 = CUDA.CuArray(randn(ComplexF64, n, 1, 1, 13))
+        for scale in (200.0, 1000.0), it in (false, true)
+            v() = CUDA.CuArray(scale .* randn(Float64, n, 1, 1))
+            vx, vy, vz = v(), v(), v()
+            R = 0.005 * sqrt(maximum(Array(vx) .^ 2 .+ Array(vy) .^ 2 .+
+                                     Array(vz) .^ 2)) * 6
+            @test R > 20                       # the halving branch really fires
+            eul = _rotate(false, sm, psi0, vx, vy, vz, 0.005, it)
+            tay = _rotate(true, sm, psi0, vx, vy, vz, 0.005, it)
+            @test norm(Array(tay) .- Array(eul)) / norm(Array(eul)) < 1e-8
+        end
+    end
+
     # A rotation is unitary; the Taylor truncation must not leak norm at the
     # production angle. (The imaginary-time arm is deliberately not unitary.)
     @testset "Taylor rotation preserves norm (real time)" begin
