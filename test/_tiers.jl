@@ -388,6 +388,10 @@ const FULL_EXTRA = [
     "gpu/test_projected_gp_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    # Bit-identity of the fused SM·DDI·SM half-step against the
+    # operator-by-operator chain, plus one arm per eligibility rule. GPU-only
+    # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
+    "oracles/test_spin_chain_fusion_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -482,6 +486,7 @@ const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.

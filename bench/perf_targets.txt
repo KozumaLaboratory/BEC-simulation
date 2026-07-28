@@ -92,3 +92,42 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   Zeeman into ONE rotation per half-V (12 rotations/step → 4) and is tested
 #   + order-2 validated, but no production path calls it. Wiring it into the
 #   RTP loop is worth more than any further kernel tuning.
+#
+# === Round 9 (2026-07-29, RTP on an RTX 5070 Ti, 64³ Eu151 D=13 F64 + DDI) ===
+# Measured with bench/profile_rtp.jl (knob decomposition + CUDA kernel table)
+# and bench/micro_spin_taylor.jl (new — sweeps the Horner degree so the
+# compute-vs-memory regime is measured, not assumed).
+#
+# Caveat on this card: FP64 runs at 1/64 rate, so the Horner body dominates
+# locally where on an H100 (1/2 rate) the same step is memory- and launch-bound.
+# Items (1) and (2) below are the local wins; (3) and (4) are the ones that
+# matter on TSUBAME. None of the four has been measured on an H100.
+#
+# done 2026-07-29 (1): `z / T(k)` in the Horner body was two FP64 divisions per
+#   degree per lane. Tabulated as the REAL `scale/k` with the ∓i folded in as a
+#   component swap — bit-identical. K=8: 6.80 → 1.69 ms.
+#
+# done 2026-07-29 (2): the degree came from a HOST reduction over max|v|, which
+#   drained the stream 12×/step (46 % of the step, GPU idle) AND paid the peak's
+#   degree in the dilute tails. Now decided per voxel in-kernel, with angle
+#   halving so the Taylor path is exact at any R and the Euler fallback is no
+#   longer a dispatch decision. 51.6 → 30.8 ms/step; GPU busy 34 % → 82 %.
+#
+# done 2026-07-29 (3): `diag · SM · DDI · SM · diag` is the WHOLE V half-step in
+#   the Eu production shape, and under the midpoint corrector its mean field is
+#   frozen — so all three rotations want the same ⟨F⟩ and both diagonal halves
+#   the same voxel phase (a rotation is unitary; it cannot move the density).
+#   One kernel: 8 ψ passes → 3, 3 spin-density passes → 1, 5 launches → 2, per
+#   half-step. Bit-identical, gated as such
+#   (test/oracles/test_spin_chain_fusion_parity.jl — which caught a 1-ulp
+#   multiply-association slip a tolerance would have passed).
+#
+# rejected 2026-07-29: staging ψ through shared memory to coalesce the rotation
+#   kernel's load/store. 5-15 % SLOWER at 64³ D=13. `CUDA.registers` = 48 with
+#   no spill, so it is neither access-pattern- nor occupancy-limited.
+#
+# NEXT: the DDI convolution's 6 rFFTs per call (3 forward + 3 backward, ~16 % of
+#   GPU time at 64³) are 6 separate cuFFT executions. Batching them needs
+#   Fx_r/Fy_r/Fz_r to be slices of one (n_pts..., 3) array, i.e. a DDIBuffers
+#   field-type change — check it does not widen a Workspace type parameter
+#   before starting.

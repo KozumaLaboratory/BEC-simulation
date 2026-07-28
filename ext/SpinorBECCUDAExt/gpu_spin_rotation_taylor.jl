@@ -102,7 +102,15 @@ const _SPIN_TAYLOR_RSAFE = Ref(1.0)
 # `_SPIN_RK_MAX = 40` is the degree ceiling. With the halving above it is never
 # approached: R ≤ 1 needs 12 terms at tol = 1e-9 and 24 at tol = 1e-24.
 const _SPIN_RK_MAX = 40
-const _SPIN_RK_CACHE = Dict{DataType, Any}()
+# Keyed by the SCALE, not just the eltype: a fixed-dt run uses a handful of
+# distinct scales (c₁·τ/2 and τ for each of the predictor's and corrector's
+# half-steps) and then never refills. That matters out of proportion to the
+# kernel's size — an empty launch costs 32-190 µs under WSL2's paravirtualised
+# submission path, so eight 40-thread launches per step were ~0.5 ms of pure
+# overhead. An adaptive-dt run will miss; the cache is cleared past a bound so
+# it cannot grow without limit.
+const _SPIN_RK_CACHE = Dict{Tuple{DataType, Float64}, Any}()
+const _SPIN_RK_CACHE_MAX = 64
 
 function _fill_rk_kernel!(rk, scale::T) where {T}
     k = CUDA.threadIdx().x
@@ -111,30 +119,29 @@ function _fill_rk_kernel!(rk, scale::T) where {T}
 end
 
 function _get_spin_rk(::CuArray{Complex{T}}, scale::T) where {T}
-    rk = get!(() -> CUDA.zeros(T, _SPIN_RK_MAX), _SPIN_RK_CACHE, T)::CuArray{T, 1}
+    key = (T, Float64(scale))
+    hit = get(_SPIN_RK_CACHE, key, nothing)
+    hit !== nothing && return hit::CuArray{T, 1}
+    length(_SPIN_RK_CACHE) >= _SPIN_RK_CACHE_MAX && empty!(_SPIN_RK_CACHE)
+    rk = CUDA.zeros(T, _SPIN_RK_MAX)
     CUDA.@cuda threads = _SPIN_RK_MAX blocks = 1 _fill_rk_kernel!(rk, scale)
+    _SPIN_RK_CACHE[key] = rk
     rk
 end
 
-# --- Taylor–Horner warp kernel (one spin component per lane) ---
+# --- Taylor–Horner pieces (one spin component per lane) ---
+#
+# Declared once here as three `@inline` steps, so the single-rotation kernel and
+# the SM·DDI·SM chain kernel (gpu_spin_chain.jl) run the SAME Horner rather than
+# two statements of it.
+#
+#   _rot_generator  build the tridiagonal A = v·F for this lane, and |v|²F²
+#   _rot_schedule   pick this voxel's angle halving and Horner degree
+#   _horner_rot     apply exp(z·A) to one lane's amplitude
+#
 # `RT` selects the real-time (multiply by -i) vs imaginary-time (real weight)
 # form of the Horner coefficient; both read the same real `rk` table.
 #
-# Each voxel sizes its own rotation from its own R = |scale|·|v(r)|·F:
-#
-#   1. halve the angle `s` times until R/2^s ≤ √rsafe2, then apply the halved
-#      rotation 2^s times (repeated squaring — exact, and s = 0 in production);
-#   2. take the smallest degree k ≥ 2 with (R/2^s)^k/k! ≤ tol.
-#
-# Both tests run on SQUARES so no FP64 sqrt is needed: (R/2^s/k)² = (rk[k]·h)²·g
-# with g = |v|²F² and h = 2^-s. `h` is then folded ONCE into the generator
-# (diag_c, b_c, bm) instead of into every Horner coefficient, so the inner loop
-# is byte-for-byte the loop it was before and the h = 1 case is bit-identical.
-#
-# `s` and the degree are raised to the WARP maximum first. `_shfl_c` carries a
-# full-warp mask, so the two voxels sharing a warp must execute the same trip
-# count or the `shfl_sync` deadlocks; neighbouring voxels pick near-identical
-# values, so rounding up costs almost nothing.
 # The load/store keeps the compute layout's addressing — a lane reads P[vox, c]
 # with the D components N·16 B apart. Staging ψ through shared memory so the
 # load/store run over consecutive VOXELS instead was tried and measured 5-15 %
@@ -142,44 +149,38 @@ end
 # by that pattern. `CUDA.registers` says 48 with no spill, so it is not
 # occupancy-limited either — at production degrees ~74 % of this card's FP64
 # peak is in the Horner body itself.
-@inline function _spin_taylor_warp_kernel!(
-    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
-) where {D, RT}
-    T = real(eltype(P))
+
+# A = v·F is Hermitian tridiagonal in the F_z basis. Returns this lane's
+# diagonal entry, its super-diagonal entry A[c,c+1], the conjugate of the
+# sub-diagonal entry A[c-1,c] (shuffled down from lane c-1), and g = |v|²F².
+@inline function _rot_generator(
+    Vx::T, Vy::T, Vz::T, mz, sxu, syu, c, cdn, F2, ::Val{W},
+) where {T, W}
     CT = Complex{T}
-    W = 16
-    tib = CUDA.threadIdx().x
-    lane0 = (tib - 1) & 31
-    sg = lane0 >> 4
-    sl = lane0 & 15
-    warp_in_block = (tib - 1) >> 5
-    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + warp_in_block
-    vox = gwarp * 2 + sg + 1
-    N = size(P, 1)
-    active = sl < D
-    in_range = vox <= N
-    c = active ? sl + 1 : 1
-
-    Vx = in_range ? (@inbounds vx[vox]) : zero(T)
-    Vy = in_range ? (@inbounds vy[vox]) : zero(T)
-    Vz = in_range ? (@inbounds vz[vox]) : zero(T)
-
     diag_c = Vz * (@inbounds mz[c])                          # real F_z diagonal
     b_c = Vx * (@inbounds sxu[c]) + Vy * (@inbounds syu[c])  # A[c,c+1]
     # lower coupling conj(A[c-1,c]) = conj(b_{c-1}); b_{c-1} from lane c-1
-    cdn = c > 1 ? c - 1 : 1
     bm_raw = _shfl_c(b_c, cdn, Val(W))
     bm = c > 1 ? bm_raw : zero(CT)
+    (diag_c, b_c, conj(bm), (Vx * Vx + Vy * Vy + Vz * Vz) * F2)
+end
 
-    psi0 = (active && in_range) ? (@inbounds P[vox, c]) : zero(CT)
-    bmc = conj(bm)
-
-    # rk[1] = scale, so `r2` starts as R² = (scale·|v|·F)².
-    g = (Vx * Vx + Vy * Vy + Vz * Vz) * F2
-    scale1 = @inbounds rk[1]
+# Each voxel sizes its own rotation from its own R = |scale|·|v(r)|·F:
+#
+#   1. halve the angle `s` times until R/2^s ≤ √rsafe2 — the halved rotation is
+#      then applied 2^s times (repeated squaring; exact, and s = 0 in production);
+#   2. take the smallest degree k ≥ 2 with (R/2^s)^k/k! ≤ tol.
+#
+# Both tests run on SQUARES so no FP64 sqrt is needed: (R/2^s/k)² = (rk[k]·h)²·g
+# with g = |v|²F² and h = 2^-s.
+#
+# `s` and the degree are raised to the WARP maximum. `_shfl_c` carries a
+# full-warp mask, so the two voxels sharing a warp must execute the same trip
+# count or the `shfl_sync` deadlocks; neighbouring voxels pick near-identical
+# values, so rounding up costs almost nothing.
+@inline function _rot_schedule(g::T, rk, K::Int32, tol2, rsafe2) where {T}
+    scale1 = @inbounds rk[1]        # rk[1] = scale ⇒ r2 starts as R²
     r2 = scale1 * scale1 * g
-
-    # (1) angle halving — exact, `h` stays a power of two.
     sh = zero(Int32)
     while r2 > rsafe2 && sh < Int32(30)
         r2 *= T(0.25)
@@ -192,7 +193,6 @@ end
     end
     gh = g * h * h
 
-    # (2) degree — smallest k ≥ 2 with ((R/2^s)^k/k!)² ≤ tol².
     kv = K
     u = one(T)
     kk = one(Int32)
@@ -205,14 +205,20 @@ end
         end
         kk += one(Int32)
     end
-    kv = max(kv, CUDA.shfl_xor_sync(0xffffffff, kv, 16))
+    (h, sh, max(kv, CUDA.shfl_xor_sync(0xffffffff, kv, 16)))
+end
 
-    # Fold the halving into the generator once; `h == 1` leaves these exact.
-    diag_c *= h
-    b_c *= h
-    bmc *= h
-
-    w = psi0
+# `w ← exp(z·A) w`. The halving `h` is folded ONCE into the generator rather
+# than into every Horner coefficient, so the inner loop is byte-for-byte the
+# loop it was before the halving existed and the h = 1 case is bit-identical.
+@inline function _horner_rot(
+    w0::CT, diag_c, b_c, bmc, c, cdn, rk, kv::Int32, h, sh::Int32,
+    ::Val{W}, ::Val{RT},
+) where {CT, W, RT}
+    dg = diag_c * h
+    bu = b_c * h
+    bd = bmc * h
+    w = w0
     rep = one(Int32) << sh
     while rep >= one(Int32)
         base = w
@@ -222,7 +228,7 @@ end
             wup = _shfl_c(wk, c + 1, Val(W))             # w_{c+1} (idle→0 at c=D)
             wdn_raw = _shfl_c(wk, cdn, Val(W))
             wdn = c > 1 ? wdn_raw : zero(CT)
-            Aw = diag_c * wk + b_c * wup + bmc * wdn
+            Aw = dg * wk + bu * wup + bd * wdn
             a = @inbounds rk[k]
             # RT: (0 - i·a)·Aw = a·(imag(Aw) - i·real(Aw));  IT: (-a)·Aw
             wk = RT ? base + a * CT(imag(Aw), -real(Aw)) : base - a * Aw
@@ -231,10 +237,43 @@ end
         w = wk
         rep -= one(Int32)
     end
+    w
+end
 
-    if active && in_range
-        @inbounds P[vox, c] = w
-    end
+# Lane → (voxel, spin component) for the width-16 subgroup layout. Two voxels
+# per warp; lanes at or above D are idle passengers (their `b_c` is multiplied
+# by sxu[D] = syu[D] = 0 at the top edge, so they cannot contaminate c = D).
+@inline function _rot_lane_map(::Val{D}) where {D}
+    tib = CUDA.threadIdx().x
+    lane0 = (tib - 1) & 31
+    sl = lane0 & 15
+    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + ((tib - 1) >> 5)
+    vox = gwarp * 2 + (lane0 >> 4) + 1
+    active = sl < D
+    c = active ? sl + 1 : 1
+    (vox, c, c > 1 ? c - 1 : 1, active)
+end
+
+@inline function _spin_taylor_warp_kernel!(
+    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
+) where {D, RT}
+    T = real(eltype(P))
+    CT = Complex{T}
+    vox, c, cdn, active = _rot_lane_map(Val(D))
+    in_range = vox <= size(P, 1)
+    live = active && in_range
+
+    Vx = in_range ? (@inbounds vx[vox]) : zero(T)
+    Vy = in_range ? (@inbounds vy[vox]) : zero(T)
+    Vz = in_range ? (@inbounds vz[vox]) : zero(T)
+
+    diag_c, b_c, bmc, g = _rot_generator(Vx, Vy, Vz, mz, sxu, syu, c, cdn, F2, Val(16))
+    h, sh, kv = _rot_schedule(g, rk, K, tol2, rsafe2)
+
+    psi0 = live ? (@inbounds P[vox, c]) : zero(CT)
+    w = _horner_rot(psi0, diag_c, b_c, bmc, c, cdn, rk, kv, h, sh, Val(16), Val(RT))
+
+    live && (@inbounds P[vox, c] = w)
     nothing
 end
 

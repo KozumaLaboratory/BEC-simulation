@@ -1,0 +1,131 @@
+# Gate for the fused SM · DDI · SM half-step (src/hamiltonian/integrator/
+# spin_chain.jl + ext/SpinorBECCUDAExt/gpu_spin_chain.jl).
+#
+# The fused kernel claims to be the SAME splitting as the operator-by-operator
+# chain, not a cheaper approximation of it: the same three rotations, in the
+# same order, with the same fields — only the HBM round-trips between them are
+# removed. That claim is testable exactly, so this gate demands BIT-IDENTITY
+# rather than a tolerance. A tolerance would let a genuinely different
+# splitting (e.g. merging the three rotations into one, which is what
+# `split_step_combined!` deliberately does) slip through as "close enough".
+#
+# The second half of the file pins the eligibility list. `_spin_chain_reason`
+# enumerates the operators that may sit between the diagonal step and DDI, and
+# a new operator added to `_outer_operators_fwd!` without a matching entry
+# there would be silently DROPPED by the fused path. One arm per entry, each
+# checking both that the reason fires and that the step still agrees with the
+# unfused chain.
+
+using Test
+using LinearAlgebra: norm
+import CUDA
+using SpinorBEC
+
+if !CUDA.functional()
+    @info "CUDA not functional — skipping spin-chain fusion parity"
+else
+    include(joinpath(@__DIR__, "..", "..", "bench", "eu151_params.jl"))
+
+    const _N = 20
+    const _GRID = make_grid(GridConfig(ntuple(_ -> _N, 3), ntuple(_ -> 12.0, 3)))
+
+    function _ws(; c1_ratio=0.05, kwargs...)
+        sp = SimParams(; dt=2e-4, n_steps=1, imaginary_time=false, save_every=10^9)
+        ws = make_workspace(;
+            grid=_GRID, atom=Eu151, interactions=eu_interaction_params(c1_ratio),
+            zeeman=ZeemanParams(EU_p_weak, 0.0),
+            potential=HarmonicTrap(1.0, 1.0, EU_λ_z),
+            sim_params=sp, enable_ddi=true, c_dd=EU_c_dd,
+            backend=CUDABackend(), kwargs...,
+        )
+        psi = init_psi(_GRID, ws.spin_matrices.system;
+            state=:spin_coherent, init_theta=0.6, init_phi=0.4)
+        psi ./= sqrt(sum(abs2, psi) * cell_volume(_GRID))
+        copyto!(ws.state.psi, psi)
+        ws
+    end
+
+    "ψ after `n` steps with the fusion forced on / off."
+    function _run(fused::Bool, n::Int; kwargs...)
+        old = SpinorBEC.SPIN_CHAIN_FUSION_ENABLED[]
+        SpinorBEC.SPIN_CHAIN_FUSION_ENABLED[] = fused
+        try
+            ws = _ws(; kwargs...)
+            for _ in 1:n
+                SpinorBEC.split_step!(ws)
+            end
+            CUDA.synchronize()
+            return Array(ws.state.psi)
+        finally
+            SpinorBEC.SPIN_CHAIN_FUSION_ENABLED[] = old
+        end
+    end
+
+    @testset "fused SM·DDI·SM ≡ the unfused chain, bit for bit" begin
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        a = _run(true, 5)
+        b = _run(false, 5)
+        @test a == b
+        # The two arms really did take different paths: with the midpoint
+        # predictor-corrector off there is no frozen ψ_mf, so the fused arm
+        # declines and the equality above would be trivially true.
+        @test SpinorBEC._spin_chain_reason(_ws(), _ws().interactions,
+            CUDA.zeros(ComplexF64, 2)) === nothing
+        # And the step actually moved ψ.
+        @test norm(a) > 0 && a != Array(_ws().state.psi)
+    end
+
+    @testset "no frozen mean field ⇒ the fusion declines" begin
+        ws = _ws()
+        # `psi_mf === nothing` is the plain (non-midpoint) half-step: the two
+        # spin-mixing substeps then see different ψ and share nothing.
+        @test SpinorBEC._spin_chain_reason(ws, ws.interactions, nothing) !== nothing
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = false
+        try
+            @test _run(true, 3) == _run(false, 3)
+        finally
+            SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        end
+    end
+
+    @testset "each operator that can sit between diag and DDI blocks the fusion" begin
+        base = _ws()
+        pmf = CUDA.zeros(ComplexF64, 2)
+
+        # c₁ = 0 — no spin-mixing rotation to fuse with in the first place.
+        @test SpinorBEC._spin_chain_reason(
+            base, eu_interaction_params(0.0), pmf) !== nothing
+
+        # c₂ ≠ 0 — the singlet-pair substep sits between diag and DDI.
+        ip2 = InteractionParams(
+            Dict(0 => base.interactions[0], 1 => base.interactions[1], 2 => 0.3))
+        @test SpinorBEC._spin_chain_reason(base, ip2, pmf) !== nothing
+
+        # A transverse field makes the Zeeman substep a separate rotation.
+        ztr = TimeDependentZeeman(ConstantWaveform(EU_p_weak), ConstantWaveform(0.0),
+            ConstantWaveform(0.4), nothing)
+        wst = _ws(; zeeman=ztr)
+        @test SpinorBEC._spin_chain_reason(wst, wst.interactions, pmf) !== nothing
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        @test _run(true, 3; zeeman=ztr) == _run(false, 3; zeeman=ztr)
+
+        # The Orszag F-filter reshapes ⟨F⟩ for DDI but not for spin-mixing, so
+        # the two would no longer be the same field.
+        old = SpinorBEC.DEALIAS_2_3_ENABLED[]
+        SpinorBEC.DEALIAS_2_3_ENABLED[] = true
+        try
+            @test SpinorBEC._spin_chain_reason(base, base.interactions, pmf) !== nothing
+        finally
+            SpinorBEC.DEALIAS_2_3_ENABLED[] = old
+        end
+
+        # No DDI at all — nothing to fuse around.
+        wsn = make_workspace(;
+            grid=_GRID, atom=Eu151, interactions=eu_interaction_params(0.05),
+            zeeman=ZeemanParams(EU_p_weak, 0.0),
+            potential=HarmonicTrap(1.0, 1.0, EU_λ_z),
+            sim_params=SimParams(; dt=2e-4, n_steps=1, save_every=10^9),
+            enable_ddi=false, backend=CUDABackend())
+        @test SpinorBEC._spin_chain_reason(wsn, wsn.interactions, pmf) !== nothing
+    end
+end
