@@ -129,7 +129,6 @@ is a warning to always include the geometry lever, not a dead end.
 
 ![c1-DDI orthogonal lever](../../figs/eu_evaporation_optimization/c1_ddi_orthogonal.png)
 
-<<<<<<< HEAD
 *Optimal aspect-ratio-scan design.* Building the 2-parameter Fisher matrix from the measured
 spin-mixing sensitivities $[\partial\ln A/\partial\ln c_1,\ \partial\ln A/\partial\ln c_{dd}]$ at
 $\lambda\in\{0.5,1,2\}$ — $(0.64,+0.16)$, $(0.91,-0.09)$, $(1.75,-1.27)$ — quantifies it: a **single**
