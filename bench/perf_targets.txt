@@ -64,3 +64,31 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #
 # _get_spinor             bench/get_spinor_d13      CLAUDE.md: 352 B/call alloc, D=13 known issue
 # rotating_norm           bench/rotating_norm       reduction with abs2; check fusion
+
+# === Round 8 (2026-07-28, RTP on TSUBAME H100) ===
+# Target was the RTP step for Eu151 F=6 (D=13) F64 with DDI — the production
+# TSUBAME shape. Profile of one step at 64³ showed `_euler_5stage_warp_kernel`
+# at 80% of GPU-busy time (8 calls, 82.7 of 102.8 ms) purely because
+# spin-mixing had not been routed to the Taylor-Horner rotation kernel the DDI
+# substep already used.
+#
+# done 2026-07-28: apply_spin_mixing_step! (GPU)  →  shared
+#   `_apply_spin_rotation_taylor!`. H100 whole-step: 6.60→4.39 ms at 64³
+#   (1.51×), 49.7→30.0 ms at 128³ (1.66×). Parity vs the exact Euler kernel
+#   4.9e-13 after 10 steps.
+#
+# rejected(H100 slower: 30.0→42.5 ms at 128³, 4.39→6.20 at 64³) 2026-07-28:
+#   thread-per-voxel addressing for the Taylor rotation kernel. ψ is
+#   (N_spatial, D) column-major, so the warp layout (one spin COMPONENT per
+#   lane) reads 13 addresses N·16 B apart and issues 32-byte transactions
+#   where the coalesced diagonal kernel issues 128-byte lines — measured
+#   0.93 TB/s vs 2.2 TB/s on the same array, which looked like a clean 2×.
+#   It is not: one voxel per thread needs the whole spinor live (ψ₀ and w,
+#   2·D complex = 104 32-bit registers at D=13) and the spill costs more than
+#   the coalescing saves. Do not retry without first fixing the register
+#   pressure (e.g. shared-memory staging of w, or F32).
+#
+# NEXT: `split_step_combined!` already merges spin-mixing + DDI + transverse
+#   Zeeman into ONE rotation per half-V (12 rotations/step → 4) and is tested
+#   + order-2 validated, but no production path calls it. Wiring it into the
+#   RTP loop is worth more than any further kernel tuning.
