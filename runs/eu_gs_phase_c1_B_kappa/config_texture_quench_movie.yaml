@@ -24,7 +24,29 @@
 metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
-dealias: {enabled: true, k_cut: 5.0}
+# DEALIAS OFF here, but do NOT read that as "off is correct" — the question is
+# open and the reasoning that led here was partly wrong.
+#
+# Measured on this exact cell (duration 0.1, everything else identical):
+#   enabled: false -> column sum 18.963 at EVERY frame (conserved to 5 s.f.)
+#   enabled: true  -> 18.963 -> 1.202 -> ... -> 0.669, norm_rel_drift = 0.993
+#
+# I first blamed `k_cut` (wrong: removing it reproduces the loss to 3 s.f.) and
+# then the DDI F-filter (also wrong: F enters as a unitary spin rotation, so
+# filtering it cannot change the norm at all).
+#
+# The resolution landed separately: the psi filter is an EXACT SPECTRAL
+# PROJECTOR, so the norm it removes IS the above-cut weight, and a large drift
+# measures how much weight the dynamics push past 2/3 k_Nyq rather than
+# indicating a bug. On that reading, disabling the filter does not fix anything
+# — the content aliases back into low k and the clean norm is a trap.
+#
+# UNRESOLVED for these configs: the dealias-OFF states measured here carry
+# 0.0% of their weight above the 2/3 cut at t=0.1 AND at t=20, which does not
+# fit "the dynamics generate several % per step". Until that is reconciled,
+# treat BOTH settings as suspect and quote `norm_rel_drift` with any result.
+# See memory gotcha_dealias_block_destroys_norm_in_ddi_dynamics_2026_07_28.
+dealias: {enabled: false}
 pipeline:
   # Prepared above the crossover — axial flux-closure texture.
   - ground_state:
