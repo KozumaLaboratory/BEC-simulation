@@ -108,7 +108,7 @@ const PATH_COVERAGE = [
     # cloud's own local spinors. The wiring gate covers the builder, the
     # uniform-cloud fallback to `:full_bdg`, and the resolver's knobs; the
     # table itself is `hamiltonian/test_spatial_lhy.jl` and its gradient
-    # (which alone carries the polarisation term — issue #131) is
+    # (whose polarisation term the propagator also carries since #131) is
     # `hamiltonian/test_lhy_gradient_all_modes.jl`.
     (axis=:lhy_kind, value="spatial", status=:gated,
         ref="workflow/test_lhy_block_wiring.jl"),

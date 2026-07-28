@@ -272,11 +272,12 @@ rather than returning nothing.
 
 Two caveats for `spatial`:
 
-- The propagator applies only the diagonal $\partial\varepsilon/\partial n$. The
-  polarisation piece of $\delta E/\delta\bar\psi$ is a spin operator, which the
-  LBFGS gradient carries and the diagonal split-step cannot — a measured 2.3%
-  difference, so ITP and LBFGS minimise slightly different functionals here
-  (issue #131).
+- The polarisation piece of $\delta E/\delta\bar\psi$ is a spin operator, which
+  a diagonal split-step cannot carry. It is applied as its own substep
+  (`apply_spatial_lhy_spin_step!`, a per-voxel rotation about the local
+  $\langle F\rangle$ axis), so the propagator and the LBFGS gradient agree. Runs
+  predating issue #131 had ITP minimising a functional 2.3% away from the one
+  LBFGS minimised.
 - Expect `full_bdg`'s dynamic-instability warning. A bin's representative
   spinor is lifted out of the cloud and is not a solution of the *uniform*
   mean-field problem at its own density; the warning is about that fictitious

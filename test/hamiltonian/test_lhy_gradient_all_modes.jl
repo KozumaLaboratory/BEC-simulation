@@ -115,8 +115,11 @@ end
         @test norm(g) > 1.0
         @test norm(g .- fd) / norm(fd) < 1e-7     # measured 8.3e-10
 
-        # The diagonal-only gradient — what the propagator applies — and by how
-        # much it falls short. Pinned so the discrepancy cannot silently grow.
+        # The diagonal-only gradient, and by how much it falls short. Since
+        # issue #131 the propagator also applies the spin piece
+        # (`apply_spatial_lhy_spin_step!`), so this is no longer what the
+        # propagator does — it is the measurement that makes that substep's
+        # contribution a number rather than an assumption.
         P = reshape(psi, prod(npts), _D)
         fp = ntuple(c -> fp_ladder_coeff(_F, _F - (c - 1)), Val(_D))
         diag = zeros(ComplexF64, prod(npts), _D)
