@@ -17,8 +17,9 @@
 #         (apply_uniform_spin_rotation!, used by transverse Zeeman / Raman /
 #         rotating basis) lives in foundation/spinor_utils/uniform_rotation.jl.
 #   terms/lhy/{phi_one_reg,polar_contact,polar_dipolar,fm_contact,
-#              fm_dipolar,icosahedral,modes_round45,dispatch}
-#       — closed-form spinor LHY tables for various spin phases
+#              fm_dipolar,icosahedral,modes_round45,dispatch,full_bdg}
+#       — closed-form spinor LHY tables for various spin phases, plus the
+#         general-spinor BdG zero-point integral (full_bdg) they gate
 #   terms/loss (engine + LossTerm) — dipolar relaxation + ABC
 #   terms/trap/{evaluate_potential} + trap_term
 #       — trap evaluators and potential application
@@ -56,6 +57,8 @@ include("hamiltonian/terms/lhy/fm_dipolar.jl")
 include("hamiltonian/terms/lhy/icosahedral.jl")
 include("hamiltonian/terms/lhy/modes_round45.jl")
 include("hamiltonian/terms/lhy/dispatch.jl")
+include("hamiltonian/terms/lhy/full_bdg.jl")
+include("hamiltonian/terms/lhy/spatial.jl")
 include("hamiltonian/integrator/absorbing_boundary.jl")
 
 # Potentials / builders. Dipole-trap potentials build on the Gaussian-beam

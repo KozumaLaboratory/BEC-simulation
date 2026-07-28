@@ -129,16 +129,102 @@ function _lhy_energy(::Any, ::NoLHY, _n_comp, _ndim, _n_pts, _dV)
     0.0
 end
 
+# Spatially-varying: ε_LHY = n^(5/2) e₁(p(r)), so the energy needs the same
+# local polarisation the propagator uses. Kept beside `_lhy_V(n, p, ·)` in
+# spirit — if these two ever disagree the term drifts silently, which is the
+# bug class the HamTerm protocol exists to prevent.
+function _lhy_energy(psi, lhy::SpatialLHY, n_comp, ndim, n_pts, dV)
+    D = n_comp
+    F = lhy.F
+    fp = lhy.fp_coeffs
+    Ns = prod(n_pts)
+    P = reshape(psi, Ns, D)
+    E = 0.0
+    @inbounds for i in 1:Ns
+        s = 0.0
+        for c in 1:D
+            s += abs2(P[i, c])
+        end
+        s < 1e-30 && continue
+        p = _local_polarisation(P, i, s, F, fp, Val(D))
+        e1 = _interpolate_1d(lhy.polarisations, lhy.e1_values, clamp(p, 0.0, 1.0))
+        E += e1 * s * s * sqrt(s)          # n^(5/2)
+    end
+    E * dV
+end
+
 # Shared energy eval for all table-based modes (TabulatedLHY subtypes).
+#
+# E = ∫ ε(n) dV, and the table stores V = dε/dn, so the energy density is the
+# INTEGRAL of the table from 0 to n — not `n·V(n)`.
+#
+# It was `n·V(n)`, which for the ε ∝ n^(5/2) that every one of these tables
+# has gives `n·V = (5/2)ε`: the reported LHY energy was exactly 2.5× too large
+# for every tabulated mode. Verified against the closed form on a uniform
+# cloud — ratio 2.500002 — while `∫₀ⁿ V dn'` reproduces ε to 6.8e-5, so the
+# tables themselves were always right and only this reduction was wrong.
+# The propagator was unaffected: it uses V directly.
 function _lhy_energy(psi, lhy::TabulatedLHY, n_comp, ndim, n_pts, dV)
     n = total_density(psi, ndim)
+    cum = _lhy_energy_density_table(lhy)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
         ni = n[I]
         ni < 1e-30 && continue
-        E += _interpolate_1d(lhy.densities, lhy.potential_values, ni) * ni
+        E += _lhy_energy_density(lhy.densities, lhy.potential_values, cum, ni)
     end
     E * dV
+end
+
+# ε(n) = ∫₀ⁿ V dn', by cumulative trapezoid over the table's own nodes. Cached
+# per table object: the tables are immutable and built once per workspace, and
+# an energy call would otherwise redo this over every voxel.
+"""
+    _lhy_energy_density(xs, ys, cum, n) -> ε(n)
+
+`ε(n) = ∫₀ⁿ V dn'` with V taken to be the SAME piecewise-linear interpolant the
+propagator evaluates, so the integral is exact rather than table-resolution
+accurate: on the interval containing `n`,
+
+    ε = cum[i] + V(xᵢ)·δ + ½·slope·δ²,     δ = n − xᵢ
+
+Linearly interpolating `cum` instead would make dε/dn the interval AVERAGE of V
+rather than V(n) — a 0.5% mismatch between the energy and the potential at
+n_points = 4000, i.e. the two faces of the term disagreeing by a discretisation
+artifact. Doing it this way, `dE/dn == V` to FD precision by construction.
+"""
+@inline function _lhy_energy_density(xs::Vector{Float64}, ys::Vector{Float64},
+    cum::Vector{Float64}, n::Float64)
+    m = length(xs)
+    m < 2 && return 0.0
+    n <= xs[1] && return 0.0
+    @inbounds if n >= xs[m]
+        return cum[m] + ys[m] * (n - xs[m])      # flat extrapolation, as `_lhy_V`
+    end
+    i = searchsortedlast(xs, n)
+    i < 1 && return 0.0
+    @inbounds begin
+        h = xs[i + 1] - xs[i]
+        d = n - xs[i]
+        slope = (ys[i + 1] - ys[i]) / h
+        cum[i] + ys[i] * d + 0.5 * slope * d * d
+    end
+end
+
+const _LHY_EPS_CACHE = IdDict{Any, Vector{Float64}}()
+
+function _lhy_energy_density_table(lhy::TabulatedLHY)
+    get!(_LHY_EPS_CACHE, lhy) do
+        xs, ys = lhy.densities, lhy.potential_values
+        cum = similar(ys)
+        acc = 0.0
+        @inbounds cum[1] = 0.0
+        @inbounds for i in 2:length(xs)
+            acc += 0.5 * (ys[i] + ys[i - 1]) * (xs[i] - xs[i - 1])
+            cum[i] = acc
+        end
+        cum
+    end
 end
 
 """

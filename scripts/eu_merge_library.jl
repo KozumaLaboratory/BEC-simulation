@@ -21,7 +21,7 @@ using Printf
 _g(f, k, d) = haskey(f, k) ? f[k] : d
 _scalar(x) = x isa Tuple ? x[1] : x
 
-const SRC = length(ARGS) >= 1 ? ARGS[1] : "figs"
+const SRC  = length(ARGS) >= 1 ? ARGS[1] : "figs"
 const DEST = length(ARGS) >= 2 ? ARGS[2] : "figs/eu_gs_library"
 
 function parse_kappa(name)
@@ -31,10 +31,8 @@ end
 function parse_branch(name)
     n = lowercase(name)
     (occursin("_dn", n) || occursin("down", n) || occursin("beqd", n)) && return "dn"
-    (
-        occursin("_up", n) || occursin("upsweep", n) || occursin("bequ", n) ||
-        occursin("rc_up", n) || occursin("flower", n)
-    ) && return "up"
+    (occursin("_up", n) || occursin("upsweep", n) || occursin("bequ", n) ||
+     occursin("rc_up", n) || occursin("flower", n)) && return "up"
     return "dn"  # m_plus_F-style default
 end
 
@@ -44,26 +42,24 @@ for sweep in readdir(SRC; join=true)
     isdir(sweep) || continue
     basename(sweep) == basename(DEST) && continue
     startswith(basename(sweep), "eu_gs_library") && continue
-    κ = parse_kappa(basename(sweep));
-    br = parse_branch(basename(sweep))
+    κ = parse_kappa(basename(sweep)); br = parse_branch(basename(sweep))
     for d in readdir(sweep; join=true)
-        pf = joinpath(d, "psi.jld2");
-        isfile(pf) || continue
+        pf = joinpath(d, "psi.jld2"); isfile(pf) || continue
         r = jldopen(pf, "r") do f
             (; grid=_scalar(_g(f, "grid_n_points", -1)),
-                B=round(_g(f, "B_uG", NaN); digits=1),
-                E=_g(f, "E_total", NaN), g=_g(f, "grad_norm", NaN),
-                conv=_g(f, "converged", -1), pin=_g(f, "pin_bx", NaN))
+               B=round(_g(f, "B_uG", NaN); digits=1),
+               E=_g(f, "E_total", NaN), g=_g(f, "grad_norm", NaN),
+               conv=_g(f, "converged", -1), pin=_g(f, "pin_bx", NaN))
         end
         isnan(r.B) && continue
         push!(rows, (; κ, br, r.grid, r.B, r.E, r.g, r.conv, r.pin,
-            src=basename(sweep), path=pf))
+                       src=basename(sweep), path=pf))
     end
 end
 
 # dedup by (grid, κ, B, branch): keep min grad_norm
 function dedup(rows)
-    best = Dict{Tuple{Int, Float64, Float64, String}, NamedTuple}()
+    best = Dict{Tuple{Int,Float64,Float64,String}, NamedTuple}()
     ndup = 0
     for r in rows
         k = (r.grid, r.κ, r.B, r.br)
@@ -92,11 +88,8 @@ for (k, r) in best
     catch
         cp(r.path, dst; force=true)  # cross-device fallback
     end
-    push!(
-        manifest,
-        (; grid, κ, B, branch=br, E=r.E, grad_norm=r.g,
-            converged=r.conv, pin=r.pin, src=r.src, path=dst),
-    )
+    push!(manifest, (; grid, κ, B, branch=br, E=r.E, grad_norm=r.g,
+                       converged=r.conv, pin=r.pin, src=r.src, path=dst))
 end
 sort!(manifest; by=r -> (r.grid, r.κ, r.B, r.branch))
 

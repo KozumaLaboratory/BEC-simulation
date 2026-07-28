@@ -9,7 +9,7 @@ export AbstractPotential
 export HarmonicTrap, NoPotential, GravityPotential, CompositePotential
 export RingPotential, BoxPotential, OpticalLatticePotential, DoubleWellPotential, QuarticPotential
 export AbstractLHY, NoLHY, ScalarLHY, Quasi2DLHY
-export TabulatedLHY
+export TabulatedLHY, SpatialLHY
 export PolarTwoChannelLHY, FullBdGLHY, PolarContactLHY, PolarDipolarLHY
 export FMContactLHY, FMDipolarLHY, IcosahedralLHY
 export MagneticGradient, TimeDependentMagneticGradient
@@ -131,6 +131,53 @@ struct Quasi2DLHY <: AbstractLHY
 end
 
 abstract type TabulatedLHY <: AbstractLHY end
+
+"""
+    SpatialLHY(polarisations, e1_values, F, fp_coeffs)
+
+LHY whose strength varies with the LOCAL spin texture, not just the local
+density.
+
+Every other LHY here is a table in `n` alone, built for ONE spinor and applied
+at every voxel. That is exact for a uniform state; on converged weak-field Eu
+ground states it costs ~5% in ε_LHY, with a sign that flips along a B-scan (see
+`test/workflow/test_lhy_texture_warning.jl` for the measurement).
+
+The separation that makes a spatial table cheap: with degenerate Zeeman
+energies the stiffness matrices are exactly ∝ n, so
+
+    ε_LHY(n, ζ) = n^(5/2) · e₁(ζ)    and    V_LHY = ∂ε/∂n = (5/2) n^(3/2) e₁(ζ)
+
+with all the spinor dependence in `e₁`. `e1_values` tabulates `e₁` against the
+local polarisation `p = |⟨F⟩|/F`, which is the direction ε_LHY actually varies
+in: rotating a spinor leaves ε_LHY invariant to machine precision for contact
+(it is an SO(3) scalar) and moves it 0.25% under the DDI, whereas taking `p`
+from 1 to 0 moves it ~20%.
+
+`p` does not determine ζ uniquely, so this is an approximation — the measured
+residual within a `p` bin is ~2%, against the ~5% it removes. `fp_coeffs` are
+the F₊ ladder coefficients, cached so the propagator can get ⟨F⟩ from the same
+component reads it already does for the density.
+"""
+struct SpatialLHY <: AbstractLHY
+    polarisations::Vector{Float64}
+    e1_values::Vector{Float64}
+    F::Int
+    fp_coeffs::Vector{Float64}
+
+    function SpatialLHY(polarisations::Vector{Float64}, e1_values::Vector{Float64},
+        F::Int, fp_coeffs::Vector{Float64})
+        length(polarisations) == length(e1_values) ||
+            throw(ArgumentError("polarisations and e1_values must have equal length"))
+        length(polarisations) >= 2 ||
+            throw(ArgumentError("SpatialLHY needs at least 2 polarisation nodes"))
+        issorted(polarisations) ||
+            throw(ArgumentError("polarisations must be sorted"))
+        length(fp_coeffs) == 2F + 1 ||
+            throw(ArgumentError("fp_coeffs must have 2F+1 entries"))
+        new(polarisations, e1_values, F, fp_coeffs)
+    end
+end
 
 """
     PolarTwoChannelLHY

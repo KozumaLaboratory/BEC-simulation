@@ -38,12 +38,12 @@ function gs_library(dir::AbstractString; write_csv::Bool=true)
         isfile(pf) || continue
         row = jldopen(pf, "r") do f
             (; B_uG=_g(f, "B_uG", NaN),
-                grid=_scalar(f["grid_n_points"]), box=_scalar(f["grid_box_size"]),
-                pin_bx=_g(f, "pin_bx", NaN),
-                c0=_g(f, "c0", NaN), c1=_g(f, "c1", NaN), c_dd=_g(f, "c_dd", NaN),
-                E_total=_g(f, "E_total", NaN), grad_norm=_g(f, "grad_norm", NaN),
-                converged=_g(f, "converged", -1), last_step=_g(f, "last_step", -1),
-                path=pf)
+               grid=_scalar(f["grid_n_points"]), box=_scalar(f["grid_box_size"]),
+               pin_bx=_g(f, "pin_bx", NaN),
+               c0=_g(f, "c0", NaN), c1=_g(f, "c1", NaN), c_dd=_g(f, "c_dd", NaN),
+               E_total=_g(f, "E_total", NaN), grad_norm=_g(f, "grad_norm", NaN),
+               converged=_g(f, "converged", -1), last_step=_g(f, "last_step", -1),
+               path=pf)
         end
         push!(rows, row)
     end
@@ -88,32 +88,23 @@ canonical way to reuse a state going forward — seed a run/dynamics/analysis wi
 `load_state(meta.path)` also works directly (files are load_state-schema).
 """
 function load_lib(; κ::Real, B_uG::Real, branch::AbstractString="dn",
-    grid::Int=32, lib::AbstractString="figs/eu_gs_library")
+                  grid::Int=32, lib::AbstractString="figs/eu_gs_library")
     csv = joinpath(lib, "library.csv")
     isfile(csv) || error("no merged library at $csv — run scripts/eu_merge_library.jl")
     hdr = split(readline(csv), '\t')
     col = Dict(h => i for (i, h) in enumerate(hdr))
     cand = NamedTuple[]
     for ln in readlines(csv)[2:end]
-        c = split(ln, '\t');
-        isempty(c[1]) && continue
-        (
-            parse(Int, c[col["grid"]]) == grid &&
-            abs(parse(Float64, c[col["κ"]]) - κ) < 1e-3 &&
-            c[col["branch"]] == branch
-        ) || continue
-        push!(
-            cand,
-            (; B=parse(Float64, c[col["B"]]), path=String(c[col["path"]]),
-                E=parse(Float64, c[col["E"]]), grad=parse(Float64, c[col["grad_norm"]])),
-        )
+        c = split(ln, '\t'); isempty(c[1]) && continue
+        (parse(Int, c[col["grid"]]) == grid &&
+         abs(parse(Float64, c[col["κ"]]) - κ) < 1e-3 &&
+         c[col["branch"]] == branch) || continue
+        push!(cand, (; B=parse(Float64, c[col["B"]]), path=String(c[col["path"]]),
+                       E=parse(Float64, c[col["E"]]), grad=parse(Float64, c[col["grad_norm"]])))
     end
     isempty(cand) && error("no library state for grid=$grid κ=$κ branch=$branch")
     r = cand[argmin(abs.(getfield.(cand, :B) .- B_uG))]
-    psi = jldopen(r.path, "r") do f
-        ;
-        Array{ComplexF64}(f["psi"]);
-    end
+    psi = jldopen(r.path, "r") do f; Array{ComplexF64}(f["psi"]); end
     (; psi, meta=r)
 end
 
@@ -135,12 +126,9 @@ function make_load_state_compatible(dir::AbstractString)
             Dict(k => f[k] for k in keys(f))
         end
         haskey(data, "t") && haskey(data, "step") && continue   # already complete
-        get!(data, "t", 0.0);
-        get!(data, "step", 0)
-        get!(data, "zeeman_q", 0.0);
-        get!(data, "dt", 0.002)
-        get!(data, "imaginary_time", true);
-        get!(data, "c_lhy", 0.0)
+        get!(data, "t", 0.0); get!(data, "step", 0)
+        get!(data, "zeeman_q", 0.0); get!(data, "dt", 0.002)
+        get!(data, "imaginary_time", true); get!(data, "c_lhy", 0.0)
         get!(data, "c_dict",
             Dict{Int, Float64}(0 => get(data, "c0", NaN), 1 => get(data, "c1", NaN)))
         tmp = pf * ".tmp"

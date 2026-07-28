@@ -31,8 +31,11 @@ function apply_projected_gp!(
     fft_buf = ws.state.fft_buf
     k_cut_sq = Float64(k_cut)^2
 
-    # Build the mask once per call (on device matching ws.state.psi).
-    k_squared = ws.grid.k_squared
+    # Build the mask once per call (on device matching ws.state.psi). `ws.grid.k_squared`
+    # is a host Array even for a GPU workspace, so a bare broadcast against a CuArray
+    # `fft_buf` fails (non-bitstype kernel arg); move it to the psi device first — the
+    # same idiom as hessian.jl / newton_cg.jl. No-op on CPU.
+    k_squared = _to_device(ws.backend, ws.grid.k_squared)
     T = real(eltype(psi))
 
     if smooth
