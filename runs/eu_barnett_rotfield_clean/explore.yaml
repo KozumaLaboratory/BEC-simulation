@@ -1,0 +1,70 @@
+# Clean rotating-field EdH/Barnett — exploratory scan (does the mechanism work?)
+#
+# Trapped Eu-151 F=1 effective (ε_dd≈1.18, LHY-stabilised), full DDI,
+# UNITARY (no loss). Converged polarised GS -> Bz quench -> rotating
+# transverse B at Omega ∈ {+0.5, 0, -0.5}.
+#
+# Corrects the earlier eu151_barnett_spin run:
+#   - records L_z (offline from psi snapshots, see analyze_barnett.jl)
+#   - NO K3 loss -> any dF_z is COHERENT orbital<->spin transfer, not
+#     dissipative depolarisation
+#   - Omega=0 control: no rotation -> no direction bias
+#   - +Omega / -Omega share the SAME initial state -> clean ± comparison
+#
+# Physics target: rotating field pumps angular momentum, split between
+# L_z (vortices, EdH) and dF_z (Barnett magnetisation); both signs set
+# by rotation direction. EdH oracle: <L_z> and dF_z co-aligned.
+
+defaults:
+  kind:    spinor
+  backend: gpu
+  interactions: {N_atoms: 20000, omega_ref: 691.15}
+
+mixins:
+  eu_f1:
+    atom: Eu151_f1_effective
+    grid: {n: [32, 32, 16], box: [18, 18, 9]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 2.0]}
+    interactions: {N_atoms: 20000, omega_ref: 691.15}
+
+pipeline:
+  # Phase 0: converged polarised GS at strong prep Bz.
+  # (ITP at +Bz relaxes to m=-F ground state; that is our clean start.)
+  - ground_state:
+      use:           [eu_f1]
+      B:             {Bz: "0.02 Gauss", q: 0.0}
+      ddi:           {enabled: true}
+      lhy:           {kind: scalar}
+      initial_state: m_minus_F
+      n_steps:       2500
+      tol:           1.0e-8
+      dt:            0.004
+
+  # Phase 1: quench Bz strong -> weak (z-component of tilted weak field).
+  - dynamics:
+      duration: 0.20
+      dt:       0.0005
+      ddi:      {enabled: true}
+      lhy:      {kind: scalar}
+      B:        {Bz: {from: 0.02, to: 2.13e-5, duration: 0.20}, q: 0.0}
+      save:     {every: 400}
+
+  # Phase 2: weak Bz + rotating transverse B (35 deg tilt), NO loss.
+  #   Bx = amp cos(Omega t) ; By = amp sin(Omega t) ; Omega = 2*pi*freq
+  #   freq sign flips rotation direction; freq=0 -> static tilt (control)
+  - dynamics:
+      duration: 12.0
+      dt:       0.0005
+      ddi:      {enabled: true}
+      lhy:      {kind: scalar}
+      B:
+        Bz: "2.13e-5 Gauss"
+        Bx: {sinusoidal: {amplitude: 1.49e-5, frequency: 0.0795775, phase: 1.5707963267948966}}
+        By: {sinusoidal: {amplitude: 1.49e-5, frequency: 0.0795775, phase: 0.0}}
+        q: 0.0
+      save:     {every: 240, psi: true, precision: f32}
+
+scan:
+  zip:
+    pipeline.2.dynamics.B.Bx.sinusoidal.frequency: [+0.0795775, 0.0, -0.0795775]
+    pipeline.2.dynamics.B.By.sinusoidal.frequency: [+0.0795775, 0.0, -0.0795775]

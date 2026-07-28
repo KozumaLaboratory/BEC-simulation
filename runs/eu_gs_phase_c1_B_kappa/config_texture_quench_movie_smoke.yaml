@@ -1,0 +1,36 @@
+# Smoke for config_texture_quench_movie.yaml — every path the real movie run
+# takes (full_bdg LHY, DDI, the quench dynamics, the movie analyzer, the JLD2
+# archive the renderer reads) on a coarse grid in a couple of minutes. Useless
+# as physics; the point is that the chain runs to an mp4.
+metadata: {owner: anko, project: Eu151 texture quench movie — smoke}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [16, 16, 32], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      initial_state: flower
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: false
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: full_bdg}
+      B: {Bz: "1.0e-4 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 40
+      tol: 1.0e-4
+
+  - dynamics:
+      duration: 0.3
+      dt: 0.001
+      interactions: {N_atoms: 50000, omega_ref: 691.1504}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: full_bdg}
+      B: {Bz: "2.0e-5 Gauss"}
+      save: {every: 10}
+
+  - analyze:
+      - vortex_density_movie:
+          {axis: 3, output_dir: figs/eu_quench_movie_smoke}
