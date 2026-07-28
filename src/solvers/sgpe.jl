@@ -190,18 +190,39 @@ function _sgpe_add_noise!(
     σ <= 0 && return nothing
 
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    re, im_ = _noise_buffers(ws, n_pts)
+    a = real(eltype(psi))(σ / sqrt(2.0))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         # Independent real + imaginary parts, each 𝒩(0, σ²/2) so that the
         # complex sum has variance σ² — matches |ξ|² expectation 1·σ².
-        re_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
-        im_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
-        noise_host = complex.(re_host, im_host)
-        noise_dev = _to_device(ws.backend, noise_host)
-        psi_c .+= noise_dev
+        # `randn!` consumes `rng` in the same order as `randn(rng, Float64, n_pts)`,
+        # so CPU streams are bit-identical to the pre-2026-07-28 host path; the GPU
+        # path fills in place via CURAND (see `_randn_fill!`).
+        _randn_fill!(ws.backend, re, rng)
+        _randn_fill!(ws.backend, im_, rng)
+        @. psi_c += a * complex(re, im_)
     end
     nothing
+end
+
+"""
+    _noise_buffers(ws, n_pts) -> (re, im)
+
+Two cached real spatial buffers on `ws`'s device, for drawing complex Gaussian
+noise without allocating per step. Float64 regardless of `eltype(psi)` so the
+CPU RNG stream is independent of mixed-precision settings.
+"""
+function _noise_buffers(ws::Workspace, n_pts::NTuple{N, Int}) where {N}
+    key = (typeof(ws.state.psi), n_pts)
+    re = scratch_get!(:sgpe_noise_re, key) do
+        _similar(ws.backend, ws.state.psi, Float64, n_pts...)
+    end
+    im_ = scratch_get!(:sgpe_noise_im, key) do
+        _similar(ws.backend, ws.state.psi, Float64, n_pts...)
+    end
+    (re, im_)
 end
 
 """

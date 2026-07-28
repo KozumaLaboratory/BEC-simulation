@@ -343,6 +343,11 @@ const CI_EXTRA = [
     # suite does not reach (it tests per-term apply_step!, not the
     # fused production kernel). Registered 2026-06-06.
     "oracles/test_operator_trinity_fused_face.jl",
+    # Full SPGPE gates: reservoir coefficients vs Rooney PRA 86 053634's own
+    # published (γ̄, ℳ̄); the ∇·j = Σ Im(ψ*∇²ψ) identity the energy-damping kernel
+    # rests on; exact number conservation + monotone energy decay (Eq. 29) —
+    # the sign oracle for the scattering term.
+    "dynamics/test_spgpe.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
@@ -375,6 +380,9 @@ const FULL_EXTRA = [
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
     "gpu/test_projected_gp_parity.jl",
+    # Same bug class for the SPGPE energy-damping kernel, which broadcasts THREE
+    # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
+    "gpu/test_spgpe_gpu_cpu_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",
@@ -402,6 +410,7 @@ const FULL_EXTRA = [
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
     "dynamics/test_sgpe_stoof.jl",
+    "dynamics/test_spgpe_reservoir.jl",   # 0-D evaporation → (T(t), μ(t)) bridge
     # Orphan-test audit 2026-05-25: promoted from unregistered → FULL_EXTRA.
     # All run ITP / RTP / find_ground_state and require the "full" tier.
     # The two Bug-4 regression pins are particularly load-bearing.

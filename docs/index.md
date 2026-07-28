@@ -30,6 +30,7 @@ docs/
 | Klaus 2022 / Eu fast-Larmor production path | `guides/klaus_regime.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
+| Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |
 | Submit jobs on TSUBAME | `guides/tsubame.md` |
 
 ### Looking something up
