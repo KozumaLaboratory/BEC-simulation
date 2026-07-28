@@ -122,7 +122,7 @@ function _lhy_energy(psi, lhy::Quasi2DLHY, n_comp, ndim, n_pts, dV)
         ni < 1e-30 && continue
         E += ni * ni * (log(ni * lhy.a_2d_sq) + lhy.log_const)
     end
-    0.5 * lhy.c_lhy_2d * E * dV
+    lhy.c_lhy_2d * E * dV
 end
 
 function _lhy_energy(::Any, ::NoLHY, _n_comp, _ndim, _n_pts, _dV)

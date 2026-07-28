@@ -299,6 +299,11 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
+    # registry term with ten interchangeable tables behind it, so "the term
+    # is gated" was true while three of its faces were broken at once.
+    # Driven by LHY_SCHEMA["kind"].enum, so a new mode cannot ship ungated.
+    "oracles/test_lhy_mode_face_coverage.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
@@ -520,6 +525,7 @@ const _COST = Dict{String, Float64}(
     "oracles/test_apply_operator_accumulates.jl" => 10.3,
     "oracles/test_stability_sneaky_prover.jl" => 10.3,
     "oracles/test_path_coverage.jl" => 10.0,
+    "oracles/test_lhy_mode_face_coverage.jl" => 17.0,  # 9 modes x 3 faces + FD
     "analysis/test_texture_observables.jl" => 9.8,
     "foundation/test_noise_waveform.jl" => 9.6,
     "manuscript/test_f5_f7_polyhedral.jl" => 9.5,
