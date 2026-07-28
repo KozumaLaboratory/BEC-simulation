@@ -87,6 +87,35 @@ pointer here, which is the part a date cannot supply.
 - Claims that turn on a coefficient identity rather than a run — e.g. the SI
   round-trip oracles, $Q_5$ closed forms, $a_{dd}$ values.
 
+## First re-derivation, and it overturned a conclusion
+
+`research_notes/eu_collapse_lhy_insufficient.md` claimed all five LHY treatments
+give identical density profiles for the Eu F=6 EdH post-quench collapse, hence
+"LHY is sub-leading vs the mean-field DDI attraction". Re-run in current code on
+the same GPU backend:
+
+| mode | $E$ | peak $n$ | FWHM$_z$ | $M_z$ |
+|---|---:|---:|---:|---:|
+| off | −881.09 | 0.01014 | 10 | −5.410 |
+| scalar | −880.99 | 0.00968 | 10 | −5.457 |
+| **polar_contact** | −851.47 | **0.00066** | **20** | −5.995 |
+| **fm_contact** | −851.45 | **0.00068** | **20** | −5.994 |
+| **full_bdg** | −847.32 | **0.00054** | **22** | −5.996 |
+
+The F-aware closed forms cut the peak density **15×** and double the axial width.
+
+The mechanism is one of the corrections in the table above: that config is
+`backend: gpu`, and until 2026-07-28 every *tabulated* LHY was silently collapsed
+to `c_lhy = 0` on the GPU broadcast path. Three of the five compared rows
+therefore ran with no LHY at all, a fourth ran 2.34× too weak, and the fifth was
+LHY-off by construction. "All five identical" was four flavours of *off*.
+
+What survives is narrower and still useful: a **scalar** Lima-Pelster treatment
+is insufficient for F=6. Generalising that to "LHY is sub-leading" was the error.
+
+This is the pattern to expect from the rest: not "the numbers moved a little"
+but "the comparison was between things that were secretly the same".
+
 ## Recommended order
 
 1. **Do not re-run 230 suites.** Most were exploratory. Re-derive only what a

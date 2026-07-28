@@ -1,9 +1,39 @@
 # Eu F=6 EdH post-quench collapse: LHY-insufficiency negative result
 
-> **Vintage note.** The `runs/` results this document cites predate every
-> physics correction merged after 2026-06-02 — including a quadratic Zeeman
-> that was 11× too large for Eu until 2026-07-08. See
-> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md) before quoting a number from here.
+> ## ⚠️ CONCLUSION OVERTURNED — re-derived 2026-07-29
+>
+> **The negative result below is wrong.** It was an artifact of a GPU bug, not
+> physics. This config is `backend: gpu`, and until 2026-07-28 (#125) every
+> *tabulated* LHY was silently collapsed to `c_lhy = 0` on the GPU broadcast
+> path. So of the five rows compared here, three (`polar_contact`,
+> `polar_dipolar`, `full_bdg`) ran with **no LHY at all**, a fourth (`scalar`)
+> ran with a coefficient short by $\pi(a_s/a_{ho})\sqrt N$ — 2.34× at this
+> $N = 10^4$ — and the fifth was LHY-off by construction. "All five identical"
+> was four flavours of *off* plus one weak one.
+>
+> Re-running the same config in current code, on GPU:
+>
+> | mode | $E$ | peak $n$ | FWHM$_z$ (voxels) | $M_z$ |
+> |---|---:|---:|---:|---:|
+> | off | −881.09 | 0.01014 | 10 | −5.410 |
+> | scalar | −880.99 | 0.00968 | 10 | −5.457 |
+> | **polar_contact** | −851.47 | **0.00066** | **20** | −5.995 |
+> | **fm_contact** | −851.45 | **0.00068** | **20** | −5.994 |
+> | **full_bdg** | −847.32 | **0.00054** | **22** | −5.996 |
+>
+> The F-aware closed forms cut the peak density **15×** and double the axial
+> width — they arrest the collapse. Only `scalar` remains indistinguishable from
+> LHY-off, which is the one result here that survives: a *scalar* Lima-Pelster
+> treatment is insufficient for F=6. Generalising that to "LHY is sub-leading"
+> was the error, and it was the GPU bug that hid the difference.
+>
+> Figure: `figs/lhy_ablation/eu_edh_lhy_ablation.png`.
+>
+> Everything below is kept as the original record. Its absolute numbers are also
+> not comparable to the table above: this run predates the Eu quadratic-Zeeman
+> fix (11× too large until 2026-07-08), the DDI integrator-order fixes and the
+> ITP density-bias fix. See
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
 
 **Status**: ablation complete, conclusion confirmed across 5 LHY treatments **Date**: 2026-05-07 **Code path**: `runs/eu151_edh_postfix_local/`, post-Bug-4-fix Julia `main`
 
