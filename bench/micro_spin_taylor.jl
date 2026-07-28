@@ -74,6 +74,16 @@ function main()
             K, t, bytes / (t * 1e-3) / 2^30, 1e6 * t / (s.Ns * K))
         prev = t
     end
+    println("\n  same kernel with ψ staged through shared memory (coalesced):")
+    EXT.SPIN_STAGE_SHARED[] = true
+    ts = time_ms(() -> EXT._apply_spin_rotation_taylor!(
+        s.psi, s.vx, s.vy, s.vz, s.coef, scale, Val(D_COMP); F=s.F))
+    EXT.SPIN_STAGE_SHARED[] = false
+    td = time_ms(() -> EXT._apply_spin_rotation_taylor!(
+        s.psi, s.vx, s.vy, s.vz, s.coef, scale, Val(D_COMP); F=s.F))
+    @printf("    direct %7.3f ms (%6.1f GB/s)   staged %7.3f ms (%6.1f GB/s)   %.2fx\n",
+        td, bytes / (td * 1e-3) / 2^30, ts, bytes / (ts * 1e-3) / 2^30, td / ts)
+
     println("\n  slope between K=4 and K=16 tells the regime:")
     t4 = time_ms(() -> EXT._apply_spin_rotation_taylor!(
         s.psi, s.vx, s.vy, s.vz, s.coef, scale, Val(D_COMP); F=s.F))
