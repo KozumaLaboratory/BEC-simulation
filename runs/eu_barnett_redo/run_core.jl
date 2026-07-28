@@ -27,8 +27,12 @@ const SMOKE = get(ENV, "SMOKE", "0") == "1"
 # somewhere off the group volume. That is not a nicety: the group Lustre area is
 # shared with two other users holding ~900 GB between them, and when it filled,
 # a production cell died with a Bus error -- JLD2 mmaps its output, so a full
-# filesystem is SIGBUS rather than a clean write error. $HOME is a separate
-# 25 GB quota on the same Lustre, so BR_OUT=$HOME/... survives a full /gs/fs.
+# filesystem is SIGBUS rather than a clean write error.
+#
+# Preferred destination: /gs/bs/work/<n>/<user>, which is a per-user area on a
+# DIFFERENT filesystem (40 PB, no per-user block quota). $HOME also works and is
+# a separate quota too, but it is only 25 GB -- fine for the ledger CSVs, not for
+# a depot plus snapshots.
 const OUT   = get(ENV, "BR_OUT", joinpath(@__DIR__, "data"))
 mkpath(OUT)
 
