@@ -48,6 +48,7 @@ include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
+include("solvers/spgpe.jl")   # full SPGPE: growth + energy-damping reservoirs (Rooney PRA 86 053634)
 # Klaus-regime rotating-basis + scalar-eGPE used to live as a vertical
 # slice at src/rotating_basis/; 2026-06-02 dispersed into proper layers
 # (foundation/, hamiltonian/integrator/, analysis/, solvers/,

@@ -31,6 +31,7 @@ docs/
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) | `guides/eu_adiabatic_protocol.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
+| Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |
 | Submit jobs on TSUBAME | `guides/tsubame.md` |
 
 ### Looking something up
