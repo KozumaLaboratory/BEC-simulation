@@ -37,6 +37,7 @@ const FAST_TESTS = [
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
+    "workflow/test_interactions_roundtrip.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
