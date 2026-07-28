@@ -129,14 +129,16 @@ function observe(psi_host, t)
     (t, Fx, Fy, Fz, sqrt(Fx^2 + Fy^2 + Fz^2), Lz, Fz + Lz, ef / tot, tot * DV)
 end
 
-function write_csv(path, rows)
-    open(path, "w") do io
+function write_csv(path, rows; quiet::Bool=false)
+    tmp = path * ".tmp"
+    open(tmp, "w") do io
         println(io, "t,Fx,Fy,Fz,Fmag,Lz,Jz,edge_frac,norm")
         for r in rows
             @printf(io, "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.8f\n", r...)
         end
     end
-    println("[redo] wrote $path"); flush(stdout)
+    mv(tmp, path; force=true)   # atomic: a kill mid-write cannot truncate the ledger
+    quiet || (println("[redo] wrote $path"); flush(stdout))
 end
 
 # ---- stage 1: ground state --------------------------------------------------
@@ -187,7 +189,7 @@ function run_gs()
 end
 
 # ---- stages 2-3: stir / quench ----------------------------------------------
-function run_dynamics(psi0, stage_sym, t0, rows, frames)
+function run_dynamics(psi0, stage_sym, t0, rows, frames; ledger_path=nothing)
     dur = stage_sym === :stir ? T_STIR : T_QUENCH
     n_steps = round(Int, dur / DT)
     zee = if stage_sym === :stir
@@ -213,6 +215,12 @@ function run_dynamics(psi0, stage_sym, t0, rows, frames)
         split_step_midpoint!(ws)
         if step % REC_EVERY == 0
             push!(rows, observe(Array(ws.state.psi), t0 + step * DT))
+            # Flush the ledger on every observation. It is a few hundred rows,
+            # so rewriting is free, and it means a walltime kill leaves usable
+            # data instead of nothing — which is what lets the batch be
+            # submitted with a tight h_rt (short jobs schedule in minutes; the
+            # 6-hour requests sat in qw for over an hour).
+            ledger_path === nothing || write_csv(ledger_path, rows; quiet=true)
         end
         if step % frame_every == 0
             push!(frames, (t0 + step * DT, ComplexF32.(Array(ws.state.psi))))
@@ -241,12 +249,14 @@ println("="^74); flush(stdout)
 rows = NTuple{9, Float64}[]
 frames = Tuple{Float64, Array{ComplexF32, 4}}[]
 
-psi_gs = run_gs()
-psi_stir = run_dynamics(psi_gs, :stir, 0.0, rows, frames)
-run_dynamics(psi_stir, :quench, T_STIR, rows, frames)
-
 tag = SMOKE ? "smoke_$CELL" : CELL
-write_csv(joinpath(OUT, "ledger_$tag.csv"), rows)
+ledger = joinpath(OUT, "ledger_$tag.csv")
+
+psi_gs = run_gs()
+psi_stir = run_dynamics(psi_gs, :stir, 0.0, rows, frames; ledger_path=ledger)
+run_dynamics(psi_stir, :quench, T_STIR, rows, frames; ledger_path=ledger)
+
+write_csv(ledger, rows)
 
 jldopen(joinpath(OUT, "frames_$tag.jld2"), "w") do f
     f["cell"] = CELL; f["omega"] = OMEGA; f["ddi"] = DDI_ON
