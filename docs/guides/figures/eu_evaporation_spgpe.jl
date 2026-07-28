@@ -418,6 +418,71 @@ function _interp(xs::AbstractVector, ys::AbstractVector, x::Real)
 end
 
 """
+    cfield_peak_density(T, mu, k_cut, c0; V=0.0) -> n
+
+Classical-field density at a point, solved self-consistently with its own
+Hartree-Fock mean field. Integrating the Rayleigh-Jeans occupation
+`T / (k^2/2 + D)` over the C region gives
+
+    n = (T/pi^2) * [ k_cut - sqrt(2D) * atan(k_cut / sqrt(2D)) ],
+    D = V + 2*c0*n - mu
+
+with the `2*c0*n` exchange-included shift making it implicit in `n`. Fixed-point
+iterated; `D <= 0` means the local mode is already condensing and the classical
+occupation is not defined there, which is returned as the last stable value.
+"""
+function cfield_peak_density(T::Real, mu::Real, k_cut::Real, c0::Real;
+    V::Real=0.0, tol::Float64=1e-12)
+    # n(Δ) = (T/π²)[k_cut − √(2Δ) atan(k_cut/√(2Δ))], Δ = V + 2c₀n − μ.
+    #
+    # Solved by BISECTION on n, not fixed-point from n = 0: whenever μ > V the
+    # starting point has Δ < 0 (the centre is condensing, RJ undefined there) and
+    # a naive iteration bails at n = 0, silently returning "no mean field" exactly
+    # in the regime the correction exists for. The physical root instead has the
+    # mean field pushing Δ back positive, so it lives at n > (μ−V)/(2c₀).
+    rj(Δ) = begin
+        s2 = sqrt(2Δ)
+        (Float64(T) / π^2) * (Float64(k_cut) - s2 * atan(Float64(k_cut) / s2))
+    end
+    f(n) = rj(Float64(V) + 2 * Float64(c0) * n - Float64(mu)) - n
+
+    n_lo = max((Float64(mu) - Float64(V)) / (2 * Float64(c0)), 0.0) + 1e-12
+    f(n_lo) > 0 || return n_lo                 # already saturated
+    n_hi = max(2 * n_lo, 1.0)
+    for _ in 1:200
+        f(n_hi) < 0 && break
+        n_hi *= 2
+    end
+    for _ in 1:200
+        mid = 0.5 * (n_lo + n_hi)
+        f(mid) > 0 ? (n_lo = mid) : (n_hi = mid)
+        n_hi - n_lo < tol * max(n_hi, 1) && break
+    end
+    0.5 * (n_lo + n_hi)
+end
+
+# Effective drive on a nucleating condensate: the reservoir mu minus the trap
+# ground state minus the Hartree-Fock shift from the classical field ALREADY
+# present. Leaving the mean-field term out (as the first version of this budget
+# did) overestimates the drive — in the Eu window the thermal field's own c0*n
+# is comparable to mu, so the omission is not a correction, it flips the verdict.
+# Effective drive on a nucleating condensate.
+#
+# The obvious refinement — subtract the classical field's own Hartree-Fock shift
+# 2*c0*n from mu — is CIRCULAR and was tried and withdrawn. `cfield_peak_density`
+# returns the boundary value 2*c0*n = mu whenever the centre is condensing (the
+# Rayleigh-Jeans integral has no Delta > 0 root there), so the "corrected" drive
+# collapses to -3/2*wbar < 0 and the criterion reports CANNOT FORM for every
+# cutoff — using a non-condensed formula to conclude that nothing condenses.
+#
+# The direct test settles it: at mu=5, T=2 the c-field reaches 82% of the
+# Thomas-Fermi number (N0 = 1167 of 1424, still rising), measured as the overlap
+# with the GP mode. So the bare-ground-state drive below is the honest one, and
+# G remains an UPPER bound on the e-foldings available — read it as "this window
+# cannot possibly work" when small, not as a guarantee when large.
+_drive(r, omega_ratio, _c0) = r.mu - 1.5 * omega_ratio
+
+"""
     growth_budget(; n_Ts, f_start) -> Vector
 
 The decisive number, computed ANALYTICALLY before spending a GPU hour: how many
@@ -441,7 +506,9 @@ function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
     traj = zero_d_trajectory()
     win = cfield_window(traj; f_start)
     ωref = win.omega_ref
-    @printf("window starts %.3f s, ω_ref/2π = %.1f Hz\n", win.t_start, ωref / 2π)
+    c0 = 4π * Eu151.a_s / sqrt(Units.HBAR / (traj.trap.mass * ωref))
+    @printf("window starts %.3f s, ω_ref/2π = %.1f Hz, c0 = %.4g\n",
+        win.t_start, ωref / 2π, c0)
     println("n_T   k_cut(0)→k_cut(T)   γ(0)→γ(T)        G=∫2γ(μ−μ̃)dt   verdict   n_grid")
     out = []
     for nT in n_Ts
@@ -454,8 +521,8 @@ function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
         for i in 1:(length(t) - 1)
             r1 = spgpe_rates(resv.reservoir, t[i])
             r2 = spgpe_rates(resv.reservoir, t[i + 1])
-            d1 = 2 * r1.gamma * max(r1.mu - 1.5 * ω[i], 0.0)
-            d2 = 2 * r2.gamma * max(r2.mu - 1.5 * ω[i + 1], 0.0)
+            d1 = 2 * r1.gamma * max(_drive(r1, ω[i], c0), 0.0)
+            d2 = 2 * r2.gamma * max(_drive(r2, ω[i + 1], c0), 0.0)
             G += 0.5 * (d1 + d2) * (t[i + 1] - t[i])
         end
         r0 = spgpe_rates(resv.reservoir, t[1])
