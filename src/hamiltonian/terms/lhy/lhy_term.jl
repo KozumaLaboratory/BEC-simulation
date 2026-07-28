@@ -230,14 +230,22 @@ end
 """
     _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N})
 
-Add scalar LHY contribution `c_lhy·n^(3/2)·ψ` to `grad`. Active only
-for the scalar c_lhy branch (rest delegate to apply_step!). Gated on
-`ws.interactions.c_lhy != 0`.
+Add `δE_LHY/δψ̄ = V_LHY(n)·ψ` to `grad`, for whichever LHY the workspace holds.
+
+`E_LHY = ∫ ε(n) dV` and `V = dε/dn`, so the functional derivative is just the
+same potential the propagator applies — there is one `_lhy_V` behind the
+propagator, the energy and this.
+
+It used to read `ws.interactions.c_lhy` only, so every table produced a
+gradient of EXACTLY ZERO, with no warning. Measured against a finite difference
+of `_lhy_energy` for `PolarContactLHY`: |grad| = 0 against a true 628.9, while
+`V(n)·ψ` reproduces the FD to 1.4e-7. LBFGS would "converge" on a Hamiltonian
+missing the whole LHY term while ITP, which goes through the propagator, had it.
 """
 function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
-    c_lhy_val = ws.interactions.c_lhy
-    c_lhy_val != 0.0 || return nothing
-    v_lhy = c_lhy_val .* n_density .* sqrt.(max.(n_density, 0.0))
+    lhy = ws.lhy === nothing ? ws.interactions.c_lhy : ws.lhy
+    _lhy_is_active(lhy) || return nothing
+    v_lhy = _lhy_V.(n_density, Ref(lhy))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= v_lhy .* view(psi, idx...)

@@ -152,7 +152,9 @@ constraint manifold {‖ψ‖²=1}.
 # Hamiltonian coverage
 
 The gradient implementation (`energy_gradient!`) covers:
-kinetic, trap, Zeeman, c0 (density), c_lhy, c1 (spin), light_shift, DDI.
+kinetic, trap, Zeeman, c0 (density), LHY (every mode, scalar and
+tabulated alike — `_grad_lhy!` applies `V_LHY(n)·ψ`, the same `_lhy_V` the
+propagator uses), c1 (spin), light_shift, DDI.
 
 It does **NOT** cover:
 - c2 (the S=0 singlet-pair channel — `apply_singlet_pair_step!`)
