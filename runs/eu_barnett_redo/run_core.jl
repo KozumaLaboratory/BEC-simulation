@@ -40,12 +40,36 @@ end
 # ---- parameters -------------------------------------------------------------
 # Box sized by EDGE DENSITY, not cloud RMS: the J_z drift is a periodic-box
 # artefact, flat in dt and in propagator order (test/oracles/test_jz_conservation_ddi.jl).
-# R_TF ~ 5, so +-14 leaves ~3 Thomas-Fermi radii for the stirred cloud.
 # n = 96 = 2^5*3 is FFT-friendly; the previous round's n = 112 = 2^4*7 was
 # measured at ~66x the per-step cost of n = 80, and that factor-7 transform is
 # a large part of why.
-const NPTS    = SMOKE ? (32, 32, 16)    : (96, 96, 40)
-const BOX     = SMOKE ? (16.0, 16.0, 8.0) : (28.0, 28.0, 12.0)
+#
+# The z half-box is 12, not 6: at omega_z = 2 the cloud is thinner in z, but not
+# nearly as much thinner as the first pass assumed. The 2026-07-28 batch ran
+# box_z = 12 and its frames carry 1.3e-3 of the density in the outermost 0.5 of
+# z against 3.5e-6 in x and y -- 1350x the 1e-6 target, and invisible because
+# `edge_frac` only scanned x and y. Geometry is env-overridable so the leak can
+# be scanned instead of argued about (see probe_leak.sh).
+#
+# Half-width 12 is sized from that batch's own z profile, not guessed: the z
+# marginal decays with a length of ~0.45 from 2.4e-3 at |z| = 4.8, so reaching
+# the 1e-6 target needs |z| >~ 8.5. 12 leaves margin for the extra spreading a
+# non-reflecting boundary allows.
+# n_z = 80, not 48: doubling box_z at fixed n_z would put dx_z = 0.5 against a
+# healing length of ~0.2. z is the TIGHTEST axis (omega_z = 2), so it needs the
+# finest resolution, not the coarsest. 80 = 2^4*5 keeps dx_z = 0.30, matching
+# dx_xy = 0.29, at 2x the cell count of the 2026-07-28 batch.
+const NPTS = let s = get(ENV, "BR_N", "")
+    isempty(s) ? (SMOKE ? (32, 32, 16) : (96, 96, 80)) :
+    NTuple{3, Int}(parse.(Int, split(s, ",")))
+end
+const BOX = let s = get(ENV, "BR_BOX", "")
+    isempty(s) ? (SMOKE ? (16.0, 16.0, 8.0) : (28.0, 28.0, 24.0)) :
+    NTuple{3, Float64}(parse.(Float64, split(s, ",")))
+end
+# Zero-padded, image-free DDI convolution. Off by default: it is ~8x the FFT
+# work, and whether the images matter at all is exactly what the probe measures.
+const DDI_PAD = get(ENV, "BR_PAD", "0") == "1"
 const OMEGA_TRAP = (1.0, 1.0, 2.0)
 const N_ATOMS = 30000
 const OMEGA_REF = 628.3                  # rad/s
@@ -59,9 +83,12 @@ const GS_STEPS = parse(Int, get(ENV, "BR_GS_STEPS", SMOKE ? "200" : "4000"))
 const GS_DT    = 0.004
 const T_STIR   = parse(Float64, get(ENV, "BR_T_STIR", SMOKE ? "0.4" : "30.0"))
 const T_QUENCH = parse(Float64, get(ENV, "BR_T_QUENCH", SMOKE ? "0.4" : "50.0"))
-const DT       = SMOKE ? 0.004 : 4.0e-4
-const REC_EVERY = SMOKE ? 10 : 250
-const PSI_FRAMES = 8                     # sparse full frames, for the vortex figure
+const DT       = parse(Float64, get(ENV, "BR_DT", SMOKE ? "0.004" : "4.0e-4"))
+const REC_EVERY = max(1, round(Int, 0.1 / DT))
+const TAG_SUFFIX = get(ENV, "BR_TAG", "")
+# Sparse full frames, for the vortex figure. 0 writes none — a geometry probe
+# only needs the ledger, and the frames are 600 MB a cell.
+const PSI_FRAMES = parse(Int, get(ENV, "BR_FRAMES", "8"))
 
 # Mirror arms: Bx identical, By negated (phase_y = pi <=> By -> -By).
 const PHASE_X = -π / 2
@@ -100,41 +127,52 @@ interactions() = InteractionParams(Dict(0 => C0, 1 => C1); c_lhy=C_LHY)
 function build_ws(psi_init, zee, sp)
     ws = make_workspace(; grid=GRID, atom=ATOM, interactions=interactions(),
         zeeman=zee, potential=NoPotential(), sim_params=sp,
-        psi_init=psi_init, enable_ddi=DDI_ON, c_dd=C_DD, backend=BACKEND)
+        psi_init=psi_init, enable_ddi=DDI_ON, c_dd=C_DD, ddi_padding=DDI_PAD,
+        backend=BACKEND)
     copyto!(ws.potential_values, V_TRAP)
     ws
 end
 
 # ---- observables ------------------------------------------------------------
 const PLANS = make_fft_plans(NPTS; flags=FFTW.ESTIMATE)
-const EDGE_LIM = BOX[1] / 2 - 0.5
+# Outermost 0.5 length-units of each axis, INDEPENDENTLY. The 2026-07-28 batch
+# scanned one shared limit over x and y only; z was the tightest axis and the
+# one that was never looked at.
+const EDGE_LIM = ntuple(d -> BOX[d] / 2 - 0.5, 3)
 
 """
-(t, Fx, Fy, Fz, |F|, Lz, Jz, edge_frac, norm) for the current state.
+(t, Fx, Fy, Fz, |F|, Lz, Jz, edge_x, edge_y, edge_z, edge_frac, norm).
 
-`edge_frac` travels with every row because it, not dt, is what controls J_z
-conservation — a reader must be able to see the ledger's error budget without
-re-running anything.
+The edge fractions travel with every row because the box, not dt, is what
+controls J_z conservation — a reader must be able to see the ledger's error
+budget without re-running anything. `edge_frac` is the max over the axes, which
+is the number the box has to be sized against.
 """
 function observe(psi_host, t)
     fx, fy, fz = spin_density_vector(psi_host, SM, 3)
     Fx = sum(fx) * DV; Fy = sum(fy) * DV; Fz = sum(fz) * DV
     Lz = orbital_angular_momentum(psi_host, GRID, PLANS)
     nden = dropdims(sum(abs2, psi_host; dims=4); dims=4)
-    tot = sum(nden); ef = 0.0
-    xg, yg, _ = GRID.x
+    tot = sum(nden)
+    xg, yg, zg = GRID.x
+    ex = ey = ez = 0.0
     for k in axes(nden, 3), j in axes(nden, 2), i in axes(nden, 1)
-        (abs(xg[i]) > EDGE_LIM || abs(yg[j]) > EDGE_LIM) && (ef += nden[i, j, k])
+        n = nden[i, j, k]
+        abs(xg[i]) > EDGE_LIM[1] && (ex += n)
+        abs(yg[j]) > EDGE_LIM[2] && (ey += n)
+        abs(zg[k]) > EDGE_LIM[3] && (ez += n)
     end
-    (t, Fx, Fy, Fz, sqrt(Fx^2 + Fy^2 + Fz^2), Lz, Fz + Lz, ef / tot, tot * DV)
+    ex /= tot; ey /= tot; ez /= tot
+    (t, Fx, Fy, Fz, sqrt(Fx^2 + Fy^2 + Fz^2), Lz, Fz + Lz,
+     ex, ey, ez, max(ex, ey, ez), tot * DV)
 end
 
 function write_csv(path, rows; quiet::Bool=false)
     tmp = path * ".tmp"
     open(tmp, "w") do io
-        println(io, "t,Fx,Fy,Fz,Fmag,Lz,Jz,edge_frac,norm")
+        println(io, "t,Fx,Fy,Fz,Fmag,Lz,Jz,edge_x,edge_y,edge_z,edge_frac,norm")
         for r in rows
-            @printf(io, "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.8f\n", r...)
+            @printf(io, "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.3e,%.3e,%.3e,%.3e,%.8f\n", r...)
         end
     end
     mv(tmp, path; force=true)   # atomic: a kill mid-write cannot truncate the ledger
@@ -183,7 +221,7 @@ function run_gs()
     psi = Array(ws.state.psi)
     o = observe(psi, 0.0)
     @printf("[redo] GS: <F> = (%+.4f, %+.4f, %+.4f)  |F| = %.4f  Lz = %+.4f  edge = %.2e\n",
-            o[2], o[3], o[4], o[5], o[6], o[8]); flush(stdout)
+            o[2], o[3], o[4], o[5], o[6], o[11]); flush(stdout)
     abs(o[2]) > 0.9 * F_AT || @warn "GS spin is not polarised along x — check the seed" o
     psi
 end
@@ -205,7 +243,7 @@ function run_dynamics(psi0, stage_sym, t0, rows, frames; ledger_path=nothing)
     end
     ws = build_ws(psi0, zee,
         SimParams(; dt=DT, n_steps, imaginary_time=false, save_every=n_steps))
-    frame_every = max(1, n_steps ÷ PSI_FRAMES)
+    frame_every = PSI_FRAMES <= 0 ? typemax(Int) : max(1, n_steps ÷ PSI_FRAMES)
 
     push!(rows, observe(Array(ws.state.psi), t0))
     t_start = time()
@@ -229,7 +267,7 @@ function run_dynamics(psi0, stage_sym, t0, rows, frames; ledger_path=nothing)
             el = time() - t_start
             @printf("  %s %d/%d  t=%.3f  Fz=%+.4f Lz=%+.4f Jz=%+.4f edge=%.1e  [%.0fs, ETA %.0fs]\n",
                     stage_sym, step, n_steps, t0 + step * DT,
-                    rows[end][4], rows[end][6], rows[end][7], rows[end][8],
+                    rows[end][4], rows[end][6], rows[end][7], rows[end][11],
                     el, el / step * (n_steps - step)); flush(stdout)
         end
     end
@@ -239,17 +277,18 @@ end
 # ---- main -------------------------------------------------------------------
 println("="^74)
 println("BARNETT REDO — cell=$CELL  Omega=$OMEGA  DDI=$DDI_ON  smoke=$SMOKE")
-@printf("  grid=%s box=%s dt=%g  stir=%g quench=%g\n", NPTS, BOX, DT, T_STIR, T_QUENCH)
+@printf("  grid=%s box=%s dt=%g  stir=%g quench=%g  ddi_padding=%s\n",
+        NPTS, BOX, DT, T_STIR, T_QUENCH, DDI_PAD)
 @printf("  p=%.4f (B=%g G)  c0=%.1f c1=%.3f c_dd=%.3f c_lhy=%.4g eps_dd=%.4f\n",
         P_ZEE, B_GAUSS, C0, C1, C_DD, C_LHY, EPS_DD)
 @printf("  phase_x=%+.4f phase_y=%+.4f  => B(0) = (%+.3f, %+.3f) x |p|\n",
         PHASE_X, PHASE_Y, sin(PHASE_X), sin(PHASE_Y))
 println("="^74); flush(stdout)
 
-rows = NTuple{9, Float64}[]
+rows = NTuple{12, Float64}[]
 frames = Tuple{Float64, Array{ComplexF32, 4}}[]
 
-tag = SMOKE ? "smoke_$CELL" : CELL
+tag = (SMOKE ? "smoke_$CELL" : CELL) * TAG_SUFFIX
 ledger = joinpath(OUT, "ledger_$tag.csv")
 
 psi_gs = run_gs()
@@ -258,7 +297,7 @@ run_dynamics(psi_stir, :quench, T_STIR, rows, frames; ledger_path=ledger)
 
 write_csv(ledger, rows)
 
-jldopen(joinpath(OUT, "frames_$tag.jld2"), "w") do f
+isempty(frames) || jldopen(joinpath(OUT, "frames_$tag.jld2"), "w") do f
     f["cell"] = CELL; f["omega"] = OMEGA; f["ddi"] = DDI_ON
     f["box"] = collect(BOX); f["n"] = collect(NPTS); f["t_stir"] = T_STIR
     for (i, (t, psi)) in enumerate(frames)
@@ -297,4 +336,13 @@ else
     @printf("    leak / conversion = %.1f%%   %s\n", 100 * leak / conv,
             leak < 0.1 * conv ? "OK" : "TOO LARGE — enlarge the box before believing this")
 end
-@printf("  max edge_frac %.2e  (target <= 1e-6)\n", maximum(r[8] for r in rows))
+@printf("  max edge fraction: x %.2e  y %.2e  z %.2e   (target <= 1e-6 on EVERY axis)\n",
+        maximum(r[8] for r in rows), maximum(r[9] for r in rows),
+        maximum(r[10] for r in rows))
+# One line per run, appended, so a geometry scan is a file rather than a pile of logs.
+open(joinpath(OUT, "leak_scan.csv"), "a") do io
+    @printf(io, "%s,%s,\"%s\",\"%s\",%g,%d,%.6f,%.6f,%.6f,%.3e,%.3e,%.3e\n",
+            tag, CELL, NPTS, BOX, DT, DDI_PAD ? 1 : 0, leak, conv,
+            lz_qE - lz_q0, maximum(r[8] for r in rows), maximum(r[9] for r in rows),
+            maximum(r[10] for r in rows))
+end

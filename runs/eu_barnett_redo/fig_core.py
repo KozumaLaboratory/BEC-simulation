@@ -60,8 +60,15 @@ ax.legend(loc="best", framealpha=0.92)
 ax.set_title(r"Orbital $\to$ spin conversion with a closed $J_z$ ledger"
              "\n" r"($B=0$ after the quench $\Rightarrow$ $J_z$ is exactly conserved)")
 
-axe.semilogy(d["t"], np.maximum(d["edge_frac"], 1e-16), color="#555", lw=1.4)
-axe.axhline(1e-6, color="#c0392b", lw=0.9, ls=":", label="target $10^{-6}$")
+# Per axis, not just the max: the 2026-07-28 batch reported one number covering
+# x and y only, and z — the tightest axis — was 400x larger and never seen.
+for key, col, lab in (("edge_x", "#1b6ca8", "$x$"), ("edge_y", "#7f8c8d", "$y$"),
+                      ("edge_z", "#c0392b", "$z$")):
+    if key in (d.dtype.names or ()):
+        axe.semilogy(d["t"], np.maximum(d[key], 1e-16), color=col, lw=1.3, label=lab)
+if "edge_x" not in (d.dtype.names or ()):
+    axe.semilogy(d["t"], np.maximum(d["edge_frac"], 1e-16), color="#555", lw=1.4)
+axe.axhline(1e-6, color="k", lw=0.9, ls=":", label="target $10^{-6}$")
 mark_quench(axe)
 axe.set_ylabel("edge\nfraction", fontsize=9)
 axe.set_xlabel(r"$t$  [$1/\omega_{\rm ref}$]")
@@ -118,7 +125,8 @@ else:
 
 # --- numbers for the text ----------------------------------------------------
 print("\n--- quench-stage summary (B = 0, J_z conserved) ---")
-print(f"{'cell':>10} {'dFz':>9} {'dLz':>9} {'Jz leak':>9} {'leak/conv':>10} {'max edge':>10}")
+print(f"{'cell':>10} {'dFz':>9} {'dLz':>9} {'Jz leak':>9} {'leak/conv':>10} "
+      f"{'edge x':>9} {'edge y':>9} {'edge z':>9}")
 for cell in ("plus", "minus", "zero", "plus_nodd"):
     dd = load(cell)
     if dd is None:
@@ -128,5 +136,7 @@ for cell in ("plus", "minus", "zero", "plus_nodd"):
     dlz = dd["Lz"][-1] - dd["Lz"][i]
     leak = abs(dd["Jz"][-1] - dd["Jz"][i])
     ratio = f"{100*leak/abs(dfz):8.1f}%" if abs(dfz) > 1e-3 else "       --"
-    print(f"{cell:>10} {dfz:+9.4f} {dlz:+9.4f} {leak:9.4f} {ratio:>10} "
-          f"{dd['edge_frac'].max():10.2e}")
+    names = dd.dtype.names or ()
+    edges = [f"{dd[k].max():9.2e}" if k in names else "       --"
+             for k in ("edge_x", "edge_y", "edge_z")]
+    print(f"{cell:>10} {dfz:+9.4f} {dlz:+9.4f} {leak:9.4f} {ratio:>10} " + " ".join(edges))
