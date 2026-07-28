@@ -16,7 +16,7 @@ using Test
 using LinearAlgebra
 using SpinorBEC
 using SpinorBEC: _grad_lhy!, _lhy_energy, _lhy_V, _lhy_is_active, total_density,
-    _c0c1_to_gS
+    _c0c1_to_gS, _lhy_needs_spin, _lhy_de1_dp, _local_polarisation, fp_ladder_coeff
 
 const _F = 6
 const _D = 13
@@ -96,6 +96,55 @@ end
         @test !_lhy_is_active(nothing)
         @test !_lhy_is_active(NoLHY())
         @test !_lhy_is_active(ScalarLHY(0.0))
+    end
+
+    @testset "SpatialLHY: the polarisation piece is in the gradient" begin
+        # ε = n^(5/2) e₁(p) depends on ψ through p as well as n, so δE/δψ̄ is
+        # NOT the diagonal V·ψ. The extra piece is a spin operator, which is
+        # exactly why the propagator cannot hold it.
+        e1var = 0.20                              # the F=6 variation spatial.jl reports
+        pgrid = collect(range(0.0, 1.0; length=9))
+        lhy = SpatialLHY(pgrid, [0.5 * (1 - e1var * p^2) for p in pgrid], _F,
+            [fp_ladder_coeff(_F, _F - (c - 1)) for c in 1:_D])
+        @test _lhy_needs_spin(lhy)
+        @test _lhy_is_active(lhy)
+
+        g = zeros(ComplexF64, size(psi))
+        _grad_lhy!(g, psi, _ws(lhy), n, npts, _D, Val(3))
+        fd = _fd_grad(psi, lhy, npts, dV)
+        @test norm(g) > 1.0
+        @test norm(g .- fd) / norm(fd) < 1e-7     # measured 8.3e-10
+
+        # The diagonal-only gradient — what the propagator applies — and by how
+        # much it falls short. Pinned so the discrepancy cannot silently grow.
+        P = reshape(psi, prod(npts), _D)
+        fp = ntuple(c -> fp_ladder_coeff(_F, _F - (c - 1)), Val(_D))
+        diag = zeros(ComplexF64, prod(npts), _D)
+        for i in 1:prod(npts)
+            s = sum(abs2, @view P[i, :])
+            s < 1e-30 && continue
+            v = _lhy_V(s, _local_polarisation(P, i, s, _F, fp, Val(_D)), lhy)
+            diag[i, :] .= v .* @view P[i, :]
+        end
+        gap = norm(reshape(diag, size(psi)) .- fd) / norm(fd)
+        @test 0.015 < gap < 0.035                 # measured 0.0233
+
+        # e₁′ is the slope of the SAME interpolant, flat outside the table.
+        @test _lhy_de1_dp(lhy, -0.1) == 0.0
+        @test _lhy_de1_dp(lhy, 1.5) == 0.0
+        @test _lhy_de1_dp(lhy, 0.5) < 0.0         # e₁ decreases with p here
+
+        # A constant e₁ has no polarisation piece: the gradient must collapse
+        # onto the diagonal form, so the spin term cannot be adding a bias.
+        flat = SpatialLHY(pgrid, fill(0.5, length(pgrid)), _F,
+            [fp_ladder_coeff(_F, _F - (c - 1)) for c in 1:_D])
+        gf = zeros(ComplexF64, size(psi))
+        _grad_lhy!(gf, psi, _ws(flat), n, npts, _D, Val(3))
+        want = similar(psi)
+        for I in CartesianIndices(npts), c in 1:_D
+            want[I, c] = 2.5 * 0.5 * n[I] * sqrt(n[I]) * psi[I, c]
+        end
+        @test maximum(abs.(gf .- want)) < 1e-12 * maximum(abs.(want))
     end
 
     @testset "the specific old failure is pinned" begin

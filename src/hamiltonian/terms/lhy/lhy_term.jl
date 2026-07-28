@@ -245,10 +245,76 @@ missing the whole LHY term while ITP, which goes through the propagator, had it.
 function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     lhy = ws.lhy === nothing ? ws.interactions.c_lhy : ws.lhy
     _lhy_is_active(lhy) || return nothing
+    _lhy_needs_spin(lhy) && return _grad_lhy_spatial!(grad, psi, lhy, n_pts, D, Val(N))
     v_lhy = _lhy_V.(n_density, Ref(lhy))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= v_lhy .* view(psi, idx...)
+    end
+    nothing
+end
+
+"""
+    _grad_lhy_spatial!(grad, psi, lhy::SpatialLHY, n_pts, D, ::Val{N})
+
+`δE/δψ̄` for the spatially-varying LHY, where `ε = n^(5/2) e₁(p)` depends on ψ
+through the local polarisation `p = |⟨F⟩|/F` as well as through `n`:
+
+    δε/δψ̄ = (5/2) n^(3/2) e₁(p) ψ  +  n^(3/2) e₁′(p) [ (ŝ·F)ψ / F − p ψ ]
+
+The first term is `_lhy_V(n, p, lhy)·ψ`, the diagonal potential the propagator
+applies. The second is not diagonal — `ŝ = ⟨F⟩/|⟨F⟩|` — so it exists only here.
+Verified against a finite difference of `_lhy_energy(::SpatialLHY)` to 8e-10.
+
+**The propagator omits the second term**, because its diagonal step has no place
+to put a spin operator. Measured on a random F=6 spinor with the ~20% `e₁(p)`
+variation `spatial.jl` reports at F=6, the omission is **2.3%** of the gradient
+norm; `test_lhy_gradient_all_modes.jl` pins that number so it cannot drift
+unnoticed. ITP and LBFGS therefore minimise slightly different functionals for
+`SpatialLHY` alone — LBFGS the true energy, ITP the diagonal approximation to
+it. Closing the gap belongs in the propagator (issue: spin-dependent SpatialLHY
+substep), not in a gradient that would then stop being the energy's derivative.
+
+`ŝ·F` uses the ladder form, from the SAME `fp_coeffs` and component convention
+as `_local_polarisation`: `(F₊ψ)_c = fp[c+1]·ψ_{c+1}`, `(F₋ψ)_c = fp[c]·ψ_{c-1}`,
+`(F_zψ)_c = (F−c+1)·ψ_c`.
+"""
+function _grad_lhy_spatial!(grad, psi, lhy::SpatialLHY, n_pts, D, ::Val{N}) where {N}
+    F = lhy.F
+    fp = lhy.fp_coeffs
+    Ns = prod(n_pts)
+    P = reshape(psi, Ns, D)
+    G = reshape(grad, Ns, D)
+    @inbounds for i in 1:Ns
+        n = 0.0
+        fz = 0.0
+        for c in 1:D
+            a = abs2(P[i, c])
+            n += a
+            fz += (F - (c - 1)) * a
+        end
+        n < 1e-30 && continue
+        sp = zero(ComplexF64)
+        for c in 2:D
+            sp += fp[c] * conj(P[i, c - 1]) * P[i, c]
+        end
+        smag = sqrt(abs2(sp) + fz * fz)
+        p = smag / (n * F)
+
+        v = _lhy_V(n, p, lhy)
+        for c in 1:D
+            G[i, c] += v * P[i, c]
+        end
+
+        de1 = _lhy_de1_dp(lhy, clamp(p, 0.0, 1.0))
+        (de1 == 0.0 || smag < 1e-30) && continue
+        pref = n * sqrt(n) * de1
+        for c in 1:D
+            sf = fz * (F - (c - 1)) * P[i, c]
+            c < D && (sf += 0.5 * conj(sp) * fp[c + 1] * P[i, c + 1])
+            c > 1 && (sf += 0.5 * sp * fp[c] * P[i, c - 1])
+            G[i, c] += pref * (sf / (smag * F) - p * P[i, c])
+        end
     end
     nothing
 end
