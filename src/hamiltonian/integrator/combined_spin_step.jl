@@ -36,6 +36,21 @@
 export split_step_combined!
 
 """
+Opt-in for the RTP loop (`_run_simulation_leapfrog!`) to take the combined
+half-V instead of the sequential one.
+
+OFF by default, and deliberately not a silent default: the two are different
+SPLITTINGS of the same Hamiltonian, agreeing at O(dt³) but not bitwise, so
+flipping it changes published numbers. It is a physics choice the run must
+make, exactly like `MEANFIELD_MIDPOINT_ENABLED`.
+
+The RTP loop only takes it when `_combined_step_unusable(ws)` also returns
+`nothing`, so an incompatible workspace silently keeps the sequential path
+rather than throwing mid-run.
+"""
+const COMBINED_SPIN_STEP_ENABLED = Ref(false)
+
+"""
     _apply_combined_spin_step!(ws, dt, t; imaginary_time=false)
 
 Compute n_tot(r) = transverse Zeeman + c₁ ⟨F⟩(r) + Φ_DDI(r), then apply
@@ -236,53 +251,70 @@ end
     end
 end
 
-# Pre-flight check: combined step is only valid when contact interaction
-# is well-approximated by c0+c1 (rank-0 + rank-1) and there are no
-# higher-rank tensor channels active. Throws ArgumentError otherwise.
+# Pre-flight check: combined step is only valid when the contact interaction is
+# well-approximated by c0+c1 (rank-0 + rank-1) and there are no higher-rank
+# tensor channels active.
+#
+# The rules are declared ONCE here, as a reason string or `nothing`.
+# `_assert_combined_step_compatible` turns a reason into an ArgumentError (the
+# explicit `split_step_combined!` entry point, where a silent downgrade would
+# hide a user mistake); the RTP loop's selector treats a reason as "keep the
+# sequential path". Two consumers, one list.
+function _combined_step_unusable(ws::Workspace)
+    abs(get_cn(ws.interactions, 2)) < 1e-30 ||
+        return "c2 ≠ 0 (S=0 singlet-pair channel is not of the form n·F̂)"
+    ws.tensor_cache === nothing ||
+        return "tensor_cache active (rank-4/6 channels are not of the form n·F̂)"
+    ws.raman === nothing || return "Raman coupling is not supported yet"
+    is_uniform(ws.zeeman) || return "a spatial Zeeman field B(r,t) is not supported"
+    ws.light_shift === nothing || return "light_shift is not supported yet"
+    ws.ddi_bufs === nothing &&
+        return "DDI buffers are required (enable_ddi=true; the spin-density and Φ scratch lives there)"
+    nothing
+end
+
+# The combined path always runs the UNPADDED _compute_and_convolve_ddi!;
+# silently ignoring a configured padded context would give the caller unpadded
+# physics behind a padded request. Refuse loudly rather than mislead
+# (App. A defect-9 audit).
+function _combined_step_unusable_full(ws::Workspace)
+    r = _combined_step_unusable(ws)
+    r === nothing || return r
+    ws.ddi_padded === nothing ||
+        return "zero-padded DDI (ddi_padding=true) uses a different convolution"
+    nothing
+end
+
 function _assert_combined_step_compatible(ws::Workspace)
-    c2 = get_cn(ws.interactions, 2)
-    abs(c2) < 1e-30 || throw(
+    reason = _combined_step_unusable_full(ws)
+    reason === nothing || throw(
         ArgumentError(
-            "split_step_combined! requires c2 = 0 (S=0 singlet-pair channel). Got c2=$c2. " *
-            "Use the standard split_step! for systems with non-zero c2."),
-    )
-    ws.tensor_cache === nothing || throw(
-        ArgumentError(
-            "split_step_combined! incompatible with tensor_cache (higher-rank " *
-            "spin tensor channels c4/c6/...). Use standard split_step! or " *
-            "construct workspace without scattering-lengths channel coupling."),
-    )
-    ws.raman === nothing || throw(
-        ArgumentError(
-            "split_step_combined! does not yet support Raman coupling. " *
-            "Use standard split_step!."),
-    )
-    is_uniform(ws.zeeman) || throw(
-        ArgumentError(
-            "split_step_combined! does not support a spatial Zeeman field B(r,t). " *
-            "Use the standard split_step!."),
-    )
-    ws.light_shift === nothing || throw(
-        ArgumentError(
-            "split_step_combined! does not yet support light_shift. " *
-            "Use standard split_step!."),
-    )
-    ws.ddi_bufs !== nothing || throw(
-        ArgumentError(
-            "split_step_combined! requires DDI buffers (the spin density " *
-            "and Φ buffers live there). Construct workspace with enable_ddi=true."),
-    )
-    # The combined path always runs the UNPADDED _compute_and_convolve_ddi!
-    # (combined_spin_step.jl:67-69); silently ignoring a configured padded
-    # context would give the caller unpadded physics behind a padded
-    # request. Refuse loudly rather than mislead (App. A defect-9 audit).
-    ws.ddi_padded === nothing || throw(
-        ArgumentError(
-            "split_step_combined! does not support zero-padded DDI " *
-            "(ddi_padding=true). The combined step uses the unpadded " *
-            "convolution; use the standard split_step! for padded DDI."),
+            "split_step_combined! is not applicable: $reason. Use the standard split_step!."),
     )
     nothing
+end
+
+"""
+    _rtp_use_combined_step(ws) -> Bool
+
+Whether `_run_simulation_leapfrog!` should take the combined half-V.
+
+Beyond `_combined_step_unusable_full`, the RTP selector additionally requires a
+purely AXIAL field. `_apply_combined_spin_step!` folds only the LINEAR
+transverse `-(bx F_x + by F_y)` into the rotation and leaves a lab-z `q F_z²` in
+the diagonal step, whereas the sequential path applies the whole tilted Zeeman
+`-(b·F) + q(b̂·F)²` as one eigen-exact matrix (the App. A defect-5 unification,
+b3881a23). Those two are the same operator only when the field is along ẑ or
+q = 0. Rather than let production silently pick up the older convention, the
+selector declines a tilted field; `split_step_combined!` called directly still
+supports it, with its own test coverage.
+"""
+function _rtp_use_combined_step(ws::Workspace)
+    COMBINED_SPIN_STEP_ENABLED[] || return false
+    _combined_step_unusable_full(ws) === nothing || return false
+    is_uniform(ws.zeeman) || return false
+    bx, by = transverse_b(ws.zeeman, ws.state.t)
+    bx == 0.0 && by == 0.0
 end
 
 """
