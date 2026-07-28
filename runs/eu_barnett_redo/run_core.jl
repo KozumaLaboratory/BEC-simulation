@@ -45,7 +45,10 @@ end
 # fixing edge_z from 1.35e-3 to 1.0e-9 left the leak unchanged (1.63 -> 1.74),
 # and the dx series below cut it 27x while the edge fraction got WORSE.
 #
-# FFT sizes keep small prime factors: 128 = 2^7, 81 = 3^4. The previous round
+# FFT sizes keep small prime factors AND must be EVEN (GridConfig rejects odd
+# n_points): 128 = 2^7, 80 = 2^4*5. 81 = 3^4 is FFT-friendly but odd, and it
+# cost a whole submitted batch -- the smoke geometry is 32^3, so it never
+# exercised the production grid. The previous round
 # measured n = 112 = 2^4*7 at ~66x the per-step cost of n = 80, and that
 # factor-7 transform is a large part of why.
 #
@@ -84,7 +87,7 @@ end
 # finest resolution, not the coarsest. 80 = 2^4*5 keeps dx_z = 0.30, matching
 # dx_xy = 0.29, at 2x the cell count of the 2026-07-28 batch.
 const NPTS = let s = get(ENV, "BR_N", "")
-    isempty(s) ? (SMOKE ? (32, 32, 16) : (128, 128, 81)) :
+    isempty(s) ? (SMOKE ? (32, 32, 16) : (128, 128, 80)) :
     NTuple{3, Int}(parse.(Int, split(s, ",")))
 end
 const BOX = let s = get(ENV, "BR_BOX", "")
@@ -132,6 +135,21 @@ const P_ZEE = SpinorBEC.Units.bfield_to_p(B_GAUSS, ATOM.g_F, OMEGA_REF)
 # q ∝ |B|^2: at 9.2e-4 G this is ~1e-3 Hz against omega_ref/2pi = 100 Hz, i.e.
 # 1e-5 of the trap scale. Set to zero rather than carried as a rounding artefact.
 const Q_ZEE = 0.0
+
+# Validate the geometry BEFORE anything expensive. `GridConfig` requires even
+# n_points, and the smoke path uses its own 32^3 grid, so a bad production
+# geometry is invisible to `SMOKE=1` and only surfaces on the cluster. A batch
+# of four jobs died 12 s in on n_z = 81 (odd) for exactly this reason.
+# BR_CHECK=1 exits here, which makes a pre-submit geometry check free.
+for (d, (np_, L)) in enumerate(zip(NPTS, BOX))
+    iseven(np_) || error("n_points[$d] = $np_ is odd — GridConfig requires even")
+    np_ > 0 || error("n_points[$d] = $np_ must be positive")
+    L > 0 || error("box[$d] = $L must be positive")
+end
+let dxs = ntuple(d -> BOX[d] / NPTS[d], 3)
+    @printf("  geometry OK: n=%s box=%s dx=(%.4f, %.4f, %.4f)\n", NPTS, BOX, dxs...)
+    get(ENV, "BR_CHECK", "0") == "1" && exit(0)
+end
 
 const GRID = make_grid(GridConfig(NPTS, BOX))
 const DV   = cell_volume(GRID)
