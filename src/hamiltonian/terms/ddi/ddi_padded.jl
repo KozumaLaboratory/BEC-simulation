@@ -158,9 +158,9 @@ function _compute_and_convolve_ddi_padded!(
     # rule. The first n_pts entries of F_pad are modified; the
     # convolution-pad (the rest) stays zero.
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_F_filter!(ctx.Fx_pad, n_pts)
-        apply_orszag_2_3_F_filter!(ctx.Fy_pad, n_pts)
-        apply_orszag_2_3_F_filter!(ctx.Fz_pad, n_pts)
+        apply_orszag_2_3_F_filter!(ctx.Fx_pad, n_pts, ddi.box_size)
+        apply_orszag_2_3_F_filter!(ctx.Fy_pad, n_pts, ddi.box_size)
+        apply_orszag_2_3_F_filter!(ctx.Fz_pad, n_pts, ddi.box_size)
     end
 
     rp = ctx.rfft_plans

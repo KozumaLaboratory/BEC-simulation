@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────────────
+#  ¹⁵¹Eu (F=6) ground-state quantum phase diagram — 3-axis exploration.
+#
+#  Axes (full Cartesian product):
+#    1. c1_ratio  spin-dependent contact (FM c1<0 ↔ AFM c1>0), crosses 0
+#    2. Bz        weak-field linear Zeeman (µG regime; DDI-competition)
+#    3. κ = ω_z/ω_r   trap oblateness → DDI demagnetization / transition order
+#
+#  Physics target: how the trap oblateness (demag) and c1 jointly control
+#  the ground-state order of dipolar F=6 Eu at weak field. κ restricted to
+#  the OBLATE side [1.0, 2.2] where (a) the box stays safe (cloud shrinks
+#  in z; radial fixed) and (b) the tricritical 1st-order jump lives
+#  (κ_tc≈0.95 from prior work). Crossover side κ<1 needs a taller z-box
+#  and is deferred.
+#
+#  Grid 128³ (H100 device-resident energy+gradient makes this cheap after
+#  the 2026-07 perf work). Full DDI (secular=false). Two initial seeds
+#  (stretched m=+F, polar m=0) per point; min-energy result is the GS.
+#
+#  Scan size: 7 (c1) × 7 (Bz) × 5 (κ) = 245 points × 2 seeds = 490 solves.
+#  UGE array: -t 1-245, each task runs one (c1,Bz,κ) point × 2 seeds via
+#  SPINORBEC_SCAN_ONLY_INDEX (comparison_runs are the inner loop).
+# ─────────────────────────────────────────────────────────────────────
+
+metadata:
+  owner: anko
+  project: Eu151 F=6 ground-state phase diagram (c1 × Bz × κ)
+  note: |
+    3-axis GS phase scan. Full DDI secular=false, LHY none, ITP + 2 seeds.
+    c1 crosses FM/AFM; Bz weak µG field; κ oblate trap ratio (demag).
+
+units: {B: Gauss}
+defaults:
+  kind: spinor
+  backend: gpu
+
+dealias:
+  enabled: true
+  k_cut: 20.0
+  auto_dt: true
+  dt_safety: 10.0
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.1504
+        c1_ratio: 0.0277777778          # ← scanned (default = 1/36, Matsui AFM)
+      grid: {n: [128, 128, 128], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}   # omega[2] ← scanned = κ
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}            # Bz ← scanned
+      noise:
+        seed: 20260722
+        initial: {thermal: 0.40}                            # symmetry-break kick
+      dt: 0.002                                            # stable for stretched seed + DDI
+      n_steps: 12000
+      tol: 1.0e-7                                           # relative dE/|E|
+
+  - analyze:
+      - phase_classify_distance: {}     # F=6 reference-distance classifier
+      - multipole_order: {}             # ⟨T_k⟩ spectrum, ranks 0,2,…,12
+      - majorana_order: {}              # Steinhardt Q₆ (icosahedral order)
+      - energy_decomposition: {}        # kinetic/trap/zeeman/c0/c1/DDI balance
+
+# 3-axis product with INFORMED, non-uniform sampling: dense (B × κ) with B
+# concentrated in the known transition band [40–62 µG], c1 sampled COARSELY
+# as a background band (per docs/design/eu_phase_diagram_adaptive_mapping.md:
+# "don't densely map >2D"; at µG, c1 is a fixed background, not a live axis).
+#   3 (c1) × 8 (Bz) × 5 (κ) = 120 points × 2 seeds = 240 solves.
+# NOTE override paths OMIT `.ground_state`: pipeline[0] = {ground_state: {...}}
+# is a single-key dict that apply_override! auto-unwraps, so paths address
+# keys INSIDE ground_state directly (proven form; see eu151_B_sweep_pm120).
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio:
+      - -0.015          # FM side (must stay > singularity −1/F² = −0.02778)
+      -  0.0            # FM/AFM boundary
+      -  0.0277777778   # physical Eu (1/36, AFM)
+    pipeline.0.B.Bz:
+      - "0.0 Gauss"        #   0 µG
+      - "2.5e-5 Gauss"     #  25 µG
+      - "4.0e-5 Gauss"     #  40 µG   ┐ transition band
+      - "4.8e-5 Gauss"     #  48 µG   │ (B_eq ≈ 40–62 µG,
+      - "5.5e-5 Gauss"     #  55 µG   │  grows with κ;
+      - "6.2e-5 Gauss"     #  62 µG   ┘  saturation 58–60 µG)
+      - "7.5e-5 Gauss"     #  75 µG
+      - "1.0e-4 Gauss"     # 100 µG
+    pipeline.0.potential.omega.2:
+      from: 1.0
+      to:   2.2
+      n:    5              # κ = ω_z/ω_r ∈ {1.0, 1.3, 1.6, 1.9, 2.2}
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}    # FM seed (m=+F)
+    - name: polar
+      override: {pipeline.0.initial_state: polar}       # polar seed (m=0)

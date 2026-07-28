@@ -81,7 +81,7 @@ function split_step!(ws::Workspace{N}) where {N}
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 
@@ -360,7 +360,7 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 

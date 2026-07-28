@@ -65,6 +65,22 @@ function _run_simulation_standard!(
     end
 end
 
+# Branch on a Bool, not on a function-valued local: the two half-V realizations
+# have different types, so a `half_V! = cond ? a : b` local would make every
+# call site a small-union dispatch inside the hot loop. Both arms here are
+# concrete calls.
+@inline function _rtp_half_V!(
+    combined::Bool, ws::Workspace{N}, dt_half, n_comp, ndim;
+    t_eval::Float64, t_start::Float64,
+) where {N}
+    if combined
+        _half_potential_combined!(ws, dt_half, n_comp, ndim, false; t_eval, t_start)
+    else
+        _half_potential!(ws, dt_half, n_comp, ndim, false; t_eval, t_start)
+    end
+    nothing
+end
+
 """
 Leapfrog-fused simulation loop for real-time dynamics.
 
@@ -92,18 +108,33 @@ function _run_simulation_leapfrog!(
     omega = sp.rotating_frame_omega
     cc = ws.coriolis_cache
 
+    # Which V half-step realization this run uses. Decided ONCE here, not per
+    # call, so a run cannot switch splittings halfway through (a t-dependent
+    # `transverse_b` in `_rtp_use_combined_step` could otherwise flip it mid-run
+    # and silently mix two integrators in one trajectory).
+    #
+    # Sequential  — diag · SM · DDI · SM · diag, 3 spin rotations per half-V.
+    # Combined    — diag · exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂) · diag, 1 rotation.
+    #
+    # Both are O(dt²) and converge to the same continuum limit; they differ at
+    # O(dt³) because the combined form has no [SM,[SM,DDI]] commutator error.
+    # See `combined_spin_step.jl` and `test_combined_spin_step.jl`.
+    combined_V = _rtp_use_combined_step(ws)
+
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+            ws.grid.config.box_size)
     end
 
-    _half_potential!(
-        ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+    _rtp_half_V!(
+        combined_V, ws, dt / 2, n_comp, N; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
     )
 
     try
         for step in 1:(sp.n_steps)
             if DEALIAS_2_3_ENABLED[]
-                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+                    ws.grid.config.box_size)
             end
 
             apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
@@ -132,8 +163,9 @@ function _run_simulation_leapfrog!(
             # fix in itp_loop.jl: drop the merge, always do close +
             # reopen so DDI is substepped. Cost: 2× _half_potential_step!
             # calls per step instead of 1 in the previously-merged path.
-            _half_potential!(
-                ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
+            _rtp_half_V!(
+                combined_V, ws, dt / 2, n_comp, N;
+                t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2,
             )
 
             apply_rt_dissipation!(ws, dt, n_comp, N)
@@ -160,16 +192,18 @@ function _run_simulation_leapfrog!(
             # Reopen V(dt/2) for the next K-step. Skipped on the final
             # step since there's no further K to chain into.
             if !is_last
-                _half_potential!(
-                    ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+                _rtp_half_V!(
+                    combined_V, ws, dt / 2, n_comp, N;
+                    t_eval=(ws.state.t + dt / 4), t_start=ws.state.t,
                 )
             end
         end
     catch e
         if e isa InterruptException
             # Close the open half-step so psi is in a valid Strang-split state
-            _half_potential!(
-                ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+            _rtp_half_V!(
+                combined_V, ws, dt / 2, n_comp, N;
+                t_eval=(ws.state.t + dt / 4), t_start=ws.state.t,
             )
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;

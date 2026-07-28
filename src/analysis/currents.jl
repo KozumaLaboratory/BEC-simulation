@@ -30,8 +30,15 @@ function probability_current(
         plans.forward * psi_k
 
         for d in 1:N
+            # Null the Nyquist mode of the first derivative: for even N the
+            # k=±N/2 coefficient is real/aliased and has no well-defined odd
+            # derivative, so `ik·ψ_k` there is pure roundoff that shows up as a
+            # checkerboard when the true current is ≈0. Zeroing it is the
+            # standard spectral-differentiation convention.
+            nyq = iseven(n_pts[d]) ? n_pts[d] ÷ 2 + 1 : 0
             @inbounds for I in CartesianIndices(n_pts)
-                dpsi[I] = im * grid.k[d][I[d]] * psi_k[I]
+                dpsi[I] = I[d] == nyq ? zero(ComplexF64) :
+                          im * grid.k[d][I[d]] * psi_k[I]
             end
             plans.inverse * dpsi
             @inbounds for I in CartesianIndices(n_pts)
@@ -85,6 +92,12 @@ function orbital_angular_momentum(
         psi_k .= psi_c
         local_plans.forward * psi_k
 
+        # NOTE: do NOT Nyquist-null here. ⟨L_z⟩ enters the Coriolis energy
+        # (energy_contribution(::CoriolisTerm) calls this), which must stay
+        # bit-consistent with the Coriolis apply_operator! / dumb-reference
+        # (un-nulled) for the energy↔operator + master oracles. Nyquist junk is
+        # removed at the SOURCE instead (_null_nyquist_modes! on the GS ψ), so
+        # real states have no Nyquist content for this to matter.
         @inbounds for I in CartesianIndices(n_pts)
             dpsi_x[I] = im * grid.k[1][I[1]] * psi_k[I]
             dpsi_y[I] = im * grid.k[2][I[2]] * psi_k[I]
