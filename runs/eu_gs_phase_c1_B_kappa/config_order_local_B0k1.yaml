@@ -1,0 +1,30 @@
+# LOCAL order diagnostic (while TSUBAME queue is stuck): B=0, kappa=1, fine c1
+# bracketing the boundary (~+0.027). Two bare seeds, tight convergence — answers
+# first-order (mF jumps, branches cross) vs continuous (single smooth branch).
+metadata: {owner: anko, project: Eu151 GS — local FM/polar order diagnostic B0 k1}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.027}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 1500
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.020, to: 0.036, n: 9}
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

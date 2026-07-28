@@ -27,7 +27,7 @@ using SpinorBEC
         # FFT-order: index i ↔ k_idx (i-1); |k_abs_idx| = min(i-1, n-(i-1)).
         # Kept: i ∈ {1,2,3,4,5,6} (k_abs 0..5) ∪ {12,...,16} (k_abs 5..1)
         # Zeroed: i ∈ {7,8,9,10,11} (k_abs 6,7,8,7,6)
-        mask = SpinorBEC._get_orszag_mask((16,))
+        mask = SpinorBEC._get_orszag_mask((16,), (12.0,))
         @test size(mask) == (16,)
         kept = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # i=1..6, k_abs=0..5
             0.0, 0.0, 0.0, 0.0, 0.0,           # i=7..11, k_abs=6,7,8,7,6
@@ -51,7 +51,7 @@ using SpinorBEC
         @test abs(buf[2]) > 0.5 * n   # k_idx=1 has the full plane-wave amplitude
         @test abs(buf[8]) > 0.5 * n   # k_idx=7 also present
 
-        SpinorBEC.apply_orszag_2_3_filter!(psi, plans, D, 1)
+        SpinorBEC.apply_orszag_2_3_filter!(psi, plans, D, 1, (12.0,))
 
         # Post-filter
         buf2 = copy(psi[:, 1])
@@ -67,15 +67,62 @@ using SpinorBEC
         rng = MersenneTwister(20260524)
         psi_a = randn(rng, ComplexF64, n, D)
         psi_b = copy(psi_a)
-        SpinorBEC.apply_orszag_2_3_filter!(psi_a, plans, D, 1)
-        SpinorBEC.apply_orszag_2_3_filter!(psi_b, plans, D, 1)
-        SpinorBEC.apply_orszag_2_3_filter!(psi_b, plans, D, 1)
+        SpinorBEC.apply_orszag_2_3_filter!(psi_a, plans, D, 1, (12.0,))
+        SpinorBEC.apply_orszag_2_3_filter!(psi_b, plans, D, 1, (12.0,))
+        SpinorBEC.apply_orszag_2_3_filter!(psi_b, plans, D, 1, (12.0,))
         @test maximum(abs, psi_a .- psi_b) < 1e-13
     end
 
+    @testset "the filter is an exact projector: norm loss == above-cut weight" begin
+        # This is the gate that tells "the filter is eating my norm" apart from
+        # "my run genuinely has weight above the cut". A projector removes
+        # EXACTLY the above-cut weight and nothing else, so by Parseval
+        #
+        #     ||psi||^2 - ||P psi||^2  ==  sum over the zeroed modes
+        #
+        # to machine precision. Any defect that would actually destroy norm —
+        # an unnormalised inverse plan, a mask on the wrong device, a stale
+        # cached plan, a mask built for the wrong box — breaks this equality
+        # while leaving the mask-geometry tests above perfectly green.
+        #
+        # Measured 2026-07-29 on Eu-151 DDI dynamics: per-step norm loss
+        # matched the above-cut weight to every printed digit at box 12 and
+        # box 24, n = 32 and n = 64. A 55%-over-20-steps "norm destruction"
+        # was the run pushing a few % of its weight past 2/3 k_Nyq every
+        # step, not the filter misbehaving.
+        rng = MersenneTwister(20260729)
+        for (n_pts, box, ndim) in (((16,), (12.0,), 1),
+            ((16, 16), (12.0, 24.0), 2),
+            ((8, 8, 8), (24.0, 24.0, 12.0), 3))
+            D = 3
+            plans = SpinorBEC.make_fft_plans(n_pts)
+            psi = randn(rng, ComplexF64, n_pts..., D)   # white noise: LOTS above the cut
+            mask = SpinorBEC._get_orszag_mask(n_pts, box)
+
+            # Above-cut weight, in real-space units via Parseval (unitary
+            # convention: sum|FFT|^2 = N * sum|psi|^2).
+            above = 0.0
+            scratch = Array{ComplexF64}(undef, n_pts)
+            for c in 1:D
+                scratch .= selectdim(psi, ndim + 1, c)
+                plans.forward * scratch
+                above += sum(abs2, scratch .* (1 .- mask))
+            end
+            above /= prod(n_pts)
+
+            n_before = sum(abs2, psi)
+            SpinorBEC.apply_orszag_2_3_filter!(psi, plans, D, ndim, box)
+            n_after = sum(abs2, psi)
+
+            @test isapprox(n_before - n_after, above; rtol=1e-10)
+            # And the projector cannot ADD norm.
+            @test n_after <= n_before + 1e-12
+        end
+    end
+
     @testset "different grid sizes get distinct masks" begin
-        m16 = SpinorBEC._get_orszag_mask((16,))
-        m32 = SpinorBEC._get_orszag_mask((32,))
+        m16 = SpinorBEC._get_orszag_mask((16,), (12.0,))
+        m32 = SpinorBEC._get_orszag_mask((32,), (12.0,))
         @test size(m16) == (16,)
         @test size(m32) == (32,)
         @test sum(m16) == 11.0   # 6 + 5 = 11 modes kept
@@ -85,7 +132,7 @@ using SpinorBEC
     @testset "3D mask: per-axis cutoff" begin
         # 8³ grid: cutoff = 8÷3 = 2 per axis. Kept per axis: |k_abs| ≤ 2 →
         # i ∈ {1,2,3} ∪ {7,8} → 5 indices. Cube: 5³ = 125 modes kept.
-        m = SpinorBEC._get_orszag_mask((8, 8, 8))
+        m = SpinorBEC._get_orszag_mask((8, 8, 8), (12.0, 12.0, 12.0))
         @test size(m) == (8, 8, 8)
         @test sum(m) == 125.0
     end
@@ -307,6 +354,7 @@ using SpinorBEC
         # session state, so we instead pin the math + the no-throw contract.
 
         n_pts = (32, 32, 32)
+        box = (12.0, 12.0, 12.0)
         F_pad = zeros(Float64, n_pts...)
 
         # k_safe formula: at n=32 axis with box L=12, k_safe = 2·π·32/(3·12)
@@ -318,38 +366,90 @@ using SpinorBEC
         # advisory (warn), not enforcement.
         for k_cut in (nothing, k_safe_32 * 0.5, k_safe_32, k_safe_32 * 2.0)
             SpinorBEC.DEALIAS_K_CUTOFF[] = k_cut
-            @test SpinorBEC.apply_orszag_2_3_F_filter!(F_pad, n_pts) === nothing
+            @test SpinorBEC.apply_orszag_2_3_F_filter!(F_pad, n_pts, box) === nothing
         end
 
         # _check_safe_k_cut itself must return nothing (side-effect only).
         SpinorBEC.DEALIAS_K_CUTOFF[] = 100.0  # far above any reasonable safe k
-        @test SpinorBEC._check_safe_k_cut(n_pts) === nothing
+        @test SpinorBEC._check_safe_k_cut(n_pts, box) === nothing
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
-        @test SpinorBEC._check_safe_k_cut(n_pts) === nothing
+        @test SpinorBEC._check_safe_k_cut(n_pts, box) === nothing
     end
 
     @testset "DEALIAS_K_CUTOFF override (fixed physical k_cut)" begin
         # Default behaviour: cutoff = n÷3 per axis.
         @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
-        m_default = SpinorBEC._get_orszag_mask((16,))
+        m_default = SpinorBEC._get_orszag_mask((16,), (12.0,))
         # 16-grid box L=12 (assumed). dk = 2π/12 ≈ 0.524. n÷3=5
         # → physical cutoff = 5·0.524 = 2.62.
         # Set DEALIAS_K_CUTOFF = 2.62 should give same mask.
         SpinorBEC.DEALIAS_K_CUTOFF[] = 5 * 2π / 12.0
-        m_kcut_match = SpinorBEC._get_orszag_mask((16,))
+        m_kcut_match = SpinorBEC._get_orszag_mask((16,), (12.0,))
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
         @test m_default == m_kcut_match
 
         # Tighter cutoff zeros more modes.
         SpinorBEC.DEALIAS_K_CUTOFF[] = 1.0  # k ≤ 1.0 → idx ≤ ~1.9 → 2 modes
-        m_tight = SpinorBEC._get_orszag_mask((16,))
+        m_tight = SpinorBEC._get_orszag_mask((16,), (12.0,))
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
         @test sum(m_tight) < sum(m_default)
 
         # Looser cutoff keeps more modes (capped by grid Nyquist).
         SpinorBEC.DEALIAS_K_CUTOFF[] = 100.0  # well above any Nyq
-        m_loose = SpinorBEC._get_orszag_mask((16,))
+        m_loose = SpinorBEC._get_orszag_mask((16,), (12.0,))
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing  # reset
         @test sum(m_loose) == 16.0  # all modes kept
+    end
+
+    @testset "physical k_cut is measured against the ACTUAL box" begin
+        # Regression: the k_cut branch used to hard-code L = 12.0 on every
+        # axis, so a run on any other box silently filtered at the wrong
+        # physical k — halving the retained band on box 24, with
+        # `_check_safe_k_cut` (which assumed 12 too) reporting nothing.
+        n_pts = (16, 16, 16)
+        k_cut = 3.0
+        SpinorBEC.DEALIAS_K_CUTOFF[] = k_cut
+
+        m12 = SpinorBEC._get_orszag_mask(n_pts, (12.0, 12.0, 12.0))
+        m24 = SpinorBEC._get_orszag_mask(n_pts, (24.0, 24.0, 24.0))
+
+        # dk = 2pi/L, so the box-24 grid resolves k twice as finely and a
+        # FIXED physical cutoff must retain about 2x as many index modes
+        # per axis. Same shape, same cutoff, different masks.
+        @test m12 != m24
+        @test sum(m24) > sum(m12)
+
+        # Exact per-axis content: keep |k_idx| * (2pi/L) <= k_cut.
+        signed_k_idx(i, n) = i - 1 <= n ÷ 2 ? i - 1 : i - 1 - n
+        for (L, m) in ((12.0, m12), (24.0, m24))
+            dk = 2π / L
+            kept = count(i -> abs(signed_k_idx(i, 16)) * dk <= k_cut, 1:16)
+            @test sum(m) == Float64(kept)^3
+        end
+
+        # The guard must key off the binding axis n_d / L_d, not n_d alone:
+        # a LONG axis with MORE points can still be the tight one in k.
+        # n/L = 32/24 = 1.33 (axis 3) < 16/6 = 2.67 (axes 1,2).
+        n_mixed = (16, 16, 32)
+        box_mixed = (6.0, 6.0, 24.0)
+        @test SpinorBEC.safe_k_cut_boundary(32, 24.0) <
+            SpinorBEC.safe_k_cut_boundary(16, 6.0)
+        # Sitting above the binding axis but below the naive smallest-n axis
+        # must still be caught (returns nothing either way; the contract here
+        # is that the call is box-aware and total).
+        SpinorBEC.DEALIAS_K_CUTOFF[] = 3.0
+        @test SpinorBEC._check_safe_k_cut(n_mixed, box_mixed) === nothing
+
+        SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
+    end
+
+    @testset "DDIParams carries the box to the F filter" begin
+        # The F filter reads `ddi.box_size`; Q_ab = k_a k_b - d_ab/3 is
+        # scale-free, so the box cannot be recovered from the tensors and
+        # must travel on the struct.
+        grid = make_grid(GridConfig((16, 16, 16), (24.0, 24.0, 24.0)))
+        atom = SpinorBEC.resolve_atom(:Eu151)
+        ddi = SpinorBEC.make_ddi_params(grid, atom; c_dd=1.0)
+        @test ddi.box_size == (24.0, 24.0, 24.0)
     end
 end

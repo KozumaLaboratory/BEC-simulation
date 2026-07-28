@@ -6,7 +6,7 @@
 # allocation. The companion `_rebuild_workspace` lets callers swap one
 # field (e.g. dt) without re-allocating the whole struct.
 
-export make_workspace
+export make_workspace, LHYTableOpts
 
 # Kwarg names accepted by `make_workspace`. Grouped semantically for
 # documentation and for the kwarg-coverage regression test
@@ -24,10 +24,36 @@ const _MAKE_WORKSPACE_KWARGS = (
     # Quasi-2D bundle
     :quasi_2d, :l_z,
     # LHY dispatch
-    :spinor_lhy,
+    :spinor_lhy, :lhy_opts,
     # Runtime / backend
     :backend, :fft_flags, :dtype, :psi_init,
 )
+
+"""
+    LHYTableOpts(; n_max=NaN, n_points=200, n_bins=12)
+
+Table-resolution knobs for the spinor LHY builders, carried as ONE concrete
+struct rather than three loose kwargs — `make_workspace` is the inference hot
+path, and every widened kwarg there is paid for in `Workspace` specialisation.
+
+- `n_max` — top of the density grid. `NaN` (default) means `3 × max|ψ_init|²`.
+- `n_points` — density nodes, for the `n`-tabulated modes.
+- `n_bins` — polarisation bins, for `:spatial` only (one BdG solve per occupied
+  bin, so it is a cost knob, not a resolution knob in the same sense).
+
+`lhy: {n_max, n_points}` has been in `LHY_SCHEMA` since the C6 block landed but
+was read by nothing: `_resolve_lhy_block!` normalised only `kind` and `c_lhy`,
+and `_build_spinor_lhy` hard-coded `n_max=_lhy_n_max(psi_init)` while letting
+`n_points` fall to each builder's own default. A user writing `n_points: 4000`
+got 200 and no warning. This struct is what carries them.
+"""
+struct LHYTableOpts
+    n_max::Float64
+    n_points::Int
+    n_bins::Int
+end
+LHYTableOpts(; n_max::Float64=NaN, n_points::Int=200, n_bins::Int=12) =
+    LHYTableOpts(n_max, n_points, n_bins)
 
 function make_workspace(;
     grid::Grid{N, T},
@@ -52,6 +78,7 @@ function make_workspace(;
     l_z::Float64=0.0,
     backend::Union{Nothing, AbstractBackend}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     absorbing_boundary::Union{Nothing, AbsorbingBoundary}=nothing,
     light_shift::Union{Nothing, LightShift}=nothing,
     time_dep_interactions::Union{Nothing, TimeDependentInteractions}=nothing,
@@ -348,7 +375,7 @@ function make_workspace(;
             nothing
         else
             _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
-                c_dd, enable_ddi)
+                c_dd, enable_ddi, lhy_opts)
         end
 
     # Silent-zero defense (2026-05-26): when the user explicitly requested
@@ -540,6 +567,10 @@ end
     maximum(sum(abs2, psi_init; dims=ndims(psi_init))) * 3.0
 end
 
+# An explicit `lhy.n_max` always wins; NaN (the default) means "derive it".
+_lhy_n_max(psi_init, opts::LHYTableOpts) =
+    isnan(opts.n_max) ? _lhy_n_max(psi_init) : opts.n_max
+
 _lhy_g_dict(atom::AtomSpecies, ws::InteractionParams) = c_to_g(atom.F, ws)
 
 """
@@ -654,41 +685,74 @@ function _warn_lhy_texture(mode::Symbol, psi_init, F::Int)
 end
 
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
-_build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
+_build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi, opts) = nothing
 
-function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
+# Spatially-varying: `e₁(p)` tabulated from the ACTUAL local spinors of
+# `psi_init`, one BdG solve per occupied `|⟨F⟩|/F` bin. Alone among the modes it
+# is not built for a single spinor, so it is the ANSWER to `_warn_lhy_texture`
+# rather than a caller of it.
+#
+# `compute_spatial_lhy` returns `nothing` when the cloud is uniform enough that
+# a single-spinor table is already right (spread < `min_spread`). The correct
+# response is NOT "no LHY" — that would hit the silent-zero throw — but the
+# single-spinor table itself, which in that regime is exact. So fall back to
+# `:full_bdg`, the general-spinor engine, built from the same peak spinor.
+#
+# Same for `psi_init === nothing`: there is no texture to read, so there is
+# nothing for this mode to do that `:full_bdg` does not already do.
+#
+# Expect `full_bdg`'s "mean field is dynamically unstable" warning here on real
+# textures, and do NOT read it as a defect: a bin's representative spinor is a
+# local spinor lifted out of the cloud, and away from a locally-uniform region
+# that is not a solution of the UNIFORM mean-field problem at its own density.
+# Instability is then a statement about that fictitious uniform system, not
+# about the state. It is `maxlog`-bounded, so it fires once per session.
+function _build_spinor_lhy(::Val{:spatial}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+    _full_bdg() = _build_spinor_lhy(Val(:full_bdg), atom, ws, psi_init, c_dd,
+        enable_ddi, opts)
+    psi_init === nothing && return _full_bdg()
+    tbl = compute_spatial_lhy(;
+        psi_init, F=atom.F, interactions=ws,
+        c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
+        n_bins=opts.n_bins)
+    tbl === nothing ? _full_bdg() : tbl
+end
+
+function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:polar_two_channel, psi_init, atom.F)
     compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws[0], c1=ws[1],
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-        n_max=_lhy_n_max(psi_init))
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
 end
 
-function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:full_bdg, psi_init, atom.F)
     spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
     compute_spinor_lhy_table(;
         spinor=spinor_init, F=atom.F, interactions=ws,
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-        n_max=_lhy_n_max(psi_init))
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
 end
 
 # F-generic polar contact LHY (paper #1, contact-only). ~1000× faster than
 # :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for post-quench /
 # mixed states fall back to :full_bdg.
-function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:polar_contact, psi_init, atom.F)
     compute_spinor_lhy_polar_contact(;
-        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
+        n_points=opts.n_points)
 end
 
 # FM-phase contact LHY (paper #2 contact-only piece). Single-mode collapse at
 # m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S this matches scalar
 # Lima-Pelster; for realistic per-S a_S it differs.
-function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:fm_contact, psi_init, atom.F)
     compute_spinor_lhy_fm_contact(;
-        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
+        n_points=opts.n_points)
 end
 
 # Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(eps_dd).
@@ -698,14 +762,15 @@ end
 # 1 + eps_dd*(3cos^2(theta)-1), convert with eps_dd = c_dd*F^2/(3*g_2F).
 # Direct callers that already have scalar eps_dd should use
 # `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
-function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:fm_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     g_2F = get(g_dict, 2 * atom.F, 0.0)
     eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) * atom.F^2 / (3.0 * abs(g_2F)) : 0.0
     compute_spinor_lhy_fm_dipolar(;
-        F=atom.F, g_dict=g_dict, eps_dd=eps_dd, n_max=_lhy_n_max(psi_init))
+        F=atom.F, g_dict=g_dict, eps_dd=eps_dd, n_max=_lhy_n_max(psi_init, opts),
+        n_points=opts.n_points)
 end
 
 # F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
@@ -734,7 +799,7 @@ end
     return CPUBackend()
 end
 
-function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:polar_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
@@ -742,7 +807,7 @@ function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enab
     eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
     compute_spinor_lhy_polar_dipolar(;
         F=atom.F, g_dict=g_dict, eps_tilde_dd=eps_tilde_dd,
-        n_max=_lhy_n_max(psi_init))
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
 end
 
 # F=6 I_h closed form (Stage D). Universal `c_0^(5/2) + 3|λ_spin|^(5/2)` with
@@ -757,10 +822,11 @@ end
 #   states share the point group but have different closed forms — dispatch
 #   them through their own builder, not this branch.
 # See: src/hamiltonian/terms/lhy/icosahedral.jl
-function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi)
+function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi, opts)
     _warn_lhy_texture(:icosahedral, psi_init, atom.F)
     atom.F == 6 || throw(ArgumentError(
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
     compute_spinor_lhy_icosahedral(;
-        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
+        F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
+        n_points=opts.n_points)
 end

@@ -56,10 +56,12 @@ const LHY_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, default="none",
         enum=["none", "scalar", "quasi_2d", "polar_two_channel", "full_bdg",
             "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
-            "icosahedral"]),
+            "icosahedral", "spatial"]),
     "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
     "n_max" => FieldSpec(; type=Number),       # null → 3 × max(|psi_init|²)
     "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
+    # `spatial` only: |⟨F⟩|/F bins, one BdG solve per OCCUPIED bin. A cost knob.
+    "n_bins" => FieldSpec(; type=Integer, default=12, range=(2, 64)),
 )
 
 # Unified `B:` Zeeman block (replaces the legacy step-level `zeeman:` /
@@ -278,6 +280,10 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     # when ∇E (not just E) must be tight — Hessian λ_min / Bogoliubov near
     # instabilities require a genuinely stationary ψ. lbfgs-only.
     "newton_polish" => FieldSpec(; type=Bool, default=false),
+    # eigenvector-residual final polish (order-4 HvP) that breaks the √eps
+    # first-order gradient floor (1e-7 → 1e-12); use when the fine GS ordering
+    # (near-degenerate phases) needs a genuinely converged ψ. lbfgs-only.
+    "residual_polish" => FieldSpec(; type=Bool, default=false),
     "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
@@ -298,6 +304,17 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
     "init_state_params" => FieldSpec(; type=Dict),
+    # `seed_from: {run: <dir of point_*.jld2>, upsample: true}` — warm-start this
+    # GS solve from a prior run's converged ψ, matched by the resolved cell
+    # signature (c1/Bz/κ/initial_state) and spectrally upsampled to this grid.
+    # Cost-compressed continuation (docs/design/eu_phase_diagram_adaptive_mapping.md).
+    "seed_from" => FieldSpec(; type=Dict),
+    # `pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}`
+    # — lbfgs-only. Adds a symmetry-breaking transverse field b_x=ε, warm-ramps
+    # ε→0, and reports the ε→0-extrapolated energy. Lifts the weak-field
+    # soft-manifold Goldstone floor (|∇E|~0.05 un-pinned → ~1e-5). See
+    # src/solvers/ground_state/pinned.jl + the phase-diagram design doc.
+    "pin" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),

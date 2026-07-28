@@ -51,6 +51,7 @@ const DROP_ALLOWLIST = DropRule[
     DropRule("calibration_history", nothing, "popped after interpolation"),
     DropRule("target_date", nothing, "consumed by calibration interpolation"),
     DropRule("dealias", nothing, "popped, applied via global Ref"),
+    DropRule("units", nothing, "popped by units_block after lab-unit conversion"),
     DropRule("use", nothing, "template/mixin reference"),
     DropRule("mixins", nothing, "template/mixin reference"),
     # B-block split: theta/phi may legitimately move to B_direction when
@@ -373,12 +374,6 @@ function _compat_polar_two_channel_lhy(params, _kind)
     return string(get(lhy, "kind", "")) == "polar_two_channel"
 end
 
-function _compat_full_bdg_f6_polar(params, _kind)
-    lhy = get(params, "lhy", nothing)
-    lhy isa AbstractDict || return false
-    return string(get(lhy, "kind", "")) == "full_bdg"
-end
-
 function _compat_spin_rotating_omega_secular(params, _kind)
     srfo = get(params, "spin_rotating_frame_omega", 0)
     srfo isa Real && srfo != 0 || return false
@@ -410,14 +405,18 @@ const COMPAT_TABLE = CompatRule[
         "FM use FMContactLHY / FMDipolarLHY; F=6 icosahedral uses " *
         "IcosahedralLHY. Polar at F=2 is fine.",
     ),
-    CompatRule(
-        :full_bdg_f6_polar, :warn,
-        "FullBdGLHY at F=6 polar emits ~3000× spurious offset",
-        _compat_full_bdg_f6_polar,
-        "Memory: full_bdg_F6_polar_broken.md. Runtime emits a @warn " *
-        "but the magnitude is large enough to render results unusable.",
-        "Use PolarContactLHY / PolarDipolarLHY at F=6 polar instead.",
-    ),
+    # `:full_bdg_f6_polar` DELETED 2026-07-28. It warned that FullBdGLHY emits a
+    # ~3000× spurious offset at F=6 polar. That offset was a UV counterterm
+    # subtracting ε_k twice — divergent at EVERY F and phase, not an F=6 polar
+    # property — and it was fixed on 2026-07-27; full_bdg now matches all three
+    # closed forms to ~1e-4. The rule outlived the bug and steered users away
+    # from the one general-spinor LHY path.
+    #
+    # Its predicate also fired on ANY `kind: full_bdg`, never checking F or the
+    # polar ansatz its own name claimed. The genuine remaining caveat —
+    # scheme-dependence when the mean field is dynamically UNSTABLE — is a
+    # property of the converged state, not of the config, so it stays a runtime
+    # @warn and cannot become a preflight rule.
     CompatRule(
         :spin_rotating_omega_secular_required, :error,
         "spin_rotating_frame_omega ≠ 0 requires secular_ddi=true",

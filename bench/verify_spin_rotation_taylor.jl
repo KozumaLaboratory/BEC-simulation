@@ -18,7 +18,7 @@ function inputs(N, D, ::Type{T}, scale) where {T}
 end
 
 function run(use_taylor, sm, psi, px, py, pz, dt, it)
-    Ext._DDI_USE_TAYLOR[] = use_taylor
+    Ext._SPIN_TAYLOR_ENABLED[] = use_taylor
     p = copy(psi)
     SpinorBEC._apply_ddi_rotation!(p, px, py, pz, sm, dt, 3; imaginary_time=it)
     CUDA.synchronize()
@@ -39,12 +39,12 @@ for T in (Float64, Float32)
             tay = run(true, sm, psi, px, py, pz, dt, it)
             relerr = norm(Array(tay) .- Array(eul)) / norm(Array(eul))
             tol = T == Float64 ? 1e-11 : 5e-5
-            tag = R > Ext._DDI_TAYLOR_RMAX[] ? "EULER-fallback" : "K=$K"
+            tag = R > Ext._SPIN_TAYLOR_RMAX[] ? "EULER-fallback" : "K=$K"
             ok = relerr < tol
             println("  T=$T R=$(round(R,digits=4)) it=$it  $tag  relerr=$relerr  ",
                 ok ? "OK" : "*** FAIL ***")
         end
     end
 end
-Ext._DDI_USE_TAYLOR[] = true
+Ext._SPIN_TAYLOR_ENABLED[] = true
 println("DONE")

@@ -58,6 +58,8 @@ include("hamiltonian/terms/lhy/icosahedral.jl")
 include("hamiltonian/terms/lhy/modes_round45.jl")
 include("hamiltonian/terms/lhy/dispatch.jl")
 include("hamiltonian/terms/lhy/full_bdg.jl")
+include("hamiltonian/terms/lhy/spatial_spin_step.jl")
+include("hamiltonian/terms/lhy/spatial.jl")
 include("hamiltonian/integrator/absorbing_boundary.jl")
 
 # Potentials / builders. Dipole-trap potentials build on the Gaussian-beam

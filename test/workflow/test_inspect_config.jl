@@ -209,6 +209,58 @@ using SpinorBEC
             ins.warnings)
     end
 
+    @testset "runner-consumed top-level blocks are not schema errors" begin
+        # `dealias:` and `units:` are real top-level blocks that the RUNNER pops
+        # before validation — `dealias` onto global Refs, `units` after lab-unit
+        # conversion. Inspect used to validate the raw dict, so it reported a
+        # schema ERROR for ~20 configs that run fine, several already run on
+        # TSUBAME. A preflight that fails valid configs is worse than none:
+        # this severity feeds the autopilot gate.
+        src = """
+        units: {B: Gauss}
+        dealias: {enabled: true, k_cut: 5.0}
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              interactions: {N_atoms: 1000, omega_ref: 691.1504}
+              lhy: {kind: full_bdg}
+              B: {Bz: "0.01 Gauss"}
+              n_steps: 10
+              tol: 1.0e-6
+        """
+        ins = SpinorBEC.inspect_config_string(src)
+        @test !any(w -> w.kind === :normalize_failed, ins.warnings)
+        @test !any(w -> w.kind === :input_resolved_drop &&
+                        occursin("units", w.title), ins.warnings)
+        # ...and inspecting must not leak the dealias Refs into the session.
+        @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+
+        # `kind: full_bdg` is no longer flagged. The ~3000× offset that rule
+        # warned about was a UV counterterm bug, fixed 2026-07-27; full_bdg is
+        # the general-spinor path and matches the closed forms to ~1e-4.
+        @test !any(w -> w.kind === :full_bdg_f6_polar, ins.warnings)
+    end
+
+    @testset "a malformed dealias block is still an error" begin
+        # Popping it must not mean ignoring it — the runner throws on this.
+        src = """
+        dealias: {enabled: true, no_such_key: 1}
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              interactions: {N_atoms: 1000, omega_ref: 691.1504}
+              n_steps: 10
+              tol: 1.0e-6
+        """
+        ins = SpinorBEC.inspect_config_string(src)
+        @test any(w -> w.kind === :dealias_block_invalid && w.severity === :error,
+            ins.warnings)
+    end
+
     # --- run_yaml audit hook (:block aborts + opt-out) -------------------
     #
     # The hook lives in `_run_yaml_impl`; we exercise it via run_yaml with
