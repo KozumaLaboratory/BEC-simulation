@@ -1,0 +1,374 @@
+% コンパイル: lualatex edh_checkerboard_summary_ja.tex  (2回)
+\documentclass[11pt]{ltjsarticle}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\graphicspath{{figures/}}
+\captionsetup{font=small}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray},
+  backgroundcolor=\color{gray!6},
+  breaklines=true,
+  showstringspaces=false,
+}
+\usepackage{xcolor}
+
+\newcommand{\Fx}{\langle F_x\rangle}
+\newcommand{\Fz}{\langle F_z\rangle}
+\newcommand{\Lz}{\langle L_z\rangle}
+\newcommand{\Jz}{J_z}
+\newcommand{\uG}{\,\mu\mathrm{G}}
+\newcommand{\ms}{\,\mathrm{ms}}
+\newcommand{\wref}{\omega^{-1}}
+
+\title{$^{151}$Eu $F{=}6$ スピノルBECの Einstein--de Haas ダイナミクス:\\
+後藤差分撮像における市松模様の反転}
+\author{SpinorBEC シミュレーション --- EdH ランプ研究}
+\date{2026-07-24}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+双極子性 $^{151}$Eu $F{=}6$ スピノルBECにおける Einstein--de Haas (EdH) 効果を
+シミュレートした。完全偏極 $m{=}{-}6$ 状態から出発し、軸方向磁場をゆっくり下げると
+双極子--双極子相互作用 (DDI) がスピン角運動量を軌道運動へ転写する。後藤 $\pm16^\circ$
+チルト\emph{差分撮像}を用いると、横磁化の「市松模様」がホールド中に\emph{周期的に反転}
+することが分かった。さらに (i) 全角運動量 $\Jz=\Fz+\Lz$ が $1.5\times10^4$ 分の $1$ の精度で
+保存されつつスピンと軌道がコヒーレントにスロッシングすること、(ii) 不活性な高磁場域を
+クエンチで飛ばしてから放物線ランプを行うと原子ロスが減り転写が\emph{強まる}こと
+(市松振幅 $+35\%$)、(iii) 市松反転・$\Lz$振動・$\Fz$振動が単一の集団スピン--軌道モード
+($T=38\pm2\ms$)であり、裸のラーモア周期 ($24\ms$) とは異なること、を示す。運動は円運動の
+歳差ではなく楕円的でほぼ直線的な振動であり、赤方偏移は磁場の落とし方($5.8$--$130\ms$)に依らない。
+\end{abstract}
+
+\section{系の設定}
+任意-$F$ スピノル Gross--Pitaevskii 分割演算子フーリエ法ソルバ (\texttt{SpinorBEC}) で
+時間発展させた。パラメータ:
+\begin{itemize}\itemsep2pt
+  \item 原子 $^{151}$Eu, $F{=}6$ ($D{=}2F{+}1=13$ 成分), 原子数 $N=5\times10^{4}$。
+  \item 格子 $64^3$, 箱 $18\,a_{\mathrm{ho}}$; 調和トラップ
+        $\boldsymbol\omega=(1,1,1.182)\,\omega_{\mathrm{ref}}$。
+  \item 内部単位 $\hbar=m=\omega_{\mathrm{ref}}=1$,
+        $\omega_{\mathrm{ref}}=2\pi\times110\ \mathrm{Hz}=691.15\ \mathrm{rad/s}$。
+\end{itemize}
+ゼーマン演算子は Kawaguchi--Ueda 形 $H_Z=-p\,F_z+q\,F_z^{2}$、$p\equiv-g_F\mu_B B$ で、
+$g_F>0$ の原子に $+B_z$ をかけると $m{=}{-}6$ が基底状態になる。導出結合定数:
+接触結合は制約 $c_0+F^2 c_1=c_{\mathrm{tot}}=4\pi(a_s/a_{\mathrm{ho}})N=4687$ の下、実験で確立した
+比 $c_1/c_0=1/36$（Buchachenko et al.\ の反強磁性推定）を課す: $c_0=2344$, $c_1=65.1$。DDI は
+$c_{dd}=211$（$\varepsilon_{dd}\simeq0.54$、強双極子）。したがってスピンダイナミクスは
+\emph{DDI と接触スピン混合($c_1$)の両方}で駆動される。なお $^{151}$Eu は個別散乱長が未知のため、
+コードは\emph{結果読み戻し}（\texttt{open\_result}）時に $c_1{=}0$ の警告を出すが、これはフォールバックで
+\emph{伝播計算には影響しない}（実際 run の \texttt{Derived:\ c\_total=4687.3} は $c_0+36c_1$ に一致し
+$c_1{=}65.1$ が使われたことを確認できる）。三体ロス $K_3=2.1\times10^{-41}\ \mathrm{m^6/s}$ を含む。
+物理スケールを表~\ref{tab:units} にまとめる。
+
+\begin{table}[h]\centering
+\begin{tabular}{lll}
+\toprule
+量 & 内部単位 & 物理値\\\midrule
+時間単位 $1\,\wref$ & $1$ & $1.447\ms$\\
+刻み $dt$ & $0.002$ & $2.9\ \mu\mathrm{s}$\\
+長さ $a_{\mathrm{ho}}$ & $1$ & $0.780\ \mu\mathrm{m}$ (箱 $14.0\ \mu\mathrm{m}$, $dx=0.220\ \mu\mathrm{m}$)\\
+トラップ & $(1,1,1.182)$ & $(110,110,130)\ \mathrm{Hz}$\\
+ラーモア @ $26\uG$ & $\sim16\,\wref$ & $\sim24\ms$\\
+\bottomrule
+\end{tabular}
+\caption{単位換算（run の保存メタデータより）。}
+\label{tab:units}
+\end{table}
+
+\section{計算スキーム}
+\subsection{スピノルGP方程式}
+13成分スピノル $\psi_m(\mathbf r,t)$ ($m={-}6,\dots,{+}6$) を次式で発展させる:
+\begin{equation}
+i\hbar\,\partial_t\psi_m=\Big[-\tfrac{\hbar^2\nabla^2}{2M}+V_{\mathrm{tr}}(\mathbf r)
+-p\,m+q\,m^2+c_0\,n(\mathbf r)\Big]\psi_m
++\big[H_{\mathrm{dd}}\psi\big]_m-\tfrac{i\hbar}{2}L_3\psi_m,
+\end{equation}
+ここで $n=\sum_m|\psi_m|^2$、$V_{\mathrm{tr}}=\tfrac{M}{2}\sum_\alpha\omega_\alpha^2 x_\alpha^2$、
+$c_1=65.1$（$c_1/c_0=1/36$、接触スピン混合あり）。三体ロスは $L_3\propto K_3\,n^2$。
+
+\subsection{双極子相互作用（$k$空間畳み込み）}
+磁化密度 $\mathbf F(\mathbf r)=\sum_{mm'}\psi_m^{*}(\mathbf F)_{mm'}\psi_{m'}$ から、双極子場を
+$k$空間の秤量テンソルで畳み込む:
+\begin{equation}
+Q_{\alpha\beta}(\mathbf k)=\hat k_\alpha \hat k_\beta-\tfrac13\delta_{\alpha\beta},
+\quad Q(\mathbf 0)=0,\qquad
+B^{\mathrm{dd}}_\alpha(\mathbf r)=c_{dd}\,\mathcal F^{-1}\!\big[\,Q_{\alpha\beta}(\mathbf k)\,
+\mathcal F[F_\beta](\mathbf k)\big],
+\end{equation}
+規約は $c_{dd}=\mu_0\mu^2$（$4\pi$ を含めない）、$Q(\mathbf 0)=0$。1ステップあたり6回のFFTで
+評価する。強双極子 $\varepsilon_{dd}\simeq0.54$。
+
+\subsection{分割演算子（Strang）法}
+時間反転対称な2次のStrang分解
+\begin{equation}
+\psi(t+dt)=\hat V(\tfrac{dt}{2})\,\hat K(dt)\,\hat V(\tfrac{dt}{2})\,\psi(t)
+\end{equation}
+を用いる。運動項 $\hat K$ は $k$空間で対角
+$\exp[-i\hbar \mathbf k^2 dt/2M]$（FFT/IFFT）。ポテンシャル項 $\hat V$ は実空間で、内側は
+対称サンドイッチ「対角部（トラップ$+$ゼーマン$+c_0 n$）$\to$ DDI $\to$ 対角部」で構成
+（本設定では $c_1\neq0$ のスピン混合部は有効、高ランクのテンソル・Raman部は $c_{k\ge2}{=}0$ で自動スキップ）。虚時間発展の
+代わりに基底状態は LBFGS（Sobolev前処理）でエネルギー勾配 $\nabla E$ を最小化し、初期は
+$m{=}{-}6$ ストレッチ状態から出発する（$\|\nabla E\|\le10^{-8}$ で収束）。
+
+\subsection{数値パラメータと後処理}
+格子 $64^3$、$dt=0.002\,\wref$、周期境界（FFT）、スナップショットは f32 で保存。
+後藤差分撮像（\S\ref{sec:goto}）はスナップショット $\psi$ に対する後処理として Julia/Python で
+実行する。角運動量は $L_z=-i(x\partial_y-y\partial_x)$ をスペクトル微分で評価する。
+
+\section{プロトコルと config}
+磁場の下げ方が異なる\textbf{2つのプロトコル}を比較する。どちらも $m{=}{-}6$ 完全偏極
+(\texttt{initial\_state:\,m\_minus\_F}, $10\ \mathrm{mG}$ で $q{=}0$) の基底状態から出発し、
+最後は同一の $26\uG$ ホールドで終わる。違いは\emph{ランプ部だけ}である
+（段構成は表~\ref{tab:proto}、磁場の下げ方は図~\ref{fig:ramp}）。
+
+\begin{table}[h]\centering
+\begin{tabular}{cll}
+\toprule
+段 & 純放物線（2段） & クエンチ$+$放物線（3段）\\\midrule
+GS & \multicolumn{2}{l}{$m{=}{-}6$ 完全偏極 @ $10\ \mathrm{mG}$ ($q{=}0$) --- 初期状態}\\[2pt]
+①（高磁場・不活性） & 放物線 $10\,\mathrm{mG}\!\to\!26\uG$ ($90\wref{=}130\ms$) & \textbf{クエンチ} $10\,\mathrm{mG}\!\to\!500\uG$ ($4\wref{=}5.8\ms$)\\[2pt]
+②（活性・EdH） & （①に含まれる） & \textbf{放物線} $500\!\to\!26\uG$ ($19.62\wref{=}28.4\ms$、同一レート)\\[2pt]
+③（観測・歳差） & ホールド $26\uG$ ＋seed ($60\wref{=}87\ms$) & ホールド $26\uG$ ＋seed ($60\wref{=}87\ms$)\\\midrule
+合計 & $217\ms$ & $\mathbf{121\ms}$\\
+\bottomrule
+\end{tabular}
+\caption{2プロトコルの段構成。純放物線は全区間を放物線でゆっくり下げる。
+クエンチ$+$放物線は不活性な $>\!500\uG$ をクエンチで飛ばし、活性域 $500\!\to\!26\uG$ のみを
+純放物線の下側と\emph{同一レート}の放物線で下げる。末尾のホールドは両者共通。}
+\label{tab:proto}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.74\linewidth]{compare_ramp_profiles.png}
+\caption{磁場の下げ方 $B_z(t)$（対数軸）: 純放物線（青、全区間を $130\ms$ かけて放物線）と
+クエンチ$+$放物線（赤、$500\uG$ まで $5.8\ms$ でクエンチ$\to$その後 $500\!\to\!26\uG$ を放物線）。
+EdHカスケードは $\sim571\uG$（緑点線）以下でのみ立ち上がるため、それ以上の不活性域を
+クエンチで飛ばしても活性域のダイナミクスは変わらない。}
+\label{fig:ramp}
+\end{figure}
+
+実際の config（純放物線版、2段）:
+
+\begin{lstlisting}
+defaults: {kind: spinor, backend: gpu,
+           interactions: {N_atoms: 50000, omega_ref: 691.15}}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027778}  # =1/36
+pipeline:
+- ground_state:                 # m=-6 完全偏極 (q=0 で線形ゼーマンが偏極を保証)
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+- dynamics:                     # 放物線ランプ 10mG -> 26uG, 90 w^-1 (130 ms)
+    duration: 90.0
+    dt: 0.002
+    B: {Bz: {piecewise: {times:  [0, ..., 45, ..., 90],
+                          values: [0.01, ..., 2.5195e-3, ..., 2.6e-5]}}}
+    loss: {K3_per_m_si: [2.1e-41 m^6/s, ...  (13 成分すべて同じ)]}
+    save: {every: 1125, psi: true, precision: f32}
+- dynamics:                     # 26uG ホールド + seed, 60 w^-1 (87 ms)
+    duration: 60.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss: {K3_per_m_si: [...]}
+    save: {every: 500, psi: true, precision: f32}
+\end{lstlisting}
+
+\noindent\textbf{クエンチ$+$放物線版}は上の1本目の \texttt{dynamics}（放物線ランプ）を
+2段（(A) クエンチ ＋ (B) 放物線 tail）に置換する。3本目のホールドと基底状態は純放物線版と
+同一（キャッシュ再利用）。置換部の config:
+
+\begin{lstlisting}
+- dynamics:                     # (A) クエンチ 10mG -> 500uG, 4 w^-1 (5.8 ms)
+    duration: 4.0
+    dt: 0.002
+    B: {Bz: {from: 0.01, to: 5.0e-4, duration: 4.0}}
+    loss: {K3_per_m_si: [...  (13 成分)]}
+    save: {every: 500, psi: true, precision: f32}
+- dynamics:                     # (B) 放物線 tail 500uG -> 26uG, 19.62 w^-1 (28.4 ms)
+    duration: 19.62             #     = 純放物線の 500->26uG 区間と同一レート
+    dt: 0.002
+    B: {Bz: {piecewise: {times:  [0, 1.962, ..., 17.658, 19.62],
+                          values: [5.0e-4, ..., 3.074e-5, 2.6e-5]}}}
+    loss: {K3_per_m_si: [...]}
+    save: {every: 500, psi: true, precision: f32}
+\end{lstlisting}
+
+\section{後藤差分撮像}\label{sec:goto}
+量子化軸を $\pm\theta$（$\theta=16^\circ$）だけ $\hat x$ まわりに傾け、
+$R(\pm\theta)=e^{\mp i\theta F_x}$ をスピノルに作用させ、$m{=}{-}6$ 成分を取り出し、
+スケールした参照を引いて撮像軸 $y$ に沿って積分する:
+\begin{equation}
+\Delta n^{\pm}_{\mathrm{col}}(x,z)=\int\!dy\Big[\,\big|(R(\pm\theta)\psi)_{-6}\big|^2
+-C_p\,|\psi_{-6}|^2\Big],\qquad C_p=|R(\theta)_{-6,-6}|^2=\cos^{4F}(\theta/2)=0.79.
+\end{equation}
+奇/偶の組合せが横・縦スピンを分離する:
+\begin{equation}
+\mathrm{dif}_{\mathrm{col}}=\tfrac12(\Delta n^{+}-\Delta n^{-})\propto\Fx
+\ (\text{EdH／「市松」}),\quad
+\mathrm{sum}_{\mathrm{col}}=\tfrac12(\Delta n^{+}+\Delta n^{-})\propto\Fz
+\ (\text{「フラワー」}).
+\end{equation}
+
+\section{EdHカスケードと角運動量保存}
+磁場が下がると DDI がスピンカスケード $m{=}{-}6\to-5\to-4\to\cdots$ を駆動する
+（図~\ref{fig:cascade} 左）: $m{=}{-}6$ は $100\%$ から $\sim55$--$75\%$ へ減り\emph{振動}する。
+Stern--Gerlach 列像（図~\ref{fig:cascade} 右）では娘状態が\emph{リング状}に現れる ---
+軌道角運動量（渦）を持つ、spin$\to$orbital 転写のミクロなシグネチャである。
+
+スピン $\Fz$ と軌道 $\Lz$（$L_z=-i(x\partial_y-y\partial_x)$）の分解が真のEdHを裏付ける
+（図~\ref{fig:angmom}）:
+\begin{equation}
+\Jz=\Fz+\Lz=-6.000\ \text{が}\ 1/1.5\times10^{4}\ \text{の精度で保存},
+\end{equation}
+$\Fz$ が上昇（$-6\to-4.98$）する分 $\Lz$ が減少（$0\to-1.02$）し反位相。$m{=}{-}6$ の振動は
+\emph{本物のコヒーレントで可逆な} spin$\leftrightarrow$orbital スロッシングであり、一方向
+カスケードではない。（$K_3$ ロスで原子数は長いランプ中に $33\%$ 減るが、per-atom の $\Jz$ は
+影響を受けない。）
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.49\linewidth]{edh_mild_population_cascade.png}\hfill
+\includegraphics[width=0.49\linewidth]{edh_mild_sg_cascade.png}
+\caption{左: $m$成分ポピュレーションのカスケード。右: Stern--Gerlach 列像 $n_m(x,y)$;
+娘状態 $m{=}{-}5,{-}4,{-}3$ がリング（軌道角運動量）を形成。}
+\label{fig:cascade}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.70\linewidth]{edh_mild_angmom_conservation.png}
+\caption{per-atom のスピン $\Fz$ と軌道 $\Lz$。$\Jz=\Fz+\Lz$ は $-6.000$ で一定:
+コヒーレントな spin$\leftrightarrow$orbital 交換。}
+\label{fig:angmom}
+\end{figure}
+
+\section{市松模様の反転}
+後藤差分像 $\mathrm{dif}_{\mathrm{col}}(x,z)$ は四重極状（「市松」）パターンで、ホールド中に
+$4$回\emph{反転}する（符号反転は $t=98,112,124,137\,\wref$; 図~\ref{fig:cb}）。重要なのは
+\emph{大域的}横スピンが $\Fx=\langle F_y\rangle\approx10^{-8}\approx0$ である点で、横磁化は
+\emph{正味ゼロのテクスチャ}である。よって $\pm\theta$ 差分撮像だけがこれを可視化でき、
+空間一様の磁力計では何も見えない。
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.92\linewidth]{edh_mild_checkerboard_stills.png}
+\caption{後藤差分像の市松 $\mathrm{dif}_{\mathrm{col}}(x,z)\propto\Fx$。ホールド各時刻で
+赤青パターンが反転する（色つき枠が反転フレーム）。}
+\label{fig:cb}
+\end{figure}
+
+\section{クエンチ$+$放物線: 不活性域スキップが EdH を強める}
+カスケードは $\sim571\uG$ 以下でのみ立ち上がるので、$10\ \mathrm{mG}\!\to\!500\uG$ を
+クエンチ（$5.8\ms$）し、その後 $500\!\to\!26\uG$ を純放物線の tail と\emph{同一レート}
+（$28.4\ms$）で下げ、同一ホールドを行う。活性域のダイナミクスは定義上変わらず、不活性な
+高磁場のみをスキップする。結果（表~\ref{tab:cmp}、図~\ref{fig:cmpang}--\ref{fig:cmpcb}）は
+\emph{より強い}EdHである: 活性域に速く到達することで原子が温存され（ロス $20\%$ 対 $33\%$）、
+雲がより高密度になりDDIが強く、転写が大きくなる。しかも全体時間は短い（$121\ms$ 対 $217\ms$）。
+
+\begin{table}[h]\centering
+\begin{tabular}{lcc}
+\toprule
+& 純放物線 & クエンチ$+$放物線 \\\midrule
+$\Fz$ 到達（スピン）          & $-4.98$ & $\mathbf{-4.70}$\\
+$\Lz$ 到達（軌道）            & $-1.02$ & $\mathbf{-1.30}$\\
+$\Jz=\Fz+\Lz$                & $-6.000$ & $-6.000$\\
+$K_3$ 原子ロス                & $33\%$  & $\mathbf{20\%}$\\
+市松ピーク $\sum|\mathrm{dif}|$ & $3.59$ & $\mathbf{4.83\ (+35\%)}$\\
+市松反転回数                  & $4$ & $5$\\
+平均 $\mathrm{asym}$          & $+0.15$（フラワー寄り） & $\mathbf{-0.17}$（EdH優勢）\\
+全体時間                      & $217\ms$ & $\mathbf{121\ms}$\\
+\bottomrule
+\end{tabular}
+\caption{純放物線 対 クエンチ$+$放物線（$26\uG$ 到達時刻で整列）。}
+\label{tab:cmp}
+\end{table}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.70\linewidth]{compare_quench500_vs_parabolic_angmom.png}
+\caption{角運動量（$26\uG$ 到達で整列）。クエンチ（実線）はより大きな $|\Lz|$／高い $\Fz$ に
+到達。$\Jz\approx-6$ は両者共通。}
+\label{fig:cmpang}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.70\linewidth]{compare_quench500_vs_parabolic_checkerboard.png}
+\caption{市松振幅と符号付き射影 $cb(t)$。クエンチ版は市松が $35\%$ 大きい。両者とも
+同じ周期・位相で反転する。}
+\label{fig:cmpcb}
+\end{figure}
+
+\section{反転が表すもの: 集団スピン--軌道モード}
+市松は（定義上）横スピンのテクスチャなので、その反転は\emph{テクスチャのラーモア歳差}
+そのものである。これが単粒子歳差か集団モードか、また軌道 $\Lz$ 振動とどう関係するかを、
+ホールド期のデータ\emph{のみ}(ランプ区間は非定常/チャープなので除外)に、振幅が線形に
+ドリフトするsin関数 $A(t)\sin(2\pi t/T+\phi)+C$ を非線形最小二乗フィットし、独立に
+FFTピークとも突き合わせて周期を定量化した(pure: $t\in[90,148]\,\wref$, $n{=}59$;
+quench: $t\in[24,80]\,\wref$, $n{=}57$):
+\begin{equation}
+\begin{aligned}
+\text{pure parabolic:}\quad & T_{cb}=36.1\pm0.4\ms,\ \ T_{\Fz}=T_{\Lz}=36.9\pm0.3\ms
+  \quad(R^2=0.90\text{--}0.93)\\
+\text{quench+parabolic:}\quad & T_{cb}=38.5\pm0.5\ms,\ \ T_{\Fz}=T_{\Lz}=39.3\pm0.4\ms
+  \quad(R^2=0.91\text{--}0.93)
+\end{aligned}
+\end{equation}
+に対し $T_{\mathrm{Larmor}}(26\uG)=24\ms$。(FFTのみのピークはどちらも$\sim15\%$高め
+に出るが、これは$\lesssim2$周期しかないホールド窓でのスペクトル漏れと整合的で、時間領域
+フィットの方が信頼できるため上式を採用。) 各プロトコル内で $T_{cb}$, $T_{\Fz}$, $T_{\Lz}$
+はサブms精度で一致 --- 市松反転・軌道 $\Lz$ 振動・縦 $\Fz$ 振動は\emph{単一のコヒーレントな
+集団スピン--軌道モード}の3つの顔である。これは裸のラーモア歳差（$24\ms$）ではない: $\sim1.5$--$1.6$
+倍の遅れは 接触 $c_1$・DDI・二次ゼーマンのドレッシングであり、ダイナミクスが単粒子でなく
+相互作用駆動（EdH）であることを裏付ける。したがって「$\Lz$ 振動」と「スピン歳差」という
+2つの見方は同時に正しく、同一のモードを指している。
+
+さらに2プロトコルを直接比較すると新しい結果が出る: モード周期そのものが\emph{振幅依存}
+である。quench+parabolicの方が $|\Fz|,|\Lz|$ の到達量が大きく(表~\ref{tab:cmp})、
+pure parabolicより $\sim2.4\ms$ \emph{遅い}（$cb/\Fz/\Lz$平均で $36.5\to38.9\ms$）
+--- 両側のサブms精度の不確かさを踏まえると有意な差。これは固定の線形応答共鳴ではなく、
+非線形で自己無撞着な集団モード周波数(復元力がDDI/接触の平均場エネルギーに由来し、
+$m{=}{-}6$ からどれだけ駆動されたかに依存する)と整合的である。
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.74\linewidth]{edh_precession_vs_L.png}
+\caption{市松 $cb(t)$・$\Lz$（軌道）・$\Fz$（スピン）はすべて同一周期（$38\pm2\ms$）で
+振動し位相のみ異なる --- 単一の集団スピン--軌道モード。$24\ms$ の裸ラーモアとは別物。
+図中の「歳差」表記は緩い言い方で、実際は楕円的でほぼ直線的な振動（本文参照）。}
+\label{fig:prec}
+\end{figure}
+
+\section{結論}
+\begin{enumerate}\itemsep2pt
+  \item 後藤 $\pm16^\circ$ 差分撮像の市松（横 $\Fx$ テクスチャ）は EdH ダイナミクスで
+        \emph{周期的に反転}し、EdH（反転する）とフラワー相（反転しない）を判別する観測量となる。
+  \item この反転はコヒーレントな spin$\leftrightarrow$orbital 集団モード($T=38\pm2\ms$)の
+        一面であり、$\Jz$ は $2\times10^{-4}$ で保存される。円運動の歳差ではなく楕円的な振動。
+        赤方偏移は磁場の落とし方($5.8$--$130\ms$)に依らず頑健。
+  \item 不活性な高磁場域をクエンチで飛ばしてから放物線ランプを行うと、速いだけでなく
+        \emph{より強い}（ロス減 $\Rightarrow$ 高密度 $\Rightarrow$ 転写増、市松 $+35\%$）。
+\end{enumerate}
+補足アニメーション（\texttt{.mp4}, \texttt{figures/} 内）:
+\texttt{edh\_mild\_checkerboard\_inversion}, \texttt{edh\_mild\_absorption\_topview/sideview},
+\texttt{edh\_quench500\_checkerboard\_inversion}。
+
+\end{document}

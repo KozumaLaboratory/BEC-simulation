@@ -1,0 +1,59 @@
+# Hold-field sweep to discriminate H4 (magnetostatic, linear in B) from
+# H6 (two-level Rabi / avoided crossing, hyperbolic with a finite floor).
+# Identical to ramp_quench500_par.yaml except the parabola endpoint AND the hold
+# field are B_hold = 18 uG. Hold extended to 150 w^-1 (217 ms) for frequency
+# resolution; psi snapshots OFF (only Fz(t) is needed) so the runs are light.
+# GS is the same (10 mG, q=0, lambda=1.182) so the cache is shared -> instant.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_64.jld2
+- dynamics:
+    duration: 4.0
+    dt: 0.002
+    B:
+      Bz: {from: 0.01, to: 5.0e-4, duration: 4.0}
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 500, psi: false}
+- dynamics:
+    duration: 19.62
+    dt: 0.002
+    B:
+      Bz:
+        piecewise:
+          times: [0.0, 1.962, 3.924, 5.886, 7.848, 9.81, 11.772, 13.734, 15.696, 17.658, 19.62]
+          values: [0.0005, 0.00040842, 0.00032648, 0.00025418, 0.00019152, 0.0001385, 9.512e-05, 6.138e-05, 3.728e-05, 2.282e-05, 1.8e-05]
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: false}
+- dynamics:
+    duration: 150.0
+    dt: 0.002
+    B: {Bz: 1.8e-05 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 250, psi: false}

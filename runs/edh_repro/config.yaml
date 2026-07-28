@@ -1,0 +1,65 @@
+# FULL EXPERIMENT-REPRODUCTION EdH -- Julia SpinorBEC.jl side, IDENTICAL to
+# config/edh_repro.nml on the Eu-Fortran side.  Parameters verified against the
+# papers (Miyazawa BEC 2022, Matsui EdH Science 2026, Kawaguchi-Ueda Phys.Rep.
+# 520, Goto thesis):
+#   ground state at Bz = 0.3 mT = 3 G (fully polarized m=-6), sudden quench to
+#   the observed weak field Bz = 2.6 nT = 26 uG (2.6e-5 G), hold 40 ms.
+#   32^3->48^3? -> 48^3 / box 16 / trap (1,1,1.182) [= (110,110,130) Hz] /
+#   Eu151 / N=5e4 / a_s=110 a0 / c1_ratio=1/36 (c1>0 antiferro) / DDI zero-padded
+#   / no symmetry-breaking seed (DDI couples m=-6->m=-5) / f64 / save every 100.
+# NOT touching any SpinorBEC.jl source -- config only.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.1504
+
+mixins:
+  eu151_repro:
+    atom: Eu151
+    grid:
+      n: [48, 48, 48]
+      box: [16, 16, 16]
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.1818182]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.1504
+      c1_ratio: 0.027777777777777776
+
+pipeline:
+  - ground_state:
+      use: [eu151_repro]
+      method: lbfgs
+      initial_state: spin_coherent
+      init_state_params:
+        init_theta: 3.141592653589793
+        init_phi: 0.0
+      B:
+        Bz: 0.01 Gauss     # 10 mG prep (GS is prep-field-independent)
+      n_steps: 500
+      tol: 1.0e-09
+      ddi:
+        enabled: true
+        secular: false
+        padded: true
+        pad_factor: 2.0
+      cache: runs/edh_repro/cache/gs_3G_48.jld2
+
+  - dynamics:
+      duration: 27.646
+      dt: 0.001
+      B:
+        Bz: 2.6e-5 Gauss
+      ddi:
+        enabled: true
+        secular: false
+        padded: true
+        pad_factor: 2.0
+      seed_amplitude: 0.0
+      save:
+        every: 276
+        psi: true
+        precision: f32
