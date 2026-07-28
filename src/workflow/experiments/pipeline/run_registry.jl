@@ -560,6 +560,8 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                         f["env/$k"] = v
                     end
                     _save_units_metadata!(f, patched)
+                    haskey(result, :workspace) &&
+                        _save_interactions_metadata!(f, result.workspace)
                     _save_analyzer_results!(f, result)
                 end
                 _move_scratch_to_final(tmp_file, psi_file)
@@ -730,6 +732,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
                 f["env/$k"] = v
             end
             _save_units_metadata!(f, data)
+            haskey(result, :workspace) && _save_interactions_metadata!(f, result.workspace)
             _save_analyzer_results!(f, result)
         end
         _move_scratch_to_final(tmp_file, psi_file)
