@@ -98,6 +98,9 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :column_density_movie
         return _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
             pipeline_results)
+    elseif name == :vortex_density_movie
+        return _analyze_vortex_density_movie(psi, grid, atom, params, ws_prev,
+            pipeline_results)
     elseif name == :hpsi_export
         return _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     elseif name == :trap_population
