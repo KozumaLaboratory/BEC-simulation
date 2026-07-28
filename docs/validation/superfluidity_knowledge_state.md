@@ -1,6 +1,6 @@
 # Superfluidity & dipolar supersolidity — what we know, what we don't
 
-**As of 2026-07-28** (revised same day: four open questions closed). Knowledge-state map for one domain: measures of
+**As of 2026-07-29.** Revised twice since first written; six open questions closed, two corrections to earlier numbers. Knowledge-state map for one domain: measures of
 superfluidity in this simulator (`superfluid_fraction`) and the dipolar
 supersolid physics they are used on. Organised by *claim*, each with the
 evidence that supports it and the confidence that evidence buys — followed by
@@ -73,15 +73,16 @@ statement than the metric shipped with, and it is gated.
 | $Q_5(\epsilon_{dd})$ is correct | **proven** | $Q_5(0)=1$, $Q_5(1)=3^{5/2}/6$ analytic, $1+\tfrac32\epsilon^2$ small-$\epsilon$ |
 | **11 droplets is the energy minimum**, not just the wavelength noise selects | **measured** | period imposed at $L/n_d$ for $n_d = 8\ldots14$, each converged separately: $E$ has a clean minimum at $n_d=11$, rising $+3.3\times10^{-3}$ at 12 and $+1.2\times10^{-3}$ at 10 |
 | The preferred droplet count **drops as $\epsilon_{dd}$ rises** | **measured** | minimum moves 11 → 9 going from $\epsilon_{dd}=1.45$ to 1.55; the paper's 11 is quoted at 1.45 |
+| The modulated ground state is robust in **shape**, not only in period | **measured** | six deliberately broken seeds at $\epsilon_{dd}=1.45$ — alternating amplitude, dimerised, one droplet suppressed, uneven spacing, broadband noise — all relax to the *same* even 11-droplet array: $E = 4.541833$ to 9 digits, contrast 0.778, $f_s$ 0.598, peak-height spread 0.011. Only the uneven-spacing seed stops short, $2.4\times10^{-4}$ high and not fully relaxed |
 | Tube images converge as $1/L_t^{2}$, not $1/L_t^{3}$ | **measured** | three ratios match $1/p^2$ to four decimals, exclude $1/p^3$; physically, images are parallel *lines* of dipoles and line–line energy per unit length falls as $1/R^2$ (#118) |
 | Transverse padding by $p$ is exactly a box $p$ times wider | **proven** | agreement to $\le3\times10^{-12}$ across FFTs of different sizes |
 
 ### Not known
 
 - ~~Whether the droplet count is the ground state or a local minimum in droplet
-  number.~~ **Answered 2026-07-28** — moved to "known" below. What remains open is
-  narrower: the scan varies the period at fixed *shape*, so a qualitatively
-  different modulated state (unequal droplets, a defect) is still not excluded.
+  number.~~ **Answered 2026-07-28** — moved to "known" below.
+- ~~Whether a qualitatively different modulated *shape* beats the even array.~~
+  **Answered 2026-07-29: no**, also moved below.
 - **Absolute $E_{dd}$ for the isolated tube** is extrapolated ($1/L_t^2$
   Richardson), not exact. The unpadded $L_t=16$ value is 3.6 % low. *Would settle
   it:* a cylindrically truncated kernel — which has no closed-form Fourier
@@ -214,10 +215,10 @@ above. What they left:
    the curvature, since a textured state carries a spin current and $E(0)$ is not
    the parabola's vertex. The function currently returns the mass-flow answer and
    says so; it does not offer the spin channel at all.
-2. **Audit which stored `runs/` verdicts still hold** in current code, or stamp
-   each stored summary with its producing commit. The May results differ from
-   current code by far more than the coefficient fix.
-3. **Vary the modulated state's shape, not just its period** (unequal droplets, a
-   defect) — the period scan fixes the shape and so does not exclude those.
-4. **A cylindrically truncated dipolar kernel** to remove the residual $1/L_t^2$
-   tail in absolute $E_{dd}$ (§2).
+2. **Audit which stored `runs/` verdicts still hold** in current code. Summaries
+   now carry `_repo_commit` and `summary_provenance` reports it, but the 230
+   files that predate stamping cannot be retro-dated — for those the only
+   answer is to re-run. Nothing has done that.
+3. **A cylindrically truncated dipolar kernel** to remove the residual
+   $1/L_t^2$ tail in absolute $E_{dd}$ (§2). The only remaining item on the
+   type-C result.
