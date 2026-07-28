@@ -482,7 +482,10 @@ const _COST = Dict{String, Float64}(
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
+    "test_level2_strang_convergence.jl" => 24.0,   # measured 24.1s
+    "hamiltonian/test_spatial_lhy.jl" => 20.0,     # e₁(p) table = one BdG solve per bin
     "workflow/test_infrastructure.jl" => 15.0,
+    "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "test_level10_hpsi_self_consistency.jl" => 12.0,
     "workflow/test_autopilot.jl" => 12.0,

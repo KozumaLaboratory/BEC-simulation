@@ -272,8 +272,9 @@ variation `spatial.jl` reports at F=6, the omission is **2.3%** of the gradient
 norm; `test_lhy_gradient_all_modes.jl` pins that number so it cannot drift
 unnoticed. ITP and LBFGS therefore minimise slightly different functionals for
 `SpatialLHY` alone — LBFGS the true energy, ITP the diagonal approximation to
-it. Closing the gap belongs in the propagator (issue: spin-dependent SpatialLHY
-substep), not in a gradient that would then stop being the energy's derivative.
+it. Closing the gap belongs in the propagator — issue #131, which needs a
+per-voxel spin substep — not in a gradient that would then stop being the
+energy's derivative.
 
 `ŝ·F` uses the ladder form, from the SAME `fp_coeffs` and component convention
 as `_local_polarisation`: `(F₊ψ)_c = fp[c+1]·ψ_{c+1}`, `(F₋ψ)_c = fp[c]·ψ_{c-1}`,
