@@ -187,6 +187,7 @@ function _run_step(
         time_dep_interactions,
         magnetic_gradient,
         spinor_lhy=spinor_lhy_mode,
+        lhy_opts=get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts,
     )
 
     if temp_ratio !== nothing
