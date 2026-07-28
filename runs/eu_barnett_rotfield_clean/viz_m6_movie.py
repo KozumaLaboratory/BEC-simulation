@@ -13,13 +13,19 @@ arms; columns are the total column density then m = -6 ... 0. Two additions:
     marked defects in the suptitle. A discretised mass circulation is only
     approximately quantised; `STRICT` filters on |w - n|.
 
-Colour scale: each panel is normalised by its own max over the WHOLE movie, not
-per frame. Per-frame self-normalisation (which the static figure uses, correctly
-for one time) would make a panel that empties out look unchanged.
+Colour scale: each panel is self-normalised PER FRAME, exactly as
+fig_m6_spatial.py does. This is not a cosmetic choice. Fixing vmax over the
+whole movie instead pushes the late frames — which have lost ~37% of their atoms
+to K3 — into the bottom of the colormap, and the vortex core stops being
+visible: on the l=-1 arm at t=50 the core sits at 10% of peak, which reads as a
+hole against a per-frame scale and as uniform dark against a movie-wide one. The
+structure is the whole point, so it wins.
+Absolute scale is not lost: each panel's own max is printed, so decay is still
+readable. `NORM=movie` restores the fixed-scale behaviour.
 
   python runs/eu_barnett_rotfield_clean/viz_m6_movie.py [outfile.mp4]
 
-Env: FPS=30  SECONDS=10  DPI=120  STRICT=0.25  SUF=lossy_
+Env: FPS=30  SECONDS=10  DPI=120  STRICT=0.25  SUF=lossy_  NORM=frame|movie
 """
 import json
 import os
@@ -41,6 +47,7 @@ SECONDS = float(os.environ.get("SECONDS", "10"))
 DPI = int(os.environ.get("DPI", "120"))
 STRICT = float(os.environ.get("STRICT", "0.25"))
 SUF = os.environ.get("SUF", "lossy_")
+NORM = os.environ.get("NORM", "frame")
 
 ROWS = [("ellp1", r"$\ell=+1$", "l=+1"), ("ellp0", r"$\ell=0$", "l=0"),
         ("ellm1", r"$\ell=-1$", "l=-1")]
@@ -69,7 +76,7 @@ sel = np.linspace(0, n_frames - 1, n_target).round().astype(int)
 if len(np.unique(sel)) < n_frames:
     print(f"note: {n_frames} frames subsampled to {len(np.unique(sel))}")
 
-# Fixed per-panel scales over the whole movie (see module docstring).
+# Only used when NORM=movie (see module docstring).
 probe = sel[:: max(1, len(sel) // 10)]
 vmax = {(tag, comp): max(float(rd(tag, comp, i).max()) for i in probe) or 1.0
         for tag, _, _ in ROWS for comp, _ in COLS}
@@ -86,8 +93,12 @@ for r, (tag, rl, plain) in enumerate(ROWS):
         a.set_xticks([])
         a.set_yticks([])
         if comp in ("tot", "nmid"):
-            (p,) = a.plot([], [], "o", mfc="none", mec="w", ms=8, mew=1.4)
-            (n,) = a.plot([], [], "x", mec="cyan", ms=8, mew=1.4)
+            # RING the core, do not cover it. An `x` drawn on the defect sits
+            # exactly on top of the density hole it is pointing at — the core
+            # is ~2 cells across and the marker hid it completely. Open circles
+            # wider than the core, sign by colour: white +1, cyan -1.
+            (p,) = a.plot([], [], "o", mfc="none", mec="w", ms=17, mew=1.5)
+            (n,) = a.plot([], [], "o", mfc="none", mec="cyan", ms=17, mew=1.5)
             marks[(tag, comp)] = (p, n)
     ax[r, 0].set_ylabel(rl, fontsize=11)
 sup = fig.suptitle("", fontsize=10.5)
@@ -102,10 +113,13 @@ def draw(k):
         for comp, cl in COLS:
             d = rd(tag, comp, i)
             ims[(tag, comp)].set_data(d.T)
+            if NORM == "frame":
+                hi = float(d.max())
+                ims[(tag, comp)].set_clim(0.0, hi if hi > 0 else 1.0)
             if comp == "tot":
-                titles[(tag, comp)].set_text(f"{rl} total")
+                titles[(tag, comp)].set_text(f"{rl} total (max {d.max():.3g})")
             elif comp == "nmid":
-                titles[(tag, comp)].set_text("mid-plane total")
+                titles[(tag, comp)].set_text(f"mid-plane total (max {d.max():.3g})")
             else:
                 titles[(tag, comp)].set_text(f"{cl} ({100 * d.sum() / tsum:.0f}%)")
 
@@ -120,7 +134,8 @@ def draw(k):
             n.set_data(px[keep & (vq < 0)], py[keep & (vq < 0)])
         net = int(vq[keep].sum()) if keep.any() else 0
         parts.append(f"{plain}: {int(keep.sum())} vortices (net {net:+d})")
-    sup.set_text(f"t = {times[i]:.2f}   per-$m$ column density (own max over the movie)"
+    scale = "self-normalised per frame" if NORM == "frame" else "fixed over the movie"
+    sup.set_text(f"t = {times[i]:.2f}   per-$m$ column density ({scale})"
                  f"   —   mass-current vortices, $|w-n|<{STRICT}$   |   "
                  + "   ".join(parts))
     return []
