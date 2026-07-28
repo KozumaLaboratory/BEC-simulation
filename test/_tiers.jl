@@ -125,6 +125,7 @@ const FAST_TESTS = [
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
     "hamiltonian/test_lhy_energy_convention.jl",
     "hamiltonian/test_spatial_lhy.jl",
+    "hamiltonian/test_lhy_gradient_all_modes.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
@@ -555,6 +556,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_continuation.jl" => 58.0,
     "workflow/test_pipeline.jl" => 17.0,
     "workflow/test_infrastructure.jl" => 15.0,
+    "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "analysis/test_tof_multiframe.jl" => 9.5,
     "gpu/test_mixed_precision.jl" => 9.0,
