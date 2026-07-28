@@ -385,6 +385,10 @@ const FULL_EXTRA = [
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
     "gpu/test_superfluid_fraction_gpu.jl",
+    # Same bug class: a public analysis entry point that scalar-indexed a
+    # device array and threw. Lz is the observable the EdH/Barnett J_z ledger
+    # is written in, and those runs are on GPU.
+    "gpu/test_gpu_orbital_angular_momentum.jl",
     # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
