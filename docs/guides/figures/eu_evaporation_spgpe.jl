@@ -43,7 +43,12 @@ using SpinorBEC
 using Printf
 using DelimitedFiles
 
-const OUTDIR = joinpath(@__DIR__, "..", "..", "..", "figs", "eu_evaporation_optimization")
+# CSV destination. Defaults to the repo's figs/ dir; `SPINORBEC_FIGS_ROOT`
+# redirects it, which is what the TSUBAME submit script sets — the group's /gs/fs
+# allocation is nearly exhausted (994/1000 GB) while $HOME has 22 GB and the work
+# area 100 GB free, and a run that cannot write its own output is a wasted run.
+const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT",
+    joinpath(@__DIR__, "..", "..", "..", "figs", "eu_evaporation_optimization"))
 
 # norm-N couplings: the SPGPE noise amplitude assumes |ψ|² is the PHYSICAL
 # density, so N must NOT be folded into c₀ (see eu_shape_finite_t.md).
