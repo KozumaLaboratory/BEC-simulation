@@ -46,6 +46,16 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.jul
 export JULIAUP_DEPOT_PATH="${JULIAUP_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup}"
 export BR_CELL="${BR_CELL:-plus}"
 
+# Optional named geometry. `qsub -v` splits values on commas, so BR_N / BR_BOX
+# tuples CANNOT be passed through -v -- they silently expand into several bogus
+# variables and the job runs the default geometry. Use BR_VARIANT=<name> from
+# variants.sh instead.
+if [ -n "${BR_VARIANT:-}" ]; then
+  source runs/eu_barnett_redo/variants.sh
+  br_select_prod "$BR_VARIANT"
+  echo "variant=$BR_VARIANT n=$BR_N box=$BR_BOX dt=$BR_DT"
+fi
+
 source scripts/tsubame_setup.sh    # node-local NVMe SPINORBEC_SCRATCH_DIR — KEEP IT.
 
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
