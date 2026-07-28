@@ -36,20 +36,14 @@ run_variant() {
   tail -8 "runs/eu_barnett_redo/logs/probe_$tag.log"
 }
 
-declare -A VARIANTS=(
-  [base]="64,64,28|28,28,12|0|1.0e-3"    # the production geometry, at probe resolution
-  [zbox]="64,64,56|28,28,24|0|1.0e-3"    # z half-box 6 -> 12
-  [xybox]="92,92,28|40,40,12|0|1.0e-3"   # xy half-box 14 -> 20
-  [pad]="64,64,28|28,28,12|1|1.0e-3"     # image-free DDI, box unchanged
-  [dt]="64,64,28|28,28,12|0|5.0e-4"      # dt halved, box unchanged
-)
+source runs/eu_barnett_redo/variants.sh
 
 TAGS=("$@")
-[[ ${#TAGS[@]} -eq 0 ]] && TAGS=(base pad zbox xybox dt)
+[[ ${#TAGS[@]} -eq 0 ]] && TAGS=(base pad zbox xybox dtx)
 
 for tag in "${TAGS[@]}"; do
-  IFS='|' read -r n box pad dt <<<"${VARIANTS[$tag]}"
-  run_variant "$tag" "$n" "$box" "$pad" "$dt"
+  br_select_variant "$tag"
+  run_variant "$tag" "$BR_N" "$BR_BOX" "$BR_PAD" "$BR_DT"
 done
 
 echo

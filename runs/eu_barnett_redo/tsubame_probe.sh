@@ -2,9 +2,11 @@
 # One geometry-probe cell on TSUBAME. Same driver as production; the variant is
 # passed in through the environment (see probe_leak.sh for the variant table).
 #
-#   qsub -g tga-kozuma-kouhi -N br_base \
-#        -v BR_TAG=_probe_base,BR_N=64\,64\,28,BR_BOX=28\,28\,12,BR_PAD=0,BR_DT=1.0e-3 \
+#   qsub -g tga-kozuma-kouhi -N br_base -v BR_VARIANT=base \
 #        runs/eu_barnett_redo/tsubame_probe.sh
+#
+# The variant is looked up here rather than passed as geometry, because
+# `qsub -v` splits its argument on commas and BR_N=64,64,28 arrives as 64.
 #
 # h_rt is 1 h, not the production 6 h: probes schedule in minutes at that size,
 # and the ledger is flushed on every observation, so a walltime kill still
@@ -27,6 +29,9 @@ export BR_CELL="${BR_CELL:-plus}"
 export BR_FRAMES="${BR_FRAMES:-0}"
 export BR_T_STIR="${BR_T_STIR:-10.0}"
 export BR_T_QUENCH="${BR_T_QUENCH:-20.0}"
+
+source runs/eu_barnett_redo/variants.sh
+br_select_variant "${BR_VARIANT:?set BR_VARIANT to a name from variants.sh}"
 
 source scripts/tsubame_setup.sh    # node-local NVMe SPINORBEC_SCRATCH_DIR — KEEP IT.
 
