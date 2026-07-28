@@ -98,10 +98,24 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 # and bench/micro_spin_taylor.jl (new — sweeps the Horner degree so the
 # compute-vs-memory regime is measured, not assumed).
 #
-# Caveat on this card: FP64 runs at 1/64 rate, so the Horner body dominates
-# locally where on an H100 (1/2 rate) the same step is memory- and launch-bound.
-# Items (1) and (2) below are the local wins; (3) and (4) are the ones that
-# matter on TSUBAME. None of the four has been measured on an H100.
+# H100 (TSUBAME gpu_1, job 8290268 — both trees back to back on the SAME GPU):
+#
+#   64³   4.394 → 2.028 ms/step   2.17×      GPU busy 3.87 → 1.87 ms
+#   128³ 29.755 → 14.224 ms/step  2.09×      GPU busy 29.2 → 14.19 ms
+#
+# The fused half-step alone, in-process A/B (bench/rtp_fusion_ab.jl):
+#   64³  3.585 → 2.024 ms/step  1.77×
+#   128³ 26.145 → 14.252       1.83×
+# i.e. it is worth 1.8× on the H100 against 1.17× on the consumer card, because
+# there the step is memory-bound and locally it is FP64-compute-bound. Read the
+# per-item numbers below with that in mind: the local ranking is not the
+# production ranking, and only the end-to-end figures above are H100-measured.
+#
+# Side effect worth knowing: the midpoint predictor-corrector used to cost 46 %
+# of the step at 128³ and now costs ~1 %, because both of its passes share one
+# mean-field evaluation. The 2nd-order mean-field treatment is now nearly free.
+# (The knob's "no midpoint" arm is UNFUSED — psi_mf is what enables the fusion —
+# so that percentage compares two different paths and is not a clean isolate.)
 #
 # done 2026-07-29 (1): `z / T(k)` in the Horner body was two FP64 divisions per
 #   degree per lane. Tabulated as the REAL `scale/k` with the ∓i folded in as a

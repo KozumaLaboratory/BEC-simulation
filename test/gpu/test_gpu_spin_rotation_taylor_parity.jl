@@ -14,6 +14,7 @@
 # running on the same device against the same input.
 
 using Test
+using Random
 using LinearAlgebra: norm
 import CUDA
 using SpinorBEC
@@ -136,14 +137,29 @@ else
 
     # A rotation is unitary; the Taylor truncation must not leak norm at the
     # production angle. (The imaginary-time arm is deliberately not unitary.)
+    #
+    # This is also the gate on `_SPIN_TAYLOR_TOL[]`. Since the degree is chosen
+    # PER VOXEL, that tolerance is binding rather than slack — at 1e-9 the drift
+    # here is 9.6e-13, at 1e-13 it is 2.2e-16 — so the bound below is set at
+    # machine precision on purpose: loosening the tolerance turns it red instead
+    # of quietly costing four orders of accuracy. Seeded, because an unseeded
+    # draw put the old 1e-12 bound within a factor 1.05 of the measured value
+    # and the test flickered.
     @testset "Taylor rotation preserves norm (real time)" begin
         sm = spin_matrices(6)
+        Random.seed!(20260729)
         psi0 = CUDA.CuArray(randn(ComplexF64, 4096, 1, 1, 13))
         n0 = sum(abs2, psi0)
         v() = CUDA.CuArray(6.0 .* randn(Float64, 4096, 1, 1))
+        vx, vy, vz = v(), v(), v()
+        # The angle is in the range where the degree really varies across the
+        # box, so a per-voxel degree that was too small would show up here.
+        R = 0.005 * sqrt(maximum(Array(vx) .^ 2 .+ Array(vy) .^ 2 .+
+                                 Array(vz) .^ 2)) * 6
+        @test 0.3 < R < 1.5
         p = copy(psi0)
-        SpinorBEC._apply_ddi_rotation!(p, v(), v(), v(), sm, 0.005, 3)
+        SpinorBEC._apply_ddi_rotation!(p, vx, vy, vz, sm, 0.005, 3)
         CUDA.synchronize()
-        @test abs(sum(abs2, p) / n0 - 1) < 1e-12
+        @test abs(sum(abs2, p) / n0 - 1) < 1e-14
     end
 end

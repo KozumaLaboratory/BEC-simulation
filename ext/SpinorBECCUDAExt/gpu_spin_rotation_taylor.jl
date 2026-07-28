@@ -73,11 +73,23 @@ end
 # mostly dilute tail, and paying the peak's degree everywhere is most of the
 # arithmetic (bench/micro_spin_taylor.jl).
 const _SPIN_TAYLOR_ENABLED = Ref(true)
-const _SPIN_TAYLOR_TOL = Ref(1.0e-9)   # backward-error target
-# 1e-9 measured: parity vs the Euler-exact CPU rotation 3.5e-13, ≈300× under the
-# 1e-10 GPU=CPU gate. The first omitted term R^{K+1}/(K+1)! is ~2e-12 per
-# rotation at production R, i.e. 6-7 orders below the split-step's own O(dt²)
-# error. The parity gate is the safety net: relax too far and it goes red.
+const _SPIN_TAYLOR_TOL = Ref(1.0e-13)  # backward-error target
+# 1e-13 because the per-voxel degree made this number BINDING. It used to be
+# slack: one degree was chosen from max|v| and then applied everywhere, so
+# every voxel below the peak got far more accuracy than 1e-9 asked for, and the
+# delivered norm drift was 3e-15 - 7e-14 per rotation. Choosing per voxel
+# collects that slack as speed — and at 1e-9 the drift duly rose to 9.6e-13,
+# a hundredfold, while still satisfying the stated contract. That is the
+# failure mode of a tolerance nobody was standing on.
+#
+# Measured at 64³ D=13, peak R ≈ 0.8 (norm drift per rotation / rel-vs-Euler):
+#   1e-9  → 9.6e-13 / 4.3e-12      1e-11 → 2.1e-15 / 3.8e-14
+#   1e-13 → 2.2e-16 / 3.0e-15      1e-15 → 2.2e-16 / 3.0e-15  (saturated)
+# so 1e-13 buys machine precision — better than the pre-per-voxel code — and
+# tightening past it buys nothing. It costs 1.088× on a card where the Horner
+# is FP64-compute-bound, and ~nothing on an H100 where the kernel is
+# memory-bound (time flat in the degree). The parity gate is the safety net:
+# relax this and it goes red.
 #
 # Angle above which a voxel halves its rotation and applies it twice (repeated
 # squaring). Production R is 0.01–0.2 so no voxel ever halves; the branch exists
