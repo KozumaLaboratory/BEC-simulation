@@ -37,8 +37,13 @@ REPO="${BR_REPO:-$PWD}"
 cd "$REPO"
 echo "REPO=$REPO  branch=$(git branch --show-current 2>/dev/null)  HEAD=$(git rev-parse --short HEAD 2>/dev/null)"
 
-export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia
-export JULIAUP_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.juliaup
+# The shared depot lives on the group volume. When that volume is full, Julia
+# cannot write precompile output and dies with an LLVM "IO failure on output
+# stream: Disk quota exceeded" -- so the depot has to be overridable too, not
+# just the results. `JULIA_DEPOT_PATH=$HOME/.julia` runs entirely off the
+# separate 25 GB home quota.
+export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.julia}"
+export JULIAUP_DEPOT_PATH="${JULIAUP_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup}"
 export BR_CELL="${BR_CELL:-plus}"
 
 source scripts/tsubame_setup.sh    # node-local NVMe SPINORBEC_SCRATCH_DIR — KEEP IT.

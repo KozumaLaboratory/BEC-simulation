@@ -51,9 +51,10 @@ struct LHYTableOpts
     n_max::Float64
     n_points::Int
     n_bins::Int
+    n_atoms::Int
 end
-LHYTableOpts(; n_max::Float64=NaN, n_points::Int=200, n_bins::Int=12) =
-    LHYTableOpts(n_max, n_points, n_bins)
+LHYTableOpts(; n_max::Float64=NaN, n_points::Int=200, n_bins::Int=12,
+    n_atoms::Int=1) = LHYTableOpts(n_max, n_points, n_bins, n_atoms)
 
 function make_workspace(;
     grid::Grid{N, T},
@@ -714,7 +715,7 @@ function _build_spinor_lhy(::Val{:spatial}, atom, ws, psi_init, c_dd, enable_ddi
     tbl = compute_spatial_lhy(;
         psi_init, F=atom.F, interactions=ws,
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-        n_bins=opts.n_bins)
+        n_bins=opts.n_bins, n_atoms=opts.n_atoms)
     tbl === nothing ? _full_bdg() : tbl
 end
 
@@ -723,7 +724,7 @@ function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, 
     compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws[0], c1=ws[1],
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi, opts)
@@ -732,7 +733,7 @@ function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_dd
     compute_spinor_lhy_table(;
         spinor=spinor_init, F=atom.F, interactions=ws,
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
-        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 # F-generic polar contact LHY (paper #1, contact-only). ~1000× faster than
@@ -742,7 +743,7 @@ function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enab
     _warn_lhy_texture(:polar_contact, psi_init, atom.F)
     compute_spinor_lhy_polar_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
-        n_points=opts.n_points)
+        n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 # FM-phase contact LHY (paper #2 contact-only piece). Single-mode collapse at
@@ -752,7 +753,7 @@ function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_
     _warn_lhy_texture(:fm_contact, psi_init, atom.F)
     compute_spinor_lhy_fm_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
-        n_points=opts.n_points)
+        n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 # Stage C scalar reduction: FM single-mode contact LHY × Lima-Pelster Q_5(eps_dd).
@@ -770,7 +771,7 @@ function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_
     eps_dd = abs(g_2F) > 1e-12 ? abs(c_dd_eff) * atom.F^2 / (3.0 * abs(g_2F)) : 0.0
     compute_spinor_lhy_fm_dipolar(;
         F=atom.F, g_dict=g_dict, eps_dd=eps_dd, n_max=_lhy_n_max(psi_init, opts),
-        n_points=opts.n_points)
+        n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 # F-generic polar contact + DDI LHY (paper #1 with dipolar extension).
@@ -807,7 +808,7 @@ function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enab
     eps_tilde_dd = abs(delta_1) > 1e-12 ? abs(c_dd_eff) / abs(delta_1) : 0.0
     compute_spinor_lhy_polar_dipolar(;
         F=atom.F, g_dict=g_dict, eps_tilde_dd=eps_tilde_dd,
-        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points)
+        n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
 # F=6 I_h closed form (Stage D). Universal `c_0^(5/2) + 3|λ_spin|^(5/2)` with
@@ -828,5 +829,5 @@ function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
     compute_spinor_lhy_icosahedral(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
-        n_points=opts.n_points)
+        n_points=opts.n_points, n_atoms=opts.n_atoms)
 end

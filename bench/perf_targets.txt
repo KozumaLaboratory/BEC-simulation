@@ -93,6 +93,28 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   + order-2 validated, but no production path calls it. Wiring it into the
 #   RTP loop is worth more than any further kernel tuning.
 #
+# === The RTP arc so far, end to end (2026-07-29) ===
+# All six numbers from ONE H100 (TSUBAME gpu_1), the SAME instrument
+# (bench/profile_rtp.jl — which had to be copied into the pre-#142 tree, since
+# that file was itself added by #142), Eu151 F=6 (D=13) F64 + DDI + midpoint.
+#
+#   checkpoint                          64³            128³
+#   pre-#142   035275b6              6.009 ms      43.721 ms
+#   post-#142  2de5f947              4.364          29.795      1.38× / 1.47×
+#   post-#148  (main)                2.043          14.556      2.14× / 2.05×
+#   ------------------------------------------------------------------
+#   cumulative                                                  2.94× / 3.00×
+#
+# GPU-busy over the same span: 5.52 → 1.91 ms at 64³, 42.79 → 14.50 at 128³.
+# At 128³ the GPU is now busy 98 % of wall (saturated); at 64³ only 56 %, so
+# that size is partly launch-bound and has little kernel headroom left.
+#
+# Note for whoever compares against the Round-8 entry below: its post-#142
+# numbers reproduce here (4.39 vs 4.364, 30.0 vs 29.795) but its pre-#142 ones
+# are 10-14 % higher than measured here (6.60 vs 6.009, 49.7 vs 43.721), so it
+# credits #142 with 1.51×/1.66× where this run says 1.38×/1.47×. The table
+# above is the one measured in a single job on a single GPU; prefer it.
+#
 # === Round 9 (2026-07-29, RTP on an RTX 5070 Ti, 64³ Eu151 D=13 F64 + DDI) ===
 # Measured with bench/profile_rtp.jl (knob decomposition + CUDA kernel table)
 # and bench/micro_spin_taylor.jl (new — sweeps the Horner degree so the
