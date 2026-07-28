@@ -6,7 +6,8 @@
 # `_SPIN_TAYLOR_ENABLED[]`:
 #
 #   Euler  — the exact 5-stage kernel (9 HBM passes over ψ: 5 phase + 4 gemm)
-#   Taylor — the shared adaptive Taylor-Horner warp kernel (2 passes)
+#   Tay/warp   — shared adaptive Taylor-Horner, one component per LANE (2 passes)
+#   Tay/thread — same recurrence, one VOXEL per thread (coalesced ψ access)
 #
 # Same process, so device clocks, cuFFT plans and the JIT are common-mode and
 # the ratio is the thing being measured rather than a difference of two jobs.
@@ -40,8 +41,9 @@ function build(n; c1_ratio=0.05, dt=1e-4)
     (ws, psi)
 end
 
-function arm!(ws, psi0, taylor::Bool, k)
-    Ext._SPIN_TAYLOR_ENABLED[] = taylor
+function arm!(ws, psi0, mode::Symbol, k)
+    Ext._SPIN_TAYLOR_ENABLED[] = mode !== :euler
+    Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = mode === :taylor_thread
     copyto!(ws.state.psi, psi0)
     ws.state.t = 0.0
     ws.state.step = 0
@@ -68,24 +70,29 @@ println("RTP GPU A/B — Eu151 F=6 (D=13), F64, DDI + c₀ + c₁, midpoint on")
 println("  device: ", CUDA.name(CUDA.device()),
     "  free/total ", round(CUDA.available_memory() / 2^30; digits=1), "/",
     round(CUDA.total_memory() / 2^30; digits=1), " GiB")
-@printf("\n%6s %14s %14s %9s %14s\n",
-    "grid", "Euler ms/step", "Taylor ms/step", "speedup", "max|Δψ|/|ψ|∞")
+@printf("\n%6s %11s %11s %11s %9s %9s %11s\n", "grid",
+    "Euler", "Tay/warp", "Tay/thread", "sp(warp)", "sp(thr)", "max|Δψ|/|ψ|∞")
 for n in SIZES
     ws, psi0 = build(n)
-    t_eul, p_eul = arm!(ws, psi0, false, NSTEP)
-    t_tay, p_tay = arm!(ws, psi0, true, NSTEP)
-    rel = maximum(abs.(p_tay .- p_eul)) / maximum(abs.(p_eul))
-    @printf("%5d³ %14.3f %14.3f %8.2f× %14.2e\n", n, t_eul, t_tay, t_eul / t_tay, rel)
+    t_eul, p_eul = arm!(ws, psi0, :euler, NSTEP)
+    t_war, p_war = arm!(ws, psi0, :taylor_warp, NSTEP)
+    t_thr, p_thr = arm!(ws, psi0, :taylor_thread, NSTEP)
+    scale = maximum(abs.(p_eul))
+    rel = max(maximum(abs.(p_war .- p_eul)), maximum(abs.(p_thr .- p_eul))) / scale
+    @printf("%5d³ %11.3f %11.3f %11.3f %8.2f× %8.2f× %11.2e\n",
+        n, t_eul, t_war, t_thr, t_eul / t_war, t_eul / t_thr, rel)
     flush(stdout)
     ws = nothing
     p_eul = nothing
-    p_tay = nothing
+    p_war = nothing
+    p_thr = nothing
     GC.gc()
     CUDA.reclaim()
 end
 
-# Kernel breakdown of the production (Taylor) path at the largest size.
+# Kernel breakdown of the production path at the largest size.
 Ext._SPIN_TAYLOR_ENABLED[] = true
+Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = true
 let n = SIZES[end]
     ws, psi0 = build(n)
     copyto!(ws.state.psi, psi0)

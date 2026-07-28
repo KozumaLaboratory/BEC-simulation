@@ -23,17 +23,21 @@ if !CUDA.functional()
 else
     const Ext = Base.get_extension(SpinorBEC, :SpinorBECCUDAExt)
 
-    # exp(z·v·F) via each realization, same input.
-    function _rotate(taylor::Bool, sm, psi0, vx, vy, vz, dt, it)
-        old = Ext._SPIN_TAYLOR_ENABLED[]
-        Ext._SPIN_TAYLOR_ENABLED[] = taylor
+    # exp(z·v·F) via each realization, same input. `mode` selects the exact
+    # Euler 5-stage or one of the two Taylor addressing schemes (component per
+    # warp lane vs voxel per thread) — both are the same recurrence, and both
+    # must match Euler, so a defect in either layout is visible here.
+    function _rotate(mode::Symbol, sm, psi0, vx, vy, vz, dt, it)
+        old = (Ext._SPIN_TAYLOR_ENABLED[], Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[])
+        Ext._SPIN_TAYLOR_ENABLED[] = mode !== :euler
+        Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = mode === :taylor_thread
         try
             p = copy(psi0)
             SpinorBEC._apply_ddi_rotation!(p, vx, vy, vz, sm, dt, 3; imaginary_time=it)
             CUDA.synchronize()
             return p
         finally
-            Ext._SPIN_TAYLOR_ENABLED[] = old
+            Ext._SPIN_TAYLOR_ENABLED[], Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = old
         end
     end
 
@@ -49,11 +53,12 @@ else
                     vx = CUDA.CuArray(T(scale) .* randn(T, n, 1, 1))
                     vy = CUDA.CuArray(T(scale) .* randn(T, n, 1, 1))
                     vz = CUDA.CuArray(T(scale) .* randn(T, n, 1, 1))
-                    eul = _rotate(false, sm, psi0, vx, vy, vz, dt, it)
-                    tay = _rotate(true, sm, psi0, vx, vy, vz, dt, it)
-                    rel = norm(Array(tay) .- Array(eul)) / norm(Array(eul))
+                    eul = _rotate(:euler, sm, psi0, vx, vy, vz, dt, it)
                     tol = T === Float64 ? 1e-10 : 5e-5
-                    @test rel < tol
+                    for mode in (:taylor_warp, :taylor_thread)
+                        tay = _rotate(mode, sm, psi0, vx, vy, vz, dt, it)
+                        @test norm(Array(tay) .- Array(eul)) / norm(Array(eul)) < tol
+                    end
                     # The rotation actually moved the state — a no-op kernel
                     # would pass the parity check above trivially.
                     @test norm(Array(eul) .- Array(psi0)) / norm(Array(psi0)) > 1e-6
@@ -70,19 +75,21 @@ else
         n = 12
         psi0 = CUDA.CuArray(randn(ComplexF64, n, n, n, D) ./ 10)
         for it in (false, true), c1 in (0.5, -0.5)
-            outs = map((false, true)) do taylor
-                old = Ext._SPIN_TAYLOR_ENABLED[]
-                Ext._SPIN_TAYLOR_ENABLED[] = taylor
+            outs = map((:euler, :taylor_warp, :taylor_thread)) do mode
+                old = (Ext._SPIN_TAYLOR_ENABLED[], Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[])
+                Ext._SPIN_TAYLOR_ENABLED[] = mode !== :euler
+                Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = mode === :taylor_thread
                 try
                     p = copy(psi0)
                     apply_spin_mixing_step!(p, sm, c1, 0.01, 3; imaginary_time=it)
                     CUDA.synchronize()
                     Array(p)
                 finally
-                    Ext._SPIN_TAYLOR_ENABLED[] = old
+                    Ext._SPIN_TAYLOR_ENABLED[], Ext._SPIN_TAYLOR_THREAD_PER_VOXEL[] = old
                 end
             end
             @test norm(outs[2] .- outs[1]) / norm(outs[1]) < 1e-10
+            @test norm(outs[3] .- outs[1]) / norm(outs[1]) < 1e-10
             @test norm(outs[1] .- Array(psi0)) / norm(Array(psi0)) > 1e-6
         end
     end

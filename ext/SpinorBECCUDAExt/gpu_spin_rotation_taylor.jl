@@ -145,6 +145,72 @@ end
     nothing
 end
 
+# --- Taylor–Horner thread kernel (one VOXEL per thread) ---
+#
+# Same recurrence as the warp variant; the difference is purely how ψ is
+# addressed. ψ is `(N_spatial, D)` column-major, so component c of voxel i sits
+# at `i + (c-1)·N`: with one component per LANE the 13 lanes of a voxel touch 13
+# addresses N·16 B apart, and a warp issues 13 separate 32-byte transactions
+# instead of contiguous 128-byte lines. Measured on H100 at 128³ that capped the
+# kernel at ~0.93 TB/s while the (thread-per-voxel, coalesced) diagonal kernel
+# reached ~2.2 TB/s on the same array.
+#
+# One voxel per thread makes consecutive threads read consecutive `P[i, c]`, so
+# each component sweep is fully coalesced. The price is register pressure: the
+# whole spinor must stay live (ψ₀ and w, 2·D complex), which is why this is a
+# separate kernel selected by `_SPIN_TAYLOR_THREAD_PER_VOXEL[]` rather than a
+# replacement — at large D the warp variant may still win.
+@inline function _spin_taylor_thread_kernel!(
+    P, vx, vy, vz, mz, sxu, syu, z::Complex{T}, K::Int32, ::Val{D},
+) where {T, D}
+    CT = Complex{T}
+    i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+    i > size(P, 1) && return nothing
+
+    Vx = @inbounds vx[i]
+    Vy = @inbounds vy[i]
+    Vz = @inbounds vz[i]
+
+    # Band of A = v·F. `d[c]` = A[c,c], `b[c]` = A[c,c+1] (b[D] ≡ 0);
+    # A[c+1,c] = conj(b[c]) since A is Hermitian.
+    d = ntuple(c -> Vz * (@inbounds mz[c]), Val(D))
+    b = ntuple(c -> Vx * (@inbounds sxu[c]) + Vy * (@inbounds syu[c]), Val(D))
+
+    psi0 = ntuple(c -> (@inbounds P[i, c]), Val(D))
+    w = psi0
+    k = K
+    while k >= one(Int32)
+        zk = z / T(k)
+        wl = w
+        w = ntuple(
+            c -> psi0[c] + zk * (
+                d[c] * wl[c] +
+                b[c] * (c < D ? wl[c + 1] : zero(CT)) +
+                (c > 1 ? conj(b[c - 1]) * wl[c - 1] : zero(CT))
+            ),
+            Val(D),
+        )
+        k -= one(Int32)
+    end
+
+    _store_spinor!(P, i, w, Val(D))
+    nothing
+end
+
+# Compile-time-unrolled store. A `for c in 1:D` loop would index the tuple `w`
+# with a runtime value, which forces it out of registers and into local memory —
+# the spill this kernel exists to avoid.
+@inline _store_spinor!(P, i, w, ::Val{0}) = nothing
+@inline function _store_spinor!(P, i, w, ::Val{C}) where {C}
+    _store_spinor!(P, i, w, Val(C - 1))
+    @inbounds P[i, C] = w[C]
+    nothing
+end
+
+# Which addressing scheme the rotation uses. Both are the same recurrence and
+# agree to round-off; the parity gate covers both.
+const _SPIN_TAYLOR_THREAD_PER_VOXEL = Ref(true)
+
 """
     _apply_spin_rotation_taylor!(P, vx, vy, vz, coef, z, K, Val(D))
 
@@ -155,6 +221,13 @@ function _apply_spin_rotation_taylor!(
     P, vx, vy, vz, coef::SpinTridiagCoef{T}, z::Complex{T}, K::Integer, ::Val{D},
 ) where {T, D}
     N = size(P, 1)
+    if _SPIN_TAYLOR_THREAD_PER_VOXEL[]
+        threads = 128
+        blocks = cld(N, threads)
+        CUDA.@cuda threads = threads blocks = blocks _spin_taylor_thread_kernel!(
+            P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, z, Int32(K), Val(D))
+        return nothing
+    end
     voxels_per_block = 16
     threads = 256
     blocks = cld(N, voxels_per_block)
