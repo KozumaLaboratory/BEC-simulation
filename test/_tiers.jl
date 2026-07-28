@@ -33,6 +33,7 @@ const FAST_TESTS = [
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
     "workflow/test_run_root_env.jl",
+    "workflow/test_config_zeeman_seed_agreement.jl",
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",

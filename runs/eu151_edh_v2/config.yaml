@@ -76,7 +76,7 @@ pipeline:
       use: [eu151_matsui_phys]
       ddi: {enabled: true, secular: true}                        # time-averaged at strong B
       lhy: {kind: none}                                          # scalar LHY = no-LHY at F=6
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}              # = -1 μT (Matsui prep, signed)
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}              # = -1 μT (Matsui prep, signed)
       initial_state: m_minus_F
       init_sigma: 1.5
       dt: 0.005
@@ -88,7 +88,7 @@ pipeline:
       duration: 0.14
       dt: 0.0005
       B:
-        Bz: {from: -0.01, to: -2.6e-5, duration: 0.14}
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.14}
         theta: 0.0
         phi: 0.0
       ddi: {enabled: true, secular: false}                       # full MDDI as B drops
@@ -101,7 +101,7 @@ pipeline:
   - dynamics:
       duration: 27.646
       dt: 0.005
-      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}             # = -2.6 nT (Matsui weak)
+      B: {Bz: "2.6e-5 Gauss", theta: 0.0, phi: 0.0}             # = -2.6 nT (Matsui weak)
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       loss:

@@ -91,7 +91,7 @@ pipeline:
         secular: false                   # [P5] non-secular regime (ω_L/ω_DDI = 0.15 per T72 §3.4)
       lhy: {kind: scalar}                # FM stretched state; scalar LHY appropriate
       B:
-        Bz: "-0.01 Gauss"                # 1.0 μT FM-stabilising field; negative sign for m_minus_F initial_state per T77 critic §7.2 Option A (ITP at p_dimless<0 energetically prefers m_F=-F)
+        Bz: "0.01 Gauss"                # 1.0 μT FM-stabilising field; negative sign for m_minus_F initial_state per T77 critic §7.2 Option A (ITP at p_dimless<0 energetically prefers m_F=-F)
         theta: 0.0                       # quantisation axis +z (Matsui polarisation convention)
         phi: 0.0
       gauge_fix: false
