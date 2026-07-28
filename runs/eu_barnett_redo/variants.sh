@@ -38,6 +38,7 @@ declare -A BR_VARIANTS=(
 declare -A BR_PROD_VARIANTS=(
   [prod_dx22]="128,128,80|28.0,28.0,18.0|0|1.0e-3|NaN"    # current production, dx 0.22
   [prod_dx175]="160,160,100|28.0,28.0,18.0|0|1.0e-3|NaN"  # dx 0.175, 2x the cells
+  [prod_dx146]="192,192,120|28.0,28.0,18.0|0|1.0e-3|NaN"  # dx 0.146, third convergence point
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
