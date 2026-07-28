@@ -224,6 +224,35 @@ function _inspect_loaded(raw::AbstractDict, path::String;
     normalised = deepcopy(raw_dict)
     warnings = ConfigWarning[]
 
+    # `dealias:` is a real top-level block, but it never reaches the schema:
+    # the runner pops it and applies it to global Refs (run_registry.jl), and
+    # strict validation rejects every top-level key it does not recognise. So
+    # inspecting a config without popping it first reported a schema ERROR for
+    # a config that runs fine — on ~20 of them, including ones already run on
+    # TSUBAME. A preflight that fails valid configs is worse than none: this
+    # severity feeds the autopilot gate.
+    #
+    # Applied rather than merely popped, because `auto_dt` tightens `dt` in the
+    # pipeline and inspect should report the dt the run will actually use. The
+    # Refs are restored immediately — inspect stays a read-only operation.
+    try
+        was_enabled, was_k_cut = apply_dealias_block!(normalised)
+        restore_dealias_refs!(was_enabled, was_k_cut)
+    catch e
+        push!(
+            warnings,
+            ConfigWarning(
+                :dealias_block_invalid, :error, 0,
+                "dealias block rejected",
+                sprint(showerror, e),
+                "Fix the `dealias:` block; the runner will throw on it too.",
+                Dict{String, Any}("exception" => string(typeof(e))),
+            ),
+        )
+        return ConfigInspection(path, raw_dict, normalised,
+            StepInspection[], warnings)
+    end
+
     # Run the same normalize+validate pass as load_config.
     try
         _normalize_and_validate!(normalised; strict)
