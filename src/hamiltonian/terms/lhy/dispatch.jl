@@ -64,6 +64,7 @@ function compute_spinor_lhy_polar_two_channel(;
     c_dd::Float64=0.0,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
 
@@ -73,7 +74,7 @@ function compute_spinor_lhy_polar_two_channel(;
     density_coef = is_active(c0) ? abs(c0)^(5 / 2) * Q5 : 0.0
     spin_coef = is_active(c1) ? 2.0 * F * abs(c1)^(5 / 2) : 0.0
 
-    _tabulate_lhy(PolarTwoChannelLHY; n_max, n_points) do n
+    _tabulate_lhy(PolarTwoChannelLHY; n_max, n_points, n_atoms) do n
         prefactor * (density_coef + spin_coef) * n^2 * sqrt(n)
     end
 end
@@ -103,9 +104,10 @@ function compute_spinor_lhy_polar_contact(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_polar_lhy_coefs(F, g_dict)
-    _tabulate_lhy(n -> lhy_energy_polar(n, coefs), PolarContactLHY; n_max, n_points)
+    _tabulate_lhy(n -> lhy_energy_polar(n, coefs), PolarContactLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -122,10 +124,11 @@ function compute_spinor_lhy_polar_dipolar(;
     eps_tilde_dd::Float64,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_polar_lhy_coefs(F, g_dict)
     _tabulate_lhy(n -> lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd),
-        PolarDipolarLHY; n_max, n_points)
+        PolarDipolarLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -142,10 +145,11 @@ function compute_spinor_lhy_fm_dipolar(;
     eps_dd::Real,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_fm_lhy_coefs(F, g_dict)
     _tabulate_lhy(n -> lhy_energy_fm_dipolar(n, coefs, eps_dd),
-        FMDipolarLHY; n_max, n_points)
+        FMDipolarLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -164,9 +168,10 @@ function compute_spinor_lhy_fm_contact(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_fm_lhy_coefs(F, g_dict)
-    _tabulate_lhy(n -> lhy_energy_fm(n, coefs), FMContactLHY; n_max, n_points)
+    _tabulate_lhy(n -> lhy_energy_fm(n, coefs), FMContactLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -186,13 +191,14 @@ function compute_spinor_lhy_icosahedral(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     F == 6 || throw(
         ArgumentError(
             "compute_spinor_lhy_icosahedral is F=6 only (got F=$F); the I_h closed " *
             "form is specific to the F=6 even-S channel structure"),
     )
-    _tabulate_lhy(n -> epsilon_LHY_F6_Ih(n, g_dict), IcosahedralLHY; n_max, n_points)
+    _tabulate_lhy(n -> epsilon_LHY_F6_Ih(n, g_dict), IcosahedralLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -268,14 +274,29 @@ end
 # loop. Keeping the derivative path in ONE place means a future change to
 # the finite-difference scheme can't silently drift between modes.
 function _tabulate_lhy(energy_fn, ::Type{ResultT};
-    n_max::Float64, n_points::Int) where {ResultT}
+    n_max::Float64, n_points::Int, n_atoms::Int=1) where {ResultT}
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    n_atoms >= 1 || throw(ArgumentError("n_atoms must be >= 1"))
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = energy_fn(n)
+        # The closed forms are ε = (8/15π²)(g n)^(5/2) with `n` the PHYSICAL
+        # density and `g` the SI coupling. Here `n = |ψ|²` is normalised to
+        # ∫|ψ|²dV = 1 and `g` comes from the dimensionless `c₀ = 4π(a_s/a_ho)N`,
+        # which already carries N. Carrying it twice at the 5/2 power leaves the
+        # tabulated energy a factor **N too large**:
+        #
+        #     (2/5)·c_lhy = (8/15π²)·c₀^(5/2) / N      [scalar Lima-Pelster]
+        #
+        # Measured in the uniform-g_S limit, `fm/scalar` and `polar/scalar` were
+        # EXACTLY N for N = 1e3, 3e4, 1e5. On a 2026-05 Eu run that made E_LHY
+        # 96% of the total energy — impossible for a beyond-mean-field term; the
+        # SI-anchored scalar path gives 0.05% for the same state.
+        #
+        # V = dε/dn, so dividing ε here divides the tabulated V too.
+        energy[i] = energy_fn(n) / n_atoms
     end
     ResultT(densities, _numerical_derivative(densities, energy))
 end

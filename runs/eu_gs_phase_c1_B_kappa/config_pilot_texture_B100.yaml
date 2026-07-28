@@ -1,0 +1,33 @@
+# Pilot: competing-seed GS at B=100µG (above the ~60µG crossover) to check that
+# the flower/CSV/PCV textures appear as GS and the fingerprint classifier separates
+# them. FM-region c1, kappa=1. Each cell solved from 5 seeds; min-E = the phase.
+metadata: {owner: anko, project: Eu151 texture pilot (FL/CSV/PCV, B0=100uG)}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "1.0e-4 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 1500
+      tol: 1.0e-8
+  - analyze:
+      - phase_classify_distance: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: [-0.012, 0.0, 0.018]
+    pipeline.0.potential.omega.2: [1.0]
+  comparison_runs:
+    - {name: flower, override: {pipeline.0.initial_state: flower}}
+    - {name: csv,    override: {pipeline.0.initial_state: chiral_spin_vortex}}
+    - {name: pcv,    override: {pipeline.0.initial_state: polar_core_vortex}}
+    - {name: fm,     override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,  override: {pipeline.0.initial_state: polar}}
