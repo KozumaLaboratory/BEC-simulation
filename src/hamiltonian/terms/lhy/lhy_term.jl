@@ -129,6 +129,30 @@ function _lhy_energy(::Any, ::NoLHY, _n_comp, _ndim, _n_pts, _dV)
     0.0
 end
 
+# Spatially-varying: ε_LHY = n^(5/2) e₁(p(r)), so the energy needs the same
+# local polarisation the propagator uses. Kept beside `_lhy_V(n, p, ·)` in
+# spirit — if these two ever disagree the term drifts silently, which is the
+# bug class the HamTerm protocol exists to prevent.
+function _lhy_energy(psi, lhy::SpatialLHY, n_comp, ndim, n_pts, dV)
+    D = n_comp
+    F = lhy.F
+    fp = lhy.fp_coeffs
+    Ns = prod(n_pts)
+    P = reshape(psi, Ns, D)
+    E = 0.0
+    @inbounds for i in 1:Ns
+        s = 0.0
+        for c in 1:D
+            s += abs2(P[i, c])
+        end
+        s < 1e-30 && continue
+        p = _local_polarisation(P, i, s, F, fp, Val(D))
+        e1 = _interpolate_1d(lhy.polarisations, lhy.e1_values, clamp(p, 0.0, 1.0))
+        E += e1 * s * s * sqrt(s)          # n^(5/2)
+    end
+    E * dV
+end
+
 # Shared energy eval for all table-based modes (TabulatedLHY subtypes).
 #
 # E = ∫ ε(n) dV, and the table stores V = dε/dn, so the energy density is the
