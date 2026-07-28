@@ -314,6 +314,9 @@ const CI_EXTRA = [
     # is gated" was true while three of its faces were broken at once.
     # Driven by LHY_SCHEMA["kind"].enum, so a new mode cannot ship ungated.
     "oracles/test_lhy_mode_face_coverage.jl",
+    # Magnitude sibling of the above: the closed forms had a consistency oracle
+    # and no SI anchor, and were exactly N_atoms too large in that gap.
+    "oracles/test_lhy_magnitude_si_anchor.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
