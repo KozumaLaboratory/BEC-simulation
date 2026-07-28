@@ -21,6 +21,12 @@ declare -A BR_VARIANTS=(
   [xybox]="92,92,28|40,40,12|0|1.0e-3|NaN"   # xy half-box 14 -> 20
   [dtx]="64,64,28|28,28,12|0|5.0e-4|NaN"     # dt halved, box unchanged
   [fine]="96,96,42|28,28,12|0|1.0e-3|NaN"    # dx 0.44 -> 0.29 at a FIXED box: resolution, not geometry
+  # dx-convergence series at a FIXED box and FIXED stage lengths. The stir
+  # output itself is not converged: the same protocol gives Jz(t=10) = 7.75 at
+  # dx 0.44 and 12.21 at dx 0.29, a 58% difference in the state that ENTERS the
+  # quench. Comparing conversions across resolutions is meaningless until this
+  # converges, so `finer` is the third point (dx 0.22, 128x128x56).
+  [finer]="128,128,56|28,28,12|0|1.0e-3|NaN"  # dx 0.29 -> 0.22 at a fixed box
   [trunc]="64,64,28|28,28,12|1|1.0e-3|0"     # image-free AND a real-space cutoff on the kernel
 )
 
