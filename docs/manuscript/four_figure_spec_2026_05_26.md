@@ -98,6 +98,42 @@ reproduces", with loss-on as bracket evidence not headline claim.
 
 **Final caption (publication-ready):**
 
+> ## ⚠️ Figure 2 does not reproduce — re-derived 2026-07-29
+>
+> **Its premise is gone.** The caption below turns on some arms *collapsing*
+> (`delay`) and the LHY closures *arresting* them (`stable_arrest`). Re-running the
+> K₃=0 factorial on current `main`, **all four arms are `stable_arrest`** — there
+> is no collapse left for the LHY closure to determine:
+>
+> | arm | ratio now | class now | ratio 2026-05 | class 2026-05 |
+> |---|---:|---|---:|---|
+> | off | **1.0502** | stable_arrest | 2.3339 | delay |
+> | scalar | **1.1839** | stable_arrest | 2.3599 | delay |
+> | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
+> | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
+>
+> So "scalar density LHY is indistinguishable from no LHY" no longer holds either
+> — scalar now moves the ratio 1.05 → 1.18 — and the ordering that made the point
+> (off/scalar collapse, closures arrest) has inverted into "everything arrests,
+> and the closures arrest *least*".
+>
+> A second, separate change: the ground-state peak density is 0.0044–0.0046 for
+> off/scalar but **0.0177–0.0185 for the closed forms** — a factor 4, *after*
+> #158 (closed-form tables were $N_{atoms}$ too large). That gap needs its own
+> explanation before any of these arms is quoted; it is not what the caption
+> describes.
+>
+> Cause is not the LHY coefficient work alone. This run also predates the Eu
+> quadratic-Zeeman fix (11× too large until 2026-07-08), the DDI integrator-order
+> fixes and the ITP density-bias fix — see
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
+>
+> **Do not use Figure 2 as specified.** The physics question it asks (what sets
+> F=6 collapse arrest) is still open; this figure's answer rested on a collapse
+> that current code does not produce.
+>
+> Run output: `/gs/bs/work/7/uk07267/spinorbec-runs/fig2_k3zero_v2`.
+
 > **Figure 2.** F=6 collapse arrest in the cigar stress regime
 > (N = 30 000, ω_z = 0.25 ω_⊥, simulated window t = 30 ms in panels
 > (a–b), 200 ms in panel (c)) is determined by the LHY closure, NOT by
