@@ -172,8 +172,10 @@ applied every 5 steps. The 0.714 s Eu window at $80^3$ is ~0.5 h per trajectory.
 
 ## Validation
 
-`test/dynamics/test_spgpe.jl` (ci tier), `test/dynamics/test_spgpe_reservoir.jl`
-(full tier), `test/gpu/test_spgpe_gpu_cpu_parity.jl` (ci tier).
+`test/dynamics/test_spgpe.jl` (**ci** tier), `test/dynamics/test_spgpe_reservoir.jl`
+(**full** tier), `test/gpu/test_spgpe_gpu_cpu_parity.jl` (**full** tier — placed
+alongside `test_projected_gp_parity.jl`, which gates the same host-array-broadcast
+bug class).
 
 | gate | what it pins | type |
 |---|---|---|
