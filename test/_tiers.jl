@@ -166,6 +166,7 @@ const FAST_TESTS = [
     "solvers/test_pseudo_arclength.jl",
     "workflow/test_active_learning.jl",
     "workflow/test_inspect_config.jl",
+    "workflow/test_vortex_density_movie.jl",
     "workflow/test_diff_dicts.jl",
     "workflow/test_inspect_batch.jl",
     "workflow/test_autopilot.jl",
