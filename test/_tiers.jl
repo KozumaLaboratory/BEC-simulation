@@ -34,6 +34,7 @@ const FAST_TESTS = [
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
+    "workflow/test_lhy_texture_warning.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -115,6 +116,9 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_superfluid_fraction.jl",
+    "analysis/test_superfluid_fraction_gp_twist.jl",
+    "solvers/test_scalar_ddi_transverse_pad.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
@@ -166,6 +170,7 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    "validation/test_dipolar_supersolid_tube.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -364,6 +369,7 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    "gpu/test_superfluid_fraction_gpu.jl",
     # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
     # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
     # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.

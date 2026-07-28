@@ -76,9 +76,26 @@ _PATH = re.compile(
     r"\b((?:src|test|scripts|bench|docs|runs|ext|dashboard)"
     r"/[A-Za-z0-9_\-./]*\.(?:jl|md|py|yaml|yml|toml|sh|json))"
 )
-# `runs/_loop/` was retired 2026-06-08 and archived outside the repo (CLAUDE.md);
-# references to it are correctly historical, not rot.
+# Correctly-historical references, not rot:
+#   runs/_loop/  — the first autonomous loop, retired 2026-06-08 and archived
+#                  outside the repo (CLAUDE.md).
+#   scripts/{loop,judge,scheduler,resource_probe,cleanup_branches}
+#                — the same loop's machinery, moved to
+#                  BEC-simulation-archive/loop_machinery_2026_06_08/.
 _RETIRED_PREFIXES = ("runs/_loop/",)
+_RETIRED_FILES = frozenset((
+    "scripts/loop.sh", "scripts/judge.py", "scripts/scheduler.py",
+    "scripts/resource_probe.py", "scripts/cleanup_branches.sh",
+    "scripts/otel_query.py", "scripts/tests/test_judge_in_operator.py",
+))
+
+# `runs/` holds RUN OUTPUT, content-addressed and routinely pruned (the data
+# lives on TSUBAME, the repo keeps figures and code). A memory naming a jld2 /
+# summary.json / per-point file under runs/ is recording what a run produced,
+# not asserting that the file is still there — so an absent one is expected,
+# not drift. Only `runs/**/*.yaml` is a config, i.e. real input worth checking.
+def _is_run_output(path):
+    return path.startswith("runs/") and not path.endswith((".yaml", ".yml"))
 
 
 def _placeholder(path):
@@ -113,10 +130,12 @@ def path_report(texts, index_text, repo, main_checkout):
         for p in sorted(set(_PATH.findall(t))):
             if _placeholder(p):
                 counts["placeholder"] += 1
-            elif any(p.startswith(r) for r in _RETIRED_PREFIXES):
+            elif any(p.startswith(r) for r in _RETIRED_PREFIXES) or p in _RETIRED_FILES:
                 counts["retired (archived outside repo)"] += 1
             elif p in head:
                 counts["in HEAD"] += 1
+            elif _is_run_output(p):
+                counts["run output (pruned by design)"] += 1
             elif p in untracked:
                 counts["untracked in main checkout"] += 1
                 indexed and untracked_only[stem].append(p)
