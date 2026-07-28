@@ -386,6 +386,42 @@ end
 
 # --- composition -----------------------------------------------------------
 
+@testset "projector diagnostic separates cutoff outflow from noise truncation" begin
+    # The first attempt reported one combined number and it was ~10³× too large to
+    # mean what it claimed: per step the projector removes a little of the field
+    # (only if the cutoff moved) and a lot of the freshly injected noise.
+    ws = flowing_state!(scalar_ws())
+    n0 = norm_sq(ws)
+
+    # (a) cutoff held fixed, noise off ⇒ nothing leaves by either route. The
+    # outflow is EXACTLY zero (the field is already projected at this cutoff, so
+    # the mask removes nothing bit-for-bit), which is the sharp statement.
+    still = SPGPEReservoir(; T=0.0, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.01, M=0.0)
+    apply_spgpe_step!(ws, still, 0.002; t=0.0, noise=false)          # settle
+    r = apply_spgpe_step!(ws, still, 0.002; t=0.0, noise=false)
+    @test r.cutoff_outflow == 0.0
+    @test r.noise_truncated < 1e-12 * n0        # only FFT round-off
+
+    # (b) cutoff SHRINKS, noise still off ⇒ the swept band leaves, and it is
+    # booked as outflow. The residual on the other channel is the damping drift's
+    # nonlinear term leaking a little power across the new (much smaller) cutoff —
+    # real, but 7 decades down, so the attribution is unambiguous.
+    shrink = SPGPEReservoir(; T=0.0, mu=1.0, a_s=0.01, gamma=0.01, M=0.0,
+        k_cut=PiecewiseLinearWaveform([0.0, 1.0], [5.0, 2.0]))
+    r2 = apply_spgpe_step!(ws, shrink, 0.002; t=1.0, noise=false)
+    @test r2.cutoff_outflow > 1e-3 * n0
+    @test r2.noise_truncated < 1e-5 * r2.cutoff_outflow
+
+    # (c) noise on at a FIXED cutoff ⇒ truncation is large, outflow exactly zero.
+    # This is the case that made the first combined diagnostic meaningless: it
+    # reported 1.4e7 "atoms leaving the C region" when the cutoff-driven flow was
+    # identically nothing.
+    noisy = SPGPEReservoir(; T=5.0, mu=1.0, a_s=0.01, k_cut=2.0, gamma=0.01, M=0.0)
+    r3 = apply_spgpe_step!(ws, noisy, 0.002; t=0.0, seed=5, noise=true)
+    @test r3.noise_truncated > 1e-3 * n0
+    @test r3.cutoff_outflow == 0.0
+end
+
 @testset "SPGPE full step composes and stays finite" begin
     ws = flowing_state!(scalar_ws())
     res = SPGPEReservoir(; T=1.0, mu=5.0, a_s=0.01, k_cut=5.0)

@@ -140,10 +140,12 @@ function spgpe_trajectory!(
     sidx = Ref(0)
     ω_prev = Ref(-1.0)
     rates_log = Tuple{Float64, Float64, Float64, Float64, Float64}[]
-    # A tracking cutoff SHRINKS, so the projector carries atoms out of the C
-    # region (back to the I region). Keep the running total so the atom budget is
-    # explicit rather than a silent leak.
-    proj_out = Ref(0.0)
+    # Two DIFFERENT things the projector removes, kept apart: atoms the shrinking
+    # cutoff swept out of the C region (physical, into the I region), and the part
+    # of each step's fresh noise that landed above the cutoff (bookkeeping). The
+    # second is ~10³× the first per step, so a single total measures only the noise.
+    proj_cut = Ref(0.0)
+    proj_noise = Ref(0.0)
 
     cb = SimulationCallbacks(
         on_step=(w, step, times, energies) -> begin
@@ -163,7 +165,8 @@ function spgpe_trajectory!(
                 @views for c in 1:(D - 1)
                     w.state.psi[:, :, :, c] .= 0
                 end
-                proj_out[] += rr.projected_out
+                proj_cut[] += rr.cutoff_outflow
+                proj_noise[] += rr.noise_truncated
                 push!(rates_log, (t, rr.T, rr.mu, rr.gamma, rr.M))
             end
             if step % save_every == 0
@@ -181,7 +184,7 @@ function spgpe_trajectory!(
         end,
     )
     run_simulation!(ws; callbacks=cb)
-    (; rates_log, projected_out=proj_out[])
+    (; rates_log, cutoff_outflow=proj_cut[], noise_truncated=proj_noise[])
 end
 
 """
@@ -221,8 +224,8 @@ function run_spgpe_ensemble(
             T_internal, dt, save_every, spgpe_every, backend,
             seed0 + tr * 1_000_003, accum, D)
         tr == 1 && (rates = tj.rates_log)
-        verbose && @printf("  trajectory %d: %.4g atoms left the C region via the projector\n",
-            tr, tj.projected_out)
+        verbose && @printf("  trajectory %d: %.4g atoms swept out by the shrinking cutoff (noise truncated: %.4g)\n",
+            tr, tj.cutoff_outflow, tj.noise_truncated)
         # Reduce and hand over after EVERY trajectory: a long ensemble that is
         # killed part-way then still leaves a valid (smaller-M) result on disk
         # instead of nothing.
@@ -267,7 +270,7 @@ SPGPE ensemble over the real ramp → CSV.
 function evap_spgpe(;
     grid_n::Int=48, box_scale::Float64=2.6, n_traj::Int=4, dt::Float64=0.002,
     spgpe_every::Int=5, f_start::Float64=1.2, equilibrate::Float64=40.0,
-    cutoff_n_T::Float64=1.5,
+    cutoff_n_T::Float64=1.0,
     n_save::Int=120, backend=CPUBackend(), tag::String="spgpe",
     duration_cap::Float64=Inf,
 )
@@ -304,12 +307,35 @@ function evap_spgpe(;
     @printf("\n")
     @printf("  reservoir       T %.2f → %.2f,  μ %.2f → %.2f  (internal)\n",
         resv.T_int[1], resv.T_int[end], resv.mu_int[1], resv.mu_int[end])
+    # Growth budget BEFORE spending the GPU hour. Two production runs were
+    # already lost to a reservoir that could not deliver the condensate; the
+    # number that decides it costs milliseconds. See `growth_budget`.
+    G = let t = resv.t_internal, ω = resv.omega_bar ./ ωref
+        acc = 0.0
+        for i in 1:(length(t) - 1)
+            a = spgpe_rates(resv.reservoir, t[i])
+            b = spgpe_rates(resv.reservoir, t[i + 1])
+            acc += 0.5 * (2 * a.gamma * max(a.mu - 1.5 * ω[i], 0.0) +
+                          2 * b.gamma * max(b.mu - 1.5 * ω[i + 1], 0.0)) *
+                   (t[i + 1] - t[i])
+        end
+        acc
+    end
+    G > 1.0 || error(
+        "growth budget G = $(round(G; sigdigits=3)) ≤ 1: the reservoir cannot grow a " *
+        "condensate in this window, so the run would return N₀ ≈ 0 no matter how " *
+        "correct the code is. Lower cutoff_n_T (currently $cutoff_n_T) or widen the " *
+        "window; run mode `growth_budget` to see the trade-off.")
+    G > 3.0 || @warn "growth budget is marginal — expect a large lag, not a saturated condensate" G
+
     r0 = spgpe_rates(resv.reservoir, 0.0)
     r1 = spgpe_rates(resv.reservoir, resv.duration_internal)
     @printf("  rates           γ %.3g → %.3g,  ℳ̄ %.3g → %.3g\n",
         r0.gamma, r1.gamma, r0.M, r1.M)
-    @printf("  cutoff          k_cut %.2f → %.2f (ϵ_cut−μ = %.1f k_BT, tracking)\n",
-        resv.k_cut[1], resv.k_cut[end], cutoff_n_T)
+    @printf("  cutoff          k_cut %.2f → %.2f (ϵ_cut−μ = %.1f k_BT, occupation %.2f)\n",
+        resv.k_cut[1], resv.k_cut[end], cutoff_n_T, 1 / cutoff_n_T)
+    @printf("  growth budget   G = ∫2γ(μ−μ̃)dt = %.2f  (%s)\n",
+        G, G > 3 ? "forms" : "marginal")
     @printf("  grid            %d³, box %.1f, max k_cut %.2f (k_max %.2f)\n",
         grid_n, box, k_cut, k_max)
     @printf("  steps           %.3g × %d trajectories\n", T_internal / dt, n_traj)
@@ -386,6 +412,61 @@ function _interp(xs::AbstractVector, ys::AbstractVector, x::Real)
     Float64(ys[j]) * (1 - f) + Float64(ys[j + 1]) * f
 end
 
+"""
+    growth_budget(; n_Ts, f_start) -> Vector
+
+The decisive number, computed ANALYTICALLY before spending a GPU hour: how many
+e-foldings of condensate growth the ramp actually affords.
+
+Number damping drives `dN₀/dt = 2γ(μ − μ̃)N₀` (Rooney Eq. 23). For a condensate
+just nucleating, `μ̃` is the trap ground-state energy `3/2·ω̄(t)`, so the growth
+the window can deliver is
+
+    G = ∫ 2γ(t)·max(μ(t) − 3/2·ω̄(t), 0) dt      (internal time)
+
+`G ≫ 1` ⇒ the condensate forms; `G ≲ 1` ⇒ it cannot, however correct the code is.
+
+This is worth its own entry point because the two failed production runs were
+both decided by a number of this kind — one that costs milliseconds to evaluate
+and an hour of H100 to discover. `γ` depends on the cutoff depth `n_T` through
+`(ln(1−e^{−n_T}))²`, which swings by ~14× between `n_T = 0.5` and `1.5`, so `G`
+is scanned over `n_T` rather than quoted at one value.
+"""
+function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
+    traj = zero_d_trajectory()
+    win = cfield_window(traj; f_start)
+    ωref = win.omega_ref
+    @printf("window starts %.3f s, ω_ref/2π = %.1f Hz\n", win.t_start, ωref / 2π)
+    println("n_T   k_cut(0)→k_cut(T)   γ(0)→γ(T)        G=∫2γ(μ−μ̃)dt   verdict   n_grid")
+    out = []
+    for nT in n_Ts
+        resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
+            omega_ref=ωref, a_s=Eu151.a_s, cutoff_n_T=nT, t_start=win.t_start)
+        t = resv.t_internal
+        # ω̄(t)/ω_ref along the window, for the ground-state energy 3/2·ω̄.
+        ω = resv.omega_bar ./ ωref
+        G = 0.0
+        for i in 1:(length(t) - 1)
+            r1 = spgpe_rates(resv.reservoir, t[i])
+            r2 = spgpe_rates(resv.reservoir, t[i + 1])
+            d1 = 2 * r1.gamma * max(r1.mu - 1.5 * ω[i], 0.0)
+            d2 = 2 * r2.gamma * max(r2.mu - 1.5 * ω[i + 1], 0.0)
+            G += 0.5 * (d1 + d2) * (t[i + 1] - t[i])
+        end
+        r0 = spgpe_rates(resv.reservoir, t[1])
+        r1 = spgpe_rates(resv.reservoir, t[end])
+        box = 2.6 * sqrt(2 * win.T_max)
+        n_req = ceil(Int, resv.k_cut_max * box / π / 2) * 2
+        verdict = G > 3 ? "FORMS" : G > 1 ? "marginal" : "CANNOT FORM"
+        @printf("%.2f  %5.2f → %5.2f      %.3g → %.3g   %8.2f      %-11s %d\n",
+            nT, resv.k_cut[1], resv.k_cut[end], r0.gamma, r1.gamma, G, verdict, n_req)
+        push!(out, (; n_T=nT, G, k_cut=resv.k_cut[1], gamma0=r0.gamma, n_req))
+    end
+    println("\nG ≫ 1 forms, G ≲ 1 cannot. Occupation at the cutoff is 1/n_T, so the")
+    println("standard c-field range is n_T ≈ 0.5–1.5; anything outside is not a free choice.")
+    out
+end
+
 # --smoke: exercise every code path in ≤ ~2 min. NOT physics.
 #
 # The real problem CANNOT be shrunk into a smoke: the C region has to hold the
@@ -437,7 +518,10 @@ function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
     elseif mode == "production"
-        evap_spgpe(; grid_n=96, n_traj=4, f_start=1.05, n_save=40, backend, tag="spgpe")
+        evap_spgpe(; grid_n=72, n_traj=4, f_start=1.05, n_save=40, cutoff_n_T=1.0,
+            backend, tag="spgpe")
+    elseif mode == "growth_budget"
+        growth_budget()
     elseif mode == "preflight"
         traj = zero_d_trajectory()
         for f in (1.05, 1.2, 1.5)

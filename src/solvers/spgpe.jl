@@ -226,7 +226,7 @@ fixed cutoff took γ from 4.8×10⁻⁴ to 6×10⁻¹⁴ and no condensate forme
 
 `n_T` is set by the standard c-field criterion: the Rayleigh–Jeans occupation at
 the cutoff, `T/(ϵ_cut−μ) = 1/n_T`, should be of order 1 — that is what makes a
-classical field the right description up to there. `n_T = 1.5` (occupation 0.67)
+classical field the right description up to there. `n_T = 1.0` (occupation exactly 1)
 is the default. Going deeper is not free: `n_T = 2.5` drops occupation to 0.4,
 cuts γ by ~9×, and demands a finer grid, so a ramp of fixed length gets fewer
 growth times. Since `n_T` is a genuine free parameter of the method, any result
@@ -234,11 +234,12 @@ read off a single value should be checked against a second one.
 
 Note the projector is *shrinking*, so it removes atoms from the C region as the
 ramp proceeds. That is physically the reverse flow into the I region, and
-[`apply_spgpe_step!`](@ref) reports it as `projected_out` so the budget stays
-visible rather than silently leaking.
+[`apply_spgpe_step!`](@ref) reports it as `cutoff_outflow`, measured separately
+from the `noise_truncated` bookkeeping (which is ~10³× larger per step and would
+otherwise swamp it).
 """
 function tracking_cutoff(
-    t_internal::AbstractVector, mu::AbstractVector, T::AbstractVector; n_T::Real=1.5
+    t_internal::AbstractVector, mu::AbstractVector, T::AbstractVector; n_T::Real=1.0
 )
     length(t_internal) == length(mu) == length(T) ||
         throw(ArgumentError("tracking_cutoff: t, mu, T must have equal length"))
@@ -311,6 +312,17 @@ function apply_spgpe_step!(
     r = spgpe_rates(res, t)
     dt_f = Float64(dt)
 
+    # Cutoff-shrinkage outflow, measured FIRST and on its own. The incoming field
+    # is already projected at the previous step's cutoff, so re-projecting at the
+    # current one removes exactly the band the cutoff swept past — atoms leaving
+    # the C region for the I region. Measuring this after the noise instead would
+    # conflate it with noise truncation, which is a per-step effect two to three
+    # orders of magnitude larger and would swamp it.
+    dV = cell_volume(ws.grid)
+    n0 = real(sum(abs2, ws.state.psi))
+    apply_projected_gp!(ws, r.k_cut)
+    cutoff_outflow = (n0 - real(sum(abs2, ws.state.psi))) * dV
+
     if r.gamma > 0
         _spgpe_number_damping!(ws, r.gamma, r.mu, r.T, dt_f; seed=seed, noise=noise)
     end
@@ -320,14 +332,14 @@ function apply_spgpe_step!(
             seed=seed === nothing ? nothing : seed + 7_919, noise=noise,
         )
     end
-    # Projection last, so both noises are projected within the same step. When
-    # k_cut(t) is shrinking this also carries atoms OUT of the C region (back to
-    # the I region) — report how many so the caller can keep a budget instead of
-    # discovering a silent leak.
+    # Projection last, so both noises are projected within the same step — the
+    # literal P{…} of Eq. (4). What it removes here is the part of the fresh
+    # noise that landed above the cutoff; that is bookkeeping of the injection,
+    # NOT a physical outflow, so it is reported separately from `cutoff_outflow`.
     n_before = real(sum(abs2, ws.state.psi))
     apply_projected_gp!(ws, r.k_cut)
-    projected_out = (n_before - real(sum(abs2, ws.state.psi))) * cell_volume(ws.grid)
-    merge(r, (; projected_out))
+    noise_truncated = (n_before - real(sum(abs2, ws.state.psi))) * dV
+    merge(r, (; cutoff_outflow, noise_truncated))
 end
 
 """
