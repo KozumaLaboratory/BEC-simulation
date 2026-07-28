@@ -152,12 +152,16 @@ using SpinorBEC
               B: {Bz: "0.01 Gauss"}
         """
         ins = SpinorBEC.inspect_config_string(src)
-        # Structural kind: feature_incompat; :block severity (run-aborter).
+        # Structural kind: feature_incompat, :warn severity. This was a :block
+        # until 2026-07-28. The underlying crash — `_apply_1d_shear_batch!`
+        # scalar-indexing GPU arrays in the Coriolis step — was fixed 2026-06-02
+        # (the shear now dispatches on `psi isa Array`), so blocking the run was
+        # advising users away from a path that works.
         ws = filter(w -> w.kind === :feature_incompat &&
                          occursin("rotating_frame_omega", w.title),
             ins.warnings)
         @test length(ws) == 1
-        @test ws[1].severity === :block
+        @test ws[1].severity === :warn
         @test ws[1].step_index == 2
     end
 
@@ -257,11 +261,31 @@ using SpinorBEC
             ins.warnings)
     end
 
-    # --- run_yaml audit hook (W4 + opt-out) -----------------------------
+    # --- run_yaml audit hook (:block aborts + opt-out) -------------------
     #
     # The hook lives in `_run_yaml_impl`; we exercise it via run_yaml with
     # `dry_run=true` so no simulator work happens. Each test writes a YAML
     # to a tempdir, then asserts on whether run_yaml threw and on what.
+    #
+    # The abort path used to be driven by W4 (rotating_frame_omega + GPU),
+    # which was downgraded to :warn on 2026-07-28 once the underlying GPU
+    # shear bug was confirmed fixed. `n_steps: 0` is used instead — it is a
+    # boundary rule with `zero_meaning = :error`, hence a genuine :block, so
+    # the abort coverage survives the downgrade. (`duration ≤ 0` would NOT
+    # work: it is `:degenerate` and only emits a :warn.)
+    _BLOCK_YAML = """
+    defaults: {kind: spinor, backend: cpu}
+    pipeline:
+      - ground_state:
+          atom: Eu151
+          grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+          potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+          interactions: {N_atoms: 1000, omega_ref: 691.1504}
+          B: {Bz: "0.01 Gauss"}
+          dt: 0.01
+          n_steps: 0
+          tol: 1.0e-6
+    """
 
     _W4_YAML = """
     defaults: {kind: spinor, backend: gpu}
@@ -284,10 +308,10 @@ using SpinorBEC
           B: {Bz: "0.01 Gauss"}
     """
 
-    @testset "audit hook: W4 aborts run_yaml" begin
+    @testset "audit hook: a :block finding aborts run_yaml" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
-            write(p, _W4_YAML)
+            p = joinpath(tmp, "block.yaml")
+            write(p, _BLOCK_YAML)
             err = nothing
             try
                 run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
@@ -296,7 +320,21 @@ using SpinorBEC
             end
             @test err isa ArgumentError
             @test occursin("audit blocked", err.msg)
-            @test occursin("rotating_frame_omega", err.msg)
+            @test occursin("n_steps", err.msg)
+        end
+    end
+
+    @testset "audit hook: W4 is a warning and does NOT abort" begin
+        mktempdir() do tmp
+            p = joinpath(tmp, "w4.yaml")
+            write(p, _W4_YAML)
+            ok = try
+                run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
+                true
+            catch
+                false
+            end
+            @test ok
         end
     end
 

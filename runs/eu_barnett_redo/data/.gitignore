@@ -1,0 +1,5 @@
+# Rebuildable outputs. Repo policy: figures + code in git, bulk data out.
+#   frames_*.jld2   sparse psi frames (~300 MB/cell at production size)
+#   *smoke*         smoke-test artefacts, regenerate with SMOKE=1
+frames_*.jld2
+*smoke*

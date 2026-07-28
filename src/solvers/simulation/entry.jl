@@ -39,6 +39,7 @@ function run_simulation!(
     ws::Workspace{N};
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
     stream_snapshots::Bool=false,
+    stepper::Union{Nothing, Function}=nothing,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
@@ -56,7 +57,11 @@ function run_simulation!(
         keep_psi=(!stream_snapshots),
     )
 
-    if it
+    # `stepper` selects an explicit per-step propagator (e.g.
+    # `split_step_midpoint!`). Without it, real time keeps the leapfrog loop,
+    # whose merged V blocks are the historical default. ITP always uses the
+    # generic loop.
+    if it || stepper !== nothing
         _run_simulation_standard!(
             ws,
             sp,
@@ -68,6 +73,7 @@ function run_simulation!(
             snapshots,
             cbs;
             stream_snapshots,
+            stepper=(stepper === nothing ? split_step! : stepper),
         )
     else
         _run_simulation_leapfrog!(

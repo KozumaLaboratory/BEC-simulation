@@ -14,11 +14,12 @@ function _run_simulation_standard!(
     snapshots,
     callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
-) where {N}
+    stepper::S=(split_step!),
+) where {N, S}
     t_start = time()
     try
         for step in 1:(sp.n_steps)
-            split_step!(ws)
+            stepper(ws)
 
             if callbacks.on_step !== nothing
                 callbacks.on_step(ws, step, times, energies)

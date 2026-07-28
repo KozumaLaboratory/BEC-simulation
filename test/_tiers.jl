@@ -180,6 +180,9 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
+    # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
+    "oracles/test_jz_conservation_ddi.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
@@ -420,6 +423,9 @@ const FULL_EXTRA = [
     # rotating-frame inertial term was ~1.8e-3 off; the unified path matches
     # the exact dynamics to ~1e-5.
     "rotating_basis/test_magnetostir_rotating_field_analytic.jl",
+    # rotating_basis ⇄ standard-path parity, and the pin that their `Fz` fields
+    # are DIFFERENT quantities (⟨F·B̂(t)⟩ vs lab ⟨F_z⟩).
+    "rotating_basis/test_rotating_basis_standard_parity.jl",
     "hamiltonian/test_adaptive_dt.jl",
     # Lima-Pelster Q5 + scalar eGPE
     "hamiltonian/test_lima_pelster_q5.jl",
