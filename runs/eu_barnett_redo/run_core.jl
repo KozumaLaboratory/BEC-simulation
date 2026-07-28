@@ -23,7 +23,13 @@ using JLD2, FFTW, Printf, LinearAlgebra
 
 const CELL  = get(ENV, "BR_CELL", "plus")
 const SMOKE = get(ENV, "SMOKE", "0") == "1"
-const OUT   = joinpath(@__DIR__, "data")
+# Output root. Defaults to the run directory, but BR_OUT can send results
+# somewhere off the group volume. That is not a nicety: the group Lustre area is
+# shared with two other users holding ~900 GB between them, and when it filled,
+# a production cell died with a Bus error -- JLD2 mmaps its output, so a full
+# filesystem is SIGBUS rather than a clean write error. $HOME is a separate
+# 25 GB quota on the same Lustre, so BR_OUT=$HOME/... survives a full /gs/fs.
+const OUT   = get(ENV, "BR_OUT", joinpath(@__DIR__, "data"))
 mkpath(OUT)
 
 CELL in ("plus", "minus", "zero", "plus_nodd") ||
