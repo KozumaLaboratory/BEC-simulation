@@ -1,10 +1,24 @@
-# Adiabatic-passage protocol for the weak-field ¹⁵¹Eu ground-state transition
+# Preparing the weak-field ¹⁵¹Eu chiral ground state
 
-Design of a *ground-state* experiment for the weak-field F=6 Eu + DDI transition:
-ramp $B_z$ through the transition in both directions at several rates and read the
-result out with Stern-Gerlach. This is the static counterpart of the Einstein–de
-Haas measurement — EdH is a quench (dynamics); this asks whether the
-chiral/flower phase can be *prepared* as a ground state.
+The Einstein–de Haas measurement was a quench; this asks the ground-state question.
+Can the chiral/flower phase be *prepared*? Three protocol classes were built and
+measured at 32³: a $B_z$ ramp, a trap-shaping (κ) ramp, and a rotating transverse
+field.
+
+**Answer: not by transforming a state prepared elsewhere.** On a closed
+mean-field system at $T = 0$ there are two moves and both are blocked — every
+axially symmetric knob (κ, $B_z$) conserves $J_z$ and the ground state is
+2.07 ħ/atom away in it, while a drive that breaks that symmetry does positive work
+and only ever raises the energy. The state must be **nucleated in place**: cooled
+through the transition at the target $(\kappa, B)$ with fluctuations available to
+select the texture. The open question is whether a realistic cooling trajectory
+selects it or gets caught on the polarised branch — that is the experiment's risk,
+and the SGPE calculation that answers it.
+
+Everything below is how that was established, in the order it was measured. The
+by-products are usable on their own: a falsifiable κ-dependent hysteresis
+prediction, a continuous spin→orbital dial via trap shape, and a magnetic-shielding
+specification.
 
 ## What is being claimed, and what would falsify it
 
@@ -46,23 +60,46 @@ target.
 
 ## Running it
 
-Both scripts read the converged GS library (`figs/eu_gs_library/`, keyed
-`(grid, κ, B, branch)`); run them from the repo root that holds it.
+Every driver reads the converged GS library (`figs/eu_gs_library/`, keyed
+`(grid, κ, B, branch)`), so run them from the repo root that holds it. Each has a
+`*_SMOKE=1` mode that renders every code path in ≤ 2 min — use it before any
+production launch; a GPU run of these is 2–3 h.
 
 ```bash
+# --- the B_z ramp -------------------------------------------------------------
 # 1. static window analysis — seconds. Where to ramp, and the Larmor bound.
 AR_KAPPAS=1.8,1.4,1.0,0.8 julia --project=. scripts/eu_adiabatic_window.jl
-
-# 2. smoke every code path first (≤ 2 min on GPU)
 LD_LIBRARY_PATH=/usr/lib/wsl/lib AR_SMOKE=1 \
-  julia --project=. scripts/eu_adiabatic_ramp_protocol.jl
+  julia --project=. scripts/eu_adiabatic_ramp_protocol.jl        # smoke
+bash scripts/run_eu_adiabatic_ramp.sh      # κ=1.8 then κ=0.8 control, ~2.5 h each
+python scripts/viz_eu_adiabatic_ramp.py    # → hysteresis / conversion / SG figures
 
-# 3. production: κ = 1.8 (first order) then κ = 0.8 (control), ~2.5 h each
-bash scripts/run_eu_adiabatic_ramp.sh          # → logs/eu_adiabatic_ramp.log
+# --- the κ (trap-shaping) ramp ------------------------------------------------
+bash scripts/run_eu_kappa_ramp.sh          # rate scan + round trip + KR_REF=1
+python scripts/viz_eu_kappa_ramp.py        # → preparation + angular-momentum figures
 
-# 4. figures
-python scripts/viz_eu_adiabatic_ramp.py
+# reference branches need the ε-ladder or they do not converge (see Limits)
+KR_TAUS= KR_REF=1 KR_REF_LBFGS=1500 KR_REF_RAMP=0.02,0.01,0.005,0.002 \
+  julia --project=. scripts/eu_kappa_ramp_protocol.jl
+
+# is the spin→orbital transfer quantised? scan the ramp endpoint, keep ψ
+for K1 in 1.0 1.4 1.8 2.2 3.0; do
+  KR_KAPPA_1=$K1 KR_TAUS=100 KR_ROUND_TRIP=0 KR_SAVE_PSI=1 \
+    KR_OUT=figs/eu_kappa_scan/k$K1 julia --project=. scripts/eu_kappa_ramp_protocol.jl
+done
+julia --project=. scripts/eu_kappa_edh_winding.jl
+python scripts/viz_eu_edh_quantisation.py
+
+# --- the z torque -------------------------------------------------------------
+TQ_EPS=0.02,0.05 TQ_OMEGA=0.1,0.3,1.0,-0.3 TQ_TAU=100 TQ_SAVE_PSI=1 \
+  julia --project=. scripts/eu_torque_protocol.jl
+python scripts/viz_eu_torque.py
 ```
+
+`KR_SHAPE` selects the ramp profile (`linear` | `slow_at` | `const_dF`) and
+`eu_ramp_common.jl` holds the two statements every driver shares — the
+$\langle F_\perp\rangle$ definition and the seed/preset epoch assertion — so they
+cannot drift apart between drivers.
 
 `eu_adiabatic_window.jl` reports, per $\kappa$: the energy crossing $B_{eq}$, the
 field range over which the branches stay distinct, each branch's converged
@@ -221,6 +258,9 @@ Three readings, in order of how much they matter:
    (+0.32 vs +0.62). Avoiding the barrier is worth something, just not enough.
 3. **The κ route's excess has a floor**: +0.323 at 145 ms and +0.319 at 434 ms, and
    the round-trip ΔE plateaus at the same ≈ 0.35. A 3× slower ramp buys nothing.
+   Trap compression is not the culprit either: the trap period is
+   $\sim 1\ \omega_{ref}^{-1} = 1.45$ ms, so even the 145 ms ramp is 100× slower
+   than the breathing mode it would excite.
 
 ## Why: $J_z$ is conserved and the ground state is in another sector
 
@@ -242,9 +282,11 @@ commutes with $J_z$ too. What the ramp *can* do inside its sector is exactly wha
 does: $L_z$ and $S_z$ trade one unit, $-0.04 \to -1.04$ against $-3.11 \to -2.11$.
 That is Einstein–de Haas, driven by trap shaping.
 
-So the endpoint is not a half-converted flower state; it is the **EdH-transferred,
-vortex-carrying member of the seed's $J_z$ sector**. Reaching $S_z = -1.04$ at fixed
-$J_z = -3.16$ would require carrying $L_z = -2.11$, and the state gets half way there.
+So the endpoint is not a half-converted flower state; it is the **EdH-transferred
+member of the seed's $J_z$ sector**. Reaching $S_z = -1.04$ at fixed $J_z = -3.16$
+would require carrying $L_z = -2.11$, and the state gets half way there. (That
+orbital angular momentum turns out to be smooth circulation rather than vortices —
+see the quantisation test below.)
 
 ### The shaped ramp was tested, and it changes nothing
 
@@ -363,10 +405,6 @@ $\kappa = 1.8$, $B = 20\ \mu$G and cooled through it. The question it answers is
 the ground state — but "does a realistic cooling trajectory select it, or does it get
 caught on the polarised branch". That is the experiment's actual risk.
 
-Trap compression is not the culprit: the trap period is
-$\sim 1\ \omega_{ref}^{-1} = 1.45$ ms, so even the 145 ms ramp is 100× slower than
-the breathing mode it would excite.
-
 ## Limits of the present run
 
 - **Reference solves need the ε-ladder.** A fixed pin stalls at
@@ -380,11 +418,16 @@ the breathing mode it would excite.
 - **Mean field at $T = 0$.** No thermal or technical noise, so the measured loop is
   the *upper bound* on what an experiment sees: noise and finite temperature
   nucleate the stable branch early and narrow the loop.
-- **$\varepsilon$ is small.** The pin is 0.068 µG at $\kappa = 1.8$ and 0.135 µG at
-  $\kappa = 0.8$ — *below* realistic transverse-field nulling. Scanning $\varepsilon$
-  upward to the µG scale is the natural follow-up and is the same calculation as
-  the magnetic-shielding specification (how well must $B_\perp$ be nulled for the
-  loop to survive).
+- **The Goldstone pin is far below a realistic residual field**, 0.068 µG at
+  $\kappa = 1.8$ and 0.135 µG at $\kappa = 0.8$, so the ramp results assume better
+  transverse nulling than a lab has. The torque scan is the same calculation carried
+  up to realistic values and it gives the **shielding specification directly**: a
+  *rotating* residual of 1.35 µG moves $J_z$ by +1.6 in 145 ms, and 3.4 µG by +2.6.
+  Any experiment holding this state for hundreds of ms needs $B_\perp$ nulled well
+  below the µG scale, or it is being torqued out of its sector while it waits. A
+  *static* residual is far more benign — the pin at 0.135 µG left $J_z$ flat to
+  3×10⁻³ over the same duration — so it is the drift and AC content that matter, not
+  the DC offset.
 - **LHY** is off. The F=6 spinor LHY table is incomplete (`PolarTwoChannelLHY` is
   30–70 % off at F=6); the seeds were converged without it, so the protocol is
   internally consistent but inherits that model limitation.
