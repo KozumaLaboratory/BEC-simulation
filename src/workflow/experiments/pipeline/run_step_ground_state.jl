@@ -493,10 +493,12 @@ function _run_step(
     gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
 
     gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
+    tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
-            dt, n_steps, tol, initial_state, init_state_params, psi_init,
+            dt, n_steps, tol, tol_drho=tol_drho_val,
+            initial_state, init_state_params, psi_init,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,

@@ -33,6 +33,8 @@ const FAST_TESTS = [
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
     "workflow/test_spinor_gs_from_jld2.jl",
+    "workflow/test_run_root_env.jl",
+    "workflow/test_config_zeeman_seed_agreement.jl",
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
@@ -167,6 +169,7 @@ const FAST_TESTS = [
     "solvers/test_pseudo_arclength.jl",
     "workflow/test_active_learning.jl",
     "workflow/test_inspect_config.jl",
+    "workflow/test_vortex_density_movie.jl",
     "workflow/test_diff_dicts.jl",
     "workflow/test_inspect_batch.jl",
     "workflow/test_autopilot.jl",
@@ -192,6 +195,7 @@ const CI_EXTRA = [
     "solvers/test_polished_ground_state.jl",
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
+    "solvers/test_itp_tol_drho.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
@@ -315,6 +319,9 @@ const CI_EXTRA = [
     # is gated" was true while three of its faces were broken at once.
     # Driven by LHY_SCHEMA["kind"].enum, so a new mode cannot ship ungated.
     "oracles/test_lhy_mode_face_coverage.jl",
+    # Magnitude sibling of the above: the closed forms had a consistency oracle
+    # and no SI anchor, and were exactly N_atoms too large in that gap.
+    "oracles/test_lhy_magnitude_si_anchor.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs

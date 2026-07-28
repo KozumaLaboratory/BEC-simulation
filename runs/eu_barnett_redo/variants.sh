@@ -30,6 +30,26 @@ declare -A BR_VARIANTS=(
   [trunc]="64,64,28|28,28,12|1|1.0e-3|0"     # image-free AND a real-space cutoff on the kernel
 )
 
+# PRODUCTION geometries (full stage lengths, unlike the probe entries above).
+# The dx-convergence series was measured at stir = 10; at the production stir of
+# 30 the same dx = 0.22 leaks 67.7% of the conversion against 15.9% at stir 10,
+# so the series does NOT extrapolate and the production resolution is unsettled.
+# `prod_dx175` is the same protocol at finer dx to test exactly that.
+declare -A BR_PROD_VARIANTS=(
+  [prod_dx22]="128,128,80|28.0,28.0,18.0|0|1.0e-3|NaN"    # current production, dx 0.22
+  [prod_dx175]="160,160,100|28.0,28.0,18.0|0|1.0e-3|NaN"  # dx 0.175, 2x the cells
+)
+
+# Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
+# commas, so a tuple like BR_N=128,128,80 cannot be passed through -v at all --
+# it silently becomes several bogus variables. Pass BR_VARIANT=<name> instead.
+br_select_prod() {
+  local tag=$1
+  [[ -n "${BR_PROD_VARIANTS[$tag]:-}" ]] || { echo "unknown prod variant: $tag" >&2; return 1; }
+  IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_PROD_VARIANTS[$tag]}"
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_$tag"
+}
+
 # Export BR_N / BR_BOX / BR_PAD / BR_DT / BR_TRUNC for one variant name.
 br_select_variant() {
   local tag=$1

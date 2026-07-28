@@ -393,13 +393,19 @@ end
     ws = flowing_state!(scalar_ws())
     n0 = norm_sq(ws)
 
-    # (a) cutoff held fixed, noise off ⇒ nothing leaves by either route. The
-    # outflow is EXACTLY zero (the field is already projected at this cutoff, so
-    # the mask removes nothing bit-for-bit), which is the sharp statement.
+    # (a) cutoff held fixed, noise off ⇒ nothing leaves by either route.
+    #
+    # `== 0.0` is NOT available here and asserting it was wrong: the projector is
+    # an FFT round-trip, not a literal no-op. What IS available is a floor 16
+    # orders below the old one. The outflow is accumulated in k-space as the
+    # weight of the masked modes, so its floor is the residual amplitude left in
+    # already-masked modes SQUARED (~1e-31), where differencing ∫|ψ|² across the
+    # call floored at the FFT round-trip error itself (~1e-15) — and could come
+    # out NEGATIVE, which is meaningless for "atoms that left".
     still = SPGPEReservoir(; T=0.0, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.01, M=0.0)
     apply_spgpe_step!(ws, still, 0.002; t=0.0, noise=false)          # settle
     r = apply_spgpe_step!(ws, still, 0.002; t=0.0, noise=false)
-    @test r.cutoff_outflow == 0.0
+    @test 0.0 <= r.cutoff_outflow < 1e-25 * n0
     @test r.noise_truncated < 1e-12 * n0        # only FFT round-off
 
     # (b) cutoff SHRINKS, noise still off ⇒ the swept band leaves, and it is
@@ -412,14 +418,16 @@ end
     @test r2.cutoff_outflow > 1e-3 * n0
     @test r2.noise_truncated < 1e-5 * r2.cutoff_outflow
 
-    # (c) noise on at a FIXED cutoff ⇒ truncation is large, outflow exactly zero.
+    # (c) noise on at a FIXED cutoff ⇒ truncation is large, outflow at the floor.
     # This is the case that made the first combined diagnostic meaningless: it
     # reported 1.4e7 "atoms leaving the C region" when the cutoff-driven flow was
     # identically nothing.
     noisy = SPGPEReservoir(; T=5.0, mu=1.0, a_s=0.01, k_cut=2.0, gamma=0.01, M=0.0)
     r3 = apply_spgpe_step!(ws, noisy, 0.002; t=0.0, seed=5, noise=true)
     @test r3.noise_truncated > 1e-3 * n0
-    @test r3.cutoff_outflow == 0.0
+    @test 0.0 <= r3.cutoff_outflow < 1e-25 * n0
+    # The separation is the point: 20+ decades between the two channels.
+    @test r3.cutoff_outflow < 1e-20 * r3.noise_truncated
 end
 
 @testset "SPGPE full step composes and stays finite" begin

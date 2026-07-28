@@ -348,10 +348,15 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # start but normalised nowhere, so `_build_spinor_lhy` never saw them and a
     # user's `n_points: 4000` silently stayed 200. They ride in one internal
     # slot as an `LHYTableOpts`, which is what `make_workspace` takes.
+    # `n_atoms` is NOT a table knob — it is the unit conversion. The closed
+    # forms are ε = (8/15π²)(g n)^(5/2) in physical units; here n is normalised
+    # to ∫|ψ|²dV = 1 and c₀ = 4π(a_s/a_ho)N already carries N, so the tabulated
+    # energy needs a 1/N or it comes out exactly N times too large.
     p["lhy_opts"] = LHYTableOpts(;
         n_max=haskey(lhy_block, "n_max") ? Float64(lhy_block["n_max"]) : NaN,
         n_points=Int(get(lhy_block, "n_points", 200)),
-        n_bins=Int(get(lhy_block, "n_bins", 12)))
+        n_bins=Int(get(lhy_block, "n_bins", 12)),
+        n_atoms=max(1, Int(get(get(p, "interactions", Dict()), "N_atoms", 1))))
     return nothing
 end
 

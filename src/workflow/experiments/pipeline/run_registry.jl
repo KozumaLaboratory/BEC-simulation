@@ -11,12 +11,25 @@ export run_yaml, run_status, list_runs, compute_run_dir
 # runs `run_pipeline` independently.
 
 """
-    compute_run_dir(yaml_path; base_dir="runs") → String
+    default_run_root() → String
+
+Where run directories are written. `SPINORBEC_STORE` if set, else `"runs"`.
+
+This is the SAME variable `default_store()` and the GS stage cache already read,
+so one setting moves the whole output tree — run dirs, `_stage/gs`, and the CAS
+store — off the project root. Before this, `run_yaml` hardcoded `"runs"` while
+`_gs_stage_dir()` honoured `SPINORBEC_STORE`, so setting it moved the ψ store and
+left the run dirs behind, which is the wrong half to move: the ψ is the bulk.
+"""
+default_run_root() = get(ENV, "SPINORBEC_STORE", "runs")
+
+"""
+    compute_run_dir(yaml_path; base_dir=default_run_root()) → String
 
 Map a YAML file to its run directory. Identical YAML content → identical
 directory, enabling transparent resume.
 """
-function compute_run_dir(yaml_path::String; base_dir::String="runs")
+function compute_run_dir(yaml_path::String; base_dir::String=default_run_root())
     isfile(yaml_path) || throw(ArgumentError("YAML file not found: $yaml_path"))
     content = read(yaml_path, String)
     hash8 = bytes2hex(sha256(content))[1:8]
@@ -171,7 +184,7 @@ function _point_filename(i::Int, run_name::String="")
 end
 
 """
-    run_yaml(yaml_path; base_dir="runs", verbose=true) → String
+    run_yaml(yaml_path; base_dir=default_run_root(), verbose=true) → String
 
 Run or resume the experiment defined by `yaml_path`. Returns the run dir.
 
@@ -179,7 +192,7 @@ The YAML must have a `pipeline:` key. If a `scan:` key is present,
 each scan point × comparison run is executed independently via
 `run_pipeline` with the corresponding overrides applied to the raw dict.
 """
-function run_yaml(yaml_path::String; base_dir::String="runs", verbose::Bool=true,
+function run_yaml(yaml_path::String; base_dir::String=default_run_root(), verbose::Bool=true,
     dry_run::Bool=false, audit::Bool=true)
     _run_yaml_status(verbose, "starting run_yaml: $yaml_path"; comment=dry_run)
     return Base.invokelatest(_run_yaml_impl,
