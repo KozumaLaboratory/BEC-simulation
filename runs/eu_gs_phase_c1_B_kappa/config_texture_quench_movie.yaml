@@ -1,0 +1,58 @@
+# Watch the weak-field Eu texture respond to a B quench: where the vortices come
+# from, how the density reacts, what the spin does — as a movie.
+#
+# The excitation is the campaign's own physics. The ground state is prepared
+# ABOVE the ~50µG crossover, where the texture pins axial; the field is then
+# dropped BELOW it, where the spin manifold is soft. The state it was in is no
+# longer the state it wants, and it can only get there through the phase — which
+# is what puts defects in.
+#
+# The quench is INSTANTANEOUS (a new dynamics phase at the new field), not a
+# ramp. That is the cleaner protocol here, and it also sidesteps a real bug:
+# `units: {B: Gauss}` rewrites a ramp's `from`/`to` into Gauss STRINGS
+# (units_block.jl:94, deliberately, inheriting the parent's unit type) while the
+# ramp builder does `Float64(spec["from"])` (builders_phase.jl:125) and throws
+# MethodError. Gauss + `{from, to, duration}` cannot currently be combined.
+#
+# `save.every` yields 200 snapshots, which at 30 fps is a ~6.7 s movie — enough
+# to hit 5 s after the renderer resamples. Snapshot cost is
+# 32*32*64*13 complex128 = 13.6 MB/frame ⇒ ~2.7 GB of scratch. Fine here; check
+# before scaling the grid.
+#
+# LHY is on (full_bdg): the F=6 phases this texture chooses between are
+# mean-field degenerate.
+metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0}
+pipeline:
+  # Prepared above the crossover — axial flux-closure texture.
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      initial_state: flower
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: full_bdg}
+      B: {Bz: "1.0e-4 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 1500
+      tol: 1.0e-8
+
+  # Quenched to 20 µG — below the crossover. Nucleation and the subsequent
+  # motion both happen here, which is what the movie is for.
+  - dynamics:
+      duration: 20.0
+      dt: 0.0005
+      interactions: {N_atoms: 50000, omega_ref: 691.1504}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: full_bdg}
+      B: {Bz: "2.0e-5 Gauss"}
+      save: {every: 200}
+
+  - analyze:
+      - vortex_density_movie:
+          {axis: 3, output_dir: figs/eu_texture_quench_movie}

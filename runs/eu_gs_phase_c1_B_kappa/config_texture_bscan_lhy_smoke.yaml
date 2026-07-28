@@ -1,0 +1,35 @@
+# Smoke for config_texture_bscan_lhy_full_bdg.yaml: every code path the real run
+# takes — full_bdg LHY table build, DDI, all five seeds, the analyzer — on a
+# coarse grid with few iterations. Cheap enough to run before a launch, useless
+# as physics. CPU success does not imply GPU works, so run this on the backend
+# the real job will use.
+metadata: {owner: anko, project: Eu151 texture B-scan LHY — smoke}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [16, 16, 32], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: false
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: full_bdg}
+      B: {Bz: "5.0e-5 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 20
+      tol: 1.0e-4
+  - analyze:
+      - phase_classify_distance: {}
+scan:
+  product:
+    pipeline.0.B.Bz: ["5.0e-5 Gauss"]
+    pipeline.0.interactions.c1_ratio: [0.0]
+  comparison_runs:
+    - {name: flower, override: {pipeline.0.initial_state: flower}}
+    - {name: csv,    override: {pipeline.0.initial_state: chiral_spin_vortex}}
+    - {name: pcv,    override: {pipeline.0.initial_state: polar_core_vortex}}
+    - {name: fm,     override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,  override: {pipeline.0.initial_state: polar}}
