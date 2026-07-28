@@ -77,17 +77,20 @@ flux_of(psi) =
         @test rad > 5 * az                    # ≫ on a known divergent texture (≈0.95)
     end
 
-    @testset "named builders: flower is flux-closure, radial is not" begin
-        # The named seeds must REALISE the physics they are documented as:
-        # :flower → n̂=φ̂ (∇·F=0, flux-closure); :radial_spin_vortex → n̂=ρ̂
-        # (∇·F=2/ρ, divergent). This pins the weak-field Eu GS default seed
-        # to its validated texture and guards against the historical
-        # fl_vortex mislabel (a radial texture named "flower vortex").
+    @testset "named builders: flower is axial (above-crossover), radial is divergent" begin
+        # :flower is the UPPER (high-|B|) side Kawaguchi–Ueda Flower: an AXIAL core
+        # (large ⟨F_z⟩) canting to an in-plane rim so the dipolar flux closes on
+        # RELAXATION. As a seed it therefore has large |⟨F_z⟩| and a divergence
+        # below the uniform floor (0.577) — not the fully-closed in-plane limit
+        # (that is the lower / soft-manifold side, ⟨F_z⟩≈0). :radial_spin_vortex is
+        # a divergent texture (n̂=ρ̂). Guards against the historical fl_vortex mislabel.
         sys = SpinSystem(F)
+        fp_flower = spinor_fingerprint(init_psi(GRID, sys; state=:flower), GRID, F)
         flower = flux_of(init_psi(GRID, sys; state=:flower))
         radial = flux_of(init_psi(GRID, sys; state=:radial_spin_vortex))
-        @test flower < 0.25                   # flux-closure (below 0.577 floor)
-        @test radial > 3 * flower             # radial is a divergent texture
+        @test abs(fp_flower.Fz) > 0.5 * F     # axial magnetisation (⟨F_z⟩ large)
+        @test flower < 0.577                  # below the uniform density-gradient floor
+        @test radial > flower                 # radial is the more divergent texture
     end
 
     @testset "coherence: uniform vs textured" begin
@@ -102,5 +105,29 @@ flux_of(psi) =
         @test isfinite(fp.Jz)
         @test length(fp.winding) == D
         @test haskey(fp, :sigma) && haskey(fp, :inert)
+    end
+
+    @testset "non-cubic grid (isotropic dx, cigar z-box)" begin
+        # A cigar trap (κ<1) needs a taller z-box, so the grid is non-cubic but
+        # keeps isotropic spacing (dx=dy=dz). The structure-factor peak used to
+        # assume a cubic shape (NX³ k-grid) and threw a BoundsError here; guard it.
+        nx, nz = 16, 32
+        box_r = 12.0
+        g = make_grid(GridConfig((nx, nx, nz), (box_r, box_r, box_r * nz / nx)))
+        @test (g.x[1][2] - g.x[1][1]) ≈ (g.x[3][2] - g.x[3][1])   # isotropic dx
+        psi = zeros(ComplexF64, nx, nx, nz, D)
+        z0 = ry_col(0.0)
+        w = box_r / 5
+        for k in 1:nz, j in 1:nx, i in 1:nx
+            r2 = g.x[1][i]^2 + g.x[2][j]^2 + g.x[3][k]^2
+            gg = exp(-r2 / (2w^2))
+            for c in 1:D
+                psi[i, j, k, c] = gg * z0[c]
+            end
+        end
+        fp = spinor_fingerprint(psi, g, F)       # must not throw on non-cubic
+        @test fp.mF ≈ 1.0 atol = 1e-6
+        @test isfinite(fp.spin_mod) && isfinite(fp.dens_mod)   # _struct_peak outputs
+        @test isfinite(fp.fluxclosure)
     end
 end

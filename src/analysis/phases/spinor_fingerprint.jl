@@ -144,15 +144,16 @@ end
 
 # D. structure-factor peak power (and its k) beyond the cloud envelope k.
 function _struct_peak(field, dens, dx)
-    NX = size(dens, 1)
+    dims = size(dens)                       # per-axis; grid may be non-cubic
+    center = (dims .+ 1) ./ 2
     rms =
         sqrt(
-            sum(dens[I] * sum(abs2, Tuple(I) .- (NX + 1) / 2) for I in CartesianIndices(dens)) /
+            sum(dens[I] * sum(abs2, Tuple(I) .- center) for I in CartesianIndices(dens)) /
             sum(dens),
         ) * dx
     kenv = 1 / max(rms, dx)
-    kf = 2π .* fftfreq(NX, 1 / dx)
-    kg = [sqrt(kf[i]^2 + kf[j]^2 + kf[l]^2) for i in 1:NX, j in 1:NX, l in 1:NX]
+    kf = ntuple(d -> 2π .* fftfreq(dims[d], 1 / dx), length(dims))   # dx isotropic
+    kg = [sqrt(sum(kf[d][I[d]]^2 for d in 1:length(dims))) for I in CartesianIndices(dims)]
     S = abs.(fft(field)) .^ 2
     beyond = kg .> 3 * kenv
     tot = sum(S)
@@ -172,7 +173,7 @@ One gauge/frame-invariant fingerprint vector for the spinor field `psi`
   `spin_mod`/`kspin`, `dens_mod`/`kdens` (structure-factor peaks), and the
   nearest polyhedral inert state `inert` with `inert_score`.
 
-Assumes a uniform-cubic grid.
+Assumes uniform (isotropic) grid spacing; the shape may be non-cubic.
 """
 function spinor_fingerprint(psi::AbstractArray{<:Complex}, grid::Grid{N}, F::Int) where {N}
     D = 2F + 1

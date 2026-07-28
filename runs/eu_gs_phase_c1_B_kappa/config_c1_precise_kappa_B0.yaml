@@ -1,0 +1,37 @@
+# Precision c1*(κ) map of the FIRST-ORDER FM->polar line at B=0, to see whether the
+# transition character strengthens (oblate) or softens toward continuous (prolate)
+# with trap geometry — connecting the c1-driven line to the B-driven tricritical arc
+# (project_eu_coreless_vortex_demag_bc). κ=1 is already pinned (c1*≈0.028, first-order
+# via config_c1_precise_B0k1). Here κ ∈ {0.5, 1.5} at the same 0.0005 c1 step. The c1
+# window [0.023,0.031] brackets BOTH refine-grid collapses (κ=0.5 in (0.025,0.027);
+# κ=1.5 in (0.027,0.029)). Two bare seeds (m_plus_F FM vs polar), no pin; newton_polish
+# + tol 1e-9 + extra ITP steps for the soft near-spinodal FM branch. Grid/box match the
+# refine + κ=1 precise runs. 17 c1 × 2 κ = 34 tasks × 2 seeds.
+metadata: {owner: anko, project: Eu151 GS — precision c1*(κ) first-order line (B0, κ=0.5/1.5)}
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.028}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 2500
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.023, to: 0.031, n: 17}
+    pipeline.0.potential.omega.2:     [0.5, 1.5]
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}
