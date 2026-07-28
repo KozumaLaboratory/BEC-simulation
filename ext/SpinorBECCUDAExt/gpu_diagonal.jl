@@ -18,7 +18,7 @@ using StaticArrays: SVector
 # +40% when tried). One transcendental per voxel (exp/cis of the voxel-dependent
 # base) instead of D. Machine-precision equivalent to the direct per-component form.
 # The voxel-dependent half of the diagonal phase, declared ONCE: this kernel
-# and the fused SM·DDI·SM half-step (gpu_spin_chain.jl, which multiplies the
+# and the fused V half-step (gpu_spin_chain.jl, which multiplies the
 # same phase in and out around its rotations) both call it.
 @inline function _diag_voxel_phase(
     Pmf, i, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},

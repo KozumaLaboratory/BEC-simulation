@@ -126,8 +126,26 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   kernel's load/store. 5-15 % SLOWER at 64³ D=13. `CUDA.registers` = 48 with
 #   no spill, so it is neither access-pattern- nor occupancy-limited.
 #
-# NEXT: the DDI convolution's 6 rFFTs per call (3 forward + 3 backward, ~16 % of
-#   GPU time at 64³) are 6 separate cuFFT executions. Batching them needs
-#   Fx_r/Fy_r/Fz_r to be slices of one (n_pts..., 3) array, i.e. a DDIBuffers
-#   field-type change — check it does not widen a Workspace type parameter
-#   before starting.
+# done 2026-07-29 (4): the Horner coefficient table is cached by SCALE and the
+#   Zeeman phase vector by value, so a fixed-dt run stops relaunching a
+#   40-thread fill kernel and re-uploading 13 numbers 8×/step. Measured below
+#   this machine's ~1.5 ms spread, so no win claimed — kept because an EMPTY
+#   kernel launch costs 32-190 µs here (measured), which is the real reason a
+#   105-launch step leaves the GPU idle ~30 % of the time under WSL2. Native
+#   Linux is ~5 µs/launch, so this is much less of an issue on TSUBAME.
+#
+# rejected(measured, 3 % for a Workspace-adjacent type change) 2026-07-29:
+#   batching the DDI convolution's 6 rFFTs (3 forward + 3 backward) into 2
+#   batched transforms. It needs Fx_r/Fy_r/Fz_r to be slices of one
+#   (n_pts..., 3) array, i.e. a DDIBuffers field-type change, which propagates
+#   into the Workspace type parameters — the #1 entry on the guardrails' do-not
+#   list. The 6 rFFTs measure 0.544 ms of the 0.709 ms convolution, i.e.
+#   2.18 ms of a ~31 ms step; halving them would buy ~3 %. Not worth it.
+#
+# NEXT: at 64³ on this card the fused half-step kernel is ~74 % of FP64 peak in
+#   the Horner body, so there is no local headroom left in it. The open
+#   questions are both H100-only and UNMEASURED here: (a) whether the fused
+#   kernel is memory-bound there, where the (N,D) column layout's 32-byte
+#   transactions cost 2.4× (Round 8 measured that for the single-rotation
+#   kernel); (b) whether 105 launches/step matters at ~5 µs each. Get a TSUBAME
+#   profile before optimizing either.

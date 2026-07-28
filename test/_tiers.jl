@@ -388,8 +388,8 @@ const FULL_EXTRA = [
     "gpu/test_projected_gp_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
-    # Bit-identity of the fused SM·DDI·SM half-step against the
-    # operator-by-operator chain, plus one arm per eligibility rule. GPU-only
+    # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
+    # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
     "oracles/test_spin_chain_fusion_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",

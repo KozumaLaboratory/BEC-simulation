@@ -132,7 +132,7 @@ end
 # --- Taylor–Horner pieces (one spin component per lane) ---
 #
 # Declared once here as three `@inline` steps, so the single-rotation kernel and
-# the SM·DDI·SM chain kernel (gpu_spin_chain.jl) run the SAME Horner rather than
+# the fused half-step kernel (gpu_spin_chain.jl) run the SAME Horner rather than
 # two statements of it.
 #
 #   _rot_generator  build the tridiagonal A = v·F for this lane, and |v|²F²

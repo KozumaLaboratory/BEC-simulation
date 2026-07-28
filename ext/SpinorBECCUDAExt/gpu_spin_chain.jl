@@ -1,18 +1,18 @@
-# Fused realization of the SM · DDI · SM run inside one V half-step.
+# Fused realization of the whole V half-step: diag · SM · DDI · SM · diag.
 #
 # The contract, the eligibility rules and the reason this is bit-identical to
-# applying the three rotations separately live in
+# applying the five operators separately live in
 # `src/hamiltonian/integrator/spin_chain.jl`. This file only supplies the GPU
 # realization: the same `_rot_generator` / `_rot_schedule` / `_horner_rot`
 # pieces the single-rotation kernel uses, run three times on one register-
 # resident amplitude instead of three times through HBM.
 #
-# The two diagonal half-steps flanking the rotations come along, because their
-# phase is IDENTICAL on both sides: a spin rotation is unitary, so it leaves the
-# total density Σ_c|ψ_c|² alone, and with ψ_mf frozen both diagonal steps read
-# the same density anyway. So the voxel phase is computed once, in a prepass
-# over ψ_mf, and multiplied in on the way into the kernel and out of it — only
-# the per-component Zeeman factor differs between the two sides.
+# The two diagonal halves come along because their phase is IDENTICAL on both
+# sides: a spin rotation is unitary, so it leaves the total density Σ_c|ψ_c|²
+# alone, and with ψ_mf frozen both diagonal steps read the same density anyway.
+# So the voxel phase is computed once, in a prepass over ψ_mf, and multiplied in
+# on the way into the kernel and out of it — only the per-component Zeeman
+# factor differs between the two sides.
 #
 # What it removes, per V half-step at D = 13 (i.e. ×4 per RTP step):
 #   * 8 ψ passes → 3 (one prepass read of ψ_mf, one read+write here)

@@ -1,20 +1,21 @@
-# Gate for the fused SM · DDI · SM half-step (src/hamiltonian/integrator/
-# spin_chain.jl + ext/SpinorBECCUDAExt/gpu_spin_chain.jl).
+# Gate for the fused V half-step `diag · SM · DDI · SM · diag`
+# (src/hamiltonian/integrator/spin_chain.jl +
+# ext/SpinorBECCUDAExt/gpu_spin_chain.jl).
 #
 # The fused kernel claims to be the SAME splitting as the operator-by-operator
-# chain, not a cheaper approximation of it: the same three rotations, in the
-# same order, with the same fields — only the HBM round-trips between them are
+# half-step, not a cheaper approximation of it: the same operators, in the same
+# order, with the same fields — only the HBM round-trips between them are
 # removed. That claim is testable exactly, so this gate demands BIT-IDENTITY
 # rather than a tolerance. A tolerance would let a genuinely different
 # splitting (e.g. merging the three rotations into one, which is what
-# `split_step_combined!` deliberately does) slip through as "close enough".
+# `split_step_combined!` deliberately does) slip through as "close enough". It
+# also catches things a tolerance cannot: it found a 1-ulp multiply
+# association, `ψ·vph·zph` where the diagonal kernel writes `ψ·(vph·zph)`.
 #
-# The second half of the file pins the eligibility list. `_spin_chain_reason`
-# enumerates the operators that may sit between the diagonal step and DDI, and
-# a new operator added to `_outer_operators_fwd!` without a matching entry
-# there would be silently DROPPED by the fused path. One arm per entry, each
-# checking both that the reason fires and that the step still agrees with the
-# unfused chain.
+# The second half of the file pins the eligibility list. The fused path
+# REPLACES the half-step, so anything `_spin_chain_reason` fails to list would
+# be silently DROPPED. One arm per entry, each checking both that the reason
+# fires and that the step still agrees with the unfused path.
 
 using Test
 using LinearAlgebra: norm
@@ -61,7 +62,7 @@ else
         end
     end
 
-    @testset "fused SM·DDI·SM ≡ the unfused chain, bit for bit" begin
+    @testset "fused half-step ≡ the unfused one, bit for bit" begin
         SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
         a = _run(true, 5)
         b = _run(false, 5)
@@ -88,7 +89,7 @@ else
         end
     end
 
-    @testset "each operator that can sit between diag and DDI blocks the fusion" begin
+    @testset "each operator on the eligibility list blocks the fusion" begin
         base = _ws()
         pmf = CUDA.zeros(ComplexF64, 2)
 
