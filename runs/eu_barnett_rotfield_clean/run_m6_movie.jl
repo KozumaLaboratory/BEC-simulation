@@ -137,7 +137,23 @@ end
 Reduce every saved frame of `pj` into the small per-frame arrays the movie
 needs, and write one archive per arm.
 """
+# NOTE the two-step write. JLD2 mmaps its output, and mmap'ing a file on the
+# Lustre /gs filesystem SIGBUSes — the TSUBAME smoke died exactly there, with a
+# core dump, after the first arm. So the archive is built on node-local NVMe and
+# copied to /gs afterwards. (run_rebuild.jl hit the same wall and worked around
+# it with IOStream; a plain copy is simpler and needs no JLD2 internals.)
 function reduce_frames(pj, tag, outjld)
+    tmp = joinpath(SC, "m6mov_tmp_$tag.jld2")
+    _reduce_frames_impl(pj, tag, tmp)
+    mkpath(dirname(outjld))
+    cp(tmp, outjld; force=true)
+    rm(tmp; force=true)
+    @printf("[m6mov] %s: archive -> %s (%.1f MB)\n", tag, outjld,
+        filesize(outjld) / 1e6)
+    flush(stdout)
+end
+
+function _reduce_frames_impl(pj, tag, outjld)
     rr = open_result(pj)
     grid = rr.grid
     n_pts = Tuple(grid.config.n_points)
@@ -213,7 +229,7 @@ function reduce_frames(pj, tag, outjld)
         o["Fz"] = fz_t
         o["tag"] = tag
     end
-    @printf("[m6mov] %s: %d frames -> %s\n", tag, idx, outjld)
+    @printf("[m6mov] %s: %d frames reduced\n", tag, idx)
     flush(stdout)
 end
 
