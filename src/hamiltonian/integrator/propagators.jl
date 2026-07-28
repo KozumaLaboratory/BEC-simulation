@@ -215,6 +215,26 @@ call site serve both.
 end
 
 """
+    _lhy_de1_dp(l::SpatialLHY, p) -> de₁/dp
+
+Slope of the SAME piecewise-linear `e₁(p)` interpolant `_lhy_V` above evaluates,
+so the two cannot describe different tables. Zero outside the tabulated range,
+matching the flat extrapolation of the interpolant.
+
+`ε_LHY = n^(5/2) e₁(p)` depends on ψ through `p` as well as through `n`, so this
+is the second half of `δε/δψ̄` — see `_grad_lhy!`, which is the only caller and
+where the measured size of the piece is recorded.
+"""
+@inline function _lhy_de1_dp(l::SpatialLHY, p::Float64)
+    xs, ys = l.polarisations, l.e1_values
+    n = length(xs)
+    (n < 2 || p <= xs[1] || p >= xs[n]) && return 0.0
+    i = searchsortedlast(xs, p)
+    i >= n && return 0.0
+    @inbounds (ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i])
+end
+
+"""
     _local_polarisation(Pmf, i, n_local, F, fp_coeffs, ::Val{D})
 
 `|⟨F⟩|/F` for the spinor at voxel index `i`, from the SAME component reads the

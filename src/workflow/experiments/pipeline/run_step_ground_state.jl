@@ -340,6 +340,10 @@ function _run_step(
     spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
         v === nothing ? nothing : Symbol(String(v))
     end
+    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
+    # "type stability boundaries": an Any-typed local reaching make_workspace
+    # is what turns into a multi-minute JIT hang with no stack trace.
+    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
 
     gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
     gs = if method === :itp
@@ -354,6 +358,7 @@ function _run_step(
             save_every=max(1, n_steps ÷ 100),
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
+            lhy_opts=gs_lhy_opts,
             rotating_frame_omega=gs_rf_omega,
             verbose=verbose,
         )

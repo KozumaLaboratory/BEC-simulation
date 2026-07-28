@@ -54,7 +54,7 @@ function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
         E = sum(n) do ni
             ni < 1e-30 ? zero(ni) : ni * ni * (log(ni * a2) + lc)
         end
-        return 0.5 * lhy.c_lhy_2d * E * dV
+        return lhy.c_lhy_2d * E * dV
     else
         # Tabulated / spinor LHY kinds: host body (single copy).
         psi_h = _gpu_energy_psi_host(psi, ws)
