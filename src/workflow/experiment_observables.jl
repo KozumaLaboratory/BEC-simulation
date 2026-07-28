@@ -289,3 +289,26 @@ function _ensemble_peaks(exp::Experiment)
         ))
     end
 end
+
+"""
+    superfluid_fraction(exp; direction=1, method=:leggett) -> Float64
+    superfluid_fraction(exp, t; direction=1, method=:leggett) -> Float64
+
+Translational superfluid fraction of the run's stored state — the final ψ for
+the no-`t` form, the snapshot nearest `t` otherwise. Adds the `Experiment`
+faces of `superfluid_fraction(psi, grid; …)`; all keywords pass through, so
+the caveats there apply unchanged (rigid density ⇒ upper bound; a cloud that
+does not span the periodic box legitimately reports ≈ 0).
+
+Grid comes from the run's own `RunResult`, so the value is reproducible from
+the jld2 alone.
+"""
+superfluid_fraction(exp::Experiment; kwargs...) =
+    let r = _runresult(exp)
+        superfluid_fraction(r.psi, r.grid; kwargs...)
+    end
+
+function superfluid_fraction(exp::Experiment, t::Real; kwargs...)
+    grid = _runresult(exp).grid
+    superfluid_fraction(psi(exp, float(t)), grid; kwargs...)
+end

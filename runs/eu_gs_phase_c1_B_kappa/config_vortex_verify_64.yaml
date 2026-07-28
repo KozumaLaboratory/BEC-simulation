@@ -1,0 +1,51 @@
+# VERIFY the discovered coreless/polar-core VORTEX is the true GS (not a seed-
+# trapped metastable). At the 3 orphan cells (physical Eu, mid-B/high-κ) run 4
+# DIVERSE seeds FROM SCRATCH (no seed_from bias) + pin ε-continuation, take min-E.
+# If the vortex seed wins converged, the vortex is the GS. Pair with the 48³
+# variant for lattice-independence.
+#   3 cells × 4 seeds = 12 solves @ 64³.
+metadata: {owner: anko, project: Eu151 GS — vortex-phase GS verification (64³)}
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: itp                 # robust from-scratch descent into the basin
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      noise: {seed: 20260724, initial: {thermal: 0.40}}
+      dt: 0.002
+      n_steps: 4000
+      tol: 1.0e-7
+  - ground_state:                 # LBFGS + pin: certify the basin energy (ε→0)
+      method: lbfgs
+      m_lbfgs: 20
+      pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}
+      n_steps: 800
+      tol: 1.0e-7
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  zip:
+    pipeline.0.B.Bz: ["2.5e-5 Gauss", "4.8e-5 Gauss", "7.5e-5 Gauss"]
+    pipeline.0.potential.omega.2: [1.3, 1.6, 2.2]
+  comparison_runs:
+    - name: vortex
+      override: {pipeline.0.initial_state: polar_core_vortex}
+    - name: flower
+      override: {pipeline.0.initial_state: flower}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}
+    - name: fm
+      override: {pipeline.0.initial_state: m_plus_F}

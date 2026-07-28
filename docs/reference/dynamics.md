@@ -38,6 +38,7 @@ These return `on_step` closures and compose freely:
 | knob                | fields                                  | semantics                                            |
 |---------------------|------------------------------------------|------------------------------------------------------|
 | `sgpe:`             | `gamma`, `T`, `mu`, `k_cut`, `every`, `seed` | stochastic projected GPE (finite-T relaxation)        |
+| *(SPGPE)*           | Julia-only: `SPGPEReservoir` + `spgpe_callback` | **full** SPGPE — growth AND energy-damping reservoirs, γ/ℳ̄ derived from (μ, T, ε_cut); accepts ramped `T(t)`, `μ(t)`. See [spgpe.md](../guides/spgpe.md). No YAML key yet. |
 | `projected_gp:`     | `k_cut`, `smooth`, `every`               | hard truncated-projected GP                          |
 | `photon_scattering:`| `Gamma_sc`, `seed`                       | spontaneous-emission heating (Lindblad jumps)         |
 | `loss:`             | `gamma_dr` and/or `K3_per_m_si: ["1.5e-30 m^6/s", …] × D` | one-body + spin-dependent three-body loss             |

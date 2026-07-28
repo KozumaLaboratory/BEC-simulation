@@ -2,7 +2,7 @@
 
 function _compute_3d_densities(jld2_path::String; target_n::Int=0, max_components::Int=0)
     d = JLD2.load(jld2_path)
-    psi = d["psi"]
+    psi = haskey(d, "psi") ? d["psi"] : load_point_psi(jld2_path)  # light point → stage
     n_comp = size(psi, ndims(psi))
     ndim = ndims(psi) - 1
     F = div(n_comp - 1, 2)
@@ -67,7 +67,7 @@ sees the expanded grid.
 
 function _compute_column_densities(jld2_path::String, axis::Int=3)
     d = JLD2.load(jld2_path)
-    psi = d["psi"]
+    psi = haskey(d, "psi") ? d["psi"] : load_point_psi(jld2_path)  # light point → stage
     n_comp = size(psi, ndims(psi))
     ndim = ndims(psi) - 1
     F = div(n_comp - 1, 2)

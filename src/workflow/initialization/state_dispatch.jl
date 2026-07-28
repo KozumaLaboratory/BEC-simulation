@@ -54,7 +54,33 @@ function init_psi(
                 psi[I, c] *= gauss[I]
             end
         end
-    elseif state == :spin_coherent || state == :radial_spin_vortex || state == :flower
+    elseif state == :flower
+        # Above-crossover flux-closure "Flower" (Kawaguchi–Ueda). The spin is
+        # AXIAL (θ≈0, m=+F, large ⟨F_z⟩) in the high-density core and cants into
+        # the plane azimuthally (θ→π/2, n̂=φ̂ ⇒ ∇·F=0) toward the low-density rim,
+        # so the bulk stays magnetised along z while the dipolar flux closes.
+        # This is the UPPER (high-|B|) side of the field crossover — the lower
+        # (soft-manifold) side is instead fully in-plane (⟨F_z⟩≈0). The tilt
+        # scale follows the cloud size (Gaussian σ); the spin winds once (the
+        # mass circulation is F× that by Mermin-Ho). The core-axial column of the
+        # spin-F coherent state is the Wigner d^F_{m,F}(θ) = √C(2F,F−m) c^{F+m}s^{F−m}.
+        N >= 2 || throw(ArgumentError(":flower requires N >= 2 (needs xy-plane)"))
+        Rc = 2 * sigma[1]
+        @inbounds for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            rho = sqrt(x^2 + y^2)
+            th = (Float64(π) / 2) * (1 - exp(-(rho / Rc)^2))   # axial core → in-plane rim
+            phi = atan(y, x) + Float64(π) / 2 + init_phi_f      # azimuthal (flux-closing)
+            ch = cos(th / 2)
+            sh = sin(th / 2)
+            for c in 1:D
+                m = F - (c - 1)
+                amp = sqrt(binomial(2F, F - m)) * ch^(F + m) * sh^(F - m)
+                psi[I, c] = gauss[I] * amp * cis(-m * phi)
+            end
+        end
+    elseif state == :spin_coherent || state == :radial_spin_vortex
         # Spin-coherent state: at each grid point, the spinor points in the
         # direction (sin θ cos φ, sin θ sin φ, cos θ), constructed as
         # |ψ⟩ = Rz(φ) Ry(θ) |m=+F⟩.
@@ -62,22 +88,15 @@ function init_psi(
         # When init_vortex_charge ≠ 0, the azimuthal angle picks up
         # ℓ × atan(y, x) so the spin texture has winding number ℓ.
         #
-        # Two named in-plane (θ=π/2, ℓ=1) textures differ ONLY by a uniform
-        # spin-azimuth offset, which is the whole physics:
-        #   :radial_spin_vortex — spin azimuth = position azimuth ⇒ n̂ = ρ̂,
-        #       ∇·F = 2/ρ ≠ 0 (a divergent / radial texture; NOT flux-closure).
-        #   :flower             — spin azimuth = position azimuth + π/2 ⇒
-        #       n̂ = φ̂, ∇·F = 0: the Kawaguchi–Ueda flux-closure "Flower"
-        #       phase. This is the validated weak-field ¹⁵¹Eu+DDI GS texture
-        #       (flux_closure_fraction ≈ 0.06 ≪ the 0.577 density-gradient floor).
-        # Public via `init_psi_radial_spin_vortex` / `init_psi_flower`.
+        #   :radial_spin_vortex — an in-plane (θ=π/2, ℓ=1) texture with spin
+        #       azimuth = position azimuth ⇒ n̂ = ρ̂, ∇·F = 2/ρ ≠ 0 (a divergent /
+        #       radial texture; NOT flux-closure). The flux-closure Flower is a
+        #       separate `:flower` branch above (axial core + in-plane rim).
+        # Public via `init_psi_radial_spin_vortex`.
         theta_use, vortex_charge_use, phi_offset = if state == :radial_spin_vortex
             N >= 2 ||
                 throw(ArgumentError(":radial_spin_vortex requires N >= 2 (needs xy-plane)"))
             (Float64(π) / 2, 1, 0.0)
-        elseif state == :flower
-            N >= 2 || throw(ArgumentError(":flower requires N >= 2 (needs xy-plane)"))
-            (Float64(π) / 2, 1, Float64(π) / 2)
         else
             (init_theta_f, init_vortex_charge_i, 0.0)
         end

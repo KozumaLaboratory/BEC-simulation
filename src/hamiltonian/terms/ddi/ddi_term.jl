@@ -76,7 +76,7 @@ function _ddi_energy_from_gpu(psi_host, sm::SpinMatrices{D}, ddi_gpu, ddi_bufs_g
 
     ddi_host = DDIParams(ddi_gpu.C_dd, _to_host(ddi_gpu.Q_xx), _to_host(ddi_gpu.Q_xy),
         _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz),
-        _to_host(ddi_gpu.Q_zz))
+        _to_host(ddi_gpu.Q_zz), ddi_gpu.box_size)
     rfft_plans = make_rfft_plans(n_pts)
     Fx_rk = rfft_plans.forward * Fx_r
     Fy_rk = similar(Fx_rk);

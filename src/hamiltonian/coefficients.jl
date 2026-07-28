@@ -354,13 +354,31 @@ end
 """
     compute_lhy_2d_params(c0_2d, l_z) → Quasi2DLHY
 
-Quasi-2D LHY correction: ε_LHY ∝ n² ln(n a²_2d).
-Ref: Petrov & Astrakharchik, PRL 117, 100401 (2016).
+Quasi-2D LHY correction, as the ENERGY DENSITY coefficient:
+
+    ε_LHY = c_lhy_2d · n² · (ln(n a²_2d) + log_const)
+    V_LHY = dε/dn = c_lhy_2d · n · (2(ln(n a²_2d) + log_const) + 1)
+
+`c_lhy_2d = c₀²/(8π)` is the prefactor of the beyond-mean-field term in
+Petrov & Astrakharchik, PRL **117**, 100401 (2016) [arXiv:1605.07535],
+Eq. (5) — `(1/8π)(g̃↑↑n↑ + g̃↓↓n↓)² ln[(g̃↑↑n↑+g̃↓↓n↓)√e/Δ]` — read here in
+the single-component reduction.
+
+It was `c₀²/(4π)` with a compensating `0.5` written into the energy face
+(twice: `_lhy_energy` and the CUDA `gpu_energy.jl`) and NOT into `_lhy_V`, so
+**the propagator applied exactly twice the correct quasi-2D LHY potential**
+while the reported energy was right. Two statements of one coefficient, which
+is the bug class the HamTerm protocol exists to remove; the factor now lives
+here once and both faces derive from it. `dE/dn == V` is gated by
+`oracles/test_lhy_mode_face_coverage.jl`, which is what caught it.
+
+No committed config under `runs/` selects `kind: quasi_2d`, so no stored
+result is affected.
 """
 function compute_lhy_2d_params(c0_2d::Float64, l_z::Float64)
     γ_E = 0.5772156649015329
     log_const = 2.0 * γ_E - 1.0 - log(2.0)
-    c_lhy_2d = c0_2d^2 / (4.0 * Float64(π))
+    c_lhy_2d = c0_2d^2 / (8.0 * Float64(π))
     a_2d_sq = l_z^2
     Quasi2DLHY(c_lhy_2d, a_2d_sq, log_const)
 end
@@ -413,7 +431,7 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
     (nodes, weights)
 end
 
-export lima_pelster_Q5, compute_c_lhy_with_ddi
+export lima_pelster_Q5, compute_c_lhy_with_ddi, scalar_lhy_coefficient
 
 """
     lima_pelster_Q5(eps_dd) → Float64
@@ -454,15 +472,56 @@ end
 """
     compute_gamma_lhy(a_s_over_aho, eps_dd, N_atoms) → Float64
 
-Dimensionless scalar LHY coefficient (Lima-Pelster) for the auto-derive
-path, identical to the non-rotating resolver in `parsing_blocks.jl`:
+!!! warning "Two scalar-LHY coefficients live here, and they DISAGREE"
+    `compute_gamma_lhy` (below) and `scalar_lhy_coefficient` (further down) are
+    both "the dimensionless scalar LHY coefficient" but are not the same
+    formula: this one is `(128/(3√π))·√(|a_s/a_ho|³)·N·Q₅`, the other is
+    `(128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅`. The second is the one PR #108
+    fixed after finding the auto-derive path short by `π·(a_s/a_ho)·√N`.
+
+    They are kept separate at this merge rather than unified, because
+    `compute_gamma_lhy` is reached ONLY by the rotating_basis ground state
+    (`run_step_rotating/ground_state.jl`) and its own test pins the current
+    values — silently switching that path's formula would move results nobody
+    asked to move. The non-rotating `lhy: {kind: scalar}` auto-derive already
+    uses the fixed `scalar_lhy_coefficient`.
+
+    TODO(owner of the rotating_basis path): decide which is right there and
+    delete the other. Two declarations of one physical quantity is exactly the
+    drift the HamTerm protocol exists to prevent.
+
+Dimensionless scalar LHY coefficient (Lima-Pelster) for the rotating_basis
+auto-derive path:
 
     c_lhy = (128/(3√π)) · √(|a_s/a_ho|³) · N · Q₅(ε_dd)
-
-Restored after the rotating_basis refactor dropped it (the
-`run_step_rotating/ground_state.jl` auto-path calls it for ε_dd > 0.5).
 """
 function compute_gamma_lhy(a_s_over_aho::Float64, eps_dd::Float64, N_atoms::Integer)
     c_lhy_scalar = (128.0 / (3.0 * sqrt(π))) * sqrt(abs(a_s_over_aho)^3) * N_atoms
     c_lhy_scalar * lima_pelster_Q5(eps_dd)
+end
+
+"""
+    scalar_lhy_coefficient(a_s_over_a_ho, N_atoms; eps_dd=0.0) → Float64
+
+Dimensionless scalar (Lee-Huang-Yang / quantum-fluctuation) coefficient in this
+repo's per-particle convention: with `∫|ψ|² dV = 1` and `c₀ = 4π(a_s/a_ho)N`,
+
+    E_LHY/N = (2/5)·c_lhy·∫n^{5/2} dV,     μ_LHY = c_lhy·n^{3/2}
+
+Derived from `γ_QF = (32/3)·g·√(a_s³/π)` with `g = 4πℏ²a_s/m`, i.e.
+`γ_QF = (128√π/3)(ℏ²/m)a_s^{5/2}`, which in these units is
+
+    c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+
+Equivalently `c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π)`, which reproduces the SI
+ratio `μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π)` — the statement with no
+convention freedom, gated by `test/oracles/test_scalar_lhy_si_roundtrip.jl`.
+
+Single declaration point: the YAML `lhy: {kind: scalar}` auto-derivation and
+the scalar-eGPE `gamma_lhy` both read it, so the two paths cannot drift.
+"""
+function scalar_lhy_coefficient(a_s_over_a_ho::Real, N_atoms::Real; eps_dd::Real=0.0)
+    ah = abs(Float64(a_s_over_a_ho))
+    n = Float64(N_atoms)
+    (128.0 * sqrt(π) / 3.0) * ah^2.5 * n^1.5 * lima_pelster_Q5(Float64(eps_dd))
 end

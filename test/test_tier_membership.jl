@@ -18,12 +18,16 @@
 #      re-selection for the physics-only tier, so it is exempt from this
 #      check).
 #
-# Runs as a pure file-glob + set comparison (no SpinorBEC needed); lives
-# in FAST so every push enforces it. The tier-list constants,
-# MANUAL_TESTS_ALLOWLIST and the _COST balance model are defined in
-# _tiers.jl, include()d in global scope before this file runs.
+# It also holds the other two harness-contract gates: the parallel-balance
+# cost model, and the export-shadowing check that the shared worker process
+# makes load-bearing (see that testset).
+#
+# Mostly file-glob + set comparison; lives in FAST so every push enforces it.
+# The tier-list constants, MANUAL_TESTS_ALLOWLIST and the _COST balance model
+# are defined in _tiers.jl, include()d in global scope before this file runs.
 
 using Test
+using SpinorBEC
 
 @testset "Tier membership is total and exact" begin
     test_root = @__DIR__
@@ -90,4 +94,32 @@ end
     ])
     @test length(stale) == 1
     @test stale[1].file == "solvers/test_3d.jl"
+end
+
+# Test files share a worker process (SPINORBEC_TEST_WORKERS > 1) and which files
+# land together is decided at run time by the claim queue, so a top-level name
+# in one file is visible to every file that runs after it in that process. If
+# that name is also a SpinorBEC export, the local definition wins in `Main` and
+# the package's binding is shadowed — silently, and only for whichever files
+# happened to share the process. That is how `result isa CheckResult` evaluated
+# false in workflow/validation/test_specs_and_check.jl: L5's own
+# `struct CheckResult` (now `L5TermCheck`) had run first.
+@testset "No test file shadows a SpinorBEC export" begin
+    exported = Set(String.(names(SpinorBEC)))
+    pattern = r"^(?:struct|mutable struct|abstract type|const)\s+([A-Za-z_][A-Za-z0-9_!]*)"
+    collisions = Tuple{String, String, Int}[]
+    test_root = @__DIR__
+    for (root, _, files) in walkdir(test_root), f in files
+        endswith(f, ".jl") || continue
+        path = joinpath(root, f)
+        for (i, line) in enumerate(eachline(path))
+            m = match(pattern, line)
+            m === nothing && continue
+            m.captures[1] in exported &&
+                push!(collisions, (relpath(path, test_root), m.captures[1], i))
+        end
+    end
+    isempty(collisions) ||
+        @info "Top-level test definitions shadowing a SpinorBEC export" collisions
+    @test isempty(collisions)
 end

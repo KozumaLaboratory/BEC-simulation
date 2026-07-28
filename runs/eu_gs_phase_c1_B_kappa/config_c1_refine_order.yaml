@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Transition-ORDER refinement across the FM↔polar band, Eu F=6.
+#
+#  The honest raw map left one thing unresolved: is the FM→polar drop at
+#  c1~+0.025-0.035 a FIRST-ORDER jump (discontinuous mF, bistable) or a
+#  CONTINUOUS crossover? Coarse Δc1=0.006 could not tell. Here: fine
+#  c1 line-scans at fixed κ ∈ {0.5,1,1.5}, for B ∈ {0,60µG}.
+#
+#  Method for an ORDER diagnosis (NOT a pinned soft-manifold GS):
+#   • NO pin — we want the BARE two-seed competition. m_plus_F (FM branch)
+#     and polar (polar branch) each relax to their nearest stationary state;
+#     if they stay DISTINCT with an energy crossing E_FM=E_polar ⇒ first-order
+#     + coexistence. If a single branch carries mF smoothly through ⇒ continuous.
+#   • tol 1e-9 + newton_polish so each branch is genuinely converged (the honest
+#     map showed a high-grad tail exactly in this band).
+#
+#  16 (c1) × 3 (κ) × 2 (B) = 96 points × 2 seeds. Grid/box match production.
+# ─────────────────────────────────────────────────────────────────────
+metadata: {owner: anko, project: Eu151 F=6 GS — FM/polar transition ORDER refinement}
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.03}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 1500
+      tol: 1.0e-9
+
+  - analyze:
+      - phase_classify_distance: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.015, to: 0.045, n: 16}
+    pipeline.0.potential.omega.2:     [0.5, 1.0, 1.5]
+    pipeline.0.B.Bz:                  ["0.0 Gauss", "6.0e-5 Gauss"]
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}
