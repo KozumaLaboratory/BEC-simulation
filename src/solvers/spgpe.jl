@@ -318,10 +318,7 @@ function apply_spgpe_step!(
     # the C region for the I region. Measuring this after the noise instead would
     # conflate it with noise truncation, which is a per-step effect two to three
     # orders of magnitude larger and would swamp it.
-    dV = cell_volume(ws.grid)
-    n0 = real(sum(abs2, ws.state.psi))
-    apply_projected_gp!(ws, r.k_cut)
-    cutoff_outflow = (n0 - real(sum(abs2, ws.state.psi))) * dV
+    cutoff_outflow = apply_projected_gp!(ws, r.k_cut)
 
     if r.gamma > 0
         _spgpe_number_damping!(ws, r.gamma, r.mu, r.T, dt_f; seed=seed, noise=noise)
@@ -336,9 +333,7 @@ function apply_spgpe_step!(
     # literal P{…} of Eq. (4). What it removes here is the part of the fresh
     # noise that landed above the cutoff; that is bookkeeping of the injection,
     # NOT a physical outflow, so it is reported separately from `cutoff_outflow`.
-    n_before = real(sum(abs2, ws.state.psi))
-    apply_projected_gp!(ws, r.k_cut)
-    noise_truncated = (n_before - real(sum(abs2, ws.state.psi))) * dV
+    noise_truncated = apply_projected_gp!(ws, r.k_cut)
     merge(r, (; cutoff_outflow, noise_truncated))
 end
 
