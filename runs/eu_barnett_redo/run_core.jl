@@ -38,13 +38,37 @@ else
 end
 
 # ---- parameters -------------------------------------------------------------
-# Box sized by EDGE DENSITY, not cloud RMS: the J_z drift is a periodic-box
-# artefact, flat in dt and in propagator order (test/oracles/test_jz_conservation_ddi.jl).
-# n = 96 = 2^5*3 is FFT-friendly; the previous round's n = 112 = 2^4*7 was
-# measured at ~66x the per-step cost of n = 80, and that factor-7 transform is
-# a large part of why.
+# The box still gets sized by EDGE DENSITY (per axis, target <= 1e-6) so the
+# wall cannot contaminate anything -- but it is NOT what drove the J_z leak.
+# That reading, and the smooth fixture behind it in
+# test/oracles/test_jz_conservation_ddi.jl, did not survive the production runs:
+# fixing edge_z from 1.35e-3 to 1.0e-9 left the leak unchanged (1.63 -> 1.74),
+# and the dx series below cut it 27x while the edge fraction got WORSE.
 #
-# The z half-box is 12, not 6: at omega_z = 2 the cloud is thinner in z, but not
+# FFT sizes keep small prime factors: 128 = 2^7, 81 = 3^4. The previous round
+# measured n = 112 = 2^4*7 at ~66x the per-step cost of n = 80, and that
+# factor-7 transform is a large part of why.
+#
+# GEOMETRY IS MEASURED, NOT GUESSED (2026-07-29 dx-convergence series, probe
+# stage lengths, fixed box 28x28x12):
+#
+#   dx     J_z at quench start    leak    conversion   leak/conv
+#   0.44         7.754            6.265     0.851        736%
+#   0.29        12.207            2.985     1.406        212%
+#   0.22        12.495            0.230     1.447        15.9%
+#
+# All three quantities converge: the stir output moves +2.4% over the last
+# refinement, the conversion +2.9%, and the leak collapses 27x. dx = 0.22 is
+# therefore the production resolution. It is the ONLY knob that mattered --
+# box, dt, periodic images and the Ronen cutoff were each ruled out by direct
+# measurement, and the static DDI-torque scan explains why: the discretised
+# kernel conserves J_z to 1e-16 for smooth states and violates it at O(1) once
+# the state carries grid-scale structure.
+#
+# dt = 1e-3, not 4e-4: halving dt reproduces the leak to six digits, so the
+# error is spatial and the finer step bought nothing but 2.5x the cost.
+#
+# The z half-box is 9 (not 6, not 12): at omega_z = 2 the cloud is thinner in z, but not
 # nearly as much thinner as the first pass assumed. The 2026-07-28 batch ran
 # box_z = 12 and its frames carry 1.3e-3 of the density in the outermost 0.5 of
 # z against 3.5e-6 in x and y -- 1350x the 1e-6 target, and invisible because
@@ -60,11 +84,11 @@ end
 # finest resolution, not the coarsest. 80 = 2^4*5 keeps dx_z = 0.30, matching
 # dx_xy = 0.29, at 2x the cell count of the 2026-07-28 batch.
 const NPTS = let s = get(ENV, "BR_N", "")
-    isempty(s) ? (SMOKE ? (32, 32, 16) : (96, 96, 80)) :
+    isempty(s) ? (SMOKE ? (32, 32, 16) : (128, 128, 81)) :
     NTuple{3, Int}(parse.(Int, split(s, ",")))
 end
 const BOX = let s = get(ENV, "BR_BOX", "")
-    isempty(s) ? (SMOKE ? (16.0, 16.0, 8.0) : (28.0, 28.0, 24.0)) :
+    isempty(s) ? (SMOKE ? (16.0, 16.0, 8.0) : (28.0, 28.0, 18.0)) :
     NTuple{3, Float64}(parse.(Float64, split(s, ",")))
 end
 # Zero-padded, image-free DDI convolution. Off by default: it is ~8x the FFT
@@ -89,7 +113,7 @@ const GS_STEPS = parse(Int, get(ENV, "BR_GS_STEPS", SMOKE ? "200" : "4000"))
 const GS_DT    = 0.004
 const T_STIR   = parse(Float64, get(ENV, "BR_T_STIR", SMOKE ? "0.4" : "30.0"))
 const T_QUENCH = parse(Float64, get(ENV, "BR_T_QUENCH", SMOKE ? "0.4" : "50.0"))
-const DT       = parse(Float64, get(ENV, "BR_DT", SMOKE ? "0.004" : "4.0e-4"))
+const DT       = parse(Float64, get(ENV, "BR_DT", SMOKE ? "0.004" : "1.0e-3"))
 const REC_EVERY = max(1, round(Int, 0.1 / DT))
 const TAG_SUFFIX = get(ENV, "BR_TAG", "")
 # Sparse full frames, for the vortex figure. 0 writes none — a geometry probe
@@ -340,7 +364,7 @@ if conv < 1e-3
     @printf("    (no conversion to speak of — leak %.2e is the whole signal)\n", leak)
 else
     @printf("    leak / conversion = %.1f%%   %s\n", 100 * leak / conv,
-            leak < 0.1 * conv ? "OK" : "TOO LARGE — enlarge the box before believing this")
+            leak < 0.1 * conv ? "OK" : "TOO LARGE — REFINE dx before believing this (not the box: measured 2026-07-29)")
 end
 @printf("  max edge fraction: x %.2e  y %.2e  z %.2e   (target <= 1e-6 on EVERY axis)\n",
         maximum(r[8] for r in rows), maximum(r[9] for r in rows),
