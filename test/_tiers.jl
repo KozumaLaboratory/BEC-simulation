@@ -478,6 +478,9 @@ const _COST = Dict{String, Float64}(
     "test_quality.jl" => 48.0,           # Aqua/JET static analysis (warm-measured)
     "workflow/test_active_learning.jl" => 41.0,  # GP/BO, no spinor workspace — real file cost
     "workflow/test_pipeline.jl" => 17.0,
+    # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
+    # SpatialLHY table build (BdG solves) — measured 22.2s.
+    "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "workflow/test_infrastructure.jl" => 15.0,
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "test_level10_hpsi_self_consistency.jl" => 12.0,
