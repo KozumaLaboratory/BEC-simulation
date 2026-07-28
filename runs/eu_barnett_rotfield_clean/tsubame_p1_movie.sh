@@ -21,7 +21,13 @@
 #$ -o logs/tsubame/p1_movie.log
 set -euo pipefail
 
-REPO=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
+# PRIVATE repo copy, not the shared one. /gs/fs/.../BEC-simulation is written
+# by every session at once: this job first died because another branch's src had
+# replaced ours (no `from_jld2`), and on the retry died again because src had
+# been fixed but `ext/` was still the other branch's and referenced a function
+# ours does not define. Patching one directory at a time loses that race
+# forever; a private tree ends the class. Override with REPO= if needed.
+REPO="${REPO:-/gs/bs/work/7/uk07267/bec-repo-barnett}"
 cd "$REPO"
 mkdir -p logs/tsubame
 export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia
@@ -53,6 +59,11 @@ need_src() {
 }
 need_src from_jld2 src/workflow/experiments/pipeline/run_step_ground_state.jl 3
 need_src _mass_current_vortices src/workflow/experiments/analyzers/analyzers_large/vortex_density_movie.jl 2
+# src and ext must come from the SAME tree — a mixed pair precompiles into an
+# UndefVarError, which is how the second attempt died.
+if [ "$(grep -r _spin_chain_available src/ 2>/dev/null | wc -l)" != "$(grep -r _spin_chain_available ext/ 2>/dev/null | wc -l)" ]; then
+  echo "FATAL: src/ and ext/ disagree — mixed trees. Re-sync BOTH and resubmit."; exit 1
+fi
 echo "[guard] remote src carries this branch's from_jld2 + mass-current vortex code"
 
 source scripts/tsubame_setup.sh
