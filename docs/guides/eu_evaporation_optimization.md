@@ -129,6 +129,17 @@ is a warning to always include the geometry lever, not a dead end.
 
 ![c1-DDI orthogonal lever](../../figs/eu_evaporation_optimization/c1_ddi_orthogonal.png)
 
+*Optimal aspect-ratio-scan design.* Building the 2-parameter Fisher matrix from the measured
+spin-mixing sensitivities $[\partial\ln A/\partial\ln c_1,\ \partial\ln A/\partial\ln c_{dd}]$ at
+$\lambda\in\{0.5,1,2\}$ — $(0.64,+0.16)$, $(0.91,-0.09)$, $(1.75,-1.27)$ — quantifies it: a **single**
+$\lambda$ leaves $c_1\!\leftrightarrow\!c_{dd}$ fully degenerate ($\sigma(c_1)\to\infty$), while **two
+geometries** give $\sigma(c_1)/c_1\approx4.5\%$ (cigar $\lambda{=}0.5$ + isotropic) and all three give
+$4.3\%$ (at 5 % per-measurement amplitude noise, $c_{dd}$ marginalized). So the practical recipe is a
+**two-aspect-ratio spin-mixing scan** (cigar + round), which pins $c_1$ to ~5 % despite DDI dominating
+each single trace.
+
+![aspect-ratio design](../../figs/eu_evaporation_optimization/aspect_design.png)
+
 **Overturned claim 2 — "$N_{\rm BEC}$ predictable to ±30 % once evaporation params are measured."**
 REFUTED as too optimistic. MC variance decomposition: $K_3$ 66 %, $a_s$ 34 %, $\tau_{bg}$/$\Gamma_h$
 < 1 %. But $K_3$ carries a **factor-2.6 cross-method systematic** (direct $1.2\times10^{-41}$ vs
@@ -141,6 +152,40 @@ density calibration; (2) BEC-decay $K_3$ at known $\bar\omega$ — kills 66 % of
 variance; (3) $a_s$ is already at 3.6 %; (4) $c_1$ needs an orthogonal DDI-separating lever, not a
 lone spin-mixing trace. $\tau_{bg},\Gamma_h$ are low-priority for the endpoint (measure in a
 dedicated hold, not on the ramp).
+
+**Do-first lever (1) verified — dipole-mode $\bar\omega$ to 1 %.** A simulated dipole-mode
+measurement (displace the GS, fit the COM oscillation $x(t)=A\sin(\omega t+\varphi)$) recovers
+$\bar\omega$ with **zero fit systematic**, and $\sigma(\bar\omega)/\bar\omega<1\%$ from ~10 imaging
+shots even at 10 % COM noise (0.1–0.5 % at 30 shots). The only requirement is **≥10 shots per 3
+trap periods** — 6 shots aliases (→ ~13 %). So a 1 % $\bar\omega$ turns the $K_3$ density-calibration
+systematic (±20 %) into a statistical one (~4 %) with a standard measurement.
+
+![omega measurement](../../figs/eu_evaporation_optimization/omega_measurement.png)
+
+**Do-first levers (1)+(2) chained end-to-end — $K_3$ recovery.** Generating synthetic BEC-decay
+data $N_0(t)$ at a known $\bar\omega$, adding atom-number noise, and fitting the analytic 3-body law
+back recovers $K_3$ with **zero bias**, at $\sigma(K_3)/K_3\approx3$–$5\%$ (10–20 shots, 3–5 % atom
+noise) **provided $\bar\omega$ is known to 1 %** — but $\sigma(K_3)$ climbs to ~13 % if $\bar\omega$ is
+only 5 %, because $K_3\propto\bar\omega^{-2.4}$. This closes the chain: the 1 % dipole-mode $\bar\omega$
+(lever 1) makes the BEC-decay $K_3$ (lever 2) a ~4 % statistical measurement — comfortably inside the
+campaign's conservative ±20 %, and it kills the 66 % $K_3$-driven share of the $N_{\rm BEC}$ variance.
+
+![k3 end-to-end](../../figs/eu_evaporation_optimization/k3_endtoend.png)
+
+## Real-ramp check (experiment-facing)
+
+![real lab ramp](../../figs/eu_evaporation_optimization/js_lab_ramp.png)
+
+Running the **literal 2020-12 lab evaporation sequence** (from `基底状態MOT_20201210更新.js`:
+hFORT $10\,\text{W}\to0.135\,\text{W}$ over $7.35$ s while vFORT $0\to$ max, calibration
+$P=10^{-3.72+0.496V}$) through the 0-D model at the direct-measured $K_3=1.2\times10^{-41}$ gives
+$N_{\rm BEC}\approx7\times10^3$, $T\approx110$ nK, cf $\approx0.96$, with the BEC forming late
+($\sim6.4$ s). That sits right in the 2020-12 epoch's measured window (thesis first BEC $3\times10^3$
+→ optimized $1.5\times10^4$), so the model tracks the real apparatus. It also makes the §"experiment
+guidance" point concrete: the shaping levers (waist + Feshbach, $\sim1.5\times$) sit **on top of** this
+evaporation ramp — the ramp does the heavy lifting (the $10^6\to10^4$ cooling), the shaping adds the
+last $\sim1.5\times$. (Caveat: vFORT's power→depth calibration is not in the JS file — the analog "10"
+is scaled to the thesis vODT max $7.4$ W.)
 
 ## Caveats / open
 
