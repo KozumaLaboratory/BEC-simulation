@@ -28,8 +28,14 @@
 #$ -o logs/tsubame/barnett_redo.log
 set -euo pipefail
 
-REPO=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
+# `#$ -cwd` already puts the job in the submission directory, which is the
+# checkout the script was submitted from. Do NOT hard-code the main checkout:
+# it is a shared working copy that other sessions keep on other branches with
+# modified src/, and running against a stale tree is how a whole TSUBAME sweep
+# silently produced NaNs on 2026-07-27. Override with BR_REPO if needed.
+REPO="${BR_REPO:-$PWD}"
 cd "$REPO"
+echo "REPO=$REPO  branch=$(git branch --show-current 2>/dev/null)  HEAD=$(git rev-parse --short HEAD 2>/dev/null)"
 
 export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia
 export JULIAUP_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.juliaup
