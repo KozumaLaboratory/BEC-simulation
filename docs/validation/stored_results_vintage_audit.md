@@ -155,19 +155,28 @@ Re-running the K₃=0 factorial on current `main`:
 | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
 | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
 
-**All four arms arrest.** The figure's premise — that there is a collapse for the
-LHY closure to determine — is absent from current code. The ordering has also
-inverted: the closures now arrest *least*.
+**Only the first two rows are usable**: `off` and `scalar` conserve energy to
+2e-8 / 7e-8, while the two closed-form arms drift **46 %** and report **97 % of
+the total energy in the LHY term** (`lhy = +1653` / `+1664` against a whole mean
+field of ≈ +2.2). Their ratios are recorded only to show the stored 1.63 / 1.60
+were not reproduced.
+
+The usable half is already decisive: **`off` does not collapse** (2.3339 → 1.0502,
+clean), so the figure's premise — a collapse for the LHY closure to determine —
+is absent from current code.
+
+Both dedicated gates for the tabulated path pass at this commit, so the 46 % drift
+is not an energy/propagator/gradient inconsistency; it is the table's magnitude in
+this Eu F=6 configuration, tracked separately.
 
 This is a different failure mode from the first re-derivation. There the
 conclusion survived a vacuous comparison; here the *phenomenon* is gone. Between
 them they cover both ways a stored result can fail: the knob was broken, or the
 thing the knob acted on no longer happens.
 
-Note also the ground-state peak density: 0.0044–0.0046 for off/scalar but
-0.0177–0.0185 for the closed forms, a factor 4 *after* #158. That gap is
-unexplained and is not what the caption describes — it needs its own work before
-any of these arms is quoted.
+The 4× higher initial peak in the closed-form arms (0.0177–0.0185 vs
+0.0044–0.0046) has the same origin as their 46 % drift: an LHY term two to three
+orders of magnitude larger than the rest of the Hamiltonian.
 
 ## Recommended order
 

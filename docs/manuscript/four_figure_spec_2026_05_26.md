@@ -112,18 +112,27 @@ reproduces", with loss-on as bracket evidence not headline claim.
 > | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
 > | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
 >
-> So "scalar density LHY is indistinguishable from no LHY" no longer holds either
-> — scalar now moves the ratio 1.05 → 1.18 — and the ordering that made the point
-> (off/scalar collapse, closures arrest) has inverted into "everything arrests,
-> and the closures arrest *least*".
+> **Only the first two rows are usable.** `off` and `scalar` conserve energy to
+> 2e-8 / 7e-8. The two closed-form arms drift **46 %** (E: 3123 → 1694) and their
+> `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
+> (`lhy = +1653` / `+1664` against a whole mean field of ≈ +2.2 in the other two
+> arms). Their ratios are not evidence of anything and are shown only to document
+> that the stored 1.63 / 1.60 were not reproduced. Do not read "the closures
+> arrest least" out of this table.
 >
-> A second, separate change: the ground-state peak density is 0.0044–0.0046 for
-> off/scalar but **0.0177–0.0185 for the closed forms** — a factor 4, *after*
-> #158 (closed-form tables were $N_{atoms}$ too large). That gap needs its own
-> explanation before any of these arms is quoted; it is not what the caption
-> describes.
+> What survives is enough to void the figure: **`off` does not collapse.** Its
+> ratio fell 2.3339 → 1.0502 with clean energy conservation, and `scalar` — also
+> clean — sits at 1.1839, so "scalar is indistinguishable from no LHY" is gone
+> too. The caption needs `off` to collapse so that the closures can be seen to
+> arrest it. It does not.
 >
-> Cause is not the LHY coefficient work alone. This run also predates the Eu
+> The two dedicated gates for the tabulated path both pass at this commit
+> (`test_lhy_energy_convention.jl` 17/17, `test_tabulated_lhy_propagator_parity.jl`
+> 42/42), so the 46 % drift is **not** an energy/propagator/gradient inconsistency.
+> It is the table's magnitude in this particular Eu F=6 configuration — tracked
+> separately; not diagnosed here.
+>
+> Cause of the `off` change is not the LHY work: this run predates the Eu
 > quadratic-Zeeman fix (11× too large until 2026-07-08), the DDI integrator-order
 > fixes and the ITP density-bias fix — see
 > [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
