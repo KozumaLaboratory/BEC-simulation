@@ -47,6 +47,15 @@ const GAMMA_DR = get(ENV, "RB_GAMMA_DR", "0.02")
 # a byte-identical config silently reuses a result computed by pre-bugfix code.
 # This tag is carried in the spec purely to break that.
 const TAG = get(ENV, "RB_TAG", "movie1")
+# Where run_yaml puts its content-addressed run dirs. The group /gs/fs quota is
+# 1 TB and was AT it (1000.06/1000.00) while this was being built, so pointing
+# this at a personal work area is not a nicety. `run_yaml` takes it as the
+# `base_dir` kwarg — it does NOT read the environment itself.
+const STORE = get(ENV, "SPINORBEC_STORE", "runs")
+# Where the small per-frame archives land (~29 MB/arm). Separate knob because
+# these are the deliverable and want to sit next to the figures, whereas the
+# run dirs above are bulk and want to sit wherever there is quota.
+const MOVIE_OUT = get(ENV, "RB_MOVIE_OUT", joinpath(OUT, "rebuild_movie"))
 const SUF = LOSSY ? "lossy_" : ""
 
 loss_block() = LOSSY ? join([
@@ -56,7 +65,7 @@ loss_block() = LOSSY ? join([
     ], "\n") : "      # no loss (unitary)"
 
 mkpath(SC)
-const MOV = joinpath(OUT, "rebuild_movie")
+const MOV = MOVIE_OUT
 mkpath(MOV)
 
 gs_yaml() = """
@@ -234,12 +243,13 @@ function _reduce_frames_impl(pj, tag, outjld)
 end
 
 println("===== M6-MOVIE Stage 1: axial m=-6 GS (Bz=$BZG, box=$BOX n=$N, tag=$TAG) =====")
+println("  store=$STORE  movie_out=$MOV")
 flush(stdout)
 gy = joinpath(SC, "m6mov_gs.yaml")
 open(gy, "w") do io
     write(io, gs_yaml())
 end
-gsdir = run_yaml(gy)
+gsdir = run_yaml(gy; base_dir=STORE)
 gs_path = joinpath(gsdir isa AbstractString ? gsdir : "", "point_001.jld2")
 
 for ell in (1, -1, 0)
@@ -251,7 +261,7 @@ for ell in (1, -1, 0)
     open(dy, "w") do io
         write(io, dyn_yaml(imp, tag))
     end
-    ddir = run_yaml(dy)
+    ddir = run_yaml(dy; base_dir=STORE)
     dpath = joinpath(ddir isa AbstractString ? ddir : "", "point_001.jld2")
     reduce_frames(dpath, tag, joinpath(MOV, "m6mov_$(SUF)$tag.jld2"))
 end
