@@ -344,6 +344,14 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     if haskey(lhy_block, "c_lhy")
         inter["c_lhy"] = lhy_block["c_lhy"]
     end
+    # Table-resolution knobs. `n_max` / `n_points` were in LHY_SCHEMA from the
+    # start but normalised nowhere, so `_build_spinor_lhy` never saw them and a
+    # user's `n_points: 4000` silently stayed 200. They ride in one internal
+    # slot as an `LHYTableOpts`, which is what `make_workspace` takes.
+    p["lhy_opts"] = LHYTableOpts(;
+        n_max=haskey(lhy_block, "n_max") ? Float64(lhy_block["n_max"]) : NaN,
+        n_points=Int(get(lhy_block, "n_points", 200)),
+        n_bins=Int(get(lhy_block, "n_bins", 12)))
     return nothing
 end
 

@@ -135,7 +135,13 @@ end
 
 # ---------------- per-term checks (propagator-level) ----------------
 
-struct CheckResult
+# NOT `CheckResult`: that name is exported by SpinorBEC (the ConservationSpec /
+# OperatorRHSSpec verdict type). A top-level `struct CheckResult` here binds the
+# name in `Main` and shadows the package's for every file that runs later in the
+# same worker process, so `result isa CheckResult` in
+# workflow/validation/test_specs_and_check.jl silently evaluated false. Test
+# files share a process — keep their top-level names out of the export surface.
+struct L5TermCheck
     name::String
     residual::Float64
     tol::Float64
@@ -147,7 +153,7 @@ function check_linear_zeeman(fx::L5Fixture; p::Float64=0.5)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("linear Zeeman   -p·F̂_z", res, TOL_PER_TERM, res < TOL_PER_TERM)
+    L5TermCheck("linear Zeeman   -p·F̂_z", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_quadratic_zeeman(fx::L5Fixture; q::Float64=0.05)
@@ -155,7 +161,7 @@ function check_quadratic_zeeman(fx::L5Fixture; q::Float64=0.05)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("quadratic Zeeman q·F̂_z²", res, TOL_PER_TERM, res < TOL_PER_TERM)
+    L5TermCheck("quadratic Zeeman q·F̂_z²", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_trap(fx::L5Fixture)
@@ -163,7 +169,7 @@ function check_trap(fx::L5Fixture)
     ref = textbook_propagator_diagonal(fx.psi, fx.V_trap, zee, 0.0, DT_PROBE)
     sb = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, 0.0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("trap V(r)·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
+    L5TermCheck("trap V(r)·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_contact_c0(fx::L5Fixture; c0::Float64=2.5)
@@ -171,7 +177,7 @@ function check_contact_c0(fx::L5Fixture; c0::Float64=2.5)
     ref = textbook_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, c0, DT_PROBE)
     sb = spinorbec_propagator_diagonal(fx.psi, zeros(fx.n_pts), zee, c0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("contact c0·n·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
+    L5TermCheck("contact c0·n·𝟙", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 function check_combined_diagonal(fx::L5Fixture;
@@ -180,7 +186,7 @@ function check_combined_diagonal(fx::L5Fixture;
     ref = textbook_propagator_diagonal(fx.psi, fx.V_trap, zee, c0, DT_PROBE)
     sb = spinorbec_propagator_diagonal(fx.psi, fx.V_trap, zee, c0, DT_PROBE)
     res = maximum(abs, ref .- sb)
-    CheckResult("combined (V + Zeeman + c0·n)", res, TOL_PER_TERM, res < TOL_PER_TERM)
+    L5TermCheck("combined (V + Zeeman + c0·n)", res, TOL_PER_TERM, res < TOL_PER_TERM)
 end
 
 # ---------------- spin matrix algebra (structural sanity) ----------------
@@ -206,7 +212,7 @@ function check_spin_algebra(fx::L5Fixture)
     r3 = maximum(abs, diag_fz .- Float64.(fx.m_values))
 
     res = max(r1, r2, r3)
-    CheckResult("spin algebra ([F_x,F_y]=iF_z, F̂·F̂=F(F+1), diag F_z=m)",
+    L5TermCheck("spin algebra ([F_x,F_y]=iF_z, F̂·F̂=F(F+1), diag F_z=m)",
         res, 1e-13, res < 1e-13)
 end
 
@@ -240,7 +246,7 @@ function check_kinetic_L0_fft_roundtrip(; n_pts::Int=32, box::Float64=8.0)
     plans.forward * buf
     plans.inverse * buf
     res = maximum(abs, buf .- psi)
-    CheckResult("kinetic L0: IFFT∘FFT round-trip", res, 1e-13, res < 1e-13)
+    L5TermCheck("kinetic L0: IFFT∘FFT round-trip", res, 1e-13, res < 1e-13)
 end
 
 """
@@ -256,7 +262,7 @@ function check_kinetic_L1_phase_array(; n_pts::Int=32, box::Float64=8.0)
     phase = SpinorBEC.prepare_kinetic_phase(grid, DT_PROBE; imaginary_time=false)
     expected = @. cis(-0.5 * grid.k_squared * DT_PROBE)
     res = maximum(abs, phase .- expected)
-    CheckResult("kinetic L1: prepare_kinetic_phase = cis(-k²/2·dt)", res, 1e-13, res < 1e-13)
+    L5TermCheck("kinetic L1: prepare_kinetic_phase = cis(-k²/2·dt)", res, 1e-13, res < 1e-13)
 end
 
 """
@@ -290,7 +296,7 @@ function check_kinetic_L2_plane_wave(; n_pts::Int=32, box::Float64=8.0, k_idx::I
     # Analytical target: exp(-i ε dt) · ψ, with ε = k₀²/2.
     expected = @. cis(-0.5 * k0^2 * DT_PROBE) * psi
     res = maximum(abs, vec(psi_sb) .- expected)
-    CheckResult("kinetic L2: plane-wave ψ=exp(ik₀x) → cis(-k₀²/2·dt)·ψ",
+    L5TermCheck("kinetic L2: plane-wave ψ=exp(ik₀x) → cis(-k₀²/2·dt)·ψ",
         res, 1e-12, res < 1e-12)
 end
 
@@ -344,7 +350,7 @@ function check_uniform_spin_rotation(fx::L5Fixture;
     chi_sb = vec(psi_sb)
 
     res = maximum(abs, chi_ref .- chi_sb)
-    CheckResult("uniform rotation: $label", res, 1e-12, res < 1e-12)
+    L5TermCheck("uniform rotation: $label", res, 1e-12, res < 1e-12)
 end
 
 check_uniform_rotation_x(fx::L5Fixture) = check_uniform_spin_rotation(
@@ -433,7 +439,7 @@ function check_spin_density_L1(fx::L5Fixture; n_grid::Int=8)
     res = max(maximum(abs, fxa .- fx_ref),
         maximum(abs, fya .- fy_ref),
         maximum(abs, fza .- fz_ref))
-    CheckResult("spin-mixing L1: _compute_spin_density! vs textbook",
+    L5TermCheck("spin-mixing L1: _compute_spin_density! vs textbook",
         res, 1e-13, res < 1e-13)
 end
 
@@ -475,7 +481,7 @@ function check_spin_mixing_L2_single_voxel(fx::L5Fixture; c1::Float64=0.5)
     chi_sb = vec(psi_sb)
 
     res = maximum(abs, chi_ref .- chi_sb)
-    CheckResult("spin-mixing L2: single voxel exp(-i c1 ⟨F⟩·F̂ dt)·χ",
+    L5TermCheck("spin-mixing L2: single voxel exp(-i c1 ⟨F⟩·F̂ dt)·χ",
         res, 1e-11, res < 1e-11)
 end
 
@@ -518,7 +524,7 @@ function check_spin_mixing_L3_multi_voxel(fx::L5Fixture; n_grid::Int=8, c1::Floa
     )
 
     res = maximum(abs, psi_ref .- psi_sb)
-    CheckResult("spin-mixing L3: multi-voxel end-to-end ($(n_grid) pts)",
+    L5TermCheck("spin-mixing L3: multi-voxel end-to-end ($(n_grid) pts)",
         res, 1e-11, res < 1e-11)
 end
 
@@ -556,7 +562,7 @@ function check_spin_mixing_L4_pure_z(fx::L5Fixture; c1::Float64=0.5)
     chi_sb = vec(psi_sb)
 
     res = maximum(abs, chi_ref .- chi_sb)
-    CheckResult("spin-mixing L4: pure-z (single-comp) ψ → diagonal",
+    L5TermCheck("spin-mixing L4: pure-z (single-comp) ψ → diagonal",
         res, 1e-13, res < 1e-13)
 end
 
@@ -650,7 +656,7 @@ function check_singlet_pair_L1_a00_zero(fx::L5Fixture; c2::Float64=0.5)
     chi_sb = vec(psi_sb)
 
     res = maximum(abs, chi_sb .- chi)
-    CheckResult("singlet-pair L1: A_{00}=0 corner (single component) → no-op",
+    L5TermCheck("singlet-pair L1: A_{00}=0 corner (single component) → no-op",
         res, 1e-13, res < 1e-13)
 end
 
@@ -667,7 +673,7 @@ function check_singlet_pair_L2_single_voxel(fx::L5Fixture; c2::Float64=0.5)
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
 
     res = maximum(abs, chi_ref .- psi_sb)
-    CheckResult("singlet-pair L2: single voxel vs textbook (RTP)",
+    L5TermCheck("singlet-pair L2: single voxel vs textbook (RTP)",
         res, 1e-12, res < 1e-12)
 end
 
@@ -683,7 +689,7 @@ function check_singlet_pair_L3_multi_voxel(fx::L5Fixture; n_grid::Int=8, c2::Flo
     SpinorBEC.apply_singlet_pair_step!(psi_sb, ip, fx.F, DT_PROBE, 1; imaginary_time=false)
 
     res = maximum(abs, psi_ref .- psi_sb)
-    CheckResult("singlet-pair L3: multi-voxel vs textbook ($(n_grid) pts)",
+    L5TermCheck("singlet-pair L3: multi-voxel vs textbook ($(n_grid) pts)",
         res, 1e-12, res < 1e-12)
 end
 
@@ -699,7 +705,7 @@ function check_singlet_pair_L4_norm_preserved(fx::L5Fixture; n_grid::Int=8, c2::
     norm_after = sum(abs2, psi_sb)
 
     res = abs(norm_after - norm_before) / norm_before
-    CheckResult("singlet-pair L4: relative ‖ψ‖² drift in RTP",
+    L5TermCheck("singlet-pair L4: relative ‖ψ‖² drift in RTP",
         res, 1e-12, res < 1e-12)
 end
 
@@ -754,7 +760,7 @@ function check_ddi_L1_qtensor_value(; n::Int=8, box::Float64=8.0)
     res_xz = abs(ddi.Q_xz[1, 1, j])
     res_yz = abs(ddi.Q_yz[1, 1, j])
     res = max(res_zz, res_xx, res_yy, res_xy, res_xz, res_yz)
-    CheckResult("DDI L1: Q_αβ at k=(0,0,k_z) = diag(-1/3,-1/3,2/3)",
+    L5TermCheck("DDI L1: Q_αβ at k=(0,0,k_z) = diag(-1/3,-1/3,2/3)",
         res, 1e-13, res < 1e-13)
 end
 
@@ -763,7 +769,7 @@ function check_ddi_L2_qtensor_k_zero(; n::Int=8, box::Float64=8.0)
     # I=(1,1,1) is k=(0,0,0) in rfft index order
     res = max(abs(ddi.Q_xx[1, 1, 1]), abs(ddi.Q_yy[1, 1, 1]), abs(ddi.Q_zz[1, 1, 1]),
         abs(ddi.Q_xy[1, 1, 1]), abs(ddi.Q_xz[1, 1, 1]), abs(ddi.Q_yz[1, 1, 1]))
-    CheckResult("DDI L2: Q_αβ(k=0) = 0 (Pedri-Santos regularisation)",
+    L5TermCheck("DDI L2: Q_αβ(k=0) = 0 (Pedri-Santos regularisation)",
         res, 1e-13, res < 1e-13)
 end
 
@@ -778,7 +784,7 @@ function check_ddi_L3_uniform_zero_phi(; n::Int=8, box::Float64=8.0, F::Int=6)
     SpinorBEC._compute_and_convolve_ddi!(psi, sm, ddi, bufs, Val(D), 3, (n, n, n))
 
     res = max(maximum(abs, bufs.Phi_x), maximum(abs, bufs.Phi_y), maximum(abs, bufs.Phi_z))
-    CheckResult("DDI L3: uniform polarized ψ → Φ_α = 0 (k=0 only F-content)",
+    L5TermCheck("DDI L3: uniform polarized ψ → Φ_α = 0 (k=0 only F-content)",
         res, 1e-12, res < 1e-12)
 end
 
@@ -818,7 +824,7 @@ function check_ddi_L4_plane_wave_phi(; n::Int=8, box::Float64=8.0, F::Int=6,
     res_x = maximum(abs, bufs.Phi_x)
     res_y = maximum(abs, bufs.Phi_y)
     res = max(res_z, res_x, res_y)
-    CheckResult("DDI L4: plane-wave F_z → analytical Φ_z (cos(k_0 z) + cos(2k_0 z))",
+    L5TermCheck("DDI L4: plane-wave F_z → analytical Φ_z (cos(k_0 z) + cos(2k_0 z))",
         res, 1e-11, res < 1e-11)
 end
 
@@ -837,7 +843,7 @@ function run_all_checks()
     )
     println()
 
-    results = CheckResult[
+    results = L5TermCheck[
         check_spin_algebra(fx),
         check_linear_zeeman(fx),
         check_quadratic_zeeman(fx),
