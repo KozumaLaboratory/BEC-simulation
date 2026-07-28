@@ -6,9 +6,10 @@
 #  * Adaptive tridiagonal Taylor-Horner (default) — the shared
 #    `_apply_spin_rotation_taylor!` in gpu_spin_rotation_taylor.jl, which the
 #    spin-mixing substep also uses (same operator, different v).
-#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — used when R exceeds
-#    `_SPIN_TAYLOR_RMAX[]` (never reached in production). Machine precision at
-#    all R, and the reference the Taylor path is parity-gated against.
+#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — reached only when
+#    the Taylor path is switched off or the spinor is wider than the warp
+#    layout (D > 16). Machine precision at all R, and the reference the Taylor
+#    path is parity-gated against.
 
 # --- Euler fallback eigenvector cache (Fy diagonalization) ---
 mutable struct GPUDDIRotCache{D, T <: AbstractFloat}
@@ -68,10 +69,11 @@ function SpinorBEC._apply_ddi_rotation!(
     py = _gpu_phi_vec(phi_y, n_pts, N)
     pz = _gpu_phi_vec(phi_z, n_pts, N)
 
-    plan = _spin_taylor_plan(psi, sm, px, py, pz, T(dt_frac), imaginary_time)
+    plan = _spin_taylor_plan(psi, sm)
     if plan !== nothing
-        coef, z, K = plan
-        _apply_spin_rotation_taylor!(P, px, py, pz, coef, z, K, Val(D))
+        coef, F = plan
+        _apply_spin_rotation_taylor!(
+            P, px, py, pz, coef, T(dt_frac), Val(D); imaginary_time, F)
         return nothing
     end
 

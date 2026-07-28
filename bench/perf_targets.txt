@@ -92,3 +92,93 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   Zeeman into ONE rotation per half-V (12 rotations/step → 4) and is tested
 #   + order-2 validated, but no production path calls it. Wiring it into the
 #   RTP loop is worth more than any further kernel tuning.
+#
+# === Round 9 (2026-07-29, RTP on an RTX 5070 Ti, 64³ Eu151 D=13 F64 + DDI) ===
+# Measured with bench/profile_rtp.jl (knob decomposition + CUDA kernel table)
+# and bench/micro_spin_taylor.jl (new — sweeps the Horner degree so the
+# compute-vs-memory regime is measured, not assumed).
+#
+# H100 (TSUBAME gpu_1, job 8290268 — both trees back to back on the SAME GPU):
+#
+#   64³   4.394 → 2.028 ms/step   2.17×      GPU busy 3.87 → 1.87 ms
+#   128³ 29.755 → 14.224 ms/step  2.09×      GPU busy 29.2 → 14.19 ms
+#
+# and after tightening _SPIN_TAYLOR_TOL to 1e-13 (which the per-voxel degree
+# made binding — see gpu_spin_rotation_taylor.jl), 128³ is 14.566 ms/step, i.e.
+# 2.04× for machine-precision rotations. The tolerance costs 1.024× there and
+# 1.088× on the consumer card.
+#
+# The fused half-step alone, in-process A/B (bench/rtp_fusion_ab.jl):
+#   64³  3.585 → 2.024 ms/step  1.77×
+#   128³ 26.145 → 14.252       1.83×
+# i.e. it is worth 1.8× on the H100 against 1.17× on the consumer card, because
+# there the step is memory-bound and locally it is FP64-compute-bound. Read the
+# per-item numbers below with that in mind: the local ranking is not the
+# production ranking, and only the end-to-end figures above are H100-measured.
+#
+# Side effect worth knowing: the midpoint predictor-corrector used to cost 46 %
+# of the step at 128³ and now costs ~1 %, because both of its passes share one
+# mean-field evaluation. The 2nd-order mean-field treatment is now nearly free.
+# (The knob's "no midpoint" arm is UNFUSED — psi_mf is what enables the fusion —
+# so that percentage compares two different paths and is not a clean isolate.)
+#
+# done 2026-07-29 (1): `z / T(k)` in the Horner body was two FP64 divisions per
+#   degree per lane. Tabulated as the REAL `scale/k` with the ∓i folded in as a
+#   component swap — bit-identical. K=8: 6.80 → 1.69 ms.
+#
+# done 2026-07-29 (2): the degree came from a HOST reduction over max|v|, which
+#   drained the stream 12×/step (46 % of the step, GPU idle) AND paid the peak's
+#   degree in the dilute tails. Now decided per voxel in-kernel, with angle
+#   halving so the Taylor path is exact at any R and the Euler fallback is no
+#   longer a dispatch decision. 51.6 → 30.8 ms/step; GPU busy 34 % → 82 %.
+#
+# done 2026-07-29 (3): `diag · SM · DDI · SM · diag` is the WHOLE V half-step in
+#   the Eu production shape, and under the midpoint corrector its mean field is
+#   frozen — so all three rotations want the same ⟨F⟩ and both diagonal halves
+#   the same voxel phase (a rotation is unitary; it cannot move the density).
+#   One kernel: 8 ψ passes → 3, 3 spin-density passes → 1, 5 launches → 2, per
+#   half-step. Bit-identical, gated as such
+#   (test/oracles/test_spin_chain_fusion_parity.jl — which caught a 1-ulp
+#   multiply-association slip a tolerance would have passed).
+#
+# rejected(measured on BOTH architectures) 2026-07-29: staging ψ through shared
+#   memory to coalesce the rotation kernel's load/store — the fix Round 8 named
+#   as the untried option after thread-per-voxel failed on register pressure.
+#     5070 Ti (compute-bound there): 5-15 % SLOWER at 64³ D=13; `CUDA.registers`
+#       = 48 with no spill, so not access-pattern- or occupancy-limited either.
+#     H100 (purely memory-bound there — t(16)/t(4) = 1.00): the ISOLATED kernel
+#       gains only 890 → 929 GB/s at 64³ and 996 → 1050 GB/s at 128³ (1.04-1.05×),
+#       and the whole RTP step gets 2 % SLOWER (2.016 → 2.045 ms at 64³,
+#       14.210 → 14.527 at 128³) because the two `sync_threads` cost more than
+#       the coalescing saves.
+#   The lesson for the next attempt: the ~900 GB/s ceiling is NOT the 32-byte
+#   transactions. Those carry full 32-byte sectors already (two voxels of a
+#   warp are adjacent), so byte efficiency was never the problem. The limit is
+#   memory-level parallelism — one warp has only 2 voxels in flight — and/or
+#   the serial shfl dependency chain in the Horner. Attack THOSE, not the
+#   addressing. Deleted rather than left behind a toggle: it is off on every
+#   machine measured.
+#
+# done 2026-07-29 (4): the Horner coefficient table is cached by SCALE and the
+#   Zeeman phase vector by value, so a fixed-dt run stops relaunching a
+#   40-thread fill kernel and re-uploading 13 numbers 8×/step. Measured below
+#   this machine's ~1.5 ms spread, so no win claimed — kept because an EMPTY
+#   kernel launch costs 32-190 µs here (measured), which is the real reason a
+#   105-launch step leaves the GPU idle ~30 % of the time under WSL2. Native
+#   Linux is ~5 µs/launch, so this is much less of an issue on TSUBAME.
+#
+# rejected(measured, 3 % for a Workspace-adjacent type change) 2026-07-29:
+#   batching the DDI convolution's 6 rFFTs (3 forward + 3 backward) into 2
+#   batched transforms. It needs Fx_r/Fy_r/Fz_r to be slices of one
+#   (n_pts..., 3) array, i.e. a DDIBuffers field-type change, which propagates
+#   into the Workspace type parameters — the #1 entry on the guardrails' do-not
+#   list. The 6 rFFTs measure 0.544 ms of the 0.709 ms convolution, i.e.
+#   2.18 ms of a ~31 ms step; halving them would buy ~3 %. Not worth it.
+#
+# NEXT: at 64³ on this card the fused half-step kernel is ~74 % of FP64 peak in
+#   the Horner body, so there is no local headroom left in it. The open
+#   questions are both H100-only and UNMEASURED here: (a) whether the fused
+#   kernel is memory-bound there, where the (N,D) column layout's 32-byte
+#   transactions cost 2.4× (Round 8 measured that for the single-rotation
+#   kernel); (b) whether 105 launches/step matters at ~5 µs each. Get a TSUBAME
+#   profile before optimizing either.
