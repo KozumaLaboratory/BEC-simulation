@@ -37,6 +37,24 @@ export P1_TAG="${P1_TAG:-movie1}"
 export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/bec-runs}"
 mkdir -p "$SPINORBEC_STORE"
 
+# The TSUBAME repo is SHARED and other sessions rsync their own branch's src
+# over it. That happened between this job's sync and its start: the remote src
+# had no `from_jld2` support at all, so `initial_state: from_jld2` fell through
+# to the numeric-parameter loop and died on Float64("<path>"). Loud is the point
+# — the same overwrite could equally well produce a quietly wrong answer.
+need_src() {
+  local pat="$1" file="$2" min="$3"
+  local n; n=$(grep -c "$pat" "$file" 2>/dev/null || echo 0)
+  if [ "$n" -lt "$min" ]; then
+    echo "FATAL: remote src is not this branch — '$pat' appears $n times in $file (need >= $min)."
+    echo "       Another session has rsynced over \$REPO/src. Re-sync and resubmit."
+    exit 1
+  fi
+}
+need_src from_jld2 src/workflow/experiments/pipeline/run_step_ground_state.jl 3
+need_src _mass_current_vortices src/workflow/experiments/analyzers/analyzers_large/vortex_density_movie.jl 2
+echo "[guard] remote src carries this branch's from_jld2 + mass-current vortex code"
+
 source scripts/tsubame_setup.sh
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 echo "=== P1-MOVIE node $(hostname) $(date) n=$P1_N box=$P1_BOX omegas=$P1_OMEGAS tag=$P1_TAG SMOKE=${SMOKE:-0} ==="
