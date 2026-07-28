@@ -134,16 +134,36 @@ end
             end
             write_run_summary(dir, jld; source="finish_hook")
             s = JSON.parsefile(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME))
-            # The repo this test runs in is a git checkout, so the stamp is there.
-            @test haskey(s, "_repo_commit")
-            c = s["_repo_commit"]
-            @test occursin(r"^[0-9a-f]{40}(-dirty)?$", c)
+            # Assert the VALUE against an independently obtained HEAD, not just
+            # that the key exists. `haskey` alone passed while the first version
+            # of the stamp was recording an ANCESTOR repo's commit (git -C walks
+            # up), which is exactly the lying hash the -dirty flag exists to
+            # avoid. Skip only where git genuinely is not available.
+            root = pkgdir(SpinorBEC)
+            head = try
+                readchomp(Cmd(`git -C $root rev-parse HEAD`; ignorestatus=true))
+            catch
+                ""
+            end
+            if occursin(r"^[0-9a-f]{40}$", head)
+                @test haskey(s, "_repo_commit")
+                c = s["_repo_commit"]
+                @test occursin(r"^[0-9a-f]{40}(-dirty)?$", c)
+                @test startswith(c, head)          # the package's OWN HEAD
+            else
+                @info "git unavailable — commit stamp is absent by design"
+                @test !haskey(s, "_repo_commit")
+            end
 
             pr = summary_provenance(dir)
-            @test pr.stamped
-            @test length(pr.commit) == 40
-            @test pr.dirty == endswith(c, "-dirty")
             @test pr.extractor_version == SpinorBEC.RUN_SUMMARY_EXTRACTOR_VERSION
+            if occursin(r"^[0-9a-f]{40}$", head)
+                @test pr.stamped
+                @test pr.commit == head
+                @test pr.dirty == endswith(s["_repo_commit"], "-dirty")
+            else
+                @test pr.stamped == false
+            end
         end
     end
 

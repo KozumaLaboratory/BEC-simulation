@@ -58,7 +58,16 @@ end
 # field here.
 function _repo_commit()
     try
-        root = dirname(dirname(dirname(dirname(@__DIR__))))   # src/workflow/validation → repo
+        root = pkgdir(@__MODULE__)
+        root === nothing && return nothing
+        # `git -C` walks UP until it finds a repository, so a wrong `root` does
+        # not fail — it silently answers for an ANCESTOR repo. That is how the
+        # first version of this function stamped the parent checkout's HEAD when
+        # run from a worktree under `.claude/worktrees/` (path arithmetic was one
+        # `dirname` too deep, and CI, whose checkout has no git ancestor, was what
+        # exposed it). So verify the repo we reached is the package's own.
+        top = readchomp(Cmd(`git -C $root rev-parse --show-toplevel`; ignorestatus=true))
+        isdir(top) && realpath(top) == realpath(root) || return nothing
         out = readchomp(Cmd(`git -C $root rev-parse HEAD`; ignorestatus=true))
         occursin(r"^[0-9a-f]{40}$", out) || return nothing
         dirty = !isempty(readchomp(Cmd(`git -C $root status --porcelain`; ignorestatus=true)))
