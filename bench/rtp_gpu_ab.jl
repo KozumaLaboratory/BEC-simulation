@@ -6,7 +6,8 @@
 # `_SPIN_TAYLOR_ENABLED[]`:
 #
 #   Euler  — the exact 5-stage kernel (9 HBM passes over ψ: 5 phase + 4 gemm)
-#   Taylor — the shared adaptive Taylor-Horner warp kernel (2 passes)
+#   seq/Taylor — same splitting, the shared Taylor-Horner rotation (2 passes)
+#   combined   — spin-mixing ⊗ DDI merged into ONE rotation per half-V
 #
 # Same process, so device clocks, cuFFT plans and the JIT are common-mode and
 # the ratio is the thing being measured rather than a difference of two jobs.
@@ -40,13 +41,14 @@ function build(n; c1_ratio=0.05, dt=1e-4)
     (ws, psi)
 end
 
-function arm!(ws, psi0, taylor::Bool, k)
-    Ext._SPIN_TAYLOR_ENABLED[] = taylor
+function arm!(ws, psi0, mode::Symbol, k)
+    Ext._SPIN_TAYLOR_ENABLED[] = mode !== :euler
+    step! = mode === :combined ? SpinorBEC.split_step_combined! : SpinorBEC.split_step!
     copyto!(ws.state.psi, psi0)
     ws.state.t = 0.0
     ws.state.step = 0
     run = () -> (for _ in 1:k
-        SpinorBEC.split_step!(ws)
+        step!(ws)
     end; CUDA.synchronize())
     # warm-up must not advance the state we then compare, so re-seed after it
     run()
@@ -68,32 +70,48 @@ println("RTP GPU A/B — Eu151 F=6 (D=13), F64, DDI + c₀ + c₁, midpoint on")
 println("  device: ", CUDA.name(CUDA.device()),
     "  free/total ", round(CUDA.available_memory() / 2^30; digits=1), "/",
     round(CUDA.total_memory() / 2^30; digits=1), " GiB")
-@printf("\n%6s %14s %14s %9s %14s\n",
-    "grid", "Euler ms/step", "Taylor ms/step", "speedup", "max|Δψ|/|ψ|∞")
+@printf("\n%6s %11s %11s %11s %8s %8s %11s %11s\n", "grid",
+    "seq/Euler", "seq/Taylor", "combined", "sp(seq)", "sp(comb)",
+    "Δψ seq/Tay", "Δψ combined")
 for n in SIZES
     ws, psi0 = build(n)
-    t_eul, p_eul = arm!(ws, psi0, false, NSTEP)
-    t_tay, p_tay = arm!(ws, psi0, true, NSTEP)
-    rel = maximum(abs.(p_tay .- p_eul)) / maximum(abs.(p_eul))
-    @printf("%5d³ %14.3f %14.3f %8.2f× %14.2e\n", n, t_eul, t_tay, t_eul / t_tay, rel)
+    t_eul, p_eul = arm!(ws, psi0, :euler, NSTEP)
+    t_tay, p_tay = arm!(ws, psi0, :taylor, NSTEP)
+    t_cmb, p_cmb = arm!(ws, psi0, :combined, NSTEP)
+    scale = maximum(abs.(p_eul))
+    # seq/Taylor must match seq/Euler to round-off — same operator, different
+    # realization. `combined` is a DIFFERENT SPLITTING, so its difference is a
+    # genuine O(dt³) integrator difference and not an error; the two columns are
+    # kept apart so they are never read as the same kind of number.
+    @printf("%5d³ %11.3f %11.3f %11.3f %7.2f× %7.2f× %11.2e %11.2e\n",
+        n, t_eul, t_tay, t_cmb, t_eul / t_tay, t_eul / t_cmb,
+        maximum(abs.(p_tay .- p_eul)) / scale,
+        maximum(abs.(p_cmb .- p_eul)) / scale)
     flush(stdout)
     ws = nothing
     p_eul = nothing
     p_tay = nothing
+    p_cmb = nothing
     GC.gc()
     CUDA.reclaim()
 end
 
-# Kernel breakdown of the production (Taylor) path at the largest size.
+# Kernel breakdown of both surviving paths at the largest size.
 Ext._SPIN_TAYLOR_ENABLED[] = true
 let n = SIZES[end]
-    ws, psi0 = build(n)
-    copyto!(ws.state.psi, psi0)
-    for _ in 1:3
-        SpinorBEC.split_step!(ws)
+    for (label, step!) in (("sequential", SpinorBEC.split_step!),
+        ("combined", SpinorBEC.split_step_combined!))
+        ws, psi0 = build(n)
+        copyto!(ws.state.psi, psi0)
+        for _ in 1:3
+            step!(ws)
+        end
+        CUDA.synchronize()
+        println("\n=== CUDA kernel breakdown, $(n)³, $label + Taylor, one step ===")
+        display(CUDA.@profile step!(ws))
+        println()
+        ws = nothing
+        GC.gc()
+        CUDA.reclaim()
     end
-    CUDA.synchronize()
-    println("\n=== CUDA kernel breakdown, $(n)³, Taylor path, one step ===")
-    display(CUDA.@profile SpinorBEC.split_step!(ws))
-    println()
 end

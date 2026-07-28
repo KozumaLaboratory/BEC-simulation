@@ -413,6 +413,7 @@ const FULL_EXTRA = [
     "gpu/test_mixed_precision.jl",
     "gpu/test_mixed_precision_phase3.jl",
     "hamiltonian/test_combined_spin_step.jl",
+    "solvers/test_rtp_combined_step_selection.jl",
     "hamiltonian/test_light_shift.jl",
     "solvers/test_conservation_properties.jl",
     "solvers/test_itp_ddi_strang_save_every.jl",      # Bug-4 ITP regression pin
