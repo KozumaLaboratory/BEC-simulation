@@ -252,10 +252,40 @@ the top of the aggregated waveform.
 
 | key | type / enum | default | notes |
 |---|---|---|---|
-| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` | none | — |
+| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` / `spatial` | none | — |
 | `c_lhy` | Number | auto | `scalar` / `quasi_2d` Lima-Pelster auto-derivation |
 | `n_max` | Number | `3 × max(\|ψ_init\|²)` | LHY table density-cap |
 | `n_points` | Int [3, 10000] | 200 | tabulation resolution |
+| `n_bins` | Int [2, 64] | 12 | `spatial` only — $|\langle F\rangle|/F$ bins |
+
+Every kind other than `spatial` builds ONE table for ONE spinor and applies it
+at every voxel — exact for a uniform cloud, measured at ~5% on converged
+weak-field Eu textures, with a sign that flips along a B-scan. `make_workspace`
+warns above a $|\langle F\rangle|/F$ spread of 0.3.
+
+`kind: spatial` is the answer to that warning: it tabulates $e_1(p)$ against the
+local polarisation $p = |\langle F\rangle|/F$, from the spinors actually present
+in `psi_init`, at one BdG solve per **occupied** bin (so `n_bins` is a cost knob
+and the cost is independent of grid size). When the cloud turns out uniform
+enough that a single-spinor table is already right, it falls back to `full_bdg`
+rather than returning nothing.
+
+Two caveats for `spatial`:
+
+- The polarisation piece of $\delta E/\delta\bar\psi$ is a spin operator, which
+  a diagonal split-step cannot carry. It is applied as its own substep
+  (`apply_spatial_lhy_spin_step!`, a per-voxel rotation about the local
+  $\langle F\rangle$ axis), so the propagator and the LBFGS gradient agree. Runs
+  predating issue #131 had ITP minimising a functional 2.3% away from the one
+  LBFGS minimised.
+- Expect `full_bdg`'s dynamic-instability warning. A bin's representative
+  spinor is lifted out of the cloud and is not a solution of the *uniform*
+  mean-field problem at its own density; the warning is about that fictitious
+  uniform system, not about your state.
+
+`n_max` and `n_points` reached nothing before 2026-07-28 — they were declared
+here and normalised by no one, so `n_points: 4000` silently stayed 200. Any
+config predating that fix ran at the defaults regardless of what it asked for.
 
 ### `loss` — three- / two-body loss, evaporation
 
@@ -438,12 +468,94 @@ Used by every field that accepts time dependence (`B.{Bx, By, Bz, ...}`,
 | `{piecewise: {times, values}}` | piecewise-linear |
 | `{interpolated: {times, values}}` | smooth interpolation |
 | `{csv: <path>}` | load from file |
+| `{noise: {...}}` | seeded field noise (below) |
+| `{sum: [<spec>, ...]}` | additive composition of any of the above |
 | existing `Waveform` | passthrough |
 
 **`frequency` convention** (Klaus-2022 footgun, memory
 `gotcha_waveform_frequency_convention.md`): for `sinusoidal`, YAML
 `frequency` is `f_phys / (2π · f_ref)`, not `f_phys / f_ref`. Pass
 `"X Hz"` (string with units) for unambiguous lab-unit input.
+
+### `noise:` — laboratory field noise
+
+Adds a seeded, reproducible noise realisation to any waveform-valued field.
+Combine it with the intended waveform via `sum:`; nothing in the `B` block
+needs to know about it.
+
+```yaml
+B:
+  Bz:
+    sum:
+      - {from: 6.0e-5, to: 3.0e-5}          # the intended ramp, in Gauss
+      - noise:
+          seed: 7
+          lines:                             # mains pickup and harmonics
+            - {frequency: "50 Hz",  rms: 3.0e-7}
+            - {frequency: "150 Hz", rms: 1.0e-7}
+          broadband:
+            shape: pink                      # none | white | pink | brown | lorentzian
+            rms: 2.0e-7                      # TOTAL rms over [f_lo, f_hi]
+            f_lo: "1 Hz"
+            f_hi: "500 Hz"
+            f_corner: "10 Hz"                # knee; 1/f and 1/f² need it > 0
+          n_components: 256
+```
+
+| key | meaning |
+|---|---|
+| `seed` | RNG seed. Fixes the realisation; vary it to build an ensemble. |
+| `lines` | list of `{frequency, rms}` discrete tones |
+| `broadband.shape` | `none`, `white`, `pink` (1/f), `brown` (1/f²), `lorentzian` |
+| `broadband.rms` | total rms over the band — **not** a spectral density |
+| `broadband.{f_lo, f_hi, f_corner}` | band edges and the 1/f knee |
+| `n_components` | tones used to represent the broadband part (default 256) |
+
+**A static field error is not noise — it is a different field.** Set it in the
+field value (`Bz: 6.1e-5`, or a bare number in the `sum:`) and, since it is one
+scalar, sweep it as an explicit axis to get the response function directly.
+Sampling it randomly would give a smeared average you then have to deconvolve.
+Randomisation earns its place for the AC phases, a few hundred dimensions that
+cannot be scanned; it does not earn it for one number.
+
+The distinction matters physically: a constant offset shifts the field AXIS, so
+both legs of a hysteresis scan move together and the loop keeps its width while
+the absolute jump field is biased. Time-varying error smears the transition
+instead. Scanning the offset separates the two failure modes; folding it into a
+"noise" rms conflates them.
+
+`rms` is in the units of the host field (Gauss for `Bx`/`By`/`Bz`,
+dimensionless for `p`/`bx`/`by`); frequencies follow the `frequency`
+convention above and accept `"X Hz"` strings.
+
+Two things worth knowing:
+
+- **The realisation is analytic in `t`, not a sampled trace.** Randomness
+  enters only through the phases, at construction. That is required, not a
+  stylistic choice: a waveform is evaluated several times per step (Strang
+  sub-steps, rejected adaptive-`dt` trials), and an RNG inside `evaluate`
+  would hand the propagator a different field at the same instant.
+- **`dt` still has to resolve the noise.** The waveform has no sampling grid,
+  but the integrator does; a `dt` coarser than the fastest component aliases
+  it to some other frequency rather than averaging it out. Keep
+  `dt ≲ 1/(10·f_max)` or narrow `f_hi`.
+
+Across seeds the per-shot rms is fixed by construction — only the realisation
+changes — so an ensemble scan measures the response to a stated noise budget
+without the budget itself fluctuating.
+
+Order-of-magnitude anchors for a magnetic field:
+
+| regime | dominant term | figures |
+|---|---|---|
+| coils, no shield | AC mains | ≈ 1.3 mG peak-to-peak at 50 Hz |
+| coils + active stabilisation | AC mains | ≈ 0.01 mG at 50 Hz, ≈ 0.05 mG at 150 Hz; broadband ≈ 10 µG/√Hz over 0–1 kHz |
+| permalloy shield + AC degauss | **static residual** | ≈ 10 µG offset; AC terms well below it |
+
+Convert a spectral density to `rms` with `rms ≈ density · √(f_hi − f_lo)`. In
+the shielded regime the AC entries here are nearly irrelevant and the limiting
+error is the static residual — which is a field VALUE, so it goes in the scan,
+not in this block.
 
 ## `scan` block
 
@@ -500,6 +612,7 @@ A list of analyzers, each `{<name>: <params>}`. Names include:
 - `population_history`
 - `trap_population` (radius, center) — inside-vs-outside-trap norm split; tracks atoms spilling toward the absorbing boundary
 - `cloud_shape` — center of mass, per-axis RMS widths, principal-axis widths, aspect ratio, in-plane tilt; quantifies cloud deformation across a snapshot series
+- `superfluid_fraction` (directions, method) — per-axis $f_s$ from the phase-twist free energy: `leggett` (plane-average bound), `relaxed` (full variational minimum), or `both` (default). Rigid-density, so both are upper bounds; a cloud that does not span the periodic box legitimately reports ≈ 0
 
 Full list in `src/workflow/experiments/analyzers/`.
 

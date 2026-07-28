@@ -24,7 +24,7 @@ export run_scalar_summary, write_run_summary,
 const RUN_SUMMARY_FILENAME = "summary.json"
 # Bump when extraction logic changes so stale summaries (older extractor)
 # can be targeted for re-backfill via `_extractor_version`.
-const RUN_SUMMARY_EXTRACTOR_VERSION = "1"
+const RUN_SUMMARY_EXTRACTOR_VERSION = "3"  # v3: + per-axis f_s (Leggett)
 
 # Run `f()`; on exception record "field: reason" in `errs` and return
 # `missing`. A `nothing` / non-finite result is treated as legitimately
@@ -51,6 +51,8 @@ wavefunction + metadata. Never throws. Keys appear only when extractable:
   energy, converged          — ground-state metadata / e_decomp / dynamics
   norm, Mz                   — computed from psi (deterministic)
   populations                — per-component |c_m|² fractions (Vector)
+  f_s_leggett                — per-axis superfluid fraction (Vector); present
+                               only when the cloud spans the periodic box
   norm_rel_drift,
   energy_rel_drift, Fz_drift — dynamics runs only
 
@@ -95,6 +97,62 @@ function run_scalar_summary(r::RunResult)
         tot = sum(Nm)
         tot > 0 ? Nm ./ tot : Nm
     end)
+    # Rotation-invariant order parameter mF = |⟨F⟩|/F of the peak-density (bulk)
+    # spinor. Unlike Mz (=⟨F_z⟩), this stays correct when the FM state lies in the
+    # xy-plane (B=0 DDI soft manifold) — the FM↔polar order variable. Carrying it
+    # here lets a phase scan read the order parameter straight from summary.json,
+    # never loading the heavy psi (Stage 1 / "graphs are the deliverable").
+    bag["mF"] = _try_field(
+        errs,
+        "mF",
+        () -> begin
+            F = r.atom.F
+            D = 2F + 1
+            sdim = ndims(r.psi)
+            dens = dropdims(sum(abs2, r.psi; dims=sdim); dims=sdim)
+            z = ComplexF64[r.psi[argmax(dens), c] for c in 1:D]
+            nz = norm(z)
+            nz > 0 || return missing
+            z ./= nz
+            sm = spin_matrices(F)
+            sqrt(
+                real(dot(z, sm.Fx * z))^2 + real(dot(z, sm.Fy * z))^2 +
+                real(dot(z, sm.Fz * z))^2,
+            ) / F
+        end,
+    )
+
+    # Per-axis superfluid fraction, Leggett branch only: it is a closed form
+    # costing milliseconds, whereas the `:relaxed` solve is ~1.8 s at 128³ per
+    # axis — too heavy for a projection meant to be cheap enough to backfill
+    # over hundreds of runs.
+    #
+    # Present ONLY when the cloud spans the box along every axis. A trapped
+    # cloud surrounded by vacuum has no phase rigidity across the box, so its
+    # f_s ≈ 0 is geometry rather than a property of the state; writing that into
+    # every summary would put a column of zeros in front of a scan that could
+    # read them as signal. Absent is the honest value, and this file already
+    # keeps "absent" distinct from "errored".
+    bag["f_s_leggett"] = _try_field(
+        errs,
+        "f_s_leggett",
+        () -> begin
+            ndim = ndims(r.psi) - 1
+            n = total_density(r.psi, ndim)
+            vals = Float64[]
+            for d in 1:ndim
+                nbar = plane_averaged_density(n, d)
+                n_mean = sum(nbar) / length(nbar)
+                n_mean > 0 || return missing
+                minimum(nbar) > 1e-3 * n_mean || return missing
+                push!(
+                    vals,
+                    superfluid_fraction(n, r.grid; direction=d, warn_vacuum=false),
+                )
+            end
+            vals
+        end,
+    )
 
     # Dynamics-only drift metrics (getproperty throws without a series).
     if r.dynamics !== nothing

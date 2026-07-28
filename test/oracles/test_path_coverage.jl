@@ -104,6 +104,14 @@ const PATH_COVERAGE = [
         ref="hamiltonian/test_lhy_polar.jl"),
     (axis=:lhy_kind, value="icosahedral", status=:gated,
         ref="hamiltonian/test_icosahedral_lhy.jl"),
+    # The only kind not built from ONE spinor: `e₁(p)` tabulated from the
+    # cloud's own local spinors. The wiring gate covers the builder, the
+    # uniform-cloud fallback to `:full_bdg`, and the resolver's knobs; the
+    # table itself is `hamiltonian/test_spatial_lhy.jl` and its gradient
+    # (whose polarisation term the propagator also carries since #131) is
+    # `hamiltonian/test_lhy_gradient_all_modes.jl`.
+    (axis=:lhy_kind, value="spatial", status=:gated,
+        ref="workflow/test_lhy_block_wiring.jl"),
 
     # --- DDI secular kernel (master oracle fixtures A secular / A′ full) ---
     (axis=:ddi_secular, value=true, status=:gated, ref="oracles/test_master_oracle.jl"),
