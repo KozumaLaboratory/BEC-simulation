@@ -131,6 +131,7 @@ function compute_spinor_lhy_table(;
     c_dd::Float64=0.0,
     n_max::Float64=100.0,
     n_points::Int=100,
+    n_atoms::Int=1,
     rtol::Float64=1e-4,
     k_max::Union{Nothing, Float64}=nothing,
     n_k::Union{Nothing, Int}=nothing,
@@ -158,7 +159,7 @@ function compute_spinor_lhy_table(;
         return FullBdGLHY(densities, (2.5 * eps_1) .* densities .^ 1.5)
     end
 
-    _tabulate_lhy(FullBdGLHY; n_max, n_points) do n0
+    _tabulate_lhy(FullBdGLHY; n_max, n_points, n_atoms) do n0
         _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman,
             c_dd, k_max, n_k, n_dir; rtol)
     end

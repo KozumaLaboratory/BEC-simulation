@@ -87,6 +87,58 @@ pointer here, which is the part a date cannot supply.
 - Claims that turn on a coefficient identity rather than a run — e.g. the SI
   round-trip oracles, $Q_5$ closed forms, $a_{dd}$ values.
 
+## First re-derivation: the conclusion held, the evidence was vacuous
+
+`research_notes/eu_collapse_lhy_insufficient.md` claimed all five LHY treatments
+give identical density profiles for the Eu F=6 EdH post-quench collapse, hence
+"LHY is sub-leading vs the mean-field DDI attraction".
+
+**The conclusion survives.** Re-run in current code, same GPU backend, the four
+usable modes agree to 4.7 % in peak density:
+
+| mode | $E$ | peak $n$ | FWHM$_z$ | $M_z$ |
+|---|---:|---:|---:|---:|
+| off | −881.086 | 0.01014 | 10 | −5.4104 |
+| scalar | −880.993 | 0.00968 | 10 | −5.4567 |
+| polar_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+| fm_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+| *full_bdg* | *−847.324* | *0.00054* | *22* | *−5.9955* |
+
+**Its evidence did not.** Three of the original five rows ran with `c_lhy = 0` —
+that config is `backend: gpu` and until #125 every tabulated LHY was silently
+zeroed on the GPU broadcast path — and a fourth ran 2.34× too weak. "All five
+identical" was four flavours of *off*: the observation was guaranteed regardless
+of the physics. The closed forms are active now (all three differ from each other
+and from `off`), so the comparison could have come out otherwise, which is what
+makes it evidence.
+
+`full_bdg` is excluded: it self-reports "mean field is dynamically unstable
+(max Im ω = 213), ε_LHY is scheme-dependent here", and its ITP returned
+`conv=false`.
+
+**This is the pattern to expect from the rest of the list.** Not "the numbers
+moved a little" but "the comparison was between things that were secretly the
+same". A stale null result is the dangerous kind, because a broken knob and a
+knob that does not matter look identical.
+
+### Two false starts, recorded because they are the same trap
+
+Both were mine, both caught before they shipped, both by checking the code's own
+report rather than by reasoning:
+
+1. First re-run reported the closed forms cutting peak density **15×** and
+   arresting the collapse. That was #158 — closed-form tables $N_{atoms}$ too
+   large — which merged **22 minutes after** the run. Caught with
+   `git merge-base --is-ancestor`, i.e. by asking whether the run contained the
+   fix rather than assuming it did.
+2. The surviving 19× outlier was nearly quoted as "LHY can arrest this collapse".
+   It was `full_bdg`, which prints a warning saying its ε_LHY is
+   scheme-dependent for exactly this state, and did not converge.
+
+Generalisation for anyone re-deriving from this list: **check the run's commit
+against the fix list above, and read the run's own warnings, before comparing
+numbers.**
+
 ## Recommended order
 
 1. **Do not re-run 230 suites.** Most were exploratory. Re-derive only what a

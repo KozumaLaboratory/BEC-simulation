@@ -1,0 +1,38 @@
+# rotating_basis magnetostir at 32^3 (GPU-fast). Spinning magnetostriction
+# ellipse via the CORRECT strong-field rotating-basis tool.
+defaults: {kind: rotating_basis, backend: gpu, interactions: {N_atoms: 30000, omega_ref: 628.3}}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 16], box: [12, 12, 6]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 2.0]}
+      interactions: {N_atoms: 30000, omega_ref: 628.3, c1_ratio: -0.005}
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.3 Gauss"}
+      init_m_idx: 1
+      init_sigma: 1.5
+      dt: 0.004
+      n_steps: 1000
+      tol: 1.0e-9
+  - dynamics:
+      duration: 6.28
+      integrator: yoshida4
+      dt: 0.0015
+      epsilon: 1.0e-6
+      B: {theta: {from: 0.0, to: 1.4, duration: 6.28}, phi: {rate: 0.0}}
+      save: {every: 100}
+  - dynamics:
+      duration: 6.0
+      integrator: yoshida4
+      dt: 0.0015
+      epsilon: 1.0e-6
+      B: {theta: 1.4, phi: {rate: {from: 0.0, to: 0.6, duration: 6.0}}}
+      save: {every: 100}
+  - dynamics:
+      duration: 20.0
+      integrator: yoshida4
+      dt: 0.0015
+      epsilon: 1.0e-6
+      B: {theta: 1.4, phi: {rate: 0.6}}
+      save: {every: 100, psi: true, precision: f32}

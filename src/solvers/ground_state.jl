@@ -111,6 +111,7 @@ function find_ground_state(;
     dt=0.001,
     n_steps=10000,
     tol=1e-10,
+    tol_drho::Float64=0.0,   # extra gate: per-(save_every) max|Δρ|/max|ρ| (density-based, gauge-invariant)
     save_every::Int=max(1, n_steps ÷ 100),  # unified observation cadence
     initial_state=:polar,
     init_state_params::Dict{Symbol, Float64}=Dict{Symbol, Float64}(),
@@ -325,6 +326,7 @@ function find_ground_state(;
     ckpt_dir = checkpoint_dir !== nothing ? checkpoint_dir : _checkpoint_dir
 
     _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
+        tol_drho=tol_drho,
         start_step=_start_step,
         checkpoint_dir=ckpt_dir,
         checkpoint=checkpoint,
