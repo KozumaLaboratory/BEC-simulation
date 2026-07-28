@@ -386,6 +386,43 @@ end
 
 # --- composition -----------------------------------------------------------
 
+@testset "SPGPE equilibrates the C region to the Rayleigh-Jeans population" begin
+    # The existing FDR test pins the RJ *slope*; this pins the TOTAL, which is
+    # what a run actually reports. Free field (c0 = 0) with no trap makes
+    # eps_k = k^2/2 exact, so the classical equilibrium is the unambiguous sum
+    # N_C = sum_{|k|<k_cut} T/(eps_k - mu) over the modes the grid really has.
+    #
+    # Worth its own gate: when a production run came back with N_C two orders
+    # below a hand estimate, this is the check that decided which of the two was
+    # wrong (the hand estimate).
+    n, L = 32, 16.0
+    T, mu, kcut, gam, dt = 2.0, -2.0, 4.0, 0.05, 0.005
+    grid = make_grid(GridConfig((n, n, n), (L, L, L)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict{Int, Float64}(0 => 0.0)),
+        sim_params=SimParams(; dt, n_steps=1, imaginary_time=false,
+            save_every=1, normalize_every=0),
+        fft_flags=FFTW.ESTIMATE)
+    D = ws.spin_matrices.system.n_components
+    dV = cell_volume(grid)
+
+    rj = 0.0
+    for I in CartesianIndices(grid.config.n_points)
+        k2 = grid.k_squared[I]
+        k2 <= kcut^2 && (rj += T / (0.5 * k2 - mu))
+    end
+
+    res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut=kcut, gamma=gam, M=0.0)
+    fill!(ws.state.psi, 0)
+    for s in 1:2400
+        apply_spgpe_step!(ws, res, dt; t=0.0, seed=1000 + s)
+    end
+    N_C = real(sum(abs2, ws.state.psi)) * dV
+
+    @test isapprox(N_C, rj * D; rtol=0.12)      # equilibrium, all D components
+    @test N_C > 100                              # the field really filled
+end
+
 @testset "projector diagnostic separates cutoff outflow from noise truncation" begin
     # The first attempt reported one combined number and it was ~10³× too large to
     # mean what it claimed: per step the projector removes a little of the field
