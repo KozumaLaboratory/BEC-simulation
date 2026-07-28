@@ -40,7 +40,12 @@ pipeline:
       lhy: {kind: full_bdg}
       B: {Bz: "1.0e-4 Gauss", theta: 0.0, phi: 0.0}
       n_steps: 1500
-      tol: 1.0e-8
+      # 1e-6, not 1e-8. The weak-field texture sits on a soft (Goldstone)
+      # manifold: measured here, |∇E| falls to 6.3e-7 by iteration ~500 and then
+      # stops moving, so a 1e-8 target just burns the remaining 1000 iterations
+      # at an unchanged state. The B-scan campaign settled at 1e-5 for the same
+      # reason.
+      tol: 1.0e-6
 
   # Quenched to 20 µG — below the crossover. Nucleation and the subsequent
   # motion both happen here, which is what the movie is for.
