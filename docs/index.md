@@ -33,6 +33,7 @@ docs/
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |
 | Submit jobs on TSUBAME | `guides/tsubame.md` |
+| Magnetic field a spin-polarised cloud radiates | `guides/dipole_field.md` |
 
 ### Looking something up
 

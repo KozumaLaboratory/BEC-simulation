@@ -46,6 +46,7 @@ include("analysis/topology.jl")
 include("analysis/synthetic_dimension.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
+include("analysis/dipole_field.jl")  # dipolar magnetic field radiated by a (spin-polarised) cloud
 include("analysis/larmor_adiabaticity.jl")  # local-field tilt + Larmor vs rotation rate
 
 # Phase exploration (needs experiments for ScanExperiment).
