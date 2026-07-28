@@ -35,6 +35,7 @@ const FAST_TESTS = [
     "workflow/test_calibration_edge_cases.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
+    "workflow/test_lhy_texture_warning.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -59,6 +60,7 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_scalar_lhy_si_roundtrip.jl",
     "validation/test_k3_unit_audit.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
@@ -68,6 +70,8 @@ const FAST_TESTS = [
     "foundation/test_no_unguarded_fft_derivative.jl",
     "foundation/test_grid.jl",
     "foundation/test_preset.jl",
+    "foundation/test_noise_waveform.jl",
+    "foundation/test_waveform_bandwidth.jl",
     "hamiltonian/test_zeeman_builders.jl",
     "analysis/test_spin_snapshot.jl",
     "foundation/test_spin_matrices.jl",
@@ -115,9 +119,13 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_superfluid_fraction.jl",
+    "analysis/test_superfluid_fraction_gp_twist.jl",
+    "solvers/test_scalar_ddi_transverse_pad.jl",
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_spatial_lhy.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
@@ -166,6 +174,7 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    "validation/test_dipolar_supersolid_tube.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -235,6 +244,7 @@ const CI_EXTRA = [
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
     "oracles/test_lhy_analytic.jl",
+    "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
     "oracles/test_magnetic_gradient_analytic.jl",
     "oracles/test_tensor_analytic.jl",
@@ -363,6 +373,11 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    "gpu/test_superfluid_fraction_gpu.jl",
+    # GPU=CPU parity for the projected-GP momentum cutoff. Gates the host-array
+    # mask broadcast bug (ws.grid.k_squared is a host Array even on a GPU
+    # workspace); no-op on CPU-only CI. CPU high-k-removal sanity always runs.
+    "gpu/test_projected_gp_parity.jl",
     "hamiltonian/test_tdhfb_gpu_phase5ab.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_expm.jl",
     "hamiltonian/test_tdhfb_gpu_phase5c_hf.jl",

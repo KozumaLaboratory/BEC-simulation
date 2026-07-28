@@ -87,9 +87,10 @@ end
     Bhat = SVector{3, Float64}(0.0, 0.0, 1.0)
     SpinorBEC.find_ground_state_scalar!(ws, 3000, 0.005; B_hat=Bhat)
     e = SpinorBEC.scalar_energies(ws, Bhat)
-    @test isapprox(e[1], 0.75; atol=2e-2)    # E_kin
-    @test isapprox(e[2], 0.75; atol=2e-2)    # E_trap
-    @test isapprox(e[5], 1.5; atol=2e-2)     # total
+    @test isapprox(e.E_kin, 0.75; atol=2e-2)
+    @test isapprox(e.E_trap, 0.75; atol=2e-2)
+    @test isapprox(e.total, 1.5; atol=2e-2)
+    @test e.E_lhy == 0.0                     # gamma_lhy = 0 here
 end
 
 @testset "scalar_egpe energy ↔ Hψ FD identity (contact + DDI)" begin
@@ -98,6 +99,10 @@ end
     # built from the SAME pieces the propagator uses. Exercises the contact
     # AND dipolar nonlinear terms (the ½'s in g|ψ|⁴/2 and ρV_dd/2 cancel the
     # modulus-derivative 2). g=c_dd≠0 so the interaction terms are live.
+    #
+    # gamma_lhy≠0 since 2026-07-27: the propagator applied γρ^{3/2} while
+    # scalar_energies omitted (2/5)γ∫ρ^{5/2}, so energy and gradient described
+    # different functionals. With γ live this FD identity is what catches it.
     n = 16
     L = 8.0
     grid = SpinorBEC.make_grid(GridConfig((n, n, n), (L, L, L)))
@@ -105,7 +110,8 @@ end
         0.5 * (grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2 + grid.x[3][I[3]]^2)
         for I in CartesianIndices((n, n, n))
     ]
-    ws = SpinorBEC.make_scalar_ws(grid, V; g_contact=5.0, c_dd=1.0, F=6.0)
+    ws = SpinorBEC.make_scalar_ws(grid, V; g_contact=5.0, c_dd=1.0, F=6.0,
+        gamma_lhy=3.0)
     dV = prod(grid.dx)
     Bhat = SVector{3, Float64}(0.0, 0.0, 1.0)
 
@@ -121,7 +127,7 @@ end
         copyto!(ws.psi, ψ)
         SpinorBEC.compute_tilted_dipole_potential!(ws, Bhat)
         ws.rho .= abs2.(ws.psi)                 # scalar_energies reads ws.rho
-        SpinorBEC.scalar_energies(ws, Bhat)[5]
+        SpinorBEC.scalar_energies(ws, Bhat).total
     end
 
     copyto!(ws.psi, base)
@@ -131,10 +137,77 @@ end
     ws.fft_fwd * kin
     kin .*= 0.5 .* ws.grid.k_squared
     ws.fft_inv * kin
-    Hψ = kin .+ (ws.V_trap .+ ws.g_contact .* abs2.(ws.psi) .+ ws.V_dd) .* ws.psi
+    ρ = abs2.(ws.psi)
+    Hψ =
+        kin .+
+        (ws.V_trap .+ ws.g_contact .* ρ .+ ws.V_dd .+ ws.gamma_lhy .* ρ .* sqrt.(ρ)) .*
+        ws.psi
     inner = 2 * real(sum(conj.(δ) .* Hψ)) * dV
 
     ε = 1e-6
     fd = (Eval(base .+ ε .* δ) - Eval(base .- ε .* δ)) / (2ε)
     @test isapprox(fd, inner; rtol=1e-3)
+end
+
+@testset "scalar_egpe uniform box: E and μ analytic with LHY live" begin
+    # No trap, periodic box ⇒ the ground state is uniform at ρ = 1/V and both
+    # scalars are closed-form in the repo's per-particle convention:
+    #   E/N = (1/2)c₀ρ + (2/5)γρ^{3/2}      (the energy functional)
+    #   μ    = c₀ρ + γρ^{3/2}                (what ITP norm decay reports)
+    # Two independent expressions, so this gates the energy face against the
+    # propagator face rather than against itself. The pre-fix code passed the μ
+    # half and failed the E half.
+    n = 12
+    L = 6.0
+    grid = SpinorBEC.make_grid(GridConfig((n, n, n), (L, L, L)))
+    V = zeros(Float64, n, n, n)
+    c0 = 40.0
+    γ = 25.0
+    ws = SpinorBEC.make_scalar_ws(grid, V; g_contact=c0, c_dd=0.0, F=6.0, gamma_lhy=γ)
+    Vbox = L^3
+    ρ = 1 / Vbox
+    ws.psi .= sqrt(ρ) + 0im
+    SpinorBEC.normalize_scalar!(ws)
+    Bhat = SVector{3, Float64}(0.0, 0.0, 1.0)
+
+    e = SpinorBEC.scalar_energies(ws, Bhat)
+    @test e.E_contact ≈ 0.5 * c0 * ρ rtol = 1e-12
+    @test e.E_lhy ≈ (2 / 5) * γ * ρ^1.5 rtol = 1e-12
+    @test e.E_kin ≈ 0.0 atol = 1e-20
+    @test e.total ≈ 0.5 * c0 * ρ + (2 / 5) * γ * ρ^1.5 rtol = 1e-12
+
+    μ = SpinorBEC.find_ground_state_scalar!(ws, 200, 1e-3; B_hat=Bhat)
+    @test μ ≈ c0 * ρ + γ * ρ^1.5 rtol = 1e-6
+end
+
+@testset "scalar_egpe seeds break the uniform stationary point" begin
+    n = 16
+    L = 8.0
+    grid = SpinorBEC.make_grid(GridConfig((n, n, n), (L, L, L)))
+    ws = SpinorBEC.make_scalar_ws(
+        grid, zeros(Float64, n, n, n); g_contact=10.0, c_dd=0.0, F=6.0
+    )
+    ws.psi .= 1.0 + 0im
+    SpinorBEC.normalize_scalar!(ws)
+    flat = maximum(abs2, ws.psi) - minimum(abs2, ws.psi)
+    @test flat < 1e-20                       # uniform: ITP would never modulate
+
+    SpinorBEC.seed_scalar_mode!(ws; k=2 * 2π / L, amplitude=0.1, axis=1)
+    @test SpinorBEC.scalar_norm(ws) ≈ 1.0 atol = 1e-12
+    # Two full periods along x, flat in y and z.
+    line = [abs2(ws.psi[i, 1, 1]) for i in 1:n]
+    @test maximum(line) - minimum(line) > 1e-4
+    @test all(abs2(ws.psi[1, j, 1]) ≈ abs2(ws.psi[1, 1, 1]) for j in 1:n)
+
+    ws.psi .= 1.0 + 0im
+    SpinorBEC.normalize_scalar!(ws)
+    SpinorBEC.seed_scalar_noise!(ws; amplitude=0.05, seed=1234)
+    @test SpinorBEC.scalar_norm(ws) ≈ 1.0 atol = 1e-12
+    @test maximum(abs2, ws.psi) - minimum(abs2, ws.psi) > 1e-6
+    # Deterministic under a fixed seed.
+    n1 = copy(abs2.(ws.psi))
+    ws.psi .= 1.0 + 0im
+    SpinorBEC.normalize_scalar!(ws)
+    SpinorBEC.seed_scalar_noise!(ws; amplitude=0.05, seed=1234)
+    @test abs2.(ws.psi) ≈ n1 rtol = 1e-14
 end

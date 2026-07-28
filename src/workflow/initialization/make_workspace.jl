@@ -542,10 +542,122 @@ end
 
 _lhy_g_dict(atom::AtomSpecies, ws::InteractionParams) = c_to_g(atom.F, ws)
 
+"""
+    _lhy_texture_spread(psi_init, F) -> (spread, peak_f, mean_f)
+
+How far the state is from having ONE spinor. Returns the `n^(5/2)`-weighted
+spread of `|⟨F⟩|/F` over the cloud (the weight `ε_LHY ∝ n^(5/2)` actually
+carries), plus the value at the density peak and the weighted mean.
+
+Every spinor LHY table in this file is built for a single spinor and then
+applied at every voxel: `:full_bdg` takes the peak spinor, and the closed forms
+assume their own fixed ansatz outright. That is exact when the state is uniform
+and an approximation when it is not.
+
+Only the SHAPE of the local spinor matters, not its direction. Measured at F=6:
+rotating the spinor leaves ε_LHY invariant to machine precision for contact
+(it is an SO(3) scalar) and to 0.25% with the DDI at ε_dd ~ 0.05 — so a pure
+direction texture (flower, spin vortex, skyrmion; all `|⟨F⟩|/F` = 1 everywhere)
+costs nothing. Varying the MAGNITUDE costs ~20% between `|⟨F⟩|/F` = 1 and 0.
+"""
+_lhy_texture_spread(::Nothing, ::Int) = (0.0, 1.0, 1.0)
+
+# `Val(N)` comes from the ARRAY'S type parameter, never from `ndims(x)` —
+# CLAUDE.md "Type stability boundaries". Taking `N = ndims(psi_init) - 1` as a
+# runtime Int made `ntuple(..., N)` uninferrable and the whole function
+# returned `Tuple{Any,Any,Any}`, inside `make_workspace`, which is precisely
+# the path that documentation warns turns into a multi-minute JIT hang.
+function _lhy_texture_spread(psi_init::AbstractArray{<:Complex, M}, F::Int) where {M}
+    N = M - 1
+    D = size(psi_init, M)
+    D == 2F + 1 || return (0.0, 1.0, 1.0)
+    n_pts = ntuple(d -> size(psi_init, d), Val(N))
+
+    # SUBSAMPLED on a stride. This is a threshold decision on a smooth field,
+    # not a physical observable, and `make_workspace` runs per scan point —
+    # CLAUDE.md calls it the hot path for every pipeline step. Full-grid cost
+    # was 26% of a 64³ workspace build and 69% of a 32³ one, to answer a
+    # yes/no question. The stride targets ~8000 samples, which holds the guard
+    # under ~1% while leaving the verdict unchanged on the converged
+    # weak-field Eu states it was calibrated on (spread 0.921 either way).
+    #
+    # `spin_density_vector` is the O(D) ladder form (F± tridiagonal, Fz
+    # diagonal), threaded and already gated. Restating it as explicit 13×13
+    # matrix-vector products cost 0.31 s and 695 MB at 96³.
+    stride = max(1, floor(Int, (prod(n_pts) / 8000)^(1 / N)))
+    # `spin_matrices(F)` is `SpinMatrices{D}` with D only known at runtime,
+    # so the call's return type has to be narrowed at this boundary.
+    fx, fy, fz = spin_density_vector(psi_init, spin_matrices(F), N)::NTuple{3, Array{Float64, N}}
+    sampled = CartesianIndices(ntuple(d -> 1:stride:n_pts[d], N))
+
+    nmax = 0.0
+    @inbounds for I in sampled
+        nsum = 0.0
+        for c in 1:D
+            nsum += abs2(psi_init[I, c])
+        end
+        nmax = max(nmax, nsum)
+    end
+    nmax <= 0 && return (0.0, 1.0, 1.0)
+    cut = 1e-6 * nmax
+
+    wsum = 0.0
+    mean_f = 0.0
+    peak_f = 1.0
+    lo, hi = Inf, -Inf
+    @inbounds for I in sampled
+        nsum = 0.0
+        for c in 1:D
+            nsum += abs2(psi_init[I, c])
+        end
+        nsum < cut && continue
+        # fx/fy/fz are DENSITY-weighted (⟨ψ|F|ψ⟩, not normalised), so dividing
+        # by the local density gives the per-spinor |⟨F⟩| the LHY table cares
+        # about — see CLAUDE.md, |F/n|² is a density-weighted average.
+        f = sqrt(fx[I]^2 + fy[I]^2 + fz[I]^2) / (nsum * F)
+        w = nsum^2.5
+        wsum += w
+        mean_f += w * f
+        lo = min(lo, f)
+        hi = max(hi, f)
+        nsum == nmax && (peak_f = f)
+    end
+    wsum <= 0 && return (0.0, 1.0, 1.0)
+    (hi - lo, peak_f, mean_f / wsum)
+end
+
+# Above this spread in |⟨F⟩|/F the single-spinor table is worth flagging.
+# Measured on converged weak-field Eu ground states (pinned B-scan,
+# figs/eu_bscan_pin_tight): spread 0.0 gives 0.00% error, 0.375 gives -1.5%,
+# 0.89 gives -4.5%, 0.90 gives +4.9% — and the sign FLIPS across the scan, so
+# it does not cancel in a B-comparison. 0.3 is where it leaves the noise.
+const _LHY_TEXTURE_WARN = 0.3
+
+function _warn_lhy_texture(mode::Symbol, psi_init, F::Int)
+    spread, peak_f, mean_f = _lhy_texture_spread(psi_init, F)
+    spread <= _LHY_TEXTURE_WARN && return nothing
+    what = if mode === :full_bdg
+        "built from the peak-density spinor (|⟨F⟩|/F ≈ $(round(peak_f; digits=2)))"
+    else
+        "built for the fixed :$mode ansatz"
+    end
+    @warn "LHY table is $what and then applied at every voxel, but this state " *
+        "is textured in |⟨F⟩|/F: spread ≈ $(round(spread; digits=2)) across the " *
+        "cloud, n^(5/2)-weighted mean ≈ $(round(mean_f; digits=2)) (sampled on " *
+        "a stride, so indicative not exact). Measured on " *
+        "converged weak-field Eu ground states that costs up to ~5% in ε_LHY, " *
+        "with a sign that flips along a B-scan (so it does not cancel in a " *
+        "comparison). Direction textures are free — only the magnitude of " *
+        "⟨F⟩ matters. Treat LHY here as good to ~5%, or keep the state " *
+        "uniform." maxlog=1
+    nothing
+end
+
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
 _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi) = nothing
 
 function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_two_channel, psi_init, atom.F)
     compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws[0], c1=ws[1],
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
@@ -553,6 +665,7 @@ function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, 
 end
 
 function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:full_bdg, psi_init, atom.F)
     spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
     compute_spinor_lhy_table(;
         spinor=spinor_init, F=atom.F, interactions=ws,
@@ -564,6 +677,7 @@ end
 # :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for post-quench /
 # mixed states fall back to :full_bdg.
 function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_contact, psi_init, atom.F)
     compute_spinor_lhy_polar_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
@@ -572,6 +686,7 @@ end
 # m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S this matches scalar
 # Lima-Pelster; for realistic per-S a_S it differs.
 function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:fm_contact, psi_init, atom.F)
     compute_spinor_lhy_fm_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init))
 end
@@ -584,6 +699,7 @@ end
 # Direct callers that already have scalar eps_dd should use
 # `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
 function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:fm_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     g_2F = get(g_dict, 2 * atom.F, 0.0)
@@ -619,6 +735,7 @@ end
 end
 
 function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:polar_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
     delta_1 = delta_polar(atom.F, 1, g_dict)
@@ -641,6 +758,7 @@ end
 #   them through their own builder, not this branch.
 # See: src/hamiltonian/terms/lhy/icosahedral.jl
 function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi)
+    _warn_lhy_texture(:icosahedral, psi_init, atom.F)
     atom.F == 6 || throw(ArgumentError(
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))
     compute_spinor_lhy_icosahedral(;

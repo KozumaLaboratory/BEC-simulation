@@ -154,23 +154,21 @@
             F=0, c0=10.0, c1=-0.5, n_max=1.0, n_points=10)
     end
 
-    @testset "validation guard: F=6 polar + FullBdG emits regime warning" begin
-        # F=6 polar (ζ_α = δ_{α, 0}) is the documented broken regime.
+    @testset "full_bdg builds for both F=6 ansatze" begin
+        # F=6 polar used to be guarded as a broken regime ("~3000× spurious
+        # offset"). The offset was a UV counterterm that subtracted ε_k
+        # twice — present at every F and every phase, not special to F=6
+        # polar. Fixed in terms/lhy/full_bdg.jl; agreement with the closed
+        # forms is gated by
+        # test/oracles/test_lhy_full_bdg_closed_form_parity.jl.
         D = 13
-        spinor_polar = ComplexF64[c == 7 ? 1.0 : 0.0 for c in 1:D]
-        @test_logs (:warn, r"spurious energy offset") match_mode = :any begin
-            compute_spinor_lhy_table(;
-                spinor=spinor_polar, F=6,
+        for c in (7, 1)   # polar (m=0), FM (m=+F)
+            spinor = ComplexF64[i == c ? 1.0 : 0.0 for i in 1:D]
+            @test compute_spinor_lhy_table(;
+                spinor, F=6,
                 interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.1)),
                 n_max=1.0, n_points=4, k_max=5.0, n_k=10,
-            )
+            ) isa FullBdGLHY
         end
-        # Non-polar F=6 should NOT warn (table still constructed normally).
-        spinor_fm = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:D]
-        @test compute_spinor_lhy_table(;
-            spinor=spinor_fm, F=6,
-            interactions=InteractionParams(Dict(0 => 10.0, 1 => 0.1)),
-            n_max=1.0, n_points=4, k_max=5.0, n_k=10,
-        ) isa FullBdGLHY
     end
 end
