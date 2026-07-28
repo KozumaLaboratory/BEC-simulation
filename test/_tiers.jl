@@ -194,6 +194,7 @@ const CI_EXTRA = [
     "solvers/test_polished_ground_state.jl",
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
+    "solvers/test_itp_tol_drho.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
