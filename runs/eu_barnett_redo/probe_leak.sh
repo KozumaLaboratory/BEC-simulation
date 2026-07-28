@@ -30,7 +30,7 @@ mkdir -p runs/eu_barnett_redo/logs
 run_variant() {
   local tag=$1 n=$2 box=$3 pad=$4 dt=$5
   echo "=== $tag  n=$n box=$box pad=$pad dt=$dt  $(date +%H:%M:%S)"
-  BR_TAG="_probe_$tag" BR_N="$n" BR_BOX="$box" BR_PAD="$pad" BR_DT="$dt" \
+  BR_TAG="_probe_$tag" BR_N="$n" BR_BOX="$box" BR_PAD="$pad" BR_DT="$dt" BR_TRUNC="${BR_TRUNC:-NaN}" \
     julia --project=. runs/eu_barnett_redo/run_core.jl \
     >"runs/eu_barnett_redo/logs/probe_$tag.log" 2>&1
   tail -8 "runs/eu_barnett_redo/logs/probe_$tag.log"

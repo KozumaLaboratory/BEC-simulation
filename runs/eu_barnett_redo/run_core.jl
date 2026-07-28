@@ -70,6 +70,12 @@ end
 # Zero-padded, image-free DDI convolution. Off by default: it is ~8x the FFT
 # work, and whether the images matter at all is exactly what the probe measures.
 const DDI_PAD = get(ENV, "BR_PAD", "0") == "1"
+# Real-space cutoff on the dipolar kernel. NaN = none (the default the batch ran
+# with); 0 = auto (half the smallest box unpadded, the box diagonal padded);
+# > 0 = that radius. A cutoff is what makes the discrete kernel the exact
+# transform of a definite real-space interaction rather than a conditionally
+# convergent lattice sum, so it is a candidate for the J_z leak in its own right.
+const DDI_TRUNC = parse(Float64, get(ENV, "BR_TRUNC", "NaN"))
 const OMEGA_TRAP = (1.0, 1.0, 2.0)
 const N_ATOMS = 30000
 const OMEGA_REF = 628.3                  # rad/s
@@ -128,7 +134,7 @@ function build_ws(psi_init, zee, sp)
     ws = make_workspace(; grid=GRID, atom=ATOM, interactions=interactions(),
         zeeman=zee, potential=NoPotential(), sim_params=sp,
         psi_init=psi_init, enable_ddi=DDI_ON, c_dd=C_DD, ddi_padding=DDI_PAD,
-        backend=BACKEND)
+        ddi_trunc_radius=DDI_TRUNC, backend=BACKEND)
     copyto!(ws.potential_values, V_TRAP)
     ws
 end
