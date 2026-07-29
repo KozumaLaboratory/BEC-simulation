@@ -296,12 +296,41 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   the MPS/Yoshida composers, where the docstring ties it to Richardson order
 #   recovery. There is no free 1.5× hiding there.
 #
-# NEXT: at 128³ the padded step is 26.95 ms against 12.79 bare, i.e. the
-#   open-boundary convolution — six rFFTs on a 256³ grid — is now more than half
-#   the step and the largest single item left. #183 already removed its pad
-#   re-zeroing and its Φ crop. What remains to try is the transform itself:
-#   whether cuFFT does better on one batched 3-field plan than on three, and
-#   whether the pad factor has to be 2 in every axis for the field error the
-#   padding is there to remove (9c117c05 measured 2.1e-2 to 4.7e-2 against free
-#   space; nobody has measured it against pad_factor). Measure the error before
-#   trading it, and on an H100 — the ratio moves with the FP64 rate.
+# rejected(measured — it is an accuracy trade, not a free win) 2026-07-29:
+#   lowering `ddi_pad_factor` below 2. At 128³ the padded step is 26.95 ms
+#   against 12.79 bare, so the open-boundary convolution — six rFFTs on a 256³
+#   grid — is the largest single item left, and the pad factor sets that volume
+#   as pad³. Nobody had measured what the error buys, only what NOT padding
+#   costs (9c117c05: 2.1e-2 to 4.7e-2 against free space). `bench/
+#   ddi_pad_factor_accuracy.jl` (new) sweeps it, referencing pad_factor 3 —
+#   the question is how much Φ still moves as the box grows, which needs no
+#   second implementation to be trusted. H100, Eu151 D=13, box 12, IDENTICAL at
+#   48³ and 64³ (so this is geometry, not resolution — as that commit also found):
+#
+#     pad_factor   rel. Φ error   ms/step (64³)   FFT voxels
+#       none         1.27e-1         1.815          1.00×
+#       1.25         4.58e-2         2.079          1.95×
+#       1.50         1.92e-2         2.385          3.38×
+#       1.75         8.82e-3         2.703          5.36×
+#       2.00         4.29e-3         3.054          8.00×
+#       2.50         9.87e-4         4.535         15.62×
+#
+#   pad 1.5 would be 1.28× faster than the default and still removes 85 % of the
+#   image error — but the 1.9e-2 it leaves is the same size as the error
+#   9c117c05 introduced the padding to remove. So the knob is real and the curve
+#   is steep, and the answer is still no without a physics decision.
+#
+#   Read the `none` row with care: 1.27e-1 here against that commit's 2.1e-2 to
+#   4.7e-2. Same phenomenon, different meters — theirs is a free-space reference
+#   on a field-magnitude measure, this is an L2 ratio over the whole grid against
+#   pad 3. It confirms the meter SEES the images and that they fall steeply, but
+#   it does not reproduce their number and should not be quoted as if it did.
+#   The pad 2.5 row is also near this meter's own floor (its residual against a
+#   true free-space limit is of the same order), so only rows ≤ 2.0 are solid.
+#
+# NEXT: the convolution, without touching its physics. Whether cuFFT does better
+#   on one batched 3-field plan than on three separate ones is unmeasured, and
+#   for the PADDED context it needs only a DDIPaddedContext field-type change,
+#   not a Workspace one — the objection that killed the same idea for the
+#   unpadded buffers in Round 9. Measure on an H100: the FFT-vs-rest balance
+#   moves with the FP64 rate, and the local card will rank it wrong.
