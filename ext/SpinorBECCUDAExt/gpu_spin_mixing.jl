@@ -106,8 +106,10 @@ function SpinorBEC.apply_spin_mixing_step!(
         fp_svec = SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D))
         thr = min(N, 256)
         blk = cld(N, thr)
+        # `nothing` = contiguous destination: the spin-mixing field buffers are
+        # its own, never a zero-padded DDI corner.
         CUDA.@cuda threads = thr blocks = blk _spin_density_kernel!(
-            fx, fy, fz, psi_mf_2d, m_svec, fp_svec, Val(D))
+            fx, fy, fz, psi_mf_2d, m_svec, fp_svec, Val(D), nothing)
     end
 
     # --- Rotation: exp(-i·c₁·dt·(⟨F⟩·F)) ---
