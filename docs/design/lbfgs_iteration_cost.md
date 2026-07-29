@@ -122,3 +122,13 @@ runs two revisions back to back in one UGE job on one node — an A/B split
 across two jobs would put a node-to-node and queue-epoch confound into the only
 number the work is judged by. `bench/plot_lbfgs_ab.py` turns the logs into a
 CSV and a per-iteration figure.
+
+**Caveat on the DDI cells.** The benchmark calls `find_ground_state_lbfgs`
+directly, where `ddi_padding` defaults to `false`; the YAML parser has
+defaulted it to `true` since 2026-07-29. So the DDI numbers here are the bare
+periodic kernel, and a YAML production run pays a larger transform for the DDI
+*energy*. Its DDI *gradient* is still the unpadded kernel either way, because
+`_grad_ddi!` has no padded branch while `_ddi_energy` does — which is a
+correctness question, not a performance one, and is not fixed here. A
+benchmark that bypasses the parser cannot see a parser default flip; state
+which side of that line a number came from.
