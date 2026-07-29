@@ -44,9 +44,10 @@ using Printf
 using DelimitedFiles
 
 # CSV destination. Defaults to the repo's figs/ dir; `SPINORBEC_FIGS_ROOT`
-# redirects it, which is what the TSUBAME submit script sets — the group's /gs/fs
-# allocation is nearly exhausted (994/1000 GB) while $HOME has 22 GB and the work
-# area 100 GB free, and a run that cannot write its own output is a wasted run.
+# redirects it, which is what the TSUBAME submit script sets so results land in
+# the run directory rather than inside the checkout. A run that cannot write its
+# own output is a wasted run — one died mid-precompile on `Disk quota exceeded`
+# when the group allocation was full.
 const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT",
     joinpath(@__DIR__, "..", "..", "..", "figs", "eu_evaporation_optimization"))
 
