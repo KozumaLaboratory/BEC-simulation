@@ -1,9 +1,12 @@
 #!/bin/bash
 # UGE submission (uk07267 / tga-kozuma-kouhi): L-BFGS solver benchmark, A/B.
 #
-#   qsub -g tga-kozuma-kouhi -N lbfgs_ab \
-#        -v SBEC_ROOTS="base:/gs/bs/work/7/uk07267/bec-perf-lbfgs-base opt:/gs/bs/work/7/uk07267/bec-perf-lbfgs" \
-#        bench/submit_lbfgs_bench.sh
+#   qsub -g tga-kozuma-kouhi -N lbfgs_ab bench/submit_lbfgs_bench.sh
+#
+# The revisions default to the two standing worktrees below. Override with
+# SBEC_ROOTS, but note UGE's `-v` splits on commas AND on whitespace, so a
+# multi-root override has to be exported by an outer wrapper, not passed as
+# a single -v value.
 #
 # Both revisions run back-to-back in ONE job on ONE node, so the comparison
 # carries no node-to-node or queue-epoch confound — and it costs one queue
@@ -19,7 +22,7 @@
 
 set -euo pipefail
 
-ROOTS=${SBEC_ROOTS:?set SBEC_ROOTS="tag:/path [tag:/path ...]"}
+ROOTS=${SBEC_ROOTS:-"base:/gs/bs/work/7/uk07267/bec-perf-lbfgs-base opt:/gs/bs/work/7/uk07267/bec-perf-lbfgs"}
 GRIDS=${SBEC_GRIDS:-}
 BACKENDS=${SBEC_BACKENDS:-"cpu gpu"}
 OUT=/gs/bs/work/7/uk07267/lbfgs-bench
