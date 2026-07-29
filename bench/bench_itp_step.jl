@@ -28,7 +28,11 @@ function build_ws(; n, lhy_kind)
     grid = make_grid(GridConfig(ntuple(_ -> n, 3), ntuple(_ -> L, 3)))
     sp = SimParams(; dt = 0.002, n_steps = 1, imaginary_time = true, save_every = 100)
     ip = eu_interaction_params(0.05)
-    psi0 = init_psi(grid, SpinSystem(6); state = :ferromagnetic)
+    # A tilted spin-coherent state: every spinor component occupied and all
+    # three of ⟨F_x⟩, ⟨F_y⟩, ⟨F_z⟩ nonzero, so no DDI/spin kernel is measured
+    # against an accidentally trivial field.
+    psi0 = init_psi(grid, SpinSystem(6); state = :spin_coherent,
+        init_theta = π / 4, init_phi = 0.3)
     bk = BACKEND_ARG == "gpu" ? CUDABackend() : CPUBackend()
     ws = make_workspace(;
         grid, atom = Eu151, interactions = ip,
@@ -101,6 +105,12 @@ function report(label; n, lhy_kind, reps = 30)
     end
     t_step = tmin(step_body, reps)
 
+    # Host allocation per step — the crop/memset defects show up here even when
+    # the wall-clock is dominated by FFTs.
+    step_body()
+    alloc_step = @allocated step_body()
+    alloc_ddi = @allocated SpinorBEC._ddi_step!(ws, dt / 2, ndim, it)
+
     parts = [
         ("outer_fwd(dt/4)  ×2", 2t_fwd),
         ("outer_bwd(dt/4)  ×2", 2t_bwd),
@@ -116,7 +126,9 @@ function report(label; n, lhy_kind, reps = 30)
     @printf("  %-22s %9.3f ms   (measured full body)\n", "STEP", t_step * 1e3)
     @printf("  %-22s %9.3f ms   (observation cadence only)\n", "total_energy", t_en * 1e3)
     @printf("  reconcile: Σparts/STEP = %.3f\n", total_parts / t_step)
-    (; label, n, t_step, t_fwd, t_bwd, t_ddi, t_kin, t_nrm, t_en)
+    @printf("  host alloc: %.3f MB/step   (%.3f MB per ddi call)\n",
+        alloc_step / 2^20, alloc_ddi / 2^20)
+    (; label, n, t_step, t_fwd, t_bwd, t_ddi, t_kin, t_nrm, t_en, alloc_step)
 end
 
 report("eu-prod"; n = N_GRID, lhy_kind = LHY_ARG)
