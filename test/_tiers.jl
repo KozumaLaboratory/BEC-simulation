@@ -129,6 +129,7 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_full_bdg_n_atoms_branches.jl",
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
     "hamiltonian/test_lhy_energy_convention.jl",
     "hamiltonian/test_spatial_lhy.jl",
