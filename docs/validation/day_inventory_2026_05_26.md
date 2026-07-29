@@ -60,8 +60,43 @@ docs/validation/figures/
 |---|---|
 | 1. L4 isotropic no-collapse | `runs/l4_k3_ladder/summary.json` + 12 cell dirs `L4_K3_n{64,96,128}_*_<hash>` |
 | 2. Matsui Fig 2C reproduction | `runs/matsui_baseline/summary.json` + `matsui_5ms_n64_density_slice.json` + 3 cell dirs |
-| 3. scalar LHY ≡ off at F=6 | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
-| 4. spinor LHY closure stabilizes alone | same factorial_2x4.json (K3=0 + polar/icosa rows) |
+| 3. scalar LHY ≡ off at F=6 — **evidence VACUOUS, see below** | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
+| 4. spinor LHY closure stabilizes alone — **UNDER REVIEW, see below** | same factorial_2x4.json (K3=0 + polar/icosa rows) |
+
+### 2026-07-29: the factorial ran under three LHY defects
+
+Every LHY-enabled cell of `factorial_2x4.json` predates fixes that change what it
+measured. Three defects, each silent:
+
+- **#174** — the dynamics phase never resolved its own `lhy:` block. For a
+  SCALAR kind that meant `interactions.c_lhy = 0`: **the dynamics ran with no
+  LHY at all** while `lhy: {kind: scalar}` sat in the YAML. Being absent rather
+  than wrong, it conserved energy and reported `lhy = +0` — the failure mode
+  that looks exactly like success.
+- **#158** — the closed-form tables were exactly `N_atoms` too large (here
+  30000×), in the **propagator** as well as the energy.
+- **#125** — the broadcast propagator, which the GPU always takes, dropped every
+  tabulated LHY entirely.
+
+**Claim 3 is circular.** "scalar LHY ≡ off" was read off two rows whose dynamics
+both ran with scalar LHY off:
+
+    K3=0, LHY=off      Fz_per_N = -4.2489457
+    K3=0, LHY=scalar   Fz_per_N = -4.2487269
+
+Agreement to 7 significant figures is the signature of the same physics run
+twice, not of a physical equivalence. The **conclusion may well survive** — at
+this gas parameter (`n_SI·a_s³ ≈ 4e-5`) a correctly-built scalar LHY is ~0.05%
+of the energy, so the difference would be small anyway — but this evidence does
+not establish it.
+
+**Claim 4 is the one that may not survive.** The `stable_arrest` classification
+appears only in the `polar_contact` / `icosa` rows, and those are exactly the
+rows whose LHY was **30000× too strong**. The arrest may be an artefact of the
+defect rather than of the closure.
+
+Both claims are being re-measured with all three fixes in; `fig4_lhy_model_
+interference.png` rests on the same factorial and inherits the same status.
 | 5. K3 not primary arrest mechanism | factorial_2x4.json + `runs/eu_k3_sweep/summary.json` (10-pt K3 sweep) + `runs/eu_k3_sweep_96/summary.json` (96³ anchor) |
 | LHY long-time stability | `runs/eu_lhy_longtime/` (5 cells: polar 50/100/200, icosa 50/100) |
 | Barnett window | `runs/barnett_eu_window/summary.json` (14 cells) |

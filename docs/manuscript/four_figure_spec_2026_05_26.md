@@ -389,7 +389,13 @@ Fig 1 (d)    :  runs/matsui_baseline/matsui_5ms_n64_density_slice.json
 Fig 1 inset  :  runs/matsui_baseline/{matsui_40ms_lossy_medium,strong}.yaml
                   → analysis to extract N(t)/N(0) ratio for inset
 Fig 2 (a, b) :  runs/eu_k3_lhy_control/factorial_2x4.json
+                  !! 2026-07-29: every LHY-enabled cell ran under #125 / #158 /
+                  !! #174. The scalar rows had no dynamics LHY at all; the
+                  !! polar/icosa rows had it 30000x too strong, which is where
+                  !! the `stable_arrest` classification comes from. Being
+                  !! re-measured -- do not draw this panel from the current json.
 Fig 2 (c)    :  runs/eu_lhy_longtime/{polar,icosa}_{50,100,200}ms .jld2
+                  !! same three defects; re-running on TSUBAME.
                   → extract peak(t), N(t), Fz(t) trajectories
 Fig 3 (a, b) :  runs/eu_k3_sweep/summary.json + runs/eu_k3_sweep_96/summary.json
 Fig 4        :  runs/barnett_eu_window/summary.json
