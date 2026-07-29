@@ -127,16 +127,22 @@ function _run_step(
     else
         prev_c_dd
     end
-    # DDI truncation / padding (Tier A/B). Like `secular`, these are not carried
-    # on the inherited `DDIParams` (the kernel bakes them in), so dynamics only
-    # applies them when an explicit dynamics `ddi:` block requests it; otherwise
-    # the bare kernel is rebuilt.
+    # DDI truncation / padding (Tier A/B). Like `secular`, these are NOT carried
+    # on the inherited `DDIParams` (the kernel bakes them in), so the dynamics
+    # kernel is rebuilt from these values rather than inherited from ws_prev.
+    # They therefore default the same way the ground_state block does — before
+    # 2026-07-29 they defaulted OFF here while a config could turn them ON in
+    # `ground_state`, which silently gave a padded GS feeding bare-kernel
+    # dynamics. A config that explicitly opts OUT in `ground_state` still has to
+    # repeat that opt-out here; the inherited DDIParams cannot carry it.
     ddi_trunc = if ddi_raw isa Dict
         _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
     else
-        NaN
+        DDI_TRUNC_RADIUS_DEFAULT
     end
-    ddi_padded_b = ddi_raw isa Dict ? Bool(get(ddi_raw, "padded", false)) : false
+    ddi_padded_b =
+        ddi_raw isa Dict ?
+        Bool(get(ddi_raw, "padded", DDI_PADDED_DEFAULT)) : DDI_PADDED_DEFAULT
     ddi_pf = ddi_raw isa Dict ? _parse_ddi_pad_factor(get(ddi_raw, "pad_factor", nothing)) : 2.0
 
     # Match the GS path: route the inner B dict through

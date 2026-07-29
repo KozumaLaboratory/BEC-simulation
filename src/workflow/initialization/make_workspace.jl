@@ -70,6 +70,14 @@ function make_workspace(;
     raman::Union{Nothing, RamanCoupling{N}, TimeDependentRaman{N}}=nothing,
     loss::Union{Nothing, LossParams}=nothing,
     fft_flags=FFTW.MEASURE,
+    # Deliberately OFF here while the YAML/DSL surface defaults them ON
+    # (`DDI_PADDED_DEFAULT` / `DDI_TRUNC_RADIUS_DEFAULT` in
+    # schema/parsing_blocks.jl). This is the library primitive — every knob is
+    # explicit, and flipping it would silently change every direct-call test and
+    # A/B fixture. Callers building a workspace by hand for production physics
+    # want `ddi_padding=true, ddi_trunc_radius=-1.0`: without them the bare
+    # periodic kernel carries a 2-5% dipolar field error that is flat in
+    # resolution (scripts/ddi_cutoff_geometry_jz_probe.jl).
     ddi_padding::Bool=false,
     ddi_trunc_radius::Float64=NaN,
     ddi_pad_factor::Union{Real, NTuple{N, Real}}=2,

@@ -150,6 +150,39 @@
         @test p["ddi"]["c_dd"] == 211.0
     end
 
+    @testset "parsing - DDI image handling defaults ON" begin
+        # Flipped 2026-07-29. The bare periodic kernel carries a 2.1e-2 … 4.7e-2
+        # dipolar field error against free space, FLAT in resolution (1.91e-2 at
+        # 32³, 48³ and 64³ alike), so it is not something a finer grid fixes.
+        # Measured by scripts/ddi_cutoff_geometry_jz_probe.jl.
+        atom = SpinorBEC.resolve_atom(:Eu151)
+        inter = Dict("N_atoms" => 30000, "omega_ref" => 628.3)
+
+        _, _, _, _, _, trunc, padded, pf = SpinorBEC._parse_gs_ddi(Dict{String, Any}(), inter, atom)
+        @test padded == true
+        @test trunc == SpinorBEC.DDI_TRUNC_RADIUS_DEFAULT
+        @test trunc <= 0        # make_workspace's "auto" sentinel
+        @test pf == 2.0
+
+        # Both knobs stay individually addressable — the opt-out is the escape
+        # hatch for reproducing a pre-flip run.
+        _, _, _, _, _, _, padded_off, _ = SpinorBEC._parse_gs_ddi(
+            Dict{String, Any}("padded" => false), inter, atom)
+        @test padded_off == false
+        @test isnan(SpinorBEC._parse_ddi_trunc_radius("none"))
+        @test isnan(SpinorBEC._parse_ddi_trunc_radius("off"))
+        @test SpinorBEC._parse_ddi_trunc_radius("auto") == -1.0
+        @test SpinorBEC._parse_ddi_trunc_radius(7.5) == 7.5
+
+        # The dynamics step rebuilds the DDI kernel instead of inheriting it, so
+        # it must default the same way or a config with no explicit `ddi:` block
+        # gets a padded ground state feeding bare-kernel dynamics. Pinning the
+        # shared constants is what keeps the two call sites from drifting apart
+        # again — they used to carry independent literals.
+        @test SpinorBEC.DDI_PADDED_DEFAULT == true
+        @test SpinorBEC.DDI_TRUNC_RADIUS_DEFAULT == -1.0
+    end
+
     @testset "run_config - ground_state" begin
         yaml = """
         pipeline:
