@@ -195,6 +195,10 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "solvers/test_itp_tol_drho.jl",
+    # In CI, not FULL, on purpose: every other L-BFGS test lives in FULL_EXTRA,
+    # so a green `ci` run executes none of them. This one is a 12x12x8 F=1
+    # problem — cheap enough to belong where it will actually run.
+    "solvers/test_lbfgs_line_search_and_de.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
@@ -620,6 +624,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_3d.jl" => 5.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
+    "solvers/test_lbfgs_line_search_and_de.jl" => 15.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)
