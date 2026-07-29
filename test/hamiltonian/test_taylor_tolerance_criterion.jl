@@ -24,6 +24,16 @@
 # rotation must be materially worse. That makes the assertion above a statement
 # about a property something could break, rather than a tautology.
 #
+# HOW FAR THE MARGIN REACHES. The ratio is not scale-free: the splitting error
+# falls as dt² while the truncation accumulates over ~1/dt rotations, so
+# truncation/splitting grows roughly as dt⁻³. The 3e-11 measured at dt = 0.002
+# therefore buys about three decades of margin per factor of ~10 in dt — a run
+# at dt ≈ 1e-4 would still sit ~1e-2 of the splitting error, and only far below
+# that would the rotation start to matter. Production dt is 1e-3–5e-3, so this
+# is comfortable; but the number belongs to the dt it was established at, and a
+# convergence study that pushes dt much further should re-measure rather than
+# cite it.
+#
 # Lives in the ci tier, not fast: it runs `find_ground_state`.
 
 using Test
