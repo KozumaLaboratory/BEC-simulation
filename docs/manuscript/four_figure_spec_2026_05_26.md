@@ -125,7 +125,20 @@ reproduces", with loss-on as bracket evidence not headline claim.
 > | polar_contact | 1.0921 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
 > | icosahedral | 1.0923 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
 >
-> Energy now conserves to ~1e-9 in every arm (was 46 % for the closed forms), and
+> **The two closed forms land 0.16 % apart, and that is real, not a bug.**
+> `polar_contact` and `icosahedral` give `lhy` = +0.11457 vs +0.11458 and ratios
+> 1.0921 vs 1.0923. Comparing the tables directly, `V_polar/V_icosa = 0.9983870`
+> at *every* density — a constant, because both closed forms are `ε = C·n^(5/2)`
+> and only `C` differs. Eu's g_S ladder is flat enough (2681…3957, a 32 % spread)
+> that the polar and icosahedral channel structures give nearly the same zero-point
+> sum. The code does discriminate: `fm_contact`, which uses only `g_{2F}`, sits
+> 46 % below both.
+>
+> This is an independent reason the figure's claim cannot hold here — two of the
+> three closures it contrasts are 0.16 % apart, so "the outcome is determined by
+> the LHY closure" has nothing to vary.
+>
+> Energy now conserves to ~1e-9 in every arm (was 135 % peak excursion for the closed forms), and
 > LHY is 5–7 % of the total rather than 97 %. The signs are physical: the LHY arms
 > have a *lower* initial peak than `off` (0.00432–0.00434 vs 0.00463) because a
 > repulsive correction broadens the ground state.
@@ -169,7 +182,7 @@ reproduces", with loss-on as bracket evidence not headline claim.
 > config that produced them was wrong in the field sign and has been fixed.
 >
 > **Only the first two rows are usable.** `off` and `scalar` conserve energy to
-> 2e-8 / 7e-8. The two closed-form arms drift **46 %** (E: 3123 → 1694) and their
+> 2e-8 / 7e-8. The two closed-form arms drift **135 %** peak excursion / 45 % endpoint (E: 3123 → 1694; `energy_rel_drift` is `max|E(t)−E(0)|/|E(0)|`, not the endpoint difference) and their
 > `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
 > (`lhy = +1653` / `+1664` against a whole mean field of ≈ +2.2 in the other two
 > arms). Their ratios are not evidence of anything and are shown only to document
@@ -184,7 +197,7 @@ reproduces", with loss-on as bracket evidence not headline claim.
 >
 > The two dedicated gates for the tabulated path both pass at this commit
 > (`test_lhy_energy_convention.jl` 17/17, `test_tabulated_lhy_propagator_parity.jl`
-> 42/42), so the 46 % drift is **not** an energy/propagator/gradient inconsistency.
+> 42/42), so the drift is **not** an energy/propagator/gradient inconsistency.
 > It is the table's magnitude in this particular Eu F=6 configuration — tracked
 > separately; not diagnosed here.
 >
