@@ -663,11 +663,16 @@ end
 
 `(n_pts..., 1)`-shaped spectral filter `f(k²)` with the inverse-FFT
 normalisation folded in, cached in the scratch registry under `category` and
-rebuilt only when `param` (whatever `f` closes over) changes. Sized and
-deviced from `k2`, so CPU and GPU callers get their own entry.
+rebuilt only when `param` (whatever `f` closes over) changes.
+
+Keyed on the IDENTITY of `k2`, not its size: two grids of the same shape but
+different box lengths have the same-sized, differently-valued `k²`, and a
+size-keyed cache would hand the second grid the first grid's filter. Keeping
+`k2` in the key also pins it against GC, so no later array can reuse its
+address and inherit its entry.
 """
 function cached_kspace_filter(k2, category::Symbol, param, f::F) where {F}
-    st = scratch_get!(category, (typeof(k2), size(k2))) do
+    st = scratch_get!(category, k2) do
         (arr=similar(k2, size(k2)..., 1), param=Ref{Any}(nothing))
     end
     if st.param[] != param

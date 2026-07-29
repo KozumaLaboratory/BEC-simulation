@@ -275,7 +275,7 @@ function trapped_bdg_low_modes(
     extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
 )
     p = params === nothing ? constrained_hessian_params(ws, ψ) : params
-    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
     α = α_pre === nothing ? max(abs(p.μ), 1e-3) : α_pre
 

@@ -186,7 +186,7 @@ function find_ground_state_lbfgs(;
     # Hamiltonian for tensor-active configurations.
 
     # Device-resident k² for energy_gradient! (matches ws.state.psi's backend)
-    k_squared_dev = _to_device(ws.backend, grid.k_squared)
+    k_squared_dev = _to_device_cached(ws.backend, grid.k_squared)
 
     # Work arrays — separate from ws.state.psi
     psi = copy(ws.state.psi)
