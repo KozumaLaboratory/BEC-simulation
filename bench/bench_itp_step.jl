@@ -82,7 +82,8 @@ function report(label; n, lhy_kind, reps = 30)
     end
 
     println("\n" * "="^72)
-    println("ITP kernel breakdown: $label  (n=$n³, D=$ncomp, lhy=$lhy_kind, $BACKEND_ARG, threads=$(Threads.nthreads()))")
+    println("ITP kernel breakdown: $label  (n=$(n)³, D=$(ncomp), lhy=$(lhy_kind), " *
+            "$(BACKEND_ARG), threads=$(Threads.nthreads()))")
     println("="^72)
 
     t_fwd = tmin(() -> SpinorBEC._outer_potential_fwd!(ws, dt / 4, ncomp, ndim, it), reps)
