@@ -204,3 +204,104 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   transactions cost 2.4× (Round 8 measured that for the single-rotation
 #   kernel); (b) whether 105 launches/step matters at ~5 µs each. Get a TSUBAME
 #   profile before optimizing either.
+
+# === Round 10 (2026-07-29, RTP on TSUBAME H100) ===
+#
+# Round 9's two open questions, answered on the card it said to ask:
+#
+#   (a) IS the rotation kernel memory-bound on an H100? YES, flatly.
+#       bench/micro_spin_taylor.jl 128 13 cloud, full H100:
+#         K       1     2     4     8    16    24
+#         ms  0.864 0.865 0.865 0.864 0.864 0.864
+#       t(16)/t(4) = 1.00 against 4.0 for pure compute, ceiling 938.6 GB/s.
+#       So the lever on this machine is ψ TRAFFIC, not the Horner op count —
+#       the opposite of the consumer card, where Round 9 measured ~74 % of FP64
+#       peak in the same body. Both of the cuts below are traffic cuts.
+#   (b) launches: at 128³ the GPU is busy 97.9 % of wall, so the ~105 launches
+#       per step are already hidden. Not a target.
+#
+# BUT FIRST, a defect that mattered more than either. `9c117c05` set
+# `DDI_PADDED_DEFAULT = true`, and `_spin_chain_reason` carried
+# `ws.ddi_padded === nothing || return "..."` — so from that commit no
+# `run_yaml` RTP run took the fused V half-step at all. `bench/profile_rtp.jl`
+# cannot see this: it calls `make_workspace` directly, where `ddi_padding`
+# defaults FALSE. The benchmark went on measuring a path production had left.
+# A bench that bypasses the config parser cannot see a parser default flip.
+#
+# `bench/rtp_padding_ab.jl` (new) prints `_spin_chain_reason`'s verdict beside
+# each timing, so which path ran is read off the run rather than inferred, and
+# it reports BOTH shapes per invocation. Baseline is 634e0234 (post-#183, which
+# had already fixed the ITP-side padded fast paths).
+#
+#   one H100, alternating arms, repeats agreed to < 0.5 %:
+#
+#                  bare (what the bench builds)   padded (what run_yaml builds)
+#                    BASE    FIX    PERF            BASE     FIX    PERF
+#    64³            2.066  2.060   1.79            4.824   3.309   3.05
+#    96³            6.454  6.478   5.69           17.057  12.126  11.37
+#   128³           14.573 14.536  12.79           40.270  28.688  26.95
+#
+#   production shape, BASE → PERF:  1.58× / 1.50× / 1.49×
+#     of which the FIX (re-fusing the padded path) is 1.46× / 1.40× / 1.41×
+#     and the two traffic cuts add                     1.09× / 1.07× / 1.06×
+#
+# The traffic cuts are worth 1.14-1.15× on the bare shape but only 1.06-1.09×
+# on the padded one, because padding runs the convolution on a 2× grid per axis
+# and those FFTs dilute a ψ-traffic saving. Quote the padded column: it is the
+# one production pays.
+#
+# ACCURACY (bench/rtp_order_padded.jl, new). Order had never been measured on
+# the combination production actually runs — GPU + zero-padded + `split_step!`
+# + the fused kernel. `bench/conv_order.jl` is CPU, N=12, unpadded, and calls
+# the half-potential helpers directly. Self-convergence at 24³, Eu151 D=13 F64:
+#
+#   padded, fused ON    dt 2e-4 → 1e-4 → 5e-5 : order 2.000, 2.000
+#   padded, fused OFF                          : order 2.000, 2.000
+#   bare,   fused ON                           : order 2.000, 2.000
+#   and fused ≡ unfused at EVERY dt, bit for bit.
+#
+# Strang is 2 and stays 2. The mean field is what puts that at risk — evaluated
+# at each substep's entry it collapses to ~1 with DDI on — so this is the
+# measurement that would catch a fused half-step that had quietly become a
+# different splitting. An order table alone cannot distinguish "same splitting"
+# from "different splitting of the same order", which is why the bit-identity
+# line is printed next to it.
+#
+# done 2026-07-29 (1): the Picard midpoint opened every iterate with a full-ψ
+#   `copyto!(psi_mid_curr, psi_orig)` — two per step for a plain `split_step!`
+#   (n_picard = 1), four for the composers (n_picard = 2), 436 MB each way at
+#   128³ D=13 F64. The fused kernel reads each (voxel, component) once before
+#   writing it, so it takes a separate source array for free: `psi_in` hands it
+#   ψ_orig and the copy disappears rather than moving. The generic chain, which
+#   is in-place throughout, materialises the request as the copy it would have
+#   paid anyway, so nothing off the fused path changes.
+#
+#   Sanity-check the mechanism against the measurement before believing it: the
+#   saving at 128³ bare is 0.84 ms for 2 × 872 MB = 2.07 TB/s, which an H100 can
+#   do. The same arithmetic is how the first draft of this note — which claimed
+#   SIX copies per step — was caught: six would have needed 6.2 TB/s, above
+#   HBM3 peak. `_half_potential!` passes `n_picard=1`; only the composers use 2.
+#
+# done 2026-07-29 (2): `_spin_density_kernel!` and `_diag_phase_kernel!` are
+#   both per-voxel reductions over the same D components of the same ψ_mf,
+#   launched back to back with the same geometry — the second re-read 436 MB for
+#   a sum the first had in registers (Σ_c|ψ_c|² is a term of both). Fused; each
+#   accumulator keeps its own kernel's terms and order, so bit-identical. Needed
+#   `_convolve_ddi!` / `_convolve_ddi_padded!` (the k-space halves) split out of
+#   the two `_compute_and_convolve_*` wrappers, which now share them.
+#
+# NOT a lever, contrary to the first draft of this note: `n_picard`. The RTP
+#   dispatcher already passes 1 (`_half_potential!`), so a plain step is four
+#   fused half-steps, not six. 2 is reached only by `split_step_midpoint!` and
+#   the MPS/Yoshida composers, where the docstring ties it to Richardson order
+#   recovery. There is no free 1.5× hiding there.
+#
+# NEXT: at 128³ the padded step is 26.95 ms against 12.79 bare, i.e. the
+#   open-boundary convolution — six rFFTs on a 256³ grid — is now more than half
+#   the step and the largest single item left. #183 already removed its pad
+#   re-zeroing and its Φ crop. What remains to try is the transform itself:
+#   whether cuFFT does better on one batched 3-field plan than on three, and
+#   whether the pad factor has to be 2 in every axis for the field error the
+#   padding is there to remove (9c117c05 measured 2.1e-2 to 4.7e-2 against free
+#   space; nobody has measured it against pad_factor). Measure the error before
+#   trading it, and on an H100 — the ratio moves with the FP64 rate.
