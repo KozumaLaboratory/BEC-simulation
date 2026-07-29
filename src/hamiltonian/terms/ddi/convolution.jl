@@ -187,6 +187,19 @@ function _compute_and_convolve_ddi!(
         apply_orszag_2_3_F_filter!(bufs.Fz_r, n_pts, ddi.box_size)
     end
 
+    _convolve_ddi!(ddi, bufs, n_pts)
+end
+
+"""
+    _convolve_ddi!(ddi, bufs, n_pts)
+
+The k-space half — `Φ = C · Q ⋆ F`, reading `bufs.F*_r`, writing `bufs.Phi_*`.
+Split out so a caller that already holds `⟨F⟩` can run the convolution without a
+second spin-density pass: the fused V half-step gets `⟨F⟩` from the same pass
+over ψ_mf that produces its diagonal voxel phase. Both entry points share this
+one body, so the 6-rFFT pipeline stays a single declaration.
+"""
+function _convolve_ddi!(ddi::DDIParams, bufs::DDIBuffers, n_pts)
     rp = bufs.rfft_plans
     mul!(bufs.Fx_rk, rp.forward, bufs.Fx_r)
     mul!(bufs.Fy_rk, rp.forward, bufs.Fy_r)

@@ -14,21 +14,30 @@
 # on the way into the kernel and out of it — only the per-component Zeeman
 # factor differs between the two sides.
 #
-# What it removes, per V half-step at D = 13 (i.e. ×4 per RTP step):
-#   * 8 ψ passes → 3 (one prepass read of ψ_mf, one read+write here)
+# What it removes, per V half-step at D = 13. A plain `split_step!` takes two of
+# them per V half (predictor + corrector, n_picard = 1) and two V halves, so ×4
+# per RTP step:
+#   * 8 ψ passes → 2 (one prepass read of ψ_mf, one read+write here)
 #   * 3 spin-density passes over ψ_mf → 1 (⟨F⟩ feeds spin-mixing directly and
 #     DDI through the convolution, and the midpoint freezes ψ_mf, so all three
 #     substeps were computing the same ⟨F⟩)
 #   * 5 kernel launches → 2
+#
+# Every lane reads its own (voxel, component) once, before it writes it, so the
+# kernel takes a separate SOURCE array at no cost. That is what lets the Picard
+# midpoint hand its ψ_orig in as `Pin` instead of memcpy-ing it into the scratch
+# buffer first — see `_half_potential_step_midpoint!`.
 #
 # A zero-padded (open-boundary) DDI changes none of that. Both ⟨F⟩ and Φ then
 # live in the `[1:n_pts...]` corner of the padded buffers, which is one index map
 # in the rotation — the same `_voxel_index` the standalone DDI rotation reads
 # through — not a reason to unfuse.
 
+using StaticArrays: SVector
+
 @inline function _spin_chain_warp_kernel!(
     P, fx, fy, fz, px, py, pz, vph, zph_fwd, zph_bwd, mz, sxu, syu, rk_sm, rk_dd,
-    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT}, src,
+    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT}, src, Pin,
 ) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
@@ -57,12 +66,71 @@
     # (`P[i, c] *= vph * zph[c]`). Floating-point multiplication is not
     # associative, and this gate demands bit-identity.
     vp = in_range ? (@inbounds vph[vox]) : one(CT)
-    w = live ? (@inbounds P[vox, c]) * (vp * (@inbounds zph_fwd[c])) : zero(CT)
+    w = live ? (@inbounds Pin[vox, c]) * (vp * (@inbounds zph_fwd[c])) : zero(CT)
     w = _horner_rot(w, ds, bs, bms, c, cdn, rk_sm, kvs, hs, shs, Val(16), Val(RT))
     w = _horner_rot(w, dd, bd, bmd, c, cdn, rk_dd, kvd, hd, shd, Val(16), Val(RT))
     w = _horner_rot(w, ds, bs, bms, c, cdn, rk_sm, kvs, hs, shs, Val(16), Val(RT))
 
     live && (@inbounds P[vox, c] = w * (vp * (@inbounds zph_bwd[c])))
+    nothing
+end
+
+# ⟨F⟩(ψ_mf) and the diagonal voxel phase, from ONE pass over ψ_mf.
+#
+# `_spin_density_kernel!` and `_diag_phase_kernel!` are both per-voxel reductions
+# over the same D components of the same array, and the half-step launched them
+# back to back with the same geometry — so the second re-read from HBM a sum the
+# first already had in registers (Σ_c|ψ_c|² is a term of both). At 128³ D = 13
+# F64 that re-read is 436 MB, four times per RTP step.
+#
+# Each accumulator is written exactly as its own kernel writes it — same terms,
+# same order — so the fused result is bit-identical rather than merely close, and
+# the fusion oracle asserts that with `==`. `dst` is the same voxel → buffer map
+# `_spin_density_kernel!` takes, so the padded corner is one argument, not a
+# second kernel.
+@inline function _chain_prepass_kernel!(
+    Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0::T, clhy::T, dt::T,
+    ::Val{D}, ::Val{IT}, dst,
+) where {T, D, IT}
+    i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+    i > size(Pmf, 1) && return nothing
+    n = zero(T)
+    fz = zero(T)
+    fxr = zero(T)
+    fyi = zero(T)
+    prev = @inbounds Pmf[i, 1]
+    n += abs2(prev)
+    fz += m_vals[1] * abs2(prev)
+    @inbounds for c in 2:D
+        cur = Pmf[i, c]
+        n += abs2(cur)
+        fz += m_vals[c] * abs2(cur)
+        pr = conj(prev) * cur
+        fxr += fp[c] * real(pr)
+        fyi += fp[c] * imag(pr)
+        prev = cur
+    end
+    lhy = clhy == zero(T) ? zero(T) : clhy * n * sqrt(n)
+    varg = (@inbounds(Vt[i]) + c0 * n + lhy) * dt
+    @inbounds begin
+        j = _voxel_index(dst, i)
+        Fx[j] = fxr
+        Fy[j] = fyi
+        Fz[j] = fz
+        db[i] = n
+        vph[i] = IT ? Complex{T}(exp(-varg), zero(T)) : cis(-varg)
+    end
+    return nothing
+end
+
+@inline function _launch_chain_prepass!(
+    Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0::T, clhy::T, dt::T,
+    ::Val{D}, it::Bool, dst, N,
+) where {T, D}
+    threads = min(N, 256)
+    CUDA.@cuda threads = threads blocks = cld(N, threads) _chain_prepass_kernel!(
+        Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0, clhy, dt,
+        Val(D), Val(it), dst)
     nothing
 end
 
@@ -72,6 +140,7 @@ SpinorBEC._spin_chain_available(psi::CuArray, ws::SpinorBEC.Workspace) =
 function SpinorBEC._apply_spin_chain!(
     psi::CuArray{Complex{T}}, ws::SpinorBEC.Workspace, dt_half, ndim,
     imaginary_time, ip, psi_mf, zeeman_diag_fwd, zeeman_diag_bwd,
+    psi_in::CuArray{Complex{T}}=psi,
 ) where {T <: AbstractFloat}
     sm = ws.spin_matrices
     D = sm.system.n_components
@@ -81,42 +150,53 @@ function SpinorBEC._apply_spin_chain!(
     it = imaginary_time === true
     dt_outer = T(dt_half) / 2                # the outer chain's substep dt
 
-    # ⟨F⟩(ψ_mf) and Φ_DDI, from ONE spin-density pass feeding both — the point of
-    # fusing. The convolution leaves ⟨F⟩ intact, and it is bit-identical to what
-    # the separate spin-mixing substep would have computed (same kernel, same
-    # coefficients, same frozen ψ_mf).
+    # ⟨F⟩(ψ_mf) feeds the two spin-mixing rotations directly AND the convolution
+    # on its way to Φ, and the midpoint freezes ψ_mf, so all three substeps want
+    # the same field — that is the point of fusing. It is bit-identical to what
+    # the separate spin-mixing substep computes: same terms, same order, same
+    # frozen ψ_mf.
     #
-    # With `ddi_padding` on — which is `DDI_PADDED_DEFAULT`, i.e. every
-    # `run_yaml` run — both fields live in the `[1:n_pts...]` corner of the
-    # padded buffers rather than in contiguous arrays of their own. That changes
-    # where the rotation reads them, which is an index map, not a reason to fall
-    # back to five separate operators. The corner ⟨F⟩ is the same kernel over the
-    # same values as the contiguous one (`_compute_spin_density!` dispatches on
-    # buffer shape and differs only in the destination index), so the
-    # bit-identity claim carries over — pinned by
-    # `test/gpu/test_gpu_padded_corner_parity.jl` on that side and by the padded
-    # arm of the fusion oracle on this one.
+    # With `ddi_padding` on — which is `DDI_PADDED_DEFAULT`, i.e. every `run_yaml`
+    # run — ⟨F⟩ and Φ live in the `[1:n_pts...]` corner of the padded buffers
+    # rather than in contiguous arrays of their own. That changes where they are
+    # written and read, which is an index map, not a reason to fall back to five
+    # separate operators. `_compute_spin_density!` dispatches on buffer shape and
+    # differs only in that index, so the corner and contiguous forms are the same
+    # kernel over the same values — `test/gpu/test_gpu_padded_corner_parity.jl`
+    # asserts that with `==`, and the padded arm of the fusion oracle asserts the
+    # consequence here.
     pad = ws.ddi_padded
-    if pad === nothing
-        SpinorBEC._compute_and_convolve_ddi!(
-            psi_mf, sm, ws.ddi, bufs, Val(D), ndim, n_pts)
-    else
-        SpinorBEC._compute_and_convolve_ddi_padded!(
-            psi_mf, sm, ws.ddi, pad, Val(D), ndim, n_pts)
-    end
 
     P = reshape(psi, N, D)
+    Pin = psi_in === psi ? P : reshape(psi_in, N, D)
     Pmf = reshape(psi_mf::CuArray{Complex{T}}, N, D)
 
-    # Diagonal phase, once, from the same frozen ψ_mf.
     c_lhy = ws.lhy !== nothing ? ws.lhy : ip.c_lhy
     clhy = c_lhy isa SpinorBEC.ScalarLHY ? T(c_lhy.c_lhy) :
            (c_lhy isa Float64 ? T(c_lhy) : zero(T))
     vph = _get_chain_vph(psi, N)
-    threads_v = min(N, 256)
-    CUDA.@cuda threads = threads_v blocks = cld(N, threads_v) _diag_phase_kernel!(
-        vph, reshape(ws.density_buf, N), Pmf, reshape(ws.potential_values, N),
-        T(ip[0]), clhy, dt_outer, Val(D), Val(it))
+    db = reshape(ws.density_buf, N)
+    Vt = reshape(ws.potential_values, N)
+    m_vals = SVector{D, T}(ntuple(c -> T(sm.system.F - (c - 1)), Val(D)))
+    fp = SVector{D, T}(SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D)))
+
+    # One pass over ψ_mf for ⟨F⟩ and the diagonal phase, then the k-space half of
+    # the convolution on the ⟨F⟩ just written. Two call sites rather than one
+    # with a Union-typed buffer/map tuple, so each launches a concretely-typed
+    # kernel.
+    if pad === nothing
+        _launch_chain_prepass!(
+            reshape(bufs.Fx_r, N), reshape(bufs.Fy_r, N), reshape(bufs.Fz_r, N),
+            vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
+            Val(D), it, nothing, N)
+        SpinorBEC._convolve_ddi!(ws.ddi, bufs, n_pts)
+    else
+        _launch_chain_prepass!(
+            pad.Fx_pad, pad.Fy_pad, pad.Fz_pad,
+            vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
+            Val(D), it, CartesianIndices(n_pts), N)
+        SpinorBEC._convolve_ddi_padded!(ws.ddi, pad)
+    end
 
     zf = _get_diag_zph(psi, zeeman_diag_fwd, dt_outer, it, 1)
     zb = _get_diag_zph(psi, zeeman_diag_bwd, dt_outer, it, 2)
@@ -132,25 +212,25 @@ function SpinorBEC._apply_spin_chain!(
         _launch_spin_chain!(
             P, reshape(bufs.Fx_r, N), reshape(bufs.Fy_r, N), reshape(bufs.Fz_r, N),
             reshape(bufs.Phi_x, N), reshape(bufs.Phi_y, N), reshape(bufs.Phi_z, N),
-            vph, zf, zb, coef, rk_sm, rk_dd, F, N, Val(D), it, nothing)
+            vph, zf, zb, coef, rk_sm, rk_dd, F, N, Val(D), it, nothing, Pin)
     else
         _launch_spin_chain!(
             P, pad.Fx_pad, pad.Fy_pad, pad.Fz_pad,
             pad.Phi_x_pad, pad.Phi_y_pad, pad.Phi_z_pad,
             vph, zf, zb, coef, rk_sm, rk_dd, F, N, Val(D), it,
-            CartesianIndices(n_pts))
+            CartesianIndices(n_pts), Pin)
     end
     nothing
 end
 
 @inline function _launch_spin_chain!(
     P, fx, fy, fz, px, py, pz, vph, zf, zb, coef, rk_sm, rk_dd, F::T, N,
-    ::Val{D}, it::Bool, src,
+    ::Val{D}, it::Bool, src, Pin,
 ) where {T, D}
     CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fx, fy, fz, px, py, pz, vph, zf, zb, coef.mz, coef.sxu, coef.syu,
         rk_sm, rk_dd, Int32(_SPIN_RK_MAX), T(_SPIN_TAYLOR_TOL[])^2, F * F,
-        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it), src)
+        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it), src, Pin)
     nothing
 end
 
