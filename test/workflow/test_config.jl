@@ -181,6 +181,26 @@
         # again — they used to carry independent literals.
         @test SpinorBEC.DDI_PADDED_DEFAULT == true
         @test SpinorBEC.DDI_TRUNC_RADIUS_DEFAULT == -1.0
+
+        # `pad_factor: auto` has to survive schema validation as a String, not
+        # just parse — the FieldSpec type is what rejects it otherwise.
+        yaml_auto = """
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid: {n: [8, 8, 16], box: [6.0, 6.0, 12.0]}
+              interactions: {N_atoms: 1000, omega_ref: 628.3}
+              ddi: {enabled: true, pad_factor: auto}
+              dt: 0.005
+              n_steps: 10
+              tol: 1.0e-6
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+        """
+        cfg_auto = load_config_from_string(yaml_auto)
+        _, _, _, _, _, _, _, pf_auto = SpinorBEC._parse_gs_ddi(
+            cfg_auto.steps[1].params["ddi"], inter, atom
+        )
+        @test pf_auto == -1.0
     end
 
     @testset "run_config - ground_state" begin
