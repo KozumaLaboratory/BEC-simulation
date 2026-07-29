@@ -275,7 +275,7 @@ SPGPE ensemble over the real ramp → CSV.
 function evap_spgpe(;
     grid_n::Int=48, box_scale::Float64=2.6, n_traj::Int=4, dt::Float64=0.002,
     spgpe_every::Int=5, f_start::Float64=1.2, equilibrate::Float64=40.0,
-    cutoff_n_T::Float64=1.0,
+    cutoff_n_T::Float64=0.3,
     n_save::Int=120, backend=CPUBackend(), tag::String="spgpe",
     duration_cap::Float64=Inf,
 )
@@ -326,12 +326,16 @@ function evap_spgpe(;
         end
         acc
     end
-    G > 1.0 || error(
-        "growth budget G = $(round(G; sigdigits=3)) ≤ 1: the reservoir cannot grow a " *
-        "condensate in this window, so the run would return N₀ ≈ 0 no matter how " *
-        "correct the code is. Lower cutoff_n_T (currently $cutoff_n_T) or widen the " *
-        "window; run mode `growth_budget` to see the trade-off.")
-    G > 3.0 || @warn "growth budget is marginal — expect a large lag, not a saturated condensate" G
+    G_eff = GROWTH_EFFICIENCY * G
+    G_eff > EFOLDINGS_NEEDED || error(
+        "growth budget: G_eff = η·G = $(round(G_eff; sigdigits=3)) against " *
+        "$(round(EFOLDINGS_NEEDED; sigdigits=3)) e-foldings needed. The reservoir " *
+        "cannot grow a condensate in this window, so the run returns N₀ ≈ 0 however " *
+        "correct the code is — which is what n_T = 1.0 (G_eff = 2.0) and n_T = 1.5 " *
+        "already cost. LOWER cutoff_n_T (currently $cutoff_n_T): a shallower cutoff " *
+        "raises γ and shrinks the grid at the same time. Run mode `growth_budget`.")
+    G_eff > 2 * EFOLDINGS_NEEDED ||
+        @warn "growth budget is within 2× of the requirement — expect a visible lag" G_eff
 
     r0 = spgpe_rates(resv.reservoir, 0.0)
     r1 = spgpe_rates(resv.reservoir, resv.duration_internal)
@@ -339,8 +343,9 @@ function evap_spgpe(;
         r0.gamma, r1.gamma, r0.M, r1.M)
     @printf("  cutoff          k_cut %.2f → %.2f (ϵ_cut−μ = %.1f k_BT, occupation %.2f)\n",
         resv.k_cut[1], resv.k_cut[end], cutoff_n_T, 1 / cutoff_n_T)
-    @printf("  growth budget   G = ∫2γ(μ−μ̃)dt = %.2f  (%s)\n",
-        G, G > 3 ? "forms" : "marginal")
+    @printf("  growth budget   G = %.2f, G_eff = %.2f vs %.2f needed  (%.1f× margin)\n",
+        G, GROWTH_EFFICIENCY * G, EFOLDINGS_NEEDED,
+        GROWTH_EFFICIENCY * G / EFOLDINGS_NEEDED)
     @printf("  grid            %d³, box %.1f, max k_cut %.2f (k_max %.2f)\n",
         grid_n, box, k_cut, k_max)
     @printf("  steps           %.3g × %d trajectories\n", T_internal / dt, n_traj)
@@ -482,6 +487,18 @@ end
 # cannot possibly work" when small, not as a guarantee when large.
 _drive(r, omega_ratio, _c0) = r.mu - 1.5 * omega_ratio
 
+# The naive rate 2γ(μ−μ̃) OVERSTATES the growth actually delivered. Measured in
+# the static test (μ=5, T=2, γ=0.02): N₀ went 1.9 → 1167 over 135 internal units,
+# 6.4 e-foldings at 0.047/unit, against a naive 0.14/unit. So the budget is
+# discounted by η before it is compared to anything.
+const GROWTH_EFFICIENCY = 1 / 3
+
+# A condensate here is O(10³) atoms and starts from a thermal seed of order one
+# in the condensate mode, so the ramp has to deliver ln(10³) e-foldings. Comparing
+# the RAW G against a round number instead is what passed n_T = 1.0 (G = 5.95,
+# G_eff = 2.0) as "forms" when it needed 6.9.
+const EFOLDINGS_NEEDED = log(1.0e3)
+
 """
     growth_budget(; n_Ts, f_start) -> Vector
 
@@ -509,7 +526,8 @@ function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
     c0 = 4π * Eu151.a_s / sqrt(Units.HBAR / (traj.trap.mass * ωref))
     @printf("window starts %.3f s, ω_ref/2π = %.1f Hz, c0 = %.4g\n",
         win.t_start, ωref / 2π, c0)
-    println("n_T   k_cut(0)→k_cut(T)   γ(0)→γ(T)        G=∫2γ(μ−μ̃)dt   verdict   n_grid")
+    @printf("need %.2f e-foldings (ln 10³), η = %.2f measured\n", EFOLDINGS_NEEDED, GROWTH_EFFICIENCY)
+    println("n_T   k_cut(0)→(T)      γ(0)→γ(T)             G   G_eff  verdict   fits  grid")
     out = []
     for nT in n_Ts
         resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
@@ -529,13 +547,26 @@ function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
         r1 = spgpe_rates(resv.reservoir, t[end])
         box = 2.6 * sqrt(2 * win.T_max)
         n_req = ceil(Int, resv.k_cut_max * box / π / 2) * 2
-        verdict = G > 3 ? "FORMS" : G > 1 ? "marginal" : "CANNOT FORM"
-        @printf("%.2f  %5.2f → %5.2f      %.3g → %.3g   %8.2f      %-11s %d\n",
-            nT, resv.k_cut[1], resv.k_cut[end], r0.gamma, r1.gamma, G, verdict, n_req)
-        push!(out, (; n_T=nT, G, k_cut=resv.k_cut[1], gamma0=r0.gamma, n_req))
+        G_eff = GROWTH_EFFICIENCY * G
+        verdict = G_eff > 2 * EFOLDINGS_NEEDED ? "FORMS" :
+                  G_eff > EFOLDINGS_NEEDED ? "marginal" : "SHORT"
+        # capacity: the condensate's momentum content reaches ~1/ξ = √(2μ), so the
+        # projector has to stay above it — smallest margin over the window.
+        margin = Inf
+        for tt in t
+            rr = spgpe_rates(resv.reservoir, tt)
+            rr.mu > 0 && (margin = min(margin, rr.k_cut / sqrt(2 * rr.mu)))
+        end
+        @printf("%.2f  %5.2f → %5.2f   %.3g → %.3g  %7.2f %7.2f  %-9s %5.2fx %4d\n",
+            nT, resv.k_cut[1], resv.k_cut[end], r0.gamma, r1.gamma, G, G_eff,
+            verdict, margin, n_req)
+        push!(out, (; n_T=nT, G, G_eff, margin, k_cut=resv.k_cut[1],
+            gamma0=r0.gamma, n_req))
     end
-    println("\nG ≫ 1 forms, G ≲ 1 cannot. Occupation at the cutoff is 1/n_T, so the")
-    println("standard c-field range is n_T ≈ 0.5–1.5; anything outside is not a free choice.")
+    println("\nG_eff is compared to the e-foldings NEEDED, not to a round number, and")
+    println("`fits` is k_cut/√(2μ) at its tightest — the condensate must stay inside the")
+    println("projector. Occupation at the cutoff is 1/n_T; n_T ≈ 0.2–0.5 keeps it at 2–5,")
+    println("which is standard c-field practice AND is where the growth budget closes.")
     out
 end
 
@@ -590,7 +621,7 @@ function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
     elseif mode == "production"
-        evap_spgpe(; grid_n=72, n_traj=4, f_start=1.05, n_save=40, cutoff_n_T=1.0,
+        evap_spgpe(; grid_n=48, n_traj=8, f_start=1.05, n_save=40, cutoff_n_T=0.3,
             backend, tag="spgpe")
     elseif mode == "growth_budget"
         growth_budget()
