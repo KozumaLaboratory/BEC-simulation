@@ -97,6 +97,7 @@ function find_ground_state_lbfgs(;
             quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
             light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
             rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
+            spinor_lhy, lhy_opts,
         )
     end
 

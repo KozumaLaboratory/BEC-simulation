@@ -36,6 +36,8 @@ const FAST_TESTS = [
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_dynamics_lhy_normalisation.jl",
+    "solvers/test_lbfgs_forward_coverage.jl",
+    "oracles/test_lhy_table_path_coverage.jl",
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
     "workflow/test_interactions_roundtrip.jl",
@@ -536,7 +538,10 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
     "oracles/test_imag_time_propagator_generator.jl" => 22.8,
     "validation/test_L5_operator_rhs_compare.jl" => 22.6,
-    "hamiltonian/test_ddi_padded.jl" => 22.1,
+    "hamiltonian/test_ddi_padded.jl" => 97.8,
+    "workflow/test_dynamics_lhy_normalisation.jl" => 3.0,
+    "solvers/test_lbfgs_forward_coverage.jl" => 2.0,
+    "oracles/test_lhy_table_path_coverage.jl" => 2.0,
     "analysis/test_diagnostics.jl" => 21.3,
     "oracles/test_zeeman_diagonal_analytic.jl" => 19.9,
     "hamiltonian/test_ddi_convention_factorial.jl" => 18.2,
@@ -601,7 +606,10 @@ const _COST = Dict{String, Float64}(
     "solvers/test_continuation.jl" => 58.0,
     "workflow/test_pipeline.jl" => 17.0,
     "workflow/test_infrastructure.jl" => 15.0,
-    "workflow/test_lhy_block_wiring.jl" => 13.0,   # 7 modes x table builds
+    # Was 13.0 when it only built tables; #179 added a run_yaml A/B
+    # (`method: lbfgs` reaches the tabulated LHY), which dominates. Now the
+    # heaviest single file in the fast tier — measured 255.9 s.
+    "workflow/test_lhy_block_wiring.jl" => 255.9,
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
     "test_level4_general_F_phase_emergence.jl" => 13.0,
     "analysis/test_tof_multiframe.jl" => 9.5,

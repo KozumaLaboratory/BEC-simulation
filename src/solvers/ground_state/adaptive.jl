@@ -30,6 +30,12 @@ function _find_ground_state_adaptive(;
     l_z_ddi::Float64=0.0,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
+    # Spinor (tabulated) LHY. `find_ground_state` / `find_ground_state_lbfgs`
+    # accept these and forward them to their own `make_workspace`, so a branch
+    # that does not thread them silently drops the TABLE while `scalar` (which
+    # rides in `interactions.c_lhy`) keeps working — the shape of #174 and #179.
+    spinor_lhy::Union{Nothing, Symbol, AbstractLHY}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     backend::AbstractBackend=CPUBackend(),
     light_shift=nothing,
     verbose::Bool=true,
@@ -60,6 +66,8 @@ function _find_ground_state_adaptive(;
         ddi_trunc_radius,
         ddi_padding,
         ddi_pad_factor,
+        spinor_lhy,
+        lhy_opts,
         fft_flags,
         quasi_2d_ddi,
         l_z_ddi,
