@@ -29,6 +29,46 @@ function _sobolev_precondition!(
 end
 
 """
+    _axpy_threaded!(a, c, b) → a
+
+`a .+= c .* b`, split across Julia threads for host arrays.
+
+Elementwise, so the result does not depend on the split: this is bit-identical
+to the broadcast it replaces at any thread count, and identical again when
+`Threads.nthreads() == 1` (the fallback IS the sequential loop).
+
+Why it exists: the two-loop recursion touches `2m` ψ-sized arrays twice each
+and was measured at ~18 GB/s — one core's streaming bandwidth — making it 60-64
+% of the CPU cost of an L-BFGS iteration (`docs/design/lbfgs_iteration_cost.md`).
+The dot products go to BLAS `zdotc` and are left alone, because splitting a
+reduction changes its summation order; the axpys are the part that can be
+parallelised without changing a single rounding.
+"""
+function _axpy_threaded!(a::Array, c::Number, b::Array)
+    n = length(a)
+    nt = Threads.nthreads()
+    # Below ~0.5 MB the `@threads` region costs more than the traffic it saves.
+    if nt == 1 || n < (1 << 15)
+        @inbounds @simd for i in eachindex(a, b)
+            a[i] += c * b[i]
+        end
+        return a
+    end
+    chunk = cld(n, nt)
+    Threads.@threads for t in 1:nt
+        lo = (t - 1) * chunk + 1
+        hi = min(t * chunk, n)
+        @inbounds @simd for i in lo:hi
+            a[i] += c * b[i]
+        end
+    end
+    return a
+end
+
+# Device arrays: the broadcast is already parallel.
+_axpy_threaded!(a, c, b) = (a .+= c .* b)
+
+"""
 Two-loop L-BFGS direction, evaluated under the manifold inner product
 `⟨a,b⟩ = real(dot(a,b))·dV` — the same convention the driver uses for
 `rho_hist` (`1/(⟨s,y⟩)`), `slope`, and `grad_norm`.
@@ -59,7 +99,9 @@ function _lbfgs_direction(
     # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
         alphas[i] = rho_hist[i] * real(dot(s_hist[i], q)) * dV
-        q .-= alphas[i] .* y_hist[i]
+        # `q - a*y` and `q + (-a)*y` agree bit for bit: negating a float is
+        # exact, so the sum rounds to the same value.
+        _axpy_threaded!(q, -alphas[i], y_hist[i])
     end
 
     if m > 0
@@ -75,7 +117,7 @@ function _lbfgs_direction(
 
     for i in 1:m
         β = rho_hist[i] * real(dot(y_hist[i], q)) * dV
-        q .+= (alphas[i] - β) .* s_hist[i]
+        _axpy_threaded!(q, alphas[i] - β, s_hist[i])
     end
 
     q .*= -1

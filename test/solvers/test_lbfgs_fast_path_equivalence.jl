@@ -19,6 +19,7 @@
 
 using SpinorBEC
 using LinearAlgebra
+using Random
 using Test
 
 # --- Independent references: the pre-batching per-component loops ----------
@@ -129,6 +130,26 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
             α == 0.0 && continue
             copyto!(ws.state.psi, psi_acc)
             @test total_energy(ws) == E
+        end
+    end
+
+    @testset "threaded axpy is bit-identical to the broadcast" begin
+        # The claim that lets the two-loop recursion be split at all: an
+        # elementwise update rounds the same way whatever the chunking, so
+        # `_axpy_threaded!` must agree with the broadcast to the last bit, at
+        # sizes both below and above its threading threshold.
+        rng = MersenneTwister(20260729)   # seeded: an unseeded draw makes the
+        # gate's outcome a per-run lottery
+        for len in (1 << 12, 1 << 15, 1 << 17)
+            a = randn(rng, ComplexF64, len)
+            b = randn(rng, ComplexF64, len)
+            for c in (0.0, 1.0, -3.7182818, 1.0e-13)
+                want = a .+ c .* b
+                got = SpinorBEC._axpy_threaded!(copy(a), c, b)
+                @test got == want
+                # ...and the sign convention the first loop relies on.
+                @test SpinorBEC._axpy_threaded!(copy(a), -c, b) == a .- c .* b
+            end
         end
     end
 
