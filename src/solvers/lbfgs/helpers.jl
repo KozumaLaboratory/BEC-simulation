@@ -74,28 +74,24 @@ _axpy_threaded!(a, c, b) = (a .+= c .* b)
 # same input would give different results on different nodes.
 const _REALDOT_BLOCKS = 64
 
-# Sequential real part of ⟨a,b⟩ over `lo:hi`, with four independent accumulators
-# so the loop is not latency-bound on one dependent add chain. The unrolling
-# factor is fixed for the same reason the block count is: `@simd` would let the
-# compiler pick a reassociation that depends on the machine's vector width.
+# Real part of ⟨a,b⟩ over `lo:hi`. `@simd` on purpose: a hand-unrolled scalar
+# form (four independent accumulators, no `@simd`) was measured at 8.2 ms
+# against BLAS `zdotc`'s 7.7 ms for the whole two-loop at 24³ × D=13 even with
+# the blocks threaded — i.e. the scalar loads alone were enough to cancel four
+# cores. Letting the compiler vectorise makes each block memory-bound, which is
+# the regime the threading can actually help.
+#
+# The cost is that the reassociation `@simd` performs depends on the machine's
+# vector width, so this is reproducible for a given binary + CPU but not across
+# CPUs — the same is already true of `zdotc`, whose kernel is selected per CPU.
+# What IS machine-independent is the block structure: `_REALDOT_BLOCKS` is a
+# constant, so the answer does not depend on the thread count.
 @inline function _realdot_range(a, b, lo::Int, hi::Int)
-    s1 = 0.0
-    s2 = 0.0
-    s3 = 0.0
-    s4 = 0.0
-    i = lo
-    @inbounds while i + 3 <= hi
-        s1 += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
-        s2 += real(a[i + 1]) * real(b[i + 1]) + imag(a[i + 1]) * imag(b[i + 1])
-        s3 += real(a[i + 2]) * real(b[i + 2]) + imag(a[i + 2]) * imag(b[i + 2])
-        s4 += real(a[i + 3]) * real(b[i + 3]) + imag(a[i + 3]) * imag(b[i + 3])
-        i += 4
+    s = 0.0
+    @inbounds @simd for i in lo:hi
+        s += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
     end
-    @inbounds while i <= hi
-        s1 += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
-        i += 1
-    end
-    return (s1 + s2) + (s3 + s4)
+    return s
 end
 
 """
@@ -118,9 +114,10 @@ input and requires it to be no worse than a sequential sum.
 What it does change is the last bits relative to the BLAS `zdotc` it replaces,
 so it is **not** bit-identical to what was there before — worth stating,
 because this solver sits close enough to the `sqrt(eps)` energy-gated floor
-that a change in summation order moves the endpoint. In exchange the result is
-reproducible across machines and thread counts, which `zdotc` — whose kernel is
-selected per CPU — is not.
+that a change in summation order moves the endpoint. It is independent of the
+THREAD COUNT (the block count is a constant), which a `@threads`-over-
+`nthreads()` reduction would not be; it is not independent of the CPU, and
+neither is `zdotc`.
 """
 function _realdot_blocked(a::Array, b::Array)
     n = length(a)

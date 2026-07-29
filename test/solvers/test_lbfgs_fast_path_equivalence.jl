@@ -201,6 +201,9 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
 
         # Reproducibility: the block count is a constant, not `nthreads()`, so
         # repeated calls agree bit for bit however the threads are scheduled.
+        # (Across DIFFERENT CPUs the vectorised inner loop may reassociate
+        # differently — as `zdotc` already does — so the claim is thread-count
+        # independence, not machine independence.)
         v = randn(rng, ComplexF64, 1 << 16)
         w = randn(rng, ComplexF64, 1 << 16)
         first = SpinorBEC._realdot_blocked(v, w)
