@@ -38,6 +38,24 @@ component model no longer matches the code. Per `bench/reconcile.jl`, an
 unreconciled breakdown is not evidence; only the end-to-end slope is quoted
 above, and it is measured identically in both arms.
 
+## Gates
+
+`tier=ci` at `915869c2`: 258 files, all passed, including
+`test_lbfgs_fast_path_equivalence.jl` (44/44). That gate was moved from
+`FULL_EXTRA` into `CI_EXTRA` on purpose — every other L-BFGS test lives in
+`FULL_EXTRA`, so the earlier green `ci` run had executed 257 files without
+running a single L-BFGS test.
+
+`tier=full` at `e8f4eb6e` fails 7 files. All 7 fail identically on `550fe24e`
+(= `main`), which fails one more (`workflow/test_phase_diff_eval.jl:75`) — the
+branch's failure set is a strict subset of the baseline's. Among them,
+`solvers/test_lbfgs_accuracy_floor.jl:118` ("Newton-CG polish tightens the
+gradient floor") is worth flagging: on `main` that polish returns a
+**bit-identical** psi — every trust-region step rejected, so the pass is a
+no-op — and the L-BFGS gradient floor it is compared against is not
+reproducible run to run (5.7e-10, 1.4e-8 and 2.8e-8 measured for the same
+commit and problem, while the energy is bit-exact at `E - 0.5 = -2.2e-16`).
+
 ## The iteration
 
 ```
