@@ -11,11 +11,19 @@
 # form that predates the fused kernel and is what the padded path actually ran
 # until this change.
 #
-# Bit-identity (`==`, not a tolerance) is the right assertion: the two forms
-# accumulate in the same order over the same values, so any difference is a
-# defect, and a tolerance here would hide exactly the indexing bug the map is
-# there to prevent (App. A defect 9 — reading the first N_spatial LINEAR
-# elements walks the pad region for ndim ≥ 2).
+# Two different strengths, deliberately:
+#
+#   padded vs contiguous  — `==`. It is the SAME kernel over the same values;
+#     only the destination/source index differs, so any difference at all is a
+#     defect. A tolerance here would hide exactly the indexing bug the map
+#     exists to prevent (App. A defect 9 — reading the first N_spatial LINEAR
+#     elements walks the pad region for ndim ≥ 2).
+#
+#   fused vs broadcast    — machine precision, NOT `==`. Same arithmetic in the
+#     same accumulation order, but one is a hand-written kernel and the other a
+#     chain of broadcasts, and NVPTX contracts `a*b + c*d` to fma at its own
+#     discretion. Asserting bit-identity across that boundary would be asserting
+#     a property of the backend, not of this code.
 
 using Test
 using Random
@@ -52,13 +60,18 @@ else
             SpinorBEC._compute_spin_density!(fx, fy, fz, psi, sm, Val(D), 3, n_pts)
             CUDA.synchronize()
 
-            for (nm, a, b) in (("Fx", fx, rx), ("Fy", fy, ry), ("Fz", fz, rz))
-                @test Array(a) == Array(b)
+            # Independent-oracle half: machine precision, since NVPTX may
+            # contract one form's mul+add to fma and not the other's.
+            for (a, b) in ((fx, rx), (fy, ry), (fz, rz))
+                ah, bh = Array(a), Array(b)
+                scale = max(maximum(abs, bh), eps())
+                @test maximum(abs, ah .- bh) <= 8 * eps() * scale
             end
 
-            # The corner is also what the CONTIGUOUS layout produces, and the
-            # pad is untouched — the two things a wrong index map would break in
-            # opposite directions.
+            # Layout half: BIT-identical, because it is the same kernel with a
+            # different destination index. This is the assertion that actually
+            # constrains the index map; the pad-untouched check is its other
+            # direction.
             cx = CUDA.zeros(Float64, n_pts...)
             cy = CUDA.zeros(Float64, n_pts...)
             cz = CUDA.zeros(Float64, n_pts...)
