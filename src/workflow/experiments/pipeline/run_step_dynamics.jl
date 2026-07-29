@@ -30,6 +30,49 @@ end
     return TimeDependentInteractions(c0_wf, c1_wf)
 end
 
+"""
+    _resolve_dyn_lhy!(p, atom, c_dd_val) -> Bool
+
+Resolve a `dynamics:` step's own `lhy:` block, in place, exactly as the
+ground_state step does.
+
+`_resolve_lhy_block!` — which derives `interactions.c_lhy` for the scalar modes
+and writes the `lhy_opts` carrying `n_atoms` for the tabulated ones — runs inside
+`_resolve_derived_params!`, and the only caller of that is
+`run_step_ground_state.jl`. So a `dynamics: {lhy: …}` block reached
+`make_workspace` with **neither**:
+
+  * scalar / quasi_2d modes: `interactions.c_lhy` stayed 0, because the dynamics
+    `interactions` dict is re-parsed by `_parse_gs_interactions` and the GS
+    resolver only ever wrote `c_lhy` onto the *ground_state* block's dict. The
+    dynamics phase then ran with **no LHY at all** while `lhy: {kind: scalar}`
+    sat in the YAML — and, being absent rather than wrong, it conserved energy
+    perfectly and reported `lhy = +0`.
+  * tabulated modes: `lhy_opts` was missing, so the fallback
+    `LHYTableOpts()` supplied `n_atoms = 1`. That factor is the unit conversion,
+    not a table knob (see `_resolve_lhy_block!`): `n` is normalised to
+    `∫|ψ|²dV = 1` while `c₀` already carries `N`, so `n_atoms = 1` makes the
+    table **exactly `N_atoms` times too strong — in the propagator as well as
+    the energy.** At Eu F=6 / N=30000 that put 97 % of the total energy in the
+    LHY term and drifted the run by 46 %.
+
+Returns whether the block was resolved, so the caller can warn rather than
+silently keep the old behaviour when the interaction block is in the `c_total`
+form (no `N_atoms` to normalise by).
+"""
+@noinline function _resolve_dyn_lhy!(p::Dict{String, Any}, atom, c_dd_val::Float64)
+    get(p, "lhy", nothing) isa Dict || return true
+    inter_d = get(p, "interactions", nothing)
+    inter_d isa Dict || return false
+    n_atoms = Int(get(inter_d, "N_atoms", 0))
+    omega_ref = Float64(get(inter_d, "omega_ref", 0.0))
+    (n_atoms > 0 && omega_ref > 0) || return false
+    a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
+    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    _resolve_lhy_block!(p, inter_d, atom, c_dd_val, eps_dd, n_atoms, a_ho)
+    return true
+end
+
 @noinline function _resolve_dyn_magnetic_gradient(
     p::Dict{String, Any}, ndim::Int, duration::Float64
 )
@@ -125,6 +168,16 @@ function _run_step(
     sp = SimParams(; dt, n_steps, save_every,
         rotating_frame_omega=rf_omega,
         spin_rotating_frame_omega=spin_rf_omega)
+
+    # Must run BEFORE `_parse_gs_interactions`, which is what reads the
+    # `c_lhy` this writes.
+    if !_resolve_dyn_lhy!(p, atom, c_dd_val)
+        @warn """dynamics `lhy:` block cannot be normalised: its `interactions:` \
+gives no (N_atoms, omega_ref), so the LHY tables have no atom number to divide \
+by and scalar `c_lhy` cannot be derived. The dynamics phase will run without \
+LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (the \
+`c_total` form is not enough).""" maxlog = 1
+    end
 
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
