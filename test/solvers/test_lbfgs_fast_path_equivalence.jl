@@ -153,6 +153,62 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
         end
     end
 
+    @testset "blocked real-dot: accuracy and reproducibility" begin
+        # `_realdot_blocked` replaces `real(dot(a,b))` in the two-loop, so it is
+        # NOT bit-identical to what it replaced. The claims are (i) it is no
+        # less accurate than a sequential sum, and (ii) it is reproducible.
+        #
+        # The reference is `BigFloat` at 256 bits — exact next to either
+        # Float64 result. The comparison partner is a plain single-accumulator
+        # loop rather than BLAS `zdotc`, because zdotc's kernel is chosen per
+        # CPU: comparing against it would make this gate's verdict depend on
+        # which node ran it.
+        #
+        # `cancel = true` plants a huge cancelling pair in an otherwise
+        # unit-scale vector, so `Σ|a_i b_i| / |Σ a_i b_i|` is ~1e10 and the two
+        # summation orders can actually separate.
+        naive(a, b) = begin
+            s = 0.0
+            for i in eachindex(a, b)
+                s += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
+            end
+            s
+        end
+
+        rng = MersenneTwister(20260729)
+        for len in (1 << 13, 1 << 16), cancel in (false, true)
+            a = randn(rng, ComplexF64, len)
+            b = randn(rng, ComplexF64, len)
+            if cancel
+                a[1] = 1.0e10 + 0.0im
+                b[1] = 1.0 + 0.0im
+                a[len] = 1.0e10 + 0.0im
+                b[len] = -1.0 + 0.0im
+            end
+            exact = sum(
+                i ->
+                    BigFloat(real(a[i])) * BigFloat(real(b[i])) +
+                    BigFloat(imag(a[i])) * BigFloat(imag(b[i])),
+                1:len,
+            )
+            scale = sum(i -> abs(a[i]) * abs(b[i]), 1:len)   # Σ|a_i||b_i|
+            err_blocked = abs(BigFloat(SpinorBEC._realdot_blocked(a, b)) - exact)
+            err_naive = abs(BigFloat(naive(a, b)) - exact)
+            @test err_blocked <= err_naive + eps(scale)
+            # Backward-stable in absolute terms too, not merely relatively.
+            @test err_blocked <= 64 * eps() * scale
+        end
+
+        # Reproducibility: the block count is a constant, not `nthreads()`, so
+        # repeated calls agree bit for bit however the threads are scheduled.
+        v = randn(rng, ComplexF64, 1 << 16)
+        w = randn(rng, ComplexF64, 1 << 16)
+        first = SpinorBEC._realdot_blocked(v, w)
+        @test all(SpinorBEC._realdot_blocked(v, w) === first for _ in 1:8)
+        # `_realdot_blocked(y, y)` is the `sum(abs2, y)` the two-loop needs.
+        @test SpinorBEC._realdot_blocked(v, v) ≈ sum(abs2, v) rtol = 1.0e-14
+    end
+
     @testset "dE is the step's energy change, not zero" begin
         # The trajectory is deterministic, so the 6-step run's last step is
         # exactly the 5-step run's endpoint → the 6-step run's reported dE must

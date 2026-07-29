@@ -40,9 +40,9 @@ to the broadcast it replaces at any thread count, and identical again when
 Why it exists: the two-loop recursion touches `2m` ψ-sized arrays twice each
 and was measured at ~18 GB/s — one core's streaming bandwidth — making it 60-64
 % of the CPU cost of an L-BFGS iteration (`docs/design/lbfgs_iteration_cost.md`).
-The dot products go to BLAS `zdotc` and are left alone, because splitting a
-reduction changes its summation order; the axpys are the part that can be
-parallelised without changing a single rounding.
+The axpys are the half that parallelises without changing a single rounding;
+the dots are handled separately by `_realdot_blocked`, which does change the
+summation order and carries its own accuracy gate.
 """
 function _axpy_threaded!(a::Array, c::Number, b::Array)
     n = length(a)
@@ -67,6 +67,85 @@ end
 
 # Device arrays: the broadcast is already parallel.
 _axpy_threaded!(a, c, b) = (a .+= c .* b)
+
+# Number of blocks the real-dot reduction is cut into. A CONSTANT, not
+# `nthreads()`: the summation order — and therefore the last bits of the answer
+# — must not depend on how many threads the machine happens to have, or the
+# same input would give different results on different nodes.
+const _REALDOT_BLOCKS = 64
+
+# Sequential real part of ⟨a,b⟩ over `lo:hi`, with four independent accumulators
+# so the loop is not latency-bound on one dependent add chain. The unrolling
+# factor is fixed for the same reason the block count is: `@simd` would let the
+# compiler pick a reassociation that depends on the machine's vector width.
+@inline function _realdot_range(a, b, lo::Int, hi::Int)
+    s1 = 0.0
+    s2 = 0.0
+    s3 = 0.0
+    s4 = 0.0
+    i = lo
+    @inbounds while i + 3 <= hi
+        s1 += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
+        s2 += real(a[i + 1]) * real(b[i + 1]) + imag(a[i + 1]) * imag(b[i + 1])
+        s3 += real(a[i + 2]) * real(b[i + 2]) + imag(a[i + 2]) * imag(b[i + 2])
+        s4 += real(a[i + 3]) * real(b[i + 3]) + imag(a[i + 3]) * imag(b[i + 3])
+        i += 4
+    end
+    @inbounds while i <= hi
+        s1 += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
+        i += 1
+    end
+    return (s1 + s2) + (s3 + s4)
+end
+
+"""
+    _realdot_blocked(a, b) → Float64
+
+`real(dot(a, b))` as a fixed 64-block reduction: each block is summed
+sequentially, then the 64 partials are added in index order, and the blocks run
+on separate threads when there are threads to run them on.
+
+The two-loop recursion spends `2m` of these per direction on ψ-sized arrays,
+and after the axpys were threaded they are what is left of a step that runs at
+one core's streaming bandwidth.
+
+This is **not** a precision trade for speed. Blocking a sum is one level of
+pairwise summation, so the error bound improves from `O(n·eps)` to
+`O((n/64 + 64)·eps)`; the gate in `test_lbfgs_fast_path_equivalence.jl`
+measures it against a `BigFloat` reference on a deliberately ill-conditioned
+input and requires it to be no worse than a sequential sum.
+
+What it does change is the last bits relative to the BLAS `zdotc` it replaces,
+so it is **not** bit-identical to what was there before — worth stating,
+because this solver sits close enough to the `sqrt(eps)` energy-gated floor
+that a change in summation order moves the endpoint. In exchange the result is
+reproducible across machines and thread counts, which `zdotc` — whose kernel is
+selected per CPU — is not.
+"""
+function _realdot_blocked(a::Array, b::Array)
+    n = length(a)
+    n == 0 && return 0.0
+    nb = min(_REALDOT_BLOCKS, n)
+    chunk = cld(n, nb)
+    partials = Vector{Float64}(undef, nb)
+    if Threads.nthreads() == 1 || n < (1 << 15)
+        @inbounds for t in 1:nb
+            partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
+        end
+    else
+        Threads.@threads for t in 1:nb
+            @inbounds partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
+        end
+    end
+    s = 0.0
+    @inbounds for t in 1:nb
+        s += partials[t]
+    end
+    return s
+end
+
+# Device arrays keep the existing reduction.
+_realdot_blocked(a, b) = real(dot(a, b))
 
 """
 Two-loop L-BFGS direction, evaluated under the manifold inner product
@@ -98,7 +177,7 @@ function _lbfgs_direction(
     # array — for a 16³ × D=13 spinor that's ~640 KB per call, repeated
     # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
-        alphas[i] = rho_hist[i] * real(dot(s_hist[i], q)) * dV
+        alphas[i] = rho_hist[i] * _realdot_blocked(s_hist[i], q) * dV
         # `q - a*y` and `q + (-a)*y` agree bit for bit: negating a float is
         # exact, so the sum rounds to the same value.
         _axpy_threaded!(q, -alphas[i], y_hist[i])
@@ -110,13 +189,13 @@ function _lbfgs_direction(
         # recomputing the dot product was a full extra pass over two
         # ψ-sized arrays for a number we had.
         ys = 1.0 / (rho_hist[end] * dV)
-        yy = real(sum(abs2, y_hist[end]))
+        yy = _realdot_blocked(y_hist[end], y_hist[end])   # ≡ sum(abs2, y)
         γ = ys / max(yy, 1e-30)
         q .*= γ
     end
 
     for i in 1:m
-        β = rho_hist[i] * real(dot(y_hist[i], q)) * dV
+        β = rho_hist[i] * _realdot_blocked(y_hist[i], q) * dV
         _axpy_threaded!(q, alphas[i] - β, s_hist[i])
     end
 
