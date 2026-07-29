@@ -98,6 +98,51 @@ reproduces", with loss-on as bracket evidence not headline claim.
 
 **Final caption (publication-ready):**
 
+> ## ⚠️ Figure 2 does not reproduce — re-derived 2026-07-29
+>
+> **Its premise is gone.** The caption below turns on some arms *collapsing*
+> (`delay`) and the LHY closures *arresting* them (`stable_arrest`). Re-running the
+> K₃=0 factorial on current `main`, **all four arms are `stable_arrest`** — there
+> is no collapse left for the LHY closure to determine:
+>
+> | arm | ratio now | class now | ratio 2026-05 | class 2026-05 |
+> |---|---:|---|---:|---|
+> | off | **1.0502** | stable_arrest | 2.3339 | delay |
+> | scalar | **1.1839** | stable_arrest | 2.3599 | delay |
+> | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
+> | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
+>
+> **Only the first two rows are usable.** `off` and `scalar` conserve energy to
+> 2e-8 / 7e-8. The two closed-form arms drift **46 %** (E: 3123 → 1694) and their
+> `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
+> (`lhy = +1653` / `+1664` against a whole mean field of ≈ +2.2 in the other two
+> arms). Their ratios are not evidence of anything and are shown only to document
+> that the stored 1.63 / 1.60 were not reproduced. Do not read "the closures
+> arrest least" out of this table.
+>
+> What survives is enough to void the figure: **`off` does not collapse.** Its
+> ratio fell 2.3339 → 1.0502 with clean energy conservation, and `scalar` — also
+> clean — sits at 1.1839, so "scalar is indistinguishable from no LHY" is gone
+> too. The caption needs `off` to collapse so that the closures can be seen to
+> arrest it. It does not.
+>
+> The two dedicated gates for the tabulated path both pass at this commit
+> (`test_lhy_energy_convention.jl` 17/17, `test_tabulated_lhy_propagator_parity.jl`
+> 42/42), so the 46 % drift is **not** an energy/propagator/gradient inconsistency.
+> It is the table's magnitude in this particular Eu F=6 configuration — tracked
+> separately; not diagnosed here.
+>
+> Cause of the `off` change is not the LHY work: this run predates the Eu
+> quadratic-Zeeman fix (11× too large until 2026-07-08), the DDI integrator-order
+> fixes and the ITP density-bias fix — see
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
+>
+> **Do not use Figure 2 as specified.** The physics question it asks (what sets
+> F=6 collapse arrest) is still open; this figure's answer rested on a collapse
+> that current code does not produce.
+>
+> Run output: `/gs/bs/work/7/uk07267/spinorbec-runs/fig2_k3zero_v2`.
+
 > **Figure 2.** F=6 collapse arrest in the cigar stress regime
 > (N = 30 000, ω_z = 0.25 ω_⊥, simulated window t = 30 ms in panels
 > (a–b), 200 ms in panel (c)) is determined by the LHY closure, NOT by

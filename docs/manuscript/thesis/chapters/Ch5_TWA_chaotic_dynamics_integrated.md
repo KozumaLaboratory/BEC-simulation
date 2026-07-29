@@ -118,6 +118,29 @@ ITP to convergence. Variable: `spinor_lhy` setting only.
 **変動 < 1%**: LHY 補正は Eu collapse 抑制に対して 1% 未満の effect しか持たない。
 平均場 DDI が dominant、LHY は **sub-leading**。
 
+> **Re-derived 2026-07-29 — 結論は保持、根拠は差し替えが必要。**
+> 上表の「5 modes すべて一致」は *vacuous* だった。この ablation の姉妹 run
+> (`eu151_edh_postfix_local`, `backend: gpu`) では、2026-07-28 (#125) まで
+> tabulated LHY が GPU broadcast 経路で黙って `c_lhy = 0` に潰れており、
+> `polar_contact` / `polar_dipolar` / `full_bdg` の 3 行は **LHY 完全にゼロ**で
+> 走っていた。`scalar` も係数が $\pi(a_s/a_{ho})\sqrt N$ 分不足 (#108)。
+> つまり「一致」は物理と無関係に保証されていた。
+>
+> 現行コードで再実行すると、使える 4 mode は peak 密度で **4.7 %** 以内に一致し、
+> かつ互いに異なる値を返す（閉形式は *効いており*、この regime で小さいだけ）。
+> **したがって §5.2 の結論は成立するが、それを支える比較は今回初めて
+> 「別の結果になりえた」ものになった。** 引用する際は再導出後の表を使うこと。
+>
+> `full_bdg` の「converged ✓」も要注意: 姉妹 config では
+> `mean field is dynamically unstable (max Im ω = 213)` を実装自身が警告し、
+> ITP は `conv=false` を返した。この mode は不安定 mean field 上で
+> $\epsilon_{LHY}$ が scheme 依存になる。
+>
+> 詳細と再導出表:
+> [`eu_collapse_lhy_insufficient.md`](../../../research_notes/eu_collapse_lhy_insufficient.md)、
+> vintage:
+> [`stored_results_vintage_audit.md`](../../../validation/stored_results_vintage_audit.md)。
+
 これは Dy droplet (Schmitt 2016) が LHY-balanced collapse-抑制を experimental に示した
 事実とは対照的である。Eu の large $a_s = 110\,a_B$ (vs Dy ~ 92 $a_B$) + 異なる species
 parameter で、LHY/MF balance が異なる regime に入る。
