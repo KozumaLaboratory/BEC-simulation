@@ -188,6 +188,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # `SPIN_TAYLOR_TOL` is not a knob a caller should reason about — this pins
+    # the RELATIONSHIP it exists to satisfy (truncation ≪ splitting error), so
+    # the number can change and the criterion still holds. Runs
+    # find_ground_state, hence ci and not fast.
+    "hamiltonian/test_taylor_tolerance_criterion.jl",
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",

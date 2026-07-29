@@ -31,8 +31,36 @@ compare against. Honoured by BOTH the CPU kernel here and the CUDA one."""
 const SPIN_TAYLOR_ENABLED = Ref(true)
 
 """Backward-error target for the per-voxel Taylor degree: the smallest `k ≥ 2`
-with `R^k / k! ≤ tol` is used. See the CUDA kernel's "Accuracy contract" block
-for the measurement that fixed this at 1e-13 rather than 1e-9."""
+with `R^k / k! ≤ tol` is used.
+
+This is NOT a knob to expose. `bench/taylor_tolerance_sweep.jl` measured it
+against the thing that actually binds the answer — the splitting error the
+caller already accepted when they chose `dt`. At Eu F=6, 32³, dt = 0.002, that
+splitting error (`|E(dt) − E(dt/2)|`, exact rotation both arms) is 7.6e-3, and
+the Taylor truncation sits at:
+
+    tol     |ΔE| vs exact   as a fraction of the splitting error   mean degree
+    1e-5      2.5e-7                     3.3e-5                       2.00
+    1e-9      2.9e-12                    3.9e-10                      2.26
+    1e-13     2.4e-13                    3.1e-11                      2.65
+    1e-15     2.4e-13                    3.2e-11                      2.82
+
+Three things follow. The answer SATURATES at 1e-11 — below that ΔE stops
+falling, so a tighter tolerance buys nothing. The cost is flat: the degree grows
+like log(1/tol)/log(1/R), which over ten decades is 2.00 → 2.82 terms, and the
+whole-run times (5.2–6.0 s) show no trend above the scatter of single runs. And
+even at the LOOSEST tolerance tested the rotation contributes 4.5 orders of
+magnitude less error than `dt` does.
+
+So the tolerance is not a decision the caller should be asked to make; `dt` is
+the decision, and this follows from it. 1e-13 is kept because it is free and
+leaves a decade of margin past saturation, and because one number for both
+devices is one declaration. The CUDA kernel's "Accuracy contract" block records
+the same conclusion measured on that device.
+
+The relationship, not this number, is what is gated:
+`test_cpu_spin_rotation_taylor_parity.jl` fails if the truncation error stops
+being negligible against the splitting error."""
 const SPIN_TAYLOR_TOL = Ref(1.0e-13)
 
 """Angle above which a voxel halves its rotation and applies it twice (repeated

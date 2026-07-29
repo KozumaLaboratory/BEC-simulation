@@ -94,7 +94,15 @@ println("="^78)
 
 # Reference 1: the EXACT rotation. Any Taylor arm's deviation from this is
 # truncation error and nothing else.
-println("\n[1/3] exact Euler reference…")
+# Warm up BOTH realizations before anything is timed. The first version of this
+# script timed the exact-Euler reference first and cold, which made its wall
+# time absorb the whole JIT cascade and reported a "4×" whole-run speedup that
+# was an artefact. Kernel-level A/B (bench/bench_itp_step.jl) said 2.19×.
+println("\n[0/3] warm-up (both realizations)…")
+run_itp(; dt=DT, n_steps=2, taylor=false)
+run_itp(; dt=DT, n_steps=2, taylor=true)
+
+println("[1/3] exact Euler reference…")
 ref = run_itp(; dt=DT, n_steps=N_STEPS, taylor=false)
 @printf("  E_exact   = %.15g   (%.1f s)\n", ref.E, ref.wall)
 
