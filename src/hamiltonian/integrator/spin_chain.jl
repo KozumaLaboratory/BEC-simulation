@@ -54,6 +54,14 @@ a uniform axial Zeeman. **If you add an operator to the outer chain, or a term
 to the diagonal step, add it here** — otherwise the fused path would silently
 drop it. `test/oracles/test_spin_chain_fusion_parity.jl` pins one arm per entry
 and demands bit-identity for the eligible shape.
+
+An entry belongs here only for something that sits BETWEEN the operators, or
+that changes the diagonal phase's form. How Φ itself is computed is neither: the
+zero-padded, open-boundary convolution gets a branch in the realization instead.
+That distinction is load-bearing rather than stylistic — `DDI_PADDED_DEFAULT` is
+`true` (9c117c05), so listing it here declined the fusion for every `run_yaml`
+RTP run, while `bench/profile_rtp.jl` went on measuring the fused path because
+it calls `make_workspace` directly, where `ddi_padding` defaults `false`.
 """
 function _spin_chain_reason(ws::Workspace, ip::InteractionParams, psi_mf)
     SPIN_CHAIN_FUSION_ENABLED[] || return "SPIN_CHAIN_FUSION_ENABLED[] is off"
@@ -61,7 +69,6 @@ function _spin_chain_reason(ws::Workspace, ip::InteractionParams, psi_mf)
         return "the mean field is not frozen (no midpoint predictor-corrector)"
     ws.ddi === nothing && return "no DDI substep to fuse with"
     ws.ddi_bufs === nothing && return "no DDI buffers"
-    ws.ddi_padded === nothing || return "zero-padded DDI uses a different convolution"
     is_active(ip[1]) || return "c₁ = 0, so there is no spin-mixing rotation to fuse"
     is_active(get_cn(ip, 2)) && return "c₂ ≠ 0 (singlet-pair substep sits between them)"
     ws.tensor_cache === nothing || return "tensor channels sit between them"
