@@ -133,10 +133,15 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
     end
 
     @testset "dE is the step's energy change, not zero" begin
-        # tol = 0 ⇒ still descending at the last step, so a correct dE is
-        # strictly positive. The pre-fix bookkeeping made it exactly 0.0.
-        r = find_ground_state_lbfgs(; base..., n_steps=6, tol=0.0)
-        @test r.dE > 0
-        @test isfinite(r.dE)
+        # The trajectory is deterministic, so the 6-step run's last step is
+        # exactly the 5-step run's endpoint → the 6-step run's reported dE must
+        # be the gap between the two runs' energies. `dE > 0` alone would be a
+        # weak (and, on a step where the line search fails, flaky) statement;
+        # this one is an identity. The pre-fix bookkeeping reported 0.0.
+        r5 = find_ground_state_lbfgs(; base..., n_steps=5, tol=0.0)
+        r6 = find_ground_state_lbfgs(; base..., n_steps=6, tol=0.0)
+        gap = abs(r6.energy - r5.energy)
+        @test gap > 0            # still descending, so the gate has teeth
+        @test r6.dE ≈ gap rtol = 1.0e-8
     end
 end
