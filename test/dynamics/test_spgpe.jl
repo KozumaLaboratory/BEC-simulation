@@ -386,6 +386,43 @@ end
 
 # --- composition -----------------------------------------------------------
 
+@testset "SPGPE equilibrates the C region to the Rayleigh-Jeans population" begin
+    # The existing FDR test pins the RJ *slope*; this pins the TOTAL, which is
+    # what a run actually reports. Free field (c0 = 0) with no trap makes
+    # eps_k = k^2/2 exact, so the classical equilibrium is the unambiguous sum
+    # N_C = sum_{|k|<k_cut} T/(eps_k - mu) over the modes the grid really has.
+    #
+    # Worth its own gate: when a production run came back with N_C two orders
+    # below a hand estimate, this is the check that decided which of the two was
+    # wrong (the hand estimate).
+    n, L = 32, 16.0
+    T, mu, kcut, gam, dt = 2.0, -2.0, 4.0, 0.05, 0.005
+    grid = make_grid(GridConfig((n, n, n), (L, L, L)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict{Int, Float64}(0 => 0.0)),
+        sim_params=SimParams(; dt, n_steps=1, imaginary_time=false,
+            save_every=1, normalize_every=0),
+        fft_flags=FFTW.ESTIMATE)
+    D = ws.spin_matrices.system.n_components
+    dV = cell_volume(grid)
+
+    rj = 0.0
+    for I in CartesianIndices(grid.config.n_points)
+        k2 = grid.k_squared[I]
+        k2 <= kcut^2 && (rj += T / (0.5 * k2 - mu))
+    end
+
+    res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut=kcut, gamma=gam, M=0.0)
+    fill!(ws.state.psi, 0)
+    for s in 1:2400
+        apply_spgpe_step!(ws, res, dt; t=0.0, seed=1000 + s)
+    end
+    N_C = real(sum(abs2, ws.state.psi)) * dV
+
+    @test isapprox(N_C, rj * D; rtol=0.12)      # equilibrium, all D components
+    @test N_C > 100                              # the field really filled
+end
+
 @testset "projector diagnostic separates cutoff outflow from noise truncation" begin
     # The first attempt reported one combined number and it was ~10³× too large to
     # mean what it claimed: per step the projector removes a little of the field
@@ -428,6 +465,57 @@ end
     @test 0.0 <= r3.cutoff_outflow < 1e-25 * n0
     # The separation is the point: 20+ decades between the two channels.
     @test r3.cutoff_outflow < 1e-20 * r3.noise_truncated
+end
+
+@testset "SPGPE grows a condensate to the Thomas-Fermi number" begin
+    # The physics gate the suite was missing. Every other test here checks a
+    # rate, an identity or a conservation law; none asserted that the thing the
+    # solver exists for actually happens. Its absence let two runs be read as
+    # "no condensate forms" when the solver was working and the ESTIMATOR was
+    # wrong — a trapped condensate spreads over |k| <~ 1/R_TF, so the largest
+    # single k-mode holds a small fraction of N0 (22x understated there).
+    #
+    # N0 is therefore the overlap with the actual GP mode, |<phi_GP|psi>|^2.
+    ω, a_s = 1.0, 0.02
+    c0 = 4π * a_s
+    mu, T, γ, dt = 3.0, 1.0, 0.1, 0.002
+    k_cut = sqrt(2 * (mu + T))
+    grid = make_grid(GridConfig((24, 24, 24), (10.0, 10.0, 10.0)))
+    dV = cell_volume(grid)
+    N_TF = ((2 * mu / ω)^2.5) / (15 * a_s)
+    @test π / minimum(grid.dx) > k_cut          # the grid resolves the C region
+
+    gs = find_ground_state(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict{Int, Float64}(0 => c0 * N_TF)),
+        potential=HarmonicTrap{3}((ω, ω, ω)), dt=0.002, n_steps=3000, tol=1e-10,
+        initial_state=:m_minus_F, verbose=false)
+    D = gs.workspace.spin_matrices.system.n_components
+    phi = Array(view((gs.workspace.state.psi),:,:,:,D))
+    phi ./= sqrt(sum(abs2, phi) * dV)
+
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict{Int, Float64}(0 => c0)),
+        potential=HarmonicTrap{3}((ω, ω, ω)),
+        sim_params=SimParams(; dt, n_steps=1, imaginary_time=false,
+            save_every=1, normalize_every=0), fft_flags=FFTW.ESTIMATE)
+    res = SPGPEReservoir(; T, mu, a_s, k_cut, gamma=γ, M=0.0)
+    fill!(ws.state.psi, 0)
+
+    N0 = 0.0
+    for s in 1:25_000
+        split_step!(ws)
+        apply_spgpe_step!(ws, res, dt; t=0.0, seed=90_000 + s)
+        @views for c in 1:(D - 1)
+            ws.state.psi[:, :, :, c] .= 0
+        end
+    end
+    psi = Array(view((ws.state.psi),:,:,:,D))
+    N0 = abs2(sum(conj.(phi) .* psi) * dV)
+    N_C = sum(abs2, psi) * dV
+
+    @test N0 > 0.3 * N_TF        # a condensate, not a thermal field
+    @test N0 < 1.5 * N_TF        # and not a runaway
+    @test N_C > N0               # the C region holds it plus a thermal part
 end
 
 @testset "SPGPE full step composes and stays finite" begin
