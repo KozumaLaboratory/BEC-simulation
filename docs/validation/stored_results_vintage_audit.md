@@ -156,7 +156,7 @@ Re-running the K₃=0 factorial on current `main`:
 | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
 
 **Only the first two rows are usable**: `off` and `scalar` conserve energy to
-2e-8 / 7e-8, while the two closed-form arms drift **46 %** and report **97 % of
+2e-8 / 7e-8, while the two closed-form arms drift **135 %** (`energy_rel_drift`, i.e. peak excursion; 45 % at the endpoint) and report **97 % of
 the total energy in the LHY term** (`lhy = +1653` / `+1664` against a whole mean
 field of ≈ +2.2). Their ratios are recorded only to show the stored 1.63 / 1.60
 were not reproduced.
@@ -183,7 +183,7 @@ moved", then "the premise is gone", now "the comparison was never like-for-like"
 Each correction came from checking one more thing that should have been checked
 first — and the config's own git history was a five-second check.
 
-Both dedicated gates for the tabulated path pass at this commit, so the 46 % drift
+Both dedicated gates for the tabulated path pass at this commit, so the drift
 is not an energy/propagator/gradient inconsistency; it is the table's magnitude in
 this Eu F=6 configuration, tracked separately.
 
@@ -193,7 +193,7 @@ them they cover both ways a stored result can fail: the knob was broken, or the
 thing the knob acted on no longer happens.
 
 The 4× higher initial peak in the closed-form arms (0.0177–0.0185 vs
-0.0044–0.0046) has the same origin as their 46 % drift: an LHY term two to three
+0.0044–0.0046) has the same origin as their energy drift: an LHY term two to three
 orders of magnitude larger than the rest of the Hamiltonian.
 
 ## Recommended order
