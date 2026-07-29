@@ -85,12 +85,21 @@ function _apply_ddi_rotation_batched_real!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
-
-    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
-        phi_x, phi_y, phi_z, dt_frac, N_spatial,
-        _ddi_phi_index_map(phi_x, n_pts))
     P = reshape(psi, N_spatial, D)
+    src = _ddi_phi_index_map(phi_x, n_pts)
+
+    # Taylor needs the raw field, so the whole atan/acos/sqrt angle pre-pass
+    # disappears with the 5-stage core rather than feeding it.
+    if SPIN_TAYLOR_ENABLED[]
+        apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, spin_tridiag_bands_cached(sm, T),
+            T(dt_frac), Val(D); imaginary_time=false, F, src)
+        return nothing
+    end
+
+    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial, src)
     _apply_euler_5stage_batched_real!(P, rc.W, rc.conj_V, rc.V_T,
         rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing
@@ -104,12 +113,19 @@ function _apply_ddi_rotation_batched_imag!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
-
-    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
-        phi_x, phi_y, phi_z, dt_frac, N_spatial,
-        _ddi_phi_index_map(phi_x, n_pts))
     P = reshape(psi, N_spatial, D)
+    src = _ddi_phi_index_map(phi_x, n_pts)
+
+    if SPIN_TAYLOR_ENABLED[]
+        apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, spin_tridiag_bands_cached(sm, T),
+            T(dt_frac), Val(D); imaginary_time=true, F, src)
+        return nothing
+    end
+
+    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial, src)
     _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,
         rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing

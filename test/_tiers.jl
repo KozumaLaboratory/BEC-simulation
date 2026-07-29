@@ -106,6 +106,10 @@ const FAST_TESTS = [
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
+    # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
+    # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
+    # the accuracy contract turns both red.
+    "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",
@@ -187,6 +191,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # `SPIN_TAYLOR_TOL` is not a knob a caller should reason about — this pins
+    # the RELATIONSHIP it exists to satisfy (truncation ≪ splitting error), so
+    # the number can change and the criterion still holds. Runs
+    # find_ground_state, hence ci and not fast.
+    "hamiltonian/test_taylor_tolerance_criterion.jl",
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",

@@ -37,7 +37,7 @@ using StaticArrays: SVector
 
 @inline function _spin_chain_warp_kernel!(
     P, fx, fy, fz, px, py, pz, vph, zph_fwd, zph_bwd, mz, sxu, syu, rk_sm, rk_dd,
-    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT}, src, Pin,
+    K::Int32, tol2, F2, rsafe2, cap::Int32, ::Val{D}, ::Val{RT}, src, Pin,
 ) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
@@ -59,8 +59,8 @@ using StaticArrays: SVector
 
     ds, bs, bms, gs = _rot_generator(Fx, Fy, Fz, mz, sxu, syu, c, cdn, F2, Val(16))
     dd, bd, bmd, gd = _rot_generator(Px, Py, Pz, mz, sxu, syu, c, cdn, F2, Val(16))
-    hs, shs, kvs = _rot_schedule(gs, rk_sm, K, tol2, rsafe2)
-    hd, shd, kvd = _rot_schedule(gd, rk_dd, K, tol2, rsafe2)
+    hs, shs, kvs = _rot_schedule(gs, rk_sm, K, tol2, rsafe2, cap)
+    hd, shd, kvd = _rot_schedule(gd, rk_dd, K, tol2, rsafe2, cap)
 
     # Associate as `ψ · (vph · zph)`, exactly as `_diag_step_kernel!` does
     # (`P[i, c] *= vph * zph[c]`). Floating-point multiplication is not
@@ -229,8 +229,9 @@ end
 ) where {T, D}
     CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fx, fy, fz, px, py, pz, vph, zf, zb, coef.mz, coef.sxu, coef.syu,
-        rk_sm, rk_dd, Int32(_SPIN_RK_MAX), T(_SPIN_TAYLOR_TOL[])^2, F * F,
-        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it), src, Pin)
+        rk_sm, rk_dd, Int32(SPIN_TAYLOR_RK_MAX), T(SPIN_TAYLOR_TOL[])^2, F * F,
+        T(SPIN_TAYLOR_RSAFE[])^2, Int32(SPIN_TAYLOR_DEGREE_CAP[]), Val(D),
+        Val(!it), src, Pin)
     nothing
 end
 
