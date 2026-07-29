@@ -76,6 +76,25 @@ else
         @test norm(a) > 0 && a != Array(_ws().state.psi)
     end
 
+    # `DDI_PADDED_DEFAULT` is `true`, so this — not the bare kernel above — is the
+    # shape every `run_yaml` RTP run builds. It was unpinned while
+    # `_spin_chain_reason` declined a padded DDI outright, which meant the arm
+    # above was gating a path production had stopped taking.
+    @testset "the fusion holds with a zero-padded DDI too" begin
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        a = _run(true, 5; ddi_padding=true)
+        b = _run(false, 5; ddi_padding=true)
+        @test a == b
+        wsp = _ws(; ddi_padding=true)
+        @test wsp.ddi_padded !== nothing
+        @test SpinorBEC._spin_chain_reason(
+            wsp, wsp.interactions, CUDA.zeros(ComplexF64, 2)) === nothing
+        # Padding changes Φ, so the padded arm must NOT agree with the bare one.
+        # Without this, a padded workspace that silently ran the bare convolution
+        # — the failure the index map exists to prevent — would still pass.
+        @test a != _run(true, 5)
+    end
+
     @testset "no frozen mean field ⇒ the fusion declines" begin
         ws = _ws()
         # `psi_mf === nothing` is the plain (non-midpoint) half-step: the two

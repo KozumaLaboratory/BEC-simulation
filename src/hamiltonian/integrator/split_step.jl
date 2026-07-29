@@ -262,6 +262,7 @@ function _half_potential_step!(
     t_eval::Float64=ws.state.t,
     t_start::Float64=NaN,
     psi_mf::Union{Nothing, AbstractArray}=nothing,
+    psi_in::Union{Nothing, AbstractArray}=nothing,
 ) where {N}
     # Resolve time-dependent interactions (preserves c_lhy and the
     # higher-rank tensor couplings from the static params).
@@ -299,8 +300,18 @@ function _half_potential_step!(
         @timeit_debug TIMER "spin_chain" _apply_spin_chain!(
             ws.state.psi, ws, dt_half, ndim, imaginary_time, ip, psi_mf,
             zeeman_diag_fwd, zeeman_diag_bwd,
+            psi_in === nothing ? ws.state.psi : psi_in,
         )
         return nothing
+    end
+
+    # `psi_in` is an out-of-place REQUEST, and only the fused path above can
+    # honour it — the operator-by-operator chain below is in-place throughout.
+    # Materialising it here keeps the request a pure performance detail: callers
+    # get identical values either way, and a substep that makes the fused path
+    # ineligible degrades to the copy it would have paid anyway.
+    if psi_in !== nothing && psi_in !== ws.state.psi
+        copyto!(ws.state.psi, psi_in)
     end
 
     # Forward outer chain — shared with ITP via `_outer_operators_fwd!`.
@@ -467,13 +478,22 @@ function _half_potential_step_midpoint!(
     psi_orig = ws.state.psi
     psi_mid_prev, psi_mid_curr = _get_midpoint_scratch(psi_orig)
 
+    # Every Picard iterate starts from ψ_orig, so each one used to open with a
+    # full-ψ `copyto!(psi_mid_curr, psi_orig)`. `psi_in` hands that copy to the
+    # step itself: the fused kernel already reads each (voxel, component) exactly
+    # once before writing it, so reading ψ_orig and writing psi_mid_curr costs
+    # nothing over reading and writing one array — and the copy disappears rather
+    # than moving. At 128³ D=13 F64 one copy is 436 MB read + 436 MB written; a
+    # plain `split_step!` (n_picard = 1, set in `_half_potential!`) took two per
+    # step, `split_step_midpoint!` and the MPS/Yoshida composers (n_picard = 2)
+    # take four.
+    #
     # Iteration 1: predictor with frozen MF = ψ_orig.
-    copyto!(psi_mid_curr, psi_orig)
     ws.state.psi = psi_mid_curr
     try
         _half_potential_step!(
             ws, dt_half / 2, n_comp, ndim, imaginary_time;
-            t_eval=t_eval, t_start=t_start, psi_mf=psi_orig,
+            t_eval=t_eval, t_start=t_start, psi_mf=psi_orig, psi_in=psi_orig,
         )
     finally
         ws.state.psi = psi_orig
@@ -481,13 +501,16 @@ function _half_potential_step_midpoint!(
 
     # Refining Picard iterations: MF = previous midpoint estimate.
     for _ in 2:n_picard
-        copyto!(psi_mid_prev, psi_mid_curr)
-        copyto!(psi_mid_curr, psi_orig)
+        # This iteration's frozen mean field is the previous iterate, which is
+        # sitting in `psi_mid_curr`; this iteration must not write over it. Trade
+        # the two scratch roles so the write lands in the other buffer.
+        psi_mid_prev, psi_mid_curr = psi_mid_curr, psi_mid_prev
         ws.state.psi = psi_mid_curr
         try
             _half_potential_step!(
                 ws, dt_half / 2, n_comp, ndim, imaginary_time;
                 t_eval=t_eval, t_start=t_start, psi_mf=psi_mid_prev,
+                psi_in=psi_orig,
             )
         finally
             ws.state.psi = psi_orig

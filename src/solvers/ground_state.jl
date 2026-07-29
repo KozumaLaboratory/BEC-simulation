@@ -100,6 +100,7 @@ const _LBFGS_FORWARD_KWARGS = (
     :ddi_padding, :ddi_pad_factor,
     :target_magnetization, :backend, :m_lbfgs, :verbose, :light_shift,
     :dtype, :sobolev_alpha, :rotating_frame_omega,
+    :spinor_lhy, :lhy_opts,
 )
 
 function find_ground_state(;
@@ -159,11 +160,13 @@ function find_ground_state(;
 )
     # KEEP IN SYNC: `_LBFGS_FORWARD_KWARGS` below lists every kwarg this
     # dispatcher forwards to `find_ground_state_lbfgs`. The pinning test
-    # `test_lbfgs_forward_coverage` (test/solvers/) walks both kwarg sets
-    # and fails if a kwarg present on `find_ground_state_lbfgs` is missing
-    # from this forward — the same class of bug that hid
-    # `rotating_frame_omega` from LBFGS pre-2026-06-02. See
-    # `feedback_never_patch_when_root_fix_is_available`.
+    # `test/solvers/test_lbfgs_forward_coverage.jl` walks both kwarg sets and
+    # fails if a kwarg present on `find_ground_state_lbfgs` is missing from this
+    # forward, AND if a name in the list is absent from the call below — the
+    # class of bug that hid `rotating_frame_omega` from LBFGS pre-2026-06-02,
+    # and then hid `spinor_lhy` / `lhy_opts` from it after #179, because that
+    # gate had been deleted in an orphan sweep as "plumbing, not physics". A
+    # dropped kwarg IS physics when it is a Hamiltonian term.
     if method === :lbfgs
         return find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
@@ -172,6 +175,7 @@ function find_ground_state(;
             ddi_padding, ddi_pad_factor,
             target_magnetization, backend, m_lbfgs, verbose, light_shift,
             dtype, sobolev_alpha, rotating_frame_omega,
+            spinor_lhy, lhy_opts,
         )
     end
     method === :strang || throw(
@@ -248,6 +252,8 @@ function find_ground_state(;
             grid,
             atom,
             interactions,
+            spinor_lhy,
+            lhy_opts,
             zeeman,
             potential,
             dt,

@@ -6,11 +6,26 @@
 using Test
 using SpinorBEC
 using JLD2
+using Random
 
 @testset "seed_from warm-start" begin
     dir = mktempdir()
-    psi_a = randn(ComplexF64, 8, 8, 8, 3)     # F=1 → D=3, cubic even
-    psi_b = randn(ComplexF64, 8, 8, 8, 3)
+    # The "paired with point_001, not point_002" checks below discriminate by
+    # NORM, so the two decoys must be distinguishable by construction rather
+    # than by luck. Unscaled, `sum(abs2, randn(ComplexF64, 8,8,8,3))` is
+    # 3072 ± 78 (1536 entries, 2.55 % relative sd), so two independent draws
+    # land within the rtol=1e-3 of the negative assertions about 2.2 % of the
+    # time — which is exactly how this file went red on main at 2f81f4f7, both
+    # negative assertions failing together off one unlucky pair.
+    #
+    # Scaling psi_b puts the norms 9× apart, and the seed makes any future
+    # failure reproducible instead of a 1-in-45 mystery.
+    rng = MersenneTwister(20260729)
+    psi_a = randn(rng, ComplexF64, 8, 8, 8, 3)     # F=1 → D=3, cubic even
+    psi_b = 3.0 .* randn(rng, ComplexF64, 8, 8, 8, 3)
+    # Pin the precondition: if someone drops the scaling, this fails loudly
+    # rather than the file quietly becoming flaky again.
+    @test !isapprox(sum(abs2, psi_a), sum(abs2, psi_b); rtol=0.5)
     jldopen(joinpath(dir, "point_001_stretched.jld2"), "w") do f
         f["psi"] = psi_a
         f["override"] = Dict{String, Any}(

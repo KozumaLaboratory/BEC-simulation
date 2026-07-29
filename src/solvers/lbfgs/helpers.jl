@@ -135,13 +135,21 @@ function _line_search_energy_decrease(
         # the local minimiser along the ray (steepest-descent scale finding).
         if expand
             best_α, best_E = α, E_trial
+            last_α = α
             for _ in 1:max_expand
                 α2 = best_α * grow
                 E2 = eval_energy(α2)
+                last_α = α2
                 (E2 < best_E && accept(α2, E2)) || break
                 best_α, best_E = α2, E2
             end
-            best_α == α || eval_energy(best_α)  # leave ws.state.psi at best
+            # Re-place the iterate whenever the LAST evaluation was somewhere
+            # other than `best_α`. The earlier guard was `best_α == α`, which is
+            # TRUE in the common case that the very first trial doubling is
+            # rejected — and then `ws.state.psi` was left at that rejected step
+            # while `best_E` described `α_init`. The returned energy and the
+            # workspace state disagreed.
+            last_α == best_α || eval_energy(best_α)  # leave ws.state.psi at best
             return best_α, best_E
         end
         return α, E_trial

@@ -167,6 +167,19 @@ function _compute_and_convolve_ddi_padded!(
         apply_orszag_2_3_F_filter!(ctx.Fz_pad, n_pts, ddi.box_size)
     end
 
+    _convolve_ddi_padded!(ddi, ctx)
+end
+
+"""
+    _convolve_ddi_padded!(ddi, ctx)
+
+The k-space half of the open-boundary convolution, reading `ctx.F*_pad` and
+writing `ctx.Phi_*_pad`. The padded twin of `_convolve_ddi!`, split out for the
+same reason: the fused V half-step already builds `⟨F⟩` in the pad corner while
+computing its diagonal voxel phase, and would otherwise pay a second pass over
+ψ_mf for a field it is holding.
+"""
+function _convolve_ddi_padded!(ddi::DDIParams, ctx::DDIPaddedContext)
     rp = ctx.rfft_plans
     mul!(ctx.Fx_pad_rk, rp.forward, ctx.Fx_pad)
     mul!(ctx.Fy_pad_rk, rp.forward, ctx.Fy_pad)
