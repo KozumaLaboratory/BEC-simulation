@@ -315,17 +315,10 @@ function evap_spgpe(;
     # Growth budget BEFORE spending the GPU hour. Two production runs were
     # already lost to a reservoir that could not deliver the condensate; the
     # number that decides it costs milliseconds. See `growth_budget`.
-    G = let t = resv.t_internal, ω = resv.omega_bar ./ ωref
-        acc = 0.0
-        for i in 1:(length(t) - 1)
-            a = spgpe_rates(resv.reservoir, t[i])
-            b = spgpe_rates(resv.reservoir, t[i + 1])
-            acc += 0.5 * (2 * a.gamma * max(a.mu - 1.5 * ω[i], 0.0) +
-                          2 * b.gamma * max(b.mu - 1.5 * ω[i + 1], 0.0)) *
-                   (t[i + 1] - t[i])
-        end
-        acc
-    end
+    # Rising-μ phase only — see `growth_efoldings`. The whole-window integral
+    # called this configuration a 2.8× margin when the usable budget was 0.65×.
+    _gb = growth_efoldings(resv, resv.omega_bar ./ ωref)
+    G = _gb.G_rise
     G_eff = GROWTH_EFFICIENCY * G
     G_eff > EFOLDINGS_NEEDED || error(
         "growth budget: G_eff = η·G = $(round(G_eff; sigdigits=3)) against " *
@@ -333,7 +326,10 @@ function evap_spgpe(;
         "cannot grow a condensate in this window, so the run returns N₀ ≈ 0 however " *
         "correct the code is — which is what n_T = 1.0 (G_eff = 2.0) and n_T = 1.5 " *
         "already cost. LOWER cutoff_n_T (currently $cutoff_n_T): a shallower cutoff " *
-        "raises γ and shrinks the grid at the same time. Run mode `growth_budget`.")
+        "raises γ and shrinks the grid at the same time. Note this counts only the " *
+        "phase where μ is still RISING — on this ramp that is 95 of 1288 units, " *
+        "because μ = μ_TF(N₀) follows the 0-D condensate down as K₃ eats it. " *
+        "Run mode `growth_budget`.")
     G_eff > 2 * EFOLDINGS_NEEDED ||
         @warn "growth budget is within 2× of the requirement — expect a visible lag" G_eff
 
@@ -343,8 +339,8 @@ function evap_spgpe(;
         r0.gamma, r1.gamma, r0.M, r1.M)
     @printf("  cutoff          k_cut %.2f → %.2f (ϵ_cut−μ = %.1f k_BT, occupation %.2f)\n",
         resv.k_cut[1], resv.k_cut[end], cutoff_n_T, 1 / cutoff_n_T)
-    @printf("  growth budget   G = %.2f, G_eff = %.2f vs %.2f needed  (%.1f× margin)\n",
-        G, GROWTH_EFFICIENCY * G, EFOLDINGS_NEEDED,
+    @printf("  growth budget   G(μ rising) = %.2f of %.2f total, G_eff = %.2f vs %.2f needed (%.2f×)\n",
+        G, _gb.G_total, GROWTH_EFFICIENCY * G, EFOLDINGS_NEEDED,
         GROWTH_EFFICIENCY * G / EFOLDINGS_NEEDED)
     @printf("  grid            %d³, box %.1f, max k_cut %.2f (k_max %.2f)\n",
         grid_n, box, k_cut, k_max)
@@ -519,6 +515,40 @@ and an hour of H100 to discover. `γ` depends on the cutoff depth `n_T` through
 `(ln(1−e^{−n_T}))²`, which swings by ~14× between `n_T = 0.5` and `1.5`, so `G`
 is scanned over `n_T` rather than quoted at one value.
 """
+
+"""
+    growth_efoldings(resv, omega_ratio) -> (; G_rise, G_total, t_peak_idx)
+
+E-foldings of condensate growth the window affords, integrated over the phase in
+which the reservoir `μ` is still RISING — which is the only phase that can build
+a condensate.
+
+Integrating over the whole window instead is what passed the `n_T = 0.3`
+configuration with "2.8× margin" when the usable budget was 0.65× of the
+requirement. On the euv3 ramp `μ` peaks 95 of 1288 internal units in (0.053 s of
+a 0.714 s window) and then falls for the rest, because `μ = μ_TF(N₀)` follows the
+0-D condensate as three-body loss eats it from 1.4×10⁴ down to 1.8×10³. 77% of
+the raw budget lands after the turnover, where the damping term removes
+condensate rather than building it.
+"""
+function growth_efoldings(resv, omega_ratio)
+    t = resv.t_internal
+    mu = [spgpe_rates(resv.reservoir, tt).mu for tt in t]
+    ipk = argmax(mu)
+    seg(i0, i1) = begin
+        G = 0.0
+        for i in i0:(i1 - 1)
+            a = spgpe_rates(resv.reservoir, t[i])
+            b = spgpe_rates(resv.reservoir, t[i + 1])
+            G += 0.5 * (2a.gamma * max(a.mu - 1.5 * omega_ratio[i], 0.0) +
+                        2b.gamma * max(b.mu - 1.5 * omega_ratio[i + 1], 0.0)) *
+                 (t[i + 1] - t[i])
+        end
+        G
+    end
+    (; G_rise=seg(1, max(ipk, 2)), G_total=seg(1, length(t)), t_peak_idx=ipk)
+end
+
 function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
     traj = zero_d_trajectory()
     win = cfield_window(traj; f_start)
@@ -533,23 +563,16 @@ function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
         resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
             omega_ref=ωref, a_s=Eu151.a_s, cutoff_n_T=nT, t_start=win.t_start)
         t = resv.t_internal
-        # ω̄(t)/ω_ref along the window, for the ground-state energy 3/2·ω̄.
         ω = resv.omega_bar ./ ωref
-        G = 0.0
-        for i in 1:(length(t) - 1)
-            r1 = spgpe_rates(resv.reservoir, t[i])
-            r2 = spgpe_rates(resv.reservoir, t[i + 1])
-            d1 = 2 * r1.gamma * max(_drive(r1, ω[i], c0), 0.0)
-            d2 = 2 * r2.gamma * max(_drive(r2, ω[i + 1], c0), 0.0)
-            G += 0.5 * (d1 + d2) * (t[i + 1] - t[i])
-        end
+        gb = growth_efoldings(resv, ω)
+        G = gb.G_rise
+        G_eff = GROWTH_EFFICIENCY * G
+        verdict = G_eff > 2 * EFOLDINGS_NEEDED ? "FORMS" :
+                  G_eff > EFOLDINGS_NEEDED ? "marginal" : "SHORT"
         r0 = spgpe_rates(resv.reservoir, t[1])
         r1 = spgpe_rates(resv.reservoir, t[end])
         box = 2.6 * sqrt(2 * win.T_max)
         n_req = ceil(Int, resv.k_cut_max * box / π / 2) * 2
-        G_eff = GROWTH_EFFICIENCY * G
-        verdict = G_eff > 2 * EFOLDINGS_NEEDED ? "FORMS" :
-                  G_eff > EFOLDINGS_NEEDED ? "marginal" : "SHORT"
         # capacity: the condensate's momentum content reaches ~1/ξ = √(2μ), so the
         # projector has to stay above it — smallest margin over the window.
         margin = Inf
