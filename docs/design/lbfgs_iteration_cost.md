@@ -5,6 +5,39 @@ shape of the per-iteration cost and the redundancies removed on 2026-07-29, so
 that the next person optimising it starts from the structure rather than from a
 profile.
 
+## Measured
+
+TSUBAME, one UGE job on one node (`gpu_h`, `JULIA_NUM_THREADS=8`), both
+revisions back to back — `550fe24e` (= `main`) against `915869c2`. Wall time
+per L-BFGS iteration, as the slope of wall against `n_steps`; Eu-151 F=6,
+D=13, box 12, `m_lbfgs=20`. Figure and full component breakdown:
+`docs/figs/lbfgs_iteration_cost_ab.{png,csv}`.
+
+| cell | CPU before | CPU after | | GPU before | GPU after |
+|---|---|---|---|---|---|
+| 16^3 contact | 14.27 ms | **8.26 ms** (1.73x) | | 4.22 ms | 4.26 ms |
+| 16^3 +DDI    | 16.71 ms | **9.29 ms** (1.80x) | | 4.44 ms | 5.10 ms |
+| 24^3 contact | 49.86 ms | **30.92 ms** (1.61x) | | 5.12 ms | **4.76 ms** (1.08x) |
+| 24^3 +DDI    | 59.65 ms | **32.45 ms** (1.84x) | | 6.51 ms | **5.23 ms** (1.24x) |
+
+The GPU 16^3 column is **inside run-to-run scatter** and no claim is made
+there: an earlier job measured the same baseline cells at 4.82 and 5.29 ms,
+a 14-19 % spread, which is larger than the difference. The 24^3 GPU cells
+moved the same way in both jobs. The CPU column is unambiguous in every cell.
+
+Component that moved most: the two-loop recursion, 10.1 -> 2.5 ms at 16^3 and
+32.7 -> 7.7 ms at 24^3 (~4x, from splitting its axpys across threads). The
+Sobolev preconditioner on the GPU went 0.46 -> 0.035 ms once it stopped
+copying slices.
+
+Reading the breakdown: it reconciles to -1.1 % on the baseline, so the
+baseline split is trustworthy. It does **not** reconcile on the optimised
+revision (residuals of -10 to -48 %), because the bench measures
+`energy_gradient!` while the optimised driver calls `gradient_only!` — the
+component model no longer matches the code. Per `bench/reconcile.jl`, an
+unreconciled breakdown is not evidence; only the end-to-end slope is quoted
+above, and it is measured identically in both arms.
+
 ## The iteration
 
 ```
@@ -104,9 +137,15 @@ Each of these was work whose answer the iteration already had.
   is usually accepted, computing E and grad together there would make the
   iteration cost one fused pass instead of one energy pass plus one gradient
   pass. Worth it only if the acceptance rate is high; measure it first.
-- **Threading the two-loop axpys.** Elementwise, so bit-identical at any thread
-  split, and `_compute_spin_density!` already uses `Threads.@threads`. Whether
-  it pays depends on whether the history traffic actually dominates.
+- **Threading the two-loop *dot products*.** The axpys are already split
+  (`_axpy_threaded!`); the dots are not, because splitting a reduction changes
+  its summation order and this solver already sits close enough to the
+  `sqrt(eps)` floor for that to be visible. They are now the larger half of
+  what remains of the two-loop.
+- **The compact (Byrd-Nocedal-Schnabel) form** would read each of `s_i`, `y_i`
+  once per direction instead of twice, halving the history traffic, and would
+  put it through BLAS-2. It changes the summation order, so it needs its own
+  accuracy gate first.
 - **FFTW threads.** `FFTW.set_num_threads` has zero call sites in the project,
   so every CPU transform is single-threaded. The blast radius is the whole
   codebase (plans capture the thread count at planning time, and plan choice
