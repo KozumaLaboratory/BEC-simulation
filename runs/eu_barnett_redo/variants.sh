@@ -51,6 +51,21 @@ declare -A BR_PROD_VARIANTS=(
   #             is where a time-stepping error would also live.
   [prod_box35]="240,240,120|35.0,35.0,18.0|0|1.0e-3|NaN"   # xy box 28 -> 35 at IDENTICAL dx
   [prod_dt5e4]="192,192,120|28.0,28.0,18.0|0|5.0e-4|NaN"   # dt halved, geometry identical
+  # --- BOX convergence, the series that was never taken. dx was refined three
+  # times with the xy box pinned at 28, and the box turned out to be what
+  # mattered: at identical dx = 0.1458333, xy box 28 -> 35 cut the leak 13x
+  # (0.243 -> 0.018, gate OK at 2.0%) while dealias and dt/2 changed it by less
+  # than 0.5%. It also moved the CONVERSION by -13% (1.066 -> 0.924), so the
+  # dx-converged value was converged inside a contaminated box.
+  #
+  # Why xy and not z: J_z is angular momentum about z, so density wrapping in x
+  # or y corrupts it directly while density leaving through the z faces does
+  # not. Fixing the z box earlier changed nothing, which is what sent the
+  # diagnosis down the wrong path.
+  #
+  # 42/288 = 35/240 = 28/192 exactly, so dx is held to the last digit and only
+  # the box moves. 288 = 2^5*3^2.
+  [prod_box42]="288,288,120|42.0,42.0,18.0|0|1.0e-3|NaN"   # xy box 35 -> 42, dx identical
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
