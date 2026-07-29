@@ -189,6 +189,62 @@ _fs_cosine(A) = sqrt(1 - A^2)
         )
     end
 
+    @testset "spin_direction_spread" begin
+        grid = make_grid(GridConfig(32, 8.0))
+        # Uniform direction, varying density and magnitude: spread must be 0.
+        # This is the case the LHY guard would flag (magnitude varies) and this
+        # one must not — the two measure different things.
+        psi = zeros(ComplexF64, 32, 3)
+        for i in 1:32
+            a = 0.5 + 0.4 * sin(2π * i / 32)          # magnitude + density vary
+            psi[i, 1] = a
+            psi[i, 2] = 0.3a
+        end
+        @test spin_direction_spread(psi) < 1e-12
+
+        # Winding direction in the xy-plane: spin coherent state rotated by θ(x).
+        # Spread → 1 once the direction covers the full circle.
+        function _wound(nturn)
+            p = zeros(ComplexF64, 32, 3)
+            for i in 1:32
+                θ = nturn * 2π * (i - 1) / 32
+                # |F=1, n̂⟩ with n̂ in the xy-plane at angle θ
+                p[i, 1] = 0.5 * cis(-θ)
+                p[i, 2] = sqrt(0.5)
+                p[i, 3] = 0.5 * cis(θ)
+            end
+            p
+        end
+        @test spin_direction_spread(_wound(1)) > 0.9
+        @test spin_direction_spread(_wound(2)) > 0.9
+        # A single component has no direction at all.
+        single = zeros(ComplexF64, 32, 1)
+        single[:, 1] .= 1.0
+        @test spin_direction_spread(single) == 0.0
+        # Scalar density input has no spinor to inspect, so no guard fires.
+        @test superfluid_fraction(ones(32), grid) ≈ 1.0 atol = 1e-14
+    end
+
+    @testset "textured spinor warns; uniform direction does not" begin
+        grid = make_grid(GridConfig(32, 8.0))
+        psi_uniform = zeros(ComplexF64, 32, 3)
+        psi_uniform[:, 1] .= 1.0
+        # No warning, and the value is still the density-only one.
+        @test superfluid_fraction(psi_uniform, grid) ≈ 1.0 atol = 1e-12
+
+        wound = zeros(ComplexF64, 32, 3)
+        for i in 1:32
+            θ = 2π * (i - 1) / 32
+            wound[i, 1] = 0.5 * cis(-θ)
+            wound[i, 2] = sqrt(0.5)
+            wound[i, 3] = 0.5 * cis(θ)
+        end
+        @test_logs (:warn, r"MASS-flow") superfluid_fraction(wound, grid)
+        # Silenceable, and silencing changes nothing about the number returned.
+        v = superfluid_fraction(wound, grid; warn_texture=false)
+        @test v ≈ superfluid_fraction(total_density(wound, 1), grid) rtol = 1e-14
+    end
+
     @testset "argument validation" begin
         grid = make_grid(GridConfig(16, 4.0))
         n = ones(16)

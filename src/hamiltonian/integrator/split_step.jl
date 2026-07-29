@@ -81,7 +81,7 @@ function split_step!(ws::Workspace{N}) where {N}
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 
@@ -290,6 +290,19 @@ function _half_potential_step!(
         end
     gpu = _is_gpu(ws.state.psi)
 
+    # `diag · SM · DDI · SM · diag` is the WHOLE half-step whenever nothing else
+    # is active, and it then fits in one pass over ψ — bit-identical, not a
+    # different splitting. See spin_chain.jl; `_spin_chain_reason` is the list
+    # of everything that would otherwise be silently dropped.
+    if _spin_chain_reason(ws, ip, psi_mf) === nothing &&
+        _spin_chain_available(ws.state.psi, ws)
+        @timeit_debug TIMER "spin_chain" _apply_spin_chain!(
+            ws.state.psi, ws, dt_half, ndim, imaginary_time, ip, psi_mf,
+            zeeman_diag_fwd, zeeman_diag_bwd,
+        )
+        return nothing
+    end
+
     # Forward outer chain — shared with ITP via `_outer_operators_fwd!`.
     _outer_operators_fwd!(
         ws, dt_half / 2, ndim, imaginary_time;
@@ -360,7 +373,7 @@ function split_step_midpoint!(ws::Workspace{N}; dt::Float64=ws.sim_params.dt) wh
 
     if DEALIAS_2_3_ENABLED[]
         @timeit_debug TIMER "dealias" apply_orszag_2_3_filter!(
-            ws.state.psi, ws.fft_plans, n_comp, N
+            ws.state.psi, ws.fft_plans, n_comp, N, ws.grid.config.box_size
         )
     end
 
@@ -577,6 +590,16 @@ function _outer_operators_fwd!(
         )
     end
 
+    # The spin half of a spatially-varying LHY (issue #131). No-op for every
+    # other LHY — `_lhy_needs_spin` is a compile-time trait, so nothing else
+    # pays for it. Mirrored in the reverse half below to keep Strang symmetric.
+    if _lhy_needs_spin(ws.lhy)
+        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
+            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
+        )
+    end
+
     c2 = get_cn(ip, 2)
     if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
@@ -643,6 +666,13 @@ function _outer_operators_bwd!(
     if is_active(c2)
         @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
             ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
+        )
+    end
+
+    if _lhy_needs_spin(ws.lhy)
+        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
+            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
+            imaginary_time, psi_mf,
         )
     end
 

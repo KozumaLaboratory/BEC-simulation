@@ -13,7 +13,12 @@
     @testset "Quasi2DLHY construction" begin
         lhy = compute_lhy_2d_params(10.0, 1.5)
         @test lhy isa Quasi2DLHY
-        @test lhy.c_lhy_2d ≈ 100.0 / (4π)
+        # c₀²/(8π) — the prefactor of the beyond-mean-field term in Petrov &
+        # Astrakharchik PRL 117, 100401 (2016) Eq. (5), read in the
+        # single-component reduction. It was c₀²/(4π) with a compensating 0.5
+        # written into the energy face only, so `_lhy_V` — and therefore the
+        # propagator — was exactly 2× too large. See `compute_lhy_2d_params`.
+        @test lhy.c_lhy_2d ≈ 100.0 / (8π)
         @test lhy.a_2d_sq ≈ 1.5^2
         γ_E = 0.5772156649015329
         @test lhy.log_const ≈ 2γ_E - 1 - log(2)
@@ -28,6 +33,21 @@
         V = SpinorBEC._lhy_V(n, lhy)
         @test isfinite(V)
         @test V != 0.0
+
+        # V == dε/dn, analytically. ε = c n²(ln(n a²) + L) differentiates to
+        # c n (2(ln(n a²) + L) + 1) — the closed form is checked here so the
+        # tie between the two faces does not rest on a numerical derivative
+        # alone. This is what the old c₀²/(4π) + energy-side 0.5 violated.
+        for nn in (0.5, 1.0, 3.7, 12.0)
+            want = lhy.c_lhy_2d * nn *
+                   (2.0 * (log(nn * lhy.a_2d_sq) + lhy.log_const) + 1.0)
+            @test SpinorBEC._lhy_V(nn, lhy) ≈ want rtol = 1e-14
+            # ...and against a finite difference of the energy face itself.
+            h = 1e-6
+            eps_of(x) = lhy.c_lhy_2d * x^2 * (log(x * lhy.a_2d_sq) + lhy.log_const)
+            @test isapprox((eps_of(nn + h) - eps_of(nn - h)) / (2h),
+                SpinorBEC._lhy_V(nn, lhy); rtol=1e-6)
+        end
     end
 
     @testset "ScalarLHY reproduces old behavior" begin

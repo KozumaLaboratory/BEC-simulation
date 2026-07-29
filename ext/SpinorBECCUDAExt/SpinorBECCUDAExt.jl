@@ -19,8 +19,11 @@ using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 using LinearAlgebra: dot
 
 include("backend.jl")
+include("gpu_rng.jl")
 include("gpu_euler_kernel.jl")
+include("gpu_spin_rotation_taylor.jl")
 include("gpu_ddi_rotation.jl")
+include("gpu_spin_chain.jl")
 include("gpu_diagonal.jl")
 include("gpu_lhy_field.jl")
 include("gpu_spin_density.jl")

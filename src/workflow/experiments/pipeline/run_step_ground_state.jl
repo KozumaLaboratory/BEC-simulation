@@ -368,8 +368,19 @@ function _run_step(
         return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
+    # from_jld2: load ψ from a prior result (mirrors the rotating_basis
+    # path). Its init_state_params carry a path/snap, not Float64s, so
+    # resolve it before the numeric-params loop below.
+    psi_from_jld2 = nothing
+    if initial_state === :from_jld2
+        isp = get(p, "init_state_params", Dict())
+        jpath = get(isp, "path", nothing)
+        jpath === nothing && throw(ArgumentError(
+            "initial_state: from_jld2 requires init_state_params.path"))
+        psi_from_jld2 = _load_psi_from_jld2(String(jpath), get(isp, "snap", "last"))
+    end
     init_state_params = Dict{Symbol, Float64}()
-    if haskey(p, "init_state_params")
+    if initial_state !== :from_jld2 && haskey(p, "init_state_params")
         for (k, v) in p["init_state_params"]
             init_state_params[Symbol(k)] = Float64(v)
         end
@@ -381,7 +392,9 @@ function _run_step(
     end
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
-    psi_init = psi_prev
+    # Both warm-start routes, in precedence order: an explicit from_jld2 state
+    # wins, then a carried-over psi, then a `seed_from` reference.
+    psi_init = psi_from_jld2 !== nothing ? psi_from_jld2 : psi_prev
     if psi_init === nothing && haskey(p, "seed_from")
         psi_init = _resolve_seed_from(p["seed_from"], p, grid, atom)
         verbose && println("  seed_from: loaded + upsampled warm seed (skips fresh init)")
@@ -474,12 +487,18 @@ function _run_step(
     spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
         v === nothing ? nothing : Symbol(String(v))
     end
+    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
+    # "type stability boundaries": an Any-typed local reaching make_workspace
+    # is what turns into a multi-minute JIT hang with no stack trace.
+    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
 
     gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
+    tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
-            dt, n_steps, tol, initial_state, init_state_params, psi_init,
+            dt, n_steps, tol, tol_drho=tol_drho_val,
+            initial_state, init_state_params, psi_init,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
@@ -488,6 +507,7 @@ function _run_step(
             save_every=max(1, n_steps ÷ 100),
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
+            lhy_opts=gs_lhy_opts,
             rotating_frame_omega=gs_rf_omega,
             verbose=verbose,
         )

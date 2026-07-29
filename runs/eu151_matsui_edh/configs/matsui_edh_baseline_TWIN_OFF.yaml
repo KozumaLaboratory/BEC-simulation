@@ -18,7 +18,7 @@ pipeline:
       B:
         theta: 0.0
         phi: 0.0
-        Bz: "-0.01 Gauss"
+        Bz: "0.01 Gauss"
       gauge_fix: false
       initial_state: "m_minus_F"
       tol: 1.0e-9

@@ -1,6 +1,6 @@
 # Superfluidity & dipolar supersolidity — what we know, what we don't
 
-**As of 2026-07-28.** Knowledge-state map for one domain: measures of
+**As of 2026-07-29.** Revised twice since first written; six open questions closed, two corrections to earlier numbers. Knowledge-state map for one domain: measures of
 superfluidity in this simulator (`superfluid_fraction`) and the dipolar
 supersolid physics they are used on. Organised by *claim*, each with the
 evidence that supports it and the confidence that evidence buys — followed by
@@ -32,6 +32,11 @@ Confidence vocabulary, used strictly:
 | Beyond mean field, $f_s$ *is* an upper bound (one-body phase cannot carry correlated backflow) | **assumed** | standard argument; the solid-⁴He gap (Leggett ~20 % vs experiment ~1 %) is the known instance |
 | $f_s \approx 0$ for a trapped cloud is geometry, not state | **proven** | no phase rigidity across a box with vacuum at the edge; the code warns rather than returning a bare 0 |
 | `:relaxed` costs 1.8 s at 128³ and is flat in density contrast | **measured** | 0.21 → 0.25 s from contrast 0.2 to 0.99 at 64³; no preconditioner needed |
+| For an **untextured** spinor, the scalar $f_s$ is the whole story | **measured** | 1D spin-1 GP, twisting all components together (mass) vs $+q,0,-q$ (spin): both agree with the density-only $f_s$ to 4 digits across polar, ferro and $c_1=0$ |
+| For a **textured** spinor it is not: the density-only $f_s$ overestimates by up to **~20×** | **measured** | direction spread swept on a cone $B=(b_\perp\cos kx, b_\perp\sin kx, b_z)$ and on a full winding. Ratio density-only / true mass-flow: 1.000 at spread 0, 1.010 at 0.015, 1.040 at 0.057, 1.16 at 0.18, **19.9 at 0.80**. `figs/superfluid_fraction/texture_calibration.png` |
+| The error tracks the **direction** spread, not the magnitude spread | **measured** | a spinor with uniform direction but varying $|\langle F\rangle|$ and density gives spread 0 and ratio 1.000 — the case the LHY guard flags and this one must not |
+| `superfluid_fraction` now warns above direction spread 0.05 | — | threshold calibrated from the table above: below it the silent error is ≤ 4 %, the tolerance the LHY texture guard also settles for |
+| A textured state carries a **spin current**, so a scalar "spin $f_s$" is not even defined by the twist formula | **proven** | $E(q)$ for the $+q,0,-q$ twist is *linear*, not quadratic: $+2.53, +1.26, 0, -1.25, -2.50$ (×10⁻³) — perfectly antisymmetric. $2(E(q)-E(0))/q^2$ then diverges as $q\to0$ |
 
 The practical upshot: **an $f_s$ from a GP ground state may be quoted as *the*
 mean-field superfluid fraction**, not merely a bound on it. That is a stronger
@@ -44,14 +49,8 @@ statement than the metric shipped with, and it is gated.
   is a strongly correlated solid, not a dilute gas. Nothing here bounds the gap
   for a dipolar supersolid. *Would settle it:* QMC for the same tube geometry, or
   a Bogoliubov-level estimate of the backflow contribution.
-- **Whether $f_s$ means the same thing for a spinor texture.** Everything
-  validated is scalar (single component, or a spinor collapsed to its total
-  density). For a multi-component state with spin textures there are additional
-  superfluid modes — spin superfluidity, and a matrix $f_s^{ij}$ rather than a
-  scalar per axis. The current implementation reduces the spinor to $n(\mathbf r)$
-  and answers only the mass-flow question. Whether that is the interesting
-  question for an F=6 texture is untested. *Would settle it:* a twisted-BC
-  calculation on a spinor state, twisting each component's phase independently.
+- ~~Whether $f_s$ means the same thing for a spinor texture.~~ **Answered
+  2026-07-28, and the answer is no** — moved to "known" below.
 - **The comoving-frame vs plane-average definitions beyond $O(q^2)$.** Roccuzzo &
   Ancilotto define $f_s = 1 - \langle P_x\rangle/(Nmv_x)$; we use the Leggett
   closed form. They agree at $O(q^2)$ in mean field — measured, not assumed — but
@@ -72,19 +71,18 @@ statement than the metric shipped with, and it is gated.
 | The droplet count is a prediction of the model, not of the seed | **measured** | three broadband-noise seeds all select 11 droplets at $d=1.443\ \mu$m, the reference's value |
 | The dipolar kernel and realized $\epsilon_{dd}$ are correct | **proven** | measured from the code's own kernel at two independent angles: $k\parallel B\to+2\epsilon_{dd}$, $k\perp B\to-\epsilon_{dd}$, both exact |
 | $Q_5(\epsilon_{dd})$ is correct | **proven** | $Q_5(0)=1$, $Q_5(1)=3^{5/2}/6$ analytic, $1+\tfrac32\epsilon^2$ small-$\epsilon$ |
+| **11 droplets is the energy minimum**, not just the wavelength noise selects | **measured** | period imposed at $L/n_d$ for $n_d = 8\ldots14$, each converged separately: $E$ has a clean minimum at $n_d=11$, rising $+3.3\times10^{-3}$ at 12 and $+1.2\times10^{-3}$ at 10 |
+| The preferred droplet count **drops as $\epsilon_{dd}$ rises** | **measured** | minimum moves 11 → 9 going from $\epsilon_{dd}=1.45$ to 1.55; the paper's 11 is quoted at 1.45 |
+| The modulated ground state is robust in **shape**, not only in period | **measured** | six deliberately broken seeds at $\epsilon_{dd}=1.45$ — alternating amplitude, dimerised, one droplet suppressed, uneven spacing, broadband noise — all relax to the *same* even 11-droplet array: $E = 4.541833$ to 9 digits, contrast 0.778, $f_s$ 0.598, peak-height spread 0.011. Only the uneven-spacing seed stops short, $2.4\times10^{-4}$ high and not fully relaxed |
 | Tube images converge as $1/L_t^{2}$, not $1/L_t^{3}$ | **measured** | three ratios match $1/p^2$ to four decimals, exclude $1/p^3$; physically, images are parallel *lines* of dipoles and line–line energy per unit length falls as $1/R^2$ (#118) |
 | Transverse padding by $p$ is exactly a box $p$ times wider | **proven** | agreement to $\le3\times10^{-12}$ across FFTs of different sizes |
 
 ### Not known
 
-- **Whether the modulated state at larger $\epsilon_{dd}$ is the ground state or
-  metastable.** The reference says so of its own results ("we cannot exclude that
-  for higher values of $\epsilon_{dd}$ the solution we find is a metastable state
-  rather than the ground-state"), and our calculation has the same limitation: we
-  compare two seeded branches, not an exhaustive search. The droplet count could
-  be a local minimum in the number of droplets. *Would settle it:* scan the
-  imposed period around $d=L/11$ and confirm 11 is the energy minimum, not just
-  the noise-selected attractor. **This is cheap and has not been done.**
+- ~~Whether the droplet count is the ground state or a local minimum in droplet
+  number.~~ **Answered 2026-07-28** — moved to "known" below.
+- ~~Whether a qualitatively different modulated *shape* beats the even array.~~
+  **Answered 2026-07-29: no**, also moved below.
 - **Absolute $E_{dd}$ for the isolated tube** is extrapolated ($1/L_t^2$
   Richardson), not exact. The unpadded $L_t=16$ value is 3.6 % low. *Would settle
   it:* a cylindrically truncated kernel — which has no closed-form Fourier
@@ -120,22 +118,27 @@ statement than the metric shipped with, and it is gated.
 | The error changes sign below $N\approx1100$ | **proven** | $\pi\tilde a\sqrt N$ crosses 1 there; it is an $N$ vs $N^{3/2}$ exponent error, so it is not uniformly one-signed |
 | Our LHY convention matches the reference's | **proven** | their $\gamma=(32/3\sqrt\pi)ga^{3/2}F(\epsilon_{dd})$ with $F=Q_5$ is our `scalar_lhy_coefficient` |
 | The scalar eGPE energy functional now matches its propagator | **proven** | FD identity with $\gamma\ne0$; canaried — removing $E_{LHY}$ fails by 164 % and flips the derivative's sign (#110) |
+| The `c_lhy` fix does **not** change the LHY-sensitivity verdicts | **measured** | A/B in *identical* code (old 630.9 vs new 2442): K3=0 gives peak_max 0.005656 → 0.005775, K3=200 gives 0.004505 → 0.004654. 2–3 %, same classification in both |
+| It does make LHY ~11× more consequential for peak density than the old runs showed | **measured** | LHY off vs on in current code: peak_max 0.006834 → 0.006448, i.e. 5.6 % suppression, against 0.5 % in the stored May rows |
+| No other auto-derived dimensionless coupling is mis-scaled | **proven** | SI anchors for `c_total` ($g=4\pi\hbar^2a_s/m$), `c_dd` ($2\epsilon_{dd}$ along B̂), `p` ($g_F\mu_BB$), `q` ($(g_J\mu_BB)^2q_{geom}/\Delta_{hf}$), each with exponents pinned separately |
 
 ### Not known / outstanding
 
-- **Which conclusions from the ~60 affected configs change.** Absolute impact is
-  a few per cent, so most are probably unaffected — but the runs that *measured
-  LHY sensitivity* were comparing against a term ~4× weaker than intended, and
-  their verdicts are not yet re-derived: `eu_k3_lhy`, `eu_k3_lhy_control`, the
-  LHY0/LHY1 arms of `eu_robust_factorial`. `twa_N_scan` at $N=10^5$ has the
-  largest relative change. **Not re-run as of 2026-07-28.**
-- **Whether any *other* auto-derived dimensionless coefficient has the same
-  disease.** The `c_lhy` bug was invisible to units checks and to every test that
-  passed the coefficient in explicitly. Nothing systematic has audited the other
-  auto-derivations (`c_dd`, `c0`/`c1` from scattering lengths, $q$ from $B$)
-  against convention-free SI statements the way `test_scalar_lhy_si_roundtrip.jl`
-  now does for this one. *Would settle it:* one SI-ratio oracle per derived
-  coefficient.
+- ~~Whether any other auto-derived coefficient has the same disease.~~
+  **Answered 2026-07-28: no.** `test_dimensionless_coefficient_si_roundtrip.jl`
+  gates `c_total`, `c_dd`, `p` and `q` against convention-free SI anchors, plus
+  their $N$ and $\omega_{ref}$ exponents separately. 82/82.
+- ~~Which conclusions from the LHY-sensitivity configs change.~~ **Answered
+  2026-07-28: none of them** — see below.
+- **The stored results under `runs/` are stale against current `main`**, and by
+  much more than the coefficient fix. Re-running `eu_k3_lhy_control` LHY=scalar
+  in current code gives peak_max 0.005775 where the stored May row says 0.007487,
+  and the classification moves `delay` → `marginal_arrest`. The A/B below shows
+  only 2 % of that is `c_lhy`; the rest is accumulated code change since May
+  (full_bdg UV counterterm, LHY quadrature, FM closed forms, …). **Nothing has
+  audited which stored verdicts still hold.** *Would settle it:* re-run the
+  stored suites in current code, or stamp each stored summary with the commit
+  that produced it.
 
 ---
 
@@ -193,19 +196,29 @@ Recorded because each cost time, and each is a trap independent of the code.
 | $f_s$ on device arrays (F64 + F32) | `test/gpu/test_superfluid_fraction_gpu.jl` | full, gated |
 | scalar $c_{lhy}$ vs SI | `test/oracles/test_scalar_lhy_si_roundtrip.jl` | fast |
 | padding ≡ box enlargement, $1/L^2$ exponent | `test/solvers/test_scalar_ddi_transverse_pad.jl` | fast |
+| direction-texture guard fires / stays silent | `test/analysis/test_superfluid_fraction.jl` | fast |
 | supersolid regime + species + $Q_5$ (type C) | `test/validation/test_dipolar_supersolid_tube.jl` | ci |
+| every derived dimensionless coupling vs SI | `test/oracles/test_dimensionless_coefficient_si_roundtrip.jl` | fast |
 
 Detail and reproduction instructions: [`dipolar_supersolid_tube.md`](dipolar_supersolid_tube.md).
-Figure: `figs/dipolar_supersolid/fs_curve.png`.
+Figures: `figs/dipolar_supersolid/fs_curve.png` ($f_s$ vs $\epsilon_{dd}$),
+`figs/dipolar_supersolid/period_scan.png` (energy vs imposed droplet count).
 
 ## Cheapest next steps, in order
 
-1. **Scan the imposed droplet period** around $d=L/11$ to confirm 11 is the energy
-   minimum rather than the noise-selected attractor. Closes the largest open
-   question in §2 and costs a handful of ITP runs.
-2. **Re-run the LHY-sensitivity configs** listed in §3 and re-derive their
-   verdicts.
-3. **SI-ratio oracles for the remaining auto-derived coefficients** (§3), since
-   the one bug found was invisible to every other kind of check.
-4. **Twisted-BC calculation on a spinor state** to find out whether the scalar
-   $f_s$ is the quantity of interest for an F=6 texture at all (§1).
+The four listed on 2026-07-28 were all executed; see the "Answered" entries
+above. What they left:
+
+1. ~~Warn on a textured spinor.~~ **Done** — `spin_direction_spread` plus a
+   calibrated warning above 0.05. What remains is the *positive* half: a
+   spin-flow $f_s$ needs a definition that minimises over the twist before taking
+   the curvature, since a textured state carries a spin current and $E(0)$ is not
+   the parabola's vertex. The function currently returns the mass-flow answer and
+   says so; it does not offer the spin channel at all.
+2. **Audit which stored `runs/` verdicts still hold** in current code. Summaries
+   now carry `_repo_commit` and `summary_provenance` reports it, but the 230
+   files that predate stamping cannot be retro-dated — for those the only
+   answer is to re-run. Nothing has done that.
+3. **A cylindrically truncated dipolar kernel** to remove the residual
+   $1/L_t^2$ tail in absolute $E_{dd}$ (§2). The only remaining item on the
+   type-C result.

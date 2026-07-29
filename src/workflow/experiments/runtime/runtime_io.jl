@@ -35,6 +35,54 @@ function _save_units_metadata!(f, data::Dict)
 end
 
 """
+    _save_interactions_metadata!(f, ws)
+
+Persist the interaction couplings the run ACTUALLY used, so a result can be
+re-verified later.
+
+A result file recorded its outputs — the energy decomposition, the dynamics
+series — but not the inputs that produced them, and `open_result` filled the
+gap with `compute_interaction_params(atom; N_atoms)`. That fallback returns SI
+couplings (c₀ ≈ 1e-46) where the run used dimensionless ones, silently, so
+rebuilding a workspace from a stored result gave a Hamiltonian with essentially
+no interactions. Recomputing a 2026-05 LHY run that way produced E_LHY = 1e-121
+against a stored 1301 — the discrepancy is what exposed this.
+
+`c_lhy` is the scalar coefficient only; a spinor LHY table is reproduced from
+`lhy_kind` plus these couplings, which is why the kind is recorded beside them.
+"""
+function _save_interactions_metadata!(f, ws)
+    ip = ws.interactions
+    f["interactions_c0"] = ip[0]
+    f["interactions_c1"] = ip[1]
+    f["interactions_c_lhy"] = ip.c_lhy
+    # Even-rank tensor channels, as a Pair vector — the shape
+    # `_extract_interactions` already knows how to read.
+    #
+    # These do NOT survive in `ws.interactions`: `make_workspace` moves every
+    # channel above c1 into `tensor_cache` and leaves `interactions` holding
+    # only c0/c1. Reading the couplings off `interactions` alone therefore
+    # records a c2/c4 run as if it had none — so the cache is the source here,
+    # with `interactions` as the fallback for the paths that keep them inline.
+    f["interactions_c_high_rank"] = [k => ip[k] for k in sort(collect(keys(ip.c))) if k >= 2]
+
+    # The tensor channels get their OWN key, deliberately. `make_workspace`
+    # moves every channel above c1 into `tensor_cache`, but what it stores
+    # there are **g_S pair-channel couplings**, not c_k tensor couplings — a
+    # c₂ of 0.25 lands as g₂ = −0.1178. Writing those into
+    # `interactions_c_high_rank` would relabel g_S as c_k and reconstruct a
+    # different Hamiltonian while looking perfectly healthy.
+    if ws.tensor_cache !== nothing
+        tc = ws.tensor_cache
+        f["tensor_g_channels"] = [S => g for (S, g) in zip(tc.active_channels, tc.g_values)]
+    end
+    # The spinor LHY table is not a coupling and cannot be reconstructed from
+    # `c_lhy`; without the kind, a re-verification silently gets no LHY at all.
+    f["lhy_kind"] = ws.lhy === nothing ? "none" : String(nameof(typeof(ws.lhy)))
+    nothing
+end
+
+"""
 Persist pipeline analyzer outputs under `analyze/<name>/<field>` so phase
 diagrams can be reconstructed from disk without re-running simulations.
 

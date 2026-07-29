@@ -1,0 +1,43 @@
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n: [64, 64, 64]
+      box: [18, 18, 18]
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    B: {Bz: 0.01 Gauss}
+    n_steps: 1
+    tol: 1.0e-09
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_c1_36_64.jld2
+- dynamics:
+    duration: 0.13823
+    dt: 0.001
+    B:
+      Bz:
+        piecewise:
+          times: [0, 0.00921533, 0.0184307, 0.027646, 0.0368613, 0.0460767, 0.055292, 0.0645073, 0.0737227, 0.082938, 0.0921533, 0.101369, 0.110584, 0.119799, 0.129015, 0.13823]
+          values: [0.01, 0.00672458, 0.00452199, 0.00304085, 0.00204484, 0.00137507, 0.000924675, 0.000621805, 0.000418138, 0.00028118, 0.000189081, 0.000127149, 8.55025e-05, 5.74968e-05, 3.86641e-05, 2.6e-05]
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 20, psi: true, precision: f32}
+- dynamics:
+    duration: 130
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 900, psi: true, precision: f32}

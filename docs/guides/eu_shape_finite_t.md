@@ -260,13 +260,13 @@ thesis lifetime conditions — a conditions difference, not a discrepancy.) So t
 to the formation **dynamics**, not the loss law — an independent confirmation of the
 issue-#75 diagnosis.
 
-Honest limits: the **evaporation timescale is not physical** — the ms-scale SGPE cannot
-run the s-scale evaporation ramp (the run above is $\sim60\times$ too fast), so the
-number-conserving SGPE is an arbiter for the **fast physics** (three-body decay, the
-$N_0^{9/5}$ law) and only *illustrative* for the slow evaporation itself. Additionally
-the c-field is cutoff-dependent; and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
-of Rooney/Blakie/Bradley, arXiv:1210.0952). It is a more principled arbiter than the 0-D
-model on the loss law, not a calibrated absolute-number evaporation.
+Honest limits **of this closed-field run**: the evaporation timescale is not physical
+— it is $\sim60\times$ too fast — so this number-conserving SGPE is an arbiter for the
+**fast physics** (three-body decay, the $N_0^{9/5}$ law) and only *illustrative* for the
+slow evaporation itself. The c-field is also cutoff-dependent. The s-scale ramp is
+now reachable with the full SPGPE (growth + energy-damping reservoirs,
+Rooney/Blakie/Bradley arXiv:1210.0952) — see the section below and
+[spgpe.md](spgpe.md).
 
 **Finite-depth FORT spill** (`eu_ft_evap_fort.png`, driver mode `evap_fort`): the
 radial energy-knife is replaced by a physical finite-depth Gaussian FORT
@@ -276,8 +276,24 @@ boundary — a physical spill, not an ad-hoc threshold. 48³/D=3 GPU: budget exa
 ($\Delta\sim10^{-13}$), condensate fraction $0.44\to0.97$, $N_0$ $50\text{k}\to62\text{k}$
 (the thermal cloud condenses as it is spilled). Same timescale caveat as above.
 
+## Superseded for the evaporation ramp: the full SPGPE
+
+The timescale limit above was a **cost** limit, not a physics one, and it has been
+removed — see [spgpe.md](spgpe.md). Two changes:
+
+- The dissipative sub-step drew every random number on the host and copied it over
+  PCIe, which was 88 % of its cost (18.5 ms of a 21.1 ms step at $48^3$/D=3).
+  Drawing on the device cuts the step to 2.4 ms *while also* adding the
+  energy-damping term. A 1.5 s ramp is now ~0.5 h per trajectory.
+- With the growth reservoir there is no knife to sweep. The thermal cloud is not
+  simulated — it is the I region, supplied by the 0-D model at $(T(t),\mu(t))$ on
+  the experimental timescale — so the condensate forms because the reservoir got
+  cold, at the physical rate.
+
+The $\sim60\times$-too-fast caveat on `eu_ft_evap_sgpe_cal.png` stands for **that
+figure**; it is not a limit of the method. The $K_3$-law arbiter is unaffected
+either way (ms-scale physics, physical window).
+
 ## Next
 The $64^3$–$96^3$ cutoff-convergence study of the evaporation SGPE is running on
-TSUBAME; an adiabatic (ramped) box if a box trap becomes available; and the full
-SPGPE energy-damping scattering reservoir (Rooney/Blakie/Bradley) for the reservoir
-coupling the closed field omits.
+TSUBAME; an adiabatic (ramped) box if a box trap becomes available.

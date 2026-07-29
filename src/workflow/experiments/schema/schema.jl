@@ -56,10 +56,12 @@ const LHY_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, default="none",
         enum=["none", "scalar", "quasi_2d", "polar_two_channel", "full_bdg",
             "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
-            "icosahedral"]),
+            "icosahedral", "spatial"]),
     "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
     "n_max" => FieldSpec(; type=Number),       # null → 3 × max(|psi_init|²)
     "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
+    # `spatial` only: |⟨F⟩|/F bins, one BdG solve per OCCUPIED bin. A cost knob.
+    "n_bins" => FieldSpec(; type=Integer, default=12, range=(2, 64)),
 )
 
 # Unified `B:` Zeeman block (replaces the legacy step-level `zeeman:` /
@@ -272,6 +274,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
+    "tol_drho" => FieldSpec(; type=Number, default=0.0, range=(0.0, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     # Append a 2nd-order Newton-CG trust-region pass after LBFGS to drive the
     # stationarity residual below the first-order √eps gradient floor. Needed

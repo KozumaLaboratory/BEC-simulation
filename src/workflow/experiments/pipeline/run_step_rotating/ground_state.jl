@@ -96,10 +96,21 @@ end
         c_dd_auto = compute_c_dd_dimless(atom_obj; N_atoms=N_atoms_int, omega_ref=ω_ref_val)
         a_ho = sqrt(SpinorBEC.Units.HBAR / (atom_obj.mass * ω_ref_val))
         ε_dd_phys = compute_a_dd(atom_obj) / atom_obj.a_s
-        # Lima-Pelster γ_LHY (only nonzero if ε_dd worth stabilising)
-        γ_auto =
-            ε_dd_phys > 0.5 ?
-            compute_gamma_lhy(atom_obj.a_s / a_ho, ε_dd_phys, N_atoms_int) : 0.0
+        # Scalar LHY coefficient from the single declaration point, the same one
+        # `lhy: {kind: scalar}` uses on the standard path. This used to call a
+        # rotating-basis-local `compute_gamma_lhy`, which (a) was deleted by the
+        # engine retirement leaving an UndefVarError on every Eu run, and (b)
+        # carried the pre-PR#108 formula that was short by π(a_s/a_ho)√N.
+        #
+        # No ε_dd threshold: the standard path derives whenever c_dd > 0, and a
+        # cutoff at ε_dd = 0.5 puts a silent discontinuity right next to Eu-151
+        # (ε_dd = 0.540 at a_s = 110 a₀ — LHY would switch off entirely at
+        # a_s = 120 a₀ with no diagnostic).
+        γ_auto = if c_dd_auto > 0
+            scalar_lhy_coefficient(atom_obj.a_s / a_ho, N_atoms_int; eps_dd=ε_dd_phys)
+        else
+            0.0
+        end
     end
 
     c0 = haskey(inter, "c0") ? Float64(inter["c0"]) : c0_auto

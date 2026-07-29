@@ -1,0 +1,61 @@
+# lambda geometry sweep for the magnetostatic-mode sign-flip test (2026-07-25).
+# Identical to ramp_quench500_par.yaml (c1=1/36 = real Eu, quench+parabola) EXCEPT
+# the trap aspect ratio lambda = omega_z/omega_perp = 1.0.  Only the geometry differs,
+# so any change in the collective-mode frequency shift is a pure demagnetizing (shape)
+# effect: oblate (lambda>1) -> self-field opposes -> red-shift; prolate (lambda<1) -> aids
+# -> blue-shift; sphere (lambda=1) -> ~zero demag shift (crossing point).
+# secular:false explicit; separate GS cache per geometry.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys_sphere:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys_sphere]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_64_sphere.jld2
+- dynamics:
+    duration: 4.0
+    dt: 0.002
+    B:
+      Bz: {from: 0.01, to: 5.0e-4, duration: 4.0}
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 500, psi: true, precision: f32}
+- dynamics:
+    duration: 19.62
+    dt: 0.002
+    B:
+      Bz:
+        piecewise:
+          times: [0, 1.962, 3.924, 5.886, 7.848, 9.81, 11.772, 13.734, 15.696, 17.658, 19.62]
+          values: [0.0005, 0.00040994, 0.00032936, 0.00025826, 0.00019664, 0.0001445,
+            0.00010184, 6.866e-05, 4.496e-05, 3.074e-05, 2.6e-05]
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: true, precision: f32}
+- dynamics:
+    duration: 60.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: true, precision: f32}

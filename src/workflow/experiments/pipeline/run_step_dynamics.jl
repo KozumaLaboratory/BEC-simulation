@@ -30,6 +30,49 @@ end
     return TimeDependentInteractions(c0_wf, c1_wf)
 end
 
+"""
+    _resolve_dyn_lhy!(p, atom, c_dd_val) -> Bool
+
+Resolve a `dynamics:` step's own `lhy:` block, in place, exactly as the
+ground_state step does.
+
+`_resolve_lhy_block!` — which derives `interactions.c_lhy` for the scalar modes
+and writes the `lhy_opts` carrying `n_atoms` for the tabulated ones — runs inside
+`_resolve_derived_params!`, and the only caller of that is
+`run_step_ground_state.jl`. So a `dynamics: {lhy: …}` block reached
+`make_workspace` with **neither**:
+
+  * scalar / quasi_2d modes: `interactions.c_lhy` stayed 0, because the dynamics
+    `interactions` dict is re-parsed by `_parse_gs_interactions` and the GS
+    resolver only ever wrote `c_lhy` onto the *ground_state* block's dict. The
+    dynamics phase then ran with **no LHY at all** while `lhy: {kind: scalar}`
+    sat in the YAML — and, being absent rather than wrong, it conserved energy
+    perfectly and reported `lhy = +0`.
+  * tabulated modes: `lhy_opts` was missing, so the fallback
+    `LHYTableOpts()` supplied `n_atoms = 1`. That factor is the unit conversion,
+    not a table knob (see `_resolve_lhy_block!`): `n` is normalised to
+    `∫|ψ|²dV = 1` while `c₀` already carries `N`, so `n_atoms = 1` makes the
+    table **exactly `N_atoms` times too strong — in the propagator as well as
+    the energy.** At Eu F=6 / N=30000 that put 97 % of the total energy in the
+    LHY term and drifted the run by 46 %.
+
+Returns whether the block was resolved, so the caller can warn rather than
+silently keep the old behaviour when the interaction block is in the `c_total`
+form (no `N_atoms` to normalise by).
+"""
+@noinline function _resolve_dyn_lhy!(p::Dict{String, Any}, atom, c_dd_val::Float64)
+    get(p, "lhy", nothing) isa Dict || return true
+    inter_d = get(p, "interactions", nothing)
+    inter_d isa Dict || return false
+    n_atoms = Int(get(inter_d, "N_atoms", 0))
+    omega_ref = Float64(get(inter_d, "omega_ref", 0.0))
+    (n_atoms > 0 && omega_ref > 0) || return false
+    a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
+    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    _resolve_lhy_block!(p, inter_d, atom, c_dd_val, eps_dd, n_atoms, a_ho)
+    return true
+end
+
 @noinline function _resolve_dyn_magnetic_gradient(
     p::Dict{String, Any}, ndim::Int, duration::Float64
 )
@@ -126,6 +169,16 @@ function _run_step(
         rotating_frame_omega=rf_omega,
         spin_rotating_frame_omega=spin_rf_omega)
 
+    # Must run BEFORE `_parse_gs_interactions`, which is what reads the
+    # `c_lhy` this writes.
+    if !_resolve_dyn_lhy!(p, atom, c_dd_val)
+        @warn """dynamics `lhy:` block cannot be normalised: its `interactions:` \
+gives no (N_atoms, omega_ref), so the LHY tables have no atom number to divide \
+by and scalar `c_lhy` cannot be derived. The dynamics phase will run without \
+LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (the \
+`c_total` form is not enough).""" maxlog = 1
+    end
+
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
 
@@ -187,6 +240,7 @@ function _run_step(
         time_dep_interactions,
         magnetic_gradient,
         spinor_lhy=spinor_lhy_mode,
+        lhy_opts=get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts,
     )
 
     if temp_ratio !== nothing
@@ -322,6 +376,7 @@ function _run_step(
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
         extra_on_step=extra_cb,
+        stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
     )
 
     if verbose
@@ -343,6 +398,40 @@ function _run_step(
 end
 
 """
+    _resolve_dynamics_stepper(spec) -> Union{Nothing, Function}
+
+Map the `integrator:` key of a standard `dynamics:` step onto a per-step
+propagator. `nothing` keeps the historical leapfrog loop (merged V blocks).
+
+`integrator:` used to be accepted by `DYNAMICS_SCHEMA` and then never read —
+`run_simulation!` always took the leapfrog branch, so `integrator: yoshida` on a
+standard dynamics step was a silent no-op. Silently ignoring an accuracy knob is
+worse than not offering it, so unsupported values now raise.
+
+`midpoint` is the one that matters for dipolar dynamics: plain `split_step!`
+freezes the DDI mean field at each V(dt/2) boundary and is only 1st-order in
+time when `c_dd > 0`, while `split_step_midpoint!` restores 2nd order at ~1.5-2×
+the per-step cost.
+"""
+function _resolve_dynamics_stepper(spec)
+    spec === nothing && return nothing
+    name = lowercase(strip(string(spec isa AbstractDict ? get(spec, "name", "") : spec)))
+    isempty(name) && return nothing
+    if name in ("strang", "leapfrog", "default")
+        return nothing
+    elseif name == "midpoint"
+        return split_step_midpoint!
+    else
+        throw(
+            ArgumentError(
+                "dynamics integrator \"$name\" is not implemented on the standard " *
+                "path. Supported: \"strang\" (default leapfrog) or \"midpoint\" " *
+                "(2nd-order with DDI). The rotating_basis path has its own set."),
+        )
+    end
+end
+
+"""
     _run_dynamics_with_optional_streaming!(ws, save_psi, compress)
         -> (result, tmp_path_or_nothing, snapshot_count)
 
@@ -357,11 +446,12 @@ function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
     snap_type::Type{<:Complex}=ComplexF32;
     extra_on_step::Union{Nothing, Function}=nothing,
+    stepper::Union{Nothing, Function}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
              SimulationCallbacks(; on_step=extra_on_step)
-        return (run_simulation!(ws; callbacks=cb), nothing, 0)
+        return (run_simulation!(ws; callbacks=cb, stepper), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -392,6 +482,7 @@ function _run_dynamics_with_optional_streaming!(
                 on_step=extra_on_step,
             ),
             stream_snapshots=true,
+            stepper,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]

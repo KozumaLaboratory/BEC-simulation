@@ -8,6 +8,7 @@
 
 function _run_itp_loop!(
     ws, n_steps, tol, on_step, target_magnetization;
+    tol_drho::Float64=0.0,   # 0.0 = ignore the drho gate; >0 = ALSO require drho < tol_drho
     start_step::Int=0,
     # Checkpoint observation sinks — both fire at `sp.save_every` cadence
     # (the unified observation cadence) and on terminal state. Pass any
@@ -29,6 +30,7 @@ function _run_itp_loop!(
     converged = false
     psi_prev = copy(ws.state.psi)
     final_dE = NaN
+    final_drho = NaN
     final_dpsi = NaN
     last_step = start_step
     t_start = time()
@@ -74,7 +76,8 @@ function _run_itp_loop!(
     # even after the dynamics filter is applied; see L4 cross-grid probe
     # 2026-05-24).
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim,
+            ws.grid.config.box_size)
     end
 
     # Open: V(dt/2)
@@ -87,7 +90,8 @@ function _run_itp_loop!(
             on_step !== nothing && on_step(ws, step, n_steps)
 
             if DEALIAS_2_3_ENABLED[]
-                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim)
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp_ws, N_dim,
+                    ws.grid.config.box_size)
             end
 
             # Kinetic step K(dt)
@@ -156,16 +160,33 @@ function _run_itp_loop!(
             if step % sp.save_every == 0
                 E = total_energy(ws)
                 dE = _relative_energy_change(E, E_prev)
-                psi_max = maximum(abs, ws.state.psi)
+
+                # drho = max_r |ρ(r,now) - ρ(r,prev)| / max_r ρ(r,now)
+                # where ρ(r) = Σ_c |ψ_c(r)|² is the total density.
+                # Gauge-invariant under U(1) global phase AND spin rotations
+                # around z — eliminates the gauge-orbit drift that the
+                # wavefunction-based dpsi confuses with non-convergence.
+                # GPU-compatible: broadcasting + reductions only, no scalar
+                # indexing on the device array.
+                psi_now = ws.state.psi
+                rho_now = dropdims(sum(abs2, psi_now; dims=N_dim+1); dims=N_dim+1)
+                rho_prev_arr = dropdims(sum(abs2, psi_prev; dims=N_dim+1); dims=N_dim+1)
+                rho_max = Float64(maximum(rho_now))
+                drho_max = Float64(maximum(abs.(rho_now .- rho_prev_arr)))
+                drho = rho_max > 0 ? drho_max / rho_max : 0.0
+
+                # Also keep dpsi available for diagnostic logging; uses
+                # psi_prev as scratch (destructive). Comes AFTER drho.
+                psi_max = maximum(abs, psi_now)
                 dpsi = if psi_max > 0
-                    # Fuse subtraction + abs into map-reduce (avoids temp array alloc)
-                    psi_prev .= ws.state.psi .- psi_prev  # reuse psi_prev as diff buffer
+                    psi_prev .= psi_now .- psi_prev
                     maximum(abs, psi_prev) / psi_max
                 else
                     0.0
                 end
-                copyto!(psi_prev, ws.state.psi)
+                copyto!(psi_prev, psi_now)
                 final_dE = dE
+                final_drho = drho
                 final_dpsi = dpsi
 
                 if verbose
@@ -174,12 +195,17 @@ function _run_itp_loop!(
                     eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                     println(
                         "  ITP $(step)/$(n_steps) | E=$(round(E; sigdigits=8)) dE/|E|=$(round(dE; sigdigits=3)) " *
-                        "dpsi=$(round(dpsi; sigdigits=3)) | $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
+                        "drho=$(round(drho; sigdigits=3)) dpsi=$(round(dpsi; sigdigits=3)) " *
+                        "| $(round(elapsed; digits=1))s elapsed, ETA $(round(eta; digits=0))s",
                     )
                     flush(stdout)
                 end
 
-                if dE < tol
+                # Convergence requires dE/|E| < tol; if tol_drho>0, ALSO
+                # require the per-(save_every) DENSITY change to be below
+                # the grid-error scale. ρ is U(1)/spin-rotation invariant,
+                # so gauge-orbit drift in ψ does not affect drho.
+                if dE < tol && (tol_drho <= 0.0 || drho < tol_drho)
                     converged = true
                     break
                 end
