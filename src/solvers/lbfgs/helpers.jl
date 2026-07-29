@@ -273,10 +273,13 @@ function _line_search_energy_decrease(
                 (E2 < best_E && accept(α2, E2)) || break
                 best_α, best_E = α2, E2
             end
-            # Re-place the iterate at `best_α` whenever the LAST evaluation was
-            # somewhere else — including the case `best_α == α_init` with a
-            # rejected trial doubling, which the earlier `best_α == α` guard
-            # missed and which left the returned ψ at the rejected step.
+            # Re-place the iterate whenever the LAST evaluation was somewhere
+            # other than `best_α`. The earlier guard was `best_α == α`, which is
+            # TRUE in the common case that the very first trial doubling is
+            # rejected — and then the workspace was left at that rejected step
+            # while `best_E` described `α_init`. Only the retraction is needed
+            # (`best_E` is already known), which is why this is `retract!` and
+            # not the `eval_energy` the fix on main used.
             last_α == best_α || retract!(best_α)
             return best_α, best_E, psi_trial
         end

@@ -13,9 +13,12 @@
 #      driver now adopts that iterate instead of recomputing the retraction,
 #      and reuses that energy instead of re-evaluating it, so a mismatch
 #      would silently feed L-BFGS an energy from a different ψ.
-#   4. `result.dE` reports a real energy change. It was identically zero from
-#      step 2 onward because `E_prev` was assigned the energy AT the accepted
-#      point rather than before the step.
+#   4. the threaded axpy is bit-identical to the broadcast it replaces, and the
+#      blocked real-dot — which is NOT bit-identical to the BLAS `zdotc` it
+#      replaces — is no less accurate than a sequential sum.
+#
+# `result.dE` and the line search's workspace-state contract are gated in
+# `test_lbfgs_line_search_and_de.jl`; those fixes landed separately.
 
 using SpinorBEC
 using LinearAlgebra
@@ -212,16 +215,6 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
         @test SpinorBEC._realdot_blocked(v, v) ≈ sum(abs2, v) rtol = 1.0e-14
     end
 
-    @testset "dE is the step's energy change, not zero" begin
-        # The trajectory is deterministic, so the 6-step run's last step is
-        # exactly the 5-step run's endpoint → the 6-step run's reported dE must
-        # be the gap between the two runs' energies. `dE > 0` alone would be a
-        # weak (and, on a step where the line search fails, flaky) statement;
-        # this one is an identity. The pre-fix bookkeeping reported 0.0.
-        r5 = find_ground_state_lbfgs(; base..., n_steps=5, tol=0.0)
-        r6 = find_ground_state_lbfgs(; base..., n_steps=6, tol=0.0)
-        gap = abs(r6.energy - r5.energy)
-        @test gap > 0            # still descending, so the gate has teeth
-        @test r6.dE ≈ gap rtol = 1.0e-8
-    end
+    # The `dE` identity lives in `test_lbfgs_line_search_and_de.jl` (it gates a
+    # fix that landed on its own), so it is not repeated here.
 end

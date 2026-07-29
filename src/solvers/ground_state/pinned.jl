@@ -63,6 +63,12 @@ function _lbfgs_pin_continuation(;
     init_state_params::Dict{Symbol, Float64},
     psi_init::Union{Nothing, AbstractArray},
     ws_init::Union{Nothing, Workspace},
+    # Spinor (tabulated) LHY. `find_ground_state` / `find_ground_state_lbfgs`
+    # accept these and forward them to their own `make_workspace`, so a branch
+    # that does not thread them silently drops the TABLE while `scalar` (which
+    # rides in `interactions.c_lhy`) keeps working — the shape of #174 and #179.
+    spinor_lhy::Union{Nothing, Symbol, AbstractLHY}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     enable_ddi::Bool,
     c_dd::Float64,
     secular_ddi::Bool,
@@ -122,6 +128,7 @@ function _lbfgs_pin_continuation(;
         psi_init=seed,
         enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
         quasi_2d_ddi, l_z_ddi, backend, light_shift, dtype,
+        spinor_lhy, lhy_opts,
     )
 
     rows = NamedTuple[]
@@ -139,6 +146,7 @@ function _lbfgs_pin_continuation(;
             enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
             quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
             light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
+            spinor_lhy, lhy_opts,
             rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
             lbfgs_history=hist,
         )

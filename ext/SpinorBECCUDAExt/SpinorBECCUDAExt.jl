@@ -17,6 +17,9 @@ using SpinorBEC
 import CUDA
 using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 using LinearAlgebra: dot
+# Shared with the CPU kernels — see src/foundation/voxel_index.jl. Declared once
+# so the padded-corner field access cannot drift between the two devices.
+using SpinorBEC: _voxel_index
 
 include("backend.jl")
 include("gpu_rng.jl")

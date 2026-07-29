@@ -270,6 +270,7 @@ end
 
 @inline function _spin_taylor_warp_kernel!(
     P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
+    src,
 ) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
@@ -277,9 +278,14 @@ end
     in_range = vox <= size(P, 1)
     live = active && in_range
 
-    Vx = in_range ? (@inbounds vx[vox]) : zero(T)
-    Vy = in_range ? (@inbounds vy[vox]) : zero(T)
-    Vz = in_range ? (@inbounds vz[vox]) : zero(T)
+    # `src` maps voxel → index in the field buffers: `nothing` when they are
+    # contiguous (spin-mixing, Raman, unpadded DDI), a `CartesianIndices(n_pts)`
+    # when the field is the corner of a zero-padded DDI buffer. Reading through
+    # it is what lets the padded DDI skip materialising a cropped copy of Φ.
+    j = in_range ? _voxel_index(src, vox) : _voxel_index(src, 1)
+    Vx = in_range ? (@inbounds vx[j]) : zero(T)
+    Vy = in_range ? (@inbounds vy[j]) : zero(T)
+    Vz = in_range ? (@inbounds vz[j]) : zero(T)
 
     diag_c, b_c, bmc, g = _rot_generator(Vx, Vy, Vz, mz, sxu, syu, c, cdn, F2, Val(16))
     h, sh, kv = _rot_schedule(g, rk, K, tol2, rsafe2)
@@ -297,10 +303,13 @@ end
 `P[vox, :] ← exp(z · (v(vox)·F)) · P[vox, :]` for every voxel, degree-`K`
 Taylor–Horner, with `z = -i·scale` (real time) or `-scale` (imaginary time).
 `P` is the `(N_spatial, D)` reshape of ψ.
+
+`src_idx` (default `nothing`) maps voxel → index in `vx/vy/vz` for callers whose
+field lives in the corner of a larger buffer; see `src/foundation/voxel_index.jl`.
 """
 function _apply_spin_rotation_taylor!(
     P, vx, vy, vz, coef::SpinTridiagCoef{T}, scale::T, ::Val{D};
-    imaginary_time::Bool=false, F::T=one(T),
+    imaginary_time::Bool=false, F::T=one(T), src_idx=nothing,
 ) where {T, D}
     N = size(P, 1)
     voxels_per_block = 16
@@ -311,7 +320,7 @@ function _apply_spin_rotation_taylor!(
     rsafe2 = T(_SPIN_TAYLOR_RSAFE[])^2
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
         P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(_SPIN_RK_MAX),
-        tol2, F * F, rsafe2, Val(D), Val(!imaginary_time))
+        tol2, F * F, rsafe2, Val(D), Val(!imaginary_time), src_idx)
     nothing
 end
 
