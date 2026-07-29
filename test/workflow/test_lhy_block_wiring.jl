@@ -11,6 +11,7 @@
 # out to be uniform, which must NOT trip the silent-zero throw.
 
 using Test
+using JLD2: jldopen
 using SpinorBEC
 using SpinorBEC: _build_spinor_lhy, _resolve_lhy_block!, LHYTableOpts, LHY_SCHEMA
 
@@ -131,6 +132,63 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         @test "spatial" in LHY_SCHEMA["kind"].enum
         @test LHY_SCHEMA["n_bins"].default == 12
         @test LHY_SCHEMA["n_bins"].range == (2, 64)
+    end
+
+    @testset "method: lbfgs reaches the tabulated LHY (not just scalar)" begin
+        # `find_ground_state_lbfgs` had no `spinor_lhy` kwarg at all until
+        # 2026-07-29, and the pipeline's LBFGS branch passed none — so every
+        # `method: lbfgs` ground state ran with NO spinor LHY. It failed
+        # silently and in the worst possible direction: the texture B-scan's
+        # whole point was the A/B "does the phase assignment survive LHY?", and
+        # it came back bit-identical to its `kind: none` twin on all 34 shared
+        # points, which reads as the physics answer "LHY changes nothing".
+        #
+        # `scalar` was NOT affected — it rides in `interactions.c_lhy`, which
+        # was already threaded — so testing scalar alone would have stayed
+        # green throughout. The gate has to use a mode that needs a TABLE.
+        mktempdir() do dir
+            function run_kind(kind)
+                yaml = joinpath(dir, "gs_$kind.yaml")
+                write(
+                    yaml,
+                    """
+        units: {B: Gauss}
+        defaults: {kind: spinor, backend: cpu}
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+              grid: {n: [12, 12, 12], box: [12.0, 12.0, 12.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              method: lbfgs
+              m_lbfgs: 6
+              ddi: {enabled: true, secular: false}
+              lhy: {kind: $kind}
+              B: {Bz: "6.0e-5 Gauss", theta: 0.0, phi: 0.0}
+              initial_state: flower
+              n_steps: 12
+              tol: 1.0e-8
+        """,
+                )
+                out = joinpath(dir, "out_$kind")
+                run_yaml(yaml; base_dir=out, verbose=false)
+                d = first(filter(isdir, joinpath.(out, readdir(out))))
+                f = first(filter(x -> endswith(x, ".jld2"), readdir(d)))
+                jldopen(joinpath(d, f), "r") do j
+                    (String(string(get(j, "lhy_kind", "?"))), Float64(get(j, "energy", NaN)))
+                end
+            end
+
+            kind_none, e_none = run_kind("none")
+            kind_pc, e_pc = run_kind("polar_contact")
+
+            @test kind_none == "none"
+            # The mode actually installed, not silently dropped to nothing.
+            @test occursin("PolarContact", kind_pc)
+            # And it CHANGED the answer. Bit-identity here is the bug.
+            @test e_pc != e_none
+            @test isfinite(e_pc)
+        end
     end
 
     @testset "LHYTableOpts is concrete" begin
