@@ -161,6 +161,21 @@ let dxs = ntuple(d -> BOX[d] / NPTS[d], 3)
     get(ENV, "BR_CHECK", "0") == "1" && exit(0)
 end
 
+# Orszag 2/3 dealiasing. The per-term J_z torque budget on a real post-quench
+# state (torque_budget.jl) put the violation in the KINETIC term, ~5x the DDI:
+# L_z does not map the discrete k-grid onto itself, so whatever the state carries
+# near the Nyquist edge leaks angular momentum. The 2/3 filter removes exactly
+# that band, which is why it is the direct treatment rather than yet more dx.
+#
+# Deliberately NO explicit k_cut: `DEALIAS_K_CUT` hard-codes a box of 12 on every
+# axis, so on this 28x28x18 box it would cut the occupied band roughly in half.
+# The default (n_d / 3 per axis, index space) is box-independent and is what we
+# want.
+if get(ENV, "BR_DEALIAS", "0") == "1"
+    SpinorBEC.DEALIAS_2_3_ENABLED[] = true
+    println("  dealias: Orszag 2/3 ON (index-space n/3 per axis, no k_cut override)")
+end
+
 const GRID = make_grid(GridConfig(NPTS, BOX))
 const DV   = cell_volume(GRID)
 const C0   = compute_c_total(ATOM; N_atoms=N_ATOMS, omega_ref=OMEGA_REF)
