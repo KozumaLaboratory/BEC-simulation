@@ -305,7 +305,7 @@ Taylor–Horner, with `z = -i·scale` (real time) or `-scale` (imaginary time).
 `P` is the `(N_spatial, D)` reshape of ψ.
 
 `src_idx` (default `nothing`) maps voxel → index in `vx/vy/vz` for callers whose
-field lives in the corner of a larger buffer; see `gpu_index_map.jl`.
+field lives in the corner of a larger buffer; see `src/foundation/voxel_index.jl`.
 """
 function _apply_spin_rotation_taylor!(
     P, vx, vy, vz, coef::SpinTridiagCoef{T}, scale::T, ::Val{D};

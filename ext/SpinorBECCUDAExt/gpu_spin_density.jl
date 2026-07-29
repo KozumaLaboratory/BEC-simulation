@@ -46,7 +46,7 @@ using StaticArrays: SVector
 end
 
 # Reference broadcast form (≈37 launches at D=13), kept as the parity target for
-# the fused corner kernel above — see test/gpu/test_gpu_spin_density_corner_parity.jl.
+# the fused corner kernel above — see test/gpu/test_gpu_padded_corner_parity.jl.
 function _spin_density_corner_bcast!(fx, fy, fz, psi, F, ::Val{D}, ndim, n_pts) where {D}
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = SpinorBEC.fp_ladder_coeffs(F, Val(D))
