@@ -56,6 +56,14 @@ function find_ground_state_lbfgs(;
     # VRAM-constrained at large grids.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
+    # Spinor (tabulated) LHY. Until 2026-07-29 these kwargs did not exist, so
+    # `find_ground_state_lbfgs` could not build a workspace carrying a
+    # `TabulatedLHY` at all — every LBFGS ground state ran with NO spinor LHY,
+    # silently. `scalar` was unaffected because it rides in
+    # `interactions.c_lhy`, which was already threaded; only the modes that
+    # need a table (full_bdg / polar_contact / icosahedral / …) were dropped.
+    spinor_lhy::Union{Nothing, Symbol, AbstractLHY}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     precond_alpha_v::Float64=-1.0,        # ≥0 ⇒ combined P_C = P_V^½ P_K P_V^½
@@ -140,7 +148,7 @@ function find_ground_state_lbfgs(;
             sim_params=sp, psi_init,
             enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
             quasi_2d_ddi, l_z_ddi, backend,
-            light_shift, dtype,
+            light_shift, spinor_lhy, lhy_opts, dtype,
         )
     end
 

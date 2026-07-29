@@ -539,6 +539,8 @@ function _run_step(
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,
+                spinor_lhy=spinor_lhy_mode,
+                lhy_opts=gs_lhy_opts,
                 pin=pin_closure, epsilon_ramp=pin_eps,
                 residual_polish,
             )
