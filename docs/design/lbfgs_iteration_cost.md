@@ -8,27 +8,36 @@ profile.
 ## Measured
 
 TSUBAME, one UGE job on one node (`gpu_h`, `JULIA_NUM_THREADS=8`), both
-revisions back to back — `550fe24e` (= `main`) against `915869c2`. Wall time
-per L-BFGS iteration, as the slope of wall against `n_steps`; Eu-151 F=6,
-D=13, box 12, `m_lbfgs=20`. Figure and full component breakdown:
+revisions back to back — `550fe24e` (= `main` at the time) against `4034662e`.
+Wall time per L-BFGS iteration, as the slope of wall against `n_steps`;
+Eu-151 F=6, D=13, box 12, `m_lbfgs=20`. Figure and full component breakdown:
 `docs/figs/lbfgs_iteration_cost_ab.{png,csv}`.
 
 | cell | CPU before | CPU after | | GPU before | GPU after |
 |---|---|---|---|---|---|
-| 16^3 contact | 14.27 ms | **8.26 ms** (1.73x) | | 4.22 ms | 4.26 ms |
-| 16^3 +DDI    | 16.71 ms | **9.29 ms** (1.80x) | | 4.44 ms | 5.10 ms |
-| 24^3 contact | 49.86 ms | **30.92 ms** (1.61x) | | 5.12 ms | **4.76 ms** (1.08x) |
-| 24^3 +DDI    | 59.65 ms | **32.45 ms** (1.84x) | | 6.51 ms | **5.23 ms** (1.24x) |
+| 16^3 contact | 15.40 ms | **6.50 ms** (2.37x) | | 4.82 ms | 4.19 ms |
+| 16^3 +DDI    | 16.74 ms | **9.09 ms** (1.84x) | | 5.28 ms | 5.03 ms |
+| 24^3 contact | 49.11 ms | **27.47 ms** (1.79x) | | 5.05 ms | 3.53 ms |
+| 24^3 +DDI    | 52.43 ms | **32.30 ms** (1.62x) | | 5.70 ms | 5.71 ms |
 
-The GPU 16^3 column is **inside run-to-run scatter** and no claim is made
-there: an earlier job measured the same baseline cells at 4.82 and 5.29 ms,
-a 14-19 % spread, which is larger than the difference. The 24^3 GPU cells
-moved the same way in both jobs. The CPU column is unambiguous in every cell.
+The **GPU column is not a result**. Four independent jobs measured the same
+baseline cells at 4.22-4.82, 4.44-5.29, 5.05-5.45 and 5.70-6.51 ms — a 10-19 %
+spread, comparable to the differences in the table, and the sign of the 24^3
++DDI difference is not stable across jobs. The CPU column is unambiguous: the
+baseline scatter there is 3-10 % against speedups of 1.6-2.4x.
 
-Component that moved most: the two-loop recursion, 10.1 -> 2.5 ms at 16^3 and
-32.7 -> 7.7 ms at 24^3 (~4x, from splitting its axpys across threads). The
-Sobolev preconditioner on the GPU went 0.46 -> 0.035 ms once it stopped
-copying slices.
+Component that moved most: the two-loop recursion, 9.90 -> 2.23 ms at 16^3 and
+31.49 -> 6.81 ms at 24^3 (~4.5x). The Sobolev preconditioner on the GPU went
+0.46 -> 0.035 ms once it stopped copying slices.
+
+The dot products inside that recursion took two attempts. Blocking them into 64
+fixed chunks with hand-unrolled scalar accumulators — chosen so the answer
+would be machine-independent — measured **8.20 ms against BLAS `zdotc`'s 7.72
+ms** at 24^3 with the blocks threaded: the scalar loads alone cancelled four
+cores. Letting each block vectorise (`@simd`) makes it memory-bound, which is
+the regime threading helps, and takes the recursion to 6.81 ms. The reported
+number is the second attempt; the first is recorded here because "blocked and
+threaded" sounds like it must be faster and was not.
 
 Reading the breakdown: it reconciles to -1.1 % on the baseline, so the
 baseline split is trustworthy. It does **not** reconcile on the optimised
@@ -37,6 +46,11 @@ revision (residuals of -10 to -48 %), because the bench measures
 component model no longer matches the code. Per `bench/reconcile.jl`, an
 unreconciled breakdown is not evidence; only the end-to-end slope is quoted
 above, and it is measured identically in both arms.
+
+One caveat on the harness itself: the slope is a difference of two run
+minima, which amplifies noise, and the baseline cells moved up to 20 % between
+jobs. Component microbenchmarks (`t_dir` above) are much steadier and are what
+the two-loop claims rest on.
 
 ## Gates
 
@@ -155,15 +169,21 @@ Each of these was work whose answer the iteration already had.
   is usually accepted, computing E and grad together there would make the
   iteration cost one fused pass instead of one energy pass plus one gradient
   pass. Worth it only if the acceptance rate is high; measure it first.
-- **Threading the two-loop *dot products*.** The axpys are already split
-  (`_axpy_threaded!`); the dots are not, because splitting a reduction changes
-  its summation order and this solver already sits close enough to the
-  `sqrt(eps)` floor for that to be visible. They are now the larger half of
-  what remains of the two-loop.
 - **The compact (Byrd-Nocedal-Schnabel) form** would read each of `s_i`, `y_i`
   once per direction instead of twice, halving the history traffic, and would
   put it through BLAS-2. It changes the summation order, so it needs its own
-  accuracy gate first.
+  accuracy gate — `_realdot_blocked`'s BigFloat comparison is the template.
+- **Fusing the line search's first trial with the gradient.** `alpha = 1` is
+  accepted on essentially every iteration (the measured line-search evaluation
+  count is ~1), so computing E and grad together there would replace one energy
+  pass plus one gradient pass with a single fused pass. On the CPU that is
+  worth roughly a whole energy evaluation per iteration — the largest single
+  item left. It needs a CPU fused energy+gradient, which does not exist: the
+  GPU has `_gpu_energy_and_optional_grad`, the CPU runs the registry twice.
+  Doing it without changing any energy value means fusing per term (share the
+  forward FFT between `_kinetic_energy` and `_grad_kinetic!`, share the DDI
+  potential between `_ddi_energy` and `_grad_ddi!`), not switching the energy
+  faces to `factor * Re<psi, H psi>`.
 - **FFTW threads.** `FFTW.set_num_threads` has zero call sites in the project,
   so every CPU transform is single-threaded. The blast radius is the whole
   codebase (plans capture the thread count at planning time, and plan choice
