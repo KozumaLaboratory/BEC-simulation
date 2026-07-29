@@ -304,10 +304,15 @@ function find_ground_state_lbfgs(;
 
         # Carry the new gradient/energy to the next iteration (swap buffers so the
         # old `grad` is reused as scratch for the next `grad_new`).
+        # `E_prev` is the energy BEFORE this step, so `dE` is the step's energy
+        # decrease. It used to be assigned `E_trial` — the energy AT the accepted
+        # point, i.e. the same iterate `E_new` is measured at, and bit-identical
+        # to it — so the reported `dE` was exactly 0.0 from step 2 onward, for
+        # every run, including the value returned in `result.dE`.
         grad, grad_new = grad_new, grad
         grad_norm = grad_norm_new
+        E_prev = E
         E = E_new
-        E_prev = E_trial
         last_step = step
     end
 
