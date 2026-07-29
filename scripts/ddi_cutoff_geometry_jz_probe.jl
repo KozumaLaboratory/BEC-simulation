@@ -263,8 +263,12 @@ function run_geometry(label, box, sigma, n_list)
     # cylindrical kernel would buy at equal cost.
     ref = Cfg("sphere R=Rexact, pad exact (= free space)", cost.R, cost.f_sph)
     cfgs = [
-        Cfg("bare (production default)", nothing, nothing),
+        Cfg("bare, unpadded", nothing, nothing),
         Cfg("sphere R=Lmin/2, unpadded", minimum(box) / 2, nothing),
+        # Padding with NO cutoff. Pushes the density images out but leaves the
+        # kernel itself periodic on the doubled box, so a residual survives —
+        # this is what `analysis/dipole_field.jl` currently does.
+        Cfg("pad 2, no cutoff", nothing, (2.0, 2.0, 2.0)),
         Cfg("sphere R=Lmin, pad 2", minimum(box), (2.0, 2.0, 2.0)),
         ref,
         # The reference reads err = 0 against itself by construction, which proves
@@ -328,6 +332,12 @@ function main()
     println("  FALLS in n  -> dx roughness; no cutoff geometry can help.")
     println("  If 'pad exact' is already at the floor, a cylinder buys only the")
     println("  padded-volume saving printed per geometry, not accuracy.")
+    println("\n  Cutoff and padding are not interchangeable. Padding alone leaves a")
+    println("  ~4e-4 (isotropic) to ~9e-4 (aspect 2) residual; the cutoff alone")
+    println("  fixes covariance but not magnitude. On an ANISOTROPIC box at pad 2")
+    println("  the auto cutoff is capped at R <= Lmin while exactness wants Lmax, so")
+    println("  it trades a slightly larger field error for essentially exact J_z —")
+    println("  raise pad_factor on the short axes to get both.")
 end
 
 main()
