@@ -161,9 +161,27 @@ the total energy in the LHY term** (`lhy = +1653` / `+1664` against a whole mean
 field of ≈ +2.2). Their ratios are recorded only to show the stored 1.63 / 1.60
 were not reproduced.
 
-The usable half is already decisive: **`off` does not collapse** (2.3339 → 1.0502,
-clean), so the figure's premise — a collapse for the LHY closure to determine —
-is absent from current code.
+The usable half looked decisive — **`off` does not collapse** (2.3339 → 1.0502,
+clean) — but the two runs differ by more than code. `bce2068f` corrected these
+configs from `Bz: "-0.01 Gauss"` to `+0.01 Gauss`, so the stored numbers came
+from a config that no longer exists. Under the old negative field m=−F is the
+*highest* Zeeman state, hence spin-mixing unstable, which is a sufficient
+mechanism for `delay` → `stable_arrest` by itself. The figure's stored numbers
+are not reproducible from anything now in the repo; whether current code alone
+would also fail to collapse is a separate question, being measured by an `off`
+arm at the old field sign.
+
+**Settled.** After #174 all four arms re-run clean (drift ~1e-9, LHY 5–7 % of the
+total instead of 97 %): scalar 1.0363, off 1.0502, polar_contact 1.0921,
+icosahedral 1.0923 — every one `stable_arrest`. And `off` at the OLD field sign on
+fixed code gives 1.0479, within 0.2 % of the new sign, so the like-for-like
+objection was real but numerically irrelevant: the change **is** code, not the
+config flip. Figure 2's claim has no phenomenon behind it in this regime.
+
+**This is the third framing of the same result in one day.** First "the numbers
+moved", then "the premise is gone", now "the comparison was never like-for-like".
+Each correction came from checking one more thing that should have been checked
+first — and the config's own git history was a five-second check.
 
 Both dedicated gates for the tabulated path pass at this commit, so the 46 % drift
 is not an energy/propagator/gradient inconsistency; it is the table's magnitude in

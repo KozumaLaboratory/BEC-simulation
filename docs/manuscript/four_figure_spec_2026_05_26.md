@@ -112,6 +112,62 @@ reproduces", with loss-on as bracket evidence not headline claim.
 > | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
 > | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
 >
+> ## Settled — re-measured on fixed code, both field signs
+>
+> After #174 (the dynamics phase never resolved its own `lhy:` block, so tabulated
+> tables ran exactly `N_atoms` too strong and scalar LHY was absent entirely), all
+> four arms re-run cleanly:
+>
+> | arm | ratio | E drift | `lhy` / `total` | class |
+> |---|---:|---:|---:|---|
+> | scalar | 1.0363 | 6.4e-09 | +0.157 / +2.406 | stable_arrest |
+> | off | 1.0502 | 6.4e-10 | 0 / +2.244 | stable_arrest |
+> | polar_contact | 1.0921 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
+> | icosahedral | 1.0923 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
+>
+> Energy now conserves to ~1e-9 in every arm (was 46 % for the closed forms), and
+> LHY is 5–7 % of the total rather than 97 %. The signs are physical: the LHY arms
+> have a *lower* initial peak than `off` (0.00432–0.00434 vs 0.00463) because a
+> repulsive correction broadens the ground state.
+>
+> **And the field sign is not the cause.** Re-running `off` at the old
+> `Bz: "-0.01 Gauss"` on fixed code gives **ratio 1.0479** — within 0.2 % of the
+> `+0.01 Gauss` value of 1.0502, both `stable_arrest`, drift 4e-10. So the
+> like-for-like objection below was real but numerically irrelevant here: the
+> `off` arm's 2.3339 → 1.05 **is** a code change, not the config flip. (Consistent
+> with the state staying 100 % in m=−6 either way — the linear Zeeman is a constant
+> offset for a single component, and 20 time units at `seed_amplitude: 1e-6` is not
+> enough for the instability to grow.)
+>
+> **Conclusion: Figure 2 as specified cannot be produced.** No arm collapses on
+> correct code at either field sign; the spread across all four LHY treatments is
+> 1.04–1.09. The stored `delay` at 2.33/2.36 and the "capped at 1.63/1.60" are both
+> unreproducible, so the figure's claim — that the F=6 collapse-arrest outcome is
+> *determined by the LHY closure* — has no phenomenon behind it in this regime. The
+> underlying physics question stays open; a new configuration that actually
+> collapses would be needed to ask it.
+>
+> Run output: `~/spinorbec-runs/fig2_k3zero_v3` and `…/fig2_oldsign`.
+>
+> **Correction (same day): the comparison above is not like-for-like.** The stored
+> 2026-05 numbers were produced with `B: {Bz: "-0.01 Gauss"}`; the configs were
+> corrected to `+0.01 Gauss` in `bce2068f` ("211 Eu configs pinned m=-F under a
+> field that prefers m=+F"), so the re-run used a *different config*, not just
+> different code. That commit's own reasoning applies directly here: m=−F is a
+> Zeeman eigenstate, so ITP holds it either way and nothing errors, but under the
+> old negative field m=−F is the *highest* Zeeman state and "the dynamics then
+> proceed in a field whose sign is opposite to the intent".
+>
+> That is a plausible mechanism for `delay` → `stable_arrest` on its own — a
+> spin-mixing-unstable initial state depolarises and collapses differently from a
+> stable one — so the `off` arm's 2.3339 → 1.0502 must **not** be attributed to
+> the code changes listed below until the two are separated. An `off` arm at the
+> old field sign on current code is running to do exactly that.
+>
+> The verdict on the figure is unchanged and if anything firmer: its stored
+> numbers are **not reproducible from anything now in the repo**, because the
+> config that produced them was wrong in the field sign and has been fixed.
+>
 > **Only the first two rows are usable.** `off` and `scalar` conserve energy to
 > 2e-8 / 7e-8. The two closed-form arms drift **46 %** (E: 3123 → 1694) and their
 > `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
