@@ -93,6 +93,25 @@ function report(label; n, lhy_kind, reps = 30)
     t_nrm = tmin(() -> SpinorBEC._normalize_psi!(ws.state.psi, ws.grid, ncomp, ndim), reps)
     t_en = tmin(() -> total_energy(ws), reps)
 
+    # Inside the two composites: which substep owns the time.
+    zd = SpinorBEC._resolve_zeeman_diag(ws, 0.0)
+    n_pts = ws.grid.config.n_points
+    ctx = ws.ddi_padded
+    t_diag = tmin(
+        () -> SpinorBEC._dispatch_diagonal_step!(
+            ws, Val(3), zd, dt / 4, it, ws.interactions), reps)
+    t_sm = tmin(
+        () -> SpinorBEC.apply_spin_mixing_step!(
+            ws.state.psi, ws.spin_matrices, ws.interactions[1], dt / 4, ndim;
+            imaginary_time = it), reps)
+    t_conv = tmin(
+        () -> SpinorBEC._compute_and_convolve_ddi_padded!(
+            ws.state.psi, ws.spin_matrices, ws.ddi, ctx, Val(ncomp), ndim, n_pts), reps)
+    t_rot = tmin(
+        () -> SpinorBEC._apply_ddi_rotation!(
+            ws.state.psi, ctx.Phi_x_pad, ctx.Phi_y_pad, ctx.Phi_z_pad,
+            ws.spin_matrices, dt / 2, ndim; imaginary_time = it), reps)
+
     # A full ITP step = 2×(fwd + ddi + bwd) + kinetic (+ normalize at cadence).
     step_body = () -> begin
         SpinorBEC._outer_potential_fwd!(ws, dt / 4, ncomp, ndim, it)
@@ -129,6 +148,11 @@ function report(label; n, lhy_kind, reps = 30)
     @printf("  reconcile: Σparts/STEP = %.3f\n", total_parts / t_step)
     @printf("  host alloc: %.3f MB/step   (%.3f MB per ddi call)\n",
         alloc_step / 2^20, alloc_ddi / 2^20)
+    println("  --- substeps (per single call, ×4 diag/sm and ×2 conv/rot per step) ---")
+    for (nm, t) in (("diagonal", t_diag), ("spin_mixing", t_sm),
+        ("ddi_convolve", t_conv), ("ddi_rotation", t_rot))
+        @printf("  %-22s %9.3f ms\n", nm, t * 1e3)
+    end
     (; label, n, t_step, t_fwd, t_bwd, t_ddi, t_kin, t_nrm, t_en, alloc_step)
 end
 
