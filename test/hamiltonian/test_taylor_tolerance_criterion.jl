@@ -1,47 +1,41 @@
-# Gate: the Taylor truncation error stays negligible against the SPLITTING error
-# — the tolerance is a consequence of the caller's `dt`, not a decision the
-# caller is asked to make.
+# Gate: the Taylor spin rotation's truncation error stays negligible against the
+# error the caller already accepted by choosing `dt`.
 #
-# `SPIN_TAYLOR_TOL` should not be a user-facing knob: setting it correctly needs
-# a comparison against the integrator's own error, and demanding that knowledge
-# per call site is a design failure. So the relationship is what is pinned here.
+# Expressed through `ErrorBudget` / `NegligibleErrorSpec`
+# (src/workflow/validation/error_budget.jl) rather than as hand-rolled
+# assertions, so the thing being pinned is the RELATIONSHIP and the positive
+# control is structurally mandatory: a control that fails to breach makes the
+# verdict `:indeterminate`, never a green pass.
 #
 # Measured at production scale (bench/taylor_tolerance_sweep.jl, Eu F=6, 32³,
-# dt = 0.002): splitting error |E(dt) − E(dt/2)| = 7.6e-3 against a truncation
-# error of 2.4e-13 — a ratio of 3e-11.
+# dt = 0.002): baseline |E(dt) − E(dt/2)| = 7.6e-3, truncation 2.4e-13 — a ratio
+# of 3e-11.
 #
-# WHY `tol` IS NOT THE POSITIVE CONTROL. The obvious control — loosen `tol` and
-# watch the criterion break — does NOT work here, and finding that out is the
-# point of insisting on one. The degree is floored at 2, so at production
+# WHY THE CONTROL IS NOT A LOOSENED `tol`. That was the first attempt, and it
+# cannot breach. The degree is floored at 2, so at production
 # `R = dt·|v|·F ≈ 0.01–0.2` the schedule returns degree 2 for every tolerance
-# from 1e-15 up to 1, and the sweep duly measures the same mean degree 2.00 at
-# tol = 1e-5 and 1e-7. Even that floor puts the truncation at 3.3e-5 of the
-# splitting error, which passes. So the criterion is held by the DEGREE FLOOR,
-# not by the tolerance, and a control built on `tol` would be asserting
-# something that cannot fail.
+# from 1e-15 up to 1 — the sweep measures the same mean degree 2.00 at tol 1e-5
+# and 1e-7 — and that floor alone leaves the truncation at 3.3e-5 of the
+# baseline, which passes. The criterion is held by the DEGREE FLOOR, not by the
+# tolerance, which is why that floor is now a named constant
+# (`SPIN_TAYLOR_MIN_DEGREE`) rather than a literal in the schedule. The control
+# lowers it to 1 — same pipeline, same observable, same code path, one order
+# less.
 #
-# The control below attacks the floor instead: an order-1 truncation of the same
-# rotation must be materially worse. That makes the assertion above a statement
-# about a property something could break, rather than a tautology.
-#
-# HOW FAR THE MARGIN REACHES. The ratio is not scale-free: the splitting error
-# falls as dt² while the truncation accumulates over ~1/dt rotations, so
-# truncation/splitting grows roughly as dt⁻³. The 3e-11 measured at dt = 0.002
-# therefore buys about three decades of margin per factor of ~10 in dt — a run
-# at dt ≈ 1e-4 would still sit ~1e-2 of the splitting error, and only far below
-# that would the rotation start to matter. Production dt is 1e-3–5e-3, so this
-# is comfortable; but the number belongs to the dt it was established at, and a
-# convergence study that pushes dt much further should re-measure rather than
-# cite it.
+# HOW FAR THE MARGIN REACHES. The ratio is not scale-free: the baseline falls as
+# dt² while the truncation accumulates over ~1/dt rotations, so the ratio grows
+# roughly as dt⁻³ — about three decades of margin per factor of ten in dt.
+# Production dt is 1e-3–5e-3, so 3e-11 is comfortable; but the number belongs to
+# the dt it was established at.
 #
 # Lives in the ci tier, not fast: it runs `find_ground_state`.
 
 using Test
-using LinearAlgebra: norm
+
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX,
-    _taylor_rot_schedule, _cpu_spin_rk, spin_tridiag_bands, spin_matrices,
-    _apply_ddi_rotation!
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_MIN_DEGREE,
+    NegligibleErrorSpec, measure_error_budget, check, passed,
+    _taylor_rot_schedule, _cpu_spin_rk
 
 function _with_taylor(f, on::Bool)
     old = SPIN_TAYLOR_ENABLED[]
@@ -50,6 +44,17 @@ function _with_taylor(f, on::Bool)
         f()
     finally
         SPIN_TAYLOR_ENABLED[] = old
+    end
+end
+
+# Run `f` with the Horner degree floor forced to `k`.
+function _with_min_degree(f, k::Int)
+    old = SPIN_TAYLOR_MIN_DEGREE[]
+    SPIN_TAYLOR_MIN_DEGREE[] = k
+    try
+        f()
+    finally
+        SPIN_TAYLOR_MIN_DEGREE[] = old
     end
 end
 
@@ -67,69 +72,43 @@ end
         enable_ddi=true, c_dd=0.6, ddi_padding=true,
         verbose=false).energy
 
-    # Both references use the EXACT rotation, so their difference is the
-    # splitting error alone: what `dt` already costs, before any truncation.
-    e_exact, e_half = _with_taylor(false) do
-        (_energy(DT, NST), _energy(DT / 2, 2NST))
-    end
-    split_err = abs(e_half - e_exact)
-    @test split_err > 0        # a degenerate reference would make this vacuous
+    budget = measure_error_budget(;
+        label="Taylor spin rotation",
+        # Both references use the EXACT rotation, so their difference is the
+        # splitting error alone: what `dt` already costs.
+        exact=() -> _with_taylor(false) do
+            _energy(DT, NST)
+        end,
+        refined=() -> _with_taylor(false) do
+            _energy(DT / 2, 2NST)
+        end,
+        approx=() -> _with_taylor(true) do
+            _energy(DT, NST)
+        end,
+        # Same pipeline and same observable, one order less: the floor that
+        # actually holds the criterion, lowered.
+        control=() -> _with_taylor(true) do
+            _with_min_degree(1) do
+                _energy(DT, NST)
+            end
+        end,
+        baseline_label="splitting error, dt vs dt/2",
+        approximation_label="Taylor truncation",
+        control_label="degree floor lowered to 1",
+    )
 
-    e_taylor = _with_taylor(true) do
-        _energy(DT, NST)
-    end
-    @test abs(e_taylor - e_exact) < 1e-3 * split_err
+    result = check(NegligibleErrorSpec(1e-3), budget)
+    @info "error budget" summary = result.summary
+    # `passed` is false for BOTH :fail and :indeterminate — a control that
+    # cannot breach is not a green result here, it is a refusal to judge.
+    @test passed(result)
 
     # The degree floor is what holds the criterion, so pin it directly.
     @testset "the schedule never returns a degree below 2" begin
         rk = _cpu_spin_rk(Float64, DT)
         for g in (0.0, 1e-8, 1.0, 1e4), tol in (1e-15, 1e-5, 1.0)
             _, _, kv = _taylor_rot_schedule(g, rk, SPIN_TAYLOR_RK_MAX, tol^2, 1.0)
-            @test kv >= 2
+            @test kv >= SPIN_TAYLOR_MIN_DEGREE[]
         end
-    end
-
-    # Positive control, aimed at the floor rather than at `tol`.
-    @testset "an order-1 truncation IS materially worse" begin
-        F, D = 6, 13
-        sm = spin_matrices(F)
-        n = (4, 4, 4)
-        Ns = prod(n)
-        psi = reshape([ComplexF64(sin(3i), cos(2i)) for i in 1:(Ns * D)], n..., D)
-        px = reshape([0.4sin(i) for i in 1:Ns], n)
-        py = reshape([0.4cos(i) for i in 1:Ns], n)
-        pz = reshape([0.4sin(2i) for i in 1:Ns], n)
-        dt = 0.05
-
-        exact = _with_taylor(false) do
-            p = copy(psi)
-            _apply_ddi_rotation!(p, px, py, pz, sm, dt, 3; imaginary_time=false)
-            p
-        end
-        taylor = _with_taylor(true) do
-            p = copy(psi)
-            _apply_ddi_rotation!(p, px, py, pz, sm, dt, 3; imaginary_time=false)
-            p
-        end
-
-        # Order-1: ψ + (−i·dt)·(v·F)ψ, built from the SAME bands the kernel uses,
-        # so the comparison isolates the order and nothing else.
-        mz, sxu, syu = spin_tridiag_bands(sm, Float64)
-        P = reshape(copy(psi), Ns, D)
-        out = similar(P)
-        for i in 1:Ns
-            vx, vy, vz = px[i], py[i], pz[i]
-            for c in 1:D
-                Aw = vz * mz[c] * P[i, c]
-                c < D && (Aw += (vx * sxu[c] + vy * syu[c]) * P[i, c + 1])
-                c > 1 && (Aw += conj(vx * sxu[c - 1] + vy * syu[c - 1]) * P[i, c - 1])
-                out[i, c] = P[i, c] + (-im * dt) * Aw
-            end
-        end
-        order1 = reshape(out, n..., D)
-
-        err_taylor = norm(vec(taylor) .- vec(exact)) / norm(vec(exact))
-        err_order1 = norm(vec(order1) .- vec(exact)) / norm(vec(exact))
-        @test err_order1 > 1e4 * max(err_taylor, eps())
     end
 end

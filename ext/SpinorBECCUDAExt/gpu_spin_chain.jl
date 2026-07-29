@@ -23,7 +23,7 @@
 
 @inline function _spin_chain_warp_kernel!(
     P, fx, fy, fz, px, py, pz, vph, zph_fwd, zph_bwd, mz, sxu, syu, rk_sm, rk_dd,
-    K::Int32, tol2, F2, rsafe2, ::Val{D}, ::Val{RT},
+    K::Int32, tol2, F2, rsafe2, kmin::Int32, ::Val{D}, ::Val{RT},
 ) where {D, RT}
     T = real(eltype(P))
     CT = Complex{T}
@@ -40,8 +40,8 @@
 
     ds, bs, bms, gs = _rot_generator(Fx, Fy, Fz, mz, sxu, syu, c, cdn, F2, Val(16))
     dd, bd, bmd, gd = _rot_generator(Px, Py, Pz, mz, sxu, syu, c, cdn, F2, Val(16))
-    hs, shs, kvs = _rot_schedule(gs, rk_sm, K, tol2, rsafe2)
-    hd, shd, kvd = _rot_schedule(gd, rk_dd, K, tol2, rsafe2)
+    hs, shs, kvs = _rot_schedule(gs, rk_sm, K, tol2, rsafe2, kmin)
+    hd, shd, kvd = _rot_schedule(gd, rk_dd, K, tol2, rsafe2, kmin)
 
     # Associate as `ψ · (vph · zph)`, exactly as `_diag_step_kernel!` does
     # (`P[i, c] *= vph * zph[c]`). Floating-point multiplication is not
@@ -107,7 +107,7 @@ function SpinorBEC._apply_spin_chain!(
     CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fv..., pv..., vph, zf, zb, coef.mz, coef.sxu, coef.syu, rk_sm, rk_dd,
         Int32(SPIN_TAYLOR_RK_MAX), T(SPIN_TAYLOR_TOL[])^2, F * F,
-        T(SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it))
+        T(SPIN_TAYLOR_RSAFE[])^2, Int32(SPIN_TAYLOR_MIN_DEGREE[]), Val(D), Val(!it))
     nothing
 end
 

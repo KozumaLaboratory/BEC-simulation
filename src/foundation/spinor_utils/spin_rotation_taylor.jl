@@ -72,6 +72,19 @@ const SPIN_TAYLOR_RSAFE = Ref(1.0)
 """Degree ceiling. With the halving above it is never approached."""
 const SPIN_TAYLOR_RK_MAX = 40
 
+"""Smallest Horner degree the schedule may return.
+
+This is the constant that actually holds the accuracy criterion, which is why it
+has a name instead of being a literal in the loop. At production
+`R = |scale|·|v|·F ≈ 0.01–0.2` a degree of 2 already puts the truncation ~1e-5
+of the splitting error, so the schedule returns 2 for EVERY tolerance from
+1e-15 up to 1 and `SPIN_TAYLOR_TOL` never binds
+(bench/taylor_tolerance_sweep.jl). Lowering this is the only way to make the
+rotation the dominant error, which is exactly what
+`test_taylor_tolerance_criterion.jl` needs its positive control to do —
+otherwise that gate would assert something unreachable."""
+const SPIN_TAYLOR_MIN_DEGREE = Ref(2)
+
 """
     spin_tridiag_bands(sm, ::Type{T}) -> (mz, sxu, syu)
 
@@ -125,9 +138,12 @@ end
 
 This voxel's angle halving `h = 2^-sh` and Horner degree `kv`, from
 `g = |v|²F²`. Both tests run on SQUARES so no `sqrt` is needed:
-`(R/2^sh/k)² = (rk[k]·h)²·g`.
+`(R/2^sh/k)² = (rk[k]·h)²·g`. `kmin` is the degree floor — see
+[`SPIN_TAYLOR_MIN_DEGREE`](@ref).
 """
-@inline function _taylor_rot_schedule(g::T, rk, K::Int, tol2::T, rsafe2::T) where {T}
+@inline function _taylor_rot_schedule(
+    g::T, rk, K::Int, tol2::T, rsafe2::T, kmin::Int=SPIN_TAYLOR_MIN_DEGREE[]
+) where {T}
     scale1 = @inbounds rk[1]          # rk[1] = scale ⇒ r2 starts as R²
     r2 = scale1 * scale1 * g
     sh = 0
@@ -147,7 +163,7 @@ This voxel's angle halving `h = 2^-sh` and Horner degree `kv`, from
     while kk < K
         a = @inbounds rk[kk]
         u *= a * a * gh
-        if kk >= 2 && u <= tol2
+        if kk >= kmin && u <= tol2
             kv = kk
             break
         end
