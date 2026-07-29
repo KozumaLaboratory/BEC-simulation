@@ -186,10 +186,8 @@ runs/**/*.txt
 # macOS Finder metadata + Python bytecode caches (never source-of-truth)
 .DS_Store
 __pycache__/
-
 # Local personal document — submitted thesis PDF, not part of the codebase
 /修士論文_後藤_提出版.pdf
-
 # LaTeX build artifacts (the .tex sources are tracked, the build products are not)
 *.out
 *.aux

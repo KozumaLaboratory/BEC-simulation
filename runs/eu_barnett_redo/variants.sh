@@ -38,6 +38,19 @@ declare -A BR_VARIANTS=(
 declare -A BR_PROD_VARIANTS=(
   [prod_dx22]="128,128,80|28.0,28.0,18.0|0|1.0e-3|NaN"    # current production, dx 0.22
   [prod_dx175]="160,160,100|28.0,28.0,18.0|0|1.0e-3|NaN"  # dx 0.175, 2x the cells
+  [prod_dx146]="192,192,120|28.0,28.0,18.0|0|1.0e-3|NaN"  # dx 0.146, third convergence point
+  # --- residual hunt. The dx series converged the CONVERSION (0.993 -> 1.060 ->
+  # 1.066) but left a leak of 0.243 that is no longer scaling away: 0.672 ->
+  # 0.286 -> 0.243, i.e. -57% then only -15% for the same 1.2x refinement. Two
+  # variables were never tested AT PRODUCTION STAGE LENGTHS -- both were ruled
+  # out at stir = 10, where the cloud is far more compact:
+  #   xy box  -- edge_x is 2.75e-04 at stir 30, 275x the 1e-6 target. Only z was
+  #             ever enlarged. 35/240 = 0.145833 holds dx EXACTLY equal to the
+  #             28/192 reference, so this is a one-variable change.
+  #   dt      -- the leak grows with the structure the quench injects, and that
+  #             is where a time-stepping error would also live.
+  [prod_box35]="240,240,120|35.0,35.0,18.0|0|1.0e-3|NaN"   # xy box 28 -> 35 at IDENTICAL dx
+  [prod_dt5e4]="192,192,120|28.0,28.0,18.0|0|5.0e-4|NaN"   # dt halved, geometry identical
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on

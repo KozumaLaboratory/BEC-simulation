@@ -139,6 +139,63 @@ Generalisation for anyone re-deriving from this list: **check the run's commit
 against the fix list above, and read the run's own warnings, before comparing
 numbers.**
 
+## Second re-derivation: a figure whose premise no longer exists
+
+`manuscript/four_figure_spec_2026_05_26.md` Figure 2 specifies that "F=6 collapse
+arrest in the cigar stress regime is determined by the LHY closure, NOT by
+three-body loss K₃", with `off` and `scalar` collapsing (`delay`) while
+`polar_contact` / `icosahedral` cap the peak (`stable_arrest`).
+
+Re-running the K₃=0 factorial on current `main`:
+
+| arm | ratio now | class now | ratio 2026-05 | class 2026-05 |
+|---|---:|---|---:|---|
+| off | **1.0502** | stable_arrest | 2.3339 | delay |
+| scalar | **1.1839** | stable_arrest | 2.3599 | delay |
+| polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
+| icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
+
+**Only the first two rows are usable**: `off` and `scalar` conserve energy to
+2e-8 / 7e-8, while the two closed-form arms drift **46 %** and report **97 % of
+the total energy in the LHY term** (`lhy = +1653` / `+1664` against a whole mean
+field of ≈ +2.2). Their ratios are recorded only to show the stored 1.63 / 1.60
+were not reproduced.
+
+The usable half looked decisive — **`off` does not collapse** (2.3339 → 1.0502,
+clean) — but the two runs differ by more than code. `bce2068f` corrected these
+configs from `Bz: "-0.01 Gauss"` to `+0.01 Gauss`, so the stored numbers came
+from a config that no longer exists. Under the old negative field m=−F is the
+*highest* Zeeman state, hence spin-mixing unstable, which is a sufficient
+mechanism for `delay` → `stable_arrest` by itself. The figure's stored numbers
+are not reproducible from anything now in the repo; whether current code alone
+would also fail to collapse is a separate question, being measured by an `off`
+arm at the old field sign.
+
+**Settled.** After #174 all four arms re-run clean (drift ~1e-9, LHY 5–7 % of the
+total instead of 97 %): scalar 1.0363, off 1.0502, polar_contact 1.0921,
+icosahedral 1.0923 — every one `stable_arrest`. And `off` at the OLD field sign on
+fixed code gives 1.0479, within 0.2 % of the new sign, so the like-for-like
+objection was real but numerically irrelevant: the change **is** code, not the
+config flip. Figure 2's claim has no phenomenon behind it in this regime.
+
+**This is the third framing of the same result in one day.** First "the numbers
+moved", then "the premise is gone", now "the comparison was never like-for-like".
+Each correction came from checking one more thing that should have been checked
+first — and the config's own git history was a five-second check.
+
+Both dedicated gates for the tabulated path pass at this commit, so the 46 % drift
+is not an energy/propagator/gradient inconsistency; it is the table's magnitude in
+this Eu F=6 configuration, tracked separately.
+
+This is a different failure mode from the first re-derivation. There the
+conclusion survived a vacuous comparison; here the *phenomenon* is gone. Between
+them they cover both ways a stored result can fail: the knob was broken, or the
+thing the knob acted on no longer happens.
+
+The 4× higher initial peak in the closed-form arms (0.0177–0.0185 vs
+0.0044–0.0046) has the same origin as their 46 % drift: an LHY term two to three
+orders of magnitude larger than the rest of the Hamiltonian.
+
 ## Recommended order
 
 1. **Do not re-run 230 suites.** Most were exploratory. Re-derive only what a
