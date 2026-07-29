@@ -319,6 +319,18 @@ K1_gdr1_LHY0     on  on  off  -2.6911     0.9971           5.132e-3
 K1_gdr1_LHY1     on  on  on   -2.6926     0.9971           5.106e-3
 ```
 
+> **2026-07-29 — the four `LHY1` cells did not have LHY on during dynamics.**
+> `_resolve_lhy_block!` ran only for the ground_state step (#174), so a
+> `dynamics: {lhy: {kind: scalar}}` block reached `make_workspace` unresolved
+> and `interactions.c_lhy` stayed 0. The GS-phase LHY was applied; the dynamics
+> phase was not. So `LHY0` vs `LHY1` here compares *ground states*, not
+> trajectories, and the ⟨F_z⟩/N spread of 0.05% between them is the residual of
+> that, not a demonstration that the dynamics is insensitive to LHY.
+>
+> The **EdH transfer conclusion itself is unaffected** — it is invariant across
+> K3 and gdr as well, and those knobs were live. What cannot be claimed from
+> this table is robustness *to LHY* during the dynamics. Being re-measured.
+
 **Robust conclusions (invariant across all 8 cells):**
 
 - **EdH transfer signature**: ⟨F_z⟩/N falls from −F=−6 (initial m=−F)
