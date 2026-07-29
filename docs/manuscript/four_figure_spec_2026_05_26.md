@@ -112,6 +112,25 @@ reproduces", with loss-on as bracket evidence not headline claim.
 > | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
 > | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
 >
+> **Correction (same day): the comparison above is not like-for-like.** The stored
+> 2026-05 numbers were produced with `B: {Bz: "-0.01 Gauss"}`; the configs were
+> corrected to `+0.01 Gauss` in `bce2068f` ("211 Eu configs pinned m=-F under a
+> field that prefers m=+F"), so the re-run used a *different config*, not just
+> different code. That commit's own reasoning applies directly here: m=−F is a
+> Zeeman eigenstate, so ITP holds it either way and nothing errors, but under the
+> old negative field m=−F is the *highest* Zeeman state and "the dynamics then
+> proceed in a field whose sign is opposite to the intent".
+>
+> That is a plausible mechanism for `delay` → `stable_arrest` on its own — a
+> spin-mixing-unstable initial state depolarises and collapses differently from a
+> stable one — so the `off` arm's 2.3339 → 1.0502 must **not** be attributed to
+> the code changes listed below until the two are separated. An `off` arm at the
+> old field sign on current code is running to do exactly that.
+>
+> The verdict on the figure is unchanged and if anything firmer: its stored
+> numbers are **not reproducible from anything now in the repo**, because the
+> config that produced them was wrong in the field sign and has been fixed.
+>
 > **Only the first two rows are usable.** `off` and `scalar` conserve energy to
 > 2e-8 / 7e-8. The two closed-form arms drift **46 %** (E: 3123 → 1694) and their
 > `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
