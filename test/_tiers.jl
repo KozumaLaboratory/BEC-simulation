@@ -36,6 +36,7 @@ const FAST_TESTS = [
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_dynamics_lhy_normalisation.jl",
+    "workflow/test_result_jld2_dedupe.jl",
     "solvers/test_lbfgs_forward_coverage.jl",
     "oracles/test_lhy_table_path_coverage.jl",
     "workflow/test_lhy_texture_warning.jl",
@@ -546,6 +547,9 @@ const _COST = Dict{String, Float64}(
     "validation/test_L5_operator_rhs_compare.jl" => 22.6,
     "hamiltonian/test_ddi_padded.jl" => 97.8,
     "workflow/test_dynamics_lhy_normalisation.jl" => 3.0,
+    "workflow/test_result_jld2_dedupe.jl" => 2.0,
+    # No _COST entry before, so it fell back to the 3.0 default; measured 18.2 s.
+    "hamiltonian/test_interactions_constraint.jl" => 18.2,
     "solvers/test_lbfgs_forward_coverage.jl" => 2.0,
     "oracles/test_lhy_table_path_coverage.jl" => 2.0,
     "analysis/test_diagnostics.jl" => 21.3,

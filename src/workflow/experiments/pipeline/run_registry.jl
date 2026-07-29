@@ -694,6 +694,60 @@ function _snapshot_compression_kwargs(result)
     return (;)
 end
 
+# `run_pipeline` auto-saves the dashboard-canonical `result.jld2` at its end
+# (runner.jl), including the full streamed snapshot payload, and symlinks
+# `point_001.jld2` at it — with the comment "so we don't duplicate the multi-GB
+# snapshot data". `_run_yaml_single` then writes the real `point_NNN.jld2` over
+# that symlink, so the intent is defeated by ordering and BOTH files end up
+# carrying every frame. Measured on one Eu movie run: point_001 10.25 GB +
+# result 9.71 GB for one 753-frame dynamics, and 23 such pairs had accumulated
+# to 83.7 GB of pure duplication.
+#
+# Collapse it the other way round: keep the point file (it is the richer one —
+# analyze results, per-term energy, interactions, units, env) and make
+# `result.jld2` a symlink to it.
+#
+# ONLY when the point file provably contains everything `result.jld2` does.
+# That is not automatic: `save_rotating_basis_result!` writes `Lz`,
+# `per_m_history` and `integrator_meta` for rotating-basis runs, which the
+# point file does not carry. So compare key sets — top level and one level
+# into `dynamics` — and leave both files alone if the point file is missing
+# anything. Keys only; no frame is read, so this costs milliseconds.
+function _collapse_duplicate_result_jld2(run_dir::AbstractString,
+    psi_file::AbstractString; verbose::Bool=true)
+    res = joinpath(run_dir, "result.jld2")
+    (isfile(res) && !islink(res) && isfile(psi_file) && !islink(psi_file)) || return false
+    realpath(res) == realpath(psi_file) && return false
+
+    keyset(io, grp) =
+        grp === nothing ? Set(keys(io)) :
+        (haskey(io, grp) ? Set(keys(io[grp])) : Set{String}())
+    covered = try
+        jldopen(res, "r") do a
+            jldopen(psi_file, "r") do b
+                issubset(keyset(a, nothing), keyset(b, nothing)) &&
+                    issubset(keyset(a, "dynamics"), keyset(b, "dynamics"))
+            end
+        end
+    catch err
+        @warn "result.jld2 dedupe: could not compare key sets; leaving both files" run_dir exception=err
+        return false
+    end
+    covered || return false
+
+    freed = filesize(res)
+    try
+        rm(res; force=true)
+        symlink(basename(psi_file), res)
+    catch err
+        @warn "result.jld2 dedupe: symlink failed; result.jld2 may be missing" run_dir exception=err
+        return false
+    end
+    verbose && @printf("    result.jld2 -> %s (deduped, freed %.2f GB)\n",
+        basename(psi_file), freed / 1e9)
+    return true
+end
+
 function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
@@ -761,6 +815,13 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         write_run_summary(run_dir, psi_file; source="finish_hook")
     catch err
         @warn "run summary emit failed (non-fatal)" run_dir exception=err
+    end
+
+    # Must run AFTER the point file is in place — it is the survivor.
+    try
+        _collapse_duplicate_result_jld2(run_dir, psi_file; verbose)
+    catch err
+        @warn "result.jld2 dedupe failed (non-fatal)" run_dir exception=err
     end
 
     isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
