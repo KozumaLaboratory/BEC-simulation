@@ -33,9 +33,19 @@ mkdir -p logs/tsubame
 export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia
 export JULIAUP_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.juliaup
 
+# UGE `qsub -v` SPLITS ON COMMAS, so P1_N='96,96,48' arrives as P1_N=96 and the
+# grid silently becomes 1-D ("omega length must match grid dimensions (1)").
+# Both parallel jobs died on this. Accept comma-free spellings and convert here:
+#   P1_GRID=96x96x48   P1_BOXSPEC=24x24x12   P1_OMS=0.40:0.74:0.85
+[ -n "${P1_GRID:-}" ]    && P1_N="${P1_GRID//x/,}"
+[ -n "${P1_BOXSPEC:-}" ] && P1_BOX="${P1_BOXSPEC//x/,}"
+[ -n "${P1_OMS:-}" ]     && P1_OMEGAS="${P1_OMS//:/,}"
 export P1_N="${P1_N:-48,48,24}"
 export P1_BOX="${P1_BOX:-12.0,12.0,6.0}"
 export P1_OMEGAS="${P1_OMEGAS:-0.40,0.74,0.85}"
+# A 1-D grid is never intended here; refuse rather than run something meaningless.
+case "$P1_N" in *,*,*) ;; *) echo "FATAL: P1_N='$P1_N' is not 3-D — did a comma get eaten by qsub -v? Use P1_GRID=NxNxN."; exit 1;; esac
+case "$P1_BOX" in *,*,*) ;; *) echo "FATAL: P1_BOX='$P1_BOX' is not 3-D. Use P1_BOXSPEC=LxLxL."; exit 1;; esac
 # The CAS run key is the config spec alone and does NOT include the source
 # version, so a byte-identical config reuses a pre-bugfix result. BUMP THIS on
 # any physics change.

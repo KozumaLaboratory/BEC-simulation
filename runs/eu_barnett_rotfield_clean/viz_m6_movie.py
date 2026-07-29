@@ -67,6 +67,16 @@ box = np.asarray(arms[ROWS[0][0]]["box"], dtype=float)
 ext = [-box[0] / 2, box[0] / 2, -box[1] / 2, box[1] / 2]
 
 
+# NOTE ON ORIENTATION — do not add `.T` back.
+# JLD2 writes column-major and h5py reads row-major, so an array Julia stored as
+# [ix, iy] arrives here ALREADY transposed. Transposing again swaps x and y,
+# which maps every angle theta -> 90 - theta and therefore REVERSES the apparent
+# sense of rotation. That is exactly what it did: the cloud appeared to
+# counter-rotate against the field bar while every number agreed, because the
+# numbers came from Julia (correct axes) and only the picture was flipped.
+# Verified by shape: side_ is [ix, iz] = (32, 16) in Julia and reads as (16, 32).
+
+
 def rd(tag, name, i):
     return np.asarray(arms[tag][f"{name}_{i + 1:05d}"])
 
@@ -86,7 +96,7 @@ ims, marks, titles = {}, {}, {}
 for r, (tag, rl, plain) in enumerate(ROWS):
     for c, (comp, cl) in enumerate(COLS):
         a = ax[r, c]
-        ims[(tag, comp)] = a.imshow(rd(tag, comp, sel[0]).T, origin="lower",
+        ims[(tag, comp)] = a.imshow(rd(tag, comp, sel[0]), origin="lower",
                                     extent=ext, cmap="magma", vmin=0,
                                     vmax=vmax[(tag, comp)])
         titles[(tag, comp)] = a.set_title("", fontsize=8.0)
@@ -112,7 +122,7 @@ def draw(k):
         tsum = tot.sum()
         for comp, cl in COLS:
             d = rd(tag, comp, i)
-            ims[(tag, comp)].set_data(d.T)
+            ims[(tag, comp)].set_data(d)
             if NORM == "frame":
                 hi = float(d.max())
                 ims[(tag, comp)].set_clim(0.0, hi if hi > 0 else 1.0)
@@ -125,7 +135,8 @@ def draw(k):
 
         vx, vy, vq, vw = (rd(tag, s, i) for s in ("vx", "vy", "vq", "vw"))
         keep = np.abs(vw - vq) < STRICT if len(vq) else np.zeros(0, bool)
-        nx, ny = tot.shape
+        # `tot` reads as [iy, ix]: Julia's x index maps to COLUMNS.
+        ny, nx = tot.shape
         px = (vx / nx - 0.5) * box[0]
         py = (vy / ny - 0.5) * box[1]
         for comp in ("tot", "nmid"):

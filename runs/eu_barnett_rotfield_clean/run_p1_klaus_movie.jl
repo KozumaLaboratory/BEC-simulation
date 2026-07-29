@@ -47,6 +47,13 @@ const SAVE_EVERY = parse(Int, get(ENV, "P1_SAVE_EVERY", SMOKE ? "100" : "300"))
 # byte-identical config silently reuses a pre-bugfix result. Bump on any
 # physics change.
 const TAG = get(ENV, "P1_TAG", "movie1")
+# Far-field TOF is t-independent in SHAPE (cloud and hole both scale with t),
+# so this only sets the axis scale of the stored image.
+const TOF_T = parse(Float64, get(ENV, "P1_TOF_T", "8.0"))
+const TOF_STEPS = parse(Int, get(ENV, "P1_TOF_STEPS", "25"))
+# TOF costs ~6 s/frame at 64^3 even at n_steps=25, so it runs on a stride while
+# the in-situ panels stay every frame.
+const TOF_EVERY = parse(Int, get(ENV, "P1_TOF_EVERY", "5"))
 const STORE = get(ENV, "SPINORBEC_STORE", "runs")
 const MOV = get(ENV, "P1_MOVIE_OUT", joinpath(OUT, "rebuild_movie"))
 mkpath(SC)
@@ -133,6 +140,15 @@ function _reduce_impl(pj, Om, tag, outjld)
     ys = grid.x[2]
     plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
 
+    # ONE workspace for all TOF calls; psi is swapped in per frame. Building it
+    # per frame would re-specialise make_workspace, which CLAUDE.md flags as the
+    # multi-minute JIT hot path.
+    tof_ws = make_workspace(; grid, atom=rr.atom, interactions=rr.interactions,
+        potential=HarmonicTrap((1.0, 1.0, 2.0)),
+        sim_params=SimParams(; dt=0.001, n_steps=1),
+        psi_init=ComplexF64.(rr.psi))
+    tof_frames = Int[]
+
     times, ar_t, ell_t, lag_t, lz_t = Float64[], Float64[], Float64[], Float64[], Float64[]
     vcount, vnet = Int[], Int[]
     idx = 0
@@ -156,6 +172,39 @@ function _reduce_impl(pj, Om, tag, outjld)
                 o["nmid_"*key] = Float32.(n_tot[:, :, mid])
                 # side view, so the pancake shape is on screen too
                 o["side_"*key] = Float32.(dropdims(sum(n_tot; dims=2); dims=2))
+
+                # TOF image — this is where a vortex is actually visible.
+                #
+                # In situ the core is xi = 0.17 against dx = 0.25-0.75, so it
+                # never resolves: measured core/peak 0.63 on a TF cloud with a
+                # vortex, i.e. barely a dimple.
+                #
+                # NOT the far field. `simulate_tof` returns |psi~(k)|^2, and on
+                # a cloud with two vortices placed at x = +-1.5 it puts ONE hole
+                # at the CENTRE — an interference pattern, not an image of the
+                # cores. The experiment images the expanded DENSITY, which is
+                # the co-expanding (scaling) frame.
+                #
+                # Measured on that same two-vortex cloud, core/peak:
+                #   in situ 0.63 | t_tof 2 -> 0.37 | 5 -> 0.067 | 8 -> 0.016
+                # with drop_interactions=true. Carrying the interaction through
+                # the expansion instead holds it at ~0.53 (the core refills), so
+                # this number is scheme-dependent and is quoted as such.
+                #
+                # n_steps=25, not the default 300: measured identical to 4
+                # digits (0.0155 vs 0.0156) and 16x faster (6.2 s vs 99.9 s per
+                # frame at 64^3).
+                if (idx - 1) % TOF_EVERY == 0
+                    # copyto!, not `.=`: make_workspace picks the CUDA backend
+                    # when CUDA is loaded, and broadcasting a host Array into a
+                    # CuArray fails GPU compilation. copyto! does the transfer.
+                    copyto!(tof_ws.state.psi, psi)
+                    r = simulate_tof_scaling(tof_ws; t_tof=TOF_T, n_steps=TOF_STEPS,
+                        drop_interactions=true)
+                    o["tof_"*key] = Float32.(reduce(+, values(r.chi_density)))
+                    o["tof_b_"*key] = collect(r.b)
+                    push!(tof_frames, idx)
+                end
 
                 # aspect ratio + principal axis of the column density
                 ntot = sum(col)
@@ -190,7 +239,13 @@ function _reduce_impl(pj, Om, tag, outjld)
         end
         o["n_frames"] = idx
         o["Omega"] = Om
+        o["n_pts"] = collect(n_pts)
+        o["tag"] = TAG
         o["box"] = collect(box)
+        o["tof_t"] = TOF_T
+        o["tof_frames"] = tof_frames
+        o["tof_every"] = TOF_EVERY
+        o["dk"] = [grid.dk[1], grid.dk[2]]
         o["times"] = times
         o["AR"] = ar_t
         o["ell_angle"] = ell_t
@@ -223,7 +278,11 @@ for Om in OMEGAS
     end
     ddir = run_yaml(dy; base_dir=STORE)
     dpath = joinpath(ddir isa AbstractString ? ddir : "", "point_001.jld2")
-    reduce_frames(dpath, Om, tag, joinpath(MOV, "p1mov_$tag.jld2"))
+    # TAG in the FILENAME, not just the config spec. Three jobs at different
+    # resolutions were run in parallel and every one of them wrote
+    # p1mov_O0p85.jld2 — they silently overwrote each other, and the archives
+    # carry no resolution field to tell them apart afterwards.
+    reduce_frames(dpath, Om, tag, joinpath(MOV, "p1mov_$(TAG)_$tag.jld2"))
 end
 println("\nP1_KLAUS_MOVIE_DONE")
 flush(stdout)
