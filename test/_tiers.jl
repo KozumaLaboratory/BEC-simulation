@@ -104,6 +104,10 @@ const FAST_TESTS = [
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
+    # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
+    # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
+    # the accuracy contract turns both red.
+    "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",

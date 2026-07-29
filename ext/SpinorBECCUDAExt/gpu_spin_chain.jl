@@ -106,8 +106,8 @@ function SpinorBEC._apply_spin_chain!(
 
     CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fv..., pv..., vph, zf, zb, coef.mz, coef.sxu, coef.syu, rk_sm, rk_dd,
-        Int32(_SPIN_RK_MAX), T(_SPIN_TAYLOR_TOL[])^2, F * F,
-        T(_SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it))
+        Int32(SPIN_TAYLOR_RK_MAX), T(SPIN_TAYLOR_TOL[])^2, F * F,
+        T(SPIN_TAYLOR_RSAFE[])^2, Val(D), Val(!it))
     nothing
 end
 
