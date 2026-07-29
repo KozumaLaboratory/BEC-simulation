@@ -103,6 +103,7 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",

@@ -8,12 +8,18 @@
 #   F_z = Σ_c m_c |ψ_c|² ,  F_x = Σ_c g_c Re(ψ̄_{c-1} ψ_c) ,  F_y = Σ_c g_c Im(…)
 #
 # m_c and g_c (= fp_ladder_coeffs) match the CPU `_compute_spin_density!(::Array)`
-# exactly (single physics declaration). Only the contiguous (unpadded) case is
-# fused; the zero-padded DDI corner write falls back to the broadcast form.
+# exactly (single physics declaration).
+#
+# The zero-padded DDI case writes the same voxels into the `[1:n_pts...]` corner
+# of a larger buffer. That used to fall back to the broadcast form — and since
+# `DDI_PADDED_DEFAULT` flipped to `true` (9c117c05) that fallback is what every
+# production run takes, so the fused kernel was reaching almost nothing. It is
+# the same reduction either way; only the destination index differs, which is
+# what `dst` carries (`nothing` = contiguous, a `CartesianIndices` = corner).
 
 using StaticArrays: SVector
 
-@inline function _spin_density_kernel!(Fx, Fy, Fz, P, m_vals, fp, ::Val{D}) where {D}
+@inline function _spin_density_kernel!(Fx, Fy, Fz, P, m_vals, fp, ::Val{D}, dst) where {D}
     i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     i > size(P, 1) && return nothing
     Tr = real(eltype(P))
@@ -31,15 +37,16 @@ using StaticArrays: SVector
         prev = cur
     end
     @inbounds begin
-        Fx[i] = fxr
-        Fy[i] = fyi
-        Fz[i] = fz
+        j = _voxel_index(dst, i)
+        Fx[j] = fxr
+        Fy[j] = fyi
+        Fz[j] = fz
     end
     return nothing
 end
 
-# Broadcast fallback for the zero-padded DDI case (F buffers larger than n_pts):
-# write only the spatial corner via views — matches the generic AbstractArray path.
+# Reference broadcast form (≈37 launches at D=13), kept as the parity target for
+# the fused corner kernel above — see test/gpu/test_gpu_spin_density_corner_parity.jl.
 function _spin_density_corner_bcast!(fx, fy, fz, psi, F, ::Val{D}, ndim, n_pts) where {D}
     m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
     fp = SpinorBEC.fp_ladder_coeffs(F, Val(D))
@@ -71,21 +78,28 @@ function SpinorBEC._compute_spin_density!(
     psi::CuArray{Complex{T}}, sm, ::Val{D}, ndim, n_pts,
 ) where {T, D}
     F = sm.system.F
-    if !(size(fx) == n_pts && size(fy) == n_pts && size(fz) == n_pts)
-        # zero-padded DDI: write the n_pts corner via broadcast.
-        return _spin_density_corner_bcast!(fx, fy, fz, psi, F, Val(D), ndim, n_pts)
-    end
     Ns = prod(n_pts)
     m_vals = SVector{D, T}(ntuple(c -> T(F - (c - 1)), Val(D)))
-    fpc = SpinorBEC.fp_ladder_coeffs(T, F, Val(D))
-    fp = SVector{D, T}(fpc)
+    fp = SVector{D, T}(SpinorBEC.fp_ladder_coeffs(T, F, Val(D)))
     P = reshape(psi, Ns, D)
-    Fx = reshape(fx, Ns)
-    Fy = reshape(fy, Ns)
-    Fz = reshape(fz, Ns)
+    # Two call sites, not one with a Union-typed tuple: each launches a
+    # concretely-typed kernel. Contiguous flattens and indexes linearly; padded
+    # keeps the buffers in their own shape and maps voxel → corner index.
+    if size(fx) == n_pts && size(fy) == n_pts && size(fz) == n_pts
+        _launch_spin_density!(
+            reshape(fx, Ns), reshape(fy, Ns), reshape(fz, Ns), P, m_vals, fp,
+            Val(D), nothing, Ns)
+    else
+        _launch_spin_density!(
+            fx, fy, fz, P, m_vals, fp, Val(D), CartesianIndices(n_pts), Ns)
+    end
+    nothing
+end
+
+function _launch_spin_density!(Fx, Fy, Fz, P, m_vals, fp, ::Val{D}, dst, Ns) where {D}
     threads = min(Ns, 256)
     blocks = cld(Ns, threads)
     CUDA.@cuda threads = threads blocks = blocks _spin_density_kernel!(
-        Fx, Fy, Fz, P, m_vals, fp, Val(D))
+        Fx, Fy, Fz, P, m_vals, fp, Val(D), dst)
     nothing
 end

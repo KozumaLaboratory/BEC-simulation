@@ -146,10 +146,14 @@ function _compute_and_convolve_ddi_padded!(
     ndim,
     n_pts,
 ) where {D, N}
-    ctx.Fx_pad .= 0
-    ctx.Fy_pad .= 0
-    ctx.Fz_pad .= 0
-
+    # The convolution zero-pad is zero by construction (`_zeros` in
+    # `make_ddi_padded`) and STAYS zero: the only writes to F_*_pad are the
+    # `[1:n_pts...]` corner — `_compute_spin_density!` assigns every corner
+    # voxel, and `apply_orszag_2_3_F_filter!` is documented and implemented to
+    # leave the remainder untouched. Re-zeroing the whole padded volume every
+    # call therefore rewrote 3·prod(padded_shape) zeros that were already zero: at
+    # 64³ with pad_factor 2 that is 48 MB of stores per call, twice per ITP
+    # step. Invariant gated by `test/hamiltonian/test_ddi_padded_zero_pad_invariant.jl`.
     _compute_spin_density!(ctx.Fx_pad, ctx.Fy_pad, ctx.Fz_pad, psi, sm, Val(D), ndim, n_pts)
 
     # Full Orszag 2/3 rule: ψ pre-filter (in split_step) reduces ψ bandwidth
@@ -207,12 +211,11 @@ function apply_ddi_step!(
         n_pts,
     )
 
-    # Phi_*_pad are 2n-sized (padded) arrays. _apply_ddi_rotation!
-    # crops them to psi's physical [1:n...] corner via `_ddi_crop_phi`
-    # (rotation.jl) before computing Euler angles. (Pre-2026-06-07 this
-    # comment claimed an "implicit crop" via CartesianIndices(n_pts) —
-    # true before the 2026-05-10 batched-gemm rewrite, which silently
-    # switched to linear indexing and broke 2D/3D: App. A defect 9.)
+    # Phi_*_pad are 2n-sized (padded) arrays. _apply_ddi_rotation! reads psi's
+    # physical [1:n...] corner of them, via the voxel → buffer index map
+    # `_ddi_phi_index_map` (rotation.jl) — NOT the first N_spatial linear
+    # elements, which walk full padded columns into the pad region for ndim ≥ 2
+    # (App. A defect 9, introduced by the 2026-05-10 batched-gemm rewrite).
     @timeit_debug TIMER "ddi_rotation" _apply_ddi_rotation!(
         psi, ddi_padded.Phi_x_pad, ddi_padded.Phi_y_pad, ddi_padded.Phi_z_pad,
         sm, dt_frac, ndim;
