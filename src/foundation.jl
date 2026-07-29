@@ -29,6 +29,7 @@ include("foundation/grid.jl")
 include("foundation/fft_utils.jl")
 include("foundation/backend.jl")
 include("foundation/scratch.jl")
+include("foundation/voxel_index.jl")   # _voxel_index: contiguous vs zero-padded-corner field access
 include("foundation/thresholds.jl")
 include("foundation/spin_matrices.jl")
 include("foundation/spinor_utils.jl")

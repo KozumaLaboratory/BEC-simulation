@@ -88,48 +88,54 @@ function _spin_mixing_loop!(
     # Track A1: read ⟨F⟩ from `Pmf` so the rotation operator is built
     # from the user-supplied mean-field source psi (typically a midpoint
     # estimate). Rotation is still applied to `P` (= state psi).
-    max_theta_sq = T(0)
-    @inbounds for k in 1:N_spatial
-        fz_val = T(0)
-        @simd for c in 1:D
-            fz_val += T(F - (c - 1)) * abs2(Pmf[k, c])
-        end
-        fxy_re = T(0)
-        fxy_im = T(0)
-        @simd for c in 2:D
-            pc_m1 = Pmf[k, c - 1]
-            pc = Pmf[k, c]
-            prod = conj(pc_m1) * pc
-            coef = fp_coeffs[c]
-            fxy_re += coef * real(prod)
-            fxy_im += coef * imag(prod)
-        end
-        px = c1_t * fxy_re
-        py = c1_t * fxy_im
-        pz = c1_t * fz_val
-        pm_sq = px * px + py * py + pz * pz
-        pm = sqrt(pm_sq)
-        if pm < T(1e-100)
-            alpha[k] = T(0)
-            beta[k] = T(0)
-            theta[k] = T(0)
-        else
-            alpha[k] = atan(py, px)
-            cb = pz / pm
-            cb = cb > one(T) ? one(T) : (cb < -one(T) ? -one(T) : cb)
-            beta[k] = acos(cb)
-            th = pm * dt_t
-            theta[k] = th
-            th_sq = th * th
-            max_theta_sq = th_sq > max_theta_sq ? th_sq : max_theta_sq
+    # Threaded, like the identically-shaped DDI angle pre-pass
+    # (`_ddi_compute_angles!`). It was serial only because it also carried the
+    # `max θ` reduction in the loop variable; θ is written to the cache anyway,
+    # so the guard below reads it back instead. At 32³ × D = 13 this pre-pass —
+    # D abs2, D−1 complex products, an atan, an acos and a sqrt per voxel — was
+    # the single largest serial region left in a CPU ITP step.
+    _voxel_loop!(N_spatial) do k
+        @inbounds begin
+            fz_val = T(0)
+            @simd for c in 1:D
+                fz_val += T(F - (c - 1)) * abs2(Pmf[k, c])
+            end
+            fxy_re = T(0)
+            fxy_im = T(0)
+            @simd for c in 2:D
+                pc_m1 = Pmf[k, c - 1]
+                pc = Pmf[k, c]
+                prod = conj(pc_m1) * pc
+                coef = fp_coeffs[c]
+                fxy_re += coef * real(prod)
+                fxy_im += coef * imag(prod)
+            end
+            px = c1_t * fxy_re
+            py = c1_t * fxy_im
+            pz = c1_t * fz_val
+            pm_sq = px * px + py * py + pz * pz
+            pm = sqrt(pm_sq)
+            if pm < T(1e-100)
+                alpha[k] = T(0)
+                beta[k] = T(0)
+                theta[k] = T(0)
+            else
+                alpha[k] = atan(py, px)
+                cb = pz / pm
+                cb = cb > one(T) ? one(T) : (cb < -one(T) ? -one(T) : cb)
+                beta[k] = acos(cb)
+                theta[k] = pm * dt_t
+            end
         end
     end
 
     # `_apply_euler_spin_rotation` skips per-voxel when phi·dt < 1e-14;
     # mirror that here at the call level so polar / vacuum states pay
     # only the pre-pass cost (~150 μs at 16³) instead of running four
-    # gemms over a zero phase field.
-    max_theta_sq < T(1e-28) && return nothing
+    # gemms over a zero phase field. θ = |c₁⟨F⟩|·dt ≥ 0 everywhere, so
+    # max θ² is (max θ)² — the same number the in-loop accumulator held.
+    max_theta = maximum(theta)
+    max_theta * max_theta < T(1e-28) && return nothing
 
     if imaginary_time
         _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,

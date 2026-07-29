@@ -103,6 +103,7 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",
@@ -413,6 +414,11 @@ const FULL_EXTRA = [
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    # Bit-identity of the zero-padded DDI layout against the contiguous one, for
+    # both the fused spin-density corner write and the rotation's in-place read
+    # of a padded Φ. Padding is the DEFAULT since 9c117c05, so this is the
+    # production layout; no-op on CPU-only CI.
+    "gpu/test_gpu_padded_corner_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
