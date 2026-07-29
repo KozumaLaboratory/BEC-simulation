@@ -27,7 +27,11 @@ set -euo pipefail
 
 PROJECT_ROOT=${SPINORBEC_TSUBAME_PROJECT_ROOT:?set SPINORBEC_TSUBAME_PROJECT_ROOT}
 TIER=${SBEC_TIER:-ci}
-WORKERS=${SBEC_WORKERS:-auto}
+# NOT `auto`. `auto` = one worker per core, and a TSUBAME node reports 384 of
+# them; each worker is an independent julia process that loads SpinorBEC + CUDA
+# (~1-2 GB), so `auto` asked for ~500 GB and the job was OOM-killed with nothing
+# but "Killed" in the log. Memory, not cores, is the binding resource here.
+WORKERS=${SBEC_WORKERS:-12}
 OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-$HOME/runs}/tests
 mkdir -p "$OUT_DIR"
 cd "$PROJECT_ROOT"
@@ -51,8 +55,21 @@ echo "[sbec_tier] host=$(hostname)  tier=${TIER}  workers=${WORKERS}"
 echo "[sbec_tier] HEAD=$(git rev-parse --short HEAD)  $(git log -1 --format=%s)"
 git status --porcelain | head -20
 
+set +e
 SPINORBEC_TEST_TIER="$TIER" SPINORBEC_TEST_WORKERS="$WORKERS" \
     "$JULIA" --project=. -e 'using Pkg; Pkg.test()' \
-    2>&1 | tee "$OUT_DIR/tier_${TIER}.out"
+    > "$OUT_DIR/tier_${TIER}.out" 2>&1
+status=$?
+set -e
+tail -40 "$OUT_DIR/tier_${TIER}.out"
 
-echo "[sbec_tier] done"
+# Say the verdict in the log. The first attempt was OOM-killed and the script
+# still printed "done", because the failure was inside a pipeline and got lost;
+# a test job that cannot report its own failure is worse than no test job.
+if [ $status -eq 0 ]; then
+    echo "[sbec_tier] PASS  (tier=${TIER})"
+else
+    echo "[sbec_tier] FAIL  (tier=${TIER}, exit=${status})"
+    [ $status -eq 137 ] && echo "[sbec_tier] exit 137 = SIGKILL, almost certainly OOM — lower SBEC_WORKERS"
+fi
+exit $status
