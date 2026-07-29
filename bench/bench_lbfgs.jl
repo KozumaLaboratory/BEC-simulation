@@ -49,7 +49,11 @@ function build_cell(; n::Int, enable_ddi::Bool)
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
         enable_ddi, c_dd=enable_ddi ? EU_c_dd : NaN,
         backend=BACKEND,
-        initial_state=:ferromagnetic,
+        # `:m_plus_F`, not `:ferromagnetic` — the latter is not a state the
+        # `init_psi` dispatch knows (bench/eu151_setup.jl passes it and would
+        # throw too). With p > 0 the Zeeman term prefers m = +F, so this is the
+        # aligned, well-conditioned start.
+        initial_state=:m_plus_F,
         verbose=false,
     )
 end
