@@ -72,18 +72,21 @@ const SPIN_TAYLOR_RSAFE = Ref(1.0)
 """Degree ceiling. With the halving above it is never approached."""
 const SPIN_TAYLOR_RK_MAX = 40
 
-"""Smallest Horner degree the schedule may return.
+"""Upper clamp on the Horner degree. Defaults to no clamp.
 
-This is the constant that actually holds the accuracy criterion, which is why it
-has a name instead of being a literal in the loop. At production
-`R = |scale|·|v|·F ≈ 0.01–0.2` a degree of 2 already puts the truncation ~1e-5
-of the splitting error, so the schedule returns 2 for EVERY tolerance from
-1e-15 up to 1 and `SPIN_TAYLOR_TOL` never binds
-(bench/taylor_tolerance_sweep.jl). Lowering this is the only way to make the
-rotation the dominant error, which is exactly what
-`test_taylor_tolerance_criterion.jl` needs its positive control to do —
-otherwise that gate would assert something unreachable."""
-const SPIN_TAYLOR_MIN_DEGREE = Ref(2)
+Exists because the accuracy criterion needs a positive control and nothing else
+could provide one. `SPIN_TAYLOR_TOL` cannot degrade the rotation — the degree is
+floored at 2 and at production `R = |scale|·|v|·F ≈ 1e-5` the schedule returns 2
+for every tolerance over ten decades. Neither can the floor: measured, an
+order-1 rotation is still ~1e-8 relative, four orders inside the splitting
+error. The rotation is simply nowhere near binding, and the only way to make the
+observable notice it is to REMOVE it — `cap = 0` skips the Horner loop entirely,
+leaving ψ untouched.
+
+That is the honest control for "this approximation is negligible": show that the
+observable moves when the operator is absent. If it does not, the claim was
+vacuous. See `test/hamiltonian/test_taylor_tolerance_criterion.jl`."""
+const SPIN_TAYLOR_DEGREE_CAP = Ref(SPIN_TAYLOR_RK_MAX)
 
 """
     spin_tridiag_bands(sm, ::Type{T}) -> (mz, sxu, syu)
@@ -138,11 +141,12 @@ end
 
 This voxel's angle halving `h = 2^-sh` and Horner degree `kv`, from
 `g = |v|²F²`. Both tests run on SQUARES so no `sqrt` is needed:
-`(R/2^sh/k)² = (rk[k]·h)²·g`. `kmin` is the degree floor — see
-[`SPIN_TAYLOR_MIN_DEGREE`](@ref).
+`(R/2^sh/k)² = (rk[k]·h)²·g`. `cap` clamps the result from above — see
+[`SPIN_TAYLOR_DEGREE_CAP`](@ref); it exists for the accuracy gate's positive
+control and is unclamped in production.
 """
 @inline function _taylor_rot_schedule(
-    g::T, rk, K::Int, tol2::T, rsafe2::T, kmin::Int=SPIN_TAYLOR_MIN_DEGREE[]
+    g::T, rk, K::Int, tol2::T, rsafe2::T, cap::Int=SPIN_TAYLOR_DEGREE_CAP[]
 ) where {T}
     scale1 = @inbounds rk[1]          # rk[1] = scale ⇒ r2 starts as R²
     r2 = scale1 * scale1 * g
@@ -163,13 +167,13 @@ This voxel's angle halving `h = 2^-sh` and Horner degree `kv`, from
     while kk < K
         a = @inbounds rk[kk]
         u *= a * a * gh
-        if kk >= kmin && u <= tol2
+        if kk >= 2 && u <= tol2
             kv = kk
             break
         end
         kk += 1
     end
-    (h, sh, kv)
+    (h, sh, min(kv, cap))
 end
 
 # `scale / k` for k = 1…K, cached per (eltype, scale). Two FP64 divisions per

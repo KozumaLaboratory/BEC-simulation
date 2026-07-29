@@ -186,7 +186,7 @@ end
 # full-warp mask, so the two voxels sharing a warp must execute the same trip
 # count or the `shfl_sync` deadlocks; neighbouring voxels pick near-identical
 # values, so rounding up costs almost nothing.
-@inline function _rot_schedule(g::T, rk, K::Int32, tol2, rsafe2, kmin::Int32) where {T}
+@inline function _rot_schedule(g::T, rk, K::Int32, tol2, rsafe2, cap::Int32) where {T}
     scale1 = @inbounds rk[1]        # rk[1] = scale ⇒ r2 starts as R²
     r2 = scale1 * scale1 * g
     sh = zero(Int32)
@@ -207,13 +207,13 @@ end
     while kk < K
         a = @inbounds rk[kk]
         u *= a * a * gh
-        if kk >= kmin && u <= tol2
+        if kk >= Int32(2) && u <= tol2
             kv = kk
             break
         end
         kk += one(Int32)
     end
-    (h, sh, max(kv, CUDA.shfl_xor_sync(0xffffffff, kv, 16)))
+    (h, sh, min(max(kv, CUDA.shfl_xor_sync(0xffffffff, kv, 16)), cap))
 end
 
 # `w ← exp(z·A) w`. The halving `h` is folded ONCE into the generator rather
@@ -263,7 +263,7 @@ end
 end
 
 @inline function _spin_taylor_warp_kernel!(
-    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, kmin::Int32,
+    P, vx, vy, vz, mz, sxu, syu, rk, K::Int32, tol2, F2, rsafe2, cap::Int32,
     ::Val{D}, ::Val{RT}, src,
 ) where {D, RT}
     T = real(eltype(P))
@@ -282,7 +282,7 @@ end
     Vz = in_range ? (@inbounds vz[j]) : zero(T)
 
     diag_c, b_c, bmc, g = _rot_generator(Vx, Vy, Vz, mz, sxu, syu, c, cdn, F2, Val(16))
-    h, sh, kv = _rot_schedule(g, rk, K, tol2, rsafe2, kmin)
+    h, sh, kv = _rot_schedule(g, rk, K, tol2, rsafe2, cap)
 
     psi0 = live ? (@inbounds P[vox, c]) : zero(CT)
     w = _horner_rot(psi0, diag_c, b_c, bmc, c, cdn, rk, kv, h, sh, Val(16), Val(RT))
@@ -314,7 +314,7 @@ function _apply_spin_rotation_taylor!(
     rsafe2 = T(SPIN_TAYLOR_RSAFE[])^2
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
         P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(SPIN_TAYLOR_RK_MAX),
-        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_MIN_DEGREE[]),
+        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_DEGREE_CAP[]),
         Val(D), Val(!imaginary_time), src_idx)
     nothing
 end

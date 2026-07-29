@@ -11,16 +11,25 @@
 # dt = 0.002): baseline |E(dt) − E(dt/2)| = 7.6e-3, truncation 2.4e-13 — a ratio
 # of 3e-11.
 #
-# WHY THE CONTROL IS NOT A LOOSENED `tol`. That was the first attempt, and it
-# cannot breach. The degree is floored at 2, so at production
-# `R = dt·|v|·F ≈ 0.01–0.2` the schedule returns degree 2 for every tolerance
-# from 1e-15 up to 1 — the sweep measures the same mean degree 2.00 at tol 1e-5
-# and 1e-7 — and that floor alone leaves the truncation at 3.3e-5 of the
-# baseline, which passes. The criterion is held by the DEGREE FLOOR, not by the
-# tolerance, which is why that floor is now a named constant
-# (`SPIN_TAYLOR_MIN_DEGREE`) rather than a literal in the schedule. The control
-# lowers it to 1 — same pipeline, same observable, same code path, one order
-# less.
+# FINDING THE CONTROL TOOK TWO WRONG GUESSES, AND THAT IS THE POINT.
+#
+#   1. Loosen `SPIN_TAYLOR_TOL`. Cannot breach: the degree is floored at 2, and
+#      at production `R = |scale|·|v|·F ≈ 1e-5` the schedule returns 2 for every
+#      tolerance over ten decades — the sweep measures the same mean degree 2.00
+#      at tol 1e-5 and 1e-7.
+#   2. Lower the degree floor to 1. Also cannot breach: an order-1 rotation is
+#      still ~1e-8 relative, four orders inside the splitting error. So the
+#      criterion is NOT held by the floor either, which is what I had claimed.
+#
+# What actually holds it is that `R` is tiny — the rotation is nowhere near the
+# binding error at any order ≥ 1. The only control left is to REMOVE the
+# operator: `SPIN_TAYLOR_DEGREE_CAP[] = 0` skips the Horner loop, leaving ψ
+# untouched. That is also the honest general form of the question — show the
+# observable moves when the operator is absent, or "negligible" meant nothing.
+#
+# Both wrong guesses would have shipped as green gates asserting nothing. They
+# were caught because `NegligibleErrorSpec` returns `:indeterminate`, not
+# `:pass`, when the control fails to breach.
 #
 # HOW FAR THE MARGIN REACHES. The ratio is not scale-free: the baseline falls as
 # dt² while the truncation accumulates over ~1/dt rotations, so the ratio grows
@@ -33,7 +42,7 @@
 using Test
 
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_MIN_DEGREE,
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP,
     NegligibleErrorSpec, measure_error_budget, check, passed,
     _taylor_rot_schedule, _cpu_spin_rk
 
@@ -47,14 +56,15 @@ function _with_taylor(f, on::Bool)
     end
 end
 
-# Run `f` with the Horner degree floor forced to `k`.
-function _with_min_degree(f, k::Int)
-    old = SPIN_TAYLOR_MIN_DEGREE[]
-    SPIN_TAYLOR_MIN_DEGREE[] = k
+# Run `f` with the Horner degree clamped from above. `k = 0` removes the
+# rotation entirely.
+function _with_degree_cap(f, k::Int)
+    old = SPIN_TAYLOR_DEGREE_CAP[]
+    SPIN_TAYLOR_DEGREE_CAP[] = k
     try
         f()
     finally
-        SPIN_TAYLOR_MIN_DEGREE[] = old
+        SPIN_TAYLOR_DEGREE_CAP[] = old
     end
 end
 
@@ -85,16 +95,16 @@ end
         approx=() -> _with_taylor(true) do
             _energy(DT, NST)
         end,
-        # Same pipeline and same observable, one order less: the floor that
-        # actually holds the criterion, lowered.
+        # Same pipeline, same observable, operator removed. Two weaker
+        # controls were tried first and neither could breach — see the header.
         control=() -> _with_taylor(true) do
-            _with_min_degree(1) do
+            _with_degree_cap(0) do
                 _energy(DT, NST)
             end
         end,
         baseline_label="splitting error, dt vs dt/2",
         approximation_label="Taylor truncation",
-        control_label="degree floor lowered to 1",
+        control_label="rotation removed (degree cap 0)",
     )
 
     result = check(NegligibleErrorSpec(1e-3), budget)
@@ -103,12 +113,14 @@ end
     # cannot breach is not a green result here, it is a refusal to judge.
     @test passed(result)
 
-    # The degree floor is what holds the criterion, so pin it directly.
-    @testset "the schedule never returns a degree below 2" begin
+    # The floor is not what holds the criterion, but it IS what makes `tol`
+    # unable to degrade the rotation — the reason guess (1) failed. Pin it so
+    # that fact stays true and the header stays honest.
+    @testset "tol cannot drive the degree below 2" begin
         rk = _cpu_spin_rk(Float64, DT)
         for g in (0.0, 1e-8, 1.0, 1e4), tol in (1e-15, 1e-5, 1.0)
             _, _, kv = _taylor_rot_schedule(g, rk, SPIN_TAYLOR_RK_MAX, tol^2, 1.0)
-            @test kv >= SPIN_TAYLOR_MIN_DEGREE[]
+            @test kv >= 2
         end
     end
 end
