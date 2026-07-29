@@ -124,7 +124,10 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     E_coriolis =
         (SpinorBEC.is_active(Ω, SpinorBEC.ROTATION_TOL) && N >= 2) ?
         op_energy(cor_t, 1.0) : 0.0
-    E_mg = op_energy(mg_t, 1.0)
+    # Gated like every other optional term: `op_energy` costs a fill, a full
+    # apply, a dot and an accumulate even when the term's own gate-first check
+    # makes it a no-op, and magnetic_gradient is absent in most configs.
+    E_mg = ws.magnetic_gradient !== nothing ? op_energy(mg_t, 1.0) : 0.0
 
     # Gradient-blind terms — Tensor (scalar-loop) + Raman (no-op grad):
     # host helpers behind a single ψ→host copy, only when active.
