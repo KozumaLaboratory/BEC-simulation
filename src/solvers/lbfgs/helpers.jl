@@ -1,12 +1,16 @@
 # L-BFGS internal helpers: Sobolev preconditioner + 2-loop direction
 # update + line search.
 
-# Scratch buffers for LBFGS direction update + line search, backed by the
-# shared scratch registry. Avoids per-iteration allocations that
-# accumulated to GB-scale CUDA pool pressure during long LBFGS runs on GPU.
+# Scratch buffers for LBFGS direction update + line search + the curvature
+# pair (s_k, y_k), backed by the shared scratch registry. Avoids
+# per-iteration allocations that accumulated to GB-scale CUDA pool pressure
+# during long LBFGS runs on GPU.
 function _lbfgs_scratch(template)
     scratch_get!(:lbfgs, (typeof(template), size(template))) do
-        (q=similar(template), psi_trial=similar(template))
+        (
+            q=similar(template), psi_trial=similar(template),
+            s_k=similar(template), y_k=similar(template),
+        )
     end
 end
 
@@ -17,18 +21,11 @@ function _sobolev_precondition!(
     alpha::Float64,
 ) where {N}
     alpha > 0 || return grad
-    n_pts = ntuple(d -> size(grad, d), Val(N))
-    n_comp = ws.spin_matrices.system.n_components
-    fft_buf = ws.state.fft_buf
-    @inbounds for c in 1:n_comp
-        idx = _component_slice(N, n_pts, c)
-        fft_buf .= view(grad, idx...)
-        ws.fft_plans.forward * fft_buf
-        fft_buf ./= (1 .+ alpha .* k_squared_dev)
-        ws.fft_plans.inverse * fft_buf
-        view(grad, idx...) .= fft_buf
-    end
-    grad
+    α = real(eltype(k_squared_dev))(alpha)
+    filt = cached_kspace_filter(
+        k_squared_dev, :sobolev_precond, alpha, k2 -> inv(one(α) + α * k2)
+    )
+    return batched_kspace_filter!(grad, ws, filt)
 end
 
 """
@@ -66,7 +63,11 @@ function _lbfgs_direction(
     end
 
     if m > 0
-        ys = real(dot(y_hist[end], s_hist[end]))
+        # ⟨s,y⟩ is already stored: `rho_hist[i] = 1/(⟨s_i,y_i⟩·dV)` by
+        # construction in the driver (and in the warm-start contract), so
+        # recomputing the dot product was a full extra pass over two
+        # ψ-sized arrays for a number we had.
+        ys = 1.0 / (rho_hist[end] * dV)
         yy = real(sum(abs2, y_hist[end]))
         γ = ys / max(yy, 1e-30)
         q .*= γ
@@ -100,6 +101,11 @@ decrease test `E(α) < E0`, preserving the old manifold-safe behaviour.
 `expand=true` (used for the steepest-descent step, whose scale is unknown)
 permits a bounded doubling phase when `α = 1` already decreases, so the first
 unscaled step auto-finds its scale instead of being stuck at the Newton length.
+
+Returns `(α, E, psi_accepted)`. `psi_accepted` is the retracted iterate at the
+accepted `α` (scratch-backed, valid until the next line search) so the driver
+does not have to redo the step + retraction it already computed here. On
+failure (`α = 0`) it is the untouched `psi`.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
@@ -112,15 +118,21 @@ function _line_search_energy_decrease(
     N_dim = length(grid.config.n_points)
     psi_trial = _lbfgs_scratch(psi).psi_trial
 
-    eval_energy = function (α)
+    # Retraction alone. Split out from the energy so the expansion phase can
+    # re-place the iterate at its best α without paying a second full energy
+    # evaluation for a number it already has.
+    retract! = function (α)
         psi_trial .= psi .+ α .* direction
-        # Retraction: normalize back to manifold
         norm_sq = sum(abs2, psi_trial) * dV
         psi_trial ./= sqrt(norm_sq)
         if target_Mz !== nothing
             _normalize_psi_constrained!(psi_trial, grid, D, N_dim, target_Mz, F)
         end
         copyto!(ws.state.psi, psi_trial)
+        nothing
+    end
+    eval_energy = function (α)
+        retract!(α)
         total_energy(ws)
     end
 
@@ -135,16 +147,22 @@ function _line_search_energy_decrease(
         # the local minimiser along the ray (steepest-descent scale finding).
         if expand
             best_α, best_E = α, E_trial
+            last_α = α
             for _ in 1:max_expand
                 α2 = best_α * grow
                 E2 = eval_energy(α2)
+                last_α = α2
                 (E2 < best_E && accept(α2, E2)) || break
                 best_α, best_E = α2, E2
             end
-            best_α == α || eval_energy(best_α)  # leave ws.state.psi at best
-            return best_α, best_E
+            # Re-place the iterate at `best_α` whenever the LAST evaluation was
+            # somewhere else — including the case `best_α == α_init` with a
+            # rejected trial doubling, which the earlier `best_α == α` guard
+            # missed and which left the returned ψ at the rejected step.
+            last_α == best_α || retract!(best_α)
+            return best_α, best_E, psi_trial
         end
-        return α, E_trial
+        return α, E_trial, psi_trial
     end
 
     # Backtracking from α_init.
@@ -152,9 +170,9 @@ function _line_search_energy_decrease(
         α *= shrink
         E_trial = eval_energy(α)
         if accept(α, E_trial)
-            return α, E_trial
+            return α, E_trial, psi_trial
         end
     end
     # No sufficient decrease found — return zero step.
-    (0.0, E0)
+    (0.0, E0, psi)
 end

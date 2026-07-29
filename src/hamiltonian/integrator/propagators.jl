@@ -631,6 +631,54 @@ function _make_batched_kinetic_cache(
     BatchedKineticCache(fwd, inv, kp_bc)
 end
 
+"""
+    batched_kspace_filter!(v, ws, filt_bc) → v
+
+In-place spectral filter over the SPATIAL dims of a full spinor array:
+`v ← F⁻¹(filt(k)·F(v))`, applied to all `D` components at once through the
+batched FFT plan pair in `ws.batched_kinetic`.
+
+Replaces the `copy slice → fft → scale → ifft → copy slice back` loop that
+four call sites had each grown independently (the Sobolev preconditioner and
+its forward metric, the combined `P_V^½ P_K P_V^½` preconditioner, and the
+LBFGS gradient's kinetic face). That form paid `2·D` slice copies and `2·D`
+single-transform plan calls per application; this one copies nothing and
+calls each plan once.
+
+`filt_bc` must be shaped `(n_pts..., 1)` (trailing singleton broadcasts over
+the spin components) and must carry the `1/prod(n_pts)` normalisation, since
+the batched inverse plan is the UNNORMALISED `bfft` — see
+`_make_batched_kinetic_cache`.
+"""
+function batched_kspace_filter!(v, ws, filt_bc)
+    bk = ws.batched_kinetic
+    bk.forward * v
+    v .*= filt_bc
+    bk.inverse * v
+    return v
+end
+
+"""
+    cached_kspace_filter(k2, category, param, f) → filt_bc
+
+`(n_pts..., 1)`-shaped spectral filter `f(k²)` with the inverse-FFT
+normalisation folded in, cached in the scratch registry under `category` and
+rebuilt only when `param` (whatever `f` closes over) changes. Sized and
+deviced from `k2`, so CPU and GPU callers get their own entry.
+"""
+function cached_kspace_filter(k2, category::Symbol, param, f::F) where {F}
+    st = scratch_get!(category, (typeof(k2), size(k2))) do
+        (arr=similar(k2, size(k2)..., 1), param=Ref{Any}(nothing))
+    end
+    if st.param[] != param
+        RT = real(eltype(k2))
+        inv_n = one(RT) / prod(size(k2))
+        st.arr .= inv_n .* f.(reshape(k2, size(k2)..., 1))
+        st.param[] = param
+    end
+    return st.arr
+end
+
 function _make_coriolis_cache(psi, backend::AbstractBackend=CPUBackend(); flags=FFTW.MEASURE)
     plan_buf = _similar(backend, psi)
     kw = _fft_kwargs(backend, flags)

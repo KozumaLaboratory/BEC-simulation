@@ -462,6 +462,7 @@ const FULL_EXTRA = [
     "solvers/test_ddi_strang_order.jl",               # DDI 2nd-order (midpoint MF)
     "solvers/test_yoshida_ddi_order.jl",              # DDI 4th-order (midpoint triple-jump)
     "solvers/test_lbfgs_sobolev_preconditioner.jl",
+    "solvers/test_lbfgs_fast_path_equivalence.jl",    # hot-path rewrites vs slow path
     "solvers/test_rtp_ddi_strang_save_every.jl",      # Bug-4 RTP regression pin
     "workflow/test_phase_diff_eval.jl",
     # BO-heavy tests: pure Julia (no SpinorBEC physics) but GP fitting is
@@ -609,6 +610,7 @@ const _COST = Dict{String, Float64}(
     "analysis/test_physics_invariants.jl" => 8.0,
     "solvers/test_simulation.jl" => 8.0,
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
+    "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
     "solvers/test_3d.jl" => 5.0,
