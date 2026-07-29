@@ -131,3 +131,58 @@ Grid note: FFT sizes are chosen with small prime factors. The previous round
 found `n=112` to be ~66× slower per step than `n=80` and abandoned fine grids as
 infeasible — `112 = 2⁴·7`, and that factor-7 transform is a large part of it.
 `96 = 2⁵·3` sits between the two in size and is FFT-friendly.
+
+## Results (2026-07-29)
+
+### Converged
+
+Production protocol, cell `plus`, dx-convergence at stir = 30:
+
+| dx | J_z at quench start | conversion ΔF_z | leak | leak/conv |
+|---|---|---|---|---|
+| 0.219 | 7.974 | 0.9925 | 0.6718 | 67.7% |
+| 0.175 | 8.502 | 1.0597 | 0.2863 | 27.0% |
+| **0.146** | **8.535** | **1.0658** | **0.2433** | **22.8%** |
+
+The last refinement moves the stir output +0.4% and the conversion +0.6%, so
+both are converged. **ΔF_z = 1.066 ħ/atom.**
+
+The controls are unaffected by the leak and were clean from the start:
+
+| cell | result |
+|---|---|
+| `zero` (static field, no rotation) | F_z ≡ 0 for all time |
+| `plus_nodd` (DDI off) | L_z ≡ 0, no conversion, leak 1.9e-10 |
+| `minus` | exact mirror of `plus` to all printed digits |
+
+### Not converged: the J_z leak, and why
+
+The leak stops scaling: −57% then only −15% for the same 1.2× refinement. The
+per-term torque budget on a **real** post-quench state (`torque_budget.jl`,
+which measures each term's violation of `[H, J_z] = 0` — exactly zero in the
+continuum) locates it:
+
+```
+   t |       DDI     kinetic  contact+LHY        SUM |   observed
+55.00 | +1.36e-03  -7.01e-03   -1.13e-04   -5.77e-03 | -4.55e-03
+80.00 | +4.71e-04  -2.84e-03   -9.64e-05   -2.46e-03 | -3.52e-03
+```
+
+The **sum matches the observed dJz/dt**, so the discretised Hamiltonian accounts
+for the leak — not the boundary, not the time stepping. And the **kinetic term
+dominates, ~5× the DDI**, which corrects an earlier reading that blamed the
+dipolar kernel (that scan had measured only the DDI term).
+
+`−∇²/2` is exact spectrally for a band-limited state, but `L_z` does not map the
+discrete k-grid onto itself, and the quench keeps regenerating structure at the
+Nyquist edge however fine the grid. Hence a leak that refinement cannot remove.
+
+### What this does and does not license
+
+Sound: the conversion value, the mechanism (DDI), the zero point, and the sign
+reversal. The leak is 23% of the signal but **does not track it** — it fell 64%
+across the series while the conversion moved 7% and then settled (`fig4`).
+
+Still open: whether dealiasing removes the residual, and whether any of it is
+boundary or dt after all. Predictions were recorded before those runs finished
+(PR #177): `box35` and `dt5e4` should barely move, `dealias` should help.
