@@ -194,6 +194,10 @@ const CI_EXTRA = [
     "solvers/test_checkpoint.jl",
     "solvers/test_itp_checkpoint_hook.jl",
     "solvers/test_itp_tol_drho.jl",
+    # In CI, not FULL, on purpose: every other L-BFGS test lives in FULL, so the
+    # solver's hot path had no gate that a `ci` run would trip. This one is a
+    # 12x12x8 F=1 problem — cheap enough to belong where it will actually run.
+    "solvers/test_lbfgs_fast_path_equivalence.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
@@ -462,7 +466,6 @@ const FULL_EXTRA = [
     "solvers/test_ddi_strang_order.jl",               # DDI 2nd-order (midpoint MF)
     "solvers/test_yoshida_ddi_order.jl",              # DDI 4th-order (midpoint triple-jump)
     "solvers/test_lbfgs_sobolev_preconditioner.jl",
-    "solvers/test_lbfgs_fast_path_equivalence.jl",    # hot-path rewrites vs slow path
     "solvers/test_rtp_ddi_strang_save_every.jl",      # Bug-4 RTP regression pin
     "workflow/test_phase_diff_eval.jl",
     # BO-heavy tests: pure Julia (no SpinorBEC physics) but GP fitting is
