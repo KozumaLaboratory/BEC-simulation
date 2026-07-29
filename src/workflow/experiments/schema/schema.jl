@@ -236,11 +236,12 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "secular" => FieldSpec(; type=Bool, default=false),
     "quasi_2d" => FieldSpec(; type=Bool, default=false),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
-    # Ronen spherical-truncation radius (Tier A): a number (physical R), or
-    # "auto"/"box_half" for half the smallest box extent.
+    # Ronen spherical-truncation radius (Tier A): a number (physical R),
+    # "auto"/"box_half" for the largest radius the padding admits, or
+    # "none"/"off" for the bare periodic kernel. Defaults to auto.
     "trunc_radius" => FieldSpec(; type=Union{Number, String}),
     # Tier B: zero-padded, image-free convolution + optional anisotropic pad.
-    "padded" => FieldSpec(; type=Bool, default=false),
+    "padded" => FieldSpec(; type=Bool, default=true),   # was false, flipped 2026-07-29
     "pad_factor" => FieldSpec(; type=Union{Number, Vector}),
 )
 

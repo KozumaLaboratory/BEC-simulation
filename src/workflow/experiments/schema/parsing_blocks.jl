@@ -390,6 +390,14 @@ function _parse_gs_interactions(inter::Dict, atom)
     end
 end
 
+# Single declaration of the DDI image-handling defaults. Both the ground_state
+# parser and the dynamics step read these — the two used to carry independent
+# literals and disagreed, which is how a padded GS could feed bare-kernel
+# dynamics. `FieldSpec.default` in schema.jl is documentation only (nothing
+# reads that field), so these constants are the behaviour.
+const DDI_TRUNC_RADIUS_DEFAULT = -1.0   # make_workspace sentinel: ≤ 0 ⇒ auto
+const DDI_PADDED_DEFAULT = true
+
 """
     _parse_gs_ddi(ddi_d, inter, atom)
         -> (enabled, c_dd, secular, quasi_2d, l_z, trunc_radius, padded, pad_factor)
@@ -402,10 +410,20 @@ or pass an explicit user value here. Opt-outs: `ddi: false` or
 be derived, so DDI ends up off too.
 
 `trunc_radius` (Ronen spherical-cutoff radius) is a `Float64` sentinel for
-`make_workspace`: `NaN` = off (default), `≤ 0` = auto, `> 0` = explicit R.
-`padded` (Bool) enables the zero-padded, image-free convolution (Tier B);
-`pad_factor` (a number or per-axis vector) sets the zero-pad multiple
-(default `2`; smaller on thin axes for anisotropic padding).
+`make_workspace`: `≤ 0` = auto (default), `> 0` = explicit R, `NaN` = off
+(`trunc_radius: none`). `padded` (Bool, default `true`) enables the
+zero-padded, image-free convolution (Tier B); `pad_factor` (a number or
+per-axis vector) sets the zero-pad multiple (default `2`; smaller on thin
+axes for anisotropic padding).
+
+Cutoff and padding both default ON as of 2026-07-29. They are not
+independent knobs: the cutoff alone fixes rotation covariance by ~1000x
+(J_z violation 1.9e-2 → 1.7e-5) while leaving the field magnitude
+essentially untouched (2.1e-2 → 2.0e-2), because the periodic images are
+still there. It is the PADDING that removes them. Cost at D=13 is 1.2–1.4x
+per DDI step (the step is dominated by the spin density and the Euler
+rotation on the unpadded grid, not by the 6 FFTs) plus the padded context:
+~290 MB at 64³, ~975 MB at 96³.
 """
 function _parse_gs_ddi(ddi_d, inter, atom)
     if ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
@@ -429,7 +447,7 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
     trunc = _parse_ddi_trunc_radius(get(ddi_d, "trunc_radius", nothing))
-    padded = Bool(get(ddi_d, "padded", false))
+    padded = Bool(get(ddi_d, "padded", DDI_PADDED_DEFAULT))
     pad_factor = _parse_ddi_pad_factor(get(ddi_d, "pad_factor", nothing))
     (enabled, c_dd, secular, q2d, lz, trunc, padded, pad_factor)
 end
@@ -438,15 +456,27 @@ end
     _parse_ddi_trunc_radius(raw) -> Float64
 
 Map a YAML `ddi.trunc_radius` value to the `make_workspace` sentinel:
-`nothing` ⇒ `NaN` (off); `"auto"`/`"box_half"` ⇒ `-1.0` (auto); a number ⇒
-that value.
+absent ⇒ `-1.0` (auto); `"auto"`/`"box_half"` ⇒ `-1.0`; `"none"`/`"off"` ⇒
+`NaN` (the bare periodic kernel); a number ⇒ that value.
+
+Absent used to mean OFF. Measured 2026-07-29 (`scripts/ddi_cutoff_geometry_jz_probe.jl`):
+the bare periodic kernel carries a 2.1e-2 … 4.7e-2 dipolar field error against
+free space, and the error is FLAT in resolution — 1.91e-2 at 32³, 48³ and 64³
+alike — so no amount of grid refinement touches it. `"none"` keeps the old
+behaviour for anyone who needs to reproduce a pre-flip run.
 """
 function _parse_ddi_trunc_radius(raw)
-    raw === nothing && return NaN
+    raw === nothing && return DDI_TRUNC_RADIUS_DEFAULT
     if raw isa AbstractString
         s = lowercase(strip(raw))
         (s == "auto" || s == "box_half") && return -1.0
-        throw(ArgumentError("ddi.trunc_radius string must be \"auto\"/\"box_half\", got \"$raw\""))
+        (s == "none" || s == "off") && return NaN
+        throw(
+            ArgumentError(
+                "ddi.trunc_radius string must be " *
+                "\"auto\"/\"box_half\"/\"none\"/\"off\", got \"$raw\"",
+            ),
+        )
     end
     Float64(raw)
 end
