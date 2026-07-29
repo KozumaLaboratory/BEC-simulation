@@ -103,6 +103,16 @@ function _analyze_vortex_density_movie(psi, grid, atom, params, ws_prev,
             out["phase_" * key] = Float32.(phase2d)
             out["dens_mid_" * key] = Float32.(dens2d)
 
+            # SIDE view: column along the first in-plane axis, so the axis the
+            # DDI elongates is on screen. The top view integrates ALONG that
+            # axis and is a circular blob however prolate the cloud is —
+            # measured z/x = 1.42 on the Eu ground state, invisible there.
+            out["n_side_" * key] = Float32.(
+                dropdims(sum(n_total; dims=plane[1]); dims=plane[1]))
+            # Mid-plane TOTAL density: a vortex core is a hole in THIS, not in
+            # one component's slice.
+            out["n_mid_" * key] = Float32.(selectdim(n_total, axis, mid))
+
             # THE vortex trace: circulation of the total mass current.
             n_mid = selectdim(n_total, axis, mid)
             psi_mid = selectdim(frame, axis, mid)
@@ -157,6 +167,9 @@ function _analyze_vortex_density_movie(psi, grid, atom, params, ws_prev,
         "plane_axes" => plane,
         "spacing" => [spacing[1], spacing[2]],
         "extent" => [grid.config.box_size[plane[1]], grid.config.box_size[plane[2]]],
+        # (in-plane axis 2, view axis) — the side view's own extent, which is
+        # NOT square once the cloud is elongated along the view axis.
+        "side_extent" => [grid.config.box_size[plane[2]], grid.config.box_size[axis]],
         "archive" => basename(archive_path),
     )
     open(manifest_path, "w") do io
