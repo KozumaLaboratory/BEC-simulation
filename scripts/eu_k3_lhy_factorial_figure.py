@@ -34,10 +34,14 @@ src = sys.argv[1] if len(sys.argv) > 1 else "runs/eu_k3_lhy_control/factorial_2x
 out = sys.argv[2] if len(sys.argv) > 2 else "docs/validation/figures/fig4_lhy_model_interference.png"
 
 rows = json.load(open(src))["rows"]
-MODELS = ["off", "scalar", "polar_contact", "icosa"]
+MODELS = ["off", "scalar", "polar_contact", "full_bdg"]
 K3S = [0, 200]
+# `icosa` was dropped, not renamed: `IcosahedralLHY` returns NaN at c1 < 0 (the
+# sign these configs use) since 2026-07-30, so those rows were measured in a
+# regime current main refuses. `full_bdg` is the general-spinor path and is valid
+# there.
 LBL = {"off": "no LHY", "scalar": "scalar", "polar_contact": "polar\ncontact",
-       "icosa": "icosa\n($I_h$)"}
+       "full_bdg": "full BdG"}
 # Categorical, colour-blind-safe; `off` deliberately grey — it is the control.
 COL = {0: "#4C72B0", 200: "#C44E52"}
 
