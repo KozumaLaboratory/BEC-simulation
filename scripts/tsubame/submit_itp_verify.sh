@@ -3,8 +3,8 @@
 #$ -l cpu_4=1
 #$ -l h_rt=0:40:00
 #$ -N itp_verify
-#$ -o /gs/bs/work/7/uk07267/logs/
-#$ -e /gs/bs/work/7/uk07267/logs/
+#$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
+#$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #
 # Correctness gates for the ITP hot path, then the CPU breakdown. Run this on
 # the optimised worktree; compare the breakdown against the baseline worktree's.
@@ -16,7 +16,7 @@ export JULIA_DEPOT_PATH="$HOME/.julia"
 export JULIA_NUM_THREADS="${NSLOTS:-4}"
 
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
-cd "${SPINORBEC_BENCH_ROOT:-/gs/bs/work/7/uk07267/bec-perf-itp}"
+cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-perf-itp}"
 
 echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
 echo "threads=$JULIA_NUM_THREADS"

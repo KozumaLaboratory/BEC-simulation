@@ -3,8 +3,8 @@
 #$ -l gpu_1=1
 #$ -l h_rt=0:12:00
 #$ -N gpu_gates
-#$ -o /gs/bs/work/7/uk07267/logs/
-#$ -e /gs/bs/work/7/uk07267/logs/
+#$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
+#$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #
 # GPU-only gates for the DDI / spin-rotation hot path. Nothing on a CPU node
 # exercises these kernels, so a green `ci` tier says nothing about them.
@@ -17,7 +17,7 @@ export JULIA_NUM_THREADS="${NSLOTS:-8}"
 module load cuda/12.6 2>/dev/null || module load cuda 2>/dev/null || true
 
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
-cd "${SPINORBEC_BENCH_ROOT:-/gs/bs/work/7/uk07267/bec-perf-itp}"
+cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-perf-itp}"
 
 echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
 nvidia-smi --query-gpu=name --format=csv,noheader || true
