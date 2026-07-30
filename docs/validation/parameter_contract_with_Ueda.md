@@ -498,6 +498,26 @@ largely common to the numerator and the total. And since the brightest spot
 *up* at the dip — which is the direction that makes the measured dip shallower
 than truth, not deeper.
 
+`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values (UGE 8304841
+task 5, commit `0e78456e`, exit 0, 135 points):
+
+| `K₃` [cm⁶/s] | atom loss at 5 ms, over −12.5 … +9 nT | dip centre | width |
+|---|---|---|---|
+| 1.2×10⁻²⁹ (Miyazawa 2021 direct) | **0.27 – 0.44 %** | −2.146 | 14.63 |
+| 3.6×10⁻²⁹ (3×) | 0.80 – 1.31 % | −2.161 | 14.08 |
+| 1.2×10⁻²⁸ (10×, above anything measured) | 2.61 – 4.25 % | −2.213 | 14.07 |
+| *their own Fig. S3 lifetime implies* | **0.20 %** | — | — |
+
+The published-`K₃` arm lands on the physically right answer — 0.27–0.44 %
+against the 0.20 % their S3 trap lifetime implies. There was never a 45 % for a
+loss model to reproduce. **The ladder still earned its keep**: over a 10× range
+in `K₃` the dip centre moves 0.07 nT and the width 0.6 nT, so loss cannot be
+tuned to close the gap with their curve either.
+
+(The first scan point is anomalous again — 4.2 % loss and an off-trend
+population at −13 nT where every other field gives 0.27 % — the same
+first-point-of-a-scan defect. It is excluded from the ranges above.)
+
 #### Fig. 2C — the loss-free time series
 
 Single field (2.6 nT), 40 ms, 32³, against `dataset_fig2_theo`:
