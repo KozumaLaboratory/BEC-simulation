@@ -47,6 +47,10 @@ const FAST_TESTS = [
     "workflow/validation/test_observable_dispatch.jl",
     "workflow/validation/test_open_result.jl",
     "workflow/validation/test_specs_and_check.jl",
+    # The accuracy-knob registry: every entry a real knob, the reference switch
+    # moves and restores all of them (including on exception), and the report
+    # names the per-run knobs it does NOT set.
+    "workflow/validation/test_accuracy_knobs.jl",
     "workflow/validation/test_save_operator_rhs.jl",
     "workflow/validation/test_show.jl",
     "workflow/validation/test_twin_audit.jl",
