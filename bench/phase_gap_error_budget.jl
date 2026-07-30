@@ -32,24 +32,47 @@
 # reports how far apart its two converged states actually are, and a gap quoted
 # without that number should not be believed.
 #
-#   julia --project=. bench/phase_gap_error_budget.jl [n] [steps]
+# v2 (2026-07-30). The first run answered nothing and said so: the arms were not
+# converged (the dt/2 arm disagreed with the reference by 100×) and the
+# degeneracy guard fired — two seeds relaxing to the same state, whose "gap" is a
+# measure of nothing. Both are fixed here:
+#
+#   * each arm runs to its OWN fixed point (`tol` > 0, generous step cap) and
+#     reports `converged` / `last_step`. A gap between unconverged runs is a gap
+#     between two arbitrary points on two trajectories.
+#   * states are classified by the per-component WINDING VECTOR — the observable
+#     the claims actually rest on — and a gap is only reported when the two seeds
+#     land in DIFFERENT classes. Same-class rows are printed as "no gap here",
+#     which is information, not a failure.
+#
+#   julia --project=. bench/phase_gap_error_budget.jl [n] [max_steps]
 
 using Printf
 import CUDA
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP, spin_density_vector
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP, spin_density_vector,
+    _winding_vector
 using LinearAlgebra: norm
 
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
-const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 24
-const N_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 4000
+const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
+const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 30000
+const ITP_TOL = 1.0e-9
+# The DENSITY-based, gauge-invariant convergence gate. A texture carries a gauge
+# orbit — a global U(1) phase and a spin rotation about z — that leaves ρ and the
+# energy's physical content alone but keeps `dE/|E|` moving, which is why
+# `tol_drho` exists at all. v2 used `tol` only and every one of 16 arms reported
+# `converged = false` after 30000 steps at 32³, so nothing it measured was a gap.
+const ITP_TOL_DRHO = 1.0e-7
 const SEEDS = (:flower, :chiral_spin_vortex)
 
 grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
 
-"ITP from one seed. Returns (E, Fz field) so the caller can check the two states differ."
-function relax(; seed::Symbol, B::Float64, kind, dt, n_steps, taylor::Bool, cap::Int)
+"""ITP from one seed, run to its OWN fixed point. Returns the energy, the
+convergence state (a gap between unconverged runs means nothing) and the
+per-component winding vector that classifies the state."""
+function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
     old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP[]
     SPIN_TAYLOR_ENABLED[] = taylor
     SPIN_TAYLOR_DEGREE_CAP[] = cap
@@ -60,25 +83,44 @@ function relax(; seed::Symbol, B::Float64, kind, dt, n_steps, taylor::Bool, cap:
             grid, atom=Eu151, interactions=eu_interaction_params(0.05),
             zeeman=ZeemanParams(linear_zeeman_p(Eu151, B, EU_ω_ref), 0.0),
             potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
-            dt, n_steps, tol=0.0, save_every=max(1, n_steps ÷ 2),
+            dt, n_steps=MAX_STEPS, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO,
+            save_every=200,
             enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
             spinor_lhy=kind, backend=CUDABackend(), verbose=false,
         )
         psi_h = Array(gs.workspace.state.psi)
         _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
-        (E=gs.energy, fz=fz)
+        w = _winding_vector(psi_h, gs.workspace.grid, 13)
+        (E=gs.energy, fz=fz, converged=gs.converged,
+            # The final dE VALUE, not just the boolean. Without it "not
+            # converged" cannot be told apart from "converged, but this
+            # criterion never fires" — which is the whole question when a gauge
+            # orbit is in play.
+            dE_final=hasproperty(gs, :dE) ? gs.dE : NaN,
+            steps=hasproperty(gs, :last_step) ? gs.last_step : -1,
+            wind=w)
     finally
         SPIN_TAYLOR_ENABLED[] = old_t
         SPIN_TAYLOR_DEGREE_CAP[] = old_c
     end
 end
 
-"ΔE between the two seeds at one B, plus how distinguishable the two states are."
-function gap(; B, kind, dt, n_steps, taylor, cap)
-    a = relax(; seed=SEEDS[1], B, kind, dt, n_steps, taylor, cap)
-    b = relax(; seed=SEEDS[2], B, kind, dt, n_steps, taylor, cap)
+"""ΔE between the two seeds at one B — plus everything needed to know whether
+that number is a gap between PHASES at all."""
+function gap(; B, kind, dt, taylor, cap)
+    a = relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
+    b = relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
-    (dE=b.E - a.E, sep=sep, EA=a.E, EB=b.E)
+    # `isequal`, not `!=`: `_winding_vector` returns `missing` for a depopulated
+    # component, and `!=` on vectors carrying missing yields `missing` rather than
+    # a Bool — which is a TypeError the moment it reaches an `if`. `isequal`
+    # treats missing as equal to missing and always returns Bool, so "the same
+    # component is empty in both" reads as the same class, which is what it is.
+    distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
+    (dE=b.E - a.E, sep=sep, distinct=distinct,
+        conv=a.converged && b.converged,
+        dEf=max(a.dE_final, b.dE_final), steps=max(a.steps, b.steps),
+        wa=a.wind, wb=b.wind)
 end
 
 # --- cost: table build vs per step -----------------------------------------
@@ -112,7 +154,7 @@ function cost(kind)
 end
 
 println("="^78)
-println("Phase-gap error budget — Eu F=6 D=13, $(N_GRID)³, $(N_STEPS) ITP steps")
+println("Phase-gap error budget — Eu F=6 D=13, $(N_GRID)³, tol=$(ITP_TOL), cap $(MAX_STEPS) steps")
 println("device: $(CUDA.name(CUDA.device()))   seeds: $(SEEDS)")
 println("="^78)
 
@@ -125,8 +167,8 @@ for kind in (nothing, :polar_contact, :full_bdg)
     CUDA.reclaim()
 end
 
-# --- gap: two B values so the slope, hence a boundary shift, is available ----
-const B1, B2 = 2.6e-9, 5.2e-9
+# --- gap: a small B scan, so the boundary can be located rather than assumed ---
+const BS = (2.6e-9, 3.5e-9, 4.4e-9, 5.2e-9)
 const DT = 0.002
 
 arms = [
@@ -137,57 +179,66 @@ arms = [
     ("baseline probe: dt/2, reference", (kind=:full_bdg, dt=DT / 2, taylor=false,
         cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
     ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0)),
-    ("control: LHY removed", (kind=nothing, dt=DT, taylor=false,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
 ]
 
-println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1]))")
-@printf("  %-36s %13s %13s %10s\n", "arm", "ΔE at B1", "ΔE at B2", "state sep")
-results = Dict{String, Any}()
-for (label, a) in arms
-    ns = a.dt == DT ? N_STEPS : 2N_STEPS
-    g1 = gap(; B=B1, a.kind, a.dt, n_steps=ns, a.taylor, a.cap)
-    g2 = gap(; B=B2, a.kind, a.dt, n_steps=ns, a.taylor, a.cap)
-    results[label] = (g1, g2)
-    @printf("  %-36s %13.6e %13.6e %10.3e\n", label, g1.dE, g2.dE,
-        min(g1.sep, g2.sep))
+println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1])), tol=$(ITP_TOL), " *
+        "tol_drho=$(ITP_TOL_DRHO), cap $(MAX_STEPS) steps")
+println("  `final dE` is the last dE/|E| reached. If it is far below `tol` while")
+println("  `conv` says NO, the run IS at its fixed point and the criterion is the")
+println("  thing that did not fire — read it before believing 'not converged'.")
+println("  `distinct` = the two seeds ended in DIFFERENT winding classes. Only")
+println("  those rows are gaps between phases; the rest say there is no second")
+println("  minimum there, which is information rather than a failed measurement.")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep")
+results = Dict{Tuple{String, Float64}, Any}()
+for (label, a) in arms, B in BS
+    g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
+    results[(label, B)] = g
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e\n",
+        label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
+        g.distinct ? "yes" : "no", g.sep)
     GC.gc(true);
     CUDA.reclaim()
 end
 
-println("""
-
-[read] `state sep` is |Fz(seedB) − Fz(seedA)| / |Fz(seedA)|. If it is ~0 the two
-seeds relaxed to the SAME state and that row's ΔE is not a gap between phases —
-it is a measure of nothing, and this project has misread exactly that before.""")
-
-ref = results["reference (Euler, full_bdg)"]
-slope = (ref[2].dE - ref[1].dE) / (B2 - B1)
-bracketed = sign(ref[1].dE) != sign(ref[2].dE)
-@printf("\n  ∂(ΔE)/∂B from the reference arm: %.4e  per unit B\n", slope)
-@printf("  ΔE(B1) = %+.4e, ΔE(B2) = %+.4e  ⇒ boundary %s between B1 and B2\n",
-    ref[1].dE, ref[2].dE, bracketed ? "IS bracketed" : "is NOT bracketed")
-if !bracketed
-    println("""
-  The slope is therefore a LOCAL rate on one side of the boundary, not the rate
-  at the crossing, and δB below is an extrapolation. Move B1/B2 until ΔE changes
-  sign before quoting a boundary shift.
-
-  Note which direction helps: a SMALL |∂(ΔE)/∂B| is the bad case. It means the
-  two phases stay near-degenerate over a wide range of B, so any energy error
-  moves the apparent boundary a long way — and if it is small enough, what is
-  there is a crossover and not a boundary at all. Accuracy cannot fix that; only
-  a different claim can.""")
-end
-if slope != 0
-    println("  δB_boundary = δ(ΔE) / |∂(ΔE)/∂B| for each arm, against the reference:")
-    for (label, _) in arms
-        label == "reference (Euler, full_bdg)" && continue
-        d = abs(results[label][1].dE - ref[1].dE)
-        @printf("    %-36s δ(ΔE) %10.3e → δB %10.3e\n", label, d, d / abs(slope))
+# --- verdict --------------------------------------------------------------
+println()
+ref = [results[("reference (Euler, full_bdg)", B)] for B in BS]
+usable = [i for i in eachindex(BS) if ref[i].conv && ref[i].distinct]
+if length(usable) < 2
+    println("""[verdict] The reference arm has $(length(usable)) usable B point(s) — a point is
+usable only if BOTH seeds converged AND ended in different winding classes.
+Fewer than two means the boundary cannot be located here and no δB can be
+quoted. That is the honest outcome, not a number to report.""")
+else
+    dEs = [ref[i].dE for i in usable]
+    Bs = [BS[i] for i in usable]
+    signs = sign.(dEs)
+    bracketed = any(signs[1:(end - 1)] .!= signs[2:end])
+    slope = (dEs[end] - dEs[1]) / (Bs[end] - Bs[1])
+    @printf("[verdict] usable B points: %d   ∂(ΔE)/∂B = %.4e   boundary %s\n",
+        length(usable), slope, bracketed ? "BRACKETED" : "NOT bracketed")
+    if !bracketed
+        println("""  Not bracketed ⇒ this is a local rate on one side, and any δB from it is an
+  extrapolation. Widen the scan before quoting a boundary shift.""")
     end
-    println("""
-  The `dt/2` row is the baseline: the boundary shift the caller ALREADY accepted
-  by choosing dt. An approximation whose δB is well under it is not what limits
-  the boundary; one above it is.""")
+    if slope != 0
+        println("  δB = δ(ΔE)/|∂(ΔE)/∂B|, each arm against the reference at the same B:")
+        i0 = usable[1]
+        for (label, _) in arms
+            label == "reference (Euler, full_bdg)" && continue
+            g = results[(label, BS[i0])]
+            d = abs(g.dE - ref[i0].dE)
+            @printf("    %-36s δ(ΔE) %10.3e → δB %10.3e  (conv %s)\n",
+                label, d, d / abs(slope), g.conv ? "yes" : "NO")
+        end
+        println("""
+  The dt/2 row is the BASELINE: the boundary shift already accepted by choosing
+  dt. An approximation whose δB sits well under it is not what limits the
+  boundary. And note the direction that helps — a SMALL |∂(ΔE)/∂B| is the bad
+  case: it means the phases stay near-degenerate over a wide range of B, so any
+  energy error moves the apparent boundary a long way, and far enough that way
+  there is a crossover there and not a boundary at all.""")
+    end
 end
