@@ -234,3 +234,25 @@ Two rules follow:
 - "Green standalone, red in the suite" is not automatically cross-test
   contamination. Check the codegen difference first — it is cheaper to test and
   it was the answer both times it was checked here.
+
+### …and the default FFT planner is not reproducible
+
+`FFTW.MEASURE` — the production default for every `make_workspace` — benchmarks
+candidate algorithms at plan time and keeps the fastest, so the summation order of
+every transform depends on machine load. Measured on the L-BFGS projected-gradient
+floor, four fresh processes each:
+
+| planner | grad_norm |
+|---|---|
+| `MEASURE` | 1.709e-8 · 2.130e-8 · 5.258e-8 · 1.709e-8 (energy varies in its last two digits) |
+| `ESTIMATE` | 4.1453063004739704e-9 × 4 (energy identical to all digits) |
+
+So a round-off-limited quantity is not even reproducible run to run under the
+production planner, let alone comparable to a recorded value. `test/runtests.jl`
+sets `SPINORBEC_FFT_ESTIMATE=1`, which switches `default_fft_flags()` to the
+deterministic planner for the suite only (`src/foundation/fft_planning.jl`).
+
+This does not make such quantities meaningful — a pin on round-off is still a pin.
+It makes them REPRODUCIBLE, which is what lets a test distinguish "the code
+changed" from "the plan changed". Both of the tests that were mysteriously "green
+alone, red in the suite" were round-off claims; the two effects above are why.

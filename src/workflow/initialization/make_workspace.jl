@@ -69,7 +69,7 @@ function make_workspace(;
     secular_ddi::Bool=false,
     raman::Union{Nothing, RamanCoupling{N}, TimeDependentRaman{N}}=nothing,
     loss::Union{Nothing, LossParams}=nothing,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     # Deliberately OFF here while the YAML/DSL surface defaults them ON
     # (`DDI_PADDED_DEFAULT` / `DDI_TRUNC_RADIUS_DEFAULT` in
     # schema/parsing_blocks.jl). This is the library primitive — every knob is

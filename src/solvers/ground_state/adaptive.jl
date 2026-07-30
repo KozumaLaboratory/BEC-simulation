@@ -24,7 +24,7 @@ function _find_ground_state_adaptive(;
     ddi_padding::Bool=false,
     ddi_pad_factor::Union{Real, NTuple}=2,
     dt_max,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     rotating_frame_omega::Float64=0.0,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
