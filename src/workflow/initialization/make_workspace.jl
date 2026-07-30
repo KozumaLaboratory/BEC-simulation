@@ -275,6 +275,16 @@ function make_workspace(;
         # experiments live deep in this regime (ω_L ~ kHz, c_dd × n ~ Hz).
         # Only @info, not error: the user may intentionally want the full
         # kernel to study transverse Larmor-coherent dynamics.
+        #
+        # This used to say "faster + more physical". It is NOT faster, and saying
+        # so invited an accuracy trade for nothing. Measured 0.986× on one ITP
+        # step, H100 32³ Eu F=6 (`bench/accuracy_knob_cost.jl`) — inside the
+        # noise, and structurally so: secular zeroes the off-diagonal Q
+        # components, but Q_xx = Q_yy = −Q_zz/2 are all still nonzero, so the
+        # kernel remains a 3-component convolution with all 6 FFTs. Only 6 of the
+        # 9 pointwise multiplies in the contraction disappear, and the contraction
+        # is not what the step costs. The case for `secular` is entirely the
+        # physics one below.
         p_now = linear_p(zfield)   # uniform arm → bz; spatial arm → 0 (advisory only)
         if !secular_ddi && is_active(p_now, ROTATION_TOL) && is_active(c_dd_val)
             n_peak_est =
@@ -283,7 +293,11 @@ function make_workspace(;
             larmor_ratio = abs(p_now) / max(c_dd_val * n_peak_est, 1e-30)
             if larmor_ratio > 100.0
                 @info "DDI Larmor regime: ω_L / (c_dd · ⟨n⟩) ≈ $(round(larmor_ratio; sigdigits=3)). " *
-                    "Consider `secular_ddi=true` (faster + more physical for ω_L ≫ c_dd·n)."
+                    "Consider `secular_ddi=true` — the Larmor cycle averages the " *
+                    "off-diagonal DDI to zero here, so it is the more physical kernel " *
+                    "for time-averaged observables. It is NOT faster (measured 0.986× " *
+                    "at 32³): all 6 FFTs remain, so choose it for the physics or not " *
+                    "at all."
             end
         end
 

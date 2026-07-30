@@ -133,7 +133,10 @@ bare periodic kernel, 2-5 % dipolar field error flat in resolution (9c117c05).")
     AccuracyKnob(:secular_ddi, :per_run, false, false,
         "Larmor-averaged DDI, dropping the off-diagonal components. A physics \
 approximation valid when ω_L ≫ c_dd⟨n⟩; make_workspace advises when that holds. \
-Required (ArgumentError) when spin_rotating_frame_omega ≠ 0."),
+Required (ArgumentError) when spin_rotating_frame_omega ≠ 0, so this knob cannot \
+be removed without removing the rotating-basis path. Buys NO speed — measured \
+0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
+3-component convolution with all 6 FFTs. Choose it for the physics or not at all."),
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \

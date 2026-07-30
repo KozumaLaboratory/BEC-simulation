@@ -66,3 +66,46 @@ println("""
 `full_bdg` is scheme-dependent there, so it cannot be the accuracy reference and
 an ITP started there has no fixed point to reach — that is a property of the
 (F, c₀, c₁, q, c_dd) point, not of the seed or the tolerance.""")
+
+# --- controls: WHICH term makes it unstable, and does the density matter? -----
+#
+# "Everything is unstable" is not yet a finding — it could be the dipolar term
+# (physical and unavoidable at Eu: the textures exist BECAUSE the uniform state is
+# unstable), the spin channel, or an n-dependence that a different working density
+# would escape. These two controls separate those.
+println("\n" * "="^76)
+println("Controls — is it the DIPOLE, the spin channel, or the density?")
+println("="^76)
+
+sp = probe_spinors()
+ip0 = eu_interaction_params(0.05)
+zee0 = ZeemanParams(EU_p_weak, 0.0)
+
+growth(spinor, ip, cdd, n0) = try
+    lhy_mean_field_max_growth(; F, spinor, n0, interactions=ip, zeeman=zee0,
+        c_dd=cdd)
+catch
+    NaN
+end
+
+println("\n[control 1] c_dd scaled, at c1_ratio = 0.05, n0 = 1")
+@printf("  %-16s %14s %14s\n", "c_dd", "polar", "ferromagnetic")
+for f in (0.0, 0.01, 0.1, 0.5, 1.0)
+    @printf("  %-16.4g %14.4g %14.4g\n", f * EU_c_dd,
+        growth(sp.polar, ip0, f * EU_c_dd, 1.0),
+        growth(sp.ferromagnetic, ip0, f * EU_c_dd, 1.0))
+end
+println("  c_dd = 0 stable ⇒ the instability IS the dipole, and at Eu that is")
+println("  physics, not a parameter to move away from.")
+
+println("\n[control 2] working density, at c1_ratio = 0.05, full c_dd")
+@printf("  %-16s %14s %14s\n", "n0", "polar", "ferromagnetic")
+for n0 in (0.01, 0.1, 1.0, 10.0)
+    @printf("  %-16.4g %14.4g %14.4g\n", n0,
+        growth(sp.polar, ip0, EU_c_dd, n0),
+        growth(sp.ferromagnetic, ip0, EU_c_dd, n0))
+end
+println("  If max Im ω ∝ √n0 with no zero crossing, no density is a stable")
+println("  working point either — the sign of the instability is n-independent")
+println("  because it comes from a negative eigenvalue of the coupling matrix,")
+println("  and n only sets its rate.")
