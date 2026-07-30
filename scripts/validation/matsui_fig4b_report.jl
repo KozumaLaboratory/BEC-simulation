@@ -18,7 +18,10 @@ using YAML
 using DelimitedFiles
 using Printf
 
-const FIXDIR = joinpath(@__DIR__, "..", "..", "test", "fixtures", "matsui2025")
+# Overridable so the report can run from a scratch copy on a cluster login node
+# without checking out the repo a second time.
+const FIXDIR = get(ENV, "MATSUI_FIXTURES",
+    joinpath(@__DIR__, "..", "..", "test", "fixtures", "matsui2025"))
 
 "Field (nT) of each scan point, in the order run_yaml emitted them."
 function scan_fields_nT(run_dir)
@@ -33,22 +36,45 @@ function scan_fields_nT(run_dir)
 end
 
 """
-Population fraction of every m component at the END of the hold, per scan point.
+Population fraction of every m component at the end of the hold, per scan point.
 
-Taken from the saved final `psi`, not from the last row of
-`dynamics/component_populations`: with `save.every = 100` over 3456 steps the
-last *sample* is at step 3400, 1.6 % of the hold short of the 5 ms the
-comparison is about. ψ is normalised to 1, so the fractions need no grid.
+Read from the last row of `dynamics/component_populations`, NOT from the saved
+top-level `psi`. In every multi-point scan run_yaml produced on 2026-07-30,
+`point_001`'s `psi` is the **ground state** rather than the evolved state — 45/45,
+19/19 and 6/6 point scans each had exactly that one file wrong, and a single-point
+run had none. Reading `psi` therefore hands you a first scan point that looks like
+a completely untransferred cloud, which at the edge of a scan is exactly where the
+baseline of a dip measurement comes from.
+
+The cost of using the series instead is that the last sample lands on the last
+multiple of `save.every`, so make `save.every` divide the step count (3456 = 32 x
+108). This function checks it did, and refuses rather than quietly reporting a
+population from 98 % of the hold.
 """
-function final_populations(run_dir)
+function final_populations(run_dir; duration=nothing, dt=nothing)
     files = sort(filter(f -> occursin(r"^point_\d+\.jld2$", f), readdir(run_dir)))
     isempty(files) && error("no point_NNN.jld2 in $run_dir")
     map(files) do f
         jldopen(joinpath(run_dir, f), "r") do d
-            psi = d["psi"]                                   # (n..., 2F+1)
+            pops = d["dynamics"]["component_populations"]   # (n_saves, 2F+1)
+            times = d["dynamics"]["times"]
+            if duration !== nothing && abs(times[end] - duration) > 1e-6
+                error(
+                    "$f: last dynamics sample is at t = $(times[end]) but the hold " *
+                    "ends at $duration — set save.every to divide the step count",
+                )
+            end
+            psi = d["psi"]
             D = size(psi)[end]
             w = [sum(abs2, selectdim(psi, ndims(psi), c)) for c in 1:D]
-            w ./ sum(w)
+            w ./= sum(w)
+            if abs(w[D] - pops[end, D]) > 0.02
+                @warn "$f: saved psi disagrees with the dynamics series — the known \
+                       point_001 ground-state-instead-of-final-state defect" psi_frac = w[D] series_frac = pops[
+                    end, D
+                ]
+            end
+            vec(pops[end, :])
         end
     end
 end
@@ -65,8 +91,10 @@ function reference_dip(lo, hi)
 end
 
 function main(run_dir, out_csv=nothing)
+    cfg = YAML.load_file(joinpath(run_dir, "config.yaml"))
+    duration = Float64(cfg["pipeline"][2]["dynamics"]["duration"])
     B = scan_fields_nT(run_dir)
-    pops = final_populations(run_dir)
+    pops = final_populations(run_dir; duration)
     length(B) == length(pops) || error(
         "scan axis has $(length(B)) fields but $(length(pops)) point files — " *
         "the run is incomplete; do not read a dip off it",
@@ -74,7 +102,7 @@ function main(run_dir, out_csv=nothing)
 
     D = length(pops[1])
     F = (D - 1) ÷ 2
-    N_atoms = YAML.load_file(joinpath(run_dir, "config.yaml"))["defaults"]["interactions"]["N_atoms"]
+    N_atoms = cfg["defaults"]["interactions"]["N_atoms"]
     # c = 1 ↔ m = +F (ours); their sheets are columns m = -F … +F.
     N6 = [Float64(N_atoms) * p[D] for p in pops]   # m = -F
 

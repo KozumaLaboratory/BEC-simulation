@@ -82,7 +82,8 @@ pipeline:
       seed_amplitude: 0.0        # their noise_amp is declared and never used; the
                                  # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
       save:
-        every: 100
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
         psi: false
         precision: f64
 
