@@ -126,15 +126,22 @@ const MUTANTS = Mutant[
         :path_default, :subtle,
         "gotcha_orszag_dealias_cuts_occupied_band_small_grid_2026_07_27",
         "Filters part of the OCCUPIED band. Norm-preserving-looking, physics-eating."),
-    Mutant(:spin_chain_fuses_padded_ddi,
+    # The `ddi_padded` entry this used to target was REMOVED from
+    # `_spin_chain_reason` by 9c117c05, which made the fusion handle the padded
+    # convolution instead of declining it — the harness reported the anchor STALE
+    # on 2026-07-29, which is the mechanism working. Retargeted at the Raman
+    # entry, which is still live and is the same claim: an operator that sits
+    # BETWEEN the two rotations must decline the fusion, or the fused path drops
+    # it silently.
+    Mutant(:spin_chain_fuses_over_raman,
         "src/hamiltonian/integrator/spin_chain.jl",
-        r"    ws\.ddi_padded === nothing \|\| return \"zero-padded DDI uses a different convolution\"",
-        "    # mutant: padded-DDI guard removed",
+        r"    ws\.raman === nothing \|\| return \"Raman sits between them\"",
+        "    # mutant: Raman guard removed",
         :path_default, :fatal,
         "gotcha_yaml_default_flip_disabled_rtp_fusion_2026_07_29",
-        "The inverse of the real incident: here the fused path is taken where it is \
-         NOT valid. `_spin_chain_reason` is the one list of what would silently \
-         be dropped, so every entry in it needs an arm."),
+        "`_spin_chain_reason` is the one list of what the fused half-step would \
+         otherwise silently drop, so every entry in it needs an arm. Removing one \
+         makes the fusion swallow an operator that sits between the rotations."),
 
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where

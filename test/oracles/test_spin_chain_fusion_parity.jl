@@ -62,11 +62,40 @@ else
         end
     end
 
-    @testset "fused half-step ≡ the unfused one, bit for bit" begin
+    """
+    Relative agreement between the two arms.
+
+    NOT `a == b`. Bit-identity is what the fusion is designed to deliver on a
+    fixed device state, and it does hold when this file runs alone — measured
+    max|a-b| = 0.0 at 1, 2 and 5 steps. It does NOT hold reliably inside a
+    `full`-tier worker that has already run thirty other files: the same two arms
+    came back 1e-10 apart on ψ of scale 0.13, i.e. agreeing to ~1e-9 relative,
+    which is round-off and not a physics difference. GPU reduction order is a
+    function of launch configuration and pool state, so exact equality is not a
+    property this path can be held to across processes — CLAUDE.md records the
+    same conclusion for the fused/broadcast boundary (9b30c8bb).
+
+    The bound below is still a genuine differential gate: 1e-12 relative is four
+    orders tighter than the O(dt²) difference a real splitting change would make,
+    and the padded-vs-bare assertions in this file rely on the same scale to tell
+    the two convolutions apart.
+
+    (The in-worker discrepancy was NOT reproduced by replaying that worker's
+    toggle-flipping predecessors — `SPIN_TAYLOR_ENABLED`,
+    `COMBINED_SPIN_STEP_ENABLED`, `MEANFIELD_MIDPOINT_ENABLED` — so this is a
+    robustness fix to the CLAIM, not a diagnosed root cause.)
+    """
+    function _agree(a, b)
+        scale = max(maximum(abs, a), maximum(abs, b))
+        scale == 0 && return false
+        maximum(abs, a .- b) / scale
+    end
+
+    @testset "fused half-step ≡ the unfused one, to round-off" begin
         SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
         a = _run(true, 5)
         b = _run(false, 5)
-        @test a == b
+        @test _agree(a, b) < 1e-12
         # The two arms really did take different paths: with the midpoint
         # predictor-corrector off there is no frozen ψ_mf, so the fused arm
         # declines and the equality above would be trivially true.
@@ -84,7 +113,7 @@ else
         SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
         a = _run(true, 5; ddi_padding=true)
         b = _run(false, 5; ddi_padding=true)
-        @test a == b
+        @test _agree(a, b) < 1e-12
         wsp = _ws(; ddi_padding=true)
         @test wsp.ddi_padded !== nothing
         @test SpinorBEC._spin_chain_reason(
@@ -92,7 +121,7 @@ else
         # Padding changes Φ, so the padded arm must NOT agree with the bare one.
         # Without this, a padded workspace that silently ran the bare convolution
         # — the failure the index map exists to prevent — would still pass.
-        @test a != _run(true, 5)
+        @test _agree(a, _run(true, 5)) > 1e-6
     end
 
     @testset "no frozen mean field ⇒ the fusion declines" begin
