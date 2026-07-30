@@ -14,6 +14,7 @@
 
 using Test
 using LinearAlgebra
+using Random
 using SpinorBEC
 using SpinorBEC: _grad_lhy!, _lhy_energy, _lhy_V, _lhy_is_active, total_density,
     _c0c1_to_gS, _lhy_needs_spin, _lhy_de1_dp, _local_polarisation, fp_ladder_coeff
@@ -57,7 +58,13 @@ end
     m = 4
     npts = (m, m, m)
     dV = 1.0
-    psi = 0.3 .* randn(ComplexF64, m, m, m, _D)
+    # Seeded. The `gap` assertion below is a hardcoded window around a measured
+    # value, and psi was an UNSEEDED draw, so the window was being tested against
+    # a different random state every run: observed 0.0379 against
+    # `0.015 < gap < 0.035` in a parallel run that passed standalone. Same class as
+    # the test_seed_from.jl flake fixed earlier today — a fitted window on an
+    # unseeded quantity is a coin toss, and an unreproducible one.
+    psi = 0.3 .* randn(MersenneTwister(20260730), ComplexF64, m, m, m, _D)
     n = total_density(psi, 3)
 
     @testset "gradient == finite difference of the energy" begin
