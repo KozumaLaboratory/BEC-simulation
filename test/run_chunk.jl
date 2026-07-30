@@ -36,16 +36,29 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 
 Try to take work item `i`. Exactly one caller can win: `O_CREAT | O_EXCL` fails
 for everyone but the process that creates the file.
+
+The claim is TAKEN the instant that creation succeeds, so `close` is bookkeeping
+and is handled separately. Wrapping both in one `try` (as this did until
+2026-07-29) meant a `close` failure returned `false` *after* the claim file
+existed: no other worker could ever take the item, and the worker that had taken
+it skipped it — a silently unrun test, which is the single failure mode an
+on-demand queue has that static assignment does not, and the reason `done_<i>`
+exists at all.
 """
 function claim(dir::AbstractString, i::Integer)
     flags = Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL |
             Base.Filesystem.JL_O_WRONLY
-    try
-        close(Base.Filesystem.open(joinpath(dir, "claim_$i"), flags, 0o644))
-        return true
+    fd = try
+        Base.Filesystem.open(joinpath(dir, "claim_$i"), flags, 0o644)
     catch
-        return false
+        return false            # another worker got there first
     end
+    try
+        close(fd)
+    catch e
+        @warn "claim_$i taken but close failed; keeping the claim" exception = e
+    end
+    return true
 end
 
 """
