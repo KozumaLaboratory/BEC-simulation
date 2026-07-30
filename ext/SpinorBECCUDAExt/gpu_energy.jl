@@ -76,7 +76,13 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     accumulate = grad !== nothing
 
     ctx = SpinorBEC.build_gradient_context(psi, ws)
-    out = similar(psi)
+    # Scratch-backed per-term buffer. `similar(psi)` here was a fresh CuArray
+    # per call — and this function is BOTH the GPU energy_decomposition and the
+    # LBFGS fused energy+gradient, so it ran once per line-search trial as well
+    # as once per gradient (~3 device allocations per LBFGS iteration).
+    out = SpinorBEC.scratch_get!(:gpu_energy_out, (typeof(psi), size(psi))) do
+        similar(psi)
+    end
     accumulate && fill!(grad, zero(eltype(grad)))
 
     # E_term = factor · Re⟨ψ, H_term·ψ⟩ · dV via the gated device gradient face.
@@ -118,7 +124,10 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     E_coriolis =
         (SpinorBEC.is_active(Ω, SpinorBEC.ROTATION_TOL) && N >= 2) ?
         op_energy(cor_t, 1.0) : 0.0
-    E_mg = op_energy(mg_t, 1.0)
+    # Gated like every other optional term: `op_energy` costs a fill, a full
+    # apply, a dot and an accumulate even when the term's own gate-first check
+    # makes it a no-op, and magnetic_gradient is absent in most configs.
+    E_mg = ws.magnetic_gradient !== nothing ? op_energy(mg_t, 1.0) : 0.0
 
     # Gradient-blind terms — Tensor (scalar-loop) + Raman (no-op grad):
     # host helpers behind a single ψ→host copy, only when active.
