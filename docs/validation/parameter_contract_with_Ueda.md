@@ -105,12 +105,23 @@ E_c1 + E_dd)/2` (line 743) — the ½ on the mean-field terms, none on the Zeema
 | **2.1 / 2.3** | `H ⊃ +ZeemanP·F_z` with `ZeemanP = +B·μ_B·g_F/(ħω)` (line 258, `Zeeman_p` at 739 confirms the sign in the energy) ⇒ **`H_Z = +g_F μ_B B·F_z`** | ours is `H_Z = −p·F_z` with `p ≡ −g_F μ_B B/(ħω_ref)` ⇒ **`+g_F μ_B B·F_z`**. `inspect` on our Fig. 4B config returns `p = −153.9` at their `Bfield_ini = 10.4 mG`; theirs is `ZeemanP = +153.87`, and `−p·F_z ≡ +ZeemanP·F_z` | **MATCH.** Row 2.3's own text ("p = g_F μ_B B/ħω_ref, same sign as B_z") is **stale** — it contradicts `Units.bfield_to_p` and CLAUDE.md. The *operator* is what agrees; the intermediate `p` differs in sign because we route through Kawaguchi-Ueda's `p` and they do not. +B on g_F>0 gives m=−F lowest in both. |
 | **2.2** | `+ZeemanQ·F_z²` | `+q·F_z²` | **MATCH**, including the sign. |
 | 3.1 | `E_int = (cc0/2)∫n² + (cc1/2)∫\|⟨F⟩\|²` (line 743 halves what 678-690 accumulate) | identical | **MATCH.** |
-| **4.7** | **`secular` does not exist.** No switch, no Larmor average, no rotating spin frame anywhere in `initial.f90` or `time.f90`. `calcDD_3D` always uses the full `DD0/DD1/DD2`; `calcDD_3D_pol` is a *spin-frozen* variant (only `DD0·⟨F_z⟩`) used by the ground-state driver `timeGP_3D_spin1_fix`, which is a consequence of freezing the component, not an approximation to the DDI. | ours is a user-chosen flag with an `@info` advisory above `ω_L/(c_dd⟨n⟩) > 100` | **ABSENT IN THEIR CODE.** Our secular option has no counterpart here, and CLAUDE.md's "> 100" advisory gets **no external support in either direction** from this source. Their Fig. 2/4 runs sit deep in that regime and use full MDDI regardless. |
+| **4.7** | **`secular` does not exist.** No switch, no Larmor average, no rotating spin frame anywhere in `initial.f90` or `time.f90`. `calcDD_3D` always uses the full `DD0/DD1/DD2`; `calcDD_3D_pol` is a *spin-frozen* variant (only `DD0·⟨F_z⟩`) used by the ground-state driver `timeGP_3D_spin1_fix`, which is a consequence of freezing the component, not an approximation to the DDI. | ours is a user-chosen flag with an `@info` advisory above `ω_L/(c_dd⟨n⟩) > 100` | **ABSENT IN THEIR CODE** — see the note below on what that does and does not say about our advisory. |
 | 4.8 | no spin-rotating frame | `spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true` | **ABSENT.** |
 | 5.1 | `−∇²` (prefactor 1, absorbed into `aHO`), 3-point FD, periodic | `−ħ²/2m ∇²`, spectral | **MATCH in physics, DIFFER in discretisation.** At their production `dx = 0.4 aHO` against a healing length `ξ = 1/√μ ≈ 0.28 aHO`, the FD dispersion error is not small. Any Level-10 `Hψ` diff must use the same Laplacian or it measures the stencil. |
 | 9.1 | `exp(−i dt H)` via Crank–Nicolson (2nd order, unconditionally stable, iterated to self-consistency) | Strang split-step | **DIFFER in method, agree in order.** Contract §"Acceptance criteria" already allows this: rows 1-2 (energy, `Hψ`) are method-free, row 3 (one-step) is not. |
 | 9.2 | ITP is the same CN with `diff2 = dt/2` real (line 1883) + renormalise | `exp(−τH)` + renormalise | **MATCH in intent.** |
 | 2.7 | no overflow shift — CN never exponentiates `H` | we subtract `min(E_m)` | **N/A**, and harmless: the shift is a gauge on our side. |
+
+**What row 4.7 does *not* settle.** `make_workspace` on our Fig. 4B dynamics step
+printed `ω_L/(c_dd·⟨n⟩) ≈ 373` (UGE 8304399) — but that is evaluated at the
+*start* of the ramp, `B = 1.04 µT`. The ratio is linear in `B`, and the field is
+**held at 2.6 nT**, four hundred times lower: `373 × 2.6/1040 ≈ 0.93`. During the
+physics the Larmor rate and the dipolar mean-field rate are **comparable**, which
+is precisely where a secular approximation has no justification. So their use of
+full MDDI is not evidence against our advisory; it is a run that never enters the
+regime the advisory is about. CLAUDE.md's `> 100` threshold gets **no external
+support in either direction** from this source. Type A (arithmetic on a logged
+number), producing commit `4e2fb85d`.
 
 #### 0.3.2 Spin matrices (`init_time_3D`, lines 386-396)
 
@@ -240,6 +251,36 @@ of the way across. So the number a second implementation of the same model has t
 reproduce is −2.55 nT, not −1.5 and not −3.5; and the residual 0.66 nT between their
 simulation and their experiment is the honest floor, sitting just under the ~1 nT
 field fluctuation the Fig. 4 caption itself quotes.
+
+### 0.6 The reproduction — configs, cost, and what is NOT yet measured
+
+`runs/matsui_fig4b/`, submitted from commit `2e63f0c5`, ancestor-gated against
+all 14 refs in `docs/campaign/fix_list.toml`, clean tree:
+
+| task | config | fields | grid | what it is for |
+|---|---|---|---|---|
+| 1 | `fig4b_scan_n32.yaml` | 45, −13 … +9 nT @ 0.5 | 32³, box 16 | the curve, hence the centre and width |
+| 2 | `fig4b_conv_n64.yaml` | 6 | 64³, box 16 | resolution error bar on task 1's centre |
+| 3 | `fig4b_gsvariant_n32.yaml` | 19, −8 … +1 nT | 32³ | prices the §0.3.5 ground-state ambiguity |
+| 4 | `fig2c_populations_n32.yaml` | 1 (2.6 nT), 40 ms | 32³ | `N_m(t)` against `dataset_fig2_theo` |
+
+Read alongside the numbers, whenever they land:
+
+- **32³ is under-resolved and the run cannot certify itself.** `dx = 0.5 a_ho`
+  against a healing length `ξ = 1/√(2µ) ≈ 0.20 a_ho`; the occupied band edge
+  `√(2µ) ≈ 5.1` sits at `0.81 k_max`. The charter's guard 4 (≥ 4 points per
+  healing length) is **violated**, and it is violated by their production run too
+  (`dx = 0.4 aHO` against `ξ ≈ 0.28 aHO`, 0.7 points). Task 2 exists because of
+  this; without it the 32³ centre is a number, not a measurement.
+- **The step cost is ~70× the campaign cost-table extrapolation**: 27 ms at 32³
+  D=13 with the padded DDI, measured in UGE 8304399, against the ~0.4 ms that
+  scaling 3.2 ms at 64³ by cell count predicts. Budget from the measurement.
+- **Dealiasing is off** on both sides (theirs has none; Orszag 2/3 at 32³/box 16
+  would cut `k_cut = 4.19` below the occupied `√(2µ) ≈ 5.1`).
+- Our kernel carries the spherical truncation and `Q(k=0) = 0`; theirs carries
+  neither. Both differences are bounded above in §0.3.3 at ~0.02 nT and
+  5×10⁻³ nT — below what is being measured, but they are not zero and the run
+  should not be quoted to better than that.
 
 ---
 
