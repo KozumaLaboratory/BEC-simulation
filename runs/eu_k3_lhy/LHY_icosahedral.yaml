@@ -1,3 +1,10 @@
+# LHY kind was `icosahedral` until 2026-07-30. `IcosahedralLHY`'s closed form
+# is c0^(5/2) + 3|lambda_spin|^(5/2); the absolute value made it symmetric under
+# c1 -> -c1 and returned a real energy where the spin-Goldstone branch is
+# dynamically unstable. This config runs at c1_ratio < 0, i.e. OUTSIDE that
+# domain -- `epsilon_LHY_F6_Ih` now returns NaN and the table build throws.
+# `full_bdg` diagonalises the coupled problem with no ansatz and is valid here.
+# Gated by test/oracles/test_lhy_config_validity_domain.jl.
 # Task #19C — LHY interference at K3=200× cigar regime.
 # Source: scripts/validation/eu_k3_lhy_gen.jl
 # LHY kind = icosahedral (applied outside nominal regime; see scope note).
@@ -7,7 +14,7 @@ metadata:
   ladder_level: 12
   parent_regime: cigar_N30k_omz0p25
   K3_factor: 200.0
-  LHY_kind: icosahedral
+  LHY_kind: full_bdg
   generator: scripts/validation/eu_k3_lhy_gen.jl
 
 defaults:
@@ -27,7 +34,7 @@ pipeline:
       ddi:
         enabled: true
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
@@ -45,7 +52,7 @@ pipeline:
         phi: 0.0
       ddi:
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       loss:
         K3_per_m_si:
           ["2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s"]

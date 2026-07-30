@@ -8,12 +8,15 @@
 # identity-class tolerance on the same discrete mathematics.
 #
 # Gap discipline (arch doc §4 KNOWN-LIMIT row):
-# - DUMB_DEFERRED_SLOTS (:ddi,) — dumb statement deferred to its own
-#   unit; explicitly skipped, never silently.
-# - PRODUCTION_RHS_GAPS (:raman, :tensor) — production apply_operator!
-#   is declared-nil; the oracle asserts BOTH sides of the gap
+# - DUMB_DEFERRED_SLOTS — dumb statement deferred to its own unit;
+#   explicitly skipped, never silently. Empty since the DDI unit landed.
+# - PRODUCTION_RHS_GAPS (:raman) — production apply_operator! is
+#   declared-nil; the oracle asserts BOTH sides of the gap
 #   (production ≡ 0 AND dumb ≠ 0 when active), so the gap closing or
-#   widening is a test event either way.
+#   widening is a test event either way. :tensor left the list when its
+#   gradient face was implemented 2026-06-09.
+# - Slot coverage is not KIND coverage. The `lhy` slot's dumb statement
+#   implements the scalar form only; see the declaration testset below.
 #
 # Set-equivalence meta-test: the dumb breakdown covers exactly the
 # canonical slot list — a term added to the registry without a dumb
@@ -24,7 +27,10 @@ using SpinorBEC
 using SpinorBEC:
     HamTerm, apply_operator!, energy_contribution,
     H_TERMS_CANONICAL_ORDER, build_h_terms_registry
-using SpinorBEC: dumb_energy_breakdown, dumb_rhs_breakdown, DUMB_DEFERRED_SLOTS
+using SpinorBEC:
+    dumb_energy_breakdown, dumb_rhs_breakdown, DUMB_DEFERRED_SLOTS,
+    dumb_lhy_coefficient
+using SpinorBEC: ScalarLHY, IcosahedralLHY
 using SpinorBEC: KineticTerm, TrapTerm, ZeemanTerm,
     DensityC0Term, SpinC1Term, DDITerm, LHYTerm, TensorTerm, RamanTerm,
     LightShiftTerm, CoriolisTerm, MagneticGradientTerm, SpatialZeemanTerm, LossTerm
@@ -111,7 +117,30 @@ end
         Gd = dumb_rhs_breakdown(ws, psi)
         @test Tuple(keys(Ed)) == H_TERMS_CANONICAL_ORDER
         @test Tuple(keys(Gd)) == H_TERMS_CANONICAL_ORDER
-        @test DUMB_DEFERRED_SLOTS == ()   # full 13/13 coverage since the DDI unit
+        @test DUMB_DEFERRED_SLOTS == ()   # every SLOT has a dumb arm
+    end
+
+    # Slot coverage is not kind coverage, and this is the meta-test whose job is
+    # to stop that confusion. `LHYTerm` is one slot with ten interchangeable
+    # tables behind it; the dumb statement implements the SCALAR form only and
+    # raises on every `TabulatedLHY`. So `DUMB_DEFERRED_SLOTS == ()` says each
+    # slot has a dumb arm — it does NOT say each LHY kind does, and the kinds
+    # Eu F=6 production actually uses are exactly the ones it does not.
+    #
+    # Asserting the limitation is what keeps it declared rather than assumed.
+    # The typed kinds are covered, by independent statements living elsewhere:
+    #   oracles/test_lhy_full_bdg_closed_form_parity.jl — analytic closed form
+    #       vs numerical BdG quadrature (polar F=1,2,6; FM F=6; scalar limit)
+    #   oracles/test_lhy_magnitude_si_anchor.jl — SI magnitude, not self
+    #   oracles/test_lhy_mode_face_coverage.jl — every schema kind × 3 faces
+    # Extending `dumb_lhy_coefficient` to a table turns this red, which is the
+    # prompt to widen the comparison and this declaration in the same commit.
+    @testset "dumb LHY arm is scalar-only, by declaration" begin
+        table = IcosahedralLHY([0.5, 1.0, 1.5], [1.0, 2.0, 3.0])
+        @test_throws ErrorException dumb_lhy_coefficient((; lhy=table))
+        @test dumb_lhy_coefficient((; lhy=ScalarLHY(0.7))) == 0.7
+        @test dumb_lhy_coefficient((; lhy=nothing,
+            interactions=(; c_lhy=0.3))) == 0.3
     end
 
     @testset "fixture A (3D, full incl. secular DDI)" begin

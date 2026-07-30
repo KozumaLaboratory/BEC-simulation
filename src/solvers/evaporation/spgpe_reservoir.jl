@@ -113,7 +113,7 @@ timescale it is about to run (and notice if it is about to run a millisecond).
 """
 function spgpe_reservoir(
     r::EvapBecResult, trap::EvapTrap, ramp::FortRamp;
-    omega_ref::Real, a_s::Real, k_cut=nothing, cutoff_n_T::Real=1.0,
+    omega_ref::Real, a_s::Real, k_cut=nothing, cutoff_n_T::Real=0.3,
     t_start=nothing, t_end=nothing, omega_mult=(t -> 1.0),
     number_damping::Bool=true, energy_damping::Bool=true,
     gamma=nothing, M=nothing,

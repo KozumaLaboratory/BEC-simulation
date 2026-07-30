@@ -153,10 +153,18 @@ function compute_spinor_lhy_table(;
         #     n = 2.0:  1.2e-5           vs  2.4e-5
         n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
         n_max > 0 || throw(ArgumentError("n_max must be positive"))
+        n_atoms >= 1 || throw(ArgumentError("n_atoms must be >= 1"))
         eps_1 = _lhy_bdg_energy_density(spinor, 1.0, F, interactions, zeeman,
             c_dd, k_max, n_k, n_dir; rtol)
         densities = collect(range(0.0, n_max; length=n_points))
-        return FullBdGLHY(densities, (2.5 * eps_1) .* densities .^ 1.5)
+        # `/ n_atoms` for the same reason `_tabulate_lhy` divides: `g` comes from
+        # the dimensionless c₀ = 4π(a_s/a_ho)N, which already carries N, while
+        # `n = |ψ|²` is normalised to ∫|ψ|²dV = 1. This branch bypasses
+        # `_tabulate_lhy` for accuracy and used to bypass its division with it,
+        # so `full_bdg` was exactly N too large for every DEGENERATE Zeeman
+        # config — i.e. the whole weak-field regime. Dividing V is equivalent to
+        # dividing ε, since V = dε/dn and the scaling is exactly n^(5/2) here.
+        return FullBdGLHY(densities, (2.5 * eps_1 / n_atoms) .* densities .^ 1.5)
     end
 
     _tabulate_lhy(FullBdGLHY; n_max, n_points, n_atoms) do n0

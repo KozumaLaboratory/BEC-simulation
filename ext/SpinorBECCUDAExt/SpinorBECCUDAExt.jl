@@ -20,6 +20,12 @@ using LinearAlgebra: dot
 # Shared with the CPU kernels — see src/foundation/voxel_index.jl. Declared once
 # so the padded-corner field access cannot drift between the two devices.
 using SpinorBEC: _voxel_index
+# The Taylor accuracy contract and the tridiagonal generator are declared in
+# src/foundation/spinor_utils/spin_rotation_taylor.jl and shared with the CPU
+# Horner, so the two devices cannot drift to different tolerances or a different
+# spin algebra.
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_TOL, SPIN_TAYLOR_RSAFE,
+    SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP
 
 include("backend.jl")
 include("gpu_rng.jl")
@@ -27,8 +33,9 @@ include("gpu_euler_kernel.jl")
 include("gpu_spin_rotation_taylor.jl")
 include("gpu_ddi_rotation.jl")
 include("gpu_spin_chain.jl")
+include("gpu_lhy_field.jl")   # _lhy_interp_uniform / _device_lhy_table: used by the fused diagonal
 include("gpu_diagonal.jl")
-include("gpu_lhy_field.jl")
+include("gpu_ddi_contraction.jl")
 include("gpu_spin_density.jl")
 include("gpu_spin_mixing.jl")
 include("gpu_normalize.jl")

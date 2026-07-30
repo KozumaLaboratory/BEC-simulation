@@ -47,6 +47,10 @@ const FAST_TESTS = [
     "workflow/validation/test_observable_dispatch.jl",
     "workflow/validation/test_open_result.jl",
     "workflow/validation/test_specs_and_check.jl",
+    # The accuracy-knob registry: every entry a real knob, the reference switch
+    # moves and restores all of them (including on exception), and the report
+    # names the per-run knobs it does NOT set.
+    "workflow/validation/test_accuracy_knobs.jl",
     "workflow/validation/test_save_operator_rhs.jl",
     "workflow/validation/test_show.jl",
     "workflow/validation/test_twin_audit.jl",
@@ -65,6 +69,7 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_lhy_no_bare_device_broadcast.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
     "validation/test_k3_unit_audit.jl",
@@ -106,6 +111,10 @@ const FAST_TESTS = [
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
+    # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
+    # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
+    # the accuracy contract turns both red.
+    "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",
@@ -132,12 +141,14 @@ const FAST_TESTS = [
     "hamiltonian/test_lhy_2d.jl",
     "analysis/test_bogoliubov_enhanced.jl",
     "hamiltonian/test_spinor_lhy.jl",
+    "hamiltonian/test_full_bdg_n_atoms_branches.jl",
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl",
     "hamiltonian/test_lhy_energy_convention.jl",
     "hamiltonian/test_spatial_lhy.jl",
     "hamiltonian/test_spatial_lhy_spin_substep.jl",
     "hamiltonian/test_lhy_gradient_all_modes.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
+    "hamiltonian/test_lhy_zeeman_reaches_bdg.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
     "analysis/test_sinatra_diagnostics.jl",
@@ -186,6 +197,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # `SPIN_TAYLOR_TOL` is not a knob a caller should reason about — this pins
+    # the RELATIONSHIP it exists to satisfy (truncation ≪ splitting error), so
+    # the number can change and the criterion still holds. Runs
+    # find_ground_state, hence ci and not fast.
+    "hamiltonian/test_taylor_tolerance_criterion.jl",
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
@@ -320,6 +336,10 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Validity-DOMAIN sibling of the above: a config can name a live `lhy.kind`
+    # and still sit outside that mode's domain. The `icosa` cells did, and it
+    # reached a committed json, a figure and two claims before anyone noticed.
+    "oracles/test_lhy_config_validity_domain.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
@@ -420,6 +440,7 @@ const FULL_EXTRA = [
     # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_lhy_term_faces.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     "gpu/test_lbfgs_stall_fixed_point.jl",   # floor stop gives up nothing, on device
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
@@ -427,6 +448,14 @@ const FULL_EXTRA = [
     # of a padded Φ. Padding is the DEFAULT since 9c117c05, so this is the
     # production layout; no-op on CPU-only CI.
     "gpu/test_gpu_padded_corner_parity.jl",
+    # Fused k-space DDI contraction vs the three broadcasts it replaces. The
+    # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
+    # a green ci tier says nothing about it.
+    "gpu/test_gpu_ddi_contraction_parity.jl",
+    # The fused diagonal kernel with a TABULATED LHY against the generic
+    # broadcast propagator it replaces. Every production Eu run is tabulated and
+    # every one of them took the fallback; GPU-only.
+    "gpu/test_gpu_tabulated_lhy_fused_diagonal_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.

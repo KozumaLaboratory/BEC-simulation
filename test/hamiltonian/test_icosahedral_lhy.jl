@@ -77,15 +77,27 @@ using LinearAlgebra: Diagonal
         @test isapprox(lamd, lamv; atol=1e-13)
     end
 
-    @testset "LHY positivity" begin
-        # Any positive g_S → c_0 > 0 → ε_LHY ≥ 0 at all densities.
-        rng_gs = (
-            ones(7),
-            [1.0, 0.5, 1.5, 0.9, 1.1, 1.0, 1.0],
-            [2.0, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
-            [1.0, 1.05, 0.98, 1.02, 0.97, 1.01, 0.99],
-        )
-        for gs in rng_gs
+    @testset "LHY positivity where the ansatz holds" begin
+        # PREMISE CORRECTED 2026-07-30. This asserted "any positive g_S → c_0 > 0
+        # → ε_LHY ≥ 0", which conflates two things: positive channel couplings do
+        # not make the I_h ansatz valid. The closed form assumes three STABLE
+        # spin-Goldstone branches of stiffness λ_spin, and λ_spin is a signed
+        # combination (−g₀/13 − 121g₆/646 + 91g₁₀/782 + 840g₁₂/5681) that goes
+        # negative for perfectly positive ladders — measured −0.209 for
+        # [2,0,0,1,0,0.5,0.5] and −0.0041 for [1,1.05,0.98,1.02,0.97,1.01,0.99].
+        # Taking |λ_spin|^(5/2) there returned a real energy for a state whose
+        # own stiffness is negative; along the c₀/c₁ family, where full_bdg can
+        # be constructed for comparison, that overshot by up to 11%.
+        #
+        # So the rows are split by λ_spin rather than dropped: positive stiffness
+        # must give a finite non-negative ε, negative stiffness must refuse.
+        stable = (ones(7), [1.0, 0.5, 1.5, 0.9, 1.1, 1.0, 1.0])
+        unstable = ([2.0, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5],
+            [1.0, 1.05, 0.98, 1.02, 0.97, 1.01, 0.99])
+        for gs in stable
+            c0, lam = compute_c0_lambda_F6_Ih(gs)
+            @test c0 > 0
+            @test lam >= -1e-12 * c0        # the row's premise, made explicit
             for n in (0.1, 1.0, 10.0, 100.0)
                 ε = epsilon_LHY_F6_Ih(n, gs)
                 @test isfinite(ε)
@@ -93,6 +105,14 @@ using LinearAlgebra: Diagonal
             end
             @test epsilon_LHY_F6_Ih(0.0, gs) == 0.0
             @test epsilon_LHY_F6_Ih(-1.0, gs) == 0.0
+        end
+        for gs in unstable
+            c0, lam = compute_c0_lambda_F6_Ih(gs)
+            @test c0 > 0                    # so the refusal is λ_spin's
+            @test lam < -1e-12 * c0
+            @test isnan(epsilon_LHY_F6_Ih(1.0, gs))
+            # n ≤ 0 still short-circuits to 0 before the stiffness is consulted.
+            @test epsilon_LHY_F6_Ih(0.0, gs) == 0.0
         end
     end
 
@@ -116,8 +136,12 @@ using LinearAlgebra: Diagonal
     end
 
     @testset "compute_spinor_lhy_icosahedral wrapper" begin
-        gd = Dict(0 => 1.0, 2 => 1.05, 4 => 0.98, 6 => 1.02,
-            8 => 0.97, 10 => 1.01, 12 => 0.99)
+        # Ladder changed 2026-07-30: the previous one
+        # (0=>1.0, 2=>1.05, 4=>0.98, 6=>1.02, 8=>0.97, 10=>1.01, 12=>0.99) has
+        # λ_spin = −0.0041, so the closed form now refuses it and the table build
+        # throws. Asserted below instead of quietly avoided.
+        gd = Dict(0 => 1.0, 2 => 0.5, 4 => 1.5, 6 => 0.9,
+            8 => 1.1, 10 => 1.0, 12 => 1.0)     # λ_spin = +0.0187
         tbl = compute_spinor_lhy_icosahedral(F=6, g_dict=gd, n_max=2.0, n_points=200)
         @test tbl isa IcosahedralLHY
         @test length(tbl.densities) == 200
@@ -131,6 +155,15 @@ using LinearAlgebra: Diagonal
         # F=6 only
         @test_throws ArgumentError compute_spinor_lhy_icosahedral(
             F=1, g_dict=Dict(0 => 1.0), n_max=1.0, n_points=10)
+        # A refusing closed form must not produce a NaN table. `_tabulate_lhy`
+        # checks, so the build fails where the coupling choice is readable
+        # rather than handing NaN to the propagator — which is what the
+        # pre-existing c_0 < 0 refusal used to do.
+        @test_throws ArgumentError compute_spinor_lhy_icosahedral(
+            F=6,
+            g_dict=Dict(0 => 1.0, 2 => 1.05, 4 => 0.98, 6 => 1.02,
+                8 => 0.97, 10 => 1.01, 12 => 0.99),
+            n_max=2.0, n_points=10)
     end
 
     @testset "Cross-state: IcosahedralLHY vs PolarContact (paper #1 cross-check)" begin

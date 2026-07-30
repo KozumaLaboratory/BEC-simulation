@@ -204,3 +204,133 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #   transactions cost 2.4× (Round 8 measured that for the single-rotation
 #   kernel); (b) whether 105 launches/step matters at ~5 µs each. Get a TSUBAME
 #   profile before optimizing either.
+
+# === Round 10 (2026-07-29, RTP on TSUBAME H100) ===
+#
+# Round 9's two open questions, answered on the card it said to ask:
+#
+#   (a) IS the rotation kernel memory-bound on an H100? YES, flatly.
+#       bench/micro_spin_taylor.jl 128 13 cloud, full H100:
+#         K       1     2     4     8    16    24
+#         ms  0.864 0.865 0.865 0.864 0.864 0.864
+#       t(16)/t(4) = 1.00 against 4.0 for pure compute, ceiling 938.6 GB/s.
+#       So the lever on this machine is ψ TRAFFIC, not the Horner op count —
+#       the opposite of the consumer card, where Round 9 measured ~74 % of FP64
+#       peak in the same body. Both of the cuts below are traffic cuts.
+#   (b) launches: at 128³ the GPU is busy 97.9 % of wall, so the ~105 launches
+#       per step are already hidden. Not a target.
+#
+# BUT FIRST, a defect that mattered more than either. `9c117c05` set
+# `DDI_PADDED_DEFAULT = true`, and `_spin_chain_reason` carried
+# `ws.ddi_padded === nothing || return "..."` — so from that commit no
+# `run_yaml` RTP run took the fused V half-step at all. `bench/profile_rtp.jl`
+# cannot see this: it calls `make_workspace` directly, where `ddi_padding`
+# defaults FALSE. The benchmark went on measuring a path production had left.
+# A bench that bypasses the config parser cannot see a parser default flip.
+#
+# `bench/rtp_padding_ab.jl` (new) prints `_spin_chain_reason`'s verdict beside
+# each timing, so which path ran is read off the run rather than inferred, and
+# it reports BOTH shapes per invocation. Baseline is 634e0234 (post-#183, which
+# had already fixed the ITP-side padded fast paths).
+#
+#   one H100, alternating arms, repeats agreed to < 0.5 %:
+#
+#                  bare (what the bench builds)   padded (what run_yaml builds)
+#                    BASE    FIX    PERF            BASE     FIX    PERF
+#    64³            2.066  2.060   1.79            4.824   3.309   3.05
+#    96³            6.454  6.478   5.69           17.057  12.126  11.37
+#   128³           14.573 14.536  12.79           40.270  28.688  26.95
+#
+#   production shape, BASE → PERF:  1.58× / 1.50× / 1.49×
+#     of which the FIX (re-fusing the padded path) is 1.46× / 1.40× / 1.41×
+#     and the two traffic cuts add                     1.09× / 1.07× / 1.06×
+#
+# The traffic cuts are worth 1.14-1.15× on the bare shape but only 1.06-1.09×
+# on the padded one, because padding runs the convolution on a 2× grid per axis
+# and those FFTs dilute a ψ-traffic saving. Quote the padded column: it is the
+# one production pays.
+#
+# ACCURACY (bench/rtp_order_padded.jl, new). Order had never been measured on
+# the combination production actually runs — GPU + zero-padded + `split_step!`
+# + the fused kernel. `bench/conv_order.jl` is CPU, N=12, unpadded, and calls
+# the half-potential helpers directly. Self-convergence at 24³, Eu151 D=13 F64:
+#
+#   padded, fused ON    dt 2e-4 → 1e-4 → 5e-5 : order 2.000, 2.000
+#   padded, fused OFF                          : order 2.000, 2.000
+#   bare,   fused ON                           : order 2.000, 2.000
+#   and fused ≡ unfused at EVERY dt, bit for bit.
+#
+# Strang is 2 and stays 2. The mean field is what puts that at risk — evaluated
+# at each substep's entry it collapses to ~1 with DDI on — so this is the
+# measurement that would catch a fused half-step that had quietly become a
+# different splitting. An order table alone cannot distinguish "same splitting"
+# from "different splitting of the same order", which is why the bit-identity
+# line is printed next to it.
+#
+# done 2026-07-29 (1): the Picard midpoint opened every iterate with a full-ψ
+#   `copyto!(psi_mid_curr, psi_orig)` — two per step for a plain `split_step!`
+#   (n_picard = 1), four for the composers (n_picard = 2), 436 MB each way at
+#   128³ D=13 F64. The fused kernel reads each (voxel, component) once before
+#   writing it, so it takes a separate source array for free: `psi_in` hands it
+#   ψ_orig and the copy disappears rather than moving. The generic chain, which
+#   is in-place throughout, materialises the request as the copy it would have
+#   paid anyway, so nothing off the fused path changes.
+#
+#   Sanity-check the mechanism against the measurement before believing it: the
+#   saving at 128³ bare is 0.84 ms for 2 × 872 MB = 2.07 TB/s, which an H100 can
+#   do. The same arithmetic is how the first draft of this note — which claimed
+#   SIX copies per step — was caught: six would have needed 6.2 TB/s, above
+#   HBM3 peak. `_half_potential!` passes `n_picard=1`; only the composers use 2.
+#
+# done 2026-07-29 (2): `_spin_density_kernel!` and `_diag_phase_kernel!` are
+#   both per-voxel reductions over the same D components of the same ψ_mf,
+#   launched back to back with the same geometry — the second re-read 436 MB for
+#   a sum the first had in registers (Σ_c|ψ_c|² is a term of both). Fused; each
+#   accumulator keeps its own kernel's terms and order, so bit-identical. Needed
+#   `_convolve_ddi!` / `_convolve_ddi_padded!` (the k-space halves) split out of
+#   the two `_compute_and_convolve_*` wrappers, which now share them.
+#
+# NOT a lever, contrary to the first draft of this note: `n_picard`. The RTP
+#   dispatcher already passes 1 (`_half_potential!`), so a plain step is four
+#   fused half-steps, not six. 2 is reached only by `split_step_midpoint!` and
+#   the MPS/Yoshida composers, where the docstring ties it to Richardson order
+#   recovery. There is no free 1.5× hiding there.
+#
+# rejected(measured — it is an accuracy trade, not a free win) 2026-07-29:
+#   lowering `ddi_pad_factor` below 2. At 128³ the padded step is 26.95 ms
+#   against 12.79 bare, so the open-boundary convolution — six rFFTs on a 256³
+#   grid — is the largest single item left, and the pad factor sets that volume
+#   as pad³. Nobody had measured what the error buys, only what NOT padding
+#   costs (9c117c05: 2.1e-2 to 4.7e-2 against free space). `bench/
+#   ddi_pad_factor_accuracy.jl` (new) sweeps it, referencing pad_factor 3 —
+#   the question is how much Φ still moves as the box grows, which needs no
+#   second implementation to be trusted. H100, Eu151 D=13, box 12, IDENTICAL at
+#   48³ and 64³ (so this is geometry, not resolution — as that commit also found):
+#
+#     pad_factor   rel. Φ error   ms/step (64³)   FFT voxels
+#       none         1.27e-1         1.815          1.00×
+#       1.25         4.58e-2         2.079          1.95×
+#       1.50         1.92e-2         2.385          3.38×
+#       1.75         8.82e-3         2.703          5.36×
+#       2.00         4.29e-3         3.054          8.00×
+#       2.50         9.87e-4         4.535         15.62×
+#
+#   pad 1.5 would be 1.28× faster than the default and still removes 85 % of the
+#   image error — but the 1.9e-2 it leaves is the same size as the error
+#   9c117c05 introduced the padding to remove. So the knob is real and the curve
+#   is steep, and the answer is still no without a physics decision.
+#
+#   Read the `none` row with care: 1.27e-1 here against that commit's 2.1e-2 to
+#   4.7e-2. Same phenomenon, different meters — theirs is a free-space reference
+#   on a field-magnitude measure, this is an L2 ratio over the whole grid against
+#   pad 3. It confirms the meter SEES the images and that they fall steeply, but
+#   it does not reproduce their number and should not be quoted as if it did.
+#   The pad 2.5 row is also near this meter's own floor (its residual against a
+#   true free-space limit is of the same order), so only rows ≤ 2.0 are solid.
+#
+# NEXT: the convolution, without touching its physics. Whether cuFFT does better
+#   on one batched 3-field plan than on three separate ones is unmeasured, and
+#   for the PADDED context it needs only a DDIPaddedContext field-type change,
+#   not a Workspace one — the objection that killed the same idea for the
+#   unpadded buffers in Round 9. Measure on an H100: the FFT-vs-rest balance
+#   moves with the FP64 rate, and the local card will rank it wrong.

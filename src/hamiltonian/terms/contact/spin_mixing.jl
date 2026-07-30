@@ -59,62 +59,57 @@ function _spin_mixing_loop!(
     if D == 3
         return _spin_mixing_rodrigues!(psi, psi_mf, sm, c1, dt_frac, n_pts, imaginary_time)
     end
-    # Same algorithm as the per-voxel scalar Euler decomposition, but the
-    # two D×D matvecs (Stages 2 and 4) become single BLAS gemms over the
-    # (N_spatial, D) reshape. Pre-pass computes per-voxel (α, β, θ) into
-    # the shared rotation cache; the 5-stage core then runs gemm-batched.
-    # Saves 30–35% on the per-step rotation cost (matched the DDI win).
+    # Two realizations of exp(-i·c₁·dt·(⟨F⟩·F)) per voxel, selected by
+    # `SPIN_TAYLOR_ENABLED[]`:
+    #
+    #   Taylor–Horner  the spinor stays in stack buffers for the whole
+    #                  rotation, so ψ moves through cache twice and no
+    #                  trigonometry is needed at all.
+    #   Euler 5-stage  the exact reference the Taylor path is gated against:
+    #                  per-voxel (α, β, θ) into the shared rotation cache, then
+    #                  3 phase passes + 4 BLAS gemms over the (N_spatial, D)
+    #                  reshape — ψ through cache ~18 times.
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    fp_coeffs = fp_ladder_coeffs(T, sm.system.F, Val(D))
+    P = reshape(psi, N_spatial, D)
+    c1_t = T(c1)
+    dt_t = T(dt_frac)
+
+    # The rotation axis and angle come from ⟨F⟩ of the mean-field source (Track
+    # A1: `psi_mf` may be a midpoint estimate while `psi` is the state being
+    # propagated). `_compute_spin_density!` already states that reduction — this
+    # used to be a second, hand-written copy of it fused into an angle pre-pass.
+    fx, fy, fz = _spin_field_scratch(T, n_pts)
+    _compute_spin_density!(fx, fy, fz, psi_mf, sm, Val(D), ndim_from_n_pts(n_pts), n_pts)
+
+    # `_apply_euler_spin_rotation` skips per-voxel when phi·dt < 1e-14; mirror
+    # that at the call level so a polar / vacuum state (⟨F⟩ ≡ 0) pays only the
+    # spin-density pass. Taylor would return ψ unchanged there, just not for
+    # free.
+    fmax = max(maximum(abs, fx), maximum(abs, fy), maximum(abs, fz))
+    theta_max = abs(c1_t * dt_t) * fmax * F
+    theta_max < T(1e-14) && return nothing
+
+    if SPIN_TAYLOR_ENABLED[]
+        # v = ⟨F⟩ raw, scale = c₁·dt — the same split the GPU spin-mixing
+        # substep passes to the same operator.
+        apply_spin_rotation_taylor!(
+            P, fx, fy, fz, spin_tridiag_bands_cached(sm, T),
+            c1_t * dt_t, Val(D); imaginary_time, F, src=nothing)
+        return nothing
+    end
 
     rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim_from_n_pts(n_pts))
     alpha = rc.alpha
     beta = rc.beta
     theta = rc.theta
-
-    P = reshape(psi, N_spatial, D)
-    Pmf = reshape(psi_mf, N_spatial, D)
-    c1_t = T(c1)
-    dt_t = T(dt_frac)
-
-    # Pre-pass: for each voxel compute (α, β, θ) from local spinor.
-    # Track max|θ| so we can skip the rotation entirely when the spin
-    # density vanishes everywhere (polar GS, vacuum regions in scan
-    # warm-ups, etc.) — that case used to early-return per voxel in the
-    # scalar path. Without this guard the four BLAS gemms run on an
-    # all-zero phase array, doing 5 ms of useless work on the bench's
-    # polar workspace.
-    # Track A1: read ⟨F⟩ from `Pmf` so the rotation operator is built
-    # from the user-supplied mean-field source psi (typically a midpoint
-    # estimate). Rotation is still applied to `P` (= state psi).
-    # Threaded, like the identically-shaped DDI angle pre-pass
-    # (`_ddi_compute_angles!`). It was serial only because it also carried the
-    # `max θ` reduction in the loop variable; θ is written to the cache anyway,
-    # so the guard below reads it back instead. At 32³ × D = 13 this pre-pass —
-    # D abs2, D−1 complex products, an atan, an acos and a sqrt per voxel — was
-    # the single largest serial region left in a CPU ITP step.
+    one_t = one(T)
     _voxel_loop!(N_spatial) do k
         @inbounds begin
-            fz_val = T(0)
-            @simd for c in 1:D
-                fz_val += T(F - (c - 1)) * abs2(Pmf[k, c])
-            end
-            fxy_re = T(0)
-            fxy_im = T(0)
-            @simd for c in 2:D
-                pc_m1 = Pmf[k, c - 1]
-                pc = Pmf[k, c]
-                prod = conj(pc_m1) * pc
-                coef = fp_coeffs[c]
-                fxy_re += coef * real(prod)
-                fxy_im += coef * imag(prod)
-            end
-            px = c1_t * fxy_re
-            py = c1_t * fxy_im
-            pz = c1_t * fz_val
-            pm_sq = px * px + py * py + pz * pz
-            pm = sqrt(pm_sq)
+            px = c1_t * fx[k]
+            py = c1_t * fy[k]
+            pz = c1_t * fz[k]
+            pm = sqrt(px * px + py * py + pz * pz)
             if pm < T(1e-100)
                 alpha[k] = T(0)
                 beta[k] = T(0)
@@ -122,20 +117,12 @@ function _spin_mixing_loop!(
             else
                 alpha[k] = atan(py, px)
                 cb = pz / pm
-                cb = cb > one(T) ? one(T) : (cb < -one(T) ? -one(T) : cb)
+                cb = cb > one_t ? one_t : (cb < -one_t ? -one_t : cb)
                 beta[k] = acos(cb)
                 theta[k] = pm * dt_t
             end
         end
     end
-
-    # `_apply_euler_spin_rotation` skips per-voxel when phi·dt < 1e-14;
-    # mirror that here at the call level so polar / vacuum states pay
-    # only the pre-pass cost (~150 μs at 16³) instead of running four
-    # gemms over a zero phase field. θ = |c₁⟨F⟩|·dt ≥ 0 everywhere, so
-    # max θ² is (max θ)² — the same number the in-loop accumulator held.
-    max_theta = maximum(theta)
-    max_theta * max_theta < T(1e-28) && return nothing
 
     if imaginary_time
         _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,
