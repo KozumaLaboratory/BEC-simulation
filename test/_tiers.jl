@@ -65,6 +65,7 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_lhy_no_bare_device_broadcast.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
     "validation/test_k3_unit_audit.jl",
@@ -430,6 +431,7 @@ const FULL_EXTRA = [
     # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_lhy_term_faces.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
     # both the fused spin-density corner write and the rotation's in-place read

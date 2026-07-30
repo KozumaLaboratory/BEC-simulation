@@ -18,7 +18,14 @@ function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
     lhy = ws.lhy !== nothing ? ws.lhy : ws.interactions.c_lhy
     N = ndims(psi) - 1
     n = total_density(psi, N)
-    V = _lhy_V.(n, Ref(lhy))
+    # Via `_lhy_potential_field`, NOT a bare `_lhy_V.(n, Ref(lhy))`. A
+    # `TabulatedLHY` cannot cross into a GPU kernel — it holds host
+    # `Vector{Float64}` tables, so broadcasting `_lhy_V` over a device array dies
+    # with "KernelError: passing non-bitstype argument". The CUDA extension
+    # overrides `_lhy_potential_field` for `TabulatedLHY` (uploads the table once
+    # per objectid, O(1) uniform-grid lookup); its CPU method is exactly the
+    # broadcast this replaces, so CPU behaviour is bit-unchanged.
+    V = _lhy_potential_field(lhy, n, real(eltype(psi)))
     phase = imaginary_time ? exp.(.-V .* dt) : cis.(.-V .* dt)
     D = size(psi, N + 1)
     idx = ntuple(_ -> :, Val(N))
@@ -246,7 +253,9 @@ function _grad_lhy!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
     lhy = ws.lhy === nothing ? ws.interactions.c_lhy : ws.lhy
     _lhy_is_active(lhy) || return nothing
     _lhy_needs_spin(lhy) && return _grad_lhy_spatial!(grad, psi, lhy, n_pts, D, Val(N))
-    v_lhy = _lhy_V.(n_density, Ref(lhy))
+    # Same reason as `apply_step!`: this is the L-BFGS gradient path, and a bare
+    # broadcast cannot carry a tabulated LHY into a device kernel.
+    v_lhy = _lhy_potential_field(lhy, n_density, real(eltype(psi)))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         view(grad, idx...) .+= v_lhy .* view(psi, idx...)
