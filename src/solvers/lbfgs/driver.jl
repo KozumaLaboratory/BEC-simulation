@@ -249,9 +249,9 @@ function find_ground_state_lbfgs(;
             _lbfgs_direction(grad, s_hist, y_hist, rho_hist, dV)
         end
 
-        # Ensure descent direction (`real(dot(a, b))` skips two
-        # broadcast temporaries vs `real(sum(conj.(a) .* b))`)
-        slope = real(dot(grad, direction)) * dV
+        # Ensure descent direction. `_realdot`, not `real(dot(...))` — see the
+        # note there on OpenBLAS level-1 team overhead.
+        slope = _realdot(grad, direction) * dV
         if slope >= 0
             direction .= .-grad  # fall back to steepest descent
             slope = -sum(abs2, grad) * dV
@@ -296,7 +296,7 @@ function find_ground_state_lbfgs(;
         # `size(grad)` temporaries.
         y_k = scratch.y_k
         y_k .= grad_new .- grad
-        ys = real(dot(s_k, y_k)) * dV
+        ys = _realdot(s_k, y_k) * dV
         if is_active(ys)
             # At capacity, evict the oldest pair and write the new one into
             # the buffers it was holding: steady-state history maintenance

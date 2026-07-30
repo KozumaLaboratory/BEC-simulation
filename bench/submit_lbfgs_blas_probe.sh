@@ -51,6 +51,9 @@ export JULIA_DEPOT_PATH="${T4_TMPDIR:-/tmp}/.julia:/gs/fs/tga-kozuma-kouhi/share
 mkdir -p "${T4_TMPDIR:-/tmp}/.julia"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 export SBEC_BENCH_SECONDS=${SBEC_BENCH_SECONDS:-300}
+# One cell: the BLAS question is about a CPU reduction, and the DDI cell would
+# double a 6-point matrix into a 12-measurement one (~2.3 h, measured).
+export SBEC_BENCH_CELLS=${SBEC_BENCH_CELLS:-contact}
 export SPINORBEC_SCRATCH_DIR="${T4_TMPDIR:-/tmp}/spinorbec_snaps"
 mkdir -p "$SPINORBEC_SCRATCH_DIR"
 

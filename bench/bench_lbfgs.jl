@@ -70,14 +70,21 @@ end
 # a steady-state iteration and the component breakdown cannot close.
 const TARGET_SECONDS = parse(Float64, get(ENV, "SBEC_BENCH_SECONDS", "300"))
 
-function iteration_slope(cell; n_lo::Int=25)
+function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
     run(n) = begin
         r = find_ground_state_lbfgs(; cell..., n_steps=n, tol=0.0)
         SYNC()
         r
     end
     run(n_lo)                                   # compile
-    per_probe = (@elapsed run(n_lo)) / n_lo
+    # Size the long arm from a SLOPE, not from a single short run. A single
+    # `n_lo`-step run averages in the steps before the history reaches
+    # `m_lbfgs`, which are cheaper: probing that way underestimated the
+    # steady-state iteration by 2x (116 ms vs 245 ms measured), so a "5 minute"
+    # point ran for 11.
+    t_probe_lo = @elapsed run(n_lo)
+    t_probe_hi = @elapsed run(n_probe)
+    per_probe = max((t_probe_hi - t_probe_lo) / (n_probe - n_lo), 1.0e-6)
     n_hi = clamp(round(Int, TARGET_SECONDS / per_probe) + n_lo, 4 * n_lo, 500_000)
     t_lo = @elapsed run(n_lo)
     t_hi = @elapsed run(n_hi)
@@ -149,8 +156,12 @@ end
 ms(x) = @sprintf("%8.3f ms", x * 1e3)
 
 grids = GRID_ARG > 0 ? (GRID_ARG,) : (16, 24)
+# `SBEC_BENCH_CELLS` trims the sweep. A question about a CPU reduction does not
+# need the DDI cell, and each cell is a full measurement budget.
+const CELLS = get(ENV, "SBEC_BENCH_CELLS", "both")
+ddi_cases = CELLS == "contact" ? (false,) : CELLS == "ddi" ? (true,) : (false, true)
 
-for n in grids, ddi in (false, true)
+for n in grids, ddi in ddi_cases
     label = "Eu151 F=6 $(n)³ " * (ddi ? "+DDI" : "contact")
     println("=== $label ===")
     cell = build_cell(; n, enable_ddi=ddi)
