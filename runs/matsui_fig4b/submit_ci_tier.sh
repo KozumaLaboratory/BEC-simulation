@@ -10,6 +10,7 @@
 #$ -cwd
 #$ -N f4b_ci
 #$ -l cpu_16=1
+#$ -l m_mem_free=64G
 #$ -l h_rt=4:00:00
 #$ -j n
 
@@ -26,7 +27,9 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.jul
 echo "[ci] $(hostname)  HEAD $(git rev-parse --short HEAD)  $(git status --porcelain | wc -l) dirty"
 
 export SPINORBEC_TEST_TIER=ci
-export SPINORBEC_TEST_WORKERS=auto
+# 4, not auto: `auto` spawns one julia per core and each loads SpinorBEC in a
+# clean session, which OOM-killed a 16-core node at 201 s (UGE 8304457, exit 137).
+export SPINORBEC_TEST_WORKERS=4
 export SPINORBEC_TEST_TIMING=quiet
 
 "$JULIA" --project=. -e 'using Pkg; Pkg.test()'
