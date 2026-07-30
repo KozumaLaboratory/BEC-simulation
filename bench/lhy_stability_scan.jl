@@ -105,7 +105,8 @@ for n0 in (0.01, 0.1, 1.0, 10.0)
         growth(sp.polar, ip0, EU_c_dd, n0),
         growth(sp.ferromagnetic, ip0, EU_c_dd, n0))
 end
-println("  If max Im ω ∝ √n0 with no zero crossing, no density is a stable")
-println("  working point either — the sign of the instability is n-independent")
-println("  because it comes from a negative eigenvalue of the coupling matrix,")
-println("  and n only sets its rate.")
+println("  Measured EXACTLY linear in n0 with no crossing, which is what")
+println("  |Im ω| = n·|λ_min| looks like: ω² = ε_k(ε_k + 2nλ) is most negative at")
+println("  ε_k = −nλ, giving |Im ω| = n|λ|. So the SIGN of the instability is")
+println("  n-independent and no working density is a stable point either — n only")
+println("  sets the rate.")

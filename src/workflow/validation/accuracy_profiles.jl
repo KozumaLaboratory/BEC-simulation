@@ -56,13 +56,38 @@
 #    `with_reference_accuracy` for those. `accuracy_profile_report` says so rather
 #    than letting the name imply full coverage.
 #
-# 3. `:reference` has a PRECONDITION the value alone cannot express, and it is
-#    the one that cost a day: `spinor_lhy = :full_bdg` tabulates ε_LHY from the
-#    peak-density spinor of the state the workspace is built with. Handed a raw
-#    seed, it tabulates from an unrelaxed, dynamically-unstable configuration —
-#    measured max Im ω = 1040 at Eu F=6 — and `FullBdGLHY` itself says ε_LHY is
-#    scheme-dependent there. `check_accuracy_preconditions` refuses that
-#    combination instead of leaving it to a maxlog-limited runtime warning.
+# 3. `:reference` has PRECONDITIONS the value alone cannot express, and they are
+#    what cost a day. `spinor_lhy = :full_bdg` tabulates ε_LHY from the
+#    peak-density spinor of the state the workspace is built with, and
+#    `FullBdGLHY` is scheme-dependent wherever that mean field is dynamically
+#    unstable. Two separate measurements, both via `lhy_mean_field_max_growth`
+#    (`bench/lhy_stability_scan.jl`, `bench/phase_gap_error_budget.jl`):
+#
+#      * a RAW SEED tabulates from an unrelaxed configuration — max Im ω = 1040 at
+#        Eu F=6 32³ from `:flower`. Relaxing first cuts that to ≈ 9.8, two orders
+#        better.
+#      * and it does not reach zero, because the DIPOLE is what makes it nonzero.
+#        Scaled c_dd at Eu F=6, n₀ = 1, c₁/c₀ = 0.05: c_dd = 0 gives EXACTLY 0,
+#        and every nonzero c_dd is unstable, roughly linearly (2.11 → 319,
+#        21.1 → 1060, 211 → 4371 for polar). Scanned over c₁/c₀ ∈ [−0.1, 0.1] and
+#        q ∈ {0, 1e-3, 1e-2}: not one stable point. Over n₀ ∈ [0.01, 10]:
+#        max Im ω is exactly linear in n₀ with no crossing, which is what
+#        |Im ω| = n|λ_min| looks like — so no working density escapes it either.
+#
+#    So at Eu F=6 with the real c_dd, `:reference` has NO valid instance, and
+#    "relax first" is not a workaround. `check_accuracy_preconditions` takes
+#    `c_dd` and refuses on it. That makes the reference profile honest at the cost
+#    of leaving the dipolar production problem without one — which is the true
+#    state of affairs, and is the same fact as issue #172 seen from another side:
+#    the term that is 97 % of the Eu F=6 total energy is built on a linearisation
+#    with no stable point.
+#
+#    SCOPE. This is a statement about the UNIFORM (local-density) mean field every
+#    tabulated LHY is built from, not about the trapped texture. A trap and a
+#    texture's own gradients gap the low-k modes; whether the trapped state is
+#    stable is a trapped-BdG question and a different instrument
+#    (`solvers/hessian`'s λ_min). What is measured here is that the construction
+#    of ε_LHY is ill-posed at Eu, not that the ground state does not exist.
 
 export ACCURACY_PROFILE_NAMES, DEFAULT_ERROR_BUDGET_FRAC,
     accuracy_profile, accuracy_profile_for_budget, accuracy_profile_report,
@@ -179,40 +204,68 @@ NOT set by this profile:
 end
 
 """
-    check_accuracy_preconditions(name; relaxed_initial_state::Bool) -> CheckResult
+    check_accuracy_preconditions(name; relaxed_initial_state::Bool, c_dd = 0.0)
+        -> CheckResult
 
 Whether a profile's assumptions hold for how it is about to be used.
 
-`:reference` requires `spinor_lhy = :full_bdg`, and that tabulates ε_LHY from the
-peak-density spinor of the state the workspace is built with. If that state is a
-raw seed rather than a relaxed one, the table comes from a dynamically-unstable
-configuration and ε_LHY is scheme-dependent — so the run has no well-defined
-ground state to converge to, which is not a tolerance that can be tightened.
-Measured: max Im ω = 1020 from a `:flower` seed at Eu F=6, 32³, and the reference
-arm's ITP sat at dE ≈ 1e-2 against a 1e-9 target
-(`bench/phase_gap_error_budget.jl`).
+`:reference` requires `spinor_lhy = :full_bdg`, which tabulates ε_LHY from the
+peak-density spinor of the state the workspace is built with — and is
+scheme-dependent wherever that mean field is dynamically unstable, because the
+zero-point sum drops the complex branches while the counterterms still subtract
+all `D` of them. Two independent ways to land there, and the second one is fatal:
+
+  * an UNRELAXED initial state. Measured max Im ω = 1040 from a `:flower` seed at
+    Eu F=6 32³; relaxing with `lhy = none` first brings it to ≈ 9.8.
+  * an ACTIVE DIPOLE, which cannot be relaxed away. `c_dd = 0` gives exactly
+    zero; every nonzero `c_dd` is unstable, roughly linearly in it, at every
+    `c₁/c₀ ∈ [−0.1, 0.1]`, every `q ∈ {0, 1e-3, 1e-2}` and every
+    `n₀ ∈ [0.01, 10]` scanned (`bench/lhy_stability_scan.jl`). So there is no
+    stable point to move to, and this returns `:fail` rather than advice.
+
+`c_dd` defaults to 0 so a non-dipolar caller is unaffected; pass the real value
+and a dipolar `:reference` run is refused before it is spent.
 
 Returns `:fail` rather than throwing, so a caller can report it alongside other
 checks; `passed(r)` is the green/not-green question.
 """
-function check_accuracy_preconditions(name::Symbol; relaxed_initial_state::Bool)
+function check_accuracy_preconditions(name::Symbol; relaxed_initial_state::Bool,
+    c_dd::Real=0.0)
     p = accuracy_profile(name)
-    needs_relaxed = hasproperty(p, :spinor_lhy) && p.spinor_lhy === :full_bdg
+    needs_stable = hasproperty(p, :spinor_lhy) && p.spinor_lhy === :full_bdg
     details = Pair{Symbol, Any}[
         :profile => (got=name,),
         :spinor_lhy => (got=hasproperty(p, :spinor_lhy) ? p.spinor_lhy : nothing,
-            needs_relaxed_initial_state=needs_relaxed),
+            needs_stable_mean_field=needs_stable),
         :relaxed_initial_state => (got=relaxed_initial_state,),
+        :c_dd => (got=Float64(c_dd),),
     ]
-    if needs_relaxed && !relaxed_initial_state
+    # The dipole comes FIRST: it is the unfixable one, and reporting the
+    # relaxation advice for a dipolar run would send the caller after a
+    # workaround that has been measured not to work.
+    if needs_stable && c_dd != 0
+        return CheckResult(:fail, details,
+            ":$name uses spinor_lhy = :full_bdg with c_dd = $(Float64(c_dd)) ≠ 0. " *
+            "full_bdg tabulates ε_LHY from a uniform BdG spectrum, and an active " *
+            "dipole makes that spectrum dynamically unstable at every c₁, q and " *
+            "density scanned at Eu F=6 (c_dd = 0 gives exactly 0; 2.11 → 319, " *
+            "21.1 → 1060, 211 → 4371), so ε_LHY is scheme-dependent and no " *
+            "relaxation or tolerance reaches a stable point. There is currently " *
+            "NO reference LHY for a dipolar spinor gas — the closed forms do not " *
+            "detect this but are not derived for an unstable mean field either. " *
+            "Quote the closed form you used and its own residual instead of " *
+            "claiming a reference. Scope: this is the uniform local-density mean " *
+            "field, not the trapped state.")
+    end
+    if needs_stable && !relaxed_initial_state
         return CheckResult(:fail, details,
             ":$name uses spinor_lhy = :full_bdg, which tabulates ε_LHY from the " *
             "peak-density spinor of the state the workspace is built with. The " *
             "initial state is not relaxed, so the table would come from a " *
             "dynamically-unstable configuration where ε_LHY is scheme-dependent " *
-            "(measured max Im ω = 1020 on a raw seed at Eu F=6 32³). Relax first " *
-            "with lhy = none or a closed form, then rebuild the workspace from " *
-            "that ψ and re-converge.")
+            "(measured max Im ω = 1040 on a raw seed at Eu F=6 32³, against ≈ 9.8 " *
+            "after relaxing). Relax first with lhy = none or a closed form, then " *
+            "rebuild the workspace from that ψ and re-converge.")
     end
     CheckResult(:pass, details, ":$name preconditions hold")
 end
