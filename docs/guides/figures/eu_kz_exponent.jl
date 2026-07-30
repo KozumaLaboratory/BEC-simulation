@@ -211,6 +211,15 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif mode == "probe_nohold"
+        # t_hold is the suspect. mu=15 / R_TF/xi=30 / 138^3 returned zero defects at
+        # healthy N_C (2.45e4), and so did mu=5 / R/xi=10 — tripling the system size
+        # changed nothing, which is hard to explain by "no room for a frozen
+        # correlation length". The protocol here held the field for 20 internal units
+        # AFTER the quench, and damping anneals defects away in that window; Weiler
+        # et al. measure with the hold minimised. Same cost as the probe, and it is
+        # the more upstream cause.
+        kz_scan(; tau_Qs=(8.0,), t_hold=1.0, n_seed=4, backend, tag="kz_probe_nohold")
     elseif mode == "probe"
         # ONE rate before committing ~25 GPU-hours to five. The scan is only worth
         # running if a defect appears at all at this system size: mu = 5 gave zero
