@@ -11,6 +11,8 @@
 # not the same number.
 
 using SpinorBEC
+using CodecZstd   # must be loaded BEFORE jldopen: JLD2's dynamic load of the
+# zstd decompressor hits a world-age error mid-call otherwise
 using JLD2
 using YAML
 using DelimitedFiles
@@ -30,13 +32,23 @@ function scan_fields_nT(run_dir)
     gauss .* 1e5   # 1 Gauss = 1e-4 T = 1e5 nT
 end
 
-"Final-time population of every m component, per scan point."
+"""
+Population fraction of every m component at the END of the hold, per scan point.
+
+Taken from the saved final `psi`, not from the last row of
+`dynamics/component_populations`: with `save.every = 100` over 3456 steps the
+last *sample* is at step 3400, 1.6 % of the hold short of the 5 ms the
+comparison is about. ψ is normalised to 1, so the fractions need no grid.
+"""
 function final_populations(run_dir)
     files = sort(filter(f -> occursin(r"^point_\d+\.jld2$", f), readdir(run_dir)))
+    isempty(files) && error("no point_NNN.jld2 in $run_dir")
     map(files) do f
         jldopen(joinpath(run_dir, f), "r") do d
-            pops = d["dynamics"]["component_populations"]   # (n_saves, 2F+1)
-            vec(pops[end, :])
+            psi = d["psi"]                                   # (n..., 2F+1)
+            D = size(psi)[end]
+            w = [sum(abs2, selectdim(psi, ndims(psi), c)) for c in 1:D]
+            w ./ sum(w)
         end
     end
 end
