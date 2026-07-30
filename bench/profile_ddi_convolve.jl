@@ -95,6 +95,8 @@ t_fwd = tmin(() -> begin
         mul!(ctx.Fz_pad_rk, rp.forward, ctx.Fz_pad)
     end, REPS)
 t_fwd1 = tmin(() -> mul!(ctx.Fx_pad_rk, rp.forward, ctx.Fx_pad), REPS)
+# One fused kernel on the GPU since the contraction fuse; the label used to say
+# "3 bcast" and would have quietly misdescribed the arm being measured.
 t_contr = tmin(
     () -> _ddi_padded_k_contraction!(ctx, ws.ddi.C_dd / prod(pad)), REPS)
 t_bwd = tmin(() -> begin
@@ -106,7 +108,7 @@ t_bwd1 = tmin(() -> mul!(ctx.Phi_x_pad, bp, ctx.Phi_x_pad_rk), REPS)
 
 parts = [("spin density (1 kernel)", t_dens),
     ("rFFT forward ×3", t_fwd),
-    ("k contraction (3 bcast)", t_contr),
+    ("k contraction", t_contr),
     ("brFFT backward ×3", t_bwd)]
 tot = sum(last, parts)
 for (nm, t) in parts
