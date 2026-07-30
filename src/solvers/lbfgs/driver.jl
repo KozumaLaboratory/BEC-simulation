@@ -91,6 +91,15 @@ function find_ground_state_lbfgs(;
     # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
+    max_line_search_failures::Int=3,  # consecutive α=0 line searches that end the
+    # solve. A failure empties the curvature history, so the NEXT iteration is
+    # steepest descent with a bounded expansion in front of it: if that also
+    # finds no energy decrease over 30 halvings, the iterate is at the
+    # energy-comparison floor and no further step exists to be found. Before
+    # this existed the solver ran to `n_steps` regardless, at ~30 futile energy
+    # evaluations each — measured 97.8 % of 2000 steps on Eu-151 F=6 24³ at the
+    # default `tol=1e-8`, whose gradient floor is 5e-7. Set `typemax(Int)` to
+    # restore the old behaviour.
     lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
     # two-loop (ε-continuation threads it across rungs so
     # each rung reuses curvature instead of restarting SD).
@@ -220,6 +229,8 @@ function find_ground_state_lbfgs(;
     # backtrack in front of it, which is what a ~30 evals/iteration average
     # means.
     n_line_search_failures = 0
+    consecutive_ls_failures = 0
+    stalled = false
     t_start = time()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
@@ -279,13 +290,22 @@ function find_ground_state_lbfgs(;
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
             n_line_search_failures += 1
+            consecutive_ls_failures += 1
             empty!(s_hist);
             empty!(y_hist);
             empty!(rho_hist)
             E_prev = E
             last_step = step
+            if consecutive_ls_failures >= max_line_search_failures
+                stalled = true
+                verbose && @printf(
+                    "  Stalled at the energy-comparison floor: %d consecutive line searches found no decrease. |∇E|=%.3g\n",
+                    consecutive_ls_failures, grad_norm)
+                break
+            end
             continue
         end
+        consecutive_ls_failures = 0
 
         # Step + retraction: both were already performed inside the line search
         # at the accepted α (that is what it evaluated the energy of), so take
@@ -401,10 +421,15 @@ function find_ground_state_lbfgs(;
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
+    # `converged` keeps its meaning (grad_norm < tol). `stop_reason` says WHY the
+    # loop ended, which `converged=false` alone cannot distinguish: a solve that
+    # ran out of steps while still descending and one that hit its gradient floor
+    # at step 25 and then spent 1975 steps proving it both report `false`.
+    stop_reason = converged ? :tol : (stalled ? :line_search_stalled : :max_steps)
     merge(
         result,
         (; lbfgs_history=(s_hist, y_hist, rho_hist),
-            n_line_search_evals, n_line_search_failures),
+            n_line_search_evals, n_line_search_failures, stop_reason),
     )
 end
 

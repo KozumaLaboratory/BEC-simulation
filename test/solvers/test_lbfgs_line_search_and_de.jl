@@ -71,6 +71,33 @@ using Test
         @test r6.dE ≈ gap rtol = 1.0e-8
     end
 
+    @testset "stops at the floor instead of burning n_steps" begin
+        # With `tol` below the problem's attainable gradient floor the solver
+        # reaches the floor and then cannot decrease the energy at all. Before
+        # the stall check it ran to `n_steps` regardless, at ~30 futile energy
+        # evaluations each — measured 97.8 % of 2000 steps on Eu-151 F=6 24³ at
+        # the DEFAULT tol=1e-8, whose floor is 5e-7.
+        #
+        # Once two consecutive line searches fail the state is a fixed point: ψ
+        # is unchanged, the history has been emptied, so the next iteration
+        # forms the same steepest-descent direction from the same gradient and
+        # fails identically. Stopping there cannot cost anything, and the two
+        # runs below must therefore agree on the iterate exactly.
+        r_stop = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
+        r_grind = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16,
+            max_line_search_failures=typemax(Int))
+
+        @test r_stop.stop_reason === :line_search_stalled
+        @test r_stop.last_step < 400
+        @test r_grind.stop_reason === :max_steps
+        @test r_grind.last_step == 400
+        # Same fixed point, so the early stop gives up nothing.
+        @test r_stop.energy == r_grind.energy
+        @test r_stop.grad_norm == r_grind.grad_norm
+        # ...and it is a large saving, not a marginal one.
+        @test r_grind.n_line_search_evals > 5 * r_stop.n_line_search_evals
+    end
+
     @testset "line-search evaluation count is reported" begin
         # This count, not any single kernel, is what sets the cost of an
         # iteration: a 5-minute measurement of Eu-151 F=6 at 24³ put the
