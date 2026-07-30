@@ -397,6 +397,76 @@ is therefore **still unpriced**, and no conclusion may be drawn from this arm
 until `c1_ratio` in a `ground_state` step is shown to move `c₀` in a run. That is
 the next thing to fix, and it needs a gate that fails when the value does not move.
 
+#### The `c1_ratio` defect is confirmed, and it makes every number above provisional
+
+`gs_c1ratio_probe.yaml` is three ground states and nothing else, scanning only
+`c1_ratio`. `c₀ = c_total/(1 + 36·c1_ratio)`, so the three points span a **19×
+range** in `c₀`:
+
+| `c1_ratio` | `c₀` it should give | converged `E` |
+|---|---|---|
+| 1/36 | 2343.63 | −910.6679 |
+| 0 | 4687.27 | −910.6698 |
+| 0.5 | 246.70 | −910.6692 |
+
+The energies span **1.3×10⁻³** where ~8.6 was due, and they are not even monotonic
+in `c₀`. The non-Zeeman part of this energy is ≈ 12.6 against a non-interacting
+1.59, so the contact term dominates it — this is not a case of a small effect
+hiding under a large one. **`c1_ratio` in a `ground_state` step does not reach
+`c₀`.** UGE 8304841 task 6, commit `0e78456e`, exit 0. Type A.
+
+`load_config` resolves the step's dict correctly (`c1_ratio => 0.0` for the
+variant, `0.0277…` for the scan), so the loss is downstream of parsing. Root
+cause not diagnosed here — the probe isolates it in three ground states and ~3
+minutes, which is the right place to start.
+
+**Consequence.** The dynamics step carries no `interactions` block and inherits
+`ws_prev.interactions` from the ground state, so whatever `c₀`/`c₁` the ground
+state got, the dynamics got too. Rows 3.2/3.3 of §0.3.4 say our `c1_ratio = 1/36`
+reproduces their `cc0_eff = 0.5, cc1_eff = 50` pair exactly — **that is verified
+at the function level and is not verified for what actually ran.** Until the
+defect is fixed and the scan re-run, the Fig. 4B and Fig. 2C numbers above are
+**provisional**: they may have been produced with an unintended `c₀` and with
+`c₁ = 0` rather than `c₀/36`, which is a candidate explanation for both the 20 %
+rate excess and the 15 % width excess and has to be excluded before either is
+attributed anywhere.
+
+#### Experimental corrections that cost no compute
+
+Two things separate the published curves from the measurement, and both can be
+applied without running anything.
+
+**Shot-to-shot field jitter.** The caption states ~1 nT random fluctuation, which
+is a Gaussian average over `B`. Applied to both simulations on the −13 … +9 nT
+window:
+
+| | centre [nT] | width [nT] |
+|---|---|---|
+| SpinorBEC raw | −2.138 | 14.46 |
+| SpinorBEC + 1 nT | −2.185 | 13.87 |
+| Matsui sim raw | −2.549 | 13.07 |
+| Matsui sim + 1 nT | −2.596 | 13.22 |
+| Matsui exp | −3.205 | 12.84 |
+
+The centre shifts by −0.05 nT on both sides — negligible. The widths move by
+≲0.6 nT and **in opposite directions**, which is an artefact, not physics: at the
+window edges the Gaussian kernel is truncated, and the width is measured against
+an endpoint baseline. Do not read the width column of this table as a result; the
+honest statement is that 1 nT of jitter does not close a 1.4 nT width gap.
+
+**The atom-number deficit.** Summing the experimental sheet at 5 ms gives a total
+that runs from 45.8k in the wings to 27.6k at the dip — 8 % to 45 % below 5×10⁴,
+**deepest exactly where the dip is**. Fig. 4B plots absolute `N_{−6}`, so this
+sits inside the compared quantity while both simulations conserve atom number.
+Normalising it away changes the measured dip remarkably little (centre −3.205 →
+−3.139, width 12.84 → 12.41), so the deficit is **not** what separates the
+experiment from the simulations in shape — but it does mean the absolute
+comparison Fig. 4B draws is between a lossy measurement and a lossless model.
+
+`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values (Miyazawa 2021
+direct 1.2×10⁻²⁹ cm⁶/s, 3×, and 10× — the last deliberately far above anything
+measured) to test whether three-body loss can produce that deficit at all.
+
 #### Fig. 2C — the loss-free time series
 
 Single field (2.6 nT), 40 ms, 32³, against `dataset_fig2_theo`:
