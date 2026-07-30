@@ -9,6 +9,7 @@ Anchors:
 - `README.md` / `docs/index.md` — project description + documentation map.
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
 - `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit,adding_new_hamiltonian_term}.md` — physics convention authority + 14-term sign × path audit.
+- `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 stale-doc table **overrides this file** where the two disagree, until the source doc is fixed.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
 `AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.
