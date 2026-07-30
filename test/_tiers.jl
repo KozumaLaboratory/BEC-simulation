@@ -41,6 +41,9 @@ const FAST_TESTS = [
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
     "workflow/test_interactions_roundtrip.jl",
+    # CLAUDE.md commitment #4 (same spec ⇒ same outdir) had no test at all until
+    # the mutation harness reversed the canonical key sort and nothing went red.
+    "workflow/test_content_id_determinism.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",

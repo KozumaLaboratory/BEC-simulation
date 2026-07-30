@@ -262,6 +262,48 @@ const MUTANTS = Mutant[
         "run_family's grouping contract",
         "Leaves the content-addressed hash on the family name, so every run becomes \
          its own family and the catalog's grouping collapses to one row per run."),
+    Mutant(:cas_canonical_bytes_unsorted,
+        "src/workflow/experiment.jl",
+        # `rev=true`, not "drop the sort": dropping it is a NO-OP for these specs,
+        # because Julia's Dict iteration order is a function of the key hashes, not
+        # of insertion order — measured, two specs built in different orders both
+        # iterate ["alpha","zeta","mid"]. Reversing the sort genuinely changes the
+        # canonical bytes, so this mutant asks the question the ineffective one
+        # could not: does anything pin the content id at all?
+        r"        for k in sort!\(collect\(keys\(x\)\); by=string\)",
+        "        for k in sort!(collect(keys(x)); by=string, rev=true)",
+        :drop, :fatal,
+        "CLAUDE.md commitment #4: content_id deterministic across dict-iteration order",
+        "Drops the key sort, so `content_id(spec)` depends on Dict iteration order. \
+         The same spec then lands in different outdirs on different runs and the \
+         cache never hits — the whole content-addressing guarantee."),
+    Mutant(:conservation_spec_always_passes,
+        "src/workflow/validation/specs.jl",
+        r"            \(v, v < bound\)",
+        "            (v, true)",
+        :drop, :fatal,
+        "ConservationSpec is the bound-checking half of the validation ladder",
+        "The bound is evaluated and then ignored, so every run reports PASS. A \
+         validator that cannot fail is worse than no validator: it launders a \
+         diverging run as a checked one."),
+    Mutant(:loss_k3_alias_guard_removed,
+        "src/workflow/experiments/schema/parsing_blocks.jl",
+        r"    haskey\(node, \"K3_per_m\"\) && throw\(",
+        "    false && throw(",
+        :drop, :gross,
+        "gotcha_K3_routing_pre_2026_05_13 (the alias removed 2026-05-24)",
+        "The removed `K3_per_m` alias becomes silently ignored instead of refused, \
+         so a config carrying a 3-body rate under the old name runs with NO 3-body \
+         loss — the shape of the original K3-routing defect."),
+    Mutant(:state_zoo_spin_coherent_drops_phi,
+        "src/workflow/initialization/state_zoo.jl",
+        r"    init_theta=theta, init_phi=phi\)",
+        "    init_theta=theta, init_phi=0.0)",
+        :drop, :gross,
+        "CLAUDE.md: 'Wrap, don't fork' — a named state must be the same physics",
+        "The named wrapper stops forwarding `phi`, so every caller asking for an \
+         in-plane direction gets phi = 0. `:transverse_x` is exactly this call, and \
+         the wrapper's whole contract is that it is `init_psi` with a name."),
 ]
 
 """
