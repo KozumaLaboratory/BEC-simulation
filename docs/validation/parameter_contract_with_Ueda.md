@@ -279,7 +279,11 @@ Read alongside the numbers, whenever they land:
   a number, not a measurement.
 - **Step cost, measured warm** (UGE 8304456, per-point wall over 3456 dynamics
   steps after the first point absorbs the JIT): **5.2 s at 32³ ⇒ ~1.5 ms/step**,
-  **21.7 s at 64³ ⇒ ~6.3 ms/step**. Both are upper bounds — a short ITP shares
+  **21.7 s at 64³ ⇒ ~6.3 ms/step**, and **6.2 s at 32³ with three-body loss on**
+  (+19 %). Whole-job wall clock is ~1.5× the sum of per-point times — a 135-point
+  lossy scan predicted at 13 min from per-point cost alone measured **1210 s
+  (20.2 min)**, the difference being JIT plus per-point workspace rebuild,
+  analyze and I/O. Predict from whole-job walls, not from per-point times. Both are upper bounds — a short ITP shares
   the same window. That is ~4× the campaign cost table's cell-count
   extrapolation at 32³ and ~2× its measured 3.2 ms at 64³, the gap being the
   padded DDI. **The smoke's 27 ms/step was a cold number and is retracted**: it
@@ -463,9 +467,32 @@ Normalising it away changes the measured dip remarkably little (centre −3.205 
 experiment from the simulations in shape — but it does mean the absolute
 comparison Fig. 4B draws is between a lossy measurement and a lossless model.
 
-`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values (Miyazawa 2021
-direct 1.2×10⁻²⁹ cm⁶/s, 3×, and 10× — the last deliberately far above anything
-measured) to test whether three-body loss can produce that deficit at all.
+`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values to test
+whether three-body loss can produce that deficit at all. **It cannot** (UGE
+8304841 task 5, commit `0e78456e`, exit 0, 135 points):
+
+| `K₃` [cm⁶/s] | atom loss at 5 ms, over −12.5 … +9 nT | dip centre | width |
+|---|---|---|---|
+| 1.2×10⁻²⁹ (Miyazawa 2021 direct) | 0.27 – 0.44 % | −2.146 | 14.63 |
+| 3.6×10⁻²⁹ (3×) | 0.80 – 1.31 % | −2.161 | 14.08 |
+| 1.2×10⁻²⁸ (10×, above anything measured) | 2.61 – 4.25 % | −2.213 | 14.07 |
+| *measurement* | **8 – 45 %** | −3.205 | 12.84 |
+
+Even ten times the larger published `K₃` removes **4 %** of the atoms in 5 ms
+against a measured deficit of up to **45 %**, an order of magnitude short, and
+the field-dependence is flat where the measurement's is strongly peaked at the
+dip. **Condensate three-body loss is not what the experimental atom-number
+deficit is.** Detection (Stern-Gerlach separation and counting across 13 spots,
+which gets harder exactly when the population spreads — i.e. at the dip),
+thermal fraction, or shot-to-shot preparation are the places left to look; this
+run does not distinguish among them.
+
+The dip itself is nearly insensitive: 10× `K₃` moves the centre by 0.07 nT and
+the width by 0.6 nT. Adding loss does not reconcile our curve with theirs.
+
+(The first scan point is anomalous again — 4.2 % loss and an off-trend
+population at −13 nT where every other field gives 0.27 % — the same
+first-point-of-a-scan defect. It is excluded from the ranges above.)
 
 #### Fig. 2C — the loss-free time series
 
