@@ -164,7 +164,7 @@ Semantic details + interactions live in `docs/reference/dynamics.md`.
 | `l_z` | Real [0, 100] | — |
 | `trunc_radius` | Number or `"auto"`/`"box_half"`/`"none"`/`"off"` | `"auto"` |
 | `padded` | Bool | true |
-| `pad_factor` | Number or per-axis Vector | 2 |
+| `pad_factor` | Number, per-axis Vector, or `"auto"` | 2 |
 
 Both image-handling knobs default **on** as of 2026-07-29 (they were both off
 before). The bare periodic kernel they replace carries a $2 \times 10^{-2}$ to
@@ -192,11 +192,20 @@ fixed resolution. Cost is far below the naive `prod(pad_factor)`: at $D = 13$ th
 DDI step is dominated by the spin density and the Euler rotation on the unpadded
 grid rather than by the 6 FFTs, measuring **1.2–1.4×** per step. Memory is the
 real constraint — the padded context is ~290 MB at $64^3$ and ~975 MB at $96^3$.
-**`pad_factor`** sets the zero-pad multiple — a scalar
-or a per-axis vector. Use a smaller factor on thin axes for **anisotropic
-padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to cut memory; the
-auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis to stay
-wrap-around-free. Only meaningful with `padded: true`.
+**`pad_factor`** sets the zero-pad multiple — a scalar,
+a per-axis vector, or `"auto"`. Use a smaller factor on thin axes for
+**anisotropic padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to
+cut memory; the auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis
+to stay wrap-around-free. Only meaningful with `padded: true`.
+
+`pad_factor: auto` matters only on an **anisotropic** box. A single sphere has
+one radius, so at a flat $2\times$ pad the cutoff is capped at $\min(L_d)$ while
+covering every separation in the box needs $\max(L_d)$ — the SHORT axis binds.
+Auto solves $(f_d - 1)L_d \ge \max(L_d)$ per axis, giving
+$f_d = 1 + \max(L_d)/L_d$. On the aspect-2 cigar that is $(3, 3, 2)$ and takes
+the field error from $1.8\times10^{-3}$ to $0$, for $2.25\times$ the padded
+volume. Isotropic boxes resolve to exactly 2 on every axis, so nothing changes
+for them — which is why the default stays `2` rather than `auto`.
 
 **`trunc_radius`** applies the spherically-truncated DDI kernel
 (Ronen–Bortolotti–Bohn cutoff; Vico–Greengard–Ferrando spectral form). Every

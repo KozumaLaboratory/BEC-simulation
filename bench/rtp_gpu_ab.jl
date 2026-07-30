@@ -42,7 +42,7 @@ function build(n; c1_ratio=0.05, dt=1e-4)
 end
 
 function arm!(ws, psi0, mode::Symbol, k)
-    Ext._SPIN_TAYLOR_ENABLED[] = mode !== :euler
+    SpinorBEC.SPIN_TAYLOR_ENABLED[] = mode !== :euler
     step! = mode === :combined ? SpinorBEC.split_step_combined! : SpinorBEC.split_step!
     copyto!(ws.state.psi, psi0)
     ws.state.t = 0.0
@@ -97,7 +97,7 @@ for n in SIZES
 end
 
 # Kernel breakdown of both surviving paths at the largest size.
-Ext._SPIN_TAYLOR_ENABLED[] = true
+SpinorBEC.SPIN_TAYLOR_ENABLED[] = true
 let n = SIZES[end]
     for (label, step!) in (("sequential", SpinorBEC.split_step!),
         ("combined", SpinorBEC.split_step_combined!))

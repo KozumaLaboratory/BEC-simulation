@@ -8,6 +8,12 @@
 #   spinor_utils/euler_batched.jl    — _apply_euler_5stage_batched_real! +
 #                                       _apply_euler_5stage_batched_imag!
 #                                       (CPU-batched gemm form)
+#   spinor_utils/spin_rotation_taylor.jl — apply_spin_rotation_taylor!
+#                                       (CPU Taylor-Horner form of the SAME
+#                                       rotation; shares its accuracy contract
+#                                       and tridiagonal bands with the CUDA
+#                                       kernel, which is a warp-cooperative
+#                                       realization of the same math)
 #   spinor_utils/euler_fused.jl      — apply_euler_5stage_fused!
 #                                       (GPU-friendly fused-broadcast form
 #                                       with optional cis_PD scratch)
@@ -26,6 +32,7 @@
 include("spinor_utils/slice_helpers.jl")
 include("spinor_utils/euler_per_voxel.jl")
 include("spinor_utils/euler_batched.jl")
+include("spinor_utils/spin_rotation_taylor.jl")
 include("spinor_utils/euler_fused.jl")
 include("spinor_utils/uniform_rotation.jl")
 include("spinor_utils/frame_rotation.jl")

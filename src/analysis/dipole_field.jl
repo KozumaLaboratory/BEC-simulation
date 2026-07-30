@@ -17,7 +17,8 @@
 
 export dipole_magnetic_field, magnetic_field_from_density, magnetic_field_from_spinor
 
-function _dipole_q_tensor(grid::Grid{3}, work_shape::NTuple{3, Int})
+function _dipole_q_tensor(grid::Grid{3}, work_shape::NTuple{3, Int},
+    trunc_radius::Union{Nothing, Float64})
     dx = grid.dx
     rk_shape = rfft_output_shape(work_shape)
     # n·dk = 2π/dx is the sampling frequency fed to {r,}fftfreq — identical for
@@ -41,12 +42,13 @@ function _dipole_q_tensor(grid::Grid{3}, work_shape::NTuple{3, Int})
     _build_q_tensor!(
         Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz,
         kx, ky, kz, k_sq, rk_shape; secular=false, full_n=work_shape,
+        trunc_radius,
     )
     (Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz)
 end
 
 """
-    dipole_magnetic_field(grid, Mx, My, Mz; mu0=Units.MU_0, padded=true)
+    dipole_magnetic_field(grid, Mx, My, Mz; mu0=Units.MU_0, padded=true, truncate=true)
 
 Magnetic field `B(r)` [tesla] produced by a magnetisation density
 `M(r) = (Mx, My, Mz)` [A/m] sampled on `grid`, via the magnetic dipole–dipole
@@ -60,6 +62,19 @@ Returns `(Bx, By, Bz)` as real arrays the size of `grid`.
 matching `convn(..., 'same')`; `padded=false` is the cheaper periodic form,
 acceptable when the cloud sits well inside the box. The long-range 1/r³ tail
 makes the padded form the safer default for a radiated field.
+
+`truncate=true` additionally applies the real-space spherical cutoff at the
+largest wrap-around-free radius (`auto_ddi_trunc_radius`). Padding alone is NOT
+enough: it pushes the *source* images out but leaves the *kernel* periodic on
+the doubled box, and the 1/r³ tail wraps. Measured on the DDI mean field, which
+is the same convolution, padding alone leaves a 3.9e-4 (isotropic) to 9.1e-4
+(aspect-2) relative field error against free space, versus 0 with the cutoff —
+see `scripts/ddi_cutoff_geometry_jz_probe.jl`. Pass an explicit `Float64` to set
+the radius yourself, or `false`/`nothing` for the bare kernel.
+
+On an anisotropic box at the doubled grid the cutoff is capped at `min(box)`
+while exactness wants `max(box)`, so a residual survives there; it trades that
+for a kernel that is exactly rotation-covariant.
 """
 function dipole_magnetic_field(
     grid::Grid{3},
@@ -68,6 +83,7 @@ function dipole_magnetic_field(
     Mz::AbstractArray;
     mu0::Float64=Units.MU_0,
     padded::Bool=true,
+    truncate::Union{Bool, Float64}=true,
 )
     n_pts = grid.config.n_points
     for (name, M) in (("Mx", Mx), ("My", My), ("Mz", Mz))
@@ -76,7 +92,15 @@ function dipole_magnetic_field(
     end
 
     work_shape = padded ? ntuple(d -> 2 * n_pts[d], 3) : n_pts
-    Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz = _dipole_q_tensor(grid, work_shape)
+    box = ntuple(d -> n_pts[d] * grid.dx[d], 3)
+    R = if truncate isa Float64
+        truncate
+    elseif truncate
+        auto_ddi_trunc_radius(box, padded ? 2.0 : nothing)
+    else
+        nothing
+    end
+    Q_xx, Q_xy, Q_xz, Q_yy, Q_yz, Q_zz = _dipole_q_tensor(grid, work_shape, R)
     plans = make_rfft_plans(work_shape, CPUBackend(); flags=FFTW.MEASURE, dtype=Float64)
     rk_shape = plans.rk_shape
     corner = CartesianIndices(n_pts)
@@ -117,7 +141,7 @@ end
 
 """
     magnetic_field_from_density(grid, density; atom, a_ho, n_atoms=1.0,
-                                polarization=(0,0,1), padded=true)
+                                polarization=(0,0,1), padded=true, truncate=true)
 
 Field of a fully spin-polarised cloud. `density` is the dimensionless density
 on the internal grid (∫ density dV = 1, i.e. `total_density(psi, 3)` of a
@@ -137,15 +161,16 @@ function magnetic_field_from_density(
     n_atoms::Real=1.0,
     polarization::NTuple{3, <:Real}=(0.0, 0.0, 1.0),
     padded::Bool=true,
+    truncate::Union{Bool, Float64}=true,
 )
     pn = sqrt(sum(abs2, polarization))
     p̂ = pn == 0 ? (0.0, 0.0, 1.0) : polarization ./ pn
     Mabs = (atom.mu_mag * n_atoms / a_ho^3) .* density   # |M| if fully polarised [A/m]
-    dipole_magnetic_field(grid, Mabs .* p̂[1], Mabs .* p̂[2], Mabs .* p̂[3]; padded)
+    dipole_magnetic_field(grid, Mabs .* p̂[1], Mabs .* p̂[2], Mabs .* p̂[3]; padded, truncate)
 end
 
 """
-    magnetic_field_from_spinor(psi, grid, sm, atom; a_ho, n_atoms=1.0, padded=true)
+    magnetic_field_from_spinor(psi, grid, sm, atom; a_ho, n_atoms=1.0, padded=true, truncate=true)
 
 General (not necessarily polarised) version: the magnetisation follows the
 local spin-density vector `⟨F_α⟩(r)` of `psi`, so a textured spinor radiates
@@ -162,8 +187,9 @@ function magnetic_field_from_spinor(
     a_ho::Float64,
     n_atoms::Real=1.0,
     padded::Bool=true,
+    truncate::Union{Bool, Float64}=true,
 ) where {D}
     fx, fy, fz = spin_density_vector(psi, sm, 3)
     scale = atom.mu_mag / atom.F * n_atoms / a_ho^3   # (g_F μ_B) · n_atoms / a_ho³
-    dipole_magnetic_field(grid, fx .* scale, fy .* scale, fz .* scale; padded)
+    dipole_magnetic_field(grid, fx .* scale, fy .* scale, fz .* scale; padded, truncate)
 end

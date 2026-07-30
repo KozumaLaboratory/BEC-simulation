@@ -242,7 +242,9 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "trunc_radius" => FieldSpec(; type=Union{Number, String}),
     # Tier B: zero-padded, image-free convolution + optional anisotropic pad.
     "padded" => FieldSpec(; type=Bool, default=true),   # was false, flipped 2026-07-29
-    "pad_factor" => FieldSpec(; type=Union{Number, Vector}),
+    # A number, a per-axis vector, or "auto" (size the padding so the cutoff can
+    # reach max(box) instead of being capped by the short axis).
+    "pad_factor" => FieldSpec(; type=Union{Number, Vector, String}),
 )
 
 # `kind` selects the solver path:

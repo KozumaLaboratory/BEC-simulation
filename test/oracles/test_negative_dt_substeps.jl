@@ -9,12 +9,19 @@
 # positive-dt tests green. The only thing that sees it is an order test, and the
 # order tests here live in FULL_EXTRA, which the PR gate does not run.
 #
-# That is not hypothetical: `apply_spin_mixing_step!` guarded its early exit on
-# `maximum(theta)` where `theta[k] = |c₁⟨F⟩ₖ|·dt`. For dt < 0 every entry is
-# ≤ 0, so `maximum` returns the entry CLOSEST TO ZERO — a low-density voxel,
-# ~0 — and the guard fired on every backward substep. Yoshida-4 measured 2nd
-# order (2026-07-29, PR #183). Every other `maximum` in the propagator paths is
-# `maximum(abs, …)`.
+# That is not hypothetical. Between #183 and 03dc152c, `apply_spin_mixing_step!`
+# guarded its early exit on `maximum(theta)` where `theta[k] = c₁|⟨F⟩ₖ|·dt`. For
+# dt < 0 every entry is ≤ 0, so `maximum` returned the entry CLOSEST TO ZERO — a
+# vacuum voxel, exactly 0 — and the guard fired on every backward substep,
+# dropping spin mixing from the composition. Yoshida-4 measured order 1.96
+# instead of 4, with the c_dd = 0 control failing identically.
+#
+# It was removed by 03dc152c, a Taylor-Horner performance rewrite that replaced
+# the whole reduction with `abs(c1·dt)·max|⟨F⟩|·F`. That commit's message does
+# not mention dt < 0 or the order collapse, because nobody knew: the defect was
+# fixed incidentally, and nothing pinned the claim. So this file is not a
+# regression test for a live bug — it is the gate that was missing, and the next
+# rewrite of that guard is what it is for.
 #
 # The claim these tests defend, stated once: a propagator substep is a function
 # of dt that is not identically the identity on a half-line. It is a metamorphic
@@ -123,12 +130,18 @@ end
         @test active >= 4
     end
 
-    @testset "spin mixing is exactly reversible at frozen mean field" begin
+    # BOTH signs of c₁. The guard being defended compares a signed product
+    # against a floor, so whether a missing `abs` shows up depends on
+    # sign(c₁)·sign(dt): a single-sign fixture leaves half the defect invisible.
+    # (The 2026-07-29 form of the guard reduced over per-voxel θ; the form that
+    # replaced it bounds `abs(c1·dt)·max|⟨F⟩|·F`. Same claim, different arithmetic
+    # — which is exactly why the claim, not the arithmetic, is what is tested.)
+    @testset "spin mixing is exactly reversible at frozen mean field (c1=$c1)" for c1 in (_C1, -_C1)
+
         # With `psi_mf` pinned to the ORIGINAL state the rotation operator is the
         # same for both calls, so U(-dt)·U(+dt) is the identity to round-off.
         # This is the sharpest form of the claim and the cheapest to run.
         sm = spin_matrices(_F)
-        c1 = _C1
         psi = _seeded_state(ws)
         psi_mf = copy(psi)
 
@@ -141,12 +154,12 @@ end
         @test norm(back .- psi) / norm(psi) < 1e-12
     end
 
-    @testset "spin mixing responds symmetrically to the sign of dt" begin
+    @testset "spin mixing responds symmetrically to the sign of dt (c1=$c1)" for c1 in (_C1, -_C1)
+
         # The form the defect took: the backward call returned the input
         # unchanged. Stated without reference to reversibility so it still holds
         # when the mean field is read from the state being rotated.
         sm = spin_matrices(_F)
-        c1 = _C1
         psi = _seeded_state(ws)
 
         fwd = copy(psi)

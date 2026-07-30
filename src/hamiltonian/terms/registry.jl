@@ -149,9 +149,13 @@ function build_gradient_context(psi, ws)
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
-    # Scratch-backed density on CPU (P1: total_density allocated a
-    # grid-sized array per LBFGS gradient call); the GPU branch keeps
-    # the device-aware allocating helper until P2.
+    # Scratch-backed density. `_total_density!` is the broadcast form and is
+    # GPU-safe, so the device branch no longer needs the allocating
+    # `total_density` — that was a fresh device array per gradient AND per
+    # GPU energy evaluation (the GPU energy path builds this same context),
+    # i.e. several device allocations per L-BFGS iteration. The two branches
+    # differ only in the buffer's eltype, which each side already had:
+    # Float64 on the host, `real(eltype(psi))` on the device.
     n_density = if psi isa Array
         buf = scratch_get!(:gradient_n_density, (eltype(psi), n_pts)) do
             zeros(Float64, n_pts)
@@ -159,7 +163,11 @@ function build_gradient_context(psi, ws)
         _total_density!(buf, psi, D, N, n_pts)
         buf
     else
-        total_density(psi, N)
+        buf = scratch_get!(:gradient_n_density_dev, (typeof(psi), n_pts)) do
+            similar(psi, real(eltype(psi)), n_pts)
+        end
+        _total_density!(buf, psi, D, N, n_pts)
+        buf
     end
     _compute_spin_density!(
         fx_scratch, fy_scratch, fz_scratch, psi, ws.spin_matrices,

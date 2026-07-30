@@ -21,16 +21,17 @@
 #$ -l h_rt=6:00:00
 #$ -j y
 # NB: no `#$ -o` directive — UGE does not expand $HOME (or any variable) in
-# directives, and the output must NOT default to the group allocation, which is
-# at 994/1000 GB. Pass `-o <dir>/uge.log` on the qsub CLI, same as `-g`.
+# directives, so the log destination cannot follow OUT_DIR from one. Pass
+# `-o <dir>/uge.log` on the qsub CLI, same as `-g`.
 
 set -euo pipefail
 
 PROJECT_ROOT=${SPINORBEC_TSUBAME_PROJECT_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation}
-# Output root. Defaults to $HOME (25 GB, ~22 GB free) rather than the group's
-# /gs/fs allocation (994/1000 GB used). Override with SPINORBEC_TSUBAME_RUNS_ROOT;
-# /gs/bs/work/7/uk07267 has 100 GB free and is the right home for bulk output.
-OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-$HOME/runs}/eu_evap_spgpe
+# Output root. Back on the group allocation now that it is 982/2000 GB — it was
+# briefly $HOME because the old 1000 GB cap was full and a run died mid-precompile
+# with `Disk quota exceeded`. $HOME is only 25 GB, so it is a fallback, not a home
+# for bulk output. Override with SPINORBEC_TSUBAME_RUNS_ROOT.
+OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/runs}/eu_evap_spgpe
 mkdir -p "$OUT_DIR"
 cd "$PROJECT_ROOT"
 

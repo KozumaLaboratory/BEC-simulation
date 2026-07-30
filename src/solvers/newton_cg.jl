@@ -36,19 +36,9 @@ export newton_cg_ground_state, residual_newton_refine
 # (which divides → M⁻¹); needed for the M-norm trust region.
 function _sobolev_metric!(v::AbstractArray{<:Complex}, ws, k2, α::Float64)
     α > 0 || return v
-    N = ndims(ws.grid.k_squared)
-    n_pts = ntuple(d -> size(v, d), N)
-    n_comp = ws.spin_matrices.system.n_components
-    buf = ws.state.fft_buf
-    @inbounds for c in 1:n_comp
-        idx = _component_slice(N, n_pts, c)
-        buf .= view(v, idx...)
-        ws.fft_plans.forward * buf
-        buf .*= (1 .+ α .* k2)
-        ws.fft_plans.inverse * buf
-        view(v, idx...) .= buf
-    end
-    v
+    a = real(eltype(k2))(α)
+    filt = cached_kspace_filter(k2, :sobolev_metric, α, k2v -> one(a) + a * k2v)
+    return batched_kspace_filter!(v, ws, filt)
 end
 
 """
@@ -78,7 +68,7 @@ function newton_cg_ground_state(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)
@@ -258,7 +248,7 @@ function residual_newton_refine(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)

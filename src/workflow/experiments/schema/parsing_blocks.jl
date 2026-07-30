@@ -504,10 +504,22 @@ end
 
 Map a YAML `ddi.pad_factor` value to `make_workspace`'s `ddi_pad_factor`:
 `nothing` ⇒ `2.0` (default); a number ⇒ scalar factor; a vector ⇒ per-axis
-factors (anisotropic padding).
+factors (anisotropic padding); `"auto"` ⇒ `-1.0`, the sentinel `make_workspace`
+resolves via `auto_ddi_pad_factor(box)` once the box is known.
+
+`"auto"` matters only on an ANISOTROPIC box. A single sphere has one radius, so
+at a flat 2x pad the cutoff is capped at `min(box)` while covering every
+separation needs `max(box)`; the auto factors lift that cap. On the aspect-2
+cigar that takes the field error from 1.8e-3 to 0, for 2.25x the padded volume.
+Isotropic boxes resolve to exactly 2 on every axis, so nothing changes for them —
+which is why the default stays 2.0 rather than auto.
 """
 function _parse_ddi_pad_factor(raw)
     raw === nothing && return 2.0
+    if raw isa AbstractString
+        lowercase(strip(raw)) == "auto" && return -1.0
+        throw(ArgumentError("ddi.pad_factor string must be \"auto\", got \"$raw\""))
+    end
     # Return an NTuple (not a Vector) so it satisfies the `Union{Real, NTuple}`
     # kwarg type on make_workspace / the solver entry points.
     raw isa AbstractVector && return Tuple(Float64.(raw))

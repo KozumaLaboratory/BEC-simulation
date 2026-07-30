@@ -1,12 +1,16 @@
 # L-BFGS internal helpers: Sobolev preconditioner + 2-loop direction
 # update + line search.
 
-# Scratch buffers for LBFGS direction update + line search, backed by the
-# shared scratch registry. Avoids per-iteration allocations that
-# accumulated to GB-scale CUDA pool pressure during long LBFGS runs on GPU.
+# Scratch buffers for LBFGS direction update + line search + the curvature
+# pair (s_k, y_k), backed by the shared scratch registry. Avoids
+# per-iteration allocations that accumulated to GB-scale CUDA pool pressure
+# during long LBFGS runs on GPU.
 function _lbfgs_scratch(template)
     scratch_get!(:lbfgs, (typeof(template), size(template))) do
-        (q=similar(template), psi_trial=similar(template))
+        (
+            q=similar(template), psi_trial=similar(template),
+            s_k=similar(template), y_k=similar(template),
+        )
     end
 end
 
@@ -17,19 +21,128 @@ function _sobolev_precondition!(
     alpha::Float64,
 ) where {N}
     alpha > 0 || return grad
-    n_pts = ntuple(d -> size(grad, d), Val(N))
-    n_comp = ws.spin_matrices.system.n_components
-    fft_buf = ws.state.fft_buf
-    @inbounds for c in 1:n_comp
-        idx = _component_slice(N, n_pts, c)
-        fft_buf .= view(grad, idx...)
-        ws.fft_plans.forward * fft_buf
-        fft_buf ./= (1 .+ alpha .* k_squared_dev)
-        ws.fft_plans.inverse * fft_buf
-        view(grad, idx...) .= fft_buf
-    end
-    grad
+    α = real(eltype(k_squared_dev))(alpha)
+    filt = cached_kspace_filter(
+        k_squared_dev, :sobolev_precond, alpha, k2 -> inv(one(α) + α * k2)
+    )
+    return batched_kspace_filter!(grad, ws, filt)
 end
+
+"""
+    _axpy_threaded!(a, c, b) → a
+
+`a .+= c .* b`, split across Julia threads for host arrays.
+
+Elementwise, so the result does not depend on the split: this is bit-identical
+to the broadcast it replaces at any thread count, and identical again when
+`Threads.nthreads() == 1` (the fallback IS the sequential loop).
+
+Why it exists: the two-loop recursion touches `2m` ψ-sized arrays twice each
+and was measured at ~18 GB/s — one core's streaming bandwidth — making it 60-64
+% of the CPU cost of an L-BFGS iteration (`docs/design/lbfgs_iteration_cost.md`).
+The axpys are the half that parallelises without changing a single rounding;
+the dots are handled separately by `_realdot_blocked`, which does change the
+summation order and carries its own accuracy gate.
+"""
+function _axpy_threaded!(a::Array, c::Number, b::Array)
+    n = length(a)
+    nt = Threads.nthreads()
+    # Below ~0.5 MB the `@threads` region costs more than the traffic it saves.
+    if nt == 1 || n < (1 << 15)
+        @inbounds @simd for i in eachindex(a, b)
+            a[i] += c * b[i]
+        end
+        return a
+    end
+    chunk = cld(n, nt)
+    Threads.@threads for t in 1:nt
+        lo = (t - 1) * chunk + 1
+        hi = min(t * chunk, n)
+        @inbounds @simd for i in lo:hi
+            a[i] += c * b[i]
+        end
+    end
+    return a
+end
+
+# Device arrays: the broadcast is already parallel.
+_axpy_threaded!(a, c, b) = (a .+= c .* b)
+
+# Number of blocks the real-dot reduction is cut into. A CONSTANT, not
+# `nthreads()`: the summation order — and therefore the last bits of the answer
+# — must not depend on how many threads the machine happens to have, or the
+# same input would give different results on different nodes.
+const _REALDOT_BLOCKS = 64
+
+# Real part of ⟨a,b⟩ over `lo:hi`. `@simd` on purpose: a hand-unrolled scalar
+# form (four independent accumulators, no `@simd`) was measured at 8.2 ms
+# against BLAS `zdotc`'s 7.7 ms for the whole two-loop at 24³ × D=13 even with
+# the blocks threaded — i.e. the scalar loads alone were enough to cancel four
+# cores. Letting the compiler vectorise makes each block memory-bound, which is
+# the regime the threading can actually help.
+#
+# The cost is that the reassociation `@simd` performs depends on the machine's
+# vector width, so this is reproducible for a given binary + CPU but not across
+# CPUs — the same is already true of `zdotc`, whose kernel is selected per CPU.
+# What IS machine-independent is the block structure: `_REALDOT_BLOCKS` is a
+# constant, so the answer does not depend on the thread count.
+@inline function _realdot_range(a, b, lo::Int, hi::Int)
+    s = 0.0
+    @inbounds @simd for i in lo:hi
+        s += real(a[i]) * real(b[i]) + imag(a[i]) * imag(b[i])
+    end
+    return s
+end
+
+"""
+    _realdot_blocked(a, b) → Float64
+
+`real(dot(a, b))` as a fixed 64-block reduction: each block is summed
+sequentially, then the 64 partials are added in index order, and the blocks run
+on separate threads when there are threads to run them on.
+
+The two-loop recursion spends `2m` of these per direction on ψ-sized arrays,
+and after the axpys were threaded they are what is left of a step that runs at
+one core's streaming bandwidth.
+
+This is **not** a precision trade for speed. Blocking a sum is one level of
+pairwise summation, so the error bound improves from `O(n·eps)` to
+`O((n/64 + 64)·eps)`; the gate in `test_lbfgs_fast_path_equivalence.jl`
+measures it against a `BigFloat` reference on a deliberately ill-conditioned
+input and requires it to be no worse than a sequential sum.
+
+What it does change is the last bits relative to the BLAS `zdotc` it replaces,
+so it is **not** bit-identical to what was there before — worth stating,
+because this solver sits close enough to the `sqrt(eps)` energy-gated floor
+that a change in summation order moves the endpoint. It is independent of the
+THREAD COUNT (the block count is a constant), which a `@threads`-over-
+`nthreads()` reduction would not be; it is not independent of the CPU, and
+neither is `zdotc`.
+"""
+function _realdot_blocked(a::Array, b::Array)
+    n = length(a)
+    n == 0 && return 0.0
+    nb = min(_REALDOT_BLOCKS, n)
+    chunk = cld(n, nb)
+    partials = Vector{Float64}(undef, nb)
+    if Threads.nthreads() == 1 || n < (1 << 15)
+        @inbounds for t in 1:nb
+            partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
+        end
+    else
+        Threads.@threads for t in 1:nb
+            @inbounds partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
+        end
+    end
+    s = 0.0
+    @inbounds for t in 1:nb
+        s += partials[t]
+    end
+    return s
+end
+
+# Device arrays keep the existing reduction.
+_realdot_blocked(a, b) = real(dot(a, b))
 
 """
 Two-loop L-BFGS direction, evaluated under the manifold inner product
@@ -61,20 +174,26 @@ function _lbfgs_direction(
     # array — for a 16³ × D=13 spinor that's ~640 KB per call, repeated
     # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
-        alphas[i] = rho_hist[i] * real(dot(s_hist[i], q)) * dV
-        q .-= alphas[i] .* y_hist[i]
+        alphas[i] = rho_hist[i] * _realdot_blocked(s_hist[i], q) * dV
+        # `q - a*y` and `q + (-a)*y` agree bit for bit: negating a float is
+        # exact, so the sum rounds to the same value.
+        _axpy_threaded!(q, -alphas[i], y_hist[i])
     end
 
     if m > 0
-        ys = real(dot(y_hist[end], s_hist[end]))
-        yy = real(sum(abs2, y_hist[end]))
+        # ⟨s,y⟩ is already stored: `rho_hist[i] = 1/(⟨s_i,y_i⟩·dV)` by
+        # construction in the driver (and in the warm-start contract), so
+        # recomputing the dot product was a full extra pass over two
+        # ψ-sized arrays for a number we had.
+        ys = 1.0 / (rho_hist[end] * dV)
+        yy = _realdot_blocked(y_hist[end], y_hist[end])   # ≡ sum(abs2, y)
         γ = ys / max(yy, 1e-30)
         q .*= γ
     end
 
     for i in 1:m
-        β = rho_hist[i] * real(dot(y_hist[i], q)) * dV
-        q .+= (alphas[i] - β) .* s_hist[i]
+        β = rho_hist[i] * _realdot_blocked(y_hist[i], q) * dV
+        _axpy_threaded!(q, alphas[i] - β, s_hist[i])
     end
 
     q .*= -1
@@ -100,6 +219,11 @@ decrease test `E(α) < E0`, preserving the old manifold-safe behaviour.
 `expand=true` (used for the steepest-descent step, whose scale is unknown)
 permits a bounded doubling phase when `α = 1` already decreases, so the first
 unscaled step auto-finds its scale instead of being stuck at the Newton length.
+
+Returns `(α, E, psi_accepted)`. `psi_accepted` is the retracted iterate at the
+accepted `α` (scratch-backed, valid until the next line search) so the driver
+does not have to redo the step + retraction it already computed here. On
+failure (`α = 0`) it is the untouched `psi`.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
@@ -112,15 +236,21 @@ function _line_search_energy_decrease(
     N_dim = length(grid.config.n_points)
     psi_trial = _lbfgs_scratch(psi).psi_trial
 
-    eval_energy = function (α)
+    # Retraction alone. Split out from the energy so the expansion phase can
+    # re-place the iterate at its best α without paying a second full energy
+    # evaluation for a number it already has.
+    retract! = function (α)
         psi_trial .= psi .+ α .* direction
-        # Retraction: normalize back to manifold
         norm_sq = sum(abs2, psi_trial) * dV
         psi_trial ./= sqrt(norm_sq)
         if target_Mz !== nothing
             _normalize_psi_constrained!(psi_trial, grid, D, N_dim, target_Mz, F)
         end
         copyto!(ws.state.psi, psi_trial)
+        nothing
+    end
+    eval_energy = function (α)
+        retract!(α)
         total_energy(ws)
     end
 
@@ -135,16 +265,25 @@ function _line_search_energy_decrease(
         # the local minimiser along the ray (steepest-descent scale finding).
         if expand
             best_α, best_E = α, E_trial
+            last_α = α
             for _ in 1:max_expand
                 α2 = best_α * grow
                 E2 = eval_energy(α2)
+                last_α = α2
                 (E2 < best_E && accept(α2, E2)) || break
                 best_α, best_E = α2, E2
             end
-            best_α == α || eval_energy(best_α)  # leave ws.state.psi at best
-            return best_α, best_E
+            # Re-place the iterate whenever the LAST evaluation was somewhere
+            # other than `best_α`. The earlier guard was `best_α == α`, which is
+            # TRUE in the common case that the very first trial doubling is
+            # rejected — and then the workspace was left at that rejected step
+            # while `best_E` described `α_init`. Only the retraction is needed
+            # (`best_E` is already known), which is why this is `retract!` and
+            # not the `eval_energy` the fix on main used.
+            last_α == best_α || retract!(best_α)
+            return best_α, best_E, psi_trial
         end
-        return α, E_trial
+        return α, E_trial, psi_trial
     end
 
     # Backtracking from α_init.
@@ -152,9 +291,9 @@ function _line_search_energy_decrease(
         α *= shrink
         E_trial = eval_energy(α)
         if accept(α, E_trial)
-            return α, E_trial
+            return α, E_trial, psi_trial
         end
     end
     # No sufficient decrease found — return zero step.
-    (0.0, E0)
+    (0.0, E0, psi)
 end

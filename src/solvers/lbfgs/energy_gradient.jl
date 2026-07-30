@@ -80,6 +80,33 @@ function energy_gradient!(
     return E
 end
 
+"""
+    gradient_only!(grad, psi, ws) → grad
+
+`δE/δψ*` at `psi` with the same Wirtinger scaling as `energy_gradient!`, but
+without evaluating the total energy.
+
+On the CPU that is a real saving: `energy_gradient!` runs the registry twice
+(`apply_operator_via_registry!` for the gradient, then `energy_decomposition`
+for the energy), so the whole FFT-heavy energy pass is skipped when the caller
+already knows `E` at this `psi`. On the GPU the energy comes out of the same
+fused pass for free, so this is `energy_gradient!` with the return dropped.
+"""
+function gradient_only!(
+    grad::AbstractArray{<:Complex},
+    psi::AbstractArray{<:Complex},
+    ws::Workspace{N},
+) where {N}
+    copyto!(ws.state.psi, psi)
+    if _is_gpu(psi)
+        _energy_and_gradient_gpu!(grad, ws)
+    else
+        apply_operator_via_registry!(grad, ws)
+    end
+    grad .*= 2
+    return grad
+end
+
 # GPU fused energy+gradient — implemented in the CUDA extension (gpu_energy.jl).
 function _energy_and_gradient_gpu! end
 
