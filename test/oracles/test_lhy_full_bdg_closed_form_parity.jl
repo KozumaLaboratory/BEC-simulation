@@ -65,6 +65,67 @@ end
         end
     end
 
+    @testset "icosahedral: full_bdg == epsilon_LHY_F6_Ih (F = 6, λ_spin > 0)" begin
+        # The F=6 I_h closed form is the one the phase-selection work rests on
+        # and it had no independent arm. Adding it needs one thing checked
+        # first: polar and FM are single-|m⟩ states and stationary for any
+        # (c0, c1) by symmetry, whereas ZETA_F6_IH lives in the m=±5/0 doublet
+        # and its stationarity is not free. Measured — ‖(Z+n·h_mf)ζ − μζ‖/|μ|
+        # ≤ 1.5e-15 for every c1 below, from the same h_mf the BdG solver
+        # expands around — so the comparison is well posed and a mismatch is
+        # about the implementations, not about the expansion point.
+        for c1 in (0.05, 0.1, 0.2)
+            g = _c0c1_to_gS(6, 10.0, c1)
+            @test all(>(0), values(g))
+            c0_st, lam = compute_c0_lambda_F6_Ih(g)
+            @test c0_st > 0 && lam > 0
+            closed = epsilon_LHY_F6_Ih(1.0, g)
+            @test _bdg_eps(ZETA_F6_IH, 6, 10.0, c1) ≈ closed rtol = _RTOL
+        end
+    end
+
+    @testset "icosahedral: the arm discriminates the I_h stiffness" begin
+        # Without this the arm could pass on a shared prefactor. At the SAME
+        # ladder the FM closed form is 51-111% away from the I_h one, so
+        # agreement is about c_0 and λ_spin. Polar is only 0.9-1.8% away and
+        # would not be an adequate control on its own — recorded because the
+        # obvious choice of control here is the weak one.
+        for c1 in (0.05, 0.1)
+            g = _c0c1_to_gS(6, 10.0, c1)
+            ih = epsilon_LHY_F6_Ih(1.0, g)
+            fm = lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g))
+            @test abs(1 - fm / ih) > 0.4
+        end
+    end
+
+    @testset "icosahedral: the closed form is blind to λ_spin < 0" begin
+        # DECLARED LIMITATION, pinned so it cannot go quiet.
+        #
+        # `epsilon_LHY_F6_Ih` guards `c_0 < 0` (returns NaN, "caller should
+        # fall back to BdG") and does NOT guard `λ_spin < 0`. It takes
+        # |λ_spin|^(5/2), so it is exactly symmetric under c1 → −c1 while the
+        # BdG path is not: at c1 = −0.2 the spin-Goldstone branch has
+        # max Im ω = 2.8 and full_bdg warns that ε_LHY is scheme-dependent,
+        # whereas the closed form returns the same real number it returns at
+        # c1 = +0.2. Measured gap: 0.4% at c1 = −0.05, 2.1% at −0.1, 11.0% at
+        # −0.2 — growing with |λ_spin|, i.e. with the instability.
+        #
+        # c1 < 0 is not a corner: it is the sign Eu F=6 production runs use.
+        # Adding the missing guard is a live decision, not a cleanup, because
+        # it turns configs that currently return a number into NaN. Whichever
+        # way that goes, this testset has to change with it.
+        for (c1, gap) in ((-0.05, 0.004), (-0.1, 0.021), (-0.2, 0.110))
+            g = _c0c1_to_gS(6, 10.0, c1)
+            _, lam = compute_c0_lambda_F6_Ih(g)
+            @test lam < 0
+            # symmetric closed form, asymmetric BdG
+            g_plus = _c0c1_to_gS(6, 10.0, -c1)
+            @test epsilon_LHY_F6_Ih(1.0, g) ≈ epsilon_LHY_F6_Ih(1.0, g_plus) rtol = 1e-12
+            bdg = _bdg_eps(ZETA_F6_IH, 6, 10.0, c1)
+            @test abs(1 - bdg / epsilon_LHY_F6_Ih(1.0, g)) ≈ gap atol = 0.004
+        end
+    end
+
     @testset "scalar limit: uniform g_S ⇒ (8/15π²)(g n)^(5/2)" begin
         for (F, g0) in ((1, 10.0), (2, 4.0), (6, 10.0))
             closed = 8 / (15π^2) * g0^2.5
