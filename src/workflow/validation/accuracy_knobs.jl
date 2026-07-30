@@ -44,9 +44,14 @@ One setting that trades accuracy for speed (or for convenience).
 for a `make_workspace` kwarg / YAML key it cannot — the caller must put those in
 the config, and the distinction is recorded rather than papered over.
 
-`reference` is the most accurate setting, `default` what ships. `note` says what
-the gap costs and where that was measured, so the number is never the only
-justification.
+`reference` is the most accurate setting, `default` what ships, and `fast` a
+setting whose speed AND error are both MEASURED — `nothing` when no such setting
+exists, which is the common case. `:fast` profiles are built from this field, so a
+knob cannot appear in one without a measurement behind it; that is structural
+rather than a rule someone has to remember.
+
+`note` says what the gap costs and where that was measured, so the number is
+never the only justification.
 
 `getter`/`setter` rather than `get`/`set!`: a keyword argument cannot be called
 `set!`, because `set!=nothing` parses as `set != nothing`.
@@ -57,17 +62,18 @@ struct AccuracyKnob
     reference::Any
     default::Any
     note::String
+    fast::Any
     getter::Union{Nothing, Function}
     setter::Union{Nothing, Function}
 end
 
 function AccuracyKnob(name::Symbol, scope::Symbol, reference, default, note::String;
-    getter=nothing, setter=nothing)
+    fast=nothing, getter=nothing, setter=nothing)
     scope in (:global, :per_run) ||
         throw(ArgumentError("scope must be :global or :per_run, got :$scope"))
     scope === :global && (getter === nothing || setter === nothing) &&
         throw(ArgumentError("a :global knob needs both `getter` and `setter`"))
-    AccuracyKnob(name, scope, reference, default, note, getter, setter)
+    AccuracyKnob(name, scope, reference, default, note, fast, getter, setter)
 end
 
 """
@@ -100,8 +106,11 @@ contaminates the answer.";
         "Zero-pad multiple for the open-boundary DDI convolution. Measured \
 (bench/ddi_pad_factor_accuracy.jl, H100, Eu151, referenced to pad 3): relative \
 Φ error 4.3e-3 at pad 2, 1.9e-2 at 1.5, 1.3e-1 unpadded, at 3.4×/8×/1× the FFT \
-volume. Lowering it was measured and REJECTED — the residual at 1.5 is the size \
-of the error padding exists to remove."),
+volume. Lowering it was measured and REJECTED for production — the residual at \
+1.5 is the size of the error padding exists to remove — but it is the one knob \
+whose speed AND error are both measured, so it is the one `:fast` may touch: \
+pad 1.5 is 1.28× on a 64³ RTP step (3.054 → 2.385 ms).";
+        fast=1.5),
     AccuracyKnob(:ddi_padding, :per_run, true, true,
         "Open-boundary (zero-padded) DDI convolution. ON is accurate; OFF is the \
 bare periodic kernel, 2-5 % dipolar field error flat in resolution (9c117c05)."),
