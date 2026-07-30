@@ -59,6 +59,12 @@ include(joinpath(@__DIR__, "eu151_params.jl"))
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
 const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 30000
 const ITP_TOL = 1.0e-9
+# The DENSITY-based, gauge-invariant convergence gate. A texture carries a gauge
+# orbit — a global U(1) phase and a spin rotation about z — that leaves ρ and the
+# energy's physical content alone but keeps `dE/|E|` moving, which is why
+# `tol_drho` exists at all. v2 used `tol` only and every one of 16 arms reported
+# `converged = false` after 30000 steps at 32³, so nothing it measured was a gap.
+const ITP_TOL_DRHO = 1.0e-7
 const SEEDS = (:flower, :chiral_spin_vortex)
 
 grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
@@ -77,7 +83,8 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
             grid, atom=Eu151, interactions=eu_interaction_params(0.05),
             zeeman=ZeemanParams(linear_zeeman_p(Eu151, B, EU_ω_ref), 0.0),
             potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
-            dt, n_steps=MAX_STEPS, tol=ITP_TOL, save_every=200,
+            dt, n_steps=MAX_STEPS, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO,
+            save_every=200,
             enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
             spinor_lhy=kind, backend=CUDABackend(), verbose=false,
         )
@@ -85,6 +92,11 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
         (E=gs.energy, fz=fz, converged=gs.converged,
+            # The final dE VALUE, not just the boolean. Without it "not
+            # converged" cannot be told apart from "converged, but this
+            # criterion never fires" — which is the whole question when a gauge
+            # orbit is in play.
+            dE_final=hasproperty(gs, :dE) ? gs.dE : NaN,
             steps=hasproperty(gs, :last_step) ? gs.last_step : -1,
             wind=w)
     finally
@@ -107,7 +119,8 @@ function gap(; B, kind, dt, taylor, cap)
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
     (dE=b.E - a.E, sep=sep, distinct=distinct,
         conv=a.converged && b.converged,
-        steps=max(a.steps, b.steps), wa=a.wind, wb=b.wind)
+        dEf=max(a.dE_final, b.dE_final), steps=max(a.steps, b.steps),
+        wa=a.wind, wb=b.wind)
 end
 
 # --- cost: table build vs per step -----------------------------------------
@@ -168,18 +181,23 @@ arms = [
     ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0)),
 ]
 
-println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1])), tol=$(ITP_TOL), cap $(MAX_STEPS) steps")
+println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1])), tol=$(ITP_TOL), " *
+        "tol_drho=$(ITP_TOL_DRHO), cap $(MAX_STEPS) steps")
+println("  `final dE` is the last dE/|E| reached. If it is far below `tol` while")
+println("  `conv` says NO, the run IS at its fixed point and the criterion is the")
+println("  thing that did not fire — read it before believing 'not converged'.")
 println("  `distinct` = the two seeds ended in DIFFERENT winding classes. Only")
 println("  those rows are gaps between phases; the rest say there is no second")
 println("  minimum there, which is information rather than a failed measurement.")
-@printf("\n  %-36s %8s %13s %6s %6s %9s\n",
-    "arm", "B", "ΔE", "conv", "dist", "state sep")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
     g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
     results[(label, B)] = g
-    @printf("  %-36s %8.2e %13.6e %6s %6s %9.3e\n",
-        label, B, g.dE, g.conv ? "yes" : "NO", g.distinct ? "yes" : "no", g.sep)
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e\n",
+        label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
+        g.distinct ? "yes" : "no", g.sep)
     GC.gc(true);
     CUDA.reclaim()
 end
