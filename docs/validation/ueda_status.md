@@ -29,8 +29,9 @@ code is **not** part of the current validation evidence.
   rewritten from "Ueda operator-RHS comparison" to "independent
   reference-RHS comparison". The reference RHS is a minimal CPU-only
   term-by-term Hψ implementation inside this repository
-  (`src/validation/reference_rhs_*.jl`, planned). Production Hψ is
-  compared against it on small grids (8³ / 16³).
+  (`src/validation/reference_rhs/{scalar,zeeman,contact,ddi,loss,total}.jl`,
+  implemented). Production Hψ is compared against it on small grids
+  (8³ / 16³).
 - **Next-session priorities Step 6** (`memory:next_session_priorities_2026_05_25`):
   rewritten from "Ueda contract lock-in" to "Self-contained validation
   report" (this document tree).
@@ -77,11 +78,16 @@ explicitly.
 3. **Literature benchmarks** — spin-1 polar / ferromagnetic ground
    state, spin-2 cyclic / nematic, DDI spherical cloud E_DDI = 0,
    prolate / oblate sign, canonical EdH transfer.
-4. **Independent reference-RHS** (planned) — minimal CPU-only Hψ
-   kernels per term: scalar / Zeeman / contact / DDI / loss. Compare
-   production Hψ vs reference Hψ on small grids. Tolerances: scalar
-   < 1e-10 rel, Zeeman < 1e-12 rel, contact < 1e-10 rel, DDI
-   1e-6..1e-8 (grid/cutoff bound), loss = analytic rate.
+4. **Independent reference-RHS** (implemented, `src/validation/reference_rhs/`)
+   — minimal CPU-only Hψ kernels per term: kinetic / trap / Zeeman
+   (diagonal + transverse) / density c₀ / spin c₁ / singlet-pair / DDI /
+   K₃ / L₃. Compare production Hψ vs reference Hψ on small grids.
+   Tolerances: scalar < 1e-10 rel, Zeeman < 1e-12 rel, contact
+   < 1e-10 rel, DDI 1e-6..1e-8 (grid/cutoff bound), loss = analytic rate.
+   **Not covered** — no reference statement exists for LHY, higher-rank
+   tensor (c₄, c₆), Raman, light-shift, Coriolis, or magnetic-gradient,
+   so those terms have no independent-RHS arm. LHY is the load-bearing
+   gap: it is the dominant energy term at Eu F=6.
 5. **Grid / dt / box / seed convergence** — at production parameters.
 
 For Eu production, additional **robustness layer**: factorial over

@@ -7,18 +7,72 @@ This is not a list of suspect cases. It is a single fact with a date.
 
 ## The measurement
 
-230 `summary.json` files exist under `runs/` (this worktree plus the main
-checkout). **Zero carry a producing commit** — the stamp only landed in #139, so
-none can be retro-dated. Using file mtime as the only available proxy for
-vintage:
+**Re-measured 2026-07-30 across all 65 worktrees. The first pass scanned two of
+them and undercounted by more than half.**
+
+481 `summary.json` files exist, all distinct by content, alongside ~880 `jld2`
+result payloads — `summary.json` is not the whole evidence surface, and the
+`jld2` layer has never been audited at all. Using file mtime as the only
+available proxy for vintage:
 
 | | |
 |---|---|
-| stored summaries | 230 |
-| stamped with a commit | 0 |
-| newest summary | **2026-06-02** |
+| stored summaries | **481** |
+| carrying a producing commit | 18 |
+| …of those, produced from a **dirty tree** | **18 of 18** |
+| reproducible from a commit alone | **0** |
+| newest summary | **2026-07-29** |
 | oldest | 2026-05-25 |
-| summaries predating **all** the corrections below | **230 of 230** |
+| summaries predating **all** the corrections below | 230 of 481 |
+
+The stamp landed in #139, so the 463 unstamped ones cannot be retro-dated. The
+18 stamped ones all end in `-dirty`, so they name a commit that does not describe
+the tree that produced them: `summary_provenance` reports `dirty == true` and the
+file still cannot answer the question. Zero of 481 are reproducible from a
+commit.
+
+### Where they are
+
+Outputs live in five places, not one. Every other worktree carries only the
+tracked configs, which git materialises in all 65 and which an artifact census
+will double-count if it does not filter to outputs.
+
+| summaries | outputs | location | mtime span |
+|---:|---:|---|---|
+| 230 | 1080 | `BEC-simulation` (main checkout) | 2026-05-25 .. 06-02 |
+| 213 | 1048 | `.claude/worktrees/silly-foraging-flame` | 2026-07-05 .. 07-29 |
+| 31 | 532 | `.claude/worktrees/streamed-sniffing-sifakis` | 2026-07-22 .. 07-29 |
+| 6 | 31 | `.claude/worktrees/frolicking-mapping-feather` | 2026-07-28 |
+| 1 | 5 | `.claude/worktrees/gs-stage-cache` | 2026-07-27 |
+
+### The 251 the first pass missed are the harder half
+
+The audited 230 are easy: they predate everything, so the verdict is uniform and
+no per-file work is needed. The 251 elsewhere are not.
+
+| window | summaries | status |
+|---|---:|---|
+| before 2026-06-15 | 230 | predates every correction — the original audited set |
+| 2026-06-22 .. 07-07 | **191** | post-integrator, **pre** the 11× quadratic-Zeeman fix |
+| 2026-07-08 .. 07-26 | 19 | post-$q$, pre all three LHY fixes |
+| 2026-07-27 .. 07-28 | 17 | **inside** the window the LHY fixes merged in |
+| 2026-07-29 onward | 24 | post-LHY, pre nothing known |
+
+The 191 in the June-22-to-July-7 band are the trap. They are six weeks newer than
+the audited set and read as recent, and every one of them that used a field still
+carries $q$ wrong by an order of magnitude. The 17 in the 07-27/28 band straddle
+three same-day merges, so for those the blanket verdict does not resolve and
+`git merge-base --is-ancestor` against each fix is mandatory rather than
+advisory.
+
+### Four free pre/post pairs
+
+Four run directories exist twice with different contents — same config, once in
+main at 2026-05-29 and once in `frolicking-mapping-feather` at 2026-07-28, i.e.
+either side of the LHY corrections: `K0_gdr0_LHY0_a5478a08`,
+`K0_gdr0_LHY1_adddc01b`, `LHY_scalar_K0_ba8b1637`, `LHY_scalar_fd8a76f8`. Two
+further directories are named `*_oldcoef_*`, so a pre-fix arm was kept on purpose.
+These are measurements of what the fixes changed that cost nothing to read.
 
 ## The corrections they predate
 
@@ -41,9 +95,12 @@ structure.
 
 ## What follows
 
-**No stored `runs/` summary is quotable as current evidence.** They are not
-"slightly stale" and they are not auditable — auditing would need a per-run
-comparison against current code, which costs the same as re-running. The A/B on
+**No stored `runs/` summary is quotable as current evidence without first placing
+it against the fix list.** For the 230 that predate everything the answer is
+uniform and they are not auditable — auditing would need a per-run comparison
+against current code, which costs the same as re-running. For the 251 produced
+between June 22 and July 29 the answer is per-file, and mtime is the only handle
+on it, since none is reproducible from a commit. The A/B on
 `eu_k3_lhy_control` measured what that gap looks like in one case: peak_max
 0.007487 → 0.005775 and the collapse class moving `delay` → `marginal_arrest`,
 of which the `c_lhy` fix accounts for only 2 %.
@@ -198,10 +255,19 @@ orders of magnitude larger than the rest of the Hamiltonian.
 
 ## Recommended order
 
-1. **Do not re-run 230 suites.** Most were exploratory. Re-derive only what a
+1. **Do not re-run 481 suites.** Most were exploratory. Re-derive only what a
    live document actually claims.
 2. Start with the two undated documents above, since they read as current.
 3. New runs are self-dating: `summary_provenance(run_dir)` reports the producing
    commit and whether the tree was dirty. A summary with `stamped == false` means
    the question cannot be answered from the file — treat it as this audit treats
-   all 230.
+   the 230. **`stamped == true` with `dirty == true` is the same verdict**: all 18
+   stamped summaries are dirty, so the stamp has so far never once made a run
+   reproducible. Committing before launching is what turns the field from a label
+   into evidence.
+4. **A stamp is necessary and not sufficient.** A run can contain a fix and still
+   have run without the term: `lhy` has been dropped per-path in six places, so a
+   commit-ancestry check passes while the physics is absent. Read the run's own
+   per-term `energy_decomposition` and confirm the term it claims to test is
+   non-zero. That check is what the first re-derivation below needed and did not
+   have.
