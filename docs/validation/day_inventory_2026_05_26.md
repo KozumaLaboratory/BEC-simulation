@@ -277,7 +277,10 @@ transfer physics, NOT numerical drift.
 ```
 
 YAMLs already in place:
-- `runs/eu_lhy_longtime/LHY_icosahedral_200ms.yaml` (queued)
+- `runs/eu_lhy_longtime/LHY_full_bdg_200ms.yaml` (queued; was
+  `LHY_icosahedral_200ms.yaml` and `kind: icosahedral` until 2026-07-30 — the I_h
+  closed form refuses this config's `c1_ratio < 0`, so both the mode and the file
+  name changed)
 - Matsui loss-on YAMLs (Task #C, not yet generated)
 - Barnett 64³ at Ω=−0.3 (Task #20-followup, not yet generated)
 

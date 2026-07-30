@@ -7,10 +7,9 @@
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
 # Task #19C — LHY interference at K3=200× cigar regime.
 # Source: scripts/validation/eu_k3_lhy_gen.jl
-# LHY kind = full_bdg (was icosahedral; see the note at the top of this file).
-# The FILENAME still says icosahedral. Left as-is because docs cite these paths,
-# but it is a naming lie by this repo's own convention (file name = content) and
-# the next reader will believe the name before the body.
+# LHY kind = full_bdg. Renamed from LHY_icosahedral.yaml 2026-07-30 so the file
+# name matches its content, as the convention requires; the one doc that cited
+# the old path was updated in the same commit.
 
 metadata:
   suite: eu_k3_lhy
