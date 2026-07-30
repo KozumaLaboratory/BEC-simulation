@@ -13,6 +13,12 @@
 #        -v SPINORBEC_AB_A=<baseline-worktree>,SPINORBEC_AB_B=<changed-worktree> \
 #        scripts/tsubame/submit_bench_itp_gpu_ab.sh
 set -u
+# The output filter below drops ONLY the CUDA library-path warning boxes, which
+# are noise on every TSUBAME node. DO NOT widen it to `^│|^└|^┌`: that swallows
+# every Julia @warn, and on 2026-07-30 it destroyed the one piece of evidence
+# that could distinguish two explanations for a non-converging reference arm —
+# `full_bdg` warns exactly when the mean field is dynamically unstable, which is
+# the case where there is no well-defined ground state to converge to at all.
 
 export JULIA_DEPOT_PATH="$HOME/.julia"
 export JULIA_NUM_THREADS="${NSLOTS:-8}"
@@ -36,7 +42,7 @@ for n in $CFGS; do
     for root in "$A" "$B"; do
         echo; echo "###### n=$n lhy=$LHY ROOT=$root commit=$(cd "$root" && git rev-parse --short HEAD)"
         (cd "$root" && $JULIA --project=. "$SCRIPT" gpu "$n" "$LHY" 2>&1 |
-            grep -vE "^│|^└|^┌")
+            grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library")
     done
 done
 echo "ALL DONE $(date)"
