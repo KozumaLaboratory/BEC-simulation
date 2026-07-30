@@ -116,6 +116,25 @@ using Test
         @test r_stop.grad_norm == r_grind.grad_norm
     end
 
+    @testset "an unattainable tol is reported as such, not as a failure" begin
+        # `converged = false` on its own cannot separate "the solve failed" from
+        # "the solve reached the floor and you asked for less than the floor".
+        # Measured on Eu-151 F=6 24³: floor 5.0e-7 against the DEFAULT tol=1e-8.
+        r_floor = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
+        @test r_floor.stop_reason === :line_search_stalled
+        @test r_floor.converged == false        # honest: it did not reach 1e-16
+        @test r_floor.floor_limited == true     # ...because 1e-16 is below the floor
+
+        # The floor it reports is a real number, not a label: ask for something
+        # above it and the same solve converges. Derived from the measurement
+        # rather than picked, so this cannot be tuned green.
+        attainable = 10 * r_floor.grad_norm
+        r_ok = find_ground_state_lbfgs(; base..., n_steps=400, tol=attainable)
+        @test r_ok.converged == true
+        @test r_ok.stop_reason === :tol
+        @test r_ok.floor_limited == false
+    end
+
     @testset "line-search evaluation count is reported" begin
         # This count, not any single kernel, is what sets the cost of an
         # iteration: a 5-minute measurement of Eu-151 F=6 at 24³ put the

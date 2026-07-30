@@ -431,10 +431,36 @@ function find_ground_state_lbfgs(;
     # ran out of steps while still descending and one that hit its gradient floor
     # at step 25 and then spent 1975 steps proving it both report `false`.
     stop_reason = converged ? :tol : (stalled ? :line_search_stalled : :max_steps)
+
+    # `converged` keeps meaning `grad_norm < tol` — a lot of code reads it and it
+    # is persisted — but on its own it cannot distinguish a solve that failed
+    # from one that succeeded as far as the method allows. A stall says exactly
+    # that: steepest descent found no step, so no later iteration can either,
+    # and `grad_norm` IS the attainable floor for this problem and method.
+    #
+    # Measured on Eu-151 F=6 24³: floor 5.0e-7 against the DEFAULT `tol = 1e-8`,
+    # i.e. the default asks for something fifty times below what an energy-gated
+    # line search can resolve. Reporting that as `converged = false` and nothing
+    # else is how a perfectly good ground state gets read as a failed run.
+    floor_limited = stalled && result.grad_norm > tol
+    if floor_limited
+        @warn "L-BFGS stopped at its energy-comparison floor. The requested " *
+            "`tol` is below what this problem and method can reach, so " *
+            "`converged` is false for a state that is as converged as " *
+            "L-BFGS can make it: steepest descent found no acceptable step, " *
+            "which means no later iteration can find one either. Both the " *
+            "L-BFGS line search and Newton-CG accept steps by an ENERGY " *
+            "comparison, and a step whose energy reduction falls below the " *
+            "evaluation roundoff cannot be resolved. To go below this floor " *
+            "use `residual_polish=true`, which drives (H-mu)psi to zero " *
+            "directly and is not energy-gated." tol grad_norm=result.grad_norm energy=result.energy last_step maxlog=1
+    end
+
     merge(
         result,
         (; lbfgs_history=(s_hist, y_hist, rho_hist),
-            n_line_search_evals, n_line_search_failures, stop_reason),
+            n_line_search_evals, n_line_search_failures, stop_reason,
+            floor_limited),
     )
 end
 
