@@ -136,7 +136,7 @@ function cost(kind)
 end
 
 println("="^78)
-println("Phase-gap error budget — Eu F=6 D=13, $(N_GRID)³, $(N_STEPS) ITP steps")
+println("Phase-gap error budget — Eu F=6 D=13, $(N_GRID)³, tol=$(ITP_TOL), cap $(MAX_STEPS) steps")
 println("device: $(CUDA.name(CUDA.device()))   seeds: $(SEEDS)")
 println("="^78)
 

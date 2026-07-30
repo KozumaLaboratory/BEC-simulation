@@ -19,5 +19,20 @@ JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-ddi-conv}"
 echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
 nvidia-smi --query-gpu=name --format=csv,noheader || true
-$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-24}" "${SPINORBEC_GAP_STEPS:-4000}" 2>&1 | grep -vE "^│|^└|^┌"
+# SMOKE FIRST, at a size that renders every code path in seconds. CLAUDE.md asks
+# for this before any launch over ~10 min, and skipping it cost a 19-second
+# failure on a leftover rename that `submit_load_check.sh` cannot see — that
+# checks src/ loads, not that a bench script runs.
+echo "### SMOKE (tiny)"
+$JULIA --project=. bench/phase_gap_error_budget.jl 8 40 2>&1 | grep -vE "^│|^└|^┌"
+smoke_rc=${PIPESTATUS[0]}
+echo "### smoke rc=$smoke_rc"
+if [ "$smoke_rc" -ne 0 ]; then
+    echo "SMOKE FAILED — not starting the production run"
+    echo "ALL DONE $(date)"
+    exit 1
+fi
+
+echo; echo "### PRODUCTION"
+$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-32}" "${SPINORBEC_GAP_STEPS:-30000}" 2>&1 | grep -vE "^│|^└|^┌"
 echo "ALL DONE $(date)"
