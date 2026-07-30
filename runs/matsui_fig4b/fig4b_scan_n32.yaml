@@ -1,0 +1,91 @@
+# Matsui et al. (2025) Fig. 4B — B-scan of the 5 ms EdH dip, 32³.
+#
+# Target (measured off test/fixtures/matsui2025/dataset_fig4_theo.csv by
+# `resonance_dip`, pinned in test/validation/test_matsui_fig4_dip.jl):
+#     their simulation : dip centre -2.5495 nT, half-depth width 15.0224 nT
+#     their experiment : dip centre -3.2048 nT, half-depth width 14.5414 nT
+#
+# Parameters reconstructed from time.f90 in Zenodo 17303925, NOT read off it:
+# the shipped `setup_parameters` carries Ntot = 3.5e4 where the published curves
+# total 5.0e4, and initial.f90 builds its ground state with cc0_eff = 1 /
+# cc1_eff = 0 against time.f90's cc0_eff = 0.5 / cc1_eff = 50. See
+# docs/validation/parameter_contract_with_Ueda.md §0.4.
+#
+#   N = 5.0e4, m_F = -6, (ω_x, ω_y, ω_z) = 2π·(110, 110, 130) Hz
+#   cc0_eff = 0.5 with cc1 = cc0/36  ⇔  our c1_ratio = 1/36 under the
+#     c₀ + 36c₁ = 4π(a_s/a_ho)N constraint (verified: both give c₀ = 2343.63)
+#   ZeemanQ = 1.0 Hz, a LITERAL input in their code — not derived from |B|².
+#     q/h = 1 Hz moves the m=-6 → -5 spacing by 11 Hz out of 42.3, i.e. 0.68 nT
+#     of resonance position. It is not optional.
+#   B: 10.4 mG ramped to the target with τ = 50 µs, then held; 5 ms total.
+#   Loss-free (their L3loss = 0 AND L3loss_eff = 0).
+
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_centre_and_width
+  grid_n: 32
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -2.0e-4, to: 2.0e-4, step: 5.0e-6}   # Gauss; -20 … +20 nT, 0.5 nT step
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776       # 1/36
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 100
+        psi: false
+        precision: f64
+
+  - analyze:
+      - populations: {}
+      - energy_decomposition: {}
