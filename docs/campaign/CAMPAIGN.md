@@ -32,6 +32,12 @@ re-derivable, and to install gates so this class of failure cannot recur silentl
 Any run whose producing commit is **not** a descendant of all of these is disqualified
 as campaign evidence.
 
+The machine-readable ref list is **`docs/campaign/fix_list.toml`** — the file guard 1
+reads, and the only place the SHAs are declared. The table below is the human-readable
+context and deliberately carries no SHAs, so the two cannot drift. It has 14 entries to
+this table's 11: the June integrator row expands into the four propagator paths that
+carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
+
 | merged | correction | effect |
 |---|---|---|
 | 2026-06-15 | ITP spin-rotation Stage-3 density bias (c₁ + DDI) | changes ground states |
@@ -47,8 +53,9 @@ as campaign evidence.
 | #139 | `summary_provenance` / `_repo_commit` stamping landed | pre-#139 runs cannot be retro-dated |
 
 **The gate is mechanical, not a judgement call.** Use
-`git merge-base --is-ancestor <ref> HEAD` — not "this run looks recent". One
-re-derivation was nearly published because a fix merged **22 minutes after** the run.
+`git merge-base --is-ancestor <ref> HEAD` over every ref in `fix_list.toml` — not "this
+run looks recent". One re-derivation was nearly published because a fix merged **22
+minutes after** the run.
 
 ---
 
@@ -184,7 +191,8 @@ G1 = every Lane A anchor green + guards installed
 G2 = D3 has ranked the observables by Fisher information
      └─ D1a (32³ ×1000) → D1b (64³, SNPE rounds) → D1c (96³ spot-check)
 
-C2b runs once C2a and A4 are both green, as GPU frees up.
+C2b runs once C2a and A4 are both green, as GPU frees up. C4 (secular vs full DDI
+factorial at the degeneracy) follows C2b on the same allocation.
 ```
 
 **No campaign GPU job before G1.** At 30× throughput the audit pile grows 30× too;
