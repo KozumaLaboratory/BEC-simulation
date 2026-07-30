@@ -105,6 +105,42 @@ end
         @test stretched.width ≈ 2 * base.width atol = 1e-9
     end
 
+    # Fig. 2C is the other half of the same run family, and the two sheets agree
+    # with each other: Fig. 2C at 5 ms gives N_-6 = 21449, and Fig. 4B
+    # interpolated to the same +2.6 nT gives 21344 — 0.5 %. That mutual
+    # consistency is what licenses reading "5 ms hold at 2.6 nT" off both.
+    @testset "Fig. 2C landmarks, and its consistency with Fig. 4B" begin
+        raw, _ = readdlm(joinpath(FIXDIR, "dataset_fig2_theo.csv"), ','; header=true)
+        t = Float64.(raw[:, 1])
+        N6 = Float64.(raw[:, 2])
+        Ntot = sum(Float64.(raw[1, 2:end]))
+        @test Ntot ≈ 50000.0 atol = 0.1
+        @test t[end] ≈ 40.0014 atol = 1e-3
+
+        # Early-time landmarks: the depletion timescale of the source component.
+        # These, not the >10 ms recurrences, are the fair reproduction target —
+        # by 30 ms the curve is dominated by finite-trap revivals that a coarse
+        # grid has no business matching.
+        first_below(f) = t[findfirst(<(f * Ntot), N6)]
+        @test first_below(0.9) ≈ 1.129 atol = 0.02
+        @test first_below(0.7) ≈ 2.199 atol = 0.02
+        @test first_below(0.5) ≈ 3.588 atol = 0.02
+
+        i5 = argmin(abs.(t .- 5.0))
+        @test N6[i5] / Ntot ≈ 0.4290 atol = 1e-3
+
+        # Same physical point read off the other sheet.
+        raw4, _ = readdlm(joinpath(FIXDIR, "dataset_fig4_theo.csv"), ','; header=true)
+        B4 = Float64.(raw4[:, 1])
+        N64 = Float64.(raw4[:, 2])
+        j = sortperm(B4)
+        B4, N64 = B4[j], N64[j]
+        k = searchsortedfirst(B4, 2.6)
+        w = (2.6 - B4[k - 1]) / (B4[k] - B4[k - 1])
+        n_interp = N64[k - 1] + w * (N64[k] - N64[k - 1])
+        @test abs(n_interp - N6[i5]) / N6[i5] < 0.01
+    end
+
     @testset "resonance_dip refuses an unbracketed dip" begin
         x = collect(0.0:1.0:10.0)
         @test_throws ArgumentError resonance_dip(x, collect(10.0:-1.0:0.0))  # min on endpoint
