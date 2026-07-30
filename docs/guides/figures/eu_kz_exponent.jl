@@ -100,7 +100,12 @@ turn "the slow end saturates at zero defects" into a steeper apparent exponent.
 function kz_scan(;
     grid_n::Int=48, box::Float64=14.0, c0::Float64=0.19,
     mu::Float64=5.0, T_hot::Float64=12.0, T_cold::Float64=1.0,
-    tau_Qs=(20.0, 40.0, 80.0, 160.0, 320.0),
+    # Window found by the scalar control, not guessed: at 48³ the first scan used
+    # τ_Q = 20…320 and every point came back with ZERO vortices at healthy N_C —
+    # condensed, but too slowly to trap defects. The smoke at τ_Q = 8 had 12.5.
+    # So the measurable band is the FAST side, and 32 is kept as the bridge to the
+    # zero-defect regime whose upper edge the first scan established.
+    tau_Qs=(2.0, 4.0, 8.0, 16.0, 32.0),
     t_equil::Float64=40.0, t_hold::Float64=20.0,
     gamma::Float64=0.02, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
