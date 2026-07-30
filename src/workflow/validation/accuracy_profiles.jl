@@ -119,15 +119,12 @@ function accuracy_profile(name::Symbol)
         ArgumentError(
             "unknown accuracy profile :$name; expected one of $ACCURACY_PROFILE_NAMES"),
     )
+    # `:fast` is not a list of values — it is the budget solution, so it is
+    # delegated rather than duplicated here.
+    name === :fast && return accuracy_profile_for_budget()
     per_run = filter(k -> k.scope === :per_run, ACCURACY_KNOBS)
     vals = map(per_run) do k
-        if name === :reference
-            k.reference
-        elseif name === :production
-            k.default
-        else
-            (k.fast === nothing ? k.default : k.fast)
-        end
+        name === :reference ? k.reference : k.default
     end
     NamedTuple{Tuple(k.name for k in per_run)}(Tuple(vals))
 end
