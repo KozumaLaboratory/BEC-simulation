@@ -101,6 +101,28 @@ function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
         grad_norm=r_hi.grad_norm, converged=r_hi.converged)
 end
 
+# A solve with a REALISTIC tolerance, to get the line-search evaluation count in
+# the regime that matters.
+#
+# `iteration_slope` above passes `tol = 0.0` so that `n_steps` is consumed
+# exactly and the slope is well defined. The consequence, missed for four rounds
+# of A/B: this cell reaches its gradient floor (|grad| ~ 5e-7) within a few dozen
+# steps, and every iteration after that burns the line search's full 30-deep
+# backtrack and finds nothing — 94 % of steps, 29.4 energy evaluations each. So
+# that measurement is the cost of running AT the floor, in which a change to one
+# evaluation per iteration is diluted 30x.
+#
+# The component costs are measured warm and are trustworthy; what the cost of a
+# descending iteration needs from a real solve is only the evaluation count.
+function descending_solve(cell; tol::Float64=1.0e-8, n_steps::Int=2000)
+    r = find_ground_state_lbfgs(; cell..., n_steps=n_steps, tol=tol)
+    SYNC()
+    steps = max(r.last_step, 1)
+    (; steps, converged=r.converged, grad_norm=r.grad_norm, energy=r.energy,
+        ls_evals=r.n_line_search_evals / steps,
+        ls_fail_frac=r.n_line_search_failures / steps)
+end
+
 # ----------------------------------------------------------------------------
 # Components
 # ----------------------------------------------------------------------------
@@ -211,5 +233,15 @@ for n in grids, ddi in ddi_cases
         s.energy, s.grad_norm, s.converged)
     resid = per_iter - sum(last, parts) - (ls_cost - (c.t_energy + c.t_retract))
     @printf("    %-22s %s  (%4.1f%%)\n", "residual", ms(resid), 100resid / per_iter)
+
+    # The same cost model, evaluated at the evaluation count of a solve that is
+    # actually descending rather than sitting at its floor.
+    d = descending_solve(cell)
+    base_cost = c.t_grad + 2 * c.t_proj + c.t_sob + c.t_dir
+    model = base_cost + d.ls_evals * (c.t_energy + c.t_retract)
+    @printf("  descending solve: %d steps, converged=%s, |grad|=%.3e, %.2f evals/iter, %.1f%% found no step\n",
+        d.steps, d.converged, d.grad_norm, d.ls_evals, 100 * d.ls_fail_frac)
+    @printf("  cost model at that count: %s   (fixed %s + %.2f x %s)\n",
+        ms(model), ms(base_cost), d.ls_evals, ms(c.t_energy + c.t_retract))
     println()
 end
