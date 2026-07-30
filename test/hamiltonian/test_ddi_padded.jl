@@ -206,4 +206,42 @@
         @test ws.ddi === nothing
         @test ws.ddi_padded === nothing
     end
+
+    @testset "pad_factor auto lifts the short-axis cap on the cutoff" begin
+        # A single sphere has ONE radius, so on an anisotropic box the binding
+        # axis is the SHORT one: at a flat 2x pad the cutoff is capped at
+        # min(box) while covering every separation in the box needs max(box).
+        # `pad_factor: auto` sizes the padding per axis so the cap lifts.
+        iso = (12.0, 12.0, 12.0)
+        cigar = (12.0, 12.0, 24.0)
+
+        # Isotropic boxes are already exact at a flat 2x — auto must not change
+        # them, or it would cost memory for nothing on 235 of 294 DDI configs.
+        @test SpinorBEC.auto_ddi_pad_factor(iso) == (2.0, 2.0, 2.0)
+        @test SpinorBEC.auto_ddi_trunc_radius(iso, 2.0) == 12.0
+
+        # Aspect 2: the short axis needs 3x so the cutoff can reach max(box).
+        @test SpinorBEC.auto_ddi_pad_factor(cigar) == (3.0, 3.0, 2.0)
+        @test SpinorBEC.auto_ddi_trunc_radius(cigar, SpinorBEC.auto_ddi_pad_factor(cigar)) == 24.0
+        # …which is exactly the cap a flat 2x would have imposed instead.
+        @test SpinorBEC.auto_ddi_trunc_radius(cigar, 2.0) == 12.0
+
+        # Unpadded stays at half the smallest extent (the sphere would otherwise
+        # overlap its own periodic image).
+        @test SpinorBEC.auto_ddi_trunc_radius(cigar) == 6.0
+
+        # The sentinel survives the YAML parser and resolves inside make_workspace.
+        @test SpinorBEC._parse_ddi_pad_factor("auto") == -1.0
+        @test SpinorBEC._parse_ddi_pad_factor(nothing) == 2.0
+        @test_throws ArgumentError SpinorBEC._parse_ddi_pad_factor("box_half")
+
+        grid = make_grid(GridConfig((16, 16, 32), cigar))
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 1.0)),
+            sim_params=SimParams(; dt=0.001, n_steps=1),
+            enable_ddi=true, c_dd=1.0,
+            ddi_padding=true, ddi_pad_factor=-1.0, ddi_trunc_radius=-1.0)
+        # 1 + max/L per axis on (16,16,32) at box (12,12,24) -> (3,3,2)x the grid.
+        @test ws.ddi_padded.padded_shape == (48, 48, 64)
+    end
 end

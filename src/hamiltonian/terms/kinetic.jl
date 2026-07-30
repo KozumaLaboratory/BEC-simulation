@@ -108,7 +108,7 @@ function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArr
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     fft_buf = similar(psi, ComplexF64, n_pts...)
-    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    k_squared_dev = _to_device_cached(ws.backend, ws.grid.k_squared)
     _grad_kinetic!(out, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
     return out
 end
@@ -145,7 +145,7 @@ end
 function apply_operator!(out, ::KineticTerm, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
-    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    k_squared_dev = _to_device_cached(ws.backend, ws.grid.k_squared)
     _grad_kinetic!(out, psi, ws, ctx.fft_buf, k_squared_dev, ctx.n_pts, D, Val(N))
     return out
 end

@@ -111,9 +111,21 @@ const B_UG = DIR == "down" ? collect(range(BMAX, BMIN; length=NB)) :
         isempty(RP_RAMP) ? "none" : join(RP_RAMP, ",")) : "")
 flush(stdout)
 
+# `make_workspace` deliberately defaults both image knobs OFF — it is the
+# library primitive, and flipping it there would move every direct-call fixture
+# (see its own comment). The YAML/DSL surface defaults them ON, and this script
+# is production physics reached by direct call, so it opts in explicitly.
+#
+# It matters more here than almost anywhere else. The bare periodic kernel
+# carries a 2-5 % dipolar field error that is FLAT in resolution, and its origin
+# is the square lattice of periodic images breaking rotational symmetry — an
+# ANISOTROPIC error. This scan's whole subject is how the trap aspect ratio κ
+# controls the order of the transition, so an anisotropy-dependent DDI error is
+# a direct confound on the axis being measured, not a uniform offset.
 base_kw(p) = (; grid=PRESET.grid, atom=ATOM, interactions=PRESET.interactions,
     potential=PRESET.potential, zeeman=static_zeeman(; Bz=p, Bx=EPS, q=0.0),
-    enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND)
+    enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND,
+    ddi_padding=true, ddi_trunc_radius=-1.0)
 
 # density-weighted axial + transverse magnetisation (manifest scalars).
 function frame_scalars(psi)

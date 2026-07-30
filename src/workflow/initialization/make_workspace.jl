@@ -216,7 +216,11 @@ function make_workspace(;
     #       (pad_factor_d − 1)·L_d — the largest R the zero-pad can hold
     #       without wrap-around (validated: exceeding it re-introduces images).
     box = ntuple(d -> grid.config.n_points[d] * grid.dx[d], N)
-    pf_t = if ddi_pad_factor isa Real
+    # A negative scalar is the `pad_factor: auto` sentinel — size the padding so
+    # the cutoff can reach `max(box)` instead of being capped by the short axis.
+    pf_t = if ddi_pad_factor isa Real && ddi_pad_factor < 0
+        auto_ddi_pad_factor(box)
+    elseif ddi_pad_factor isa Real
         ntuple(_ -> Float64(ddi_pad_factor), N)
     else
         ntuple(d -> Float64(ddi_pad_factor[d]), N)
@@ -224,14 +228,14 @@ function make_workspace(;
     ddi_trunc = if isnan(ddi_trunc_radius)
         nothing
     elseif ddi_trunc_radius <= 0.0
-        minimum(box) / 2
+        auto_ddi_trunc_radius(box)
     else
         ddi_trunc_radius
     end
     ddi_trunc_pad = if isnan(ddi_trunc_radius)
         nothing
     elseif ddi_trunc_radius <= 0.0
-        min(sqrt(sum(b -> b^2, box)), minimum(ntuple(d -> (pf_t[d] - 1) * box[d], N)))
+        auto_ddi_trunc_radius(box, pf_t)
     else
         ddi_trunc_radius
     end
@@ -319,7 +323,9 @@ function make_workspace(;
             quasi_2d=quasi_2d_ddi,
             l_z=l_z_ddi,
             trunc_radius=ddi_trunc_pad,
-            pad_factor=ddi_pad_factor,
+            # `pf_t`, not the raw kwarg: the `auto` sentinel is negative and
+            # `_padded_grid_size` rejects anything below 1.
+            pad_factor=pf_t,
             backend,
             dtype=U,
         )

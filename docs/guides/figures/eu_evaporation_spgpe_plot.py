@@ -35,7 +35,11 @@ OUT = os.path.join(FIGDIR, "eu_evap_spgpe.png")
 def main(csv=CSV, out=OUT):
     if not os.path.exists(csv):
         sys.exit(f"missing {csv} — run docs/guides/figures/eu_evaporation_spgpe.jl first")
-    d = np.genfromtxt(csv, delimiter=",", names=True)
+    # The driver writes a '# M_trajectories=N' provenance line first; skip it and
+    # take the header from the next line.
+    with open(csv) as fh:
+        lines = [ln for ln in fh if not ln.startswith("#")]
+    d = np.genfromtxt(lines, delimiter=",", names=True)
 
     t = d["t_s"]
     fig, (ax, ax2) = plt.subplots(
@@ -50,6 +54,19 @@ def main(csv=CSV, out=OUT):
     ax.plot(t, d["N_C_spgpe"], lw=1.2, color="#7f8c8d", alpha=0.8,
             label="SPGPE classical region $N_C$")
 
+    # Mark where the reservoir mu turns over: the condensate can only be built
+    # while mu is rising, and on this ramp that is the first 4% of the window.
+    ipk = int(np.argmax(d["mu_internal"]))
+    for a in (ax, ax2):
+        a.axvline(t[ipk], color="#34495e", lw=1.1, ls="-.", alpha=0.75)
+    ax.annotate(
+        f"$\\mu$ peaks at {t[ipk] - t[0]:.3f} s\ninto a {t[-1] - t[0]:.2f} s window\n"
+        "— only this sliver can\nbuild a condensate",
+        xy=(t[ipk], 0.55 * np.nanmax(d["N0_0d"])),
+        xytext=(0.30, 0.60), textcoords="axes fraction", fontsize=8.5,
+        color="#34495e",
+        arrowprops=dict(arrowstyle="->", color="#34495e", lw=0.9))
+
     onset = np.flatnonzero(d["N0_0d"] > 0)
     if onset.size:
         ax.axvline(t[onset[0]], color="#c0392b", lw=0.9, ls=":", alpha=0.7)
@@ -63,7 +80,7 @@ def main(csv=CSV, out=OUT):
     ax.legend(frameon=False, fontsize=9, loc="upper left")
     ax.set_title(
         f"$^{{151}}$Eu evaporation over {t[-1] - t[0]:.2f} s of REAL ramp time\n"
-        "full SPGPE, reservoir $(T(t),\\mu(t))$ from the 0-D model",
+        "full SPGPE; the c-field cannot follow a reservoir that turns over this fast",
         fontsize=11)
     ax.grid(alpha=0.25)
 

@@ -9,9 +9,20 @@ export find_ground_state_lbfgs
 # identically. Mirrors the former inline block exactly ⇒ bit-identical trajectory.
 @inline function _lbfgs_grad!(
     g, psi, ws, k_squared_dev, grid, target_magnetization, F,
-    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64,
+    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64;
+    E_known::Union{Nothing, Float64}=nothing,
 )
-    E = energy_gradient!(g, psi, ws; k_squared_dev)
+    # `E_known` short-circuits the energy evaluation. The line search already
+    # evaluated the total energy at exactly this ψ (it is the value it accepted
+    # the step on, and the driver adopts the line search's own retracted
+    # iterate), so recomputing it here was a second full energy pass per
+    # iteration — on the CPU, a second traversal of the whole term registry.
+    E = if E_known === nothing
+        energy_gradient!(g, psi, ws; k_squared_dev)
+    else
+        gradient_only!(g, psi, ws)
+        E_known
+    end
     _project_constraints!(g, psi, grid, target_magnetization, F)
     grad_norm = sqrt(sum(abs2, g) * dV)
     if precond_alpha_v >= 0
@@ -176,12 +187,15 @@ function find_ground_state_lbfgs(;
     # Hamiltonian for tensor-active configurations.
 
     # Device-resident k² for energy_gradient! (matches ws.state.psi's backend)
-    k_squared_dev = _to_device(ws.backend, grid.k_squared)
+    k_squared_dev = _to_device_cached(ws.backend, grid.k_squared)
 
     # Work arrays — separate from ws.state.psi
     psi = copy(ws.state.psi)
     grad = similar(psi)
     grad_new = similar(psi)
+    # (q, psi_trial, s_k, y_k) — shared with the direction update and the line
+    # search, so the per-iteration step/curvature buffers are never allocated.
+    scratch = _lbfgs_scratch(psi)
 
     # L-BFGS history — warm-start from a supplied history when threading across
     # ε-continuation rungs (copied so the caller's vectors are not mutated).
@@ -230,7 +244,7 @@ function find_ground_state_lbfgs(;
         # L-BFGS direction (steepest descent for first step)
         is_sd = isempty(rho_hist)
         direction = if is_sd
-            -grad
+            scratch.q .= .-grad   # same buffer _lbfgs_direction returns
         else
             _lbfgs_direction(grad, s_hist, y_hist, rho_hist, dV)
         end
@@ -246,7 +260,7 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        α, E_trial = _line_search_energy_decrease(
+        α, E_trial, psi_accepted = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
             slope=slope, expand=is_sd,
         )
@@ -261,41 +275,47 @@ function find_ground_state_lbfgs(;
             continue
         end
 
-        # Step
-        s_k = α .* direction
-        psi .+= s_k
-
-        # Retraction
-        norm_sq = sum(abs2, psi) * dV
-        psi ./= sqrt(norm_sq)
-        if target_magnetization !== nothing
-            _normalize_psi_constrained!(
-                psi, grid, D, length(grid.config.n_points), target_magnetization, F
-            )
-        end
+        # Step + retraction: both were already performed inside the line search
+        # at the accepted α (that is what it evaluated the energy of), so take
+        # its iterate rather than recomputing `psi .+= α·d` and renormalising.
+        s_k = scratch.s_k
+        s_k .= α .* direction
+        copyto!(psi, psi_accepted)
 
         # Gradient at the new ψ — same preconditioning as the initial gradient so
         # it can be carried to the next iteration. grad_norm_new is the projected-
         # raw residual used by the next convergence test.
         E_new, grad_norm_new = _lbfgs_grad!(
             grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
-            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV,
+            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV;
+            E_known=Float64(E_trial),
         )
 
         # L-BFGS history update — `real(dot(s_k, y_k))` is the same
         # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
         # `size(grad)` temporaries.
-        y_k = grad_new .- grad
+        y_k = scratch.y_k
+        y_k .= grad_new .- grad
         ys = real(dot(s_k, y_k)) * dV
         if is_active(ys)
-            push!(s_hist, copy(s_k))
-            push!(y_hist, copy(y_k))
-            push!(rho_hist, 1.0 / ys)
-            if length(s_hist) > m_lbfgs
-                popfirst!(s_hist);
-                popfirst!(y_hist);
+            # At capacity, evict the oldest pair and write the new one into
+            # the buffers it was holding: steady-state history maintenance
+            # allocates nothing. `push!(hist, copy(s_k))` used to allocate two
+            # ψ-sized arrays per iteration (~5.8 MB/iter at 24³ × D=13) and
+            # drop two more on the floor for the GC / CUDA pool.
+            if length(s_hist) >= m_lbfgs
+                s_slot = popfirst!(s_hist)
+                y_slot = popfirst!(y_hist)
                 popfirst!(rho_hist)
+                copyto!(s_slot, s_k)
+                copyto!(y_slot, y_k)
+                push!(s_hist, s_slot)
+                push!(y_hist, y_slot)
+            else
+                push!(s_hist, copy(s_k))
+                push!(y_hist, copy(y_k))
             end
+            push!(rho_hist, 1.0 / ys)
         else
             empty!(s_hist);
             empty!(y_hist);
