@@ -65,6 +65,71 @@ end
         end
     end
 
+    @testset "icosahedral: full_bdg == epsilon_LHY_F6_Ih (F = 6, λ_spin > 0)" begin
+        # The F=6 I_h closed form is the one the phase-selection work rests on
+        # and it had no independent arm. Adding it needs one thing checked
+        # first: polar and FM are single-|m⟩ states and stationary for any
+        # (c0, c1) by symmetry, whereas ZETA_F6_IH lives in the m=±5/0 doublet
+        # and its stationarity is not free. Measured — ‖(Z+n·h_mf)ζ − μζ‖/|μ|
+        # ≤ 1.5e-15 for every c1 below, from the same h_mf the BdG solver
+        # expands around — so the comparison is well posed and a mismatch is
+        # about the implementations, not about the expansion point.
+        for c1 in (0.05, 0.1, 0.2)
+            g = _c0c1_to_gS(6, 10.0, c1)
+            @test all(>(0), values(g))
+            c0_st, lam = compute_c0_lambda_F6_Ih(g)
+            @test c0_st > 0 && lam > 0
+            closed = epsilon_LHY_F6_Ih(1.0, g)
+            @test _bdg_eps(ZETA_F6_IH, 6, 10.0, c1) ≈ closed rtol = _RTOL
+        end
+    end
+
+    @testset "icosahedral: the arm discriminates the I_h stiffness" begin
+        # Without this the arm could pass on a shared prefactor. At the SAME
+        # ladder the FM closed form is 51-111% away from the I_h one, so
+        # agreement is about c_0 and λ_spin. Polar is only 0.9-1.8% away and
+        # would not be an adequate control on its own — recorded because the
+        # obvious choice of control here is the weak one.
+        for c1 in (0.05, 0.1)
+            g = _c0c1_to_gS(6, 10.0, c1)
+            ih = epsilon_LHY_F6_Ih(1.0, g)
+            fm = lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g))
+            @test abs(1 - fm / ih) > 0.4
+        end
+    end
+
+    @testset "icosahedral: λ_spin < 0 refuses instead of answering" begin
+        # The closed form takes |λ_spin|^(5/2), so before the guard it was
+        # exactly symmetric under c1 → −c1 and returned a real energy for a
+        # state whose BdG branches are complex. Measured overshoot vs full_bdg
+        # at c₀ = 10 was 0.4% / 2.1% / 11.0% at c1 = −0.05 / −0.1 / −0.2 —
+        # growing with the instability, not with a numerical parameter, and
+        # full_bdg reports max Im ω = 2.8 at c1 = −0.2.
+        #
+        # c1 < 0 is the sign Eu F=6 production uses, so the guard changes live
+        # configurations from a wrong number to an error. That is the point:
+        # the parameter choice is visible at build time and the NaN was not.
+        for c1 in (-0.05, -0.1, -0.2)
+            g = _c0c1_to_gS(6, 10.0, c1)
+            c0_st, lam = compute_c0_lambda_F6_Ih(g)
+            @test c0_st > 0        # so the refusal is λ_spin's, not c_0's
+            @test lam < 0
+            @test isnan(epsilon_LHY_F6_Ih(1.0, g))
+            # full_bdg still answers here — it diagonalises rather than
+            # assuming the branch structure, which is why it is the fallback.
+            @test isfinite(_bdg_eps(ZETA_F6_IH, 6, 10.0, c1))
+        end
+        # The refusal must not become a NaN table. `_tabulate_lhy` checks, so
+        # the build throws where the cause is readable instead of handing NaN
+        # to the propagator. Same guard covers the pre-existing c_0 < 0 case.
+        @test_throws ArgumentError compute_spinor_lhy_icosahedral(;
+            F=6, g_dict=_c0c1_to_gS(6, 10.0, -0.1), n_max=2.0, n_points=8)
+        # ...and the stable side still builds.
+        @test compute_spinor_lhy_icosahedral(;
+            F=6, g_dict=_c0c1_to_gS(6, 10.0, 0.1), n_max=2.0,
+            n_points=8) isa IcosahedralLHY
+    end
+
     @testset "scalar limit: uniform g_S ⇒ (8/15π²)(g n)^(5/2)" begin
         for (F, g0) in ((1, 10.0), (2, 4.0), (6, 10.0))
             closed = 8 / (15π^2) * g0^2.5

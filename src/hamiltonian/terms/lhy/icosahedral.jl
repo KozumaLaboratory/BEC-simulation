@@ -107,15 +107,35 @@ LHY energy density for the F=6 icosahedral (I_h) phase at density `n`.
 
     ε = (8 √M³ / (15 π² ℏ³)) · n^(5/2) · (c_0^(5/2) + 3 |λ_spin|^(5/2))
 
-Returns 0 for `n ≤ 0` or when both stiffnesses vanish. `c_0 < 0` means
-the I_h state is not the ground state of the contact Hamiltonian and
-the closed form does not apply — caller should fall back to BdG.
+Returns 0 for `n ≤ 0` or when both stiffnesses vanish. Returns NaN, and
+so refuses to answer, in the two regimes where the closed form does not
+apply — `_tabulate_lhy` turns that into a loud error rather than a NaN
+table:
+
+- `c_0 < 0` — the I_h state is not the ground state of the contact
+  Hamiltonian.
+- `λ_spin < 0` — the spin-Goldstone branch is dynamically unstable. The
+  `|λ_spin|` below would otherwise make ε exactly symmetric under
+  `λ_spin → −λ_spin` and report a real energy for a state whose BdG
+  branches are complex. Measured against `full_bdg` at F=6, c₀=10:
+  0.4 % / 2.1 % / 11.0 % high at c₁ = −0.05 / −0.1 / −0.2, growing with
+  the instability (`full_bdg` reports max Im ω = 2.8 at c₁ = −0.2 and
+  warns that ε_LHY is scheme-dependent there). Gated by
+  `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`.
+
+Both cases want `full_bdg`, which diagonalises rather than assuming the
+branch structure. `c₁ < 0` is the sign Eu F=6 production uses, so this
+guard changes live configurations from a wrong number to an error.
 """
 function epsilon_LHY_F6_Ih(n::Real, g_S::Union{AbstractVector{<:Real}, AbstractDict};
     M_mass::Real=1.0, hbar::Real=1.0)::Float64
     n <= 0 && return 0.0
     c0, lambda_spin = compute_c0_lambda_F6_Ih(g_S)
-    c0 < 0 && return NaN     # caller's responsibility — I_h not the GS
+    c0 < 0 && return NaN            # I_h not the GS
+    # Round-off band, not a physics band: at uniform g_S the cancellation
+    # −g₀/13 − 121g₆/646 + 91g₁₀/782 + 840g₁₂/5681 leaves λ_spin at −2.2e-16
+    # rather than exactly 0, and the scalar limit must not be refused.
+    lambda_spin < -1e-12 * c0 && return NaN   # spin-Goldstone branch unstable
     prefactor = (8.0 * sqrt(Float64(M_mass)^3)) / (15.0 * π^2 * Float64(hbar)^3)
     return prefactor * Float64(n)^2.5 *
            (c0^2.5 + 3 * abs(Float64(lambda_spin))^2.5)
