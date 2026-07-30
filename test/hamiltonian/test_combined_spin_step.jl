@@ -111,11 +111,24 @@ end
         # gate: H ⊃ −bx·Fx gives d⟨Fy⟩/dt = bx·⟨Fz⟩ > 0 from m=+F;
         # pre-fix the combined step left ⟨Fy⟩ at exactly 0 while the
         # sequential path rotated.
+        #
+        # q = 0 IS REQUIRED for the cross-path comparison below, and this
+        # testset used q = 0.1 until 2026-07-29. `_rtp_use_combined_step`'s
+        # docstring states the reason: the combined path leaves a lab-z `q F_z²`
+        # in the diagonal step while the sequential path applies the whole
+        # tilted Zeeman `-(b·F) + q(b̂·F)²` as one eigen-exact matrix, and those
+        # are the same operator only for an axial field or q = 0. With
+        # (bx, p, q) = (0.4, 0.5, 0.1) the two therefore disagree BY DESIGN:
+        # measured ⟨Fy⟩ = -0.00163902 sequential vs +0.0048 combined, and a
+        # 13×13 `exp(-i·dt·H)` reproduces the first to all printed digits with
+        # the field-axis quadratic and the second with the lab-z one. The
+        # deliberate divergence is pinned in its own testset below; this one
+        # tests the defect-8 claim, which needs q = 0 to be a fair comparison.
         dt = 0.002
         bx = 0.4
         sp = SimParams(; dt=dt, n_steps=1, imaginary_time=false)
         zeeman = TimeDependentZeeman(
-            ConstantWaveform(0.5), ConstantWaveform(0.1),
+            ConstantWaveform(0.5), ConstantWaveform(0.0),
             ConstantWaveform(bx), ConstantWaveform(0.0),
         )
         function _mk_transverse_ws()
@@ -146,6 +159,56 @@ end
         @test fy_seq > 1e-4                       # sequential sees the drive
         @test fy_comb > 1e-4                      # combined does too (defect 8)
         @test isapprox(fy_comb, fy_seq; rtol=0.05)  # same physics, O(dt²) apart
+    end
+
+    @testset "tilted field + q: the two paths differ BY DESIGN" begin
+        # Pins the divergence `_rtp_use_combined_step` exists to keep out of
+        # production, against an exact oracle rather than against each other:
+        #
+        #   sequential  →  H = -(b·F) + q(b̂·F)²     (the ZeemanTerm the registry
+        #                                            declares; field-axis q)
+        #   combined    →  H = -(b·F) + q F_z²      (lab-z q, left in V_diag)
+        #
+        # Both are exact for their own H, so "which is right" is a convention
+        # question and the convention is the registry's. What must never happen
+        # is production silently taking the other one — hence the selector — and
+        # what must never happen here is this file asserting the two agree.
+        F = 6
+        D = 2F + 1
+        dt = 0.002
+        bx, p, q = 0.4, 0.5, 0.1
+        sm = spin_matrices(F)
+        Fx, Fy, Fz = Matrix(sm.Fx), Matrix(sm.Fy), Matrix(sm.Fz)
+        chi = zeros(ComplexF64, D)
+        chi[1] = 1.0                     # m = +F
+        _fy(H) = (c=exp(-im * dt * H) * chi; real(c' * Fy * c))
+
+        bhat = (bx, 0.0, p) ./ sqrt(bx^2 + p^2)
+        F_b = bhat[1] * Fx + bhat[3] * Fz
+        fy_axis = _fy(-(bx * Fx + p * Fz) + q * F_b^2)
+        fy_labz = _fy(-(bx * Fx + p * Fz) + q * Fz^2)
+        # The conventions are distinguishable at this (bx, p, q) — otherwise the
+        # rest of this testset would be vacuous.
+        @test !isapprox(fy_axis, fy_labz; rtol=0.05)
+
+        # The registry's own propagator is the field-axis one, and the sequential
+        # split-step is built from that same ZeemanTerm.
+        P = SpinorBEC._zeeman_propagator(sm, SpinorBEC.ZeemanTerm(bx, 0.0, p, q), dt, false)
+        c = Matrix(P) * chi
+        @test isapprox(real(c' * Fy * c), fy_axis; rtol=1e-8)
+
+        # And production may not reach the combined path with a tilted field.
+        sp = SimParams(; dt=dt, n_steps=1, imaginary_time=false)
+        ws = make_workspace(;
+            grid=_GRID, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
+            zeeman=TimeDependentZeeman(
+                ConstantWaveform(p), ConstantWaveform(q),
+                ConstantWaveform(bx), ConstantWaveform(0.0)),
+            potential=HarmonicTrap(1.0, 1.0, 1.0), sim_params=sp,
+            enable_ddi=true, c_dd=100.0,
+        )
+        @test SpinorBEC._rtp_use_combined_step(ws) == false
     end
 
     @testset "Asserts on incompatible workspace" begin

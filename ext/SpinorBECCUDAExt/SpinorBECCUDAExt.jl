@@ -15,6 +15,13 @@ module SpinorBECCUDAExt
 
 using SpinorBEC
 import CUDA
+# `CuGraph` / `CuGraphExec` look unused and are NOT: `CUDA.@captured` expands to
+# code that names `CuGraphExec` UNQUALIFIED (CUDA.jl lib/cudadrv/graph.jl:190),
+# so the name has to be in scope at the expansion site. Deleting them makes the
+# whole extension fail to load with `UndefVarError: CuGraphExec`.
+# `check_no_stale_explicit_imports` reports all three as stale because it reads
+# the source before macro expansion; the exception is declared in
+# test/test_quality.jl with this reason rather than "fixed" here.
 using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 using LinearAlgebra: dot
 # Shared with the CPU kernels — see src/foundation/voxel_index.jl. Declared once
