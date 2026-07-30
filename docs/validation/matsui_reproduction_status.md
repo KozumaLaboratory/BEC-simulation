@@ -47,7 +47,7 @@ loss-off baseline.
 | 2 | Early-time EdH selection rule | m=−6 decreasing, m=−5 growing first, m=−5 has `(z·e^{-iφ})` ring node | t < 5ms |
 | 3 | 5 ms morphology | m=−5 two-ring, m=−4 three-ring structure | `matsui_5ms_morphology_n{32,64}.yaml` |
 | 4 | 0–40 ms population dynamics | N_m(t) matches Fig 2C (loss-free) | `matsui_40ms_dynamics_n64.yaml` |
-| 5 | Imaging reproduction | TOF + Stern-Gerlach 42 mT/m + column density | not started; needs imaging pipeline |
+| 5 | Imaging reproduction | TOF + Stern-Gerlach 42 mT/m + column density | not started; the pipeline EXISTS — `simulate_rf_sg_tof` / `simulate_tof_with_gradient` / `simulate_tof_scaling` (`analysis/tof{,_multiframe}.jl`) + PSF / saturation / shot noise / binning (`analysis/imaging.jl`). Blocker is the Fig-2C source data, not the code |
 
 ## Configs generated 2026-05-26
 
