@@ -304,6 +304,42 @@ const MUTANTS = Mutant[
         "The named wrapper stops forwarding `phi`, so every caller asking for an \
          in-plane direction gets phi = 0. `:transverse_x` is exactly this call, and \
          the wrapper's whole contract is that it is `init_psi` with a name."),
+    Mutant(:gs_cache_key_ignores_interactions,
+        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+        r"        \"c\" => _hashable\(interactions\.c\),",
+        "        # mutant: interaction channels dropped from the cache key",
+        :drop, :fatal,
+        "the GS stage cache's 'sensitivity to real physics' contract",
+        "Drops the scattering channels from the cache key, so changing c0/c1 hits a \
+         STALE cached ground state. The run reports success and reuses the wrong \
+         physics — the worst shape a cache bug can take, because nothing looks \
+         broken."),
+    Mutant(:gs_cache_key_includes_metadata,
+        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+        r"        \"v\" => 1,                                    # key-schema version",
+        "        \"v\" => 1, \"analyze\" => _hashable(get(p, \"analyze\", nothing)),",
+        :drop, :subtle,
+        "the cache's 'INSENSITIVE to non-physics' contract",
+        "Folds a NON-physics key (the analyze block) into the cache key, so adding an \
+         analyzer invalidates a ground state that is physically identical. Silent: \
+         the answers stay right and only the cost changes."),
+    Mutant(:b_block_cartesian_direction_guard,
+        "src/workflow/experiments/schema/B_block.jl",
+        r"    has_cartesian && has_direction &&\n        throw\(",
+        "    false &&\n        throw(",
+        :drop, :gross,
+        "the B block's 'the forms are mutually exclusive' rule",
+        "Accepts Cartesian components together with a theta/phi direction, which \
+         over-determines the field. One of the two is then silently ignored, and \
+         which one depends on the downstream path."),
+    Mutant(:save_operator_rhs_missing_hpsi_guard,
+        "src/workflow/validation/save_operator_rhs.jl",
+        r"    r\.hpsi === nothing && throw\(",
+        "    false && throw(",
+        :drop, :gross,
+        "'the operator-RHS diff is meaningless without Hψ'",
+        "Writes an operator-RHS bundle with no Hψ in it, so the Level-10 A/B diff \
+         later compares nothing and reports agreement."),
 ]
 
 """
