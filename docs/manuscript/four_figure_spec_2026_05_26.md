@@ -389,6 +389,10 @@ Fig 1 (d)    :  runs/matsui_baseline/matsui_5ms_n64_density_slice.json
 Fig 1 inset  :  runs/matsui_baseline/{matsui_40ms_lossy_medium,strong}.yaml
                   → analysis to extract N(t)/N(0) ratio for inset
 Fig 2 (a, b) :  runs/eu_k3_lhy_control/factorial_2x4.json
+                  regen: scripts/eu_k3_lhy_factorial_regen.jl (8 cells, one revision)
+                  plot:  scripts/eu_k3_lhy_factorial_figure.py
+                  NOTE the panel now shows the OPPOSITE of the original reading:
+                  within each K3 row the LHY model does not change the outcome.
                   !! 2026-07-29: every LHY-enabled cell ran under #125 / #158 /
                   !! #174. The scalar rows had no dynamics LHY at all; the
                   !! polar/icosa rows had it 30000x too strong, which is where
