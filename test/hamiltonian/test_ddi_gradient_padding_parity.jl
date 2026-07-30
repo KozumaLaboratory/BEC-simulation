@@ -57,9 +57,13 @@ function _ddi_fd_vs_gradient(ws, psi, dpsi; ε=1.0e-7)
     grad = similar(psi)
     fill!(grad, zero(eltype(grad)))
     apply_operator!(grad, DDITerm(), ws, psi)
-    # Mean-field term: E = (1/2) Re<psi, H psi>, so dE = Re<H psi, dpsi> and the
-    # operator face IS the gradient without a further factor.
-    analytic = real(dot(grad, dpsi)) * dV
+    # `apply_operator!` returns dE/dpsi_bar, and the energy's first variation is
+    # dE = 2 Re<dE/dpsi_bar, dpsi> — the Wirtinger factor of 2 that
+    # `energy_gradient!` applies for its callers and that this raw face does not.
+    # Dropping it made BOTH the padded case and the unpadded control fail, which
+    # is the control earning its place: it said the comparison was broken rather
+    # than letting a broken comparison indict the padded path.
+    analytic = 2 * real(dot(grad, dpsi)) * dV
 
     e_plus = energy_contribution(DDITerm(), psi .+ ε .* dpsi, ws)
     e_zero = energy_contribution(DDITerm(), psi, ws)
@@ -112,7 +116,7 @@ end
         g_bare = similar(psi)
         fill!(g_bare, zero(eltype(g_bare)))
         apply_operator!(g_bare, DDITerm(), ws_bare, psi)
-        wrong = real(dot(g_bare, dpsi)) * dV
+        wrong = 2 * real(dot(g_bare, dpsi)) * dV
 
         ε = 1.0e-7
         fd =

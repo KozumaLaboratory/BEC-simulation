@@ -15,11 +15,16 @@
 # This measures the size of that: same spec, same solver, two revisions, one
 # node. What moves is the converged ψ, its energy, and the reported residual.
 
+# Top level, not inside the `if` below: a macro is resolved when the enclosing
+# top-level expression is LOWERED, so `using Printf` in the same block comes too
+# late and `@printf` is undefined — which is exactly how the first run of this
+# probe died, in the arm that never touches the compare branch.
+using JLD2
+using Printf
+
 const MODE = length(ARGS) >= 1 ? ARGS[1] : "solve"
 
 if MODE == "compare"
-    using JLD2
-    using Printf
     a = load(ARGS[2])
     b = load(ARGS[3])
     println("=== ", ARGS[2], "  vs  ", ARGS[3], " ===")
@@ -44,8 +49,6 @@ if MODE == "compare"
 end
 
 using SpinorBEC
-using JLD2
-using Printf
 
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
