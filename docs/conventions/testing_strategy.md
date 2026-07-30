@@ -177,6 +177,30 @@ An anchor that stops matching is reported STALE and aborts the run. A catalog
 entry that silently stops testing anything is the failure mode the catalog
 exists to prevent, so it is never allowed to be silent.
 
+**The catalog only sees what it models, so "caught nothing" is never a licence to
+delete.** Run over `test/workflow/` with seven defect classes, 47 of 52 files
+caught nothing and a 4-file / 31 s subset carried everything — which read as an
+enormous pruning opportunity. Reading the top candidates showed the opposite:
+
+| file | what it actually defends |
+|---|---|
+| `test_dynamics_lhy_plumbing.jl` | a bad `lhy:` config **throws** instead of running with LHY off |
+| `test_lhy_texture_warning.jl` | a textured state **warns** that it is getting a single-spinor table |
+| `test_dynamics_lhy_normalisation.jl` | `n_atoms` reaches `lhy_opts`, and dynamics matches ground_state |
+
+The catalog had no mutant that stops a guard throwing or a warning firing, so it
+systematically under-credited every test defending one. Adding those two classes
+made each of the first two files the SOLE catcher of its class. An instrument
+blind to a kind of coverage will always propose deleting the tests that provide
+it — so the workflow is: read the candidate, name its claim, and add the mutant
+that would break that claim. If the file then catches it, the file is proven, not
+suspected. Only a file that catches nothing *after* its own claim is modelled is a
+deletion candidate.
+
+A related caveat: the harness spawns `run_chunk.jl` directly, so files needing a
+test-only dependency (e.g. `workflow/test_vtk_export.jl`) are red at baseline and
+excluded. They are not evaluated, not exonerated.
+
 Cost is one package precompile per mutant, so this is an on-demand and nightly
 instrument, never a PR gate.
 

@@ -178,7 +178,39 @@ const MUTANTS = Mutant[
         "Lab-unit fields (`p_mv`, `coil_mode`) resolve to Gauss BEFORE downstream \
          parsing. Skipping it leaves the raw millivolts in the field, so every \
          downstream number is wrong by the coil calibration factor."),
-]
+
+    # ── guards and warnings: the class the catalog was blind to ───────
+    # Added 2026-07-30. The workflow probe reported
+    # `test_dynamics_lhy_plumbing.jl` and `test_lhy_texture_warning.jl` as
+    # catching NOTHING, which read as "delete candidates" — and reading them
+    # showed why that was wrong: their claims are that a bad config THROWS and
+    # that a risky one WARNS, and the catalog had no mutant that stops a guard
+    # throwing or a warning firing. An instrument that cannot see a kind of
+    # coverage will always propose deleting the tests that provide it.
+    Mutant(:make_workspace_silent_zero_guard,
+        "src/workflow/initialization/make_workspace.jl",
+        # `identity(` instead of `throw(`: the ArgumentError is still built and
+        # then discarded, so control falls through and the run proceeds with LHY
+        # off — the silent zero itself. An earlier version of this mutant reworded
+        # the MESSAGE and escaped, correctly: the test asserts
+        # `@test_throws ArgumentError`, which pins the type, not the prose. A
+        # message-pinning test would have been a pin, and there is rightly none.
+        r"        throw\(\n            ArgumentError\(\n                \"spinor_lhy=:",
+        "        identity(\n            ArgumentError(\n                \"spinor_lhy=:",
+        :drop, :fatal,
+        "the guard added after `ws.lhy` was dropped on six separate paths",
+        "Turns the refusal into a fall-through: `make_workspace` returns a \
+         workspace with no LHY for a config that asked for it, which is the \
+         failure the guard exists to make loud."),
+    Mutant(:lhy_texture_warning_muted,
+        "src/workflow/initialization/make_workspace.jl",
+        r"    spread <= _LHY_TEXTURE_WARN && return nothing",
+        "    return nothing",
+        :drop, :subtle,
+        "gotcha_spatial_lhy_not_a_tabulated_lhy_2026_07_28 (single-spinor caveat)",
+        "Mutes the one thing telling a user their textured state is being given a \
+         single-spinor LHY table. Costs up to ~5 % in ε_LHY with a sign that flips \
+         along a B-scan, so silence here is a wrong number nobody sees.")]
 
 """
     check_anchors(root) -> Vector{(Mutant, n_matches)}

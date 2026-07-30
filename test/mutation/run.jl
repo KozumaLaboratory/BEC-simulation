@@ -42,6 +42,12 @@ function probe_files()
         copy(ORACLE_TESTS)
     elseif spec == "fast"
         select_tests("fast")
+    elseif startswith(spec, "dir:")
+        # Every tier-listed file under a subdirectory. The question "which of
+        # test/workflow/ earns its runtime?" needs the whole directory in the
+        # pool, not a grounding-filtered subset of it.
+        pre = spec[5:end]
+        filter(f -> startswith(f, pre), select_tests("full"))
     elseif spec == "grounded_cheap"
         # Files that can ground a claim (not pins, not API spellings). The pool
         # is deliberately wide: the question is WHICH file catches a defect, so
@@ -81,6 +87,12 @@ end
 # tests its own way could report a catch the real suite would miss.
 
 const _JL = Base.julia_cmd()
+
+# The harness spawns `run_chunk.jl` directly, so it does NOT inherit the
+# deterministic FFT planning that `test/runtests.jl` sets. Without this a mutant
+# would be compared against a baseline planned differently — round-off differences
+# read as catches. See src/foundation/fft_planning.jl.
+get!(ENV, "SPINORBEC_FFT_ESTIMATE", "1")
 
 precompile_package() = run(
     pipeline(
