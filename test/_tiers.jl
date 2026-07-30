@@ -435,6 +435,10 @@ const FULL_EXTRA = [
     # of a padded Φ. Padding is the DEFAULT since 9c117c05, so this is the
     # production layout; no-op on CPU-only CI.
     "gpu/test_gpu_padded_corner_parity.jl",
+    # Fused k-space DDI contraction vs the three broadcasts it replaces. The
+    # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
+    # a green ci tier says nothing about it.
+    "gpu/test_gpu_ddi_contraction_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
