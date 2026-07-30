@@ -148,6 +148,39 @@ than quietly lowering it — a lowered cutoff would let the *grid* define the C
 region and would push $\epsilon_\mathrm{cut}$ below $\mu$, where the reservoir
 formulas are undefined.
 
+### Result on the euv3 ramp: the c-field cannot follow
+
+![second-scale SPGPE evaporation](../../figs/eu_evaporation_optimization/eu_evap_spgpe.png)
+
+Run it and the condensate does not form — and after four attempts the reason is
+not a setting. The reservoir $\mu(t)$ **peaks 95 of 1288 internal units in**
+(0.053 s of a 0.714 s window) and falls for the rest, because $\mu=\mu_{\rm TF}(N_0)$
+follows the 0-D condensate down as $K_3$ eats it from $1.4\times10^4$ to
+$1.8\times10^3$. The c-field is told to grow briefly and to shrink for 96 % of the
+run; $N_C$'s monotone $1.15\times10^4\to158$ is that instruction followed correctly.
+
+A condensate can only be built while $\mu$ is **rising**, so that is the only part
+of the budget that counts:
+
+| | $G$ | $G_\mathrm{eff}=\eta G$ |
+|---|---|---|
+| $\mu$ rising (usable) | 13.4 | **4.5** — against 6.9 needed |
+| $\mu$ falling | 45.2 | 15.1 |
+| whole window | 58.7 | 19.6 |
+
+77 % of the budget lands after the turnover, where the damping term *removes*
+condensate. Integrating over the whole window is what reported a "2.8× margin"
+for a configuration whose usable budget was 0.65×. With the correction **every**
+cutoff depth is short — $n_T=0.5\to1.97$, $1.0\to0.44$, $2.0\to0.04$ — so no
+choice of $n_T$ makes this window work.
+
+**Read this as a statement about the window, not about the method.** $\mu$ is
+driven down by the 0-D condensate's three-body decay, which carries the known
+$\sim2\times$ systematic of issue #75; if the 0-D over-destroys the condensate it
+over-drops $\mu$ with it. What is established independently is that the solver
+condenses when the reservoir lets it: at fixed $\mu=5$, $T=2$ it reaches 82 % of
+the Thomas–Fermi number and is still rising.
+
 ## Cost — why this is now affordable
 
 Second-scale runs were previously written off as out of reach. The binding
@@ -168,7 +201,9 @@ bit-identical; GPU reproducibility is **per trajectory**, seeded with
 `seed_device_rng!`, not per step.
 
 Budget: a full 1.5 s ramp at $64^3$ is ~0.55 h per trajectory with the reservoir
-applied every 5 steps. The 0.714 s Eu window at $80^3$ is ~0.5 h per trajectory.
+applied every 5 steps. The 0.714 s Eu window sized by the growth budget lands at
+$48^3$ — an order of magnitude cheaper than the $96^3$ an over-deep cutoff
+demanded, because a shallower cutoff raises $\gamma$ *and* shrinks the grid.
 
 ## Validation
 
@@ -188,6 +223,8 @@ bug class).
 | growth direction | $N_C$ grows for $\mu>\tilde\mu$ and decays for $\mu<\tilde\mu$ (Eq. 23) | A |
 | GPU = CPU | quiet step agrees to $10^{-11}$; three host k-space arrays broadcast against device buffers | A (Level 0) |
 | timescale | the bridge carries a $>0.5$ s ramp into $>10^3$ internal units | A |
+| **condensation** | $N_0$ reaches $[0.3,1.5]\,N_\mathrm{TF}$ and stays below $N_C$ — the gate for the thing the solver exists to do | B |
+| **Rayleigh–Jeans total** | free field: $N_C$ equals $\sum_{\|k\|<k_\mathrm{cut}}T/(\epsilon_k-\mu)$ to 4 % | B |
 
 Known limits, unchanged by this work:
 
@@ -199,3 +236,10 @@ Known limits, unchanged by this work:
   evaporation runs use, the distinction does not arise.
 - $\gamma$ and $\bar{\mathcal M}$ are taken **spatially uniform**, as in Rooney
   §III D 1. A local-density $\gamma(r)$ is a straightforward extension.
+- **Measure $N_0$ as an overlap with the condensate mode**, not as the occupation
+  of the largest single $k$-mode. A trapped condensate spreads over
+  $|k|\lesssim1/R_\mathrm{TF}$, several grid modes wide; the peak mode understated
+  $N_0$ by $22\times$ here and turned a working solver into a reported failure.
+- The growth budget's efficiency $\eta\approx1/3$ is calibrated on one static
+  test. It is an order-of-magnitude gate, not a predictor — treat $G_\mathrm{eff}$
+  as "this window cannot possibly work" when short, not as a guarantee when large.

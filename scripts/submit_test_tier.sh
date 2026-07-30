@@ -32,7 +32,7 @@ TIER=${SBEC_TIER:-ci}
 # (~1-2 GB), so `auto` asked for ~500 GB and the job was OOM-killed with nothing
 # but "Killed" in the log. Memory, not cores, is the binding resource here.
 WORKERS=${SBEC_WORKERS:-12}
-OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-$HOME/runs}/tests
+OUT_DIR=${SPINORBEC_TSUBAME_RUNS_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/runs}/tests
 mkdir -p "$OUT_DIR"
 cd "$PROJECT_ROOT"
 
