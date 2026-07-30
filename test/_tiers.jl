@@ -443,6 +443,10 @@ const FULL_EXTRA = [
     # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
     # a green ci tier says nothing about it.
     "gpu/test_gpu_ddi_contraction_parity.jl",
+    # The fused diagonal kernel with a TABULATED LHY against the generic
+    # broadcast propagator it replaces. Every production Eu run is tabulated and
+    # every one of them took the fallback; GPU-only.
+    "gpu/test_gpu_tabulated_lhy_fused_diagonal_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
