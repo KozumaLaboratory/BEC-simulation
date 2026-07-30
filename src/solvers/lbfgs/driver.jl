@@ -210,6 +210,10 @@ function find_ground_state_lbfgs(;
     E_prev = Inf
     converged = false
     last_step = 0
+    # Total-energy evaluations spent inside the line search, summed over the
+    # solve. Returned because it, not any single kernel, is what sets the cost
+    # per iteration — see `_line_search_energy_decrease`.
+    n_line_search_evals = 0
     t_start = time()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
@@ -260,10 +264,11 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        α, E_trial, psi_accepted = _line_search_energy_decrease(
+        α, E_trial, psi_accepted, n_ls = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
             slope=slope, expand=is_sd,
         )
+        n_line_search_evals += n_ls
 
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
@@ -389,7 +394,7 @@ function find_ground_state_lbfgs(;
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
-    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist)))
+    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist), n_line_search_evals))
 end
 
 """

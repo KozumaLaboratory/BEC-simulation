@@ -70,4 +70,14 @@ using Test
         @test gap > 0            # still descending, so the gate has teeth
         @test r6.dE ≈ gap rtol = 1.0e-8
     end
+
+    @testset "line-search evaluation count is reported" begin
+        # This count, not any single kernel, is what sets the cost of an
+        # iteration: a 5-minute measurement of Eu-151 F=6 at 24³ put the
+        # iteration at ~245 ms against a component sum of ~57 ms. It has to be
+        # a real count — at least one trial per step that took a step.
+        r = find_ground_state_lbfgs(; base..., n_steps=6, tol=0.0)
+        @test r.n_line_search_evals >= r.last_step
+        @test r.n_line_search_evals == round(Int, r.n_line_search_evals)
+    end
 end

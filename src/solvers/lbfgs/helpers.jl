@@ -189,10 +189,17 @@ decrease test `E(α) < E0`, preserving the old manifold-safe behaviour.
 permits a bounded doubling phase when `α = 1` already decreases, so the first
 unscaled step auto-finds its scale instead of being stuck at the Newton length.
 
-Returns `(α, E, psi_accepted)`. `psi_accepted` is the retracted iterate at the
-accepted `α` (scratch-backed, valid until the next line search) so the driver
-does not have to redo the step + retraction it already computed here. On
+Returns `(α, E, psi_accepted, n_eval)`. `psi_accepted` is the retracted iterate
+at the accepted `α` (scratch-backed, valid until the next line search) so the
+driver does not have to redo the step + retraction it already computed here. On
 failure (`α = 0`) it is the untouched `psi`.
+
+`n_eval` is how many TOTAL-ENERGY evaluations this call made. It is reported
+because it, not any single kernel, is what sets the cost of an iteration: a
+5-minute measurement of Eu-151 F=6 at 24³ put the iteration at ~245 ms against
+a component sum of ~57 ms, and the only candidate for the missing ~190 ms is
+this count being much larger than one. Retractions without an energy (the
+expansion phase's final re-placement) are not counted — they are not evaluations.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
@@ -218,8 +225,10 @@ function _line_search_energy_decrease(
         copyto!(ws.state.psi, psi_trial)
         nothing
     end
+    n_eval = 0
     eval_energy = function (α)
         retract!(α)
+        n_eval += 1
         total_energy(ws)
     end
 
@@ -250,9 +259,9 @@ function _line_search_energy_decrease(
             # (`best_E` is already known), which is why this is `retract!` and
             # not the `eval_energy` the fix on main used.
             last_α == best_α || retract!(best_α)
-            return best_α, best_E, psi_trial
+            return best_α, best_E, psi_trial, n_eval
         end
-        return α, E_trial, psi_trial
+        return α, E_trial, psi_trial, n_eval
     end
 
     # Backtracking from α_init.
@@ -260,9 +269,9 @@ function _line_search_energy_decrease(
         α *= shrink
         E_trial = eval_energy(α)
         if accept(α, E_trial)
-            return α, E_trial, psi_trial
+            return α, E_trial, psi_trial, n_eval
         end
     end
     # No sufficient decrease found — return zero step.
-    (0.0, E0, psi)
+    (0.0, E0, psi, n_eval)
 end

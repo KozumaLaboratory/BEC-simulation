@@ -87,8 +87,10 @@ function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
     per_probe = max((t_probe_hi - t_probe_lo) / (n_probe - n_lo), 1.0e-6)
     n_hi = clamp(round(Int, TARGET_SECONDS / per_probe) + n_lo, 4 * n_lo, 500_000)
     t_lo = @elapsed run(n_lo)
-    t_hi = @elapsed run(n_hi)
-    (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo)
+    r_hi = nothing
+    t_hi = @elapsed (r_hi = run(n_hi))
+    (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo,
+        ls_evals=r_hi.n_line_search_evals / max(r_hi.last_step, 1))
 end
 
 # ----------------------------------------------------------------------------
@@ -187,9 +189,14 @@ for n in grids, ddi in ddi_cases
     for (k, v) in parts
         @printf("    %-22s %s  (%4.1f%%)\n", k, ms(v), 100v / per_iter)
     end
-    resid = per_iter - sum(last, parts)
-    n_ls = 1 + resid / (c.t_energy + c.t_retract)
-    @printf("    %-22s %s  (%4.1f%%)  -> implied line-search evals/iter = %.2f\n",
-        "residual", ms(resid), 100resid / per_iter, n_ls)
+    # Reconcile against the MEASURED number of line-search energy evaluations,
+    # not an inferred one. The earlier form solved the residual for the count,
+    # which makes the breakdown close by construction and can therefore never
+    # report that it does not.
+    ls_cost = s.ls_evals * (c.t_energy + c.t_retract)
+    @printf("    %-22s %s  (%4.1f%%)  [measured %.2f evals/iter]\n",
+        "line search TOTAL", ms(ls_cost), 100ls_cost / per_iter, s.ls_evals)
+    resid = per_iter - sum(last, parts) - (ls_cost - (c.t_energy + c.t_retract))
+    @printf("    %-22s %s  (%4.1f%%)\n", "residual", ms(resid), 100resid / per_iter)
     println()
 end
