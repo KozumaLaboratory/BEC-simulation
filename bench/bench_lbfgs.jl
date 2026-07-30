@@ -62,15 +62,26 @@ end
 # End-to-end: per-iteration slope
 # ----------------------------------------------------------------------------
 
-function iteration_slope(cell; n_lo::Int=4, n_hi::Int=20, samples::Int=3)
+# Wall-clock budget for the long arm of the slope. The original 4-vs-20-step
+# form put ~1 s on each arm and differenced two run minima: at that scale the
+# estimator is measuring startup and its own noise, and the baseline cells moved
+# up to 20 % between jobs. `n_lo` also has to clear `m_lbfgs` — below it the
+# two-loop is still filling its history, so the differenced steps cost less than
+# a steady-state iteration and the component breakdown cannot close.
+const TARGET_SECONDS = parse(Float64, get(ENV, "SBEC_BENCH_SECONDS", "300"))
+
+function iteration_slope(cell; n_lo::Int=25)
     run(n) = begin
         r = find_ground_state_lbfgs(; cell..., n_steps=n, tol=0.0)
         SYNC()
         r
     end
-    t_lo = timed(() -> run(n_lo); warmup=1, samples).t
-    t_hi = timed(() -> run(n_hi); warmup=0, samples).t
-    (t_hi - t_lo) / (n_hi - n_lo)
+    run(n_lo)                                   # compile
+    per_probe = (@elapsed run(n_lo)) / n_lo
+    n_hi = clamp(round(Int, TARGET_SECONDS / per_probe) + n_lo, 4 * n_lo, 500_000)
+    t_lo = @elapsed run(n_lo)
+    t_hi = @elapsed run(n_hi)
+    (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo)
 end
 
 # ----------------------------------------------------------------------------
@@ -145,7 +156,12 @@ for n in grids, ddi in (false, true)
     cell = build_cell(; n, enable_ddi=ddi)
 
     c = components(cell)
-    per_iter = iteration_slope(cell)
+    s = iteration_slope(cell)
+    per_iter = s.per_iter
+    # Print what the estimator actually did, so a point that silently ran for a
+    # second instead of the budget cannot be read as a 5-minute measurement.
+    @printf("  measured over %d steps in %.1f s (short arm %d steps, %.1f s)\n",
+        s.n_hi, s.t_hi, 25, s.t_lo)
 
     # One gradient (grad + 2 projections + sobolev) + direction + >=1 line-search
     # energy evaluation (retraction + total_energy) per iteration.

@@ -20,19 +20,27 @@
 #
 # JULIA_NUM_THREADS is pinned to 1 for the first four runs so Julia-level
 # threading cannot confound the BLAS axis; the last two re-check at 16.
+#
+# node_q, not node_f: 48 cores is the autopilot's `default` profile, so it is
+# the configuration production actually runs in. The BLAS effect scales with
+# the machine's core count and is still plainly visible there.
+#
+# SBEC_BENCH_SECONDS=300 per point. The previous 4-vs-20-step estimator put ~1 s
+# on each arm and differenced two minima, which measured startup: the baseline
+# cells moved up to 20 % between jobs on that.
 #$ -cwd
-#$ -l node_f=1
-#$ -l h_rt=1:30:00
+#$ -l node_q=1
+#$ -l h_rt=3:00:00
 #$ -j y
-#$ -o /gs/fs/tga-kozuma-kouhi/uk07267/lbfgs-blas/uge.log
+#$ -o /gs/fs/tga-kozuma-kouhi/uk07267/lbfgs-blas5/uge.log
 
 set -euo pipefail
 
 FS=/gs/fs/tga-kozuma-kouhi/uk07267
-BASE=${SBEC_BASE:-$FS/wt-lbfgs-base}
-OPT=${SBEC_OPT:-$FS/wt-lbfgs}
+BASE=${SBEC_BASE:-$FS/wt5-lbfgs-base}
+OPT=${SBEC_OPT:-$FS/wt5-lbfgs}
 GRID=${SBEC_GRID:-24}
-OUT=$FS/lbfgs-blas
+OUT=$FS/lbfgs-blas5
 mkdir -p "$OUT"
 
 . /etc/profile.d/modules.sh
@@ -42,6 +50,7 @@ module load cuda/12.8.0 2>/dev/null || module load cuda 2>/dev/null || true
 export JULIA_DEPOT_PATH="${T4_TMPDIR:-/tmp}/.julia:/gs/fs/tga-kozuma-kouhi/shared/.julia"
 mkdir -p "${T4_TMPDIR:-/tmp}/.julia"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
+export SBEC_BENCH_SECONDS=${SBEC_BENCH_SECONDS:-300}
 export SPINORBEC_SCRATCH_DIR="${T4_TMPDIR:-/tmp}/spinorbec_snaps"
 mkdir -p "$SPINORBEC_SCRATCH_DIR"
 
