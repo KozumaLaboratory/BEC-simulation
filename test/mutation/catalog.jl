@@ -210,7 +210,59 @@ const MUTANTS = Mutant[
         "gotcha_spatial_lhy_not_a_tabulated_lhy_2026_07_28 (single-spinor caveat)",
         "Mutes the one thing telling a user their textured state is being given a \
          single-spinor LHY table. Costs up to ~5 % in ε_LHY with a sign that flips \
-         along a B-scan, so silence here is a wrong number nobody sees.")]
+         along a B-scan, so silence here is a wrong number nobody sees."),
+    # ── workflow claims the catalog did not model ─────────────────────
+    # Added 2026-07-30. After the guard/warning classes, these are the remaining
+    # things test/workflow/ actually asserts, taken from the testset names rather
+    # than guessed: a schema rejection, a calibration interpolation that clamps
+    # instead of extrapolating, its date ordering, the checkpoint memo, and the
+    # catalog's family grouping. Until a claim is modelled, the file defending it
+    # reads as dead weight.
+    Mutant(:schema_c1_ratio_singularity_guard,
+        "src/workflow/experiments/schema/schema.jl",
+        r"        if cr <= bound \+ 1e-10",
+        "        if false",
+        :drop, :fatal,
+        "docs: `c1_ratio > -1/F²`; `interaction_params_from_constraint` gives c0 → ∞",
+        "Lets a config through at or below the -1/F² singularity, where \
+         c0 = c_total/(1 + F²·c1_ratio) is infinite or negative. The run then \
+         proceeds with a non-physical coupling instead of being refused."),
+    Mutant(:calibration_extrapolates,
+        "src/workflow/experiments/calibration/core.jl",
+        r"    if target <= hist\.dates\[1\]\n        return _stamped\(hist\.entries\[1\], target\)",
+        "    if false\n        return _stamped(hist.entries[1], target)",
+        :drop, :subtle,
+        "the clamp comment: 'drift outside the measured window is unsafe'",
+        "Removes the low-side clamp, so a target date before the first measured \
+         epoch extrapolates the coil/FORT drift instead of pinning to the nearest \
+         measurement — a silently wrong field for a date nobody calibrated."),
+    Mutant(:calibration_history_unsorted,
+        "src/workflow/experiments/calibration/core.jl",
+        r"        issorted\(dates\) \|\| throw\(ArgumentError\(\"calibration dates must be sorted ascending\"\)\)",
+        "        # mutant: ordering invariant dropped",
+        :drop, :subtle,
+        "CalibrationHistory's constructor invariant",
+        "`interpolate_calibration` finds its bracket with `searchsortedlast`, which \
+         needs sorted dates. Dropping the invariant makes the bracket meaningless \
+         and the interpolation silently wrong."),
+    Mutant(:checkpoint_never_reuses,
+        "src/workflow/checkpoint.jl",
+        r"    if !force\n        cached = load_checkpoint\(cp, key\)",
+        "    if false\n        cached = load_checkpoint(cp, key)",
+        :drop, :subtle,
+        "the checkpoint primitive's whole purpose",
+        "`get_or_compute!` stops reusing a stored result, so every resume recomputes \
+         from scratch. Cheap to miss — the answers stay right and only the cost \
+         changes, which is exactly why it needs a test rather than a reviewer."),
+    Mutant(:catalog_family_keeps_hash,
+        "src/workflow/io/catalog_index.jl",
+        r"    s = replace\(String\(name\), r\"_\[0-9a-f\]\{8,\}\$\" => \"\"\)",
+        "    s = String(name)",
+        :drop, :subtle,
+        "run_family's grouping contract",
+        "Leaves the content-addressed hash on the family name, so every run becomes \
+         its own family and the catalog's grouping collapses to one row per run."),
+]
 
 """
     check_anchors(root) -> Vector{(Mutant, n_matches)}
