@@ -12,11 +12,13 @@
 #      their simulation   centre -2.5495 nT   half-depth width 15.0224 nT
 #      their experiment   centre -3.2048 nT   half-depth width 14.5414 nT
 #
-#  Four tasks, all loss-free (their L3loss = 0):
+#  Six tasks (1-4 loss-free ; their L3loss = 0):
 #    1  fig4b_scan_n32       81 fields, -20 … +20 nT, the curve
 #    2  fig4b_conv_n64        8 fields, resolution error bar on task 1's centre
 #    3  fig4b_gsvariant_n32  19 fields, their literal (inconsistent) ground state
 #    4  fig2c_populations_n32  one field, 40 ms, N_m(t) against their Fig. 2C sheet
+#    5  fig4b_loss_n32       45 fields x 3 K3, the experiment's atom-number deficit
+#    6  gs_c1ratio_probe     3 ground states, does c1_ratio reach c0 at all
 #
 #  Run 2 and 3 are not optional extras. At 32³ the occupied band edge
 #  sqrt(2·mu) ≈ 5.1 sits at 0.81·k_max, so task 1 alone cannot say whether its
@@ -39,7 +41,7 @@
 #$ -N matsui_fig4b
 #$ -l gpu_1=1
 #$ -l h_rt=6:00:00
-#$ -t 1-4
+#$ -t 1-6
 #$ -j n
 
 set -euo pipefail
@@ -65,6 +67,8 @@ else
         2) CONFIG=runs/matsui_fig4b/fig4b_conv_n64.yaml ;;
         3) CONFIG=runs/matsui_fig4b/fig4b_gsvariant_n32.yaml ;;
         4) CONFIG=runs/matsui_fig4b/fig2c_populations_n32.yaml ;;
+        5) CONFIG=runs/matsui_fig4b/fig4b_loss_n32.yaml ;;
+        6) CONFIG=runs/matsui_fig4b/gs_c1ratio_probe.yaml ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
