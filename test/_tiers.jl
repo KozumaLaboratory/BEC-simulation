@@ -144,6 +144,7 @@ const FAST_TESTS = [
     "hamiltonian/test_spatial_lhy_spin_substep.jl",
     "hamiltonian/test_lhy_gradient_all_modes.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
+    "hamiltonian/test_lhy_zeeman_reaches_bdg.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
     "analysis/test_sinatra_diagnostics.jl",
