@@ -73,15 +73,18 @@ run_one() {  # tag root julia_threads blas_threads|"default"
         2>&1 | tee "$OUT/${tag}_j${jt}_b${bt}.out"
 }
 
-# The decisive pair: baseline with Julia single-threaded, BLAS left at the
-# machine default vs pinned to 1. If the two-loop collapses on the second, the
-# cost was the thread team, not the memory traffic.
-run_one base "$BASE" 1 default
-run_one base "$BASE" 1 1
-run_one opt "$OPT" 1 default
-run_one opt "$OPT" 1 1
-# Then with Julia threading on, to see what it adds once BLAS is pinned.
-run_one base "$BASE" 16 1
-run_one opt "$OPT" 16 1
+# Points as `arm:julia_threads:blas_threads`, whitespace separated. Each one is
+# a full measurement budget, so trim the list rather than paying for points the
+# question does not need.
+POINTS=${SBEC_POINTS:-"base:1:default base:1:1 opt:1:default opt:1:1 base:16:1 opt:16:1"}
+for pt in $POINTS; do
+    IFS=: read -r arm jt bt <<< "$pt"
+    case "$arm" in
+        base) root=$BASE ;;
+        opt) root=$OPT ;;
+        *) echo "unknown arm $arm"; exit 1 ;;
+    esac
+    run_one "$arm" "$root" "$jt" "$bt"
+done
 
 echo "[blas] done"

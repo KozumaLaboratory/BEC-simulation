@@ -89,8 +89,13 @@ function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
     t_lo = @elapsed run(n_lo)
     r_hi = nothing
     t_hi = @elapsed (r_hi = run(n_hi))
+    # `n_line_search_evals` only exists on revisions that report it; keep the
+    # bench file identical across A/B arms by degrading to NaN rather than
+    # erroring on the older one.
+    ls = hasproperty(r_hi, :n_line_search_evals) ?
+         r_hi.n_line_search_evals / max(r_hi.last_step, 1) : NaN
     (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo,
-        ls_evals=r_hi.n_line_search_evals / max(r_hi.last_step, 1))
+        ls_evals=ls)
 end
 
 # ----------------------------------------------------------------------------
