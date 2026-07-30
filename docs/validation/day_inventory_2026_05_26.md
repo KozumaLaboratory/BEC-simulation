@@ -60,8 +60,8 @@ docs/validation/figures/
 |---|---|
 | 1. L4 isotropic no-collapse | `runs/l4_k3_ladder/summary.json` + 12 cell dirs `L4_K3_n{64,96,128}_*_<hash>` |
 | 2. Matsui Fig 2C reproduction | `runs/matsui_baseline/summary.json` + `matsui_5ms_n64_density_slice.json` + 3 cell dirs |
-| 3. scalar LHY ≡ off at F=6 — **evidence VACUOUS, see below** | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
-| 4. spinor LHY closure stabilizes alone — **UNDER REVIEW, see below** | same factorial_2x4.json (K3=0 + polar/icosa rows) |
+| ~~3. scalar LHY ≡ off at F=6~~ — **REFUTED 2026-07-29, see below** | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
+| ~~4. spinor LHY closure stabilizes alone~~ — **REFUTED 2026-07-29, see below** | same factorial_2x4.json (K3=0 + polar/icosa rows) |
 
 ### 2026-07-29: the factorial ran under three LHY defects
 
@@ -95,8 +95,35 @@ appears only in the `polar_contact` / `icosa` rows, and those are exactly the
 rows whose LHY was **30000× too strong**. The arrest may be an artefact of the
 defect rather than of the closure.
 
-Both claims are being re-measured with all three fixes in; `fig4_lhy_model_
-interference.png` rests on the same factorial and inherits the same status.
+### Re-measured 2026-07-29 — both claims are refuted
+
+Re-ran every LHY-enabled cell with all three fixes in. `classification` is
+`classify_collapse`, unchanged.
+
+| cell | classification (was → is) | Fz_per_N (was → is) | N(T)/N(0) |
+|---|---|---|---|
+| K3=0, scalar | `delay` → **`stable_arrest`** | −4.2487 → **−5.7496** | 1.000 |
+| K3=0, polar_contact | `stable_arrest` → `stable_arrest` | −5.2675 → −5.7469 | 1.000 |
+| K3=0, icosa | `stable_arrest` → `stable_arrest` | −5.2803 → −5.7469 | 1.000 |
+| K3=200, scalar | `sacrificial_arrest` → `sacrificial_arrest` | −5.7057 → **−2.3312** | 0.400 |
+| K3=200, polar_contact | `stable_arrest` → **`sacrificial_arrest`** | −5.3806 → −2.2914 | 0.393 |
+| K3=200, icosa | `stable_arrest` → **`sacrificial_arrest`** | −5.3789 → −2.2914 | 0.393 |
+
+**Claim 3 is refuted.** With scalar LHY actually applied, K3=0 goes from `delay`
+to `stable_arrest` — the collapse arrests. Scalar LHY is not equivalent to off
+at F=6. The old seven-figure agreement with the `off` row was #174 making the
+dynamics run with no LHY in both arms.
+
+**Claim 4 is refuted, in both directions.** At K3=0 the scalar and the two
+closed forms all arrest identically (Fz_per_N −5.7496 / −5.7469 / −5.7469), so
+arrest is not specific to the spinor closure. At K3=200 the closed forms fall
+OUT of `stable_arrest` into `sacrificial_arrest`, losing 61% of the atoms — the
+"stabilisation" was the 30000× overstrength, not the closure.
+
+`polar_contact` and `icosa` now agree to six figures everywhere, which is what a
+mostly-polarised state should give; the old spread between them was defect
+noise. `fig4_lhy_model_interference.png` rests on this factorial and its premise
+is gone.
 | 5. K3 not primary arrest mechanism | factorial_2x4.json + `runs/eu_k3_sweep/summary.json` (10-pt K3 sweep) + `runs/eu_k3_sweep_96/summary.json` (96³ anchor) |
 | LHY long-time stability | `runs/eu_lhy_longtime/` (5 cells: polar 50/100/200, icosa 50/100) |
 | Barnett window | `runs/barnett_eu_window/summary.json` (14 cells) |
