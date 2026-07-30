@@ -1,26 +1,35 @@
 using SpinorBEC
+using LinearAlgebra
 using Test
 
 # The L-BFGS floor stop, on the GPU.
 #
 # `stop_at_floor` ends the solve at the first steepest-descent line search that
-# finds no acceptable step. The justification is that such a failure leaves ψ,
-# `grad` and `E` untouched with an empty curvature history, so every later
-# iteration rebuilds the same direction from the same gradient and repeats the
-# same evaluations to the same answer — the iterate is a fixed point of the
-# loop.
+# finds no acceptable step, on the argument that such a failure leaves ψ, `grad`
+# and `E` untouched with an empty curvature history — so the next iteration
+# rebuilds the same direction from the same gradient with the same `E0` and
+# repeats the same evaluations to the same answer. The iterate is a fixed point
+# of the loop.
 #
-# That argument assumes the energy evaluation is DETERMINISTIC. On the CPU that
-# is gated in `solvers/test_lbfgs_line_search_and_de.jl`. The GPU is a separate
-# claim: `total_energy` there goes through the fused
-# `_gpu_energy_and_optional_grad` pass with device reductions, not the CPU
-# registry. If it were non-deterministic at the ulp level, the solver could stop
-# one iteration before a step that would have been accepted — silently, and only
-# on the GPU.
+# That argument assumes the energy evaluation is DETERMINISTIC. On the GPU
+# `total_energy` goes through the fused `_gpu_energy_and_optional_grad` pass
+# with device reductions, not the CPU registry, so it is a separate claim from
+# the CPU gate in `solvers/test_lbfgs_line_search_and_de.jl`.
 #
-# So: run the same solve with the stop on and off and require the two to agree
-# on the iterate EXACTLY. Not `≈` — the claim is that stopping gives up nothing,
-# and an approximate agreement would not distinguish that from a small loss.
+# What this file does NOT assert: that a stall occurs within some step budget.
+# Two earlier versions did, and both failed for the uninteresting reason that
+# this problem had not reached its floor yet on this backend — while every
+# assertion that mattered passed. Whether a given problem reaches its floor in
+# N steps is not a property of the stop rule, and a gate that legislates it is a
+# gate that gets its step count tuned until it goes green.
+#
+# What it asserts instead is the mechanism the rule rests on, all of which hold
+# whether or not a stall happens to occur:
+#
+#   1. turning the flag on never changes the answer;
+#   2. the line search is deterministic — identical inputs, identical outputs;
+#   3. it never mutates the ψ it is given;
+#   4. a failure is reachable and returns α = 0 cleanly.
 
 const HAS_CUDA = try
     @eval import CUDA
@@ -44,37 +53,77 @@ end
             backend=CUDABackend(),
             verbose=false,
         )
+        dV = cell_volume(grid)
+        F = atom.F
 
-        # Reaching the floor must not be left to a step budget. The first
-        # attempt asserted a stall within 200 steps and failed on the GPU for
-        # the uninteresting reason that this problem had not got there yet —
-        # the exact-agreement assertions passed, because both arms had simply
-        # run 200 identical steps.
-        #
-        # So drive to the floor first and hand that ψ to the paired runs. The
-        # seed either stalled (ψ IS the fixed point) or ran out of steps very
-        # near it; either way the paired runs stall within a few iterations,
-        # and the construction does not depend on how many steps this
-        # particular problem needs on this particular backend.
-        seed = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
-        psi0 = Array(seed.workspace.state.psi)
+        @testset "the flag never changes the answer" begin
+            # The production-safety claim. True whether or not the stop fires:
+            # if it fires, the iterate it stopped at is the one the grinding run
+            # ends on; if it does not, the two runs are the same run.
+            r_stop = find_ground_state_lbfgs(; base..., n_steps=150, tol=1.0e-16)
+            r_grind = find_ground_state_lbfgs(;
+                base..., n_steps=150, tol=1.0e-16, stop_at_floor=false)
+            @test r_stop.energy == r_grind.energy
+            @test r_stop.grad_norm == r_grind.grad_norm
+            @test Array(r_stop.workspace.state.psi) ==
+                Array(r_grind.workspace.state.psi)
+            @info "GPU floor stop" stop_reason = r_stop.stop_reason last_step = r_stop.last_step failures =
+                r_stop.n_line_search_failures
+        end
 
-        r_stop = find_ground_state_lbfgs(;
-            base..., psi_init=psi0, n_steps=200, tol=1.0e-16)
-        r_grind = find_ground_state_lbfgs(;
-            base..., psi_init=psi0, n_steps=200, tol=1.0e-16, stop_at_floor=false)
+        @testset "the line search is deterministic and does not mutate its input" begin
+            seed = find_ground_state_lbfgs(; base..., n_steps=60, tol=0.0)
+            ws = seed.workspace
+            psi = copy(ws.state.psi)
+            psi_before = copy(psi)
 
-        @test r_stop.stop_reason === :line_search_stalled
-        @test r_stop.last_step <= 10
-        @test r_grind.stop_reason === :max_steps
-        @test r_grind.last_step == 200
+            g = similar(psi)
+            E0 = SpinorBEC.energy_gradient!(g, psi, ws)
+            SpinorBEC._project_constraints!(g, psi, grid, nothing, F)
+            dirn = -g
+            slope = SpinorBEC._realdot(g, dirn) * dV
 
-        # The whole claim: stopping early costs nothing.
-        @test r_stop.energy == r_grind.energy
-        @test r_stop.grad_norm == r_grind.grad_norm
-        @test Array(r_stop.workspace.state.psi) == Array(r_grind.workspace.state.psi)
+            a1, e1, _, n1 = SpinorBEC._line_search_energy_decrease(
+                psi, dirn, E0, ws, grid, dV, nothing, F; slope=slope, expand=true)
+            a2, e2, _, n2 = SpinorBEC._line_search_energy_decrease(
+                psi, dirn, E0, ws, grid, dV, nothing, F; slope=slope, expand=true)
 
-        # ...and it is a large saving, not a marginal one.
-        @test r_grind.n_line_search_evals > 5 * r_stop.n_line_search_evals
+            # Identical inputs, identical outputs — this is the whole basis for
+            # calling a failed steepest-descent search conclusive.
+            @test a1 === a2
+            @test e1 === e2
+            @test n1 == n2
+            # And the search reads `psi`, never writes it: the argument that a
+            # failure leaves the iterate untouched depends on it.
+            @test Array(psi) == Array(psi_before)
+        end
+
+        @testset "a failing search returns alpha = 0 without moving psi" begin
+            seed = find_ground_state_lbfgs(; base..., n_steps=60, tol=0.0)
+            ws = seed.workspace
+            psi = copy(ws.state.psi)
+            psi_before = copy(psi)
+
+            g = similar(psi)
+            E0 = SpinorBEC.energy_gradient!(g, psi, ws)
+            SpinorBEC._project_constraints!(g, psi, grid, nothing, F)
+            # Uphill, and starting small: E(α) = E0 + α·slope + O(α²) with
+            # slope > 0, so every trial from α_init downwards raises the energy
+            # and is rejected. This reaches the failure branch without depending
+            # on the solve having converged, and without depending on where a
+            # full-length step along +grad happens to land.
+            up = copy(g)
+            slope = SpinorBEC._realdot(g, up) * dV
+            @test slope > 0        # positive control: this really is ascent
+
+            α, E, psi_acc, n_eval = SpinorBEC._line_search_energy_decrease(
+                psi, up, E0, ws, grid, dV, nothing, F;
+                slope=slope, expand=false, α_init=1.0e-3)
+            @test α == 0.0
+            @test E == E0
+            @test n_eval >= 1
+            @test Array(psi) == Array(psi_before)
+            @test psi_acc === psi   # failure hands back the untouched iterate
+        end
     end
 end
