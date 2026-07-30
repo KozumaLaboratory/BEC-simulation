@@ -58,7 +58,10 @@ function final_populations(run_dir; duration=nothing, dt=nothing)
         jldopen(joinpath(run_dir, f), "r") do d
             pops = d["dynamics"]["component_populations"]   # (n_saves, 2F+1)
             times = d["dynamics"]["times"]
-            if duration !== nothing && abs(times[end] - duration) > 1e-6
+            # One dt of slack: the integrator takes ceil(duration/dt) steps, so the
+            # last sample lands at 3.4560 for a nominal 3.4558. Anything larger
+            # means save.every does not divide the step count.
+            if duration !== nothing && abs(times[end] - duration) > 1.1e-3
                 error(
                     "$f: last dynamics sample is at t = $(times[end]) but the hold " *
                     "ends at $duration — set save.every to divide the step count",

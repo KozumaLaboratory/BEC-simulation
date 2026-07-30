@@ -293,6 +293,106 @@ Read alongside the numbers, whenever they land:
   5×10⁻³ nT — below what is being measured, but they are not zero and the run
   should not be quoted to better than that.
 
+### 0.7 Results — UGE 8304651, commit `f7433171`, clean tree
+
+Ancestor gate green on all 14 `fix_list.toml` refs. All four tasks exit 0.
+
+#### Fig. 4B — the dip
+
+| | centre [nT] | half-depth width [nT] |
+|---|---|---|
+| **SpinorBEC 32³** (45 fields, −13 … +9 nT @ 0.5) | **−2.138** | **14.62** |
+| Matsui simulation, **same window, same metric** | −2.5495 | 12.7524 |
+| difference | **+0.41** | **+1.87 (+15 %)** |
+| Matsui experiment (full window) | −3.2048 | 14.5414 |
+
+**Type C**, producing commit `f7433171`, gate `ci`
+(`test/validation/test_matsui_fig4_dip.jl` pins the reference side).
+
+What this does and does not say:
+
+- **The sign and the scale of the offset reproduce.** The dip is on the negative
+  side and it is a couple of nT there — that is the resonant-EdH claim, and an
+  independent implementation with independently-declared conventions lands on it.
+- **The offset is 16 % short of theirs** (−2.14 against −2.55) and 33 % short of
+  the measurement (−3.20). Since the whole offset is the gas's own dipole field
+  shifting the resonance, a 16 % shortfall in the offset is roughly a 16 %
+  shortfall in the effective dipole field seen by the spins. That is larger than
+  every kernel-convention difference bounded in §0.3.3 combined (~0.02 nT), so it
+  is **not** explained by the k=0 bin or the spherical truncation.
+- **The width is 15 % wide**, in the opposite direction. The paper reads the width
+  as the spread of the dipole field over the cloud, so a wider dip with a smaller
+  centre offset says our field distribution is broader and its mean smaller —
+  consistent with a density profile that is flatter than theirs.
+
+#### Resolution: the 32³ number is not resolution-limited
+
+Task 2 re-ran five of the fields at 64³ (`dx` 0.5 → 0.25 a_ho). `N_{m=−6}` at the
+matched fields:
+
+| B [nT] | 32³ | 64³ | diff |
+|---|---|---|---|
+| −4.0 | 10802.3 | 10803.34 | 0.010 % |
+| −3.0 | 10064.3 | 10062.07 | 0.022 % |
+| −2.5 | 9814.2 | 9810.98 | 0.033 % |
+| −2.0 | 9760.1 | 9759.75 | 0.004 % |
+| +5.0 | 23666.3 | 23679.31 | 0.055 % |
+
+**≤ 0.06 % across a 2× refinement**, on two independently built grids, FFT plans
+and padded DDI kernels. The under-resolution flagged in §0.6 is real for the
+healing-length structure but does not reach this observable in 5 ms: the transfer
+is driven by the bulk mean field, and the bulk is well resolved at 32³. The 0.41
+nT gap is physics or parameters, not the grid. **Type A**, `f7433171`.
+
+Do **not** read a dip centre off task 2 itself. Six fields chosen for a
+convergence check do not bracket a dip, and `resonance_dip` applied to them
+returns −5.32 nT, which is an artefact of extrapolating a vertex across a 7.5 nT
+gap. It is reported here only so nobody re-derives it and believes it.
+
+#### Task 3 (their literal ground state) is VOID — the knob did not move
+
+`fig4b_gsvariant_n32.yaml` sets `c1_ratio: 0.0` in the ground-state step, which
+should double `c₀` from 2343.63 to 4687.27 (verified at the function level:
+`compute_eu151_interactions` returns exactly that). It does not reach the run.
+The two arms' converged ground-state energies are **−910.66795 and −910.66985** —
+2×10⁻⁶ relative apart — where a 2× change in `c₀` should move the non-Zeeman part
+of the energy by ~30 %. And the resulting dip centres differ by 0.02 nT.
+
+Two arms that should differ and are numerically indistinguishable is evidence
+about the **plumbing**, not about the physics. The §0.3.5 ground-state ambiguity
+is therefore **still unpriced**, and no conclusion may be drawn from this arm
+until `c1_ratio` in a `ground_state` step is shown to move `c₀` in a run. That is
+the next thing to fix, and it needs a gate that fails when the value does not move.
+
+#### Fig. 2C — the loss-free time series
+
+Single field (2.6 nT), 40 ms, 32³, against `dataset_fig2_theo`:
+
+| landmark | SpinorBEC | Matsui | ratio |
+|---|---|---|---|
+| t at `N_{−6}` = 90 % | 0.940 ms | 1.129 ms | 0.83 |
+| t at 70 % | 1.838 ms | 2.199 ms | 0.84 |
+| t at 50 % | 2.908 ms | 3.588 ms | 0.81 |
+| `N_{−6}` at 5 ms | 0.2721 | 0.4290 | 0.63 |
+| `N_{−6}` at 20 ms | 0.4396 | 0.4700 | 0.94 |
+| `N_{−6}` at 40 ms | 0.6334 | 0.3618 | 1.75 |
+
+**Answer: partially, and only early.** The phenomenon reproduces — `m = −6`
+depletes on a millisecond timescale into `m = −5` first, with a partial recovery
+later — but **our transfer runs ~20 % fast**: all three early landmarks sit at
+0.81-0.84 of theirs, a near-constant *rate* ratio rather than a shape difference.
+By 5 ms that has compounded into a 37 % population gap, and past ~10 ms the two
+curves are unrelated (at 40 ms ours has recovered to 0.63 where theirs sits at
+0.36). The late-time disagreement is expected and not diagnostic: that regime is
+finite-trap revivals, sensitive to everything.
+
+A ~20 % rate excess and a ~16 % offset shortfall are the **same size** and both
+point at the effective dipolar drive. They are the thing to chase next; they are
+not accounted for by any convention difference found in §0.3.
+
+**Type C**, producing commit `f7433171`, no tier (single run, not gated).
+
+
 ---
 
 ## 1. Spin-matrix conventions
