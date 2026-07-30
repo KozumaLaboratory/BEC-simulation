@@ -234,7 +234,14 @@ ordering is worth *more* when execution is cheap, not less.
 
 F = 6 (13 components), g_J = 1.9934, g_F ≈ 1.163, μ ≈ 6.977 μ_B, a_s = 110(4) a₀,
 $\epsilon_{dd}$ ≈ 0.54, $a_{dd}$ ≈ 59 a₀.
-**q/h = 1.43 kHz/G² at 1 G** (post-2026-07-08; any earlier figure is 11× high).
+**q/h = 1.42 kHz/G² at 1 G** (post-2026-07-08; any earlier figure is 11× high).
+Measured 2026-07-30 with `compute_quadratic_zeeman` (`src/hamiltonian/coefficients.jl:310`;
+there is no `bfield_to_q`): 1 G → q/h = 1421 Hz, 3 G → 12.79 kHz, 1.32 G → 2.48 kHz,
+but **2.6 nT → q/h = 9.6e-7 Hz against p/h = 42.3 Hz**, a ratio of 2.3e-8. So the 11×
+error is decisive in the gauss band — the (p,q) diagrams, `eu151_B_sweep_pm120`, the
+1.32 G Feshbach region — and cannot move an nT-band EdH run at all. Weak-field runs are
+still disqualified, but by the integrator / ITP-bias / LHY corrections, not by q. Order
+the re-derivation accordingly: gauss-band scans first, since only there is q the reason.
 Constraint `c₀ + 36 c₁ = 4π(a_s/a_ho)N`. Only $a_{12}$ is known — the other six $a_S$
 have **never been measured and have no theoretical value to quote**; Tomza's Eu+Eu work
 fixes only the long range ($C_6 = 3610$ a.u. ⇒ $R_6 = 178\,a_0$). ¹⁵³Eu's registry entry
