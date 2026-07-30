@@ -321,20 +321,38 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
 
     kind = String(get(lhy_block, "kind", "none"))
     # Auto-derive c_lhy for scalar / quasi_2d when user omitted it.
+    #
+    # Guarded on `c_dd_val > 0` until 2026-07-29, which made
+    # `lhy: {kind: scalar}` a SILENT no-op on every non-dipolar config: the
+    # coefficient stayed 0, nothing warned, and the run reported an LHY mode it
+    # was not using. Scalar LHY is the plain Lee-Huang-Yang correction of a
+    # contact gas — it is *most* meaningful without DDI. The dipolar factor
+    # `Q₅(ε_dd)` is the DDI ENHANCEMENT of it, so ε_dd enters only when the DDI
+    # is actually in the Hamiltonian; `eps_dd` as passed here is the atom's
+    # intrinsic a_dd/a_s and is non-zero even for a run with DDI switched off.
+    # Dimensionless scalar LHY coefficient for the repo's per-particle
+    # convention (∫|ψ|²dV = 1, E_LHY/N = (2/5)·c_lhy·∫n^{5/2}dV,
+    # c₀ = 4π(a_s/a_ho)N). Fixed by SI alone — no convention freedom:
+    #
+    #   γ_QF = (32/3)·g·√(a_s³/π),  g = 4πℏ²a_s/m
+    #        = (128√π/3)(ℏ²/m)·a_s^{5/2}
+    #   ⇒ c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+    #
+    # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces the
+    # textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
+    # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
     if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
-        if !isnan(c_dd_val) && c_dd_val > 0
-            # Dimensionless scalar LHY coefficient for the repo's per-particle
-            # convention (∫|ψ|²dV = 1, E_LHY/N = (2/5)·c_lhy·∫n^{5/2}dV,
-            # c₀ = 4π(a_s/a_ho)N). Fixed by SI alone — no convention freedom:
-            #
-            #   γ_QF = (32/3)·g·√(a_s³/π),  g = 4πℏ²a_s/m
-            #        = (128√π/3)(ℏ²/m)·a_s^{5/2}
-            #   ⇒ c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
-            #
-            # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces
-            # the textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
-            # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
-            lhy_block["c_lhy"] = scalar_lhy_coefficient(atom.a_s / a_ho, N_atoms; eps_dd)
+        ddi_active = !isnan(c_dd_val) && c_dd_val > 0
+        if N_atoms > 0 && isfinite(a_ho) && a_ho > 0
+            lhy_block["c_lhy"] = scalar_lhy_coefficient(
+                atom.a_s / a_ho, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
+            )
+        else
+            # Cannot derive without N and a_ho. Must not be silent — that is the
+            # same failure mode the `c_dd > 0` guard caused.
+            @warn "lhy: {kind: $kind}: c_lhy cannot be derived without " *
+                "interactions.N_atoms and interactions.omega_ref. Pass " *
+                "lhy.c_lhy explicitly; the LHY term is OFF for this step."
         end
     end
     # Normalise to internal fields for downstream consumers.

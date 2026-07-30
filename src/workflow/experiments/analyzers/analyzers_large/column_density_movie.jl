@@ -54,5 +54,5 @@ function _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
     end
     (output_dir=output_dir, n_frames=global_idx,
         archive_path=archive_path, manifest_path=manifest_path,
-        axis=axis, n_phases=multi_step ? length(sources) : 1)
+        axis=axis, n_phases=n_phases)
 end

@@ -192,6 +192,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # (physics block × solver path) table: the term must be LIVE on the
+    # Workspace after a YAML run, on every path. Drives run_config, so `ci`
+    # rather than `fast`. Replaces the per-incident plumbing files — a new path
+    # is a row, not a new file.
+    "workflow/test_yaml_physics_reaches_workspace.jl",
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
