@@ -1,13 +1,21 @@
 using SpinorBEC, JLD2, CodecZstd
+# `icosa` is NOT a cell any more. `IcosahedralLHY`'s closed form is
+# `c_0^(5/2) + 3|lambda_spin|^(5/2)`; the absolute value made it symmetric under
+# c1 -> -c1 and returned a real energy where the spin-Goldstone branch is
+# dynamically unstable. These configs use c1_ratio = -0.005, i.e. c1 < 0, so the
+# icosa rows were measured in a regime current main now refuses with an
+# ArgumentError. `full_bdg` diagonalises the coupled problem with no ansatz and
+# IS valid there (checked: finite V, no instability warning at c0=3270, c1=-16.35,
+# m=-F), so it takes the slot.
 CELLS = [
   ("K3=0, LHY=off",            "LHY_off_K0_2e71a8ce",          0,   "off"),
   ("K3=0, LHY=scalar",         "LHY_scalar_K0_7fa5a5de",       0,   "scalar"),
   ("K3=0, LHY=polar_contact",  "LHY_polar_contact_K0_b7492d26",0,   "polar_contact"),
-  ("K3=0, LHY=icosa",          "LHY_icosahedral_K0_026053aa",  0,   "icosa"),
+  ("K3=0, LHY=full_bdg",       "LHY_fullbdg_K0_c8ac9b21",      0,   "full_bdg"),
   ("K3=200, LHY=off",          "LHY_off_9ed79424",             200, "off"),
   ("K3=200, LHY=scalar",       "LHY_scalar_41f93da5",          200, "scalar"),
   ("K3=200, LHY=polar_contact","LHY_polar_contact_f142b6fb",   200, "polar_contact"),
-  ("K3=200, LHY=icosa",        "LHY_icosahedral_35a4ee80",     200, "icosa"),
+  ("K3=200, LHY=full_bdg",     "LHY_fullbdg_17c90dbc",         200, "full_bdg"),
 ]
 rows = Any[]
 for (label, dir, k3, lhy) in CELLS
