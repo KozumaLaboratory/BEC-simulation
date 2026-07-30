@@ -1,14 +1,22 @@
 # Long-time LHY stability ladder — auto-generated.
 # Source: scripts/validation/eu_lhy_longtime_gen.jl
-# LHY = icosahedral, K3 = 0, duration = 62.83 ω_ref⁻¹ ≈ 100ms
+# LHY = full_bdg, K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
+# Was `kind: icosahedral`, migrated 2026-07-30. The I_h closed form now
+# refuses this ladder: c1_ratio = -0.005 gives lambda_spin/c_0 = -0.07, i.e. a
+# negative spin-Goldstone stiffness, where it used to take |lambda_spin|^(5/2)
+# and overshoot full_bdg by up to 11%. `full_bdg` is the general-spinor path
+# the guard directs callers to and it is valid here. NOTE the state is
+# `m_minus_F`, so the matching CLOSED form would be `fm_contact` (any F since
+# 2026-07-27, gated against full_bdg at F=1..8) at ~100x less cost; full_bdg is
+# chosen to keep this suite's arms distinct from a future fm_contact arm.
 
 metadata:
   suite: eu_lhy_longtime
   ladder_level: 12
   parent_regime: cigar_N30k_omz0p25
   K3_factor: 0
-  LHY_kind: icosahedral
-  target_ms: 100ms
+  LHY_kind: full_bdg
+  target_ms: 200ms
   generator: scripts/validation/eu_lhy_longtime_gen.jl
   caveat: |
     Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
@@ -37,7 +45,7 @@ pipeline:
       ddi:
         enabled: true
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
@@ -47,7 +55,7 @@ pipeline:
       tol: 1.0e-9
 
   - dynamics:
-      duration: 62.83
+      duration: 125.66
       dt: 0.005
       B:
         Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
@@ -55,7 +63,7 @@ pipeline:
         phi: 0.0
       ddi:
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       # NO loss block — K3 = 0
       seed_amplitude: 1.0e-6
       seed_k_cut: 2.5

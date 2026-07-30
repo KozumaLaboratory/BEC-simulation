@@ -1,13 +1,21 @@
 # Task #19C — LHY interference at K3=200× cigar regime.
 # Source: scripts/validation/eu_k3_lhy_gen.jl
-# LHY kind = icosahedral (applied outside nominal regime; see scope note).
+# LHY kind = full_bdg (general-spinor BdG; valid for this state and ladder).
+# Was `kind: icosahedral`, migrated 2026-07-30. The I_h closed form now
+# refuses this ladder: c1_ratio = -0.005 gives lambda_spin/c_0 = -0.07, i.e. a
+# negative spin-Goldstone stiffness, where it used to take |lambda_spin|^(5/2)
+# and overshoot full_bdg by up to 11%. `full_bdg` is the general-spinor path
+# the guard directs callers to and it is valid here. NOTE the state is
+# `m_minus_F`, so the matching CLOSED form would be `fm_contact` (any F since
+# 2026-07-27, gated against full_bdg at F=1..8) at ~100x less cost; full_bdg is
+# chosen to keep this suite's arms distinct from a future fm_contact arm.
 
 metadata:
   suite: eu_k3_lhy
   ladder_level: 12
   parent_regime: cigar_N30k_omz0p25
   K3_factor: 200.0
-  LHY_kind: icosahedral
+  LHY_kind: full_bdg
   generator: scripts/validation/eu_k3_lhy_gen.jl
 
 defaults:
@@ -27,7 +35,7 @@ pipeline:
       ddi:
         enabled: true
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
@@ -45,7 +53,7 @@ pipeline:
         phi: 0.0
       ddi:
         secular: false
-      lhy: {kind: icosahedral}
+      lhy: {kind: full_bdg}
       loss:
         K3_per_m_si:
           ["2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s", "2.0e-39 m^6/s"]
