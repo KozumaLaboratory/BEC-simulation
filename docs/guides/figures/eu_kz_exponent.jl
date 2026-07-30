@@ -98,8 +98,8 @@ reported separately: a log fit cannot take them, and silently dropping them woul
 turn "the slow end saturates at zero defects" into a steeper apparent exponent.
 """
 function kz_scan(;
-    grid_n::Int=48, box::Float64=14.0, c0::Float64=0.19,
-    mu::Float64=5.0, T_hot::Float64=12.0, T_cold::Float64=1.0,
+    grid_n::Int=138, box::Float64=20.1, c0::Float64=0.19,
+    mu::Float64=15.0, T_hot::Float64=30.0, T_cold::Float64=2.0,
     # Window found by the scalar control, not guessed: at 48³ the first scan used
     # τ_Q = 20…320 and every point came back with ZERO vortices at healthy N_C —
     # condensed, but too slowly to trap defects. The smoke at τ_Q = 8 had 12.5.
@@ -115,6 +115,26 @@ function kz_scan(;
     k_max = π / (box / grid_n)
     k_max > k_cut || error("grid_n=$grid_n cannot resolve k_cut=$(round(k_cut; digits=2)) " *
                            "(k_max=$(round(k_max; digits=2))) at box=$box")
+
+    # TWO preconditions, both measured rather than guessed (see
+    # test/analysis/test_vortex_counter_control.jl):
+    #
+    #  (i) dx ≤ 0.8ξ or the COUNTER invents defects. On a noisy vortex-free field
+    #      it returned 13 at dx/ξ = 1.44 and 0 at 1.01 and 0.76 — and a 24³ smoke
+    #      "measured" 12.5 in exactly that regime.
+    # (ii) R_TF/ξ = 2μ must be large enough to host defects at all. At 2μ = 10 the
+    #      quench produced ZERO at every rate, converged across 24³/48³/64³, which
+    #      is a real zero and not a resolution artefact. Defects need 2μ ≳ 30.
+    ξ = 1 / sqrt(2 * mu)
+    dx = box / grid_n
+    dx <= 0.8ξ || error(
+        "dx/ξ = $(round(dx / ξ; digits=2)) > 0.8: the vortex counter invents defects " *
+        "here (13 on a vortex-FREE field at 1.44). Need grid_n ≥ " *
+        "$(ceil(Int, box / (0.8ξ))) at box=$box, or a larger μ.")
+    R_over_ξ = 2 * mu
+    R_over_ξ >= 25 || @warn "R_TF/ξ = 2μ is small; at 10 the quench gave zero defects " *
+                            "at every rate (converged). Expect no signal." R_over_ξ
+    @printf("  dx/ξ = %.2f (need ≤0.80)   R_TF/ξ = 2μ = %.0f (need ≳30)\n", dx / ξ, R_over_ξ)
     @printf("=== KZ scan (scalar limit: c₁=0, no DDI) ===\n")
     @printf("  grid %d³ box %.1f   k_cut %.2f (k_max %.2f)   μ=%.1f  T %.1f→%.1f\n",
         grid_n, box, k_cut, k_max, mu, T_hot, T_cold)
@@ -181,8 +201,11 @@ end
 # --smoke: every code path on a small grid and a short quench. NOT physics —
 # 2 seeds and 3 rates cannot resolve an exponent.
 function smoke(; backend=CPUBackend())
-    kz_scan(; grid_n=24, box=10.0, tau_Qs=(8.0, 16.0, 32.0), t_equil=8.0,
-        t_hold=4.0, n_seed=2, backend, tag="kz_smoke")
+    # Smoke must satisfy dx ≤ 0.8ξ like anything else, or the counter invents
+    # defects and the smoke "passes" on fiction — which is what the first one did.
+    kz_scan(; grid_n=32, box=6.0, mu=5.0, T_hot=12.0, T_cold=1.0,
+        tau_Qs=(4.0, 8.0, 16.0), t_equil=8.0, t_hold=4.0, n_seed=2,
+        backend, tag="kz_smoke")
 end
 
 function main(mode::String="smoke"; backend=CPUBackend())

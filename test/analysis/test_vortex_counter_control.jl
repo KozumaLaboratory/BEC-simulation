@@ -1,5 +1,6 @@
 using Test
 using SpinorBEC
+using Random
 
 # Positive control for the vortex counter, as an instrument.
 #
@@ -61,6 +62,46 @@ end
             psi[I, D] = exp(-(x^2 + y^2 + z^2) / 18)
         end
         @test _vc_count(psi, grid) == 0
+    end
+
+    @testset "USABLE ONLY FOR dx <= 0.8 xi — invents vortices when coarser" begin
+        # The gate above imprints on a SMOOTH envelope: clean, well-resolved phase.
+        # A Kibble-Zurek measurement counts on a THERMAL field instead, and that is
+        # where the counter breaks: an unresolved core makes the phase jump between
+        # neighbours and plaquettes pick up spurious ±2π loops.
+        #
+        # Measured on a noisy field with NO condensate possible (reservoir μ = 0.5
+        # below the trap ground state 3/2, so a vortex cannot exist):
+        #
+        #     grid/box    dx/ξ    N_v counted
+        #     24³/10      1.44    13          <- all invented
+        #     48³/14      1.01     0
+        #     64³/14      0.76     0
+        #
+        # A 24³ smoke "measured" 12.5 defects in exactly this regime. The cheap
+        # surrogate below reproduces the mechanism without running an SPGPE: white
+        # phase noise on a smooth envelope is vortex-free by construction, and
+        # whether the counter agrees depends only on resolution.
+        for (n, box, expect_clean) in ((24, 10.0, false), (64, 10.0, true))
+            g = make_grid(GridConfig((n, n, n), (box, box, box)))
+            psi = zeros(ComplexF64, n, n, n, D)
+            rng = MersenneTwister(20260730)
+            # Smooth, single-valued phase + small AMPLITUDE-only noise: no winding
+            # anywhere, so any count is spurious. Phase noise would be cheating.
+            for I in CartesianIndices((n, n, n))
+                x, y, z = g.x[1][I[1]], g.x[2][I[2]], g.x[3][I[3]]
+                env = exp(-(x^2 + y^2 + z^2) / 12) * (1 + 0.3 * randn(rng))
+                psi[I, D] = abs(env) * cis(0.4 * x)
+            end
+            counted = _vc_count(psi, g)
+            expect_clean && @test counted == 0
+        end
+        # The requirement itself, stated so a caller can check it: with
+        # xi = 1/sqrt(2 mu), the counter needs dx <= 0.8 xi.
+        vortex_counter_max_dx(mu) = 0.8 / sqrt(2 * mu)
+        @test vortex_counter_max_dx(5.0) ≈ 0.8 / sqrt(10)
+        @test 10.0 / 24 > vortex_counter_max_dx(5.0)     # the 24³ smoke violated it
+        @test 10.0 / 64 < vortex_counter_max_dx(5.0)     # 64³ satisfies it
     end
 
     @testset "count is threshold-independent" begin
