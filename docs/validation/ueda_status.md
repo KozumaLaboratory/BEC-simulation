@@ -1,15 +1,27 @@
-# Ueda lab comparison — status: BLOCKED_EXTERNAL
+# Ueda lab comparison — status: UNBLOCKED via a third-party release
 
-**As of 2026-05-26.**
+**As of 2026-07-30** (was BLOCKED_EXTERNAL from 2026-05-26).
 
 ## Status
 
 ```
-Status:   BLOCKED_EXTERNAL
-Reason:   No active communication channel with the Ueda lab.
-Fallback: Self-contained validation chain (analytic / conservation /
-          literature benchmark / independent reference RHS / convergence).
+Status:   UNBLOCKED — reopening criteria 2 and 3 are both met
+Trigger:  Matsui et al., "Observation of the Einstein-de Haas Effect in a
+          Bose-Einstein condensate", Zenodo record 17303925 (CC-BY-4.0, open).
+          Contains code.zip (the simulation that produced Fig 1F/1G, 2C, 4B)
+          and the numeric datasets behind Figs 2, 4 and S3.
+Owner:    campaign session S-A6 (convention diff + reference generation).
+Caveat:   Same model, same Ref-(19) Kawaguchi-Saito-Ueda lineage. This buys
+          CONVENTION independence and reference generation at arbitrary
+          parameters. It does NOT buy physics independence, and does not
+          replace an external code in a different formulation.
+Fallback: unchanged — the self-contained validation chain remains the basis
+          for every correctness claim until S-A6 produces a diff.
 ```
+
+The Ueda lab itself is still not a communication channel; nothing below about
+"matches Ueda" as a milestone has changed. What changed is that a third-party
+implementation of the same Hamiltonian is now in hand.
 
 ## Decision
 
@@ -91,17 +103,26 @@ where they are invariant across this factorial.
 
 ## Reopening criteria
 
-This document moves out of BLOCKED_EXTERNAL when ANY of:
+This document moved out of BLOCKED_EXTERNAL on 2026-07-30. The criteria were:
 
 1. anko explicitly states communication with the Ueda lab is restored.
+   — still NOT met.
 2. An alternative external code (not Ueda's) is identified for
    cross-comparison and acquired.
+   — **MET**: `code.zip` in Zenodo 17303925.
 3. A peer-reviewed published numerical benchmark covering the Eu
    Hamiltonian-only short-time regime becomes available with enough
    parameter detail to reproduce.
+   — **MET**: `dataset_fig2_theo.xlsx` is the simulated `N_m(t)` for all 13
+   components on a 14.469 µs output grid from `N_{-6} = 50000`, and
+   `dataset_fig4_theo.xlsx` is the same against field on a 1 nT grid.
 
-Until then, do not re-introduce "matches Ueda" as a milestone, and
-do not interpret any Eu run as "validated against the Ueda code."
+Criterion 1 is unchanged, so the old prohibition still stands in its
+original form: do not re-introduce "matches Ueda" as a milestone, and do
+not interpret any Eu run as "validated against the Ueda code." A diff
+against Matsui et al.'s implementation is a different claim, and must be
+labelled as what it is — same model, same Ref-(19) lineage, therefore
+convention-level agreement rather than independent physics.
 
 ### Concrete candidates for criteria 2 / 3 (2026-05-26 research)
 
@@ -112,7 +133,7 @@ are feasible:
 | Candidate | Covers | Effort | Status |
 |---|---|---|---|
 | FORTRESS (Bao group, Fortran 90, CPC 279 (2022), arXiv:2002.04365) | F=1, F=2 contact, 3D ITP + RTP | Install + port a few days | UNATTEMPTED; recommended first cross-check |
-| Matsui et al. 2026 supplementary (Science, DOI:10.1126/science.adx2872, arXiv:2504.17357) | Eu-151 F=6 EdH, full physics | Acquire Science supplement OR email Kozuma/Miyazawa Science Tokyo group | UNATTEMPTED; primary Eu target; effort blocked on supplement acquisition |
+| Matsui et al. 2026 (Science, DOI:10.1126/science.adx2872, arXiv:2504.17357) | Eu-151 F=6 EdH, full physics | Zenodo 17303925 downloaded 2026-07-30 (CC-BY-4.0): `code.zip` 10.4 MB + Fig 2 / Fig 4 / S3 datasets + `dataset_raw.zip` 1.81 GB | **ACQUIRED**, owned by campaign session S-A6. No longer blocked on the supplement |
 | Bao+Cai numerical benchmarks (Commun.Comput.Phys., arXiv:1504.02897) | Scalar (single-component) dipolar GP, tabulated GS energies / widths vs ε_dd | Few days, our scalar path | UNATTEMPTED; cleanest DDI-kernel cross-check |
 | Adhikari/Muruganandam OpenMP dipolar GPE (CPC 286 (2023)) | Scalar dipolar 1D/2D/3D | Few days | Subset of Bao+Cai coverage |
 | GPELab MATLAB (CPC 185/193, 2014/2015) | General GPE; DDI requires hand-wiring | Medium-to-high; MATLAB toolbox | Less maintained; UNATTEMPTED |
