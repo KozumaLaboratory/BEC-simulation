@@ -99,7 +99,12 @@ function gap(; B, kind, dt, taylor, cap)
     a = relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
     b = relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
-    distinct = a.wind != b.wind          # the classification the claims rest on
+    # `isequal`, not `!=`: `_winding_vector` returns `missing` for a depopulated
+    # component, and `!=` on vectors carrying missing yields `missing` rather than
+    # a Bool — which is a TypeError the moment it reaches an `if`. `isequal`
+    # treats missing as equal to missing and always returns Bool, so "the same
+    # component is empty in both" reads as the same class, which is what it is.
+    distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
     (dE=b.E - a.E, sep=sep, distinct=distinct,
         conv=a.converged && b.converged,
         steps=max(a.steps, b.steps), wa=a.wind, wb=b.wind)
