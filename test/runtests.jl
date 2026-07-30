@@ -46,6 +46,16 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 # CUDA-importing oracles on a machine whose driver probe crashes the
 # precompiler). SPINORBEC_TEST_TIMING=quiet suppresses the per-file timing table.
 
+# Deterministic FFT plans for the whole suite. `FFTW.MEASURE` (the production
+# default) benchmarks candidate algorithms at plan time, so the summation order of
+# every transform depends on machine load and every round-off-limited quantity
+# stops being reproducible across processes. Measured on the L-BFGS gradient floor,
+# four fresh processes: MEASURE gave 1.709e-8 / 2.130e-8 / 5.258e-8 / 1.709e-8,
+# ESTIMATE gave 4.1453063004739704e-9 four times. See
+# src/foundation/fft_planning.jl. Overridable, so a run can deliberately measure
+# the production planner.
+get!(ENV, "SPINORBEC_FFT_ESTIMATE", "1")
+
 const _SKIP = Set(filter(!isempty, split(get(ENV, "SPINORBEC_TEST_SKIP", ""), ",")))
 const _NWORKERS = let w = get(ENV, "SPINORBEC_TEST_WORKERS", "1")
     w == "auto" ? max(1, Sys.CPU_THREADS) : parse(Int, w)
@@ -118,11 +128,21 @@ else
         wait(p)
         out = String(take!(buf))
         timed_out && (out *= "\n⏱  worker $k TIMED OUT after $(_TIMEOUT)s — killed\n")
-        (k, timed_out ? 124 : p.exitcode, out)
+        # `p.exitcode` is 0 for a process that died on a SIGNAL — the signal lands
+        # in `p.termsignal`. Reading only the exit code reported an OOM-killed
+        # worker as a clean exit, so the suite blamed the file it happened to be
+        # running: `oracles/test_continuity_equation.jl` came up "never completed"
+        # three times with every worker "exit 0", while `dmesg` showed four julia
+        # processes killed at 14-21 GB RSS. Report 128+signal (the shell
+        # convention), so SIGKILL surfaces as 137 and reads as OOM at a glance.
+        code = timed_out ? 124 : (p.termsignal != 0 ? 128 + p.termsignal : p.exitcode)
+        (k, code, out)
     end
 
     for (k, code, out) in results
-        println("\n──── worker $k (exit $code) ────")
+        sig = code == 137 ? "  ← SIGKILL, almost certainly the OOM killer: lower \
+                             SPINORBEC_TEST_WORKERS (full-tier peak ≈ 2.7 GB/process)" : ""
+        println("\n──── worker $k (exit $code)$sig ────")
         print(out)
     end
 
@@ -130,7 +150,21 @@ else
     # it leaves a claim with no `done_` marker. Without this check that file
     # would simply not have run — a silently-skipped test, the one failure mode
     # an on-demand queue can have that static assignment cannot.
-    unrun = [f for (i, f) in enumerate(ordered) if !isfile(joinpath(qdir, "done_$i"))]
+    # Distinguish the two ways an index can lack a `done_` marker, because they
+    # have different causes and only one is dangerous:
+    #   CLAIMED   a worker took the item and never finished it — it died, or it
+    #             returned from `claim` without running (the hole fixed in
+    #             d7c8517b). The test did not run and nothing else noticed.
+    #   UNCLAIMED nobody ever took it, i.e. parent and workers disagree about the
+    #             index space or the queue file.
+    # `oracles/test_continuity_equation.jl` has come up unrun three times with
+    # every worker exiting 0, no duplicate in the file list, and an 8 s runtime
+    # standalone — so the next occurrence needs to say WHICH of these it is.
+    unrun = Tuple{String, Bool}[]
+    for (i, f) in enumerate(ordered)
+        isfile(joinpath(qdir, "done_$i")) && continue
+        push!(unrun, (f, isfile(joinpath(qdir, "claim_$i"))))
+    end
     nfail = count(r -> r[2] != 0, results)
 
     # Name the red FILES, not just the red workers. Worker stdout is buffered
@@ -145,7 +179,18 @@ else
     isempty(redfiles) || println("\n✗ $(length(redfiles)) file(s) FAILED:\n    ",
         join(redfiles, "\n    "))
     if !isempty(unrun)
-        println("\n✗ $(length(unrun)) file(s) never completed: ", join(unrun, ", "))
+        println("\n✗ $(length(unrun)) file(s) never completed:")
+        for (f, claimed) in unrun
+            println(
+                "    ",
+                rpad(f, 60),
+                if claimed
+                    "CLAIMED (a worker took it and did not finish)"
+                else
+                    "UNCLAIMED (nobody took it — index-space bug)"
+                end,
+            )
+        end
         error("SpinorBEC test suite: unrun files (tier=$TEST_TIER) — see above")
     end
     nfail > 0 &&
