@@ -107,7 +107,7 @@ function kz_scan(;
     # zero-defect regime whose upper edge the first scan established.
     tau_Qs=(2.0, 4.0, 8.0, 16.0, 32.0),
     t_equil::Float64=40.0, t_hold::Float64=20.0,
-    gamma::Float64=0.02, M::Float64=0.0, dt::Float64=0.002,
+    gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
@@ -208,9 +208,65 @@ function smoke(; backend=CPUBackend())
         backend, tag="kz_smoke")
 end
 
+"""
+    kz_merge(; dir=OUTDIR) -> (; tau_Qs, means, sems, alpha, alpha_err)
+
+Merge the per-rate CSVs written by the `rate<τ>` jobs and fit
+`N_v ∝ τ_Q^{-α}`. Split across jobs because one rate at 138³ is ~2 h and five do
+not fit a single walltime; the fit has to happen after the fact rather than inside
+the scan.
+
+Zero-mean rates are excluded from the fit and named, for the same reason as in
+`kz_scan`: a log fit cannot take them and dropping them quietly steepens the
+apparent exponent.
+"""
+function kz_merge(; dir::String=OUTDIR)
+    files = filter(f -> startswith(f, "kz_rate") && endswith(f, ".csv"), readdir(dir))
+    isempty(files) && error("kz_merge: no kz_rate*.csv in $dir")
+    τs, ms, ss, ncs = Float64[], Float64[], Float64[], Float64[]
+    for f in files
+        for ln in readlines(joinpath(dir, f))
+            (isempty(ln) || startswith(ln, "#") || startswith(ln, "tau_Q")) && continue
+            p = split(ln, ",")
+            push!(τs, parse(Float64, p[1]));  push!(ms, parse(Float64, p[2]))
+            push!(ss, parse(Float64, p[3]));  push!(ncs, parse(Float64, p[4]))
+        end
+    end
+    o = sortperm(τs)
+    τs, ms, ss, ncs = τs[o], ms[o], ss[o], ncs[o]
+    @printf("%-8s %-10s %-10s %-10s\n", "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩")
+    for i in eachindex(τs)
+        @printf("%-8.0f %-10.3f %-10.3f %-10.4g\n", τs[i], ms[i], ss[i], ncs[i])
+    end
+    keep = findall(>(0), ms)
+    α, αe = NaN, NaN
+    if length(keep) >= 3
+        x, y = log.(τs[keep]), log.(ms[keep])
+        x̄, ȳ = mean(x), mean(y)
+        Sxx = sum((x .- x̄) .^ 2)
+        sl = sum((x .- x̄) .* (y .- ȳ)) / Sxx
+        r = y .- (ȳ .+ sl .* (x .- x̄))
+        α, αe = -sl, sqrt(sum(r .^ 2) / max(length(x) - 2, 1) / Sxx)
+        @printf("\nα = %.3f ± %.3f   (N_v ∝ τ_Q^-α, %d of %d rates)\n",
+            α, αe, length(keep), length(τs))
+    else
+        @printf("\nonly %d non-zero rates — cannot fit\n", length(keep))
+    end
+    length(keep) == length(τs) ||
+        @printf("EXCLUDED (⟨N_v⟩=0): τ_Q = %s\n", string(τs[setdiff(eachindex(ms), keep)]))
+    (; tau_Qs=τs, means=ms, sems=ss, alpha=α, alpha_err=αe)
+end
+
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif startswith(mode, "rate")
+        # One rate per job: at 138³ a single rate with 8 seeds is ~2 h, and five of
+        # them in one job does not fit h_rt. Mode string carries the rate, e.g.
+        # "rate8" -> tau_Q = 8. Results are merged by kz_merge over the CSVs.
+        τ = parse(Float64, mode[5:end])
+        kz_scan(; tau_Qs=(τ,), t_hold=1.0, n_seed=8, backend,
+            tag="kz_rate$(replace(string(τ), "." => "p"))")
     elseif mode == "probe_lowgamma"
         # gamma is the last suspect, and the arithmetic says it should have been the
         # first. Damping removes a defect in ~1/(2 gamma dmu) ~ 1/(2*0.02*13) ~ 2
@@ -237,6 +293,8 @@ function main(mode::String="smoke"; backend=CPUBackend())
         # everywhere (converged), and mu = 15 buys R/xi = 30 but costs 24x. If this
         # comes back empty, the remaining four rates would be spent confirming it.
         kz_scan(; tau_Qs=(8.0,), n_seed=4, backend, tag="kz_probe")
+    elseif mode == "merge"
+        kz_merge()
     elseif mode == "scalar"
         kz_scan(; backend, tag="kz_scalar")
     else
