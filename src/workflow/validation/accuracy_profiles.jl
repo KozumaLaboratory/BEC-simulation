@@ -13,15 +13,44 @@
 #
 #   :reference   every knob at its most accurate setting
 #   :production  the shipped defaults
-#   :fast        production, except where a MEASURED faster setting exists
+#   :fast        SOLVED from a stated error budget, not hand-picked
+#
+# THE SPEED PROFILE IS A SOLUTION, NOT A LIST. `accuracy_profile_for_budget(frac)`
+# takes each knob's measured `ladder` of `(value, rel_error, rel_cost)` and picks
+# the cheapest entry whose `rel_error` is at most `frac ×` the error the DEFAULT
+# setting already carries. Nobody decides that a trade is acceptable — including
+# me, which matters, because the first version of this file had a hand-picked
+# `fast` field and I put `ddi_pad_factor = 1.5` in it. That value's 1.9e-2
+# residual is 4.4× the 4.3e-3 pad 2 already carries, i.e. it violates the
+# criterion in `error_budget.jl`'s own header. The budget rule rejects it at any
+# `frac ≤ 1`; the hand-picked field did not.
+#
+# WHAT THE MEASUREMENT SAYS TODAY: nothing moves. Measured on an H100 at 32³, Eu
+# F=6 (`bench/accuracy_knob_cost.jl`), one ITP step against production 0.456 ms:
+#
+#   spinor_lhy = :polar_contact   0.987×   free — no speed to buy
+#   spinor_lhy = :full_bdg        0.997×   free (since the fused diagonal took tables)
+#   secular_ddi = true            0.986×   free — so no speed reason to approximate
+#   ddi_pad_factor = 1.5          0.906×   the only real speedup, and it FAILS the budget
+#   ddi_pad_factor = 3.0          1.507×   the price of :reference
+#   spin_taylor = false           1.613×   the price of :reference
+#   dealias_2_3 = true            1.484×   the price of being right about aliasing
+#
+# So the accuracy knobs are where accuracy is PAID FOR, not where speed is hiding.
+# `:fast` comes out equal to `:production`, and that is the honest answer rather
+# than a name with nothing behind it. The mechanism is what matters: if someone
+# later measures a defensible rung, it enters without anyone choosing.
+#
+# COMPOSITION IS NOT MEASURED. The costs above are one knob at a time. A profile
+# changes several, and they overlap (pad and dealias both add FFTs), so the
+# profile's cost is NOT the product of its rows. `:reference` is measured as a
+# whole by the bench's profile rows, never inferred from the per-knob ones.
 #
 # THREE THINGS THAT STILL NEED A HUMAN.
 #
-# 1. `:fast` is not "fast mode". Today exactly one knob has a measured trade
-#    (`ddi_pad_factor` 2 → 1.5: 1.28× on a 64³ RTP step, Φ error 4.3e-3 → 1.9e-2),
-#    and that residual is the size of the error padding was added to remove. So
-#    `:fast` is a REQUEST for a documented trade, not a free win, and
-#    `accuracy_profile_report(:fast)` prints what is being traded.
+# 1. Only `ddi_pad_factor` has a ladder — both halves measured. Every other knob
+#    is missing the error half, the cost half, or both, and a knob with no ladder
+#    cannot move. That is a gap in the data, not a property of the knobs.
 #
 # 2. A profile sets `:per_run` knobs. The `:global` ones are `Ref`s; use
 #    `with_reference_accuracy` for those. `accuracy_profile_report` says so rather
@@ -31,16 +60,44 @@
 #    the one that cost a day: `spinor_lhy = :full_bdg` tabulates ε_LHY from the
 #    peak-density spinor of the state the workspace is built with. Handed a raw
 #    seed, it tabulates from an unrelaxed, dynamically-unstable configuration —
-#    measured max Im ω = 1020 on a `:flower` seed at Eu F=6 32³ — and `FullBdGLHY`
-#    itself says ε_LHY is scheme-dependent there. `check_accuracy_preconditions`
-#    refuses that combination for `:reference` instead of leaving it to a runtime
-#    warning nobody reads.
+#    measured max Im ω = 1040 at Eu F=6 — and `FullBdGLHY` itself says ε_LHY is
+#    scheme-dependent there. `check_accuracy_preconditions` refuses that
+#    combination instead of leaving it to a maxlog-limited runtime warning.
 
-export ACCURACY_PROFILE_NAMES,
-    accuracy_profile, accuracy_profile_report,
+export ACCURACY_PROFILE_NAMES, DEFAULT_ERROR_BUDGET_FRAC,
+    accuracy_profile, accuracy_profile_for_budget, accuracy_profile_report,
     check_accuracy_preconditions
 
 const ACCURACY_PROFILE_NAMES = (:reference, :production, :fast)
+
+"""Default budget for `:fast`: a looser setting may add at most this fraction of
+the error the production setting already carries. 1.0 means "no worse than what
+we already accept" — deliberately generous, and even so nothing currently
+qualifies."""
+const DEFAULT_ERROR_BUDGET_FRAC = 1.0
+
+"""
+    accuracy_profile_for_budget(frac = DEFAULT_ERROR_BUDGET_FRAC) -> NamedTuple
+
+The fastest admissible per-run settings: for each knob, the cheapest rung of its
+measured `ladder` whose `rel_error` is at most `frac ×` the error its DEFAULT
+setting already carries. A knob with no ladder keeps its default — no ladder means
+no measurement, and an unmeasured trade is not a trade.
+
+This is what `:fast` is. It is solved, not chosen.
+"""
+function accuracy_profile_for_budget(frac::Real=DEFAULT_ERROR_BUDGET_FRAC)
+    frac > 0 || throw(ArgumentError("budget frac must be > 0, got $frac"))
+    per_run = filter(k -> k.scope === :per_run, ACCURACY_KNOBS)
+    vals = map(per_run) do k
+        isempty(k.ladder) && return k.default
+        bound = frac * k.accepted_error
+        admissible = filter(r -> r.rel_error <= bound, k.ladder)
+        isempty(admissible) && return k.default
+        argmin(r -> r.rel_cost, admissible).value
+    end
+    NamedTuple{Tuple(k.name for k in per_run)}(Tuple(vals))
+end
 
 """
     accuracy_profile(name) -> NamedTuple
