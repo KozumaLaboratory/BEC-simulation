@@ -132,9 +132,16 @@ function _spin_mixing_loop!(
     # `_apply_euler_spin_rotation` skips per-voxel when phi·dt < 1e-14;
     # mirror that here at the call level so polar / vacuum states pay
     # only the pre-pass cost (~150 μs at 16³) instead of running four
-    # gemms over a zero phase field. θ = |c₁⟨F⟩|·dt ≥ 0 everywhere, so
-    # max θ² is (max θ)² — the same number the in-loop accumulator held.
-    max_theta = maximum(theta)
+    # gemms over a zero phase field.
+    #
+    # `maximum(abs, …)`, not `maximum`: θ = c₁|⟨F⟩|·dt carries the SIGN of dt,
+    # and the Yoshida/Suzuki composers run their middle substep with dt < 0
+    # (`_YOSHIDA_W0 < 0`). For dt < 0 every entry is ≤ 0, so a plain `maximum`
+    # returns the entry closest to zero — a low-density voxel — and this guard
+    # fired on every backward substep, dropping spin mixing from the
+    # composition. Yoshida-4 then measured 2nd order (PR #183 → #184). Gated by
+    # `test/oracles/test_negative_dt_substeps.jl`.
+    max_theta = maximum(abs, theta)
     max_theta * max_theta < T(1e-28) && return nothing
 
     if imaginary_time

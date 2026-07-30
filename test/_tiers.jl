@@ -65,6 +65,10 @@ const FAST_TESTS = [
     "manuscript/test_paper3_audit.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
+    # Gates the dt < 0 half-line that every high-order composer needs. FAST on
+    # purpose: the order tests that also see this defect are in FULL_EXTRA, so
+    # the PR gate never ran them (PR #183 shipped a 4th → 2nd order collapse).
+    "oracles/test_negative_dt_substeps.jl",
     "validation/test_k3_unit_audit.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
