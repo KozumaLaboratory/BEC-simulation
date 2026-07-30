@@ -336,6 +336,10 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Validity-DOMAIN sibling of the above: a config can name a live `lhy.kind`
+    # and still sit outside that mode's domain. The `icosa` cells did, and it
+    # reached a committed json, a figure and two claims before anyone noticed.
+    "oracles/test_lhy_config_validity_domain.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
