@@ -60,7 +60,7 @@ docs/validation/figures/
 |---|---|
 | 1. L4 isotropic no-collapse | `runs/l4_k3_ladder/summary.json` + 12 cell dirs `L4_K3_n{64,96,128}_*_<hash>` |
 | 2. Matsui Fig 2C reproduction | `runs/matsui_baseline/summary.json` + `matsui_5ms_n64_density_slice.json` + 3 cell dirs |
-| ~~3. scalar LHY ≡ off at F=6~~ — **REFUTED 2026-07-29, see below** | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
+| 3. scalar LHY ≡ off at F=6 — **SUPPORTED on re-measurement, see below** | `runs/eu_k3_lhy_control/factorial_2x4.json` (cells K3∈{0,200} × LHY=scalar vs off) |
 | ~~4. spinor LHY closure stabilizes alone~~ — **REFUTED 2026-07-29, see below** | same factorial_2x4.json (K3=0 + polar/icosa rows) |
 
 ### 2026-07-29: the factorial ran under three LHY defects
@@ -95,7 +95,45 @@ appears only in the `polar_contact` / `icosa` rows, and those are exactly the
 rows whose LHY was **30000× too strong**. The arrest may be an artefact of the
 defect rather than of the closure.
 
-### Re-measured 2026-07-29 — both claims are refuted
+### Re-measured 2026-07-30 — claim 3 SURVIVES, claim 4 does not
+
+`factorial_2x4.json` has been regenerated from all eight cells re-run at one
+revision (`792a154`), including the two `LHY=off` controls, which the first pass
+did NOT re-run. Regenerator: `scripts/eu_k3_lhy_factorial_regen.jl`.
+`classification` is `classify_collapse`, unchanged.
+
+| K3 | LHY | classification | Fz_per_N | N(T)/N(0) |
+|---|---|---|---|---|
+| 0 | **off** | `stable_arrest` | **−5.74131** | 1.000 |
+| 0 | scalar | `stable_arrest` | −5.74958 | 1.000 |
+| 0 | polar_contact | `stable_arrest` | −5.74687 | 1.000 |
+| 0 | icosa | `stable_arrest` | −5.74686 | 1.000 |
+| 200 | **off** | `sacrificial_arrest` | **−2.19516** | 0.377 |
+| 200 | scalar | `sacrificial_arrest` | −2.33119 | 0.400 |
+| 200 | polar_contact | `sacrificial_arrest` | −2.29143 | 0.393 |
+| 200 | icosa | `sacrificial_arrest` | −2.29143 | 0.393 |
+
+**Claim 3 survives.** At one revision `off` and `scalar` land in the same class
+with Fz_per_N −5.74131 vs −5.74958 — 0.14% apart — and the same holds at
+K3=200. Scalar LHY really is ≈ off at F=6. That is expected on the numbers: at
+this gas parameter (`n_SI·a_s³ ≈ 4e-5`) a correctly-built scalar LHY is ~0.05%
+of the energy.
+
+**Claim 4 does not.** All four LHY settings collapse onto one class per K3 row.
+There is no stabilisation specific to the spinor closure. In the old json the
+closed forms alone read `stable_arrest` at K3=200 while `off`/`scalar` read
+`sacrificial_arrest`; that separation was the 30000× overstrength of #158.
+`polar_contact` and `icosa` now agree to six figures, as a mostly-polarised
+state should.
+
+**A retraction.** An earlier pass reported claim 3 as refuted, comparing
+re-measured `scalar` against the OLD `off` row. The `off` row moves too: it was
+`delay` at −4.249 on the 2026-05 revision and is `stable_arrest` at −5.741 now,
+for reasons unrelated to LHY (53 commits of other fixes in between). Stating in
+advance that the controls "cannot change the verdict" was the error — whether a
+control moves is not knowable until it is run, which is what a control is for.
+
+### Superseded: the first pass (both claims called refuted)
 
 Re-ran every LHY-enabled cell with all three fixes in. `classification` is
 `classify_collapse`, unchanged.
