@@ -424,6 +424,16 @@ const MUTANTS = Mutant[
         "Drops the 2π from the wavenumber grid, so every kinetic energy, every \
          spectral derivative and every current is off by (2π)² or 2π. Uniformly \
          wrong, therefore self-consistent: only an absolute reference catches it."),
+    Mutant(:spin_pair_eigenvalue_offset,
+        "src/foundation/spin_matrices.jl",
+        r"@inline spin_pair_eigenvalue\(S::Integer, F::Integer\) =",
+        "@inline spin_pair_eigenvalue(S::Integer, F::Integer) = 1 +",
+        :factor, :fatal,
+        "λ_S = (S(S+1) − 2F(F+1))/2 — the ⟨F_i·F_j⟩ eigenvalue in the pair basis",
+        "Shifts every spin-pair eigenvalue by a constant, which moves the c↔g \
+         channel map AND the Sign Pattern Lemma's β_S together. Both would still \
+         agree with each other — this is a single declaration two subsystems read, \
+         so only an absolute reference can see it."),
 ]
 
 """

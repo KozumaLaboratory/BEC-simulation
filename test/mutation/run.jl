@@ -61,9 +61,18 @@ function probe_files()
     else
         error("unknown --probe $spec")
     end
+    # An unparseable or over-narrow probe must not silently measure nothing: with
+    # zero files every mutant "escapes" and the report reads as a wall of gaps.
+    # (Hit on 2026-07-31 with `--probe dir:a,dir:b`, which matches no branch and
+    # returned an empty list — the exact silent-no-op class this catalog exists to
+    # hunt, in the harness itself.)
+    isempty(sel) && error("--probe $spec selected NO files. Check the spec; \
+                           `dir:` takes one prefix, and a file list must name \
+                           paths relative to test/.")
     # Every probe file is re-run once per mutant, so a single slow file costs
     # `--max-cost × n_mutants`. Dropped files are named, never silently cut.
     keep = filter(f -> _cost(f) <= MAX_COST, sel)
+    isempty(keep) && error("--max-cost $MAX_COST removed every probe file; raise it.")
     dropped = setdiff(sel, keep)
     isempty(dropped) || println("  probe: dropped $(length(dropped)) file(s) over \
         --max-cost=$MAX_COST (", round(Int, sum(_cost, dropped)), "s): ",
