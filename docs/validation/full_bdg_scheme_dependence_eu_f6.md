@@ -17,6 +17,27 @@ mean field at the representative spinor and warns when a branch grows:
 So this is not a `full_bdg` defect that switching to `polar_contact` /
 `icosahedral` avoids. It is a statement about the state.
 
+For `icosahedral` the door is shut harder still, and independently. As of
+2026-07-30 `epsilon_LHY_F6_Ih` **returns NaN for `λ_spin < 0`, i.e. for `c₁ < 0`**,
+and `_tabulate_lhy` turns a non-finite table into an `ArgumentError` at build time.
+The closed form is `c₀^(5/2) + 3|λ_spin|^(5/2)`; the `|·|` had made it symmetric
+under `c₁ → −c₁` and returned a real energy exactly where the spin-Goldstone branch
+is dynamically unstable — the same instability this document is about, reached from
+the other side. Measured then: `full_bdg` reports max Im ω = 2.8 at
+(c₀=10, c₁=−0.2), and the closed form ran 0.4 / 2.1 / 11.0 % high at
+c₁ = −0.05 / −0.1 / −0.2.
+
+**`c₁ < 0` is the sign Eu F=6 production uses.** So `icosahedral` does not merely
+inherit the scheme dependence — it now refuses to run at all here, and the
+remaining option is `full_bdg`, which is what this document measures. Both doors
+were found shut on the same day, by different routes:
+
+| mode | status at Eu F=6, c₁ < 0, 50–80 µG |
+|---|---|
+| `icosahedral` | **errors at build time** — closed form invalid where the spin branch is unstable |
+| `polar_contact` | ansatz is polar; inherits the scheme dependence by the warning's own statement |
+| `full_bdg` | runs, but ε_LHY is scheme-dependent — measured below |
+
 ## The three escape routes, all closed
 
 The warning names `(F, c₀, c₁, q)`. `F` is the atom. That leaves three.
