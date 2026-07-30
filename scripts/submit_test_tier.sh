@@ -15,6 +15,12 @@
 # no-op without CUDA, which is the same "the gate never ran" failure in a
 # different costume.
 #
+# NB: the `-o` log only ever holds this wrapper's own echo lines. The suite's
+# output goes to $OUT_DIR/tier_<tier>.out, and OUT_DIR follows
+# SPINORBEC_TSUBAME_RUNS_ROOT, which scripts/spinorbec.env sets to
+# /gs/fs/tga-kozuma-kouhi/uk07267/runs — NOT $HOME. Watching the -o log alone
+# looks like a job that has produced nothing for half an hour.
+#
 # NB: -g and -o go on the qsub CLI, not as directives (UGE rejects `#$ -g` and
 # does not expand $HOME in directives).
 #$ -cwd
@@ -49,6 +55,19 @@ if [ -n "${T4_TMPDIR:-}" ] && [ -w "${T4_TMPDIR}" ]; then
 else
     export JULIA_DEPOT_PATH="$SHARED_DEPOT"
 fi
+# Pin BLAS to one thread. OpenBLAS sizes its level-1 thread team from the core
+# count, and a TSUBAME node reports 384 of them, so every `dot` on a few-MB
+# ComplexF64 array becomes spawn+barrier rather than arithmetic. Left unset, the
+# first attempt at the ci tier ran
+# `oracles/test_lhy_full_bdg_closed_form_parity.jl` for 18m52s against a 51.8s
+# estimate (24s measured on cpu_4 with this pinned), a worker hit the 1800s
+# per-file timeout mid-`test_term_properties.jl`, and the run aborted with 227
+# files never started — a tier job that measured nothing while looking like a
+# red tier. This is not tuning: the workers are already the parallelism, so a
+# BLAS team inside each one is pure contention.
+export OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-1}
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
 echo "[sbec_tier] host=$(hostname)  tier=${TIER}  workers=${WORKERS}"
