@@ -115,7 +115,15 @@ _scalar_V(n, a_over_aho, N) = scalar_lhy_coefficient(a_over_aho, N) * n * sqrt(n
         si_peak = (32 / 3) * sqrt(gas_param / π)
         @test 1e-5 < gas_param < 1e-4       # the dilute regime this claim needs
 
-        for kind in (:icosahedral, :polar_contact, :fm_contact)
+        # `full_bdg` replaces `:icosahedral` here. This ladder is the Eu
+        # production one (c₁ = −0.005 c₀), and at c₁ < 0 the I_h closed form has
+        # λ_spin < 0 — its spin-Goldstone branch is dynamically unstable and it
+        # now refuses rather than reporting |λ_spin|^(5/2). So the old row was
+        # anchoring the magnitude of a value the closed form should not have
+        # produced at all. `full_bdg` is the path the guard directs callers to
+        # and it answers at this ladder, so the anchor keeps the production
+        # regime instead of retreating to c₁ > 0 to keep a green row.
+        for kind in (:full_bdg, :polar_contact, :fm_contact)
             ws = make_workspace(; grid, atom, interactions=ip, sim_params=sp,
                 psi_init=psi, spinor_lhy=kind, lhy_opts=LHYTableOpts(; n_atoms=N))
             ed = energy_decomposition(ws)
@@ -128,6 +136,14 @@ _scalar_V(n, a_over_aho, N) = scalar_lhy_coefficient(a_over_aho, N) * n * sqrt(n
                 # TOTAL energy — off the top of this bound by orders.
                 @test 0.2 < ratio / si_peak < 1.0
             end
+        end
+
+        # The I_h closed form is still gated at this ladder — by its refusal,
+        # which is the claim that replaced the magnitude row above.
+        @testset "icosahedral refuses at the production sign" begin
+            @test_throws ArgumentError make_workspace(; grid, atom,
+                interactions=ip, sim_params=sp, psi_init=psi,
+                spinor_lhy=:icosahedral, lhy_opts=LHYTableOpts(; n_atoms=N))
         end
     end
 end
