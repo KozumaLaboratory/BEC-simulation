@@ -211,6 +211,12 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif mode == "probe"
+        # ONE rate before committing ~25 GPU-hours to five. The scan is only worth
+        # running if a defect appears at all at this system size: mu = 5 gave zero
+        # everywhere (converged), and mu = 15 buys R/xi = 30 but costs 24x. If this
+        # comes back empty, the remaining four rates would be spent confirming it.
+        kz_scan(; tau_Qs=(8.0,), n_seed=4, backend, tag="kz_probe")
     elseif mode == "scalar"
         kz_scan(; backend, tag="kz_scalar")
     else
