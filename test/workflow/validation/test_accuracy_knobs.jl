@@ -29,7 +29,7 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
                 :dtype, :temperature_ratio)
             @test length(k.note) > 40          # a cost, not a label
             if k.scope === :global
-                @test k.get !== nothing && k.set! !== nothing
+                @test k.getter !== nothing && k.setter !== nothing
             end
         end
     end
@@ -39,22 +39,22 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
         @test !isempty(globals)
         # Put each global at its DEFAULT first, so "it moved" is a statement
         # about the switch and not about whatever the session happened to hold.
-        saved = [k.get() for k in globals]
+        saved = [k.getter() for k in globals]
         try
             for k in globals
-                k.set!(k.default)
+                k.setter(k.default)
             end
             with_reference_accuracy() do
                 for k in globals
-                    @test k.get() == k.reference
+                    @test k.getter() == k.reference
                 end
             end
             for k in globals
-                @test k.get() == k.default    # restored
+                @test k.getter() == k.default    # restored
             end
         finally
             for (k, v) in zip(globals, saved)
-                k.set!(v)
+                k.setter(v)
             end
         end
     end

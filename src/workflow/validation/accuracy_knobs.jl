@@ -47,6 +47,9 @@ the config, and the distinction is recorded rather than papered over.
 `reference` is the most accurate setting, `default` what ships. `note` says what
 the gap costs and where that was measured, so the number is never the only
 justification.
+
+`getter`/`setter` rather than `get`/`set!`: a keyword argument cannot be called
+`set!`, because `set!=nothing` parses as `set != nothing`.
 """
 struct AccuracyKnob
     name::Symbol
@@ -54,17 +57,17 @@ struct AccuracyKnob
     reference::Any
     default::Any
     note::String
-    get::Union{Nothing, Function}
-    set!::Union{Nothing, Function}
+    getter::Union{Nothing, Function}
+    setter::Union{Nothing, Function}
 end
 
 function AccuracyKnob(name::Symbol, scope::Symbol, reference, default, note::String;
-    get=nothing, set!=nothing)
+    getter=nothing, setter=nothing)
     scope in (:global, :per_run) ||
         throw(ArgumentError("scope must be :global or :per_run, got :$scope"))
-    scope === :global && (get === nothing || set! === nothing) &&
-        throw(ArgumentError("a :global knob needs both `get` and `set!`"))
-    AccuracyKnob(name, scope, reference, default, note, get, set!)
+    scope === :global && (getter === nothing || setter === nothing) &&
+        throw(ArgumentError("a :global knob needs both `getter` and `setter`"))
+    AccuracyKnob(name, scope, reference, default, note, getter, setter)
 end
 
 """
@@ -80,19 +83,19 @@ Truncated series, per-voxel degree. Measured at Eu F=6 32³ dt=0.002: 2.4e-13 \
 against a splitting error of 7.6e-3, i.e. 3e-11 of it — but measured on ENERGY \
 only. Gated by test_taylor_tolerance_criterion.jl, which therefore licenses an \
 energy claim and not a phase-classification one.";
-        get=() -> SPIN_TAYLOR_ENABLED[], (set!)=v -> (SPIN_TAYLOR_ENABLED[] = v)),
+        getter=() -> SPIN_TAYLOR_ENABLED[], setter=v -> (SPIN_TAYLOR_ENABLED[] = v)),
     AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-13,
         "Backward-error target for the Taylor degree. Measured irrelevant across \
 ten decades (the degree floor of 2 already puts the truncation 4.5 orders under \
 the splitting error at production rotation angles), so the reference value is \
 tighter for form's sake and costs nothing.";
-        get=() -> SPIN_TAYLOR_TOL[], (set!)=v -> (SPIN_TAYLOR_TOL[] = v)),
+        getter=() -> SPIN_TAYLOR_TOL[], setter=v -> (SPIN_TAYLOR_TOL[] = v)),
     AccuracyKnob(:dealias_2_3, :global, true, false,
         "Orszag 2/3 filter on ψ and on the bilinear DDI field. NOTE the \
 direction: ON is the accurate setting. OFF does not remove the above-cut \
 content, it ALIASES it back into low k, where it is invisible in the norm and \
 contaminates the answer.";
-        get=() -> DEALIAS_2_3_ENABLED[], (set!)=v -> (DEALIAS_2_3_ENABLED[] = v)),
+        getter=() -> DEALIAS_2_3_ENABLED[], setter=v -> (DEALIAS_2_3_ENABLED[] = v)),
     AccuracyKnob(:ddi_pad_factor, :per_run, 3.0, 2.0,
         "Zero-pad multiple for the open-boundary DDI convolution. Measured \
 (bench/ddi_pad_factor_accuracy.jl, H100, Eu151, referenced to pad 3): relative \
@@ -138,15 +141,15 @@ the gap is visible rather than assumed away.
 """
 function with_reference_accuracy(f)
     globals = filter(k -> k.scope === :global, ACCURACY_KNOBS)
-    saved = [k.get() for k in globals]
+    saved = [k.getter() for k in globals]
     try
         for k in globals
-            k.set!(k.reference)
+            k.setter(k.reference)
         end
         f()
     finally
         for (k, v) in zip(globals, saved)
-            k.set!(v)
+            k.setter(v)
         end
     end
 end
@@ -163,7 +166,7 @@ function accuracy_report(; io::IO=stdout)
     println(io, "Accuracy knobs — reference = most accurate setting, NOT 'fast paths off'")
     println(io, "="^78)
     for k in ACCURACY_KNOBS
-        cur = k.scope === :global ? repr(k.get()) : "(per-run)"
+        cur = k.scope === :global ? repr(k.getter()) : "(per-run)"
         println(io, "  $(k.name)  [$(k.scope)]")
         println(
             io,
