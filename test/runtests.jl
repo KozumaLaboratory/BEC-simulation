@@ -132,6 +132,18 @@ else
     # an on-demand queue can have that static assignment cannot.
     unrun = [f for (i, f) in enumerate(ordered) if !isfile(joinpath(qdir, "done_$i"))]
     nfail = count(r -> r[2] != 0, results)
+
+    # Name the red FILES, not just the red workers. Worker stdout is buffered
+    # until the worker exits, so on a long run the only thing visible for
+    # minutes is "worker k (exit 1)"; the per-file verdict markers written by
+    # serve_queue turn that into a list you can act on.
+    redfiles = [
+        f for (i, f) in enumerate(ordered)
+        if isfile(joinpath(qdir, "done_$i")) &&
+        startswith(read(joinpath(qdir, "done_$i"), String), "FAIL")
+    ]
+    isempty(redfiles) || println("\n✗ $(length(redfiles)) file(s) FAILED:\n    ",
+        join(redfiles, "\n    "))
     if !isempty(unrun)
         println("\n✗ $(length(unrun)) file(s) never completed: ", join(unrun, ", "))
         error("SpinorBEC test suite: unrun files (tier=$TEST_TIER) — see above")

@@ -53,7 +53,10 @@ end
 
 Take files from the shared queue until none is left unclaimed. `done_<i>` is
 written only after the file has actually returned, so the parent can tell a
-finished file from a claimed-then-killed one.
+finished file from a claimed-then-killed one. Its CONTENT is this file's
+verdict (`PASS`/`FAIL` + seconds): the parent buffers each worker's stdout
+until the worker exits, so without a per-file record a red run names the
+worker, not the test. The mutation harness reads the same markers.
 """
 function serve_queue(qdir::AbstractString)
     failed = false
@@ -63,7 +66,9 @@ function serve_queue(qdir::AbstractString)
         f_failed, f_timings = run_test_files([f])
         failed |= f_failed
         append!(timings, f_timings)
-        touch(joinpath(qdir, "done_$i"))
+        secs = isempty(f_timings) ? 0.0 : last(f_timings[end])
+        write(joinpath(qdir, "done_$i"),
+            string(f_failed ? "FAIL" : "PASS", " ", round(secs; digits=2), " ", f))
     end
     return failed, timings
 end

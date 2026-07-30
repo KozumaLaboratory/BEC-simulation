@@ -46,3 +46,28 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         with:
           coverage: false   # see .github/workflows/ci.yml for rationale
+
+  mutation:
+    name: Mutation catalog (defect classes vs the suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      # Injects each cataloged defect class into src/ and records which test
+      # files go red — see docs/conventions/testing_strategy.md. Costs one
+      # package precompile per mutant, so it is nightly and never a PR gate.
+      # It does NOT fail the job on escapes: an escaped mutant is a coverage
+      # gap to triage from the report, not a broken build. A STALE anchor DOES
+      # fail, because a catalog entry that quietly tests nothing is the exact
+      # failure mode the catalog exists to prevent.
+      - run: julia --project=. --startup-file=no test/mutation/run.jl --workers 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation_out/
