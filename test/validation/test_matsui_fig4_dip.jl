@@ -13,10 +13,38 @@
 
 using Test
 using SpinorBEC
-using DelimitedFiles
 using Statistics
 
 const FIXDIR = joinpath(@__DIR__, "..", "fixtures", "matsui2025")
+
+# Hand-rolled rather than DelimitedFiles: that is a stdlib but still needs
+# declaring in the test target, and these fixtures are a header line plus rows of
+# plain floats. One fewer thing between the gate and the data.
+function _read_csv(path)
+    lines = filter(!isempty, readlines(path))
+    # Header fields are quoted and contain commas ("Magnetic field, B (nT)"), so
+    # splitting it needs to respect quotes. The data rows are bare floats.
+    header = _split_quoted(lines[1])
+    rows = [parse.(Float64, split(l, ',')) for l in lines[2:end]]
+    (permutedims(reduce(hcat, rows)), header)
+end
+
+function _split_quoted(line)
+    out = String[]
+    buf = IOBuffer()
+    inq = false
+    for c in line
+        if c == '"'
+            inq = !inq
+        elseif c == ',' && !inq
+            push!(out, String(take!(buf)))
+        else
+            print(buf, c)
+        end
+    end
+    push!(out, String(take!(buf)))
+    out
+end
 
 # Values recomputed from the fixture at 886d03bd; see
 # docs/validation/parameter_contract_with_Ueda.md §0.5.
@@ -26,8 +54,8 @@ const EXP_CENTER_NT = -3.2048
 const EXP_WIDTH_NT = 14.5414
 
 function _load(stem)
-    raw, hdr = readdlm(joinpath(FIXDIR, stem * ".csv"), ','; header=true)
-    (Float64.(raw[:, 1]), Float64.(raw[:, 2]), vec(hdr))
+    raw, hdr = _read_csv(joinpath(FIXDIR, stem * ".csv"))
+    (raw[:, 1], raw[:, 2], hdr)
 end
 
 # Their experimental scan is 4 (negative side) / 3 (positive side) repeats
@@ -48,9 +76,9 @@ end
     @testset "fixtures parse with the expected columns" begin
         for stem in
             ["dataset_fig2_exp", "dataset_fig2_theo", "dataset_fig4_exp", "dataset_fig4_theo"]
-            raw, hdr = readdlm(joinpath(FIXDIR, stem * ".csv"), ',', header=true)
+            raw, hdr = _read_csv(joinpath(FIXDIR, stem * ".csv"))
             @test size(raw, 2) == 14                      # abscissa + m = -6 … +6
-            @test occursin("N_{-6}", vec(hdr)[2])
+            @test occursin("N_{-6}", hdr[2])
             @test size(raw, 1) > 50
         end
         _, _, h4 = _load("dataset_fig4_theo")
@@ -110,10 +138,10 @@ end
     # interpolated to the same +2.6 nT gives 21344 — 0.5 %. That mutual
     # consistency is what licenses reading "5 ms hold at 2.6 nT" off both.
     @testset "Fig. 2C landmarks, and its consistency with Fig. 4B" begin
-        raw, _ = readdlm(joinpath(FIXDIR, "dataset_fig2_theo.csv"), ','; header=true)
-        t = Float64.(raw[:, 1])
-        N6 = Float64.(raw[:, 2])
-        Ntot = sum(Float64.(raw[1, 2:end]))
+        raw, _ = _read_csv(joinpath(FIXDIR, "dataset_fig2_theo.csv"))
+        t = raw[:, 1]
+        N6 = raw[:, 2]
+        Ntot = sum(raw[1, 2:end])
         @test Ntot ≈ 50000.0 atol = 0.1
         @test t[end] ≈ 40.0014 atol = 1e-3
 
@@ -130,9 +158,9 @@ end
         @test N6[i5] / Ntot ≈ 0.4290 atol = 1e-3
 
         # Same physical point read off the other sheet.
-        raw4, _ = readdlm(joinpath(FIXDIR, "dataset_fig4_theo.csv"), ','; header=true)
-        B4 = Float64.(raw4[:, 1])
-        N64 = Float64.(raw4[:, 2])
+        raw4, _ = _read_csv(joinpath(FIXDIR, "dataset_fig4_theo.csv"))
+        B4 = raw4[:, 1]
+        N64 = raw4[:, 2]
         j = sortperm(B4)
         B4, N64 = B4[j], N64[j]
         k = searchsortedfirst(B4, 2.6)
