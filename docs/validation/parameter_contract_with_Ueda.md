@@ -314,16 +314,49 @@ What this does and does not say:
 - **The sign and the scale of the offset reproduce.** The dip is on the negative
   side and it is a couple of nT there — that is the resonant-EdH claim, and an
   independent implementation with independently-declared conventions lands on it.
-- **The offset is 16 % short of theirs** (−2.14 against −2.55) and 33 % short of
-  the measurement (−3.20). Since the whole offset is the gas's own dipole field
-  shifting the resonance, a 16 % shortfall in the offset is roughly a 16 %
-  shortfall in the effective dipole field seen by the spins. That is larger than
-  every kernel-convention difference bounded in §0.3.3 combined (~0.02 nT), so it
-  is **not** explained by the k=0 bin or the spherical truncation.
-- **The width is 15 % wide**, in the opposite direction. The paper reads the width
-  as the spread of the dipole field over the cloud, so a wider dip with a smaller
-  centre offset says our field distribution is broader and its mean smaller —
-  consistent with a density profile that is flatter than theirs.
+- **The two simulations disagree by 0.41 nT in the centre and 15 % in the width**,
+  and that is larger than every kernel-convention difference bounded in §0.3.3
+  combined (~0.02 nT), so it is not the `k=0` bin or the spherical truncation.
+
+**Which side carries the error is not settled by which side published first.**
+Their implementation has three properties that could each bias it: a 2nd-order
+finite-difference Laplacian at 0.7 points per healing length, the internally
+inconsistent shipped ground state of §0.3.5, and an `Ntot` in the shipped code
+that is not the one behind the published curves. Ours has an under-resolved grid
+(§0.6) and a ground-state parameter ambiguity we **failed to price** (task 3
+below is void). Neither is the reference for the other.
+
+**The experiment cannot arbitrate the centre.** The Fig. 4 caption states the
+field axis "may contain an offset error of up to 10 nT" — **three times the dip
+centre itself**. So −2.14, −2.55 and the measured −3.20 are all consistent with
+the measurement, and so, for that matter, is the paper's own −1.5 nT analytic
+estimate. Any claim that a simulated centre "agrees with experiment" is claiming
+more than that axis supports.
+
+**The width can arbitrate, and it does not favour us.** An axis offset shifts a
+dip; it does not stretch one. Measured on the identical −13 … +9 nT window:
+
+| | half-depth width [nT] | vs experiment |
+|---|---|---|
+| Matsui experiment | 12.84 | — |
+| Matsui simulation | 13.07 | **+1.8 %** |
+| SpinorBEC 32³ | 14.62 | **+14 %** |
+
+On the one Fig. 4B quantity immune to their stated systematic, **their simulation
+agrees with their measurement an order of magnitude better than ours does**. That
+is weak evidence — one number, one observable — but it points at our side, not
+theirs. The paper reads the width as the spread of the dipole field over the
+cloud, so a 14 % wide dip says our field distribution is broader than the real
+one.
+
+(The width is somewhat baseline-sensitive: the same curve gives 13.07 nT over
+[−13, +9] with 42 sample points and 12.75 nT when the window edge falls one
+point differently. Quote it to two significant figures, not four.)
+
+**Therefore: fix our own known unknowns before attributing anything to them.**
+The task-3 plumbing defect means we have not measured how much of the 0.41 nT our
+own ground-state choice is worth, and §0.3.5 says that choice moves the peak
+density by 34 %. That has to be closed first.
 
 #### Resolution: the 32³ number is not resolution-limited
 
