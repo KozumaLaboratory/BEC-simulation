@@ -211,6 +211,17 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif mode == "probe_lowgamma"
+        # gamma is the last suspect, and the arithmetic says it should have been the
+        # first. Damping removes a defect in ~1/(2 gamma dmu) ~ 1/(2*0.02*13) ~ 2
+        # internal units, against a quench lasting tau_Q = 8: damping wins
+        # throughout, so nothing can freeze in. KZ needs the opposite ordering.
+        # gamma/10 puts the damping time at ~19 > 8.
+        #
+        # Three things are already excluded at healthy N_C: system size (R/xi 10 and
+        # 30 both gave zero), and the post-quench hold (removing it changed nothing).
+        kz_scan(; tau_Qs=(8.0,), t_hold=1.0, gamma=0.002, n_seed=4, backend,
+            tag="kz_probe_lowgamma")
     elseif mode == "probe_nohold"
         # t_hold is the suspect. mu=15 / R_TF/xi=30 / 138^3 returned zero defects at
         # healthy N_C (2.45e4), and so did mu=5 / R/xi=10 — tripling the system size
