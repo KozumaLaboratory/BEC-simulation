@@ -215,3 +215,22 @@ Classify before debugging. The method tells you what red means:
 
 Widening a tolerance to make a test pass converts a grounded test into a pin.
 If that is the right call, say so and change the label.
+
+### The suite does not run the code production runs
+
+`Pkg.test()` compiles with `--check-bounds=yes`, which disables `@inbounds` and
+therefore changes vectorisation and summation order. Any quantity that lives at
+round-off reads *differently* inside the suite than in a plain build. Measured on
+the finite-difference Hessian's homogeneity residual: $1.3\times10^{-16}$ plain,
+$4.7\times10^{-11}$ under `--check-bounds=yes` — a factor of $3\times10^{5}$, and
+constant, not noisy.
+
+Two rules follow:
+
+- A tolerance calibrated in a REPL will fail under `Pkg.test()` if the claim is
+  round-off-limited. Derive the bound from the construction (here: gradient
+  round-off $\sim 10^{-16}$ divided by the finite-difference step $2\varepsilon$),
+  not from one measurement.
+- "Green standalone, red in the suite" is not automatically cross-test
+  contamination. Check the codegen difference first — it is cheaper to test and
+  it was the answer both times it was checked here.
