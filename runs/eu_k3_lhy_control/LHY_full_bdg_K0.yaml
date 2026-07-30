@@ -7,8 +7,8 @@
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
 # K3=0 LHY model control — auto-generated.
 # Source: scripts/validation/eu_k3_lhy_control_gen.jl
-# LHY = full_bdg (was icosahedral), K3 = 0, γ_dr = 0. Filename unchanged.
-# Compare to eu_k3_lhy/LHY_icosahedral.yaml (same LHY, K3=200) to isolate
+# LHY = full_bdg (was icosahedral), K3 = 0, γ_dr = 0. Renamed to match 2026-07-30.
+# Compare to eu_k3_lhy/LHY_full_bdg.yaml (same LHY, K3=200) to isolate
 # LHY-alone vs LHY+K3 effects.
 
 metadata:
