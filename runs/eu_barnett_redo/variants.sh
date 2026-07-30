@@ -66,6 +66,15 @@ declare -A BR_PROD_VARIANTS=(
   # 42/288 = 35/240 = 28/192 exactly, so dx is held to the last digit and only
   # the box moves. 288 = 2^5*3^2.
   [prod_box42]="288,288,120|42.0,42.0,18.0|0|1.0e-3|NaN"   # xy box 35 -> 42, dx identical
+  # Fourth box point. The leak converges monotonically (0.243 -> 0.018 -> 0.0086)
+  # and box 42 is the FIRST to meet the 1e-6 edge target on both in-plane axes
+  # (8.9e-07 vs 1.95e-05 at box 35), so box 35 was probably still contaminated.
+  # The conversion does NOT yet converge: 1.066 -> 0.924 -> 1.013. The stir
+  # output does (8.784 -> 8.887 -> 8.889, last step +0.02%), so whatever moves
+  # is in the QUENCH, not in the state entering it.
+  # n = 320 = 2^6*5 rather than 336 = 2^4*3*7: the factor 7 is what made n = 112
+  # ~66x slower per step than n = 80. box = 320 * 7/48 keeps dx at 7/48 exactly.
+  [prod_box47]="320,320,120|46.6666666667,46.6666666667,18.0|0|1.0e-3|NaN"
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
