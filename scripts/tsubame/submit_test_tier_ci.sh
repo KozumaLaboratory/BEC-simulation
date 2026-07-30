@@ -23,6 +23,13 @@ cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-perf-itp}"
 echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
 echo "tier=$SPINORBEC_TEST_TIER workers=$SPINORBEC_TEST_WORKERS"
 
+# Instantiate first. The shared depot can lose a package between jobs -- a run
+# on 2026-07-30 saw `Package CUDA ... does not seem to be installed` on main and
+# on a branch minutes after both had used CUDA successfully, and the downstream
+# symptom was a core parity gate reporting 14 errors. Without this, an
+# environment fault is indistinguishable from a regression.
+$JULIA --project=. -e 'using Pkg; Pkg.instantiate()' 2>&1 | tail -5
+
 $JULIA --project=. -e 'using Pkg; Pkg.test()' 2>&1
 echo "TEST_RC=$?"
 echo "ALL DONE $(date)"
