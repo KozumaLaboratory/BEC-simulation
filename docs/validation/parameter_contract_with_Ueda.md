@@ -37,6 +37,48 @@ the Ueda data must be rewritten to make it directly comparable to ours.
 
 ---
 
+## 0. Matsui et al. (2025) Fortran implementation — first pass, 2026-07-30
+
+The "Ueda code" columns below are still empty and will stay that way: there is no
+channel to that lab (`ueda_status.md` criterion 1). What arrived instead is a
+**third-party implementation of the same Hamiltonian** — Zenodo record 17303925
+(CC-BY-4.0, open), `code.zip`: `initial.f90` (77 KB, polarised initial state),
+`time.f90` (81 KB, in-trap evolution), `tof.f90` (93 KB), `spin6.nb` (17.6 MB,
+Mathematica, spin-6 initial state). FFT via Intel MKL DFTI.
+
+Same model, same Ref-(19) Kawaguchi-Saito-Ueda lineage. It buys **convention
+independence and reference generation at arbitrary parameters**, not physics
+independence. Line numbers below are `time.f90` in the Zenodo `code.zip`.
+
+### 0.1 Verified
+
+| contract row | Matsui et al. | vs ours | line |
+|---|---|---|---|
+| units | `aHO = sqrt(hbar/(2·m·omegaX))` — **factor 2 inside** | ours is the usual `sqrt(ħ/mω)`; every dimensionless coupling differs by a power of √2 | 244 |
+| 3.2 / 3.3 | `NM==6`: `cc0 = 8π·N·a0/aHO`, `cc1 = cc0·1e-2/36`, then `cc0 *= cc0_eff (0.5)`, `cc1 *= cc1_eff (50)` ⇒ **c₁/c₀ = 1/36 exactly** | our `c1_ratio` default for the Buchachenko antiferromagnetic estimate is the same 1/36 | 282-285, 25, 322-326 |
+| 3.x inputs | Eu: `a0 = 110 a_B`, **`a2 = a4 = a6 = 0`** | they have no measured a_S either; the spin-dependent strength is the `_eff` knob, not spectroscopy | 219-228 |
+| 2.3 | `ZeemanP = Bfield·1e-7 · muB·gF/(hbar·omegaX)`, positive, `Bfield` in mG | ours declares `p ≡ −g_F μ_B B`. **Not yet a contradiction** — the sign in front of `p·F_z` in their H assembly has not been read. Resolve before quoting. | 255-258 |
+| 2.4 | two branches: if `ZeemanQ ≠ 0` it is taken as a literal Hz input; else `q = (gF·muB)²(B·1e-7)²/(2π·ħ²·Ehf·omegaX)`. **The Fig 2/4 runs pin `ZeemanQ = 1.0 Hz`** | ours always derives q from \|B\|² via Breit-Rabi: 9.6e-7 Hz at 2.6 nT. Six orders apart, both negligible against p/h = 42.3 Hz — which is independent support for q not being the discriminator in the nT band | 246-253, 1688 |
+| 2.x inputs | Eu block sets `Ehf = 1.772e9` — **²³Na's hyperfine splitting, reused** | unused for Fig 2/4 because the `ZeemanQ ≠ 0` branch wins; it would matter for any run with `ZeemanQ = 0` | 226 |
+| 4.1 / 4.2 | `cdd = 1e-7 · (gF·muB/hbar)² · 2·mass·Ntot/aHO` — the `1e-7` is μ₀/4π, so **4π is absorbed** | ours is `c_dd = μ₀μ²`, no 4π. Whether this is a real factor difference depends on their `Q_αβ` normalisation (row 4.3/4.5), which is not yet read | 322 |
+| loss | Eu branch sets `L3loss = 0`, and `L3loss_eff = 0` globally | their Fig 2/4 theory curves are **loss-free**. Keep them separate from `dataset_fig2_exp.xlsx` | 222, 25 |
+
+### 0.2 Run parameters behind the published curves
+
+`Bfield_ini = 10.4 mG` ramped to `Bfield_fin = 26e-3 mG = 2.6 nT` with
+`Bfield_tau = 50 µs`; `time_step = 1e-3` trap units; `OmegaB = 0`
+(lines 1686-1691). Fig 4 is produced by scanning `Bfield_fin` (readme).
+
+### 0.3 Still to read — this is what S-A6 finishes
+
+`Q_αβ(k)` and its k=0 treatment (rows 4.3-4.5); CG / ladder normalisation and the
+component ordering of `MatSZ` / `MatSP` (rows 1.2-1.6, declared at line 16);
+ψ normalisation, `∫|ψ|² = 1` vs `= N` (row 3.7); whether a secular DDI switch exists
+at all; and the sign in front of each term where the Hamiltonian is assembled — without
+that last one, row 2.3 cannot be closed either way.
+
+---
+
 ## 1. Spin-matrix conventions
 
 | # | Quantity | SpinorBEC.jl (this code) | Ueda code | Match? | Notes |
