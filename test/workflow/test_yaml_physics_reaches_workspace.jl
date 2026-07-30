@@ -24,7 +24,7 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: TabulatedLHY, NoLHY
+using SpinorBEC: TabulatedLHY, NoLHY, zeeman_at
 
 # ── the table ──────────────────────────────────────────────────────
 # Each block: (name, YAML lines to splice into ground_state, predicate on ws).
@@ -60,13 +60,13 @@ const _BLOCKS = [
         ws -> ws.lhy isa TabulatedLHY),
 ]
 
-# Each path: (name, YAML lines that select it).
+# Each ground-state path: (name, YAML lines that select it).
 const _PATHS = [
     (:itp, "      method: itp"),
     (:lbfgs, "      method: lbfgs"),
 ]
 
-_config(block_yaml::String, path_yaml::String) = """
+const _GS_HEAD = """
 pipeline:
   - ground_state:
       atom: Rb87
@@ -77,17 +77,51 @@ pipeline:
       dt: 0.01
       n_steps: 2
       tol: 1.0e-2
-$path_yaml
-$block_yaml
 """
+
+_gs_config(block_yaml::String, path_yaml::String) =
+    string(_GS_HEAD, path_yaml, "\n", block_yaml, "\n")
+
+# ── dynamics rows ──────────────────────────────────────────────────
+# The overlay a `dynamics:` step applies has its own set of drop sites, and they
+# are not reachable from a ground_state fixture. `:dynamics_workspace` in the step
+# result is the observation point.
+const _DYN_BLOCKS = [
+# `_apply_pulse_sequence` read `haskey(compiled, :B)` while the compiler
+# writes `:zeeman`, so the TimeDependentZeeman it had just built was discarded
+# on every run — the whole `pulse_sequence` B overlay was dead. Nothing else
+# observed the dynamics workspace, so nothing saw it.
+# Asserted on the FIELD, not on the container type: the overlay builds a
+# `TimeDependentZeeman` and the unified B block then wraps it in a
+# `ZeemanField`, so a type check pins plumbing that is free to change. What
+# cannot change is that a ramp from 0 to 5 must make p(0) ≠ p(t_end).
+# (Measured with the defect restored: every waveform slot is `nothing`.)
+    (:pulse_sequence_B,
+    """      pulse_sequence:
+        - {t: 0.0, apply: B, duration: 0.02, p: {from: 0.0, to: 5.0}}
+""",
+    ws -> zeeman_at(ws.zeeman, 0.0).p != zeeman_at(ws.zeeman, 0.02).p),
+]
+
+_dyn_config(block_yaml::String) = string(
+    _GS_HEAD, "      method: itp\n",
+    """  - dynamics:
+      duration: 0.02
+      dt: 0.005
+""", block_yaml,
+)
 
 @testset "YAML physics blocks reach the Workspace on every path" begin
     for (bname, byaml, pred) in _BLOCKS, (pname, pyaml) in _PATHS
         @testset "$bname via $pname" begin
-            cfg = load_config_from_string(_config(byaml, pyaml))
-            result = run_config(cfg; verbose=false)
-            ws = result.workspace
-            @test pred(ws)
+            result = run_config(load_config_from_string(_gs_config(byaml, pyaml));
+                verbose=false)
+            @test pred(result.workspace)
         end
+    end
+
+    @testset "$bname via dynamics" for (bname, byaml, pred) in _DYN_BLOCKS
+        result = run_config(load_config_from_string(_dyn_config(byaml)); verbose=false)
+        @test pred(result.dynamics_workspace)
     end
 end

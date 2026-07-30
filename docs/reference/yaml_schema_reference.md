@@ -458,7 +458,7 @@ snapshot every `every` steps to the run dir.
 | key | type | required |
 |---|---|---|
 | `t` | Number [0, 1e6] | yes |
-| `apply` | "B" / "raman" / "interactions" / "trap" | yes |
+| `apply` | "B" / "raman" / "interactions" | yes |
 | `duration` | Number [0, 1e6] | — |
 
 Per-target params (left permissive; `_apply_pulse_sequence` validates):
@@ -468,7 +468,10 @@ Per-target params (left permissive; `_apply_pulse_sequence` validates):
 | `B` | `p`, `q`, `bx`, `by` |
 | `raman` | `Omega`, `delta`, `k_eff` |
 | `interactions` | `c0`, `c1` |
-| `trap` | `omega`, `center` |
+
+`trap` was listed here until 2026-07-29 and has never been compiled:
+`compile_pulse_sequence` has no branch for it, so the event was silently
+dropped. `parse_pulse_sequence` now rejects any target it cannot compile.
 
 ### `potential`
 

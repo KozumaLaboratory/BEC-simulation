@@ -653,9 +653,12 @@ pipeline:
 
     @testset "P1.4: Pulse sequence parse + compile" begin
         raw = [
-            Dict{String, Any}("t" => 0.0, "apply" => "zeeman", "duration" => 0.5,
+            # `apply: B`, not `zeeman`: the unified B block renamed the target,
+            # and `zeeman` is now rejected rather than silently compiled to
+            # nothing (which is what this test was actually asserting).
+            Dict{String, Any}("t" => 0.0, "apply" => "B", "duration" => 0.5,
                 "p" => Dict{String, Any}("from" => 0.0, "to" => 100.0)),
-            Dict{String, Any}("t" => 0.5, "apply" => "zeeman", "duration" => 0.5,
+            Dict{String, Any}("t" => 0.5, "apply" => "B", "duration" => 0.5,
                 "p" => 100.0),
         ]
         events = SpinorBEC.parse_pulse_sequence(raw, 1.0)
