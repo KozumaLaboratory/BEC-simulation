@@ -162,6 +162,10 @@ using SpinorBEC: ACCURACY_KNOBS, ACCURACY_PROFILE_NAMES, accuracy_profile,
         s = String(take!(buf))
         @test occursin("NOT set by this profile", s)
         @test occursin("with_reference_accuracy", s)
+        # The footer must name BOTH ways :reference fails, or it reads as though
+        # relaxing the state were enough — which is the thing that was measured
+        # not to be.
+        @test occursin("c_dd", s)
         buf2 = IOBuffer()
         accuracy_profile_report(:reference; io=buf2)
         @test occursin("scheme-dependent", String(take!(buf2)))

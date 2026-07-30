@@ -195,10 +195,13 @@ function accuracy_profile_report(name::Symbol; io::IO=stdout)
 NOT set by this profile:
   * the :global knobs ($(join((string(k.name) for k in ACCURACY_KNOBS if k.scope === :global), ", "))).
     Use `with_reference_accuracy(f)` for those.
-  * the :reference precondition — call `check_accuracy_preconditions` before
-    trusting a reference run. `spinor_lhy = :full_bdg` tabulates from the state
-    the workspace is BUILT with, so a raw seed tabulates from an unrelaxed,
-    dynamically-unstable configuration where ε_LHY is scheme-dependent.""",
+  * the :reference preconditions — call `check_accuracy_preconditions(name;
+    relaxed_initial_state, c_dd)` before trusting a reference run.
+    `spinor_lhy = :full_bdg` tabulates from a uniform BdG spectrum, which is
+    dynamically unstable (⇒ ε_LHY scheme-dependent) in two cases: a raw seed
+    rather than a relaxed state, and — measured at Eu F=6, unfixable by any
+    relaxation — ANY nonzero c_dd. So :reference has no valid instance for a
+    dipolar gas; quote the closed form you used and its own residual.""",
     )
     nothing
 end
