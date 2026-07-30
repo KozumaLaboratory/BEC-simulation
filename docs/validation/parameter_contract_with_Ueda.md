@@ -69,13 +69,177 @@ independence. Line numbers below are `time.f90` in the Zenodo `code.zip`.
 `Bfield_tau = 50 µs`; `time_step = 1e-3` trap units; `OmegaB = 0`
 (lines 1686-1691). Fig 4 is produced by scanning `Bfield_fin` (readme).
 
-### 0.3 Still to read — this is what S-A6 finishes
+### 0.3 Closed — second pass, 2026-07-30 (session S-A6)
 
-`Q_αβ(k)` and its k=0 treatment (rows 4.3-4.5); CG / ladder normalisation and the
-component ordering of `MatSZ` / `MatSP` (rows 1.2-1.6, declared at line 16);
-ψ normalisation, `∫|ψ|² = 1` vs `= N` (row 3.7); whether a secular DDI switch exists
-at all; and the sign in front of each term where the Hamiltonian is assembled — without
-that last one, row 2.3 cannot be closed either way.
+Every row §0.2 left open is filled below, from `time.f90` unless stated. **Nothing
+here is physics independence** — same model, same Ref-(19) lineage. What it buys is
+*convention independence* and *reference generation*, the "external code" entry of the
+campaign charter's four independence sources. It does not substitute for S-A1 / S-A2.
+
+#### 0.3.1 The Hamiltonian, sign by sign (`timeGP_3D_spin1`, lines 470-519)
+
+They integrate with **Crank–Nicolson**, not split-step: `coefD = 1 + Δ·H`,
+`coefB = (1 − Δ·H)ψ`, `ψⁿ⁺¹ = coefB / coefD`, self-consistently iterated to
+`zure ≤ 1e-10` (line 526). `Δ ≡ diff2 = −dt/(−γ + i)/2 = +i·dt/2` at `γ = 0`
+(line 1886), so this is `(1 + i dt H/2)ψⁿ⁺¹ = (1 − i dt H/2)ψⁿ` — `i ∂ψ/∂t = Hψ`
+with the usual sign. The Laplacian is a **3-point finite difference** with periodic
+BCs (lines 491-500), not spectral.
+
+Reading `H` off the bracket, **every term enters with `+`**:
+
+```
+H = −∇²  +  V_trap  −  μ
+      + ZeemanP·F_z  +  ZeemanQ·F_z²
+      + cc0·n        +  cc1·⟨F⟩·F        (diag `cc1·⟨F_z⟩·m` + ladder `½cc1⟨F∓⟩F±`)
+      + cdd·(B_eff·F)                    (diag `cdd·INT0·m` + ladder `½cdd·INT1*·F±`)
+      − i·L3loss·n²
+```
+
+The kinetic prefactor is exactly `1`, not `½`, because `aHO = √(ħ/2mω)` puts the
+factor 2 in the length unit; `V_trap = ¼(x² + …)` (line 1870) is the same statement.
+`calcENE_3D_spin1` confirms the energy functional: `E = T + V + E_p + E_q + (E_c0 +
+E_c1 + E_dd)/2` (line 743) — the ½ on the mean-field terms, none on the Zeeman.
+
+| row | Matsui et al. | vs ours | verdict |
+|---|---|---|---|
+| **2.1 / 2.3** | `H ⊃ +ZeemanP·F_z` with `ZeemanP = +B·μ_B·g_F/(ħω)` (line 258, `Zeeman_p` at 739 confirms the sign in the energy) ⇒ **`H_Z = +g_F μ_B B·F_z`** | ours is `H_Z = −p·F_z` with `p ≡ −g_F μ_B B/(ħω_ref)` ⇒ **`+g_F μ_B B·F_z`**. `inspect` on our Fig. 4B config returns `p = −153.9` at their `Bfield_ini = 10.4 mG`; theirs is `ZeemanP = +153.87`, and `−p·F_z ≡ +ZeemanP·F_z` | **MATCH.** Row 2.3's own text ("p = g_F μ_B B/ħω_ref, same sign as B_z") is **stale** — it contradicts `Units.bfield_to_p` and CLAUDE.md. The *operator* is what agrees; the intermediate `p` differs in sign because we route through Kawaguchi-Ueda's `p` and they do not. +B on g_F>0 gives m=−F lowest in both. |
+| **2.2** | `+ZeemanQ·F_z²` | `+q·F_z²` | **MATCH**, including the sign. |
+| 3.1 | `E_int = (cc0/2)∫n² + (cc1/2)∫\|⟨F⟩\|²` (line 743 halves what 678-690 accumulate) | identical | **MATCH.** |
+| **4.7** | **`secular` does not exist.** No switch, no Larmor average, no rotating spin frame anywhere in `initial.f90` or `time.f90`. `calcDD_3D` always uses the full `DD0/DD1/DD2`; `calcDD_3D_pol` is a *spin-frozen* variant (only `DD0·⟨F_z⟩`) used by the ground-state driver `timeGP_3D_spin1_fix`, which is a consequence of freezing the component, not an approximation to the DDI. | ours is a user-chosen flag with an `@info` advisory above `ω_L/(c_dd⟨n⟩) > 100` | **ABSENT IN THEIR CODE.** Our secular option has no counterpart here, and CLAUDE.md's "> 100" advisory gets **no external support in either direction** from this source. Their Fig. 2/4 runs sit deep in that regime and use full MDDI regardless. |
+| 4.8 | no spin-rotating frame | `spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true` | **ABSENT.** |
+| 5.1 | `−∇²` (prefactor 1, absorbed into `aHO`), 3-point FD, periodic | `−ħ²/2m ∇²`, spectral | **MATCH in physics, DIFFER in discretisation.** At their production `dx = 0.4 aHO` against a healing length `ξ = 1/√μ ≈ 0.28 aHO`, the FD dispersion error is not small. Any Level-10 `Hψ` diff must use the same Laplacian or it measures the stencil. |
+| 9.1 | `exp(−i dt H)` via Crank–Nicolson (2nd order, unconditionally stable, iterated to self-consistency) | Strang split-step | **DIFFER in method, agree in order.** Contract §"Acceptance criteria" already allows this: rows 1-2 (energy, `Hψ`) are method-free, row 3 (one-step) is not. |
+| 9.2 | ITP is the same CN with `diff2 = dt/2` real (line 1883) + renormalise | `exp(−τH)` + renormalise | **MATCH in intent.** |
+| 2.7 | no overflow shift — CN never exponentiates `H` | we subtract `min(E_m)` | **N/A**, and harmless: the shift is a gauge on our side. |
+
+#### 0.3.2 Spin matrices (`init_time_3D`, lines 386-396)
+
+```fortran
+do im = -NM, NM
+   MatSZ(im) = dble(im)
+   MatSP(im) = dsqrt(dble(NM-im+1)*dble(NM+im))
+enddo
+```
+
+| row | Matsui et al. | vs ours | verdict |
+|---|---|---|---|
+| 1.1 | `NM = 6` is the spin quantum number, 13 components | `atom.F = 6` | **MATCH.** |
+| **1.2** | array index **is** `m`, running `−F … +F` — **ascending** | `c=1 ↔ m=+F`, **descending** | **DIFFER — pure relabelling.** `c = F + 1 − m`. Their `im=−6` is our `c=13`. Mechanical, but every component-resolved comparison must apply it, and their output columns are written `im = −NM … NM`. |
+| 1.3 | `F_z` diagonal `= m` | same | **MATCH.** |
+| **1.6** | `MatSP(im) = √((F−m+1)(F+m)) = √(F(F+1) − m(m−1)) = ⟨F,m\|F₊\|F,m−1⟩`, real and positive | `F_±\|F,m⟩ = √(F(F+1) − m(m±1))\|F,m±1⟩` | **MATCH**, Condon-Shortley, same phase. |
+| 1.4 | never forms `F_x`, `F_y`; only `F_z` and `F_±` via `MatSP`. `spinP ≡ ⟨F₊⟩ = Σ MatSP(im)·φ*_im φ_{im−1}` (line 777), and `INT1 ≡ B_eff,x + i B_eff,y` (line 815) — so `F_x ± iF_y` with the standard `+i` | `[F_x, F_y] = +iF_z` | **MATCH** (implied, not independently stated). |
+| 1.5 | never forms `F²` | `F(F+1)·I` | **N/A**, no choice involved. |
+
+#### 0.3.3 `Q_αβ(k)`, its k=0 bin, and the `4π` (`makeDD_ini`, lines 923-941)
+
+Their kernel, at `k ≠ 0`:
+
+```
+DD0 = −(4π/3)(1 − 3k_z²/k²) = 4π·Q_zz
+DD1 = 4π·k_z(k_x + i k_y)/k²  = 4π·(Q_xz + i Q_yz)
+DD2 = 4π·(k_x + i k_y)²/k²    = 4π·(Q_xx − Q_yy + 2i Q_xy)
+```
+
+with `Q_αβ = k̂_α k̂_β − δ_αβ/3` — **our exact tensor, times 4π**. Substituting into
+`INT0L = ½(DD1*·⟨F₊⟩ + DD1·⟨F₋⟩) + DD0·⟨F_z⟩` (line 847) collapses to
+`4π(Q_xz⟨F_x⟩ + Q_yz⟨F_y⟩ + Q_zz⟨F_z⟩)` — the same contraction our
+`apply_ddi_step!` performs.
+
+**Report the product, not the halves.** Their `cdd = (μ₀/4π)·(g_F μ_B/ħ)²·2m·N/aHO`
+(the `1.d-7` is `μ₀/4π`), so
+
+```
+cdd · DD = μ₀ (g_F μ_B)² · (2m/ħ²) · N/aHO · Q = [μ₀ μ² · N/aHO³] / (ħω) · Q
+```
+
+using `2m aHO²/ħ = 1`. Ours is `c_dd·Q` with `c_dd = μ₀μ²`, `μ = g_F μ_B`, no 4π
+anywhere. **The two `4π`s cancel exactly and the products are identical**, including
+the `μ = g_F μ_B` per-spin-matrix convention of row 4.6 (their `(gF*muB/hbar)²` is
+per-`F_z`-quantum, not the `g_F F μ_B` saturation moment).
+
+| row | Matsui et al. | vs ours | verdict |
+|---|---|---|---|
+| 4.1 / 4.2 | `cdd` absorbs `μ₀/4π` | `c_dd = μ₀μ²`, no 4π | **MATCH in the product** (row 4.5 compensates). Neither is "the" convention; only `cdd·Q` is physical. |
+| 4.3 / 4.5 | `Q` carries an extra `4π`; otherwise the identical traceless tensor, no `1/(4π)` | bare `k̂k̂ − δ/3` | **MATCH in the product.** |
+| 4.6 | `μ = g_F μ_B` per spin matrix | same | **MATCH.** |
+| **4.4** | `DD0(k=0) = −4π/3`, `DD1(0) = DD2(0) = 0` (lines 930-933) — i.e. `Q_zz(0) = −1/3`, the `−δ_αβ/3` piece kept with `k̂k̂ → 0` | `Q(k=0) = 0`, all components (Pedri-Santos; and `h(0)=0` keeps it there under our spherical truncation) | **DIFFER — and it is negligible here.** The k=0 bin adds a uniform `B_eff,z ∝ ⟨F_z⟩/V_pad`, which is an effective linear-Zeeman shift. At their `128³ × dx 0.4 × sn=2` and `N = 5×10⁴` this is `cdd·(−4π/3)·⟨F_z⟩/(dx³·sn³·N_pts) ≈ 7.8×10⁻⁴` trap units, i.e. **5×10⁻³ nT** against a −2.5 nT resonance offset and a 1 nT scan step. It vanishes as `1/V_pad`, so our `Q(0)=0` is their large-box limit. **Type A (analytic), not measured.** |
+| — | zero-padding `sn = 2` in `time.f90`, `sn = 1` (**none**) in `initial.f90` | `padded: true, pad_factor: 2` default since 2026-07-29 | **MATCH for the dynamics; their ground state is unpadded.** |
+| — | no real-space spherical truncation of the kernel | `trunc_radius: "auto"` by default | **DIFFER.** Ours removes the `k̂k̂` angular discontinuity at the origin; theirs does not. Our own probe puts that class of error at ~2×10⁻² of the field with padding alone — worth ~0.02 nT of offset here, below the effects being measured but not below the quoted precision. |
+| 5.2 | `k = 2π/(sn·N·dx)·[0 … N/2−1, −N/2 … −1]` (lines 924-928) | identical FFTW layout | **MATCH.** |
+| 5.4 | **no dealiasing** | Orszag 2/3, opt-in | **ABSENT IN THEIR CODE.** |
+
+#### 0.3.4 ψ normalisation and the remaining rows
+
+| row | Matsui et al. | vs ours | verdict |
+|---|---|---|---|
+| **3.7** | `phi = phi_n/√(Σ\|phi_n\|²·dx dy dz)` (line 530) ⇒ **`∫\|ψ\|² = 1`**, with `N` absorbed into `cc0 ∝ Ntot`, `cc1`, `cdd ∝ Ntot`, `L3loss ∝ Ntot²`. `calcENE` reports `ntrap_r(im) = ∫\|φ_m\|²` as fractions summing to 1. | `∫\|ψ\|² dV = 1`, N in the coefficients | **MATCH.** No transformation needed. |
+| 3.2 / 3.3 | `cc0 = 8πN a₀/aHO` × `cc0_eff`, `cc1 = cc0_raw·(10⁻²/36)` × `cc1_eff` | `c₀ = c_total/(1 + F²·c₁_ratio)`, `c_total = 4πN a_s/a_ho` | **MATCH.** `8π/aHO = 8π√2/a_ho = 2√2 · 4π/a_ho`, and the energy rescale under `a_ho = √2 aHO` divides by exactly `2√2`. With `cc0_eff = 0.5, cc1_eff = 50` their pair is `c₀ = 2343.63, c₁ = c₀/36` at N=5×10⁴; our `c1_ratio = 1/36` returns `c₀ = 2343.63` — **verified numerically**, not by algebra alone. |
+| 3.4 / 3.5 / 3.6 | `cc2`, `cc3` exist for F=2/3 but are **`0` on the ¹⁵¹Eu branch**; no singlet-pair or higher-rank tensor term is ever evaluated at F=6 | our tensor path handles all channels | **N/A for Eu.** Their F=6 model is `c₀ + c₁` only. Ours must set `c_extra = {}` to match — the six unmeasured `a_S` are absent from their model too, so this dataset **cannot** constrain them. |
+| 6.x | **no LHY term anywhere** | opt-in | **ABSENT IN THEIR CODE.** Their model is pure mean-field. |
+| 7.1 / 7.2 | `dn/dt ⊃ −L3loss·n²·ψ` — a **cubic-in-n** loss in ψ, i.e. our `K3_per_m_cubic` shape (row 7.1). `L3loss = 0` for Eu **and** `L3loss_eff = 0` globally. | both shapes available | **MATCH in shape, INACTIVE in their published runs.** |
+| 7.3 | `L3loss ← L3loss·(2π/ω)·N²/aHO⁶` | `K3·n₀²/ω_ref`, `n₀ = N/a_ho³` | **MATCH** modulo the `aHO`/`a_ho` √2 (a factor 8 in `aHO⁶`). Untested — the term is off. |
+| 8.1 | **`aHO = √(ħ/2mω)`** | `a_ho = √(ħ/mω)` | **DIFFER by √2.** Every length, density and dimensionless coupling differs by a power of √2. This is the first transformation to apply, before any number is compared. |
+| 8.2 / 8.3 | `1/ω_x`, `ħω_x` | same | **MATCH.** Their `time_step = 1e-3` transfers to our `dt` unchanged. |
+| 10.2 / 10.3 | `im_fix = −6`, seeded from a Thomas-Fermi profile in that one component | `m_minus_F` populates `c = D` | **MATCH** after the 1.2 relabelling. |
+| 10.5 | `noise_amp = 5e-2` is **declared, assigned, and never read** in either file — dead code. No thermal or symmetry-breaking seed exists. | heuristic seed available | **ABSENT.** Correct for this problem: the m=−6 → −5 transfer is *driven* by the DDI off-diagonal `INT1`, not seeded from an instability. Our configs set `seed_amplitude: 0`. |
+
+#### 0.3.5 Two ways the shipped code is not the published configuration
+
+Both are provable from the files, and both matter for a reproduction:
+
+1. **`Ntot = 3.5×10⁴`** in `setup_parameters` (line 1667) against published theory
+   curves that total **49999.9** — `dataset_fig2_theo` starts at exactly `N_{-6} =
+   50000`. The runs behind the figures used `N = 5×10⁴`.
+2. **`initial.f90` and `time.f90` disagree on the interaction.** `initial.f90` line 25
+   ships `cc0_eff = 1, cc1_eff = 0`; `time.f90` line 25 ships `cc0_eff = 0.5,
+   cc1_eff = 50`. As shipped, the state handed to the dynamics is the ground state of
+   a Hamiltonian with **twice** the contact repulsion — `R_TF` larger by `2^0.2 =
+   1.15`, peak density lower by `0.66`. Peak density sets the dipole field, which
+   sets the very resonance offset Fig. 4B measures.
+
+So the parameters have to be **reconstructed**, not read off. `runs/matsui_fig4b/`
+does that, and carries `fig4b_gsvariant_n32.yaml` to price item 2 rather than assume
+it away.
+
+### 0.4 Consequences for the contract as a whole
+
+- **No blocking convention mismatch remains.** Every difference is either a
+  relabelling (1.2), a unit power of √2 (8.1), a cancelling `4π` (4.1/4.2 vs
+  4.3/4.5), a numerical method (5.1/9.1/9.3), or a term one side simply does not
+  have (4.7, 5.4, 6.x). Rows 1.2, 4.4 and 8.1 need an explicit transformation; the
+  rest are direct.
+- **The `Ueda code` columns stay empty.** These findings live in §0, not in the
+  per-row `Ueda code` cells, because Matsui et al. are not the Ueda lab and merging
+  them would make the table claim a channel that does not exist
+  (`ueda_status.md` criterion 1 is still unmet).
+- **The inverse problem is untouched.** Their F=6 model has `a₂ = a₄ = a₆ = 0` and
+  `cc2 = cc3 = 0`; the spin-dependent strength is the `_eff` knob. The six unknown
+  `a_S` are not in this dataset and cannot be extracted from it.
+
+### 0.5 Fig. 4B — the target, measured off their own data
+
+`test/fixtures/matsui2025/dataset_fig4_theo.csv` is a 1 nT grid descending from
++20 nT (0.5 nT between −10 and +10), 61 points, totalling 49999.9 atoms at every
+field. The Fig. 4B observable is `N_{m=−6}` after a 5 ms hold. Applying
+`resonance_dip` (parabolic vertex; half-depth crossings against a per-side endpoint
+baseline) to both published curves:
+
+| curve | dip centre | half-depth width | minimum |
+|---|---|---|---|
+| their **simulation** (`dataset_fig4_theo`) | **−2.5495 nT** | **15.0224 nT** | 12287 |
+| their **experiment** (`dataset_fig4_exp`, 4/3 repeats averaged) | **−3.2048 nT** | **14.5414 nT** | 8818 |
+
+Type C, producing commit `bbbe4829`, gated in tier `ci` by
+`test/validation/test_matsui_fig4_dip.jl`.
+
+**The paper's own framing is not the sharpest test available.** It contrasts an
+*analytic* estimate of −1.5 nT (from the rotational kinetic energy, refs 38-39)
+with −3.5 nT observed, and attributes the gap to the gas's dipole field. But their
+simulation — which contains that dipole field — already lands at **−2.55 nT**, 70 %
+of the way across. So the number a second implementation of the same model has to
+reproduce is −2.55 nT, not −1.5 and not −3.5; and the residual 0.66 nT between their
+simulation and their experiment is the honest floor, sitting just under the ~1 nT
+field fluctuation the Fig. 4 caption itself quotes.
 
 ---
 

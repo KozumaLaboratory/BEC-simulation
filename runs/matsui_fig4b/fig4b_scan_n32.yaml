@@ -35,7 +35,7 @@ defaults:
 
 scan:
   zip:
-    pipeline.1.B.Bz.to: {from: -2.0e-4, to: 2.0e-4, step: 5.0e-6}   # Gauss; -20 … +20 nT, 0.5 nT step
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
 
 pipeline:
   - ground_state:
@@ -87,5 +87,4 @@ pipeline:
         precision: f64
 
   - analyze:
-      - populations: {}
       - energy_decomposition: {}

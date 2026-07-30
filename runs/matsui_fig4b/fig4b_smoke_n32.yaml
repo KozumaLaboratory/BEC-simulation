@@ -91,5 +91,4 @@ pipeline:
         precision: f64
 
   - analyze:
-      - populations: {}
       - energy_decomposition: {}

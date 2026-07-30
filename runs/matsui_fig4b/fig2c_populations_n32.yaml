@@ -1,10 +1,10 @@
-# Matsui et al. (2025) Fig. 4B — 64³ convergence spot check for fig4b_scan_n32.yaml.
+# Matsui et al. (2025) Fig. 2C — N_m(t) over 40 ms at the nominal field, 32³.
 #
-# Same physics, dx 0.5 -> 0.25 a_ho, at eight fields: the six around the dip
-# minimum plus the two half-depth crossings. Its job is to put a resolution
-# error bar on the 32³ centre, not to produce a curve of its own — at 32³ the
-# occupied band edge sqrt(2 mu) ~ 5.1 sits at 0.81 k_max, so the healing
-# length is barely on the grid and the 32³ number is not self-certifying.
+# Single field (2.6 nT), no scan: the target is the population time series
+# their loss-free simulation produced, test/fixtures/matsui2025/
+# dataset_fig2_theo.csv (2766 rows, 0 -> 40.02 ms, starting at N_-6 = 50000).
+# The experimental sheet beside it is NOT loss-free and must not be overlaid
+# on this.
 #
 # Target (measured off test/fixtures/matsui2025/dataset_fig4_theo.csv by
 # `resonance_dip`, pinned in test/validation/test_matsui_fig4_dip.jl):
@@ -31,23 +31,18 @@ metadata:
   ladder_level: 12
   reference: Matsui_2025_EdH_Zenodo_17303925
   claim_type: C
-  target: fig4b_dip_centre_and_width
-  grid_n: 64
+  target: fig2c_populations_40ms
+  grid_n: 32
 
 defaults:
   kind: spinor
   backend: gpu
   interactions: {N_atoms: 50000, omega_ref: 691.1504}
 
-scan:
-  zip:
-    pipeline.1.B.Bz.to: [-1.0e-4, -4.0e-5, -3.0e-5, -2.5e-5, -2.0e-5, 5.0e-5]  # Gauss; -10,-4,-3,-2.5,-2,+5 nT
-                                                                              # 8x the voxels of task 1: ~27 min/point
-
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [64, 64, 64], box: [16.0, 16.0, 16.0]}   # dx = 0.25 a_ho, within 12 % of their 0.283
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
       potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
       interactions:
         N_atoms: 50000
@@ -72,10 +67,10 @@ pipeline:
       tol: 1.0e-10
 
   - dynamics:
-      duration: 3.4558           # 5 ms × 691.1504
+      duration: 27.646           # 40 ms × 691.1504
       dt: 0.001                  # their time_step, in the same 1/ω_ref units
       B:
-        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        Bz: {from: 0.0104, to: 2.6e-5, duration: 0.1037}   # 2.6 nT, their Bfield_fin  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
         theta: 0.0
         phi: 0.0
         q: 0.00909116
@@ -89,7 +84,7 @@ pipeline:
       seed_amplitude: 0.0        # their noise_amp is declared and never used; the
                                  # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
       save:
-        every: 100
+        every: 10                # ~14.5 us, matching their 0.0145 ms sheet spacing
         psi: false
         precision: f64
 
