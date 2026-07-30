@@ -65,6 +65,10 @@ const FAST_TESTS = [
     "manuscript/test_paper3_audit.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
+    # Composer order from the COEFFICIENTS, on 8×8 matrices — no grid, no
+    # Workspace. Milliseconds for what test_yoshida_ddi_order.jl spends 14 s on
+    # in `full`, and it names the coefficient rather than the stack.
+    "hamiltonian/test_composer_order_conditions.jl",
     # Gates the dt < 0 half-line that every high-order composer needs. FAST on
     # purpose: the order tests that also see this defect are in FULL_EXTRA, so
     # the PR gate never ran them (PR #183 shipped a 4th → 2nd order collapse).
