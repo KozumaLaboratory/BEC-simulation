@@ -27,6 +27,10 @@
 #
 #    qsub -g tga-kozuma-kouhi runs/matsui_fig4b/submit_fig4b.sh
 #
+#  Cost, measured warm (UGE 8304456): 5.2 s per 32³ point, 21.7 s per 64³ point,
+#  plus ~75 s of JIT absorbed by each task's first point. The whole array is ~10
+#  min per task, not the hours a cold smoke timer suggests.
+#
 #  Smoke first (2 fields at 32³, every code path, minutes):
 #    qsub -g tga-kozuma-kouhi -N f4b_smk -t 1-1 -l h_rt=1:00:00 \
 #         runs/matsui_fig4b/submit_fig4b.sh SMOKE

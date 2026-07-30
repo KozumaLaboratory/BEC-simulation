@@ -277,9 +277,15 @@ Read alongside the numbers, whenever they land:
   off the completed run's energy decomposition rather than either estimate before
   anything is quoted. Task 2 exists because of this; without it the 32³ centre is
   a number, not a measurement.
-- **The step cost is ~70× the campaign cost-table extrapolation**: 27 ms at 32³
-  D=13 with the padded DDI, measured in UGE 8304399, against the ~0.4 ms that
-  scaling 3.2 ms at 64³ by cell count predicts. Budget from the measurement.
+- **Step cost, measured warm** (UGE 8304456, per-point wall over 3456 dynamics
+  steps after the first point absorbs the JIT): **5.2 s at 32³ ⇒ ~1.5 ms/step**,
+  **21.7 s at 64³ ⇒ ~6.3 ms/step**. Both are upper bounds — a short ITP shares
+  the same window. That is ~4× the campaign cost table's cell-count
+  extrapolation at 32³ and ~2× its measured 3.2 ms at 64³, the gap being the
+  padded DDI. **The smoke's 27 ms/step was a cold number and is retracted**: it
+  came from an ITP progress timer over 200 steps that is still dominated by
+  first-call compilation, and reading it as a rate over-predicted the campaign
+  by 15×.
 - **Dealiasing is off** on both sides (theirs has none; Orszag 2/3 at 32³/box 16
   would cut `k_cut = 4.19` below the occupied `√(2µ) ≈ 5.1`).
 - Our kernel carries the spherical truncation and `Q(k=0) = 0`; theirs carries
