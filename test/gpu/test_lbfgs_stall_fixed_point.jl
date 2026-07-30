@@ -45,14 +45,27 @@ end
             verbose=false,
         )
 
-        # `tol` below the attainable floor, so the solve is guaranteed to reach
-        # the regime the stop rule is about.
-        r_stop = find_ground_state_lbfgs(; base..., n_steps=200, tol=1.0e-16)
-        r_grind = find_ground_state_lbfgs(; base..., n_steps=200, tol=1.0e-16,
-            stop_at_floor=false)
+        # Reaching the floor must not be left to a step budget. The first
+        # attempt asserted a stall within 200 steps and failed on the GPU for
+        # the uninteresting reason that this problem had not got there yet —
+        # the exact-agreement assertions passed, because both arms had simply
+        # run 200 identical steps.
+        #
+        # So drive to the floor first and hand that ψ to the paired runs. The
+        # seed either stalled (ψ IS the fixed point) or ran out of steps very
+        # near it; either way the paired runs stall within a few iterations,
+        # and the construction does not depend on how many steps this
+        # particular problem needs on this particular backend.
+        seed = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
+        psi0 = Array(seed.workspace.state.psi)
+
+        r_stop = find_ground_state_lbfgs(;
+            base..., psi_init=psi0, n_steps=200, tol=1.0e-16)
+        r_grind = find_ground_state_lbfgs(;
+            base..., psi_init=psi0, n_steps=200, tol=1.0e-16, stop_at_floor=false)
 
         @test r_stop.stop_reason === :line_search_stalled
-        @test r_stop.last_step < 200
+        @test r_stop.last_step <= 10
         @test r_grind.stop_reason === :max_steps
         @test r_grind.last_step == 200
 
