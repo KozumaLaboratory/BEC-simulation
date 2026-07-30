@@ -88,7 +88,7 @@ function newton_cg_ground_state(
     converged = false
     gnorm = Inf
     iters = 0
-    t0 = time()
+    t0 = time_ns()
 
     for outer in 1:max_outer
         iters = outer
@@ -100,7 +100,7 @@ function newton_cg_ground_state(
         gnorm = sqrt(ipR(gp, gp))
         if verbose
             @printf("  NCG %2d/%d | E=%.8g |∇E|=%.3e Δ=%.2g μ=%.4f | %.1fs\n",
-                outer, max_outer, E, gnorm, Δ, prm.μ, time() - t0)
+                outer, max_outer, E, gnorm, Δ, prm.μ, elapsed_s(t0))
             flush(stdout)
         end
         if gnorm < tol
@@ -269,7 +269,7 @@ function residual_newton_refine(
     gnorm = Inf
     converged = false
     iters = 0
-    t0 = time()
+    t0 = time_ns()
 
     # ‖gp‖ at the current ψ, reusing the constrained_hessian_params gradient.
     function residual_norm(prm)
@@ -283,7 +283,7 @@ function residual_newton_refine(
         gnorm, gp = residual_norm(prm)
         if verbose
             @printf("  rNCG %2d/%d | ‖gp‖=%.3e μ=%.5f | %.1fs\n",
-                outer, max_outer, gnorm, prm.μ, time() - t0)
+                outer, max_outer, gnorm, prm.μ, elapsed_s(t0))
             flush(stdout)
         end
         gnorm < tol && (converged=true; break)

@@ -83,7 +83,7 @@ function _find_ground_state_adaptive(;
 
     final_dE = NaN
     final_dpsi = NaN
-    t_start = time()
+    t_start = time_ns()
 
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
@@ -120,7 +120,7 @@ function _find_ground_state_adaptive(;
             final_dpsi = dpsi
 
             if verbose
-                elapsed = time() - t_start
+                elapsed = elapsed_s(t_start)
                 frac = total_steps / n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(

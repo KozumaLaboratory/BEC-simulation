@@ -210,7 +210,7 @@ function find_ground_state_lbfgs(;
     E_prev = Inf
     converged = false
     last_step = 0
-    t_start = time()
+    t_start = time_ns()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
     # accepted ψ becomes the next step's gradient) rather than recomputed at the
@@ -226,7 +226,7 @@ function find_ground_state_lbfgs(;
 
         # Log
         if verbose && (step == 1 || step % max(1, n_steps ÷ 20) == 0 || step == n_steps)
-            elapsed = time() - t_start
+            elapsed = elapsed_s(t_start)
             eta = elapsed / step * (n_steps - step)
             @printf("  LBFGS %d/%d | E=%.8g dE=%.3g |∇|=%.3g | %.1fs, ETA %.0fs\n",
                 step, n_steps, E, dE, grad_norm, elapsed, eta)
