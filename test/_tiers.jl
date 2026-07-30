@@ -94,6 +94,10 @@ const FAST_TESTS = [
     "foundation/test_unitful.jl",
     "analysis/test_texture_observables.jl",
     "analysis/test_vorticity_berry.jl",
+    # Instrument gate for the vortex counter: n imprinted -> n counted, ZERO on a
+    # vortex-free field (a KZ defect count sits on a thermal background), and
+    # threshold-independent.
+    "analysis/test_vortex_counter_control.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
