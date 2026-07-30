@@ -91,6 +91,16 @@ function find_ground_state_lbfgs(;
     # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
+    stop_at_floor::Bool=true,   # end the solve when a STEEPEST-DESCENT line
+    # search finds no acceptable step. That is not a heuristic: such a failure
+    # leaves ψ, `grad` and `E` untouched and the curvature history empty, so the
+    # next iteration forms the same direction from the same gradient with the
+    # same `E0` and repeats the same evaluations to the same answer, forever.
+    # The iterate is a fixed point of the loop and nothing further can be found.
+    # Without this the solver ran to `n_steps` regardless: measured 97.8 % of
+    # 2000 steps on Eu-151 F=6 24³ at the default `tol=1e-8`, ~30 futile energy
+    # evaluations each, because that problem's gradient floor is 5e-7. Set
+    # `false` to restore the old behaviour.
     lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
     # two-loop (ε-continuation threads it across rungs so
     # each rung reuses curvature instead of restarting SD).
@@ -210,6 +220,17 @@ function find_ground_state_lbfgs(;
     E_prev = Inf
     converged = false
     last_step = 0
+    # Total-energy evaluations spent inside the line search, summed over the
+    # solve. Returned because it, not any single kernel, is what sets the cost
+    # per iteration — see `_line_search_energy_decrease`.
+    n_line_search_evals = 0
+    # Line searches that found no acceptable step (α = 0) and therefore threw
+    # the curvature history away. A solve where this is most iterations is not
+    # running L-BFGS at all — it is running steepest descent with a 30-deep
+    # backtrack in front of it, which is what a ~30 evals/iteration average
+    # means.
+    n_line_search_failures = 0
+    stalled = false
     t_start = time()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
@@ -249,9 +270,9 @@ function find_ground_state_lbfgs(;
             _lbfgs_direction(grad, s_hist, y_hist, rho_hist, dV)
         end
 
-        # Ensure descent direction (`real(dot(a, b))` skips two
-        # broadcast temporaries vs `real(sum(conj.(a) .* b))`)
-        slope = real(dot(grad, direction)) * dV
+        # Ensure descent direction. `_realdot`, not `real(dot(...))` — see the
+        # note there on OpenBLAS level-1 team overhead.
+        slope = _realdot(grad, direction) * dV
         if slope >= 0
             direction .= .-grad  # fall back to steepest descent
             slope = -sum(abs2, grad) * dV
@@ -260,18 +281,34 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        α, E_trial, psi_accepted = _line_search_energy_decrease(
+        α, E_trial, psi_accepted, n_ls = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
             slope=slope, expand=is_sd,
         )
+        n_line_search_evals += n_ls
 
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
+            n_line_search_failures += 1
             empty!(s_hist);
             empty!(y_hist);
             empty!(rho_hist)
             E_prev = E
             last_step = step
+            # A failure along the STEEPEST-DESCENT direction is conclusive: ψ,
+            # `grad` and `E` are untouched and the history is now empty, so the
+            # next iteration rebuilds this exact direction from this exact
+            # gradient and repeats these exact evaluations. Continuing cannot
+            # produce a different answer. (A failure along an L-BFGS direction
+            # is NOT conclusive — the reset to steepest descent is a genuinely
+            # different attempt, and it often succeeds.)
+            if stop_at_floor && is_sd
+                stalled = true
+                verbose && @printf(
+                    "  Stopped at the energy-comparison floor: steepest descent finds no decrease, so no later step can. |∇E|=%.3g\n",
+                    grad_norm)
+                break
+            end
             continue
         end
 
@@ -296,7 +333,7 @@ function find_ground_state_lbfgs(;
         # `size(grad)` temporaries.
         y_k = scratch.y_k
         y_k .= grad_new .- grad
-        ys = real(dot(s_k, y_k)) * dV
+        ys = _realdot(s_k, y_k) * dV
         if is_active(ys)
             # At capacity, evict the oldest pair and write the new one into
             # the buffers it was holding: steady-state history maintenance
@@ -389,7 +426,42 @@ function find_ground_state_lbfgs(;
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
-    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist)))
+    # `converged` keeps its meaning (grad_norm < tol). `stop_reason` says WHY the
+    # loop ended, which `converged=false` alone cannot distinguish: a solve that
+    # ran out of steps while still descending and one that hit its gradient floor
+    # at step 25 and then spent 1975 steps proving it both report `false`.
+    stop_reason = converged ? :tol : (stalled ? :line_search_stalled : :max_steps)
+
+    # `converged` keeps meaning `grad_norm < tol` — a lot of code reads it and it
+    # is persisted — but on its own it cannot distinguish a solve that failed
+    # from one that succeeded as far as the method allows. A stall says exactly
+    # that: steepest descent found no step, so no later iteration can either,
+    # and `grad_norm` IS the attainable floor for this problem and method.
+    #
+    # Measured on Eu-151 F=6 24³: floor 5.0e-7 against the DEFAULT `tol = 1e-8`,
+    # i.e. the default asks for something fifty times below what an energy-gated
+    # line search can resolve. Reporting that as `converged = false` and nothing
+    # else is how a perfectly good ground state gets read as a failed run.
+    floor_limited = stalled && result.grad_norm > tol
+    if floor_limited
+        @warn "L-BFGS stopped at its energy-comparison floor. The requested " *
+            "`tol` is below what this problem and method can reach, so " *
+            "`converged` is false for a state that is as converged as " *
+            "L-BFGS can make it: steepest descent found no acceptable step, " *
+            "which means no later iteration can find one either. Both the " *
+            "L-BFGS line search and Newton-CG accept steps by an ENERGY " *
+            "comparison, and a step whose energy reduction falls below the " *
+            "evaluation roundoff cannot be resolved. To go below this floor " *
+            "use `residual_polish=true`, which drives (H-mu)psi to zero " *
+            "directly and is not energy-gated." tol grad_norm=result.grad_norm energy=result.energy last_step maxlog=1
+    end
+
+    merge(
+        result,
+        (; lbfgs_history=(s_hist, y_hist, rho_hist),
+            n_line_search_evals, n_line_search_failures, stop_reason,
+            floor_limited),
+    )
 end
 
 """

@@ -39,6 +39,9 @@ using SpinorBEC: _LBFGS_FORWARD_KWARGS, find_ground_state_lbfgs
         # eigenvector-residual final polish inside the driver (see the
         # `if residual_polish` block); a convergence stage, no Strang counterpart
         :residual_polish, :residual_hvp_order,
+        # floor detection for the Armijo backtracking loop — ITP has no line
+        # search, so there is nothing to forward it to
+        :stop_at_floor,
     ])
 
     not_forwarded = setdiff(lbfgs_kwargs, forwarded, lbfgs_exclusive)
