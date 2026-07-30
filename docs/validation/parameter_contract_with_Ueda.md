@@ -267,11 +267,16 @@ all 14 refs in `docs/campaign/fix_list.toml`, clean tree:
 Read alongside the numbers, whenever they land:
 
 - **32³ is under-resolved and the run cannot certify itself.** `dx = 0.5 a_ho`
-  against a healing length `ξ = 1/√(2µ) ≈ 0.20 a_ho`; the occupied band edge
-  `√(2µ) ≈ 5.1` sits at `0.81 k_max`. The charter's guard 4 (≥ 4 points per
-  healing length) is **violated**, and it is violated by their production run too
-  (`dx = 0.4 aHO` against `ξ ≈ 0.28 aHO`, 0.7 points). Task 2 exists because of
-  this; without it the 32³ centre is a number, not a measurement.
+  against a healing length `ξ = 1/√(2µ)` of order `0.17-0.20 a_ho` — the range
+  spans a Thomas-Fermi estimate (`µ ≈ 12.8`) and `µ ≈ 17.5` inferred from the
+  smoke's converged `E = −910.67` by subtracting the Zeeman term and using
+  `E = (5/7)µ`. Either way the occupied band edge `√(2µ) ≈ 5.1-5.9` sits at
+  `0.8-0.94` of `k_max = 6.28`, and the charter's guard 4 (≥ 4 points per healing
+  length) is **violated by an order of magnitude**. So is their production run
+  (`dx = 0.4 aHO` against `ξ ≈ 0.28 aHO`, 0.7 points per ξ). `µ` should be read
+  off the completed run's energy decomposition rather than either estimate before
+  anything is quoted. Task 2 exists because of this; without it the 32³ centre is
+  a number, not a measurement.
 - **The step cost is ~70× the campaign cost-table extrapolation**: 27 ms at 32³
   D=13 with the padded DDI, measured in UGE 8304399, against the ~0.4 ms that
   scaling 3.2 ms at 64³ by cell count predicts. Budget from the measurement.
