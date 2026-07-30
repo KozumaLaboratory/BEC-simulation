@@ -214,6 +214,12 @@ function find_ground_state_lbfgs(;
     # solve. Returned because it, not any single kernel, is what sets the cost
     # per iteration — see `_line_search_energy_decrease`.
     n_line_search_evals = 0
+    # Line searches that found no acceptable step (α = 0) and therefore threw
+    # the curvature history away. A solve where this is most iterations is not
+    # running L-BFGS at all — it is running steepest descent with a 30-deep
+    # backtrack in front of it, which is what a ~30 evals/iteration average
+    # means.
+    n_line_search_failures = 0
     t_start = time()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
@@ -272,6 +278,7 @@ function find_ground_state_lbfgs(;
 
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
+            n_line_search_failures += 1
             empty!(s_hist);
             empty!(y_hist);
             empty!(rho_hist)
@@ -394,7 +401,11 @@ function find_ground_state_lbfgs(;
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
-    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist), n_line_search_evals))
+    merge(
+        result,
+        (; lbfgs_history=(s_hist, y_hist, rho_hist),
+            n_line_search_evals, n_line_search_failures),
+    )
 end
 
 """

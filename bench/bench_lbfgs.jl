@@ -94,8 +94,11 @@ function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
     # erroring on the older one.
     ls = hasproperty(r_hi, :n_line_search_evals) ?
          r_hi.n_line_search_evals / max(r_hi.last_step, 1) : NaN
+    fails = hasproperty(r_hi, :n_line_search_failures) ?
+            r_hi.n_line_search_failures / max(r_hi.last_step, 1) : NaN
     (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo,
-        ls_evals=ls)
+        ls_evals=ls, ls_fail_frac=fails, energy=r_hi.energy,
+        grad_norm=r_hi.grad_norm, converged=r_hi.converged)
 end
 
 # ----------------------------------------------------------------------------
@@ -199,8 +202,13 @@ for n in grids, ddi in ddi_cases
     # which makes the breakdown close by construction and can therefore never
     # report that it does not.
     ls_cost = s.ls_evals * (c.t_energy + c.t_retract)
-    @printf("    %-22s %s  (%4.1f%%)  [measured %.2f evals/iter]\n",
-        "line search TOTAL", ms(ls_cost), 100ls_cost / per_iter, s.ls_evals)
+    @printf("    %-22s %s  (%4.1f%%)  [measured %.2f evals/iter, %.1f%% of steps found no step]\n",
+        "line search TOTAL", ms(ls_cost), 100ls_cost / per_iter,
+        s.ls_evals, 100 * s.ls_fail_frac)
+    # Whether the solve is going anywhere at all. A cost measured on a solve
+    # that is not descending is a cost measured on the wrong problem.
+    @printf("  end state: E=%.10g  |grad|=%.3e  converged=%s\n",
+        s.energy, s.grad_norm, s.converged)
     resid = per_iter - sum(last, parts) - (ls_cost - (c.t_energy + c.t_retract))
     @printf("    %-22s %s  (%4.1f%%)\n", "residual", ms(resid), 100resid / per_iter)
     println()
