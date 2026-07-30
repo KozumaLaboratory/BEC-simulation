@@ -7,7 +7,7 @@
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
 # Long-time LHY stability ladder — auto-generated.
 # Source: scripts/validation/eu_lhy_longtime_gen.jl
-# LHY = icosahedral, K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
+# LHY = full_bdg (was icosahedral), K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
 
 metadata:
   suite: eu_lhy_longtime
