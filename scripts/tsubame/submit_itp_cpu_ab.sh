@@ -28,7 +28,7 @@ echo; echo "###### GATES on B commit=$(cd "$B" && git rev-parse --short HEAD)"
 for t in $GATES; do
     echo "--- $t"
     (cd "$B" && $JULIA --project=. \
-        -e "using Test; using SpinorBEC; include(\"test/$t\")" 2>&1 | tail -12)
+        -e "using Test; using SpinorBEC; include(\"test/$t\")" 2>&1)
 done
 
 echo; echo "###### BREAKDOWN"
@@ -36,7 +36,7 @@ SCRIPT="$B/bench/bench_itp_step.jl"
 for n in 32 48; do
     for root in "$A" "$B"; do
         echo; echo "--- n=$n ROOT=$root commit=$(cd "$root" && git rev-parse --short HEAD)"
-        (cd "$root" && $JULIA --project=. "$SCRIPT" cpu "$n" none 2>&1 | tail -22)
+        (cd "$root" && $JULIA --project=. "$SCRIPT" cpu "$n" none 2>&1)
     done
 done
 echo "ALL DONE $(date)"

@@ -36,7 +36,7 @@ for n in $CFGS; do
     for root in "$A" "$B"; do
         echo; echo "###### n=$n lhy=$LHY ROOT=$root commit=$(cd "$root" && git rev-parse --short HEAD)"
         (cd "$root" && $JULIA --project=. "$SCRIPT" gpu "$n" "$LHY" 2>&1 |
-            grep -vE "^│|^└|^┌" | tail -22)
+            grep -vE "^│|^└|^┌")
     done
 done
 echo "ALL DONE $(date)"

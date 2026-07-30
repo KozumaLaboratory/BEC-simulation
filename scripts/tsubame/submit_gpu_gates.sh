@@ -27,9 +27,18 @@ nvidia-smi --query-gpu=name --format=csv,noheader || true
 # where a 30-minute one waits out a saturated gpu_1 pool.
 GATES="${SPINORBEC_GPU_GATES:-gpu/test_gpu_padded_corner_parity.jl gpu/test_gpu_spin_rotation_taylor_parity.jl oracles/test_gpu_cpu_per_term_parity.jl}"
 
+# Instantiate first: the shared depot can lose a package between jobs, and the
+# downstream symptom is a gate reporting errors that read exactly like a
+# regression in whatever is under test (2026-07-30: 156/156 -> 2 passed /
+# 14 errored, cause was a missing CUDA in the depot).
+$JULIA --project=. -e 'using Pkg; Pkg.instantiate()' 2>&1 | tail -5
+
 for t in $GATES; do
     echo; echo "###### $t"
+    # NOT piped through `tail`. Truncating to the last N lines keeps the test
+    # SUMMARY and throws away the exception HEADER, which is the one line that
+    # says what went wrong — it cost a whole diagnosis round on 2026-07-30.
     $JULIA --project=. -e "using Test; import CUDA; using SpinorBEC; include(\"test/$t\")" 2>&1 |
-        grep -vE "^│|^└|^┌" | tail -25
+        grep -vE "^│|^└|^┌"
 done
 echo "ALL DONE $(date)"
