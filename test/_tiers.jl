@@ -421,6 +421,7 @@ const FULL_EXTRA = [
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    "gpu/test_lbfgs_stall_fixed_point.jl",   # floor stop gives up nothing, on device
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
     # both the fused spin-density corner write and the rotation's in-place read
     # of a padded Φ. Padding is the DEFAULT since 9c117c05, so this is the

@@ -85,10 +85,12 @@ using Test
         # runs below must therefore agree on the iterate exactly.
         r_stop = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
         r_grind = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16,
-            max_line_search_failures=typemax(Int))
+            stop_at_floor=false)
 
         @test r_stop.stop_reason === :line_search_stalled
         @test r_stop.last_step < 400
+        # Conclusive at the FIRST steepest-descent failure — no tunable count.
+        @test r_stop.n_line_search_failures <= 2
         @test r_grind.stop_reason === :max_steps
         @test r_grind.last_step == 400
         # Same fixed point, so the early stop gives up nothing.
@@ -96,6 +98,22 @@ using Test
         @test r_stop.grad_norm == r_grind.grad_norm
         # ...and it is a large saving, not a marginal one.
         @test r_grind.n_line_search_evals > 5 * r_stop.n_line_search_evals
+    end
+
+    @testset "the floor is a fixed point under a magnetization constraint too" begin
+        # The stop rule rests on a failed steepest-descent line search leaving
+        # the iterate untouched, which needs the whole evaluation — including
+        # the constrained retraction `_normalize_psi_constrained!`, which
+        # ITERATES — to be deterministic. Checked separately from the
+        # unconstrained case because it is a different code path.
+        cons = (; base..., target_magnetization=0.0)
+        r_stop = find_ground_state_lbfgs(; cons..., n_steps=300, tol=1.0e-16)
+        r_grind = find_ground_state_lbfgs(; cons..., n_steps=300, tol=1.0e-16,
+            stop_at_floor=false)
+        @test r_stop.stop_reason === :line_search_stalled
+        @test r_grind.stop_reason === :max_steps
+        @test r_stop.energy == r_grind.energy
+        @test r_stop.grad_norm == r_grind.grad_norm
     end
 
     @testset "line-search evaluation count is reported" begin

@@ -91,15 +91,16 @@ function find_ground_state_lbfgs(;
     # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
-    max_line_search_failures::Int=3,  # consecutive α=0 line searches that end the
-    # solve. A failure empties the curvature history, so the NEXT iteration is
-    # steepest descent with a bounded expansion in front of it: if that also
-    # finds no energy decrease over 30 halvings, the iterate is at the
-    # energy-comparison floor and no further step exists to be found. Before
-    # this existed the solver ran to `n_steps` regardless, at ~30 futile energy
-    # evaluations each — measured 97.8 % of 2000 steps on Eu-151 F=6 24³ at the
-    # default `tol=1e-8`, whose gradient floor is 5e-7. Set `typemax(Int)` to
-    # restore the old behaviour.
+    stop_at_floor::Bool=true,   # end the solve when a STEEPEST-DESCENT line
+    # search finds no acceptable step. That is not a heuristic: such a failure
+    # leaves ψ, `grad` and `E` untouched and the curvature history empty, so the
+    # next iteration forms the same direction from the same gradient with the
+    # same `E0` and repeats the same evaluations to the same answer, forever.
+    # The iterate is a fixed point of the loop and nothing further can be found.
+    # Without this the solver ran to `n_steps` regardless: measured 97.8 % of
+    # 2000 steps on Eu-151 F=6 24³ at the default `tol=1e-8`, ~30 futile energy
+    # evaluations each, because that problem's gradient floor is 5e-7. Set
+    # `false` to restore the old behaviour.
     lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
     # two-loop (ε-continuation threads it across rungs so
     # each rung reuses curvature instead of restarting SD).
@@ -229,7 +230,6 @@ function find_ground_state_lbfgs(;
     # backtrack in front of it, which is what a ~30 evals/iteration average
     # means.
     n_line_search_failures = 0
-    consecutive_ls_failures = 0
     stalled = false
     t_start = time()
 
@@ -290,22 +290,27 @@ function find_ground_state_lbfgs(;
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
             n_line_search_failures += 1
-            consecutive_ls_failures += 1
             empty!(s_hist);
             empty!(y_hist);
             empty!(rho_hist)
             E_prev = E
             last_step = step
-            if consecutive_ls_failures >= max_line_search_failures
+            # A failure along the STEEPEST-DESCENT direction is conclusive: ψ,
+            # `grad` and `E` are untouched and the history is now empty, so the
+            # next iteration rebuilds this exact direction from this exact
+            # gradient and repeats these exact evaluations. Continuing cannot
+            # produce a different answer. (A failure along an L-BFGS direction
+            # is NOT conclusive — the reset to steepest descent is a genuinely
+            # different attempt, and it often succeeds.)
+            if stop_at_floor && is_sd
                 stalled = true
                 verbose && @printf(
-                    "  Stalled at the energy-comparison floor: %d consecutive line searches found no decrease. |∇E|=%.3g\n",
-                    consecutive_ls_failures, grad_norm)
+                    "  Stopped at the energy-comparison floor: steepest descent finds no decrease, so no later step can. |∇E|=%.3g\n",
+                    grad_norm)
                 break
             end
             continue
         end
-        consecutive_ls_failures = 0
 
         # Step + retraction: both were already performed inside the line search
         # at the accepted α (that is what it evaluated the energy of), so take
