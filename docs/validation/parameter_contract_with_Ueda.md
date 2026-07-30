@@ -458,41 +458,45 @@ window edges the Gaussian kernel is truncated, and the width is measured against
 an endpoint baseline. Do not read the width column of this table as a result; the
 honest statement is that 1 nT of jitter does not close a 1.4 nT width gap.
 
-**The atom-number deficit.** Summing the experimental sheet at 5 ms gives a total
-that runs from 45.8k in the wings to 27.6k at the dip — 8 % to 45 % below 5×10⁴,
-**deepest exactly where the dip is**. Fig. 4B plots absolute `N_{−6}`, so this
-sits inside the compared quantity while both simulations conserve atom number.
-Normalising it away changes the measured dip remarkably little (centre −3.205 →
-−3.139, width 12.84 → 12.41), so the deficit is **not** what separates the
-experiment from the simulations in shape — but it does mean the absolute
-comparison Fig. 4B draws is between a lossy measurement and a lossless model.
+**The atom-number deficit is a detection systematic, not loss.** Summing the
+Fig. 4B experimental sheet at 5 ms gives a total running from 45.8k in the wings
+to 27.2k at the dip — 8 % to 45 % below 5×10⁴, deepest exactly where the dip is.
+That is **not** atom loss, and their own data says so:
 
-`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values to test
-whether three-body loss can produce that deficit at all. **It cannot** (UGE
-8304841 task 5, commit `0e78456e`, exit 0, 135 points):
+- `dataset_figs3.csv` is their trap-lifetime measurement, 4 repeats. `N(0) =
+  54396`, `N(1.6 s)/N(0) = 0.532` ⇒ **1/e time 2.54 s**, i.e. **0.20 % loss in
+  5 ms**. Even taking the whole 0 → 1.6 s drop as a linear rate — an
+  over-estimate for a decaying-rate curve — gives 80 atoms, 0.15 %.
+- 45 % in 5 ms would require an 8.4 ms lifetime, **303× faster than they
+  measured themselves**.
+- Our own lossy scan lands on the real number: 0.27–0.44 % at the published
+  `K₃`, against the 0.20 % their S3 implies.
 
-| `K₃` [cm⁶/s] | atom loss at 5 ms, over −12.5 … +9 nT | dip centre | width |
+What the deficit actually tracks is **how far the population has spread across
+the Stern-Gerlach spots**. Over the 61 measured fields, the correlation between
+the reported total and the number of components carrying > 2 % of it is
+**−0.935**:
+
+| B [nT] | reported total | components > 2 % | columns reported negative |
 |---|---|---|---|
-| 1.2×10⁻²⁹ (Miyazawa 2021 direct) | 0.27 – 0.44 % | −2.146 | 14.63 |
-| 3.6×10⁻²⁹ (3×) | 0.80 – 1.31 % | −2.161 | 14.08 |
-| 1.2×10⁻²⁸ (10×, above anything measured) | 2.61 – 4.25 % | −2.213 | 14.07 |
-| *measurement* | **8 – 45 %** | −3.205 | 12.84 |
+| −17.50 | 41954 | 4 | 2 |
+| −8.17 | 31406 | 9 | 2 |
+| −5.83 | **27187** | **10** | 1 |
+| +8.17 | 45039 | 3 | 3 |
+| +17.50 | 45595 | 2 | 5 |
 
-Even ten times the larger published `K₃` removes **4 %** of the atoms in 5 ms
-against a measured deficit of up to **45 %**, an order of magnitude short, and
-the field-dependence is flat where the measurement's is strongly peaked at the
-dip. **Condensate three-body loss is not what the experimental atom-number
-deficit is.** Detection (Stern-Gerlach separation and counting across 13 spots,
-which gets harder exactly when the population spreads — i.e. at the dip),
-thermal fraction, or shot-to-shot preparation are the places left to look; this
-run does not distinguish among them.
+Spread the same atoms over ten faint, broad spots instead of two bright ones and
+each fit under-counts; several columns come back **negative**, which is
+background subtraction, not physics. So Fig. 4B compares an absolute `N_{−6}`
+carrying a field-correlated counting bias against two simulations that carry
+none.
 
-The dip itself is nearly insensitive: 10× `K₃` moves the centre by 0.07 nT and
-the width by 0.6 nT. Adding loss does not reconcile our curve with theirs.
-
-(The first scan point is anomalous again — 4.2 % loss and an off-trend
-population at −13 nT where every other field gives 0.27 % — the same
-first-point-of-a-scan defect. It is excluded from the ranges above.)
+It does **not** rescue our gap. Normalising it away moves the measured dip very
+little (centre −3.205 → −3.139, width 12.84 → 12.41), because the bias is
+largely common to the numerator and the total. And since the brightest spot
+(`m = −6`) is the one under-counted *least*, the fraction is if anything biased
+*up* at the dip — which is the direction that makes the measured dip shallower
+than truth, not deeper.
 
 #### Fig. 2C — the loss-free time series
 
