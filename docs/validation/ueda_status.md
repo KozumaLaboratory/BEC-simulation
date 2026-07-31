@@ -111,7 +111,7 @@ do not interpret any Eu run as "validated against the Ueda code."
 
 ### Concrete candidates for criteria 2 / 3 (2026-05-26 research)
 
-Survey in `runs/_loop/research/cross_code_benchmark_alternatives_T1.md`.
+Survey in `runs/_loop/research/cross_code_benchmark_alternatives_T1.md` (archived).
 None covers the F=6 + DDI + 3D setting fully, but partial cross-checks
 are feasible:
 

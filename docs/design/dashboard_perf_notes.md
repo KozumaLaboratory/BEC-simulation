@@ -56,7 +56,7 @@ The atlas worker already transfers the `Float32Array` buffers zero-copy via `pos
 
 ## Disk-cache layout
 
-Atlases are persisted to `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`. Stale check: if the source `.jld2` mtime is newer than the cache file, the cache is silently rebuilt. To wipe everything, `rm -rf runs/_dashboard_cache`.
+Atlases are persisted to `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Stale check: if the source `.jld2` mtime is newer than the cache file, the cache is silently rebuilt. To wipe everything, `rm -rf runs/_dashboard_cache` (example).
 
 ## Bench targets (Klaus F=8, 64×64×32, 157 snaps)
 

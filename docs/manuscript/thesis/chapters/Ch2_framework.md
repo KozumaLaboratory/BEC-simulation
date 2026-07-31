@@ -376,7 +376,7 @@ WSL2: `LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. ...`。
 `result.jld2` は追跡されていない。
 
 - `runs/F6_phase_diagram/` Eu phase diagram (paper3 §V.D, Ch.6 §6.1-6.5) — dir はあるが `config.yaml` は無い
-- `runs/lhy_mode_ablation/` LHY-insufficiency (Ch.5 §5.2, T3.1) — **ディレクトリごと不在、履歴にも無し**。§5.2 の表は再チェック不能
+- `runs/lhy_mode_ablation/` (gone) LHY-insufficiency (Ch.5 §5.2, T3.1) — **ディレクトリごと不在、履歴にも無し**。§5.2 の表は再チェック不能
 - `runs/twa_N_scan_pinned_16g/` Sinatra-clean 1/N test (Ch.5 §5.5, T3.2)
 - `runs/twa_eps_dd_scan/` species universality (Ch.5 §5.6)
 - (etc.)

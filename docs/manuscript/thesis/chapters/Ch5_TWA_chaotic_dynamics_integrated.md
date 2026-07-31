@@ -102,10 +102,10 @@ SpinorBEC.jl supports 5 LHY treatment modes (via `spinor_lhy:` YAML key):
 
 ### 5.2.2 Eu collapse test config
 
-Config: `runs/lhy_mode_ablation/`. Eu F=6, $a_s = 110\,a_B$, $N = 10^4$, 32³ box=10,
+Config: `runs/lhy_mode_ablation/` (gone). Eu F=6, $a_s = 110\,a_B$, $N = 10^4$, 32³ box=10,
 ITP to convergence. Variable: `spinor_lhy` setting only.
 
-> **その config は git に一度も入っていない (2026-07-31)。** `runs/lhy_mode_ablation/`
+> **その config は git に一度も入っていない (2026-07-31)。** `runs/lhy_mode_ablation/` (gone)
 > は履歴上どの commit にも存在しない — 誰かの作業ツリーにあり、本文が引用し、
 > 引用だけが残った。**したがって下表の 5 行は再チェック不能**であり、古いのではなく
 > **辿れない**。stale な run なら特定して日付を付けて失格にできるが、これはできない。
@@ -227,10 +227,10 @@ Visualization: Round-3 Task 5 dashboard panel (3D variance overlay).
 
 | Sweep | configs path | 主結果 |
 |---|---|---|
-| LHY-mode ablation | `runs/lhy_mode_ablation/` | LHY-insufficient (§5.2) |
+| LHY-mode ablation | `runs/lhy_mode_ablation/` (gone) | LHY-insufficient (§5.2) |
 | Coupling N scan (32³) | `runs/twa_N_scan/` | Findings A/B (§5.4) |
 | Species ε_dd scan | `runs/twa_eps_dd_scan/` | trend confirmed (§5.6) |
-| Sinatra check (32³ + 2×16³) | `runs/twa_sinatra/` | GS-resolution artifact (§5.7) |
+| Sinatra check (32³ + 2×16³) | `runs/twa_sinatra/` (gone) | GS-resolution artifact (§5.7) |
 | Pinned 1/N at 16³×box=10 | `runs/twa_N_scan_pinned_16g/` | 1/√N fails (§5.5) |
 
 すべて `runs/*.config.yaml` + `result.jld2` で repository-tracked。
@@ -396,11 +396,11 @@ chaos, not species-specific quantum fluctuation.
 
 ### 5.7.1 May-7 Sinatra check の anomaly
 
-`runs/twa_sinatra/` で実施した systematic Sinatra criterion test:
+`runs/twa_sinatra/` (gone) で実施した systematic Sinatra criterion test:
 
 > **引用先が違ううえ、下表の数値が出典と合わない (2026-07-31)。**
 >
-> 1. `runs/twa_sinatra/` は git に一度も存在しない。実際の出力は CAS ディレクトリ
+> 1. `runs/twa_sinatra/` (gone) は git に一度も存在しない。実際の出力は CAS ディレクトリ
 >    `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2` で、これは
 >    [`twa_sinatra_validation.md`](../../../research_notes/twa_sinatra_validation.md)
 >    に書かれている。ディレクトリ名そのものが誤り。

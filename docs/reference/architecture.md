@@ -198,7 +198,7 @@ For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_
 | `/api/lab/list?run=…`           | lab images uploaded for `<run>`                |
 | `/api/lab/image` (POST)         | upload a `.png` lab image into a run dir       |
 
-Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`. Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
+Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
 
 ## I/O (`workflow/io/`)
 
