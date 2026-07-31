@@ -84,6 +84,32 @@ else
     toggle-flipping predecessors — `SPIN_TAYLOR_ENABLED`,
     `COMBINED_SPIN_STEP_ENABLED`, `MEANFIELD_MIDPOINT_ENABLED` — so this is a
     robustness fix to the CLAIM, not a diagnosed root cause.)
+
+    Six further reproduction attempts, each with a positive control, all came
+    back bit-identical, so none of these is the mechanism either. Listed so the
+    next reader does not spend the jobs again:
+
+      - GPU memory pressure, down to 0.82 GiB free of 46 (cuFFT plan selection
+        is workspace-dependent, so this was the leading guess).
+      - Device model: green standalone on both `gpu_h` and `gpu_1`, and the
+        red run was `gpu_1`.
+      - The file that actually preceded it in that worker — the queue is
+        heaviest-first and on-demand, so only `workflow/test_experiment.jl`
+        (205 s, queue item 1) ran before it. Replayed in one process: green.
+      - Global accuracy knobs: none of worker 1's other twelve files writes
+        one.
+      - GPU COMPUTE contention: eleven concurrent CUDA processes, 100 %
+        utilisation, this file 57.5 s against 42.7 s alone — so it really was
+        contending — and still bit-identical. (The load has to be
+        preallocated; the first attempt allocated per iteration, took the
+        device to 95 GiB and made the test fail with "Out of GPU memory",
+        which is an OOM masquerading as a physics result.)
+      - The suite harness itself: run through `run_test_files`, i.e. inside the
+        outer `@testset` that installs its own RNG rather than a bare
+        `include`. 15/15.
+
+    What is left, and untried, is eleven concurrent *SpinorBEC* processes doing
+    FFT and DDI work on the one device — not eleven GEMM loops.
     """
     function _agree(a, b)
         scale = max(maximum(abs, a), maximum(abs, b))
