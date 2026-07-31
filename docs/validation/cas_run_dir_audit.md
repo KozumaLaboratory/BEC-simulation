@@ -62,11 +62,21 @@ Positive control on `fig4b_scan_n32.yaml`: every deep perturbation moves the id,
 including `dt` by 1 part in 10⁷ and a box edge by 6 parts in 10⁵. It also moves
 on `metadata.target`, which is over-sensitivity again — safe direction.
 
-## What should change
+## Fixed, 2026-07-31
 
-- **Fold the producing commit into the run-directory key**, or refuse to skip
-  cached points when `git rev-parse HEAD` differs from the snapshot's
-  `env.git_hash`. Today the second is recorded and not checked.
-- **Widen the suffix** from 8 to 16 hex, matching commitment #4.
-- Either make `run_yaml` use `content_id(spec)` or state plainly in CLAUDE.md
-  that it does not — right now the commitment reads as if it does.
+- **Cached points now require matching provenance.** `_assert_point_provenance`
+  refuses to reuse a `point_*.jld2` unless its recorded `env.git_hash` equals
+  the current one with neither tree dirty. A point file with no provenance at all
+  — every one written before today — is refused too, since unknown provenance is
+  exactly the case this exists for. Override with
+  `SPINORBEC_ALLOW_STALE_POINTS=1`, which is right for a docs-only commit and
+  wrong for anything else. Folding the commit into the *directory key* was the
+  alternative and was rejected: it would orphan a 12-hour run on a typo fix.
+- **The suffix is 16 hex**, matching commitment #4. Every future directory is
+  renamed, so runs cached under the old 8-hex name are recomputed once.
+- **CLAUDE.md commitment #4 now describes both mechanisms** instead of reading as
+  if `run_yaml` used `content_id`.
+- Gated by `test/workflow/test_run_dir_provenance_gate.jl` (tier `fast`), whose
+  first assertion is the positive control — a matching clean provenance must be
+  ALLOWED, or every other assertion would pass against a gate that rejects
+  everything.
