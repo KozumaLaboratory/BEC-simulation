@@ -154,7 +154,7 @@ function compute_spinor_lhy_table(;
         n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
         n_max > 0 || throw(ArgumentError("n_max must be positive"))
         n_atoms >= 1 || throw(ArgumentError("n_atoms must be >= 1"))
-        eps_1, _ = _lhy_bdg_energy_density(spinor, 1.0, F, interactions, zeeman,
+        eps_1 = _lhy_bdg_energy_density(spinor, 1.0, F, interactions, zeeman,
             c_dd, k_max, n_k, n_dir; rtol)
         densities = collect(range(0.0, n_max; length=n_points))
         # `/ n_atoms` for the same reason `_tabulate_lhy` divides: `g` comes from
@@ -168,10 +168,8 @@ function compute_spinor_lhy_table(;
     end
 
     _tabulate_lhy(FullBdGLHY; n_max, n_points, n_atoms) do n0
-        first(
-            _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman,
-                c_dd, k_max, n_k, n_dir; rtol),
-        )
+        _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman,
+            c_dd, k_max, n_k, n_dir; rtol)
     end
 end
 
@@ -386,8 +384,8 @@ function _lhy_k_panel(C, B, D::Int, a::Float64, b::Float64, n::Int,
 end
 
 """
-    _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
-                            k_max, n_k, n_dir) → (ε_LHY, max_growth)
+    _lhy_bdg_energy_and_growth(spinor, n0, F, interactions, zeeman, c_dd,
+                               k_max, n_k, n_dir) → (ε_LHY, max_growth)
 
 `ε_LHY(n₀)` for the given spinor — UV-subtracted BdG zero-point energy density,
 spherically averaged over `k̂` when the DDI is active — together with
@@ -402,7 +400,7 @@ tabulated `full_bdg` from an unrelaxed seed at max Im ω = 1040, reported
 the warning that said so had been eaten by a log filter. See
 [`lhy_mean_field_max_growth`].
 """
-function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
+function _lhy_bdg_energy_and_growth(spinor, n0, F, interactions, zeeman, c_dd,
     k_max, n_k, n_dir; rtol::Float64=1e-4, max_refine::Int=5)
     D = 2F + 1
     nd = _lhy_n_dir(rtol, c_dd, n_dir)
@@ -524,6 +522,17 @@ function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
 end
 
 """
+    _lhy_bdg_energy_density(args...; kwargs...) → Float64
+
+`ε_LHY` alone. The body computes it together with `max Im ω`, so the pair-returning
+[`_lhy_bdg_energy_and_growth`] is the real function and this is its projection —
+which is why this is one line rather than a second declaration of the same physics.
+Every caller that only wants the energy keeps this name and this signature.
+"""
+_lhy_bdg_energy_density(args...; kwargs...) =
+    first(_lhy_bdg_energy_and_growth(args...; kwargs...))
+
+"""
     lhy_mean_field_max_growth(; F, spinor, n0, interactions, zeeman, c_dd, rtol) → Float64
 
 `max Im ω` of the Bogoliubov spectrum for this mean field: zero when it is
@@ -535,7 +544,7 @@ counterterms still subtract all `D` of them — so `full_bdg` cannot serve as an
 accuracy reference there and neither can any closed form. The ITP has nothing to
 converge to, and no tolerance fixes that.
 
-The same number drives the `@warn` in `_lhy_bdg_energy_density`, but a
+The same number drives the `@warn` in `_lhy_bdg_energy_and_growth`, but a
 `maxlog`-limited warning is not something a caller can ASK, and it is something a
 log filter can eat — which is exactly how a phase-gap budget spent two rounds
 reporting "unconverged" and then "blocked on #172" while running at
@@ -544,7 +553,7 @@ max Im ω = 1040 (2026-07-30).
 function lhy_mean_field_max_growth(; F::Int, spinor, n0::Real=1.0,
     interactions::InteractionParams, zeeman=ZeemanParams(), c_dd::Real=0.0,
     rtol::Float64=1.0e-4)
-    _, g = _lhy_bdg_energy_density(spinor, Float64(n0), F, interactions, zeeman,
+    _, g = _lhy_bdg_energy_and_growth(spinor, Float64(n0), F, interactions, zeeman,
         Float64(c_dd), nothing, nothing, nothing; rtol)
     g
 end
