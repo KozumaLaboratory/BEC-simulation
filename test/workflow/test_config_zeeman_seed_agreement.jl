@@ -20,6 +20,7 @@
 # Scope: only configs that pin a fully-stretched seed AND set a non-zero B_z.
 # Everything else is a legitimate choice and is not the business of this test.
 
+using SpinorBEC
 using Test
 using YAML
 

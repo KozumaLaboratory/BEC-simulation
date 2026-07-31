@@ -25,6 +25,7 @@
 # direction: an entry that starts resolving must be removed from the list, or the
 # list rots into a permanent excuse the way a stale KNOWN-LIMIT does.
 
+using SpinorBEC
 using Test
 
 const _DOCS = joinpath(@__DIR__, "..", "..", "docs")

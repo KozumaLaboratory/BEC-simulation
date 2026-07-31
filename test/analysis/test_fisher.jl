@@ -1,6 +1,7 @@
 using Test
 using LinearAlgebra
 using Random
+using SpinorBEC
 using SpinorBEC: fisher_jacobian, fisher_information, identifiable_directions
 
 @testset "Fisher information utilities" begin
