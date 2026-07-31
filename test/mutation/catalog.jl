@@ -191,16 +191,17 @@ const MUTANTS = Mutant[
     # touching a Hamiltonian term, so no term-level oracle can see it.
     Mutant(:atom_eu_g_f_swaps_I_and_J,
         "src/workflow/initialization/atoms.jl",
-        r"lande_g_factor\(6, 5 // 2, 7 // 2; g_J=_EU_G_J\)",
-        "lande_g_factor(6, 7 // 2, 5 // 2; g_J=_EU_G_J)",
+        r"lande_g_factor\(6, 5 // 2, 7 // 2; g_J=_EU_G_J\);   # was 7/12",
+        "lande_g_factor(6, 7 // 2, 5 // 2; g_J=_EU_G_J);   # was 7/12",
         :factor, :fatal,
         "the hand-typed 7/12·g_J this line replaced",
         "Swaps the nuclear and electronic spins in Eu151's Landé factor, so \
          g_F is wrong and every Zeeman energy, every B→p conversion and the \
          auto-derived q scale with it. The value stays plausible, which is how \
          the hand-typed 7/12·g_J survived. Anchored on the Eu151 line \
-         specifically: Eu153 repeats every constant, so a bare match is not \
-         unique."),
+         specifically — via the trailing comment, since Eu153 repeats every \
+         constant and the bare call matches twice. The harness refused to run \
+         until that was fixed, which is the anchor mechanism working."),
     Mutant(:thermal_seed_drops_the_quarter,
         "src/workflow/initialization/thermal_noise.jl",
         r"    sqrt\(T_over_Tc\^3 / 4\)",

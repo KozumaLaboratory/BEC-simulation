@@ -11,7 +11,7 @@
 # this uses its own checkout (`bec-mutation`) and not the shared one.
 #
 #   qsub -g tga-kozuma-kouhi \
-#        -v MUT_PROBE=<probe-spec>,MUT_MUTANTS=<id,id,…>,MUT_TAG=<name> \
+#        -v MUT_PROBE=<spec+spec>,MUT_MUTANTS=<id:id:…>,MUT_TAG=<name> \
 #        scripts/tsubame/submit_mutation.sh
 #
 # Everything it writes lands under /gs/fs (group volume), never $HOME.
@@ -39,9 +39,11 @@ export SPINORBEC_FFT_ESTIMATE=1
 export OPENBLAS_NUM_THREADS=1
 
 # UGE's `-v` separates variables with commas, and both the probe spec and the
-# mutant list are themselves comma-separated. Colons are the wire format on the
-# qsub side and are translated here rather than fought with quoting.
-MUT_PROBE=${MUT_PROBE//:/,}
+# mutant list are themselves comma-separated, so each has a wire format that
+# avoids the comma. They are NOT the same character: `dir:` is part of the probe
+# grammar, and translating colons there turned `dir:workflow` into
+# `dir,workflow` — a spec matching no branch (2026-07-31).
+MUT_PROBE=${MUT_PROBE//+/,}
 MUT_MUTANTS=${MUT_MUTANTS//:/,}
 
 mkdir -p "$OUT"
