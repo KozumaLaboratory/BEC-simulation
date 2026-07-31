@@ -14,10 +14,10 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: _canonicalize_b_to_dimless_xyz, get_atom
+using SpinorBEC: _canonicalize_b_to_dimless_xyz, resolve_atom
 
 @testset "B-block spherical angles are degrees" begin
-    atom = get_atom(:Rb87)
+    atom = resolve_atom(:Rb87)
     ω_ref = 2π * 100.0
     dur = 1.0
 

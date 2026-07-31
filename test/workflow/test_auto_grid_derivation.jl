@@ -16,22 +16,29 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: _auto_grid_from_physics, _DEFAULT_TF_BOX_SAFETY, _DEFAULT_TF_NYQUIST
+using SpinorBEC: _auto_grid_from_physics, _DEFAULT_TF_BOX_SAFETY, _DEFAULT_TF_NYQUIST,
+    resolve_atom
 
 @testset "auto_grid derivation" begin
     # A ground-state step as the schema hands it over: isotropic trap, so every
     # axis gets the same radius and the arithmetic is checkable by hand.
+    # The keys `_auto_grid_from_physics` actually reads. It returns a FALLBACK
+    # grid when they are absent, so a test built on a guessed shape passes
+    # against any defect — the first version of this file did exactly that, and
+    # the N-ratio row below is what caught it.
     _step(; n_atoms=1.0e5, omega=[1.0, 1.0, 1.0]) = Dict{Any, Any}(
         "atom" => "Rb87",
-        "interactions" => Dict{Any, Any}(
-            "n_atoms" => n_atoms, "omega_ref" => 2π * 100.0, "omega" => omega),
+        "N_atoms" => n_atoms,
+        "omega_ref" => 2π * 100.0,
+        "potential" => Dict{Any, Any}("omega" => omega),
     )
+    _FALLBACK_BOX = 12.0            # what the function returns when its keys are absent
 
     _rtf(step) = begin
-        atom = get_atom(:Rb87)
-        ω_ref = step["interactions"]["omega_ref"]
+        atom = resolve_atom(:Rb87)
+        ω_ref = step["omega_ref"]
         a_ho = sqrt(SpinorBEC.Units.HBAR / (atom.mass * ω_ref))
-        N = step["interactions"]["n_atoms"]
+        N = step["N_atoms"]
         μ = 0.5 * (15.0 * N * atom.a_s / a_ho)^(2 / 5)
         sqrt(2μ)                                    # ω = 1 on each axis
     end
@@ -40,6 +47,8 @@ using SpinorBEC: _auto_grid_from_physics, _DEFAULT_TF_BOX_SAFETY, _DEFAULT_TF_NY
         step = _step()
         g = _auto_grid_from_physics(step)
         R = _rtf(step)
+        # Positive control: prove we are on the derivation path at all.
+        @test g["box"][1] != _FALLBACK_BOX
         # The margin is the whole point: a box at R puts the cloud edge on the
         # wall. Asserted as the ratio, not the value, so retuning the constant
         # does not require editing a number here — but a box AT the radius does.

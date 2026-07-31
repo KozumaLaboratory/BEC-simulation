@@ -29,7 +29,7 @@ using SpinorBEC: ErrorBudget, NegligibleErrorSpec, check
 
     @testset "control breaches ⇒ a real verdict" begin
         r = check(spec, _budget(1.0e-2))          # 10× the bound
-        @test r.status == true
+        @test r.status == :pass
     end
 
     @testset "control does NOT breach ⇒ indeterminate, not a pass" begin
@@ -37,14 +37,14 @@ using SpinorBEC: ErrorBudget, NegligibleErrorSpec, check
         # thing that changed is that the comparison can no longer fail.
         r = check(spec, _budget(1.0e-9))
         @test r.status == :indeterminate
-        @test r.status != true
-        @test occursin("cannot fail", r.message)
+        @test r.status != :pass
+        @test occursin("cannot fail", r.summary)
     end
 
     @testset "a failing approximation still fails" begin
         b = ErrorBudget(; label="probe", baseline=base,
             approximation=1.0e-2, control=1.0e-2)
-        @test check(spec, b).status == false
+        @test check(spec, b).status == :fail
     end
 
     @testset "a zero baseline is indeterminate too" begin
