@@ -340,6 +340,37 @@ const MUTANTS = Mutant[
         "'the operator-RHS diff is meaningless without Hψ'",
         "Writes an operator-RHS bundle with no Hψ in it, so the Level-10 A/B diff \
          later compares nothing and reports agreement."),
+    # ── analysis: the observables themselves ─────────────────────────
+    # Added 2026-07-31. Everything above mutates the Hamiltonian or the workflow;
+    # nothing asked whether the OBSERVABLES that read a state are right. These
+    # break the three that every result is quoted in terms of.
+    Mutant(:magnetization_m_index_flipped,
+        "src/analysis/observables/density_spin.jl",
+        r"        Mz \+= m \* sum\(abs2, view\(psi, idx\.\.\.\)\) \* dV",
+        "        Mz -= m * sum(abs2, view(psi, idx...)) * dV",
+        :sign, :fatal,
+        "CLAUDE.md layout: `c=1 → m=F`, `c=D → m=−F`",
+        "Flips the sign of ⟨F_z⟩ for every state. Every magnetisation, every \
+         m-resolved population plot and every Zeeman directional claim is read \
+         through this one sum."),
+    Mutant(:probability_current_sign,
+        "src/analysis/currents.jl",
+        r"                j\[d\]\[I\] \+= imag\(conj\(psi_c\[I\]\) \* dpsi\[I\]\)",
+        "                j[d][I] -= imag(conj(psi_c[I]) * dpsi[I])",
+        :sign, :fatal,
+        "j = Im(ψ* ∇ψ) — the superfluid flow direction",
+        "Reverses every current, so a plane wave flows backwards and any \
+         circulation / vortex-charge readout changes sign. A magnitude-only test \
+         cannot see it."),
+    Mutant(:orbital_angular_momentum_sign,
+        "src/analysis/currents.jl",
+        r"            Lz \+= real\(conj\(psi_c\[I\]\) \* \(-im\) \* \(x \* dpsi_y\[I\] - y \* dpsi_x\[I\]\)\) \* dV",
+        "            Lz += real(conj(psi_c[I]) * (-im) * (y * dpsi_x[I] - x * dpsi_y[I])) * dV",
+        :sign, :fatal,
+        "⟨L_z⟩ = ∫ ψ*(-i)(x∂_y − y∂_x)ψ — the rotation-sense convention",
+        "Swaps the cross-product order, so ⟨L_z⟩ changes sign. The Coriolis sign \
+         oracle (+Ω ⇒ ⟨L_z⟩ > 0) and every vortex-chirality claim are read \
+         through it."),
 ]
 
 """
