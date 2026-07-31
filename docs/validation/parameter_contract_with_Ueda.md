@@ -323,9 +323,9 @@ Ancestor gate green on all 14 `fix_list.toml` refs. All four tasks exit 0.
 
 | | centre [nT] | half-depth width [nT] |
 |---|---|---|
-| **SpinorBEC 32³** (45 fields, −13 … +9 nT @ 0.5) | **−2.138** | **14.62** |
-| Matsui simulation, **same window, same metric** | −2.5495 | 12.7524 |
-| difference | **+0.41** | **+1.87 (+15 %)** |
+| **SpinorBEC 32³** (45 fields, −13 … +9 nT @ 0.5) | **−2.138** | **13.97** |
+| Matsui simulation, **same window, same metric** | −2.5495 | 12.75 |
+| difference | **+0.41** | **+1.22 (+9.6 %)** |
 | Matsui experiment (full window) | −3.2048 | 14.5414 |
 
 **Type C**, producing commit `f7433171`, gate `ci`
@@ -362,10 +362,10 @@ dip; it does not stretch one. Measured on the identical −13 … +9 nT window:
 |---|---|---|
 | Matsui experiment | 12.84 | — |
 | Matsui simulation | 13.07 | **+1.8 %** |
-| SpinorBEC 32³ | 14.62 | **+14 %** |
+| SpinorBEC 32³ | 13.97 | **+8.8 %** |
 
 On the one Fig. 4B quantity immune to their stated systematic, **their simulation
-agrees with their measurement an order of magnitude better than ours does**. That
+agrees with their measurement several times better than ours does**. That
 is weak evidence — one number, one observable — but it points at our side, not
 theirs. The paper reads the width as the spread of the dipole field over the
 cloud, so a 14 % wide dip says our field distribution is broader than the real
@@ -375,71 +375,106 @@ one.
 [−13, +9] with 42 sample points and 12.75 nT when the window edge falls one
 point differently. Quote it to two significant figures, not four.)
 
-**Therefore: fix our own known unknowns before attributing anything to them.**
-The task-3 plumbing defect means we have not measured how much of the 0.41 nT our
-own ground-state choice is worth, and §0.3.5 says that choice moves the peak
-density by 34 %. That has to be closed first.
+**Where that leaves it.** Everything cheap on our side has now been excluded:
 
-#### Resolution: the 32³ number is not resolution-limited
+| candidate | verdict |
+|---|---|
+| grid resolution | **excluded** — 64³ agrees with 32³ to 0.48 % worst-case |
+| ramp shape (linear vs their exponential) | **excluded** — worth 0.07 nT of 0.41 |
+| three-body loss | **excluded** — 10× `K₃` worth 0.07 nT, and the real loss is 0.2 % |
+| kernel conventions (`k=0` bin, truncation) | **excluded** — bounded at ~0.02 nT |
+| ground-state ambiguity (§0.3.5) | **does not exist** — polarised GS is degenerate in `c1_ratio` |
+| 1 nT field jitter | **excluded** — 0.05 nT |
+| the experiment's atom-number deficit | **not loss** — a counting systematic |
 
-Task 2 re-ran five of the fields at 64³ (`dx` 0.5 → 0.25 a_ho). `N_{m=−6}` at the
-matched fields:
+What is left is a **uniform ~20 % excess in how many atoms we move out of
+`m = −6`**, at every field (ratio 0.78–0.84 across the dip region) and on the
+same timescale in Fig. 2C. That is one number in the coupling, not a protocol
+difference. The two candidates that survive are something in the effective
+dipolar drive we have not found, and their own discretisation — a 2nd-order
+finite-difference Laplacian at 0.7 points per healing length, against our
+converged spectral result. The width evidence still tilts toward the first.
 
-| B [nT] | 32³ | 64³ | diff |
+#### Resolution: measured on the full grid, not inferred
+
+`fig4b_scan_n64.yaml` re-runs the **same 45 fields** at `dx` 0.5 → 0.25 a_ho
+(UGE 8307358 task 8, exit 0, 1297 s):
+
+| | centre [nT] | width [nT] |
+|---|---|---|
+| SpinorBEC 32³ | −2.138 | 13.97 |
+| SpinorBEC 64³ | **−2.145** | **13.96** |
+| Matsui simulation, [−12.5, +9] | −2.549 | 12.75 |
+
+Centre 0.007 nT apart, width 0.01 nT apart, and the **largest** point-wise
+difference in `N_{−6}` over the 44 uncorrupted fields is **0.48 %** (typically
+< 0.1 %). **The 32³ result is converged**, and the 0.40 nT centre gap and 1.21 nT
+width gap with their curve are not resolution.
+
+The under-resolution flagged in §0.6 is real for healing-length structure and
+does not reach this observable in 5 ms: the transfer is driven by the bulk mean
+field, and the bulk is resolved at 32³. Type A, `87cc221d`.
+
+(The earlier 6-field 64³ arm is superseded. Six fields chosen for a
+point-by-point check cannot bracket a dip, and `resonance_dip` on them returned
+−5.32 nT — an artefact of extrapolating a vertex across a 7.5 nT gap. It is
+recorded here only so nobody re-derives it and believes it.)
+
+#### The `point_001` defect is worse than reported, and it inflated our widths
+
+`point_001` of a multi-point scan does not merely carry the ground state as its
+top-level `psi`. Its **dynamics series carries the LAST scan point's result**:
+
+| scan | `N_{−6}` at B = −13 nT (point 001) | at B = +9 nT (point 045) |
+|---|---|---|
+| `fig4b_scan_n32` (linear ramp) | 36404.886940 | 36404.886940 |
+| `fig4b_theirramp_n32` | 36704.978256 | 36704.978256 |
+
+Agreement to ten digits at two fields whose published values differ by 13 %.
+Physically impossible; the first row of every B-scan in this document was the
+last row.
+
+The **centre is untouched** — it is a parabolic vertex through the minimum's two
+neighbours, 20 sample points away from either endpoint. The **width is not**,
+because its left half-depth level is measured against the endpoint baseline.
+Dropping the corrupted point:
+
+| | centre [nT] | width, all 45 | width, point 1 dropped |
 |---|---|---|---|
-| −4.0 | 10802.3 | 10803.34 | 0.010 % |
-| −3.0 | 10064.3 | 10062.07 | 0.022 % |
-| −2.5 | 9814.2 | 9810.98 | 0.033 % |
-| −2.0 | 9760.1 | 9759.75 | 0.004 % |
-| +5.0 | 23666.3 | 23679.31 | 0.055 % |
+| ours, linear 150 µs ramp | −2.138 | 14.62 | **13.97** |
+| ours, their exponential ramp | −2.208 | 14.77 | **14.02** |
+| Matsui simulation, [−12.5, +9] | −2.549 | — | **12.75** |
 
-**≤ 0.06 % across a 2× refinement**, on two independently built grids, FFT plans
-and padded DDI kernels. The under-resolution flagged in §0.6 is real for the
-healing-length structure but does not reach this observable in 5 ms: the transfer
-is driven by the bulk mean field, and the bulk is well resolved at 32³. The 0.41
-nT gap is physics or parameters, not the grid. **Type A**, `f7433171`.
+So our width excess is **+9.6 %**, not the +14 % reported earlier. Every width in
+this document is the point-1-dropped number from here on.
 
-Do **not** read a dip centre off task 2 itself. Six fields chosen for a
-convergence check do not bracket a dip, and `resonance_dip` applied to them
-returns −5.32 nT, which is an artefact of extrapolating a vertex across a 7.5 nT
-gap. It is reported here only so nobody re-derives it and believes it.
+#### Their ramp shape is not the explanation
 
-#### RETRACTED: there is no `c1_ratio` defect — the probe was degenerate
+`fig4b_theirramp_n32.yaml` replaces our 150 µs linear ramp with their
+`B(t) = (B_ini − B_fin)exp(−t/τ) + B_fin`, τ = 50 µs, built as a constant plus a
+piecewise-linear exponential tail sampled at τ/6.
 
-This section previously reported a confirmed plumbing defect, on the strength of
-`fig4b_gsvariant_n32.yaml` and `gs_c1ratio_probe.yaml` showing a converged
-ground-state energy that barely moved under a nominal 19× swing in `c₀`:
+The hypothesis was that their ramp needs 347 µs to fall within 10 nT of the
+target where ours is done at 150 µs, so we had been starting ~200 µs early out of
+5000 — and that a 200 µs head start would move their 90 % Fig. 2C landmark from
+1.129 ms to 0.929 against our measured 0.940.
 
-| `c1_ratio` | `c₀` | `c₁` | `c₀ + 36c₁` | converged `E` |
-|---|---|---|---|---|
-| 1/36 | 2343.633 | 65.101 | **4687.2663** | −910.6679 |
-| 0 | 4687.266 | 0 | **4687.2663** | −910.6698 |
-| 0.5 | 246.698 | 123.349 | **4687.2663** | −910.6692 |
+**It moves the centre by 0.07 nT** (−2.138 → −2.208, closing 17 % of the 0.41 nT
+gap) **and leaves the width unchanged** (13.97 → 14.02). The ramp is worth
+something and is worth using — it is their actual protocol — but it is not what
+separates the two curves.
 
-The last column is the answer. A fully polarised `m = −F` state feels only
-`c₀ + F²c₁`, and `interaction_params_from_constraint` **holds that sum fixed** —
-that is the `c₀ + 36c₁ = 4π(a_s/a_ho)N` constraint doing its job. The ground-state
-energy is *supposed* to be independent of `c1_ratio` here. **The knob was scanned
-along a direction the observable is degenerate in, and the flat result was the
-correct answer, not a defect.** UGE 8304841 task 6 stands; only its interpretation
-was wrong.
+What the point-by-point ratio shows instead is a **uniform** effect. Ours over
+theirs, at the same field:
 
-The error is the one the campaign charter warns about in the other direction:
-a control with no positive arm. Nothing in the probe would have moved even if the
-plumbing were perfect, so "it did not move" carried no information. **A knob-does-
-reach-the-solver test needs an observable that is not degenerate in the knob** —
-for `c1_ratio` that means a state with `|⟨F⟩| < F n`, or a direct read of
-`ws.interactions`, not a polarised ground-state energy.
+| B [nT] | −13 | −9 | −5 | −2 | 0 | +5 | +9 |
+|---|---|---|---|---|---|---|---|
+| ours / theirs | (corrupt) | 0.837 | 0.831 | 0.794 | 0.781 | 0.812 | 0.908 |
 
-Consequences of the retraction:
-
-- The Fig. 4B and Fig. 2C numbers above are **not** provisional for this reason.
-  Rows 3.2/3.3 stand as verified.
-- The §0.3.5 ground-state ambiguity **does not exist**: their `initial.f90` and
-  `time.f90` settings produce the same polarised ground state, as does every
-  `c1_ratio` on our side.
-- The 20 % rate excess and the 15 % width excess therefore **lose their leading
-  candidate explanation and remain unexplained.**
+**0.78–0.84 across the whole dip region.** We move ~20 % more atoms out of
+`m = −6` at every field — the same 20 % as the Fig. 2C rate excess, and not a
+shape difference. One number is wrong somewhere in the coupling, not the
+protocol.
 
 #### Experimental corrections that cost no compute
 
