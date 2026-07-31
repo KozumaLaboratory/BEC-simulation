@@ -118,16 +118,21 @@ SPINORBEC_TEST_WORKERS=auto SPINORBEC_TEST_TIER=fast \
 ```
 
 Tiers: `fast` (unit tests only), `ci` (fast + ITP/RTP integration),
-`full` (everything; default), `physics` (analytic validation only), and
-`oracles` (the cross-checking gates — sign conventions, GPU/CPU parity per
-term, energy-vs-gradient consistency — pulled out so they can run on their
-own). Membership is listed explicitly in `test/_tiers.jl`: a new test is
-added to a tier by hand rather than picked up by discovery, so nothing joins
-or leaves a tier silently.
+`full` (everything; default) and `physics` (analytic validation only), plus
+two derived views of the same files — `oracles` (the cross-checking gates:
+sign conventions, GPU/CPU parity per term, energy-vs-gradient consistency)
+and `integration` (the rest of `ci`: ground state, split-step, simulation,
+config/experiment plumbing). Membership is listed explicitly in
+`test/_tiers.jl`: a new test is added to a tier by hand rather than picked up
+by discovery, so nothing joins or leaves a tier silently.
 
-Per-push CI runs `fast` and `oracles` as separate jobs; the nightly workflow
-runs `full` with `SPINORBEC_RUN_HEAVY_YAML=true` to also cover the gated YAML
-integration blocks.
+Per-push CI runs `fast`, `oracles` and `integration` as three parallel jobs,
+which between them cover the whole `ci` tier without any one job paying for it
+serially. That the three still cover `ci` is itself a test —
+`test_tier_membership.jl` reads the tiers back out of the workflow file, so
+deleting a job turns the suite red instead of quietly shrinking coverage. The
+nightly workflow runs `full` with `SPINORBEC_RUN_HEAVY_YAML=true` to also cover
+the gated YAML integration blocks.
 
 Runner knobs (all read by `test/runtests.jl`):
 

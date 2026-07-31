@@ -180,6 +180,47 @@ jobs:
         with:
           coverage: false
 
+  integration:
+    name: Integration gates (tier=integration)
+    needs: changes
+    runs-on: ubuntu-latest
+    # The other half of the hole the `oracles` job was cut to close. `fast`
+    # gates FAST_TESTS and `oracles` gates every `test/oracles/` file, which
+    # left exactly CI_EXTRA's non-oracle files — ITP/RTP integration, ground
+    # state, split-step, config/experiment plumbing — running only in the
+    # nightly `full` job. A PR could break `solvers/test_ground_state.jl` and
+    # merge with three green checks.
+    #
+    # This runs JUST those files (tier=integration, derived from CI_EXTRA in
+    # test/_tiers.jl), so `fast` + `oracles` + `integration` between them cover
+    # the whole `ci` tier per PR without any single job paying ~30-45 min for
+    # it serially. test_tier_membership.jl reads the tiers back out of this
+    # file and fails if the three stop covering `ci`.
+    #
+    # These are integration tests, not unit tests: budget above the 15 min the
+    # sibling jobs use until a measured runtime says otherwise.
+    timeout-minutes: 30
+    env:
+      SPINORBEC_TEST_TIER: integration
+      SPINORBEC_TEST_WORKERS: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        if: needs.changes.outputs.code == 'true'
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+        if: needs.changes.outputs.code == 'true'
+        with:
+          # Shared with the `test` job — see the rationale on that job's cache step.
+          cache-name: julia-cache;workflow=${{ github.workflow }}
+      - uses: julia-actions/julia-buildpkg@v1
+        if: needs.changes.outputs.code == 'true'
+      - uses: julia-actions/julia-runtest@v1
+        if: needs.changes.outputs.code == 'true'
+        with:
+          coverage: false
+
   format:
     name: JuliaFormatter check
     needs: changes
