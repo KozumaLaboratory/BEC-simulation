@@ -111,6 +111,9 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    # energy and gradient must come from the SAME DDI kernel; test_ddi_padded.jl
+    # never calls either face
+    "hamiltonian/test_ddi_gradient_padding_parity.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
@@ -207,6 +210,10 @@ const CI_EXTRA = [
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
+    # so the type-C target cannot drift when the fixture or the metric changes.
+    # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
+    "validation/test_matsui_fig4_dip.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -342,6 +349,7 @@ const CI_EXTRA = [
     # reached a committed json, a figure and two claims before anyone noticed.
     "oracles/test_lhy_config_validity_domain.jl",
     "oracles/test_full_bdg_config_stability.jl",
+    "oracles/test_doc_run_citations_resolve.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
@@ -454,6 +462,9 @@ const FULL_EXTRA = [
     # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
     # a green ci tier says nothing about it.
     "gpu/test_gpu_ddi_contraction_parity.jl",
+    # the padded DDI GRADIENT face reads a strided corner view of Phi_*_pad;
+    # the contraction gate above stops before apply_operator!
+    "gpu/test_gpu_ddi_gradient_padding_parity.jl",
     # The fused diagonal kernel with a TABULATED LHY against the generic
     # broadcast propagator it replaces. Every production Eu run is tabulated and
     # every one of them took the fallback; GPU-only.

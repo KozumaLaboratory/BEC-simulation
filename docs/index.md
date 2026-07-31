@@ -62,6 +62,7 @@ docs/
 | Single TWA scan, raw data | `research_notes/twa_*_result.md` |
 | F=6 phase boundary scan | `research_notes/F6_phase_boundaries.md` |
 | Eu collapse + LHY ablation | `research_notes/eu_collapse_lhy_insufficient.md` |
+| Evaporative cooling to BEC (0-D truncated-Boltzmann model) | `research_notes/evaporation_bec_prep_model_2026-06-15.md` |
 | Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
 | Whether a stored `runs/` result can still be quoted | `validation/stored_results_vintage_audit.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
