@@ -33,6 +33,7 @@ function report(rows; io::IO=stdout)
     rows = collect(rows)
     isempty(rows) && (println(io, "[report] no rows"); return nothing)
     arms = unique(r.arm for r in rows)
+    hasarm(a) = a in arms
     BS = sort(unique(r.B for r in rows))
     at(arm, B) = rows[findfirst(r -> r.arm == arm && r.B == B, rows)]
 
@@ -108,10 +109,39 @@ function report(rows; io::IO=stdout)
         end
     end
 
+    # The pad candidate is decided by the classification table above, so answer it
+    # there — explicitly, because "read the table" is how a question goes
+    # unanswered for six runs.
+    let cand = "candidate: ddi_pad_factor 1.5", base = "production (Taylor, polar_contact)"
+        if cand in arms && base in arms
+            flips = [B for B in BS if at(cand, B).distinct != at(base, B).distinct]
+            println(io, "\n[pad 1.5] does the only measured speedup change the classification?")
+            if isempty(flips)
+                println(io, "  No — same class as production at all $(length(BS)) B points. Its 1.9e-2")
+                println(io, "  residual is 4.4× what pad 2 already carries, so the budget rule still")
+                println(io, "  rejects it; this says the rejection costs no ANSWER, not that it is wrong.")
+            else
+                println(io, "  YES at $(length(flips)) point(s): $(join(flips, ", ")). That is an accuracy floor")
+                println(io, "  stated in the units the claims are made in — pad 1.5 is not admissible")
+                println(io, "  for this observable regardless of what it saves.")
+            end
+        end
+    end
+
     println(io)
     ref = [at(REF_ARM, B) for B in BS]
     usable = [i for i in eachindex(BS)
               if ref[i].conv && ref[i].distinct && (ref[i].growth == 0)]
+    if length(usable) < 2 && all(r -> r.growth != 0, ref)
+        println(io, """[verdict] The reference arm has NO usable B point and STRUCTURALLY cannot:
+`max Im ω ≠ 0` at every point, and `bench/lhy_stability_scan.jl` shows that is the
+DIPOLE — c_dd = 0 gives exactly 0, every nonzero c_dd is unstable at every c₁, q
+and density scanned. So ε_LHY is scheme-dependent here for `full_bdg` and for the
+closed forms alike, and no tolerance, seed or step count reaches a reference. Stop
+re-running this expecting the reference arm to become usable; read the
+[classification] and [pad 1.5] sections above, which do not need one.""")
+        return nothing
+    end
     if length(usable) < 2
         println(io, """[verdict] The reference arm has $(length(usable)) usable B point(s) — a point is
 usable only if BOTH seeds converged, ended in DIFFERENT winding classes, AND the

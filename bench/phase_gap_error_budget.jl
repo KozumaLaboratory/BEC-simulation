@@ -215,7 +215,7 @@ function cached(f, nt)
 end
 
 "One ITP run at fixed knobs. `psi0` is a state, so a caller can chain stages."
-function itp(; psi0, B::Float64, kind, dt, steps::Int)
+function itp(; psi0, B::Float64, kind, dt, steps::Int, pad::Float64)
     grid = grid_of()
     find_ground_state(;
         grid, atom=Eu151, interactions=eu_interaction_params(0.05),
@@ -223,7 +223,7 @@ function itp(; psi0, B::Float64, kind, dt, steps::Int)
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
         dt, n_steps=steps, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO, save_every=200,
         enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
-        spinor_lhy=kind, backend=CUDABackend(), verbose=false,
+        ddi_pad_factor=pad, spinor_lhy=kind, backend=CUDABackend(), verbose=false,
     )
 end
 
@@ -239,7 +239,8 @@ Returns the energy, the convergence state, the winding vector that classifies th
 state — and `growth`, the `max Im ω` of the mean field the table was built from.
 `growth > 0` means ε_LHY is scheme-dependent for this row and the row is not a
 measurement of anything, whatever its ΔE says."""
-function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
+function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int,
+    pad::Float64)
     old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP[]
     SPIN_TAYLOR_ENABLED[] = taylor
     SPIN_TAYLOR_DEGREE_CAP[] = cap
@@ -253,7 +254,7 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         nsteps = round(Int, MAX_STEPS * (DT / dt))
         # Stage 1: mean field only. Half the step budget — it starts from a seed
         # and only has to reach a physical texture, not the final fixed point.
-        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2)
+        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2, pad)
         psi_pre = Array(pre.workspace.state.psi)
 
         # Ask, before spending the second stage, whether a reference is even
@@ -269,7 +270,7 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         end
 
         # Stage 2: the arm's own LHY, tabulated from the relaxed ψ.
-        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
+        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps, pad)
         psi_h = Array(gs.workspace.state.psi)
         sm = gs.workspace.spin_matrices
         _, _, fz = spin_density_vector(psi_h, sm, 3)
@@ -301,12 +302,12 @@ end
 
 """ΔE between the two seeds at one B — plus everything needed to know whether
 that number is a gap between PHASES at all."""
-function gap(; B, kind, dt, taylor, cap)
-    a = cached((; seed=SEEDS[1], B, kind, dt, taylor, cap)) do
-        relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
+function gap(; B, kind, dt, taylor, cap, pad)
+    a = cached((; seed=SEEDS[1], B, kind, dt, taylor, cap, pad)) do
+        relax(; seed=SEEDS[1], B, kind, dt, taylor, cap, pad)
     end
-    b = cached((; seed=SEEDS[2], B, kind, dt, taylor, cap)) do
-        relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
+    b = cached((; seed=SEEDS[2], B, kind, dt, taylor, cap, pad)) do
+        relax(; seed=SEEDS[2], B, kind, dt, taylor, cap, pad)
     end
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
     # The same measure at the two earlier points of the trajectory: the raw seeds,
@@ -381,14 +382,24 @@ end
 # --- gap: a small B scan, so the boundary can be located rather than assumed ---
 const BS = (2.6e-9, 3.5e-9, 4.4e-9, 5.2e-9)
 
+# THE ARM THIS WHOLE EXERCISE WAS FOR was missing from six runs of this bench.
+# `ddi_pad_factor = 1.5` is the ONLY measured speedup among the accuracy knobs
+# (0.906x at 32^3; every other knob is free or costs), and the question that
+# decides it is "does it change the winding classification". That question needs
+# the `[classification]` section only — arms agreeing or disagreeing with each
+# other — and NOT the reference arm, which `bench/lhy_stability_scan.jl` has since
+# shown can never be dynamically stable for a dipolar gas. So it is answerable
+# here even though the boundary verdict is not.
+const RK = SpinorBEC.SPIN_TAYLOR_RK_MAX
 arms = [
-    ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
+    ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false, cap=RK, pad=2.0)),
     ("production (Taylor, polar_contact)", (kind=:polar_contact, dt=DT, taylor=true,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
+        cap=RK, pad=2.0)),
+    ("candidate: ddi_pad_factor 1.5", (kind=:polar_contact, dt=DT, taylor=true,
+        cap=RK, pad=1.5)),
     ("baseline probe: dt/2, reference", (kind=:full_bdg, dt=DT / 2, taylor=false,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
-    ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0)),
+        cap=RK, pad=2.0)),
+    ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0, pad=2.0)),
 ]
 
 println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1])), tol=$(ITP_TOL), " *
@@ -409,7 +420,7 @@ println("  read that before reading `dist`.")
     "arm", "B", "ΔE", "conv", "final dE", "dist", "sep@0", "sep@1", "sep", "max Imω")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
-    g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
+    g = gap(; B, a.kind, a.dt, a.taylor, a.cap, a.pad)
     results[(label, B)] = g
     @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3e %9.3e %9.3g\n",
         label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
