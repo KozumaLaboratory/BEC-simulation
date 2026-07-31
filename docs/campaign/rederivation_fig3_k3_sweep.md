@@ -45,6 +45,47 @@ completely.**
 A sentence that survives on different evidence is not the same claim. Anyone
 quoting Fig 3 should quote the new shape.
 
+## Most of the sweep is not at a physical K₃
+
+Raised by anko, and it was missing from my first write-up: I judged the rows by
+their drift and never asked why those K₃ values were being measured at all.
+
+The configs' own header says `K3_factor = 1.0 × Dy proxy = 1.0e-41 m⁶/s` — a
+**dysprosium** proxy, not an ¹⁵¹Eu measurement. Eu's measured value, with the
+convention unified 2026-07-25, is **direct K₃ ≈ 1.2×10⁻⁴¹** (the branch where the
+thesis `L` and the 1.4 s lifetime agree) against **effective K₃(BEC-fit)
+≈ 4.6×10⁻⁴²**, a ~2.6× systematic. In this sweep's units that is
+`K3_factor ≈ 0.46 – 1.2`; allowing the systematic, 1 – 4.
+
+| factor | K₃ [m⁶/s] | × measured direct (1.2e-41) |
+|---:|---|---:|
+| 1 | 1.0e-41 | 0.83 |
+| 3 | 3.0e-41 | 2.5 |
+| 10 | 1.0e-40 | 8 |
+| 30 | 3.0e-40 | 25 |
+| 100 | 1.0e-39 | 83 |
+| 150–300 | 1.5–3.0e-39 | 125–250 |
+
+**Seven of the ten points sit at ≥ 8× the measured value, reaching 250×.** As a
+search for an arrest threshold that is a deliberate choice; as the evidence under
+"K3 is not the primary arrest mechanism" it means the regime the claim was argued
+in is not Eu's.
+
+It also sharpens the point below: **the trustworthy rows and the physical rows are
+the same rows.**
+
+| factor | drift | × measured | usable |
+|---:|---:|---:|---|
+| 0, 1, 3 | ≤ 0.045 | 0 – 2.5 | **yes** |
+| 10, 30 | 0.14, 0.34 | 8 – 25 | neither comfortably |
+| 100 – 300 | 0.69 – 0.92 | 83 – 250 | no |
+
+The reversal `delay → stable_arrest` happens at factors 0, 1 and 3 — trustworthy
+and physical — so the headline stands. But the stored figure's *transition* to
+`sacrificial_arrest` sat near factor 150, i.e. **125× the measured K₃**. Even had
+the old numbers been right, that transition was never within reach of Eu's
+physics.
+
 ## Do not quote the high-K3 rows yet
 
 `energy_rel_drift` climbs monotonically with K3, from 7.1e-07 to **0.92**. K3 is
