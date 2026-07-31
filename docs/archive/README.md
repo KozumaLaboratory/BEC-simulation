@@ -22,16 +22,22 @@ Bug fixed 2026-05-02 in `src/solvers/ground_state/itp_loop.jl`. Regression test:
 
 ## Promoted out of agent memory 2026-07-31
 
-Seven document-shaped notes (roadmaps, status snapshots, arc logs) that had accumulated in the agent
+Document-shaped notes (roadmaps, status snapshots, arc logs) that had accumulated in the agent
 memory store, where the one-file-one-fact rule does not fit them. They are dated records of how a
 decision was reached — **none of them is a live specification**; the live equivalent is named per entry.
+
+Two of the seven did not land here. `option_gamma_rotating_basis_design.md` and
+`validation_ladder_2026-05-22.md` between them cite seven `runs/` directories that do not exist, which
+`test/oracles/test_doc_run_citations_resolve.jl` correctly rejects: that gate is a ratchet on unresolved
+citations, and importing a document is no reason to widen it. They are historical records whose value is
+the reasoning, not the runs, so they were moved outside the repository to
+`BEC-simulation-archive/promoted_memory_notes_2026_07_31/` instead of being carried here with their
+citations pinned as permanent exceptions.
 
 - **`north_star_phase_diagram_plan_2026-06-02.md`** — the 4-track ¹⁵¹Eu (F=6) roadmap (A phase diagram, B fluctuation selection, C vortices, D experimental anchor) written after the c-determination protocol closed, plus the execution discipline distilled from the Sprint 1–5 failure modes. Live equivalent: `design/eu_phase_diagram_adaptive_mapping.md` and the active-arc section of the agent memory index.
 - **`hamiltonian_layered_architecture_arc_2026-06-05.md`** — round-by-round log of the layered-Hamiltonian redesign. Live SSoT is `design/hamiltonian_layered_architecture.md`; this is only the reasoning trail that produced it.
 - **`sprint3_static_gate_baseline_2026-06-01.md`** — static-gate measurement baseline for Sprint 3. Live equivalent: the oracle suite under `test/oracles/`.
 - **`integrator_modernization_status_2026-05.md`** — May-2026 status snapshot. Live equivalent: `design/integrator_modernization_plan.md` + `design/integrator_ch3_plan.md`.
-- **`option_gamma_rotating_basis_design.md`** — design for the instantaneous local-frame spinor GPE (Option γ). Implemented; live reference is `reference/dynamics.md` plus `src/workflow/experiments/pipeline/run_step_rotating/` and `src/workflow/experiments/analyzers/rotating_basis.jl`.
-- **`validation_ladder_2026-05-22.md`** — the 13-level ladder as first written down. Live equivalent: the validation-ladder table in `CLAUDE.md` + `docs/validation/`.
 - **`klaus_quench_protocol_pivot_2026-05-26.md`** — record of the rotation+quench magnetostir protocol pivot. Live equivalent: `guides/klaus_regime.md`.
 
 ## Removed in tidy-up 2026-05-13
