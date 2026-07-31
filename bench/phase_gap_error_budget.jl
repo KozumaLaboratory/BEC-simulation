@@ -181,8 +181,12 @@ const SRC_REV = try
 catch
     nothing
 end
+# One JSONL PER src key, not one shared file. It is appended to, so a shared name
+# would silently interleave rows from different revisions of the code and the
+# report would average over them — the same corruption the smoke/production split
+# already guards against, one level up.
 const RESULTS_JSONL = get(ENV, "SPINORBEC_GAP_JSONL",
-    joinpath(CACHE_DIR, "rows.jsonl"))
+    joinpath(CACHE_DIR, "rows_$(SRC_REV === nothing ? "dirty" : SRC_REV[1:12]).jsonl"))
 
 if SRC_REV === nothing
     println("[cache] DISABLED — src/ is dirty or not a git tree. Every cell recomputes.")

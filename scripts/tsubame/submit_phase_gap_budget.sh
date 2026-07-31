@@ -12,6 +12,12 @@
 #   qsub -g tga-kozuma-kouhi -v SPINORBEC_BENCH_ROOT=<worktree> \
 #        scripts/tsubame/submit_phase_gap_budget.sh
 set -u
+# `--line-buffered` is not optional here. Julia flushing its own stdout after each
+# row buys nothing if grep then holds the line: GNU grep buffers its OUTPUT
+# whenever stdout is not a tty, which is always in a batch job. Without this the
+# rows arrive in one block at the end and the run is unreadable while alive —
+# exactly the problem the per-row flush was added to fix.
+#
 # The output filter below drops ONLY the CUDA library-path warning boxes, which
 # are noise on every TSUBAME node. DO NOT widen it to `^│|^└|^┌`: that swallows
 # every Julia @warn, and on 2026-07-30 it destroyed the one piece of evidence
@@ -38,7 +44,7 @@ nvidia-smi --query-gpu=name --format=csv,noheader || true
 # checks src/ loads, not that a bench script runs.
 echo "### SMOKE (tiny)"
 SPINORBEC_GAP_JSONL="$SPINORBEC_GAP_CACHE/smoke.jsonl" \
-    $JULIA --project=. bench/phase_gap_error_budget.jl 8 40 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
+    $JULIA --project=. bench/phase_gap_error_budget.jl 8 40 2>&1 | grep --line-buffered -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
 smoke_rc=${PIPESTATUS[0]}
 echo "### smoke rc=$smoke_rc"
 if [ "$smoke_rc" -ne 0 ]; then
@@ -48,5 +54,5 @@ if [ "$smoke_rc" -ne 0 ]; then
 fi
 
 echo; echo "### PRODUCTION"
-$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-32}" "${SPINORBEC_GAP_STEPS:-120000}" 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
+$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-32}" "${SPINORBEC_GAP_STEPS:-120000}" 2>&1 | grep --line-buffered -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
 echo "ALL DONE $(date)"
