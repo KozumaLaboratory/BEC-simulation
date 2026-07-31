@@ -13,19 +13,20 @@ using Printf
 #   - Hermitian projection on ρ, symmetric projection on κ
 #   - Norm preservation on a vacuum-(ρ=κ=0) initial state
 
-try
+# `return` at the top level of an included file does not stop the include —
+# Julia evaluates each top-level expression on its own, so the old
+# `try … return nothing … end` guard logged "skipping" and then fell straight
+# through to the CUDA calls below. On every CPU-only runner this file died with
+# `LoadError: CUDA driver not functional` instead of skipping. The guard has to
+# sit inside each `@testset`, whose body IS a function.
+const HAS_CUDA = try
     @eval using CUDA
-    if !CUDA.functional()
-        @info "CUDA not functional — skipping TDHFB GPU phase5c HF tests"
-        return nothing
-    end
-catch e
-    @info "CUDA not available — skipping TDHFB GPU phase5c HF tests"
-    return nothing
+    CUDA.functional()
+catch
+    false
 end
 
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())
 
 function _make_states(F::Int, spatial::Tuple; with_rho::Real=0.0, with_kappa::Real=0.0)
     D = 2F + 1
@@ -59,6 +60,7 @@ function _make_states(F::Int, spatial::Tuple; with_rho::Real=0.0, with_kappa::Re
 end
 
 @testset "TDHFB GPU phase5c HF: φ subupdate vs CPU (F=1, vacuum)" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(1, (4, 4, 4))
     g_S = Dict{Int, Float64}(0 => 0.5)
     V_cpu = SpinorBEC.channel_kernel(1, g_S)
@@ -70,6 +72,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: R subupdate vs CPU (F=1, thermal)" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(1, (4, 4, 4); with_rho=0.05, with_kappa=0.01)
     g_S = Dict{Int, Float64}(0 => 0.5)
     V_cpu = SpinorBEC.channel_kernel(1, g_S)
@@ -83,6 +86,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: full HF step vs CPU (F=1, thermal)" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(1, (4, 4, 4); with_rho=0.05, with_kappa=0.01)
     g_S = Dict{Int, Float64}(0 => 0.5)
     SpinorBEC._tdhfb_hf_step!(state_cpu, 1, g_S, 0.01; hfb_mode=:full_hfb)
@@ -97,6 +101,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: Hermitian rho + symmetric kappa preserved" begin
+    HAS_CUDA || (@test true; return nothing)
     _, state_gpu = _make_states(1, (4, 4, 4); with_rho=0.05, with_kappa=0.01)
     g_S = Dict{Int, Float64}(0 => 0.5)
     SpinorBEC._tdhfb_hf_step!(state_gpu, 1, g_S, 0.01; hfb_mode=:full_hfb)
@@ -107,6 +112,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: Popov mode (drop anomalous in phi sub)" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(1, (4, 4, 4); with_rho=0.05, with_kappa=0.01)
     g_S = Dict{Int, Float64}(0 => 0.5)
     SpinorBEC._tdhfb_hf_step!(state_cpu, 1, g_S, 0.01; hfb_mode=:popov)
@@ -118,6 +124,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: 10 HF steps vs CPU end-to-end" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(1, (4, 4, 4); with_rho=0.05, with_kappa=0.01)
     g_S = Dict{Int, Float64}(0 => 0.5)
     for _ in 1:10
@@ -133,6 +140,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c HF: F=6 Eu sample voxel" begin
+    HAS_CUDA || (@test true; return nothing)
     state_cpu, state_gpu = _make_states(6, (4, 4, 4); with_rho=0.01, with_kappa=0.0)
     # Eu-typical g_S (rough order-of-magnitude)
     g_S = Dict{Int, Float64}(0 => 0.1, 2 => 0.05, 4 => 0.02)
@@ -145,5 +153,4 @@ end
     @test maximum(abs.(Array(state_gpu.kappa) .- state_cpu.kappa)) < 1e-11
 end
 
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())
