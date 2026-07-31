@@ -123,3 +123,40 @@ end
         @info "Top-level test definitions shadowing a SpinorBEC export" collisions
     @test isempty(collisions)
 end
+
+# The per-PR required checks must, between them, run the whole `ci` tier.
+#
+# `oracles` exists because the `ci` tier is nightly-only, so a PR could break an
+# oracle gate and merge green (5 gates sat RED for weeks, 2026-06-21). Cutting
+# that pseudo-tier fixed the oracle half and left the other half: CI_EXTRA's
+# non-oracle files — ground state, split-step, simulation, config/experiment
+# plumbing — were still gated only by the nightly run.
+#
+# Splitting `ci` across three jobs is only equivalent to running `ci` if the
+# three actually cover it, and if the workflow actually runs all three. Asserting
+# the set identity over the tier lists alone would not catch someone deleting the
+# job, so this reads the tiers back out of `.github/workflows/ci.yml` — delete a
+# job or rename a tier and this test goes red, rather than the coverage quietly
+# shrinking.
+@testset "Per-PR CI jobs cover the ci tier" begin
+    workflow = joinpath(@__DIR__, "..", ".github", "workflows", "ci.yml")
+    @test isfile(workflow)
+
+    pr_tiers = Set{String}()
+    for line in eachline(workflow)
+        m = match(r"^\s*SPINORBEC_TEST_TIER:\s*([A-Za-z_]+)\s*$", line)
+        m === nothing || push!(pr_tiers, m.captures[1])
+    end
+    # Guard against the regex silently matching nothing after a formatting change.
+    @test !isempty(pr_tiers)
+
+    covered = union((Set(select_tests(t)) for t in pr_tiers)...)
+    ci_tier = Set(select_tests("ci"))
+    uncovered = sort(collect(setdiff(ci_tier, covered)))
+
+    isempty(uncovered) || @info string(
+        "ci-tier files no per-PR job runs (add them to a gated tier, or add a ",
+        "job for the tier they live in)",
+    ) uncovered
+    @test isempty(uncovered)
+end
