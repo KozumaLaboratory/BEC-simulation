@@ -43,26 +43,52 @@ const _MARKERS = [
     ],
     :differential => [
         r"reference_\w+", r"dumb_\w+", r"\blegacy\b"i, r"parity"i,
+        # "bit-identity" is not "bit-identical", and the file whose whole title
+        # is "HamTerm ↔ independent statement bit-identity" was landing in :pin.
+        r"bit[-_ ]?identit"i, r"↔",
         r"registry.{0,40}(≈|isapprox)"i, r"cpu.{0,30}gpu"i, r"gpu.{0,30}cpu"i,
         r"bit[-_ ]?identical"i, r"cross[-_ ]?check"i, r"\btwin\b"i,
         r"independent(ly)?\s+(computed|stated|implement)"i,
     ],
     :metamorphic => [
+        # A round-trip is f⁻¹(f(x)) == x — the canonical metamorphic relation.
+        # It was ONLY in _API_MARKERS, so the two SI round-trips (physical
+        # quantities through unit conversion and back) read as spelling tests.
+        r"round[-_ ]?trip"i,
         r"covarian"i, r"invarian"i, r"symmetr"i, r"\bparity\b"i,
         r"translat"i, r"rotat\w*.{0,40}(≈|isapprox)"i, r"mirror"i,
         r"global[_ ]phase"i, r"time[-_ ]revers"i, r"gauge"i, r"chiral"i,
     ],
     :invariant => [
+        # Algebraic contracts stated as maths rather than as the word
+        # "conservation": Σ parts == total, and the accumulate contract.
+        r"total.{0,30}(≈|==).{0,10}(Σ|sum|parts)"i, r"Σ\s*parts"i,
+        r"accumulat"i,
         r"conserv"i, r"\bdrift\b"i, r"hermitic"i, r"unitar"i,
         r"norm\w*\s*.{0,20}(≈|isapprox)\s*1", r"sum[_ ]rule"i,
         r"positive[-_ ]?(semi)?definite"i, r"virial"i, r"trace"i,
         r"continuity"i, r"completeness"i, r"orthonormal"i,
     ],
     :exact => [
+        # The claim written as the identity itself. These files state
+        # `E = Re⟨ψ|Hψ⟩·dV`, `E = −Ω·⟨L_z⟩`, `= ψ†·F_α·ψ`, `v = k` — none of
+        # which contains the word "analytic", so all of them were :pin.
+        r"⟨ψ\s*\|", r"ψ†", r"Re⟨", r"⟨L_z⟩", r"⟨F", r"·dV\b",
         r"analytic"i, r"\bexact\b"i, r"closed[-_ ]form"i, r"theoretical"i,
         r"gauss[-_ ]hermite"i, r"manufactured"i, r"\bclosed form\b"i,
         r"known\s+(solution|answer|value)"i, r"first[-_ ]principles"i,
     ],
+]
+
+# Gates whose subject is the SUITE, not the physics: coverage meta-tests, static
+# source scans, doc-citation ratchets. They ground nothing about the simulator
+# and are not meant to — but they are not pins or spellings either, and calling
+# them :pin marks them for pruning. Checked BEFORE :pin/:api, after the five
+# grounding labels.
+const _META_MARKERS = [
+    r"meta[-_ ]?test"i, r"\bcoverage\b"i, r"every\s+\w+\s+is\s+(gated|in|listed)"i,
+    r"no\s+bare\s+`?\w+`?\s+broadcast"i, r"source[-_ ]scan"i,
+    r"cite\s+runs/"i, r"do\s+not\s+shadow"i, r"orphan"i, r"allowlist"i,
 ]
 
 const _API_MARKERS = [
@@ -120,6 +146,7 @@ struct FileInfo
     labels::Vector{Symbol}
     npin::Int
     napi::Int
+    nmeta::Int
     layer::Symbol
 end
 
@@ -159,6 +186,7 @@ function _scan(root::String, rel::String)
         labels,
         sum(p -> count(p, src), _PIN_MARKERS; init=0),
         sum(p -> count(p, src), _API_MARKERS; init=0),
+        sum(p -> count(p, src), _META_MARKERS; init=0),
         _layer_of(src),
     )
 end
@@ -169,6 +197,16 @@ function primary(fi::FileInfo)
     for (name, _) in _MARKERS
         name in fi.labels && return name
     end
+    # :meta is checked AFTER the five grounding labels, not before. Meta-first
+    # was tried and measured: it moves 18 files, and among them
+    # `test_master_oracle.jl` (:differential — the dumb-vs-production gate),
+    # `test_propagator_references.jl` (:order) and `test_term_fd_registry_
+    # coverage.jl` (:order). Those ground physics AND carry a coverage clause;
+    # calling them :meta understates them, which is the direction that turns a
+    # file into a pruning candidate. Two coverage gates therefore keep an
+    # over-credited grounding label, which is the safe direction this file
+    # declares in its header.
+    fi.nmeta > 0 && return :meta
     fi.npin > 0 && return :pin
     fi.napi > 0 && return :api
     return :unclassified
@@ -185,7 +223,7 @@ function inventory(root::String=_INV_DIR)
 end
 
 const _ORDER = [:order, :differential, :metamorphic, :invariant, :exact,
-    :pin, :api, :unclassified]
+    :meta, :pin, :api, :unclassified]
 
 _row(k, n, tot, cost) = println("  ", rpad(string(k), 16),
     lpad(string(n), 4), " files ", lpad("$(round(Int, 100n / tot))%", 5),
@@ -246,13 +284,13 @@ end
 
 function write_csv(inv::Vector{FileInfo}, path::String)
     open(path, "w") do io
-        println(io, "path,tier,loc,assertions,cost_s,primary,labels,pins,api,layer")
+        println(io, "path,tier,loc,assertions,cost_s,primary,labels,pins,api,meta,layer")
         for f in inv
             println(
                 io,
                 join(
                     (f.path, f.tier, f.loc, f.ntest, f.cost,
-                        primary(f), join(f.labels, ";"), f.npin, f.napi, f.layer), ","),
+                        primary(f), join(f.labels, ";"), f.npin, f.napi, f.nmeta, f.layer), ","),
             )
         end
     end
