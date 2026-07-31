@@ -371,6 +371,59 @@ const MUTANTS = Mutant[
         "Swaps the cross-product order, so ⟨L_z⟩ changes sign. The Coriolis sign \
          oracle (+Ω ⇒ ⟨L_z⟩ > 0) and every vortex-chirality claim are read \
          through it."),
+    # ── solvers: the loops themselves ────────────────────────────────
+    # Added 2026-07-31. Nothing had asked whether the ITP / L-BFGS loops do what
+    # they claim: renormalise, stop for the right reason, and only accept a step
+    # that decreases the energy.
+    Mutant(:itp_skips_renormalisation,
+        "src/solvers/ground_state/itp_loop.jl",
+        r"                _normalize_psi!\(ws\.state\.psi, ws\.grid, n_comp_ws, N_dim\)",
+        "                # mutant: renormalisation skipped",
+        :drop, :fatal,
+        "imaginary time is not norm-preserving — the renormalisation IS the method",
+        "Without it ψ decays toward the lowest mode's amplitude instead of being \
+         projected onto it, so the energy is evaluated on an unnormalised state \
+         and every reported number is scaled by a drifting norm."),
+    Mutant(:itp_converges_immediately,
+        "src/solvers/ground_state/itp_loop.jl",
+        r"                if dE < tol && \(tol_drho <= 0\.0 \|\| drho < tol_drho\)",
+        "                if true",
+        :drop, :fatal,
+        "`converged` is the ITP flag every downstream check reads",
+        "Declares convergence at the first check regardless of dE or the density \
+         change, so a run that has not converged reports `converged = true` and \
+         its ground state is used as if it had."),
+    Mutant(:lbfgs_line_search_accepts_anything,
+        "src/solvers/lbfgs/helpers.jl",
+        r"    accept\(α, E\) = slope < 0 \? \(E ≤ E0 \+ c1 \* α \* slope\) : \(E < E0\)",
+        "    accept(α, E) = true",
+        :drop, :fatal,
+        "the Armijo condition is what makes L-BFGS a descent method",
+        "Accepts the first trial step whatever it does to the energy, so the \
+         iteration can climb. The variational principle — the only reason a \
+         ground-state energy means anything — stops holding."),
+    # ── foundation: the primitives everything is built on ────────────
+    # Added 2026-07-31. `test/foundation/` was the last unmeasured directory. If a
+    # spin matrix or a k-grid is wrong, every term, every observable and every
+    # oracle inherits it — and they would all agree with each other.
+    Mutant(:spin_ladder_lowers_instead_of_raises,
+        "src/foundation/spin_matrices.jl",
+        r"        if m\[i\] == m\[j\] \+ 1",
+        "        if m[i] == m[j] - 1",
+        :sign, :fatal,
+        "F+ raises m by 1: F+|F,m⟩ = √(F(F+1)−m(m+1))|F,m+1⟩",
+        "Turns F+ into F−, so Fx stays Hermitian and correct-looking while Fy \
+         changes sign and every raising/lowering-derived quantity flips. The spin \
+         algebra itself, which no downstream test re-derives."),
+    Mutant(:grid_k_missing_2pi,
+        "src/foundation/grid.jl",
+        r"        dk = T\(2π\) / L",
+        "        dk = T(1) / L",
+        :factor, :fatal,
+        "k = 2π n / L — the spectral grid every FFT derivative uses",
+        "Drops the 2π from the wavenumber grid, so every kinetic energy, every \
+         spectral derivative and every current is off by (2π)² or 2π. Uniformly \
+         wrong, therefore self-consistent: only an absolute reference catches it."),
 ]
 
 """

@@ -71,3 +71,36 @@ using Test
         @test r6.dE ≈ gap rtol = 1.0e-8
     end
 end
+
+# ── the acceptance rule itself ────────────────────────────────────────
+# The two gates above are BOOKKEEPING: which iterate the line search leaves
+# behind, and what `dE` reports. Neither says the search only accepts a step that
+# decreases the energy — and the mutation harness found that the Armijo condition
+# was defended by exactly one file, `test_polished_ground_state.jl`, and there
+# only incidentally ("the polish must not raise the energy").
+#
+# That is thin for the property that makes L-BFGS a descent method at all. With
+# `accept(α, E) = true` substituted for the Armijo test, this problem climbs from
+# E = 4.663 to E = 26.59 in 25 steps — a factor of 5.7 the wrong way. So the
+# variational statement is a sharp, cheap gate, and it needs no reference energy:
+# whatever the minimum is, the run may not end above where it started.
+@testset "L-BFGS is a descent method (variational)" begin
+    grid = make_grid(GridConfig(64, 12.0))
+    ws = make_workspace(;
+        grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 30.0, 1 => 0.0)),
+        zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap(1.0),
+        sim_params=SimParams(; dt=0.005, n_steps=1, imaginary_time=true))
+    psi0 = init_psi(grid, SpinSystem(1); state=:polar)
+    psi0 ./= sqrt(sum(abs2, psi0) * cell_volume(grid))
+    copyto!(ws.state.psi, psi0)
+    E_init = total_energy(ws)
+
+    r = find_ground_state_lbfgs(; ws_init=ws, n_steps=25, tol=1e-10, verbose=false)
+
+    # The start is genuinely above the minimum — otherwise "did not increase"
+    # would be satisfiable by doing nothing at all.
+    @test r.energy < E_init - 1e-6
+    # And the run may never end above its own starting point.
+    @test r.energy <= E_init
+end
