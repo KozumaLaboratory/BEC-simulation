@@ -69,7 +69,7 @@ function run_one(; B_nT, c0, c1, n, box, fd::Bool, backend)
         zeeman=ZeemanParams(p_of(B_nT * 1e-9), q), potential=pot,
         sim_params=SimParams(; dt=DT, n_steps=round(Int, DURATION / DT),
             save_every=10^9),
-        psi_init=gs.psi, enable_ddi=true, c_dd, secular_ddi=false,
+        psi_init=Array(gs.workspace.state.psi), enable_ddi=true, c_dd, secular_ddi=false,
         ddi_padding=true, ddi_trunc_radius=-1.0, backend)
     res = run_simulation!(ws)
     psi = Array(res.psi_final)
