@@ -31,6 +31,16 @@
 # `icosahedral` while carrying `full_bdg`, which the naming convention forbids.
 # Record: docs/validation/full_bdg_scheme_dependence_eu_f6.md
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
+#
+# ┌ PAIRED ARM (2026-07-31). A sibling `LHY_full_bdg*` config runs the SAME cell
+# │ with `kind: full_bdg`. Both exist because two independent renames of the old
+# │ `LHY_icosahedral*` file chose different targets; kept deliberately, because
+# │ the pair measures the size of full_bdg's scheme dependence at this ladder:
+# │ 0.59327 there vs 0.553422 here, a 7 % spread. THIS arm is the one whose
+# │ ansatz matches the state; that one is the comparator.
+# │
+# └ `factorial_2x4.json` has NO row for either arm — it predates them and its
+#   rows are measured values nobody has re-run.
 # Task #19C — LHY interference at K3=200× cigar regime.
 # Source: scripts/validation/eu_k3_lhy_gen.jl
 # LHY kind = full_bdg (was icosahedral; see the note at the top of this file).
