@@ -4,6 +4,9 @@
 # abstract dispatch over `PipelineStep`. The fix is the deferred
 # concrete-step refactor described in pipeline_runner.jl. Until that
 # lands, skip the affected blocks unless the user explicitly opts in.
+using Test
+using SpinorBEC
+
 const _SKIP_HEAVY_YAML_INFRA =
     get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 

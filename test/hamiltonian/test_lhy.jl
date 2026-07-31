@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "LHY Beyond-Mean-Field" begin
     @testset "c_lhy=0 regression: identical to original" begin
         config = GridConfig(64, 20.0)

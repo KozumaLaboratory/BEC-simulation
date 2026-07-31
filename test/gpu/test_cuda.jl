@@ -31,7 +31,7 @@ using Test
             backend=CUDABackend(),
         )
 
-        @test ws.state.psi isa CuArray
+        @test ws.state.psi isa CUDA.CuArray
         @test ws.backend isa CUDABackend
     end
 

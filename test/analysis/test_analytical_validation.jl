@@ -1,3 +1,4 @@
+using SpinorBEC
 using Test
 using FFTW
 using Random
