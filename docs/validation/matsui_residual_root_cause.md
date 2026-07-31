@@ -26,7 +26,7 @@ Against Matsui et al.'s published simulation, on the identical window and metric
 | time step | `dt` 1e-3 → 2.5e-4 (2nd order ⇒ converged) | 0.031 nT, 1.3 % | 8307989.12 |
 | ramp shape | their exact `exp(−t/50 µs)` vs our linear 150 µs | 0.070 nT, ~0 in `N` | 8307358.7 |
 | three-body loss | `K₃` × {1, 3, 10} of the published value | ~0 (real loss is 0.2 %) | 8304841.5 |
-| their FD Laplacian | analytic, against the measured spectrum | ~2 % of kinetic at `k_rms`; 3–8 % of weight where the error exceeds 5 % | static |
+| **their FD Laplacian** | run with `grid.k_squared` replaced by the FD symbol | **wrong sign**, 3.5–8.6 % | 8308423 |
 | ground-state ambiguity | — | **does not exist**: polarised GS is degenerate in `c1_ratio` | — |
 | 1 nT field jitter | Gaussian average over B | 0.05 nT | static |
 | the experiment's 8–45 % atom deficit | their own Fig. S3 lifetime (1/e = 2.54 s ⇒ 0.20 % in 5 ms) | **not loss** — a counting systematic, corr(total, #components) = −0.935 | static |
@@ -43,6 +43,47 @@ and the 128³ run took **219 s per point against 5.2 s at 32³** — a factor 42
 **Running on their exact grid changes nothing**: centre −2.145 against our
 −2.138, `N_{−6}` fraction 0.195195 against 0.195201. Grid, box and resolution are
 now excluded together and independently.
+
+## Their FD Laplacian: excluded, and with the wrong sign
+
+On a periodic grid the 3-point FD Laplacian is diagonal in Fourier space with
+eigenvalue `Σ_d (2/dx_d²)(1 − cos(k_d dx_d))`, so their operator is reproduced
+**exactly** by substituting `grid.k_squared`. The substitution is surgical: the
+DDI builds its own half-grid `k` from `grid.k` / `grid.dk` and never reads
+`grid.k_squared`. Nothing knowingly-inexact enters the production Hamiltonian —
+this lives in `scripts/validation/matsui_fd_laplacian_probe.jl`.
+
+**Predicted first.** On their exact grid (128³, `dx` = 0.4 aHO), the FD kinetic
+deficit measured from the saved 5 ms state runs from 0.234 ħω at `m = +6` down to
+0.025 at `m = −6`; **differenced between adjacent components it is 0.0166 ħω =
+0.112 nT** for `m = −5` against `m = −6`. The resonance sits where the Zeeman
+splitting matches the rotational kinetic-energy difference, so a *smaller*
+difference puts the resonance *closer to zero*. Their exact-Laplacian equivalent
+would be **−2.661**, not −2.549, and the gap to ours would **widen** from 0.411
+to 0.52 nT.
+
+**Then measured.**
+
+| B [nT] | exact | FD | FD − exact |
+|---|---|---|---|
+| −3.0 | 0.215985 | 0.197494 | **−8.6 %** |
+| −2.5 | 0.211028 | 0.197577 | −6.4 % |
+| −2.0 | 0.208473 | 0.198779 | −4.7 % |
+| −1.5 | 0.208546 | 0.201300 | −3.5 % |
+
+FD *lowers* `N_{−6}`, i.e. transfers **more**. Matsui's curve is **higher**
+(0.2475 against our 0.1952). So their Laplacian moves the disagreement in the
+wrong direction, by 3.5–8.6 % on top of the 21 % already there. **Candidate 1 is
+excluded.**
+
+**Read the caveat.** The probe's positive control **failed**: the hand-built path
+gives 0.208473 at −2.0 nT where the pipeline gives 0.195201, a 6.8 % difference,
+most likely because the hand-built path applies the held field from `t = 0` and
+omits the 150 µs ramp. So the *absolute* numbers in that table are not comparable
+to the pipeline's, and only the **FD − exact differential**, measured on a
+like-for-like pair inside one path, is quotable. The control is reported rather
+than quietly dropped because two nulls in this campaign were wrong for want of
+one.
 
 ## The structural finding
 
@@ -73,13 +114,11 @@ answer. What is left is a structural difference in the dynamics itself.
 
 The surviving candidates, in order of what the evidence supports:
 
-1. **Their discretisation.** 3-point FD Laplacian at 0.7 points per healing
-   length plus Crank–Nicolson, against our converged spectral split-step. Our
-   analytic bound puts the FD kinetic deficit at ~2 % of `k_rms`, which is the
-   right sign (a softer kinetic operator slows the transfer) but an order of
-   magnitude short of 20 % on that estimate alone. The estimate is crude: it
-   ignores how the deficit compounds over 3456 steps and how it interacts with
-   the resonance condition.
+1. ~~**Their discretisation.**~~ **EXCLUDED** — see above. Both the analytic
+   estimate and the direct run say their FD Laplacian moves the disagreement the
+   wrong way. What remains untested from their numerics is Crank–Nicolson
+   itself, but our own `dt` convergence makes an integrator explanation
+   implausible: two 2nd-order schemes both converged in `dt` agree.
 2. **A parameter in their published run that is not in the shipped code.** We
    already know `Ntot` is one such; `cc0_eff` / `cc1_eff` / the trap could be
    others. This is not falsifiable from what they released.
