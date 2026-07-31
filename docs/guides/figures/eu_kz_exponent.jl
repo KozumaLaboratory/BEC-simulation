@@ -109,9 +109,13 @@ function kz_scan(;
     t_equil::Float64=40.0, t_hold::Float64=20.0,
     gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
+    k_cut_mult::Float64=1.0,
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
-    k_cut = sqrt(2 * (mu + T_hot))          # C region holds the hot cloud
+    # C region holds the hot cloud. `k_cut_mult` moves the boundary WITHOUT
+    # touching the physics, which is the only way to show that a reported exponent
+    # is a property of the quench and not of where the classical region was cut.
+    k_cut = k_cut_mult * sqrt(2 * (mu + T_hot))
     k_max = π / (box / grid_n)
     k_max > k_cut || error("grid_n=$grid_n cannot resolve k_cut=$(round(k_cut; digits=2)) " *
                            "(k_max=$(round(k_max; digits=2))) at box=$box")
@@ -260,6 +264,17 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif startswith(mode, "kcut")
+        # Cutoff-robustness of alpha. The whole justification for reporting an
+        # exponent instead of a defect count is that a ratio at FIXED cutoff is
+        # clean where an absolute number is not — which is worth nothing until
+        # alpha is shown to survive moving the cutoff. Mode carries rate and
+        # multiplier: "kcut8_1.2" -> tau_Q = 8 at 1.2x k_cut.
+        body = mode[5:end]
+        rs, ms = split(body, "_")
+        τ, km = parse(Float64, rs), parse(Float64, ms)
+        kz_scan(; tau_Qs=(τ,), t_hold=1.0, n_seed=8, k_cut_mult=km, backend,
+            tag="kz_kcut$(replace(ms, "." => "p"))_r$(replace(rs, "." => "p"))")
     elseif startswith(mode, "rate")
         # One rate per job: at 138³ a single rate with 8 seeds is ~2 h, and five of
         # them in one job does not fit h_rt. Mode string carries the rate, e.g.
