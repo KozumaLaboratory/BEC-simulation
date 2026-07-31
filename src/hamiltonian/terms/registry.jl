@@ -131,11 +131,12 @@ function build_energy_context(psi_host::Array{<:Complex, ND_psi}, ws) where {ND_
     fft_buf, n_density, fx, fy, fz = scratch_get!(
         :energy_context, (eltype(psi_host), n_pts)
     ) do
-        # The FFT buffer takes ψ's eltype — the plans were built for it. The
-        # density / spin-density buffers stay Float64 on purpose: nothing hands
-        # them to a plan, and a wider accumulator is free here.
         (
-            zeros(complex(real(eltype(psi_host))), n_pts), zeros(Float64, n_pts),
+            # `eltype(psi_host)`, not ComplexF64: the scratch key already
+            # discriminates on it, and `ws.fft_plans` follows ψ's precision —
+            # a mismatched buffer turns the in-place FFT into an out-of-place
+            # one and the k-space reduction reads real-space ψ.
+            zeros(eltype(psi_host), n_pts), zeros(Float64, n_pts),
             zeros(Float64, n_pts), zeros(Float64, n_pts), zeros(Float64, n_pts),
         )
     end

@@ -108,7 +108,7 @@ spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
 LHYTerm, ZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
-struct EnergyContext{ND, PsiT, FFTBuf, FFTPlan, SM, NRho, NF}
+struct EnergyContext{ND, PsiT, CT, FFTPlan, SM, NRho, NF}
     # NOTE: the original definition typed psi_host as Array{ComplexF64, ND}
     # while n_pts/fft_buf are ND-dimensional SPATIAL objects — ψ has ND+1
     # dims, so the constructor could never be called. It had zero callers
@@ -116,15 +116,13 @@ struct EnergyContext{ND, PsiT, FFTBuf, FFTPlan, SM, NRho, NF}
     # when the latent mismatch surfaced (dead scaffolding cannot be wrong
     # in a detectable way until something consumes it).
     psi_host::PsiT
-    # `FFTBuf`, not `Array{ComplexF64, ND}`: this buffer is handed to
-    # `ws.fft_plans`, which are planned for ψ's eltype, and FFTW's in-place plans
-    # reinterpret the memory they receive. Pinning ComplexF64 here meant every
-    # Float32 workspace fed a ComplexF64 buffer to a ComplexF32 in-place plan —
-    # no error, garbage out: the F32 kinetic energy came back 0.0035 against
-    # 0.48, i.e. the reported F32 total was ~10 % wrong while every other term
-    # agreed to 1e-8 (2026-07-29). Gated by
-    # test/gpu/test_mixed_precision.jl's per-term F32/F64 comparison.
-    fft_buf::FFTBuf
+    # `CT`, not a hard-coded ComplexF64: `plans` follows ψ's precision, and an
+    # in-place FFTW plan applied to a buffer of a DIFFERENT eltype silently
+    # falls back to the out-of-place `*`, leaving `fft_buf` untransformed. The
+    # k-space reduction then sums k²|ψ(r)|² over real space and returns a
+    # finite, wrong number — measured 0.115 against an exact 0.500 for the
+    # kinetic energy of a Float32 workspace.
+    fft_buf::Array{CT, ND}
     plans::FFTPlan
     spin_matrices::SM
     n_density::NRho

@@ -22,11 +22,14 @@ using Printf
 function _energy_gradient_scratch(psi, n_pts)
     scratch_get!(:energy_gradient, (typeof(psi), n_pts)) do
         (
-            similar(psi, n_pts),  # fft_buf
-            similar(psi, Float64, n_pts),     # fx scratch
-            similar(psi, Float64, n_pts),     # fy scratch
-            similar(psi, Float64, n_pts),     # fz scratch
-            similar(psi, n_pts),  # Coriolis derivative scratch
+            # eltype(psi), not ComplexF64 — `ws.fft_plans` follows ψ's
+            # precision and an in-place plan on a mismatched buffer degrades
+            # to out-of-place, so the k-space work silently reads real-space ψ.
+            similar(psi, eltype(psi), n_pts),  # fft_buf
+            similar(psi, Float64, n_pts),      # fx scratch
+            similar(psi, Float64, n_pts),      # fy scratch
+            similar(psi, Float64, n_pts),      # fz scratch
+            similar(psi, eltype(psi), n_pts),  # Coriolis derivative scratch
         )
     end
 end

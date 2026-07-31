@@ -63,7 +63,16 @@ function __init__()
     # memory back to the device. Without this, ~96 64³ ComplexF64
     # workspaces accumulate on a 16 GB GPU (~150 MB pinned per point
     # across psi/fft_buf/k²/ddi_kernel) and a long scan will OOM mid-run.
-    SpinorBEC._cuda_reclaim_callback[] = () -> (CUDA.reclaim(); nothing)
+    #
+    # The `functional()` guard is load-bearing, not defensive: this extension
+    # loads whenever CUDA.jl is imported, driver or no driver, so a CPU-only
+    # machine that merely has CUDA.jl installed reached `CUDA.reclaim()`
+    # between scan points and got `ERROR: CUDA driver not functional`. Its two
+    # sibling callbacks below were guarded from the start; this one drifted.
+    SpinorBEC._cuda_reclaim_callback[] = function ()
+        CUDA.functional() && CUDA.reclaim()
+        nothing
+    end
     SpinorBEC._cuda_functional_callback[] = () -> CUDA.functional()
     SpinorBEC._cuda_state_lines_callback[] = function ()
         if !CUDA.functional()
