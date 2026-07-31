@@ -36,6 +36,18 @@ const MAX_COST = parse(Float64, _arg("--max-cost", "15"))
 
 function probe_files()
     spec = _arg("--probe", "grounded_cheap")
+    # A comma-separated spec is a UNION of specs, resolved one at a time. The
+    # first version treated the whole string as one token, so `dir:a,dir:b`
+    # matched no branch — and the empty-selection guard below is what turned
+    # that into an error instead of a report full of false gaps.
+    if occursin(",", spec) && !occursin(".jl", spec)
+        parts = string.(split(spec, ","))
+        return unique(reduce(vcat, [_probe_spec(p) for p in parts]))
+    end
+    _probe_spec(spec)
+end
+
+function _probe_spec(spec::AbstractString)
     sel = if occursin(".jl", spec)
         string.(split(spec, ","))
     elseif spec == "oracles"
