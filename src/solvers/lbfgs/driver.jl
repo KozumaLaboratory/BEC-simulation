@@ -70,12 +70,22 @@ function find_ground_state_lbfgs(;
     # but the +DDI iteration COUNT rises as m falls, and total wall is
     # flat over m = 5..40. `history_precision` is the lever instead.
     history_precision::DataType=Float64,   # element type of the s/y history.
-    # `Float32` halves the two-loop's traffic, which is what it costs:
-    # 4m reads of a ψ-sized array per direction (230 MB at m=20, 24³,
-    # D=13) at one core's ~23 GB/s. The history only steers the SEARCH
-    # DIRECTION — the line search still accepts on a full-precision
-    # energy and `rho_hist`/`grad` stay Float64 — so this trades
-    # curvature resolution, not correctness.
+    # `Float32` narrows the two-loop's traffic, which is what that step
+    # costs: 4m reads of a ψ-sized array per direction (230 MB at m=20,
+    # 24³, D=13) at one core's ~23 GB/s. The history only steers the
+    # SEARCH DIRECTION — the line search still accepts on a
+    # full-precision energy and `rho_hist`/`grad` stay Float64 — so it
+    # trades curvature resolution, not correctness.
+    #
+    # WHEN IT PAYS, measured at 24³ over three c1_ratio values:
+    #   contact  31.2→27.6 ms/iteration and the SAME iteration count
+    #            (36 either way) ⇒ −9 % wall.
+    #   +DDI     the same −3.6 ms/iteration, but 16-36 % MORE iterations
+    #            ⇒ +3 to +21 % wall. A NET LOSS.
+    # So this is opt-in for contact-dominated problems and must not be
+    # switched on for the dipolar production case. The per-iteration
+    # saving is consistent to 0.1 ms across all six runs; it is the
+    # convergence side that decides.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     # Spinor (tabulated) LHY. Until 2026-07-29 these kwargs did not exist, so

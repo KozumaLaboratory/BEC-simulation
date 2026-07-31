@@ -20,6 +20,12 @@ using SpinorBEC:
 #   - the direction it produces is still a DESCENT direction,
 #   - the two solves land on the same energy,
 #   - and it is refused, loudly, where it has not been measured.
+#
+# What it does NOT gate is that turning it on is a good idea, because that
+# depends on the problem: measured at 24³ over three c1_ratio values it is
+# −9 % wall on contact (same iteration count, 36 either way) and +3 to +21 %
+# on +DDI (same −3.6 ms/iteration, but 16-36 % more iterations). Hence the
+# Float64 default.
 
 @testset "L-BFGS history precision" begin
     grid = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0)))
