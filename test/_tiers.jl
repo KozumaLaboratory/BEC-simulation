@@ -135,6 +135,10 @@ const FAST_TESTS = [
     "analysis/test_fisher.jl",
     "hamiltonian/test_interactions_constraint.jl",
     "workflow/test_io.jl",
+    # The run dir is keyed on the config BYTES, not the commit, so the same YAML
+    # under different code reuses cached points silently. This pins the gate that
+    # stops it, and the widened 16-hex directory suffix.
+    "workflow/test_run_dir_provenance_gate.jl",
     "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",
