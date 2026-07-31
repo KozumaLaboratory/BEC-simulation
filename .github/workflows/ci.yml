@@ -15,9 +15,13 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-# Markdown-only changes touch no Julia code, so the expensive steps are worth
-# skipping (~30 % of commits are markdown-only: README / docs / CLAUDE.md /
-# memory notes). This used to be a workflow-level `paths-ignore: ["**/*.md"]`.
+# Markdown-only changes touch no Julia code, so the expensive test tiers are
+# worth skipping (~30 % of commits are markdown-only: README / docs / CLAUDE.md
+# / memory notes). This used to be a workflow-level `paths-ignore: ["**/*.md"]`.
+#
+# The exception is the oracle job: one of those gates takes `docs/**.md` as its
+# INPUT, so for it a markdown change is the change that can break it. See the
+# `docs` output on the `changes` job.
 #
 # That broke once `main` gained branch protection with three required checks.
 # `paths-ignore` stops the workflow from being CREATED at all, so the three
@@ -40,6 +44,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      # Markdown is not inert here: `test/oracles/test_doc_run_citations_resolve.jl`
+      # reads `docs/**.md` and fails on a document citing a `runs/` path that does
+      # not exist. Treating .md as "no code changed" made that gate unreachable
+      # from the change that can break it — main went red on 2026-07-31 when a
+      # docs-only PR imported two documents carrying seven such citations and
+      # merged with three green checks, none of which had run.
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,11 +71,20 @@ jobs:
           if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             echo "base $base unavailable - running everything"
             echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           files=$(git diff --name-only "$base" "$head")
           echo "changed files:"
           echo "$files"
+          # Documentation is an input to a gate, not just prose — see the `docs`
+          # output above. Reported separately from `code` so a markdown-only
+          # change pays for the oracle job (~5 min) and not the test tiers.
+          if printf '%s\n' "$files" | grep -q '^docs/.*\.md$'; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          fi
           # Any file not ending in .md means code. An empty diff also lands
           # here (the empty line does not end in .md), which is the safe way
           # round.
@@ -145,18 +165,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Shared with the `test` job — see the rationale on that job's cache step.
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - uses: julia-actions/julia-runtest@v1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           coverage: false
 
