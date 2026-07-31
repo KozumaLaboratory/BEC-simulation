@@ -240,6 +240,58 @@ const MUTANTS = Mutant[
          or the last snapshot is not the final state — the +1 breaks exactly \
          that divisibility while leaving a plausible number of snapshots."),
 
+    # ── workflow layer, round 2: schema -> runtime -> report ──────────
+    # Chosen for the same reason as the last batch: each is a single
+    # declaration that reaches every run without passing through a Hamiltonian
+    # term, so the whole oracle suite is green by construction.
+    Mutant(:b_theta_degrees_not_converted,
+        "src/workflow/experiments/runtime/b_block_builders.jl",
+        r"        θ = deg2rad\(evaluate\(theta_wf, t\)\)",
+        "        θ = evaluate(theta_wf, t)",
+        :factor, :fatal,
+        "the YAML key is `theta_deg`; the builder works in radians",
+        "Reads the tilt angle as radians. |B| is unchanged, the field still \
+         rotates with the knob and still points along +z at 0, so a scan looks \
+         like a scan — it is just a different field at every nonzero angle."),
+    Mutant(:auto_grid_box_drops_safety,
+        "src/workflow/experiments/schema/auto_defaults.jl",
+        r"    box = \[R \* _DEFAULT_TF_BOX_SAFETY for R in R_TF\]",
+        "    box = [R for R in R_TF]",
+        :factor, :major,
+        "auto_grid derives the box from the Thomas-Fermi radius",
+        "Sizes the box AT the TF radius instead of outside it, so the cloud \
+         touches the wall. The run completes, the norm is conserved, and the \
+         density is clipped — visible only if something checks the edge."),
+    Mutant(:tf_chemical_potential_exponent,
+        "src/workflow/experiments/schema/auto_defaults.jl",
+        r"\(15\.0 \* N_atoms \* a_s / a_ho\)\^\(2\.0 / 5\.0\)",
+        "(15.0 * N_atoms * a_s / a_ho)^(2.0 / 3.0)",
+        :factor, :major,
+        "μ_TF/ℏω = ½(15 N a_s/a_ho)^{2/5}, isotropic harmonic",
+        "The 2/5 is the 3-D Thomas-Fermi exponent. Any exponent still grows \
+         with N and still gives a positive radius, so the derived grid stays \
+         plausible while being wrong by a power."),
+    # Not a physics defect: this one removes a DISCIPLINE the code enforces.
+    Mutant(:error_budget_skips_positive_control,
+        "src/workflow/validation/error_budget.jl",
+        r"    if !\(b\.control >= bound\)",
+        "    if false",
+        :missing_gate, :fatal,
+        "mistake_null_from_a_degenerate_knob_2026_07_31",
+        "`NegligibleErrorSpec` refuses to return a PASS when the control does \
+         not breach the bound — a comparison that cannot fail is not evidence \
+         that the approximation is good. Removing the guard turns every vacuous \
+         budget into a green one, and nothing downstream can tell."),
+    Mutant(:save_state_drops_the_channel_dict,
+        "src/workflow/io/io.jl",
+        r"        c_dict=ws\.interactions\.c,",
+        "        c_dict=Dict{Int, Float64}(),",
+        :missing_gate, :fatal,
+        "mistake_config_zeeman_sign_drift_211_files_2026_07_29",
+        "Writes an EMPTY channel dict, so every reload silently loses c₂ and \
+         every higher even-rank channel while c₀ and c₁ survive. The file \
+         opens, the state loads, the physics is a different Hamiltonian."),
+
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where
     # every term-level oracle is green by construction because it never goes
