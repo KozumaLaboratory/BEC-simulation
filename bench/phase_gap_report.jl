@@ -24,7 +24,8 @@ const REF_ARM = "reference (Euler, full_bdg)"
     report(rows; io = stdout)
 
 `rows` is any iterable of NamedTuples carrying `arm, B, dE, conv, dEf, distinct,
-sep0, sep1, sep, growth`. Prints the three judgements in the order they have to be
+distinct1, sep0, sep1, sep, growth`. `distinct1` may be `missing` for rows written
+before it existed, and a `missing` is reported as unanswered rather than filled in. Prints the three judgements in the order they have to be
 read: whether the scaffolding produced the answer, whether the accuracy setting
 changes the answer, and only then the boundary verdict.
 """
@@ -53,10 +54,18 @@ function report(rows; io::IO=stdout)
     # ratio, no absolute-vs-relative ambiguity.
     println(io, "\n[scaffolding] were the seeds still in DIFFERENT classes when the arm took over?")
     let n_total = length(rows),
-        pre_merged = [r for r in rows if !r.distinct1]
+        unknown = count(r -> r.distinct1 === missing, rows),
+        pre_merged = [r for r in rows if r.distinct1 === false]
 
+        if unknown == n_total
+            println(io, "  NOT RECORDED in these rows — they predate the field. This section")
+            println(io, "  cannot be answered from them, and the classification below must")
+            println(io, "  not be read as physics until a run records it.")
+            @goto after_scaffolding
+        end
+        unknown > 0 && @printf(io, "  %d row(s) predate the field and are excluded.\n", unknown)
         @printf(io, "  arm had a choice: %d   already one class after stage 1: %d   (of %d)\n",
-            n_total - length(pre_merged), length(pre_merged), n_total)
+            n_total - length(pre_merged) - unknown, length(pre_merged), n_total - unknown)
         if isempty(pre_merged)
             println(io, "  Every arm inherited two distinct classes, so each `dist` below is")
             println(io, "  the arm's own answer and not the two-stage scaffolding's.")
@@ -71,6 +80,7 @@ function report(rows; io::IO=stdout)
             println(io, "  those and say which were pre-merged; do not average over both.")
         end
     end
+    @label after_scaffolding
 
     # The classification, not ΔE, is what the claims rest on — so the next thing
     # to report is whether the ARMS AGREE about it. If two accuracy settings put
@@ -163,7 +173,12 @@ function read_rows(path::AbstractString)
                    v == "true" ? true : v == "false" ? false : parse(Float64, v)
         end
         push!(rows, (arm=d["arm"], B=d["B"], dE=d["dE"], conv=d["conv"],
-            dEf=d["dEf"], distinct=d["distinct"], distinct1=get(d, "distinct1", true),
+            # `missing`, NEVER a default. A row written before this field existed
+            # does not know whether the arm had a choice, and defaulting it to
+            # `true` would have the report print a measurement it never made —
+            # the exact failure this bench keeps catching in the physics.
+            dEf=d["dEf"], distinct=d["distinct"],
+            distinct1=get(d, "distinct1", missing),
             sep0=d["sep0"],
             sep1=d["sep1"], sep=d["sep"], growth=d["growth"]))
     end
