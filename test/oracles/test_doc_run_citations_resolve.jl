@@ -37,7 +37,11 @@ const PLACEHOLDERS = Set([
     "tsubame_scan", "_dashboard_cache",
 ])
 
-# Cited, absent, and known. Regenerated 2026-07-31 with the corrected pattern.
+# Cited, absent, and known. Regenerated 2026-07-31 with the corrected pattern,
+# then trimmed to 26 the same day: #227 regenerated this list while the two notes
+# imported by #221 were still in the tree, and #228 moved those notes out of the
+# repository without dropping the seven names only they cited. Each PR was green
+# alone and they were red together — which is what the rot arm below is for.
 #
 # A NAME list churns: every session that adds a document naming a run it has not
 # produced yet has to edit this file. The better shape is a marker at the citation
@@ -48,15 +52,14 @@ const PLACEHOLDERS = Set([
 const KNOWN_UNRESOLVED = Set([
     "12174e883326ecac", "Cr_eps0.15_", "Dy_eps1.39_", "Er_eps0.88_",
     "Eu151_GS_64g", "Eu_eps0.55_", "_loop", "ddi_convention_factorial",
-    "ensemble_traces_round5", "eu151_b1_c1_sweep_template", "eu151_edh_ext",
+    "ensemble_traces_round5", "eu151_edh_ext",
     "eu151_klaus_lab_units", "eu151_mz_scan", "eu151_phase_pq",
-    "eu151_phi_omega", "fortress_compare", "klaus_eu151_mechanism_",
-    "klaus_eu151_spin_excitation", "klaus_eu151_v2_full", "klaus_option_gamma",
-    "klaus_option_gamma_full", "lhy_mode_ablation", "lyapunov_diagnostic_round6",
-    "option_gamma_micro", "option_gamma_smoke", "paper4_meanfield",
+    "eu151_phi_omega", "fortress_compare",
+    "klaus_eu151_v2_full",
+    "lhy_mode_ablation", "lyapunov_diagnostic_round6",
+    "option_gamma_micro", "paper4_meanfield",
     "sigma_mu_scan_", "sigma_mu_scan_round5", "species_scan_round6",
     "sprint5_M1_", "sprint5_M1_multistart_groundstate", "twa_sinatra",
-    "validation_level",
 ])
 
 """A citation resolves if the directory exists, or — for a family written
