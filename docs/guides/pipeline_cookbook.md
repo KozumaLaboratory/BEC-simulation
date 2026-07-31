@@ -1,6 +1,6 @@
 # Pipeline cookbook
 
-Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` and `runs/eu151_*/config.yaml`.
+Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` (example) and `runs/eu151_*/config.yaml`.
 
 ## Basic ground state
 

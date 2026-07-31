@@ -114,10 +114,10 @@ production runs.
 ### Layer F — DDI convention factorial
 
 Script: `test/hamiltonian/test_ddi_convention_factorial.jl` — **in `FAST_TESTS`,
-so it runs on every PR.** ~~Output: `runs/ddi_convention_factorial/results.jld2`.~~
+so it runs on every PR.** ~~Output: `runs/ddi_convention_factorial/results.jld2` (gone).~~
 
 > **The authority here is the test, not the table (2026-07-31).**
-> `runs/ddi_convention_factorial/` has never existed in any commit, so the numeric
+> `runs/ddi_convention_factorial/` (gone) has never existed in any commit, so the numeric
 > rows below cannot be re-checked. That matters less than it does elsewhere,
 > because what the test asserts is the *relations* — spherical → 0 (traceless Q),
 > prolate along B → E_DDI < 0 (head-to-tail attractive), oblate ⊥ B → E_DDI > 0,
