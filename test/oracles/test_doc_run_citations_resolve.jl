@@ -83,6 +83,22 @@ function _cited_run_dirs()
         endswith(n, ".md") || continue
         path = joinpath(root, n)
         rel = relpath(path, _DOCS)
+        # `docs/archive/` is out of scope. This gate is about LIVE claims: a
+        # document saying "see runs/x" is asserting that evidence can be
+        # followed. Archived documents are, by that directory's own README,
+        # "kept for historical context but not part of the live documentation
+        # set" — a run they name is part of the record of what was done at the
+        # time, not a pointer a reader is meant to follow today.
+        #
+        # Without this, importing a historical document is enough to fail the
+        # gate, and the only ways out are to widen KNOWN_UNRESOLVED (which is
+        # the one thing it exists to stop) or to keep the document out of the
+        # repository. That happened on 2026-07-31 and cost two round trips.
+        #
+        # Measured before making the change: no cited name appears ONLY under
+        # `archive/`, so nothing is hidden today and no KNOWN_UNRESOLVED entry
+        # becomes uncited. This is scope, not amnesty.
+        startswith(rel, "archive" * Base.Filesystem.path_separator) && continue
         for m in eachmatch(pat, read(path, String))
             # Trim trailing punctuation and the glob star a doc writes for a family.
             d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
@@ -95,6 +111,18 @@ end
 
 @testset "documents cite runs/ paths that resolve" begin
     cited = _cited_run_dirs()
+
+    # The scope exclusion is load-bearing, so assert it directly rather than
+    # trusting the `continue` above. Archived docs DO cite runs/ paths (AUDIT_BUG4
+    # and MEASUREMENT_CAMPAIGN_PHASE2 between them name three), so this is not
+    # vacuous: delete the exclusion and those citers reappear here.
+    @testset "archived docs are out of scope" begin
+        from_archive = sort([
+            "$d <- $f" for (d, fs) in cited for f in fs if
+            startswith(f, "archive" * Base.Filesystem.path_separator)
+        ])
+        @test from_archive == String[]
+    end
 
     @testset "the sweep found citations" begin
         # A zero here makes every assertion below vacuous — the same shape this
