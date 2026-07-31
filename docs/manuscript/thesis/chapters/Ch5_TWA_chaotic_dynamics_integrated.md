@@ -105,7 +105,26 @@ SpinorBEC.jl supports 5 LHY treatment modes (via `spinor_lhy:` YAML key):
 Config: `runs/lhy_mode_ablation/`. Eu F=6, $a_s = 110\,a_B$, $N = 10^4$, 32³ box=10,
 ITP to convergence. Variable: `spinor_lhy` setting only.
 
+> **その config は git に一度も入っていない (2026-07-31)。** `runs/lhy_mode_ablation/`
+> は履歴上どの commit にも存在しない — 誰かの作業ツリーにあり、本文が引用し、
+> 引用だけが残った。**したがって下表の 5 行は再チェック不能**であり、古いのではなく
+> **辿れない**。stale な run なら特定して日付を付けて失格にできるが、これはできない。
+> 監査 (`stored_results_vintage_audit.md`) が扱う 481 件とは別の失敗形態で、
+> 全体像は [`doc_run_citation_inventory.md`](../../../campaign/doc_run_citation_inventory.md)
+> にある（cited 66 / absent 26 のうち、結果を伴う主張はこれを含め 4 件のみ）。
+>
+> 直下の 2026-07-29 注記が参照する再導出は **姉妹 config**
+> (`eu151_edh_postfix_local`) に対するものであって、この ablation そのものではない。
+> パラメータは上に書かれているので**再生成は可能**だが、まだ走らせていない。
+
 ### 5.2.3 結果: 5 modes all collapse to identical filament
+
+> **この表を campaign evidence として引用しないこと。** 下の 5 行は §5.2.2 の
+> 消えた config が出したもので、(a) 再チェックできず、(b) 2026-06 の積分器修正、
+> 2026-07-08 の q 修正、および LHY 欠陥群（表引き LHY が経路単位で落ちる 6 経路、
+> 閉形式の $N_{atoms}$ 倍、GPU broadcast の silent zero、FM の
+> `kappa < 1e-12 && return 0.0` が負の $g_{2F}$ を飲む件）すべてより前に測られている。
+> 結論そのものの現状は直下の注記を読むこと。
 
 | spinor_lhy mode | filament length (μm) | peak density ratio | converged? |
 |---|---|---|---|
