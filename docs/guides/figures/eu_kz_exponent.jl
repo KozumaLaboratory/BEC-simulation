@@ -149,7 +149,13 @@ function kz_scan(;
     R_over_ξ >= 25 || @warn "R_TF/ξ = 2μ is small; at 10 the quench gave zero defects " *
                             "at every rate (converged). Expect no signal." R_over_ξ
     @printf("  dx/ξ = %.2f (need ≤0.80)   R_TF/ξ = 2μ = %.0f (need ≳30)\n", dx / ξ, R_over_ξ)
-    @printf("=== KZ scan (scalar limit: c₁=0, no DDI) ===\n")
+    # Header must state the configuration ACTUALLY running. It was hardcoded to
+    # "scalar limit: c₁=0, no DDI" and printed that while the spinor step ran with
+    # c₁ = -0.0095 — a log that disagrees with the run is how a wrong setting
+    # survives review.
+    @printf("=== KZ scan (%s) ===\n",
+        spinor ? "SPINOR: c₁=$(c1), all components evolve, no DDI" :
+        "scalar limit: c₁=0, no DDI")
     @printf("  grid %d³ box %.1f   k_cut %.2f (k_max %.2f)   μ=%.1f  T %.1f→%.1f\n",
         grid_n, box, k_cut, k_max, mu, T_hot, T_cold)
     @printf("  γ=%.3g (FIXED) ℳ̄=%.3g   τ_Q %s   %d seeds\n",
