@@ -100,9 +100,16 @@
 # them onto one state, stage 2 only refines it and "0 distinct" says nothing about
 # whether two minima exist — the comparison would have been destroyed by the fix
 # that made the reference well-posed. So v5 records `state sep` at the END OF
-# STAGE 1 as well, which is the direct test: sep_1 already ≈ sep_2 means the
-# merge happened before the arm's own physics was switched on, and the result is
-# an artifact.
+# STAGE 1 as well. The FIRST version of that check compared sep@1 to the final
+# sep and flagged "merged" when they were close — which is wrong, and the smoke
+# said so: at 40 steps both are ≈ 0.43, i.e. nothing merged and stage 2 simply had
+# no time to act, yet the rule fired on all 16 points. Closeness of the two says
+# stage 2 did nothing; it does not say stage 1 did everything.
+#
+# So the separation is recorded at all THREE points — seed, end of stage 1, end of
+# stage 2 — and the question becomes which leg of that trajectory did the
+# collapsing. That is readable directly from the printed numbers, so the rule is a
+# convenience rather than the evidence.
 #
 # Also worth an explanation, and NOT yet explained: the reference arm reports
 # ΔE = 43.4 between two states that agree to 1.6e-3, where the production arm
@@ -195,10 +202,12 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         # Stage 2: the arm's own LHY, tabulated from the relaxed ψ.
         gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
         psi_h = Array(gs.workspace.state.psi)
-        _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
-        _, _, fz1 = spin_density_vector(psi_pre, gs.workspace.spin_matrices, 3)
+        sm = gs.workspace.spin_matrices
+        _, _, fz = spin_density_vector(psi_h, sm, 3)
+        _, _, fz1 = spin_density_vector(psi_pre, sm, 3)
+        _, _, fz0 = spin_density_vector(Array(seed_psi), sm, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
-        (E=gs.energy, fz=fz, fz1=fz1, converged=gs.converged, growth=growth,
+        (E=gs.energy, fz=fz, fz1=fz1, fz0=fz0, converged=gs.converged, growth=growth,
             # The final dE VALUE, not just the boolean. Without it "not
             # converged" cannot be told apart from "converged, but this
             # criterion never fires" — which is the whole question when a gauge
@@ -218,18 +227,20 @@ function gap(; B, kind, dt, taylor, cap)
     a = relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
     b = relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
-    # The same measure at the END OF STAGE 1, i.e. before either arm's own LHY
-    # was switched on. If this already matches `sep`, the two-stage design merged
-    # the seeds itself and the arm's `distinct` verdict is about my scaffolding
-    # rather than about the physics.
+    # The same measure at the two earlier points of the trajectory: the raw seeds,
+    # and the end of the common LHY-free stage 1. `sep0 → sep1 → sep` says WHERE
+    # the two seeds stopped being different — and if that is the first leg, the
+    # two-stage scaffolding merged them and the arm's `distinct` verdict is about
+    # my design rather than about whether two minima exist.
     sep1 = norm(vec(a.fz1) .- vec(b.fz1)) / max(norm(vec(a.fz1)), eps())
+    sep0 = norm(vec(a.fz0) .- vec(b.fz0)) / max(norm(vec(a.fz0)), eps())
     # `isequal`, not `!=`: `_winding_vector` returns `missing` for a depopulated
     # component, and `!=` on vectors carrying missing yields `missing` rather than
     # a Bool — which is a TypeError the moment it reaches an `if`. `isequal`
     # treats missing as equal to missing and always returns Bool, so "the same
     # component is empty in both" reads as the same class, which is what it is.
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
-    (dE=b.E - a.E, sep=sep, sep1=sep1, distinct=distinct,
+    (dE=b.E - a.E, sep=sep, sep1=sep1, sep0=sep0, distinct=distinct,
         conv=a.converged && b.converged,
         # The WORSE of the two, because a reference is only defined where BOTH
         # states have one.
@@ -305,18 +316,19 @@ println("  those rows are gaps between phases; the rest say there is no second")
 println("  minimum there, which is information rather than a failed measurement.")
 println("  `max Imω` is the mean field the LHY table was built from. Nonzero ⇒")
 println("  ε_LHY is scheme-dependent for that row and its ΔE is not a gap.")
-println("  `sep@1` is the same separation at the END OF STAGE 1, before the arm's")
-println("  own LHY. sep@1 ≈ sep means the two-stage scaffolding merged the seeds,")
-println("  not the physics — read that column BEFORE reading `dist`.")
-@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s %9s\n",
-    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep", "sep@1", "max Imω")
+println("  `sep@0 → sep@1 → sep` is the separation at the raw seeds, at the end of")
+println("  the common LHY-free stage 1, and at the end of the arm. If the collapse")
+println("  happens on the FIRST leg the scaffolding merged the seeds, not the arm —")
+println("  read that before reading `dist`.")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s %9s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "sep@0", "sep@1", "sep", "max Imω")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
     g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
     results[(label, B)] = g
-    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3e %9.3g\n",
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3e %9.3e %9.3g\n",
         label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
-        g.distinct ? "yes" : "no", g.sep, g.sep1, g.growth)
+        g.distinct ? "yes" : "no", g.sep0, g.sep1, g.sep, g.growth)
     GC.gc(true);
     CUDA.reclaim()
 end
@@ -330,18 +342,28 @@ end
 # converged ΔE or a slope to be meaningful.
 # The scaffolding check comes FIRST: if stage 1 already merged the seeds, nothing
 # below is about the physics and saying so has to precede saying anything else.
-let merged = [(label, B) for (label, _) in arms, B in BS
-              if results[(label, B)].sep1 < 10 * results[(label, B)].sep]
-    println("\n[scaffolding] did stage 1 merge the seeds before the arm ran?")
-    if isempty(merged)
-        println("  No: every arm entered stage 2 with the seeds still ≥10× further")
-        println("  apart than they ended, so the merge is the arm's own doing.")
+println("\n[scaffolding] which leg of sep@0 → sep@1 → sep did the collapsing?")
+let n_total = length(arms) * length(BS),
+    # Stage 1 owns the merge when it closed more of the gap than the arm did.
+    # Only meaningful where a collapse happened at all, so points that never
+    # merged are counted separately rather than folded in either way.
+    legs = [(label, B, results[(label, B)]) for (label, _) in arms, B in BS]
+
+    merged = [(l, B) for (l, B, r) in legs if r.sep < 0.1 * r.sep0 && (r.sep0 - r.sep1) > (r.sep1 - r.sep)]
+    late = [(l, B) for (l, B, r) in legs if r.sep < 0.1 * r.sep0 && (r.sep0 - r.sep1) <= (r.sep1 - r.sep)]
+    never = n_total - length(merged) - length(late)
+    @printf("  stage 1 did most of it: %d   the arm did most of it: %d   no collapse: %d   (of %d)\n",
+        length(merged), length(late), never, n_total)
+    if !isempty(merged)
+        println("  The first group's `dist` verdict is about the two-stage scaffolding,")
+        println("  NOT about whether two minima exist. Fix the design before reading")
+        println("  any classification from those points.")
+    elseif never == n_total
+        println("  Nothing collapsed anywhere — the seeds stayed apart, so `dist` is")
+        println("  the arm's own answer (and a too-short run looks like this too:")
+        println("  check `conv` before believing it).")
     else
-        println("  YES at $(length(merged)) of $(length(arms) * length(BS)) points — at those, the seeds were")
-        println("  already within 10× of their final separation before the arm's LHY")
-        println("  was switched on. Their `dist` verdict is about the two-stage")
-        println("  scaffolding, NOT about whether two minima exist. Fix the design")
-        println("  before reading any classification from them.")
+        println("  The collapse is the arm's own doing, so `dist` is about the physics.")
     end
 end
 
