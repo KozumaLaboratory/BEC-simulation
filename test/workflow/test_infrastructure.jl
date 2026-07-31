@@ -564,9 +564,15 @@ pipeline:
         @test sum(abs2, psi) * cell_volume(grid2d) ≈ 1.0 atol=1e-10
     end
 
-    @testset "P1.1: Schema accepts all 22 init states" begin
+    @testset "P1.1: Schema accepts every init state it advertises" begin
+        # `ferromagnetic` / `ferromagnetic_min` became `m_plus_F` / `m_minus_F`
+        # in c2b0bece. The rename deleted the old names from the schema, as the
+        # naming convention requires, and this list kept them — for 2½ months,
+        # because no tier ran this file and the nightly that did was already
+        # red. The set-equality below is what makes the next rename fail HERE,
+        # with both sides named, instead of inside `validate_config!`.
         all_states = [
-            "polar", "ferromagnetic", "ferromagnetic_min",
+            "polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "radial_spin_vortex", "flower", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
@@ -575,6 +581,11 @@ pipeline:
             "chiral_spin_vortex", "magnetic_domain",
             "vortex_lattice", "skyrmion_lattice",
         ]
+        # `from_jld2` is a loader, not a named state — the one enum entry this
+        # list deliberately omits.
+        @test Set(all_states) ==
+            setdiff(Set(SpinorBEC.GS_SCHEMA["initial_state"].enum), Set(["from_jld2"]))
+
         for s in all_states
             d = Dict{String, Any}(
                 "atom" => "Rb87", "grid" => Dict("n" => 32, "box" => 10.0),
