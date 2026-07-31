@@ -89,6 +89,28 @@
 # positive control fired: with the spin rotation removed, final dE ran 1e-1
 # instead of 1e-6, so the instrument is not blind.
 #
+# v5 (2026-07-31). At 120000 steps every arm CONVERGES (dE ≈ 9.5e-10 against a
+# 1e-9 target) and every arm reports the two seeds landing in the SAME winding
+# class, with `state sep` at 1e-3 (reference) to 1e-7 (production) against 1.09
+# for the broken control. So the bistability v3 appeared to show was
+# under-convergence: the seeds had simply not merged yet at 30000 steps.
+#
+# BUT THAT MAY BE MY OWN DESIGN AND NOT THE PHYSICS. Two-stage relaxation runs
+# both seeds through a COMMON LHY-free stage 1 first. If stage 1 already collapses
+# them onto one state, stage 2 only refines it and "0 distinct" says nothing about
+# whether two minima exist — the comparison would have been destroyed by the fix
+# that made the reference well-posed. So v5 records `state sep` at the END OF
+# STAGE 1 as well, which is the direct test: sep_1 already ≈ sep_2 means the
+# merge happened before the arm's own physics was switched on, and the result is
+# an artifact.
+#
+# Also worth an explanation, and NOT yet explained: the reference arm reports
+# ΔE = 43.4 between two states that agree to 1.6e-3, where the production arm
+# reports 6.1e-3. Each seed builds its OWN full_bdg table from its own stage-1
+# state, and those tables are individually scheme-dependent, so the suspicion is
+# that ΔE there is a difference of TABLES rather than of states. `sep_1` plus the
+# per-seed ε_LHY now printed makes that checkable instead of suspected.
+#
 #   julia --project=. bench/phase_gap_error_budget.jl [n] [max_steps]
 
 using Printf
@@ -174,8 +196,9 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
         psi_h = Array(gs.workspace.state.psi)
         _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
+        _, _, fz1 = spin_density_vector(psi_pre, gs.workspace.spin_matrices, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
-        (E=gs.energy, fz=fz, converged=gs.converged, growth=growth,
+        (E=gs.energy, fz=fz, fz1=fz1, converged=gs.converged, growth=growth,
             # The final dE VALUE, not just the boolean. Without it "not
             # converged" cannot be told apart from "converged, but this
             # criterion never fires" — which is the whole question when a gauge
@@ -195,13 +218,18 @@ function gap(; B, kind, dt, taylor, cap)
     a = relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
     b = relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
+    # The same measure at the END OF STAGE 1, i.e. before either arm's own LHY
+    # was switched on. If this already matches `sep`, the two-stage design merged
+    # the seeds itself and the arm's `distinct` verdict is about my scaffolding
+    # rather than about the physics.
+    sep1 = norm(vec(a.fz1) .- vec(b.fz1)) / max(norm(vec(a.fz1)), eps())
     # `isequal`, not `!=`: `_winding_vector` returns `missing` for a depopulated
     # component, and `!=` on vectors carrying missing yields `missing` rather than
     # a Bool — which is a TypeError the moment it reaches an `if`. `isequal`
     # treats missing as equal to missing and always returns Bool, so "the same
     # component is empty in both" reads as the same class, which is what it is.
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
-    (dE=b.E - a.E, sep=sep, distinct=distinct,
+    (dE=b.E - a.E, sep=sep, sep1=sep1, distinct=distinct,
         conv=a.converged && b.converged,
         # The WORSE of the two, because a reference is only defined where BOTH
         # states have one.
@@ -277,15 +305,18 @@ println("  those rows are gaps between phases; the rest say there is no second")
 println("  minimum there, which is information rather than a failed measurement.")
 println("  `max Imω` is the mean field the LHY table was built from. Nonzero ⇒")
 println("  ε_LHY is scheme-dependent for that row and its ΔE is not a gap.")
-@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s\n",
-    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep", "max Imω")
+println("  `sep@1` is the same separation at the END OF STAGE 1, before the arm's")
+println("  own LHY. sep@1 ≈ sep means the two-stage scaffolding merged the seeds,")
+println("  not the physics — read that column BEFORE reading `dist`.")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep", "sep@1", "max Imω")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
     g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
     results[(label, B)] = g
-    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3g\n",
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3e %9.3g\n",
         label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
-        g.distinct ? "yes" : "no", g.sep, g.growth)
+        g.distinct ? "yes" : "no", g.sep, g.sep1, g.growth)
     GC.gc(true);
     CUDA.reclaim()
 end
@@ -297,6 +328,23 @@ end
 # same (B, seeds) in different winding classes, that disagreement IS the accuracy
 # requirement, stated in the units the claim is made in, and it does not need a
 # converged ΔE or a slope to be meaningful.
+# The scaffolding check comes FIRST: if stage 1 already merged the seeds, nothing
+# below is about the physics and saying so has to precede saying anything else.
+let merged = [(label, B) for (label, _) in arms, B in BS
+              if results[(label, B)].sep1 < 10 * results[(label, B)].sep]
+    println("\n[scaffolding] did stage 1 merge the seeds before the arm ran?")
+    if isempty(merged)
+        println("  No: every arm entered stage 2 with the seeds still ≥10× further")
+        println("  apart than they ended, so the merge is the arm's own doing.")
+    else
+        println("  YES at $(length(merged)) of $(length(arms) * length(BS)) points — at those, the seeds were")
+        println("  already within 10× of their final separation before the arm's LHY")
+        println("  was switched on. Their `dist` verdict is about the two-stage")
+        println("  scaffolding, NOT about whether two minima exist. Fix the design")
+        println("  before reading any classification from them.")
+    end
+end
+
 println("\n[classification] does the accuracy setting change the ANSWER?")
 @printf("  %-36s %s\n", "arm", join((@sprintf("%9.2e", B) for B in BS), " "))
 for (label, _) in arms
