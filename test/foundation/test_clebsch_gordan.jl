@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Clebsch-Gordan / Wigner coefficients" begin
     @testset "Wigner 3j known values" begin
         # (1,1,0; 0,0,0) = -1/√3 (standard Condon-Shortley convention)

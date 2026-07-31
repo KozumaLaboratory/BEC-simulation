@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "DDI" begin
     @testset "Q tensor symmetry and tracelessness" begin
         config = GridConfig((16, 16, 16), (10.0, 10.0, 10.0))

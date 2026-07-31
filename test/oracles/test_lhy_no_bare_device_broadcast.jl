@@ -1,3 +1,4 @@
+using SpinorBEC
 using Test
 
 # A `TabulatedLHY` holds host `Vector{Float64}` tables, so it cannot be captured

@@ -7,6 +7,8 @@
 # those features as `:octahedral` / `:cubic` / `:cube_octahedral` /
 # `:dodecahedral` instead of falling back to `:unknown`.
 
+using Test
+using SpinorBEC
 using SpinorBEC: make_grid, GridConfig, spin_matrices, canonical_polyhedral_spinor,
     classify_phase_detailed, classify_phase_distance, DEFAULT_PHASE_REFERENCES,
     canonical_polyhedral_point_group

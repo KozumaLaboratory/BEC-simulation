@@ -5,6 +5,7 @@
 # to either route through the nulling helpers or consciously extend the allow-list
 # AND add a Nyquist oracle. Closes the token-comment loophole of a grep guard.
 
+using SpinorBEC
 using Test
 
 @testset "odd FFT derivative: exact allow-list (Nyquist-null enforced)" begin

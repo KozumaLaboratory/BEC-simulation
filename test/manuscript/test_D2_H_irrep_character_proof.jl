@@ -12,6 +12,7 @@
 #
 # Reference: docs/manuscript/papers/paper3_universal_theorem/rank2_vanishing_analytical_proof.md
 
+using SpinorBEC
 using Test
 using Printf
 
