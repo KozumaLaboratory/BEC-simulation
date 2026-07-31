@@ -16,8 +16,11 @@
 #     knobs and must be REJECTED, because its residual is 4.4× what production
 #     already carries — a hand-picked `fast` field had it in, and that was the
 #     defect this design replaces.
-#   * the `:reference` precondition refuses the `full_bdg`-from-a-raw-seed
-#     combination, with a positive control that it can pass at all.
+#   * the `:reference` preconditions refuse BOTH ways `full_bdg` lands on an
+#     unstable mean field — a raw seed, and an active dipole — with a positive
+#     control that the check can pass at all. The dipole case is ordered first
+#     deliberately: it is the one no relaxation fixes, so a dipolar caller must
+#     not be handed the relaxation advice.
 
 using Test
 using SpinorBEC
@@ -117,17 +120,40 @@ using SpinorBEC: ACCURACY_KNOBS, ACCURACY_PROFILE_NAMES, accuracy_profile,
         @test_throws ArgumentError accuracy_profile(:turbo)
     end
 
-    @testset ":reference refuses full_bdg tabulated from a raw seed" begin
+    @testset ":reference refuses an unstable mean field, both ways in" begin
         bad = check_accuracy_preconditions(:reference; relaxed_initial_state=false)
         @test !passed(bad)
         @test occursin("scheme-dependent", bad.summary)
-        # Positive control: the check CAN pass, so the failure above is about the
-        # input and not about the check being unsatisfiable.
+        @test occursin("Relax first", bad.summary)
+
+        # An active dipole is the case no relaxation fixes: measured unstable at
+        # every c₁, q and density scanned at Eu F=6. So a relaxed dipolar caller
+        # must STILL be refused, and must NOT be told to relax.
+        dip = check_accuracy_preconditions(:reference; relaxed_initial_state=true,
+            c_dd=211.0)
+        @test !passed(dip)
+        @test occursin("dipole", dip.summary)
+        @test !occursin("Relax first", dip.summary)
+        # Ordering: the dipole reason wins even when both hold, because the
+        # relaxation advice would send the caller after a measured non-fix.
+        both = check_accuracy_preconditions(:reference; relaxed_initial_state=false,
+            c_dd=211.0)
+        @test occursin("dipole", both.summary)
+
+        # Positive control: the check CAN pass, so the failures above are about
+        # the input and not about the check being unsatisfiable.
         ok = check_accuracy_preconditions(:reference; relaxed_initial_state=true)
         @test passed(ok)
-        # Production does not use full_bdg, so it has no such precondition.
-        @test passed(check_accuracy_preconditions(:production;
-            relaxed_initial_state=false))
+        # …and c_dd = 0 really is the discriminator, not the relaxation flag
+        # doing all the work.
+        @test passed(check_accuracy_preconditions(:reference;
+            relaxed_initial_state=true, c_dd=0.0))
+        # Production does not use full_bdg, so it has no such precondition — with
+        # or without a dipole.
+        @test passed(
+            check_accuracy_preconditions(:production;
+                relaxed_initial_state=false, c_dd=211.0),
+        )
     end
 
     @testset "the report names what it does NOT set" begin
@@ -136,6 +162,10 @@ using SpinorBEC: ACCURACY_KNOBS, ACCURACY_PROFILE_NAMES, accuracy_profile,
         s = String(take!(buf))
         @test occursin("NOT set by this profile", s)
         @test occursin("with_reference_accuracy", s)
+        # The footer must name BOTH ways :reference fails, or it reads as though
+        # relaxing the state were enough — which is the thing that was measured
+        # not to be.
+        @test occursin("c_dd", s)
         buf2 = IOBuffer()
         accuracy_profile_report(:reference; io=buf2)
         @test occursin("scheme-dependent", String(take!(buf2)))

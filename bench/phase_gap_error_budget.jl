@@ -45,19 +45,63 @@
 #     land in DIFFERENT classes. Same-class rows are printed as "no gap here",
 #     which is information, not a failure.
 #
+# v3 (2026-07-30). v2 still answered nothing, and this time the run had TOLD me
+# why in a line I had filtered out of the log:
+#
+#     FullBdG LHY: mean field is dynamically unstable (max Im ω = 1040.0)
+#
+# `:full_bdg` tabulates ε_LHY from the peak-density spinor of the state the
+# workspace is BUILT with, and the reference arm handed it a raw `:flower` seed.
+# Where the mean field is dynamically unstable ε_LHY is scheme-dependent — the
+# zero-point sum drops the complex branches while the counterterms still subtract
+# all D of them — so the reference arm's ITP had no fixed point to converge to.
+# Non-convergence was the CORRECT behaviour of a well-posed code on an ill-posed
+# request. I read it as "unconverged", then as "blocked on issue #172", and both
+# were wrong.
+#
+# So v3 changes what is asked, not the tolerances:
+#
+#   * TWO-STAGE relaxation. Stage 1 relaxes with no LHY at all; stage 2 rebuilds
+#     the workspace from that RELAXED ψ, so the table is tabulated from a
+#     physical state rather than a seed, and re-converges. Both stages run for
+#     every arm, so the staging itself is not a confound between them.
+#   * the stability is now ASKED, not inferred. `lhy_mean_field_max_growth` at the
+#     relaxed peak spinor is printed per row, and a nonzero value marks the row
+#     unusable — the honest verdict, and one that costs milliseconds instead of a
+#     30000-step ITP that was never going to land.
+#
+# v4 (2026-07-31). Two defects the v3 run exposed in itself:
+#
+#   * THE dt/2 ARM WAS CONFOUNDED. Every arm got the same step cap, so halving dt
+#     halved the imaginary time reached. Its `state sep` staying at 5e-2 where the
+#     dt arm collapsed to 4e-5 therefore says "less relaxed", not "dt matters" —
+#     the arm meant to measure the discretisation error was measuring its own
+#     shorter run. Steps now scale as DT/dt, so all arms cover the same τ.
+#   * 30000 STEPS DOES NOT CONVERGE THIS PROBLEM. Every arm finished at
+#     dE ≈ 1e-6..1e-5 against a 1e-9 target, and a gap between two unconverged
+#     runs is a gap between two points on two trajectories. The cap is raised.
+#
+# What v3 DID establish, and what to keep looking at: ΔE is not the usable
+# observable here. The reference arm and its own dt/2 baseline disagree by ~7 at
+# a B where ΔE itself is ~8-15, so the discretisation error is of order the
+# observable. `state sep` — how far apart the two converged states are — moved
+# monotonically and by four orders across the B scan, which is a signal. And the
+# positive control fired: with the spin rotation removed, final dE ran 1e-1
+# instead of 1e-6, so the instrument is not blind.
+#
 #   julia --project=. bench/phase_gap_error_budget.jl [n] [max_steps]
 
 using Printf
 import CUDA
 using SpinorBEC
 using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP, spin_density_vector,
-    _winding_vector
+    _winding_vector, _extract_spinor, lhy_mean_field_max_growth
 using LinearAlgebra: norm
 
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
-const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 30000
+const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 120000
 const ITP_TOL = 1.0e-9
 # The DENSITY-based, gauge-invariant convergence gate. A texture carries a gauge
 # orbit — a global U(1) phase and a spin rotation about z — that leaves ρ and the
@@ -66,32 +110,72 @@ const ITP_TOL = 1.0e-9
 # `converged = false` after 30000 steps at 32³, so nothing it measured was a gap.
 const ITP_TOL_DRHO = 1.0e-7
 const SEEDS = (:flower, :chiral_spin_vortex)
+# Defined here rather than beside the arms: `relax` scales its step count by
+# DT/dt, so the reference dt has to exist before the first arm runs.
+const DT = 0.002
 
 grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
 
-"""ITP from one seed, run to its OWN fixed point. Returns the energy, the
-convergence state (a gap between unconverged runs means nothing) and the
-per-component winding vector that classifies the state."""
+"One ITP run at fixed knobs. `psi0` is a state, so a caller can chain stages."
+function itp(; psi0, B::Float64, kind, dt, steps::Int)
+    grid = grid_of()
+    find_ground_state(;
+        grid, atom=Eu151, interactions=eu_interaction_params(0.05),
+        zeeman=ZeemanParams(linear_zeeman_p(Eu151, B, EU_ω_ref), 0.0),
+        potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
+        dt, n_steps=steps, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO, save_every=200,
+        enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
+        spinor_lhy=kind, backend=CUDABackend(), verbose=false,
+    )
+end
+
+"""TWO-STAGE ITP from one seed.
+
+Stage 1 relaxes with NO LHY, so stage 2 can tabulate ε_LHY from a relaxed state
+rather than from the seed. That ordering is the whole point: a tabulated LHY is
+built once, at `make_workspace` time, from the peak-density spinor it is handed,
+and a seed's peak spinor is not a physical mean field. Both stages run for every
+arm so the staging cannot differ between them.
+
+Returns the energy, the convergence state, the winding vector that classifies the
+state — and `growth`, the `max Im ω` of the mean field the table was built from.
+`growth > 0` means ε_LHY is scheme-dependent for this row and the row is not a
+measurement of anything, whatever its ΔE says."""
 function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
     old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP[]
     SPIN_TAYLOR_ENABLED[] = taylor
     SPIN_TAYLOR_DEGREE_CAP[] = cap
     try
         grid = grid_of()
-        psi0 = init_psi(grid, SpinSystem(6); state=seed)
-        gs = find_ground_state(;
-            grid, atom=Eu151, interactions=eu_interaction_params(0.05),
-            zeeman=ZeemanParams(linear_zeeman_p(Eu151, B, EU_ω_ref), 0.0),
-            potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
-            dt, n_steps=MAX_STEPS, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO,
-            save_every=200,
-            enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
-            spinor_lhy=kind, backend=CUDABackend(), verbose=false,
-        )
+        seed_psi = init_psi(grid, SpinSystem(6); state=seed)
+        # Steps scale INVERSELY with dt, so every arm covers the same imaginary
+        # time. Without this the dt/2 arm reaches half the τ of the others and
+        # its "smaller error" is just a shorter run — which is exactly what v3
+        # measured and nearly reported as a dt effect.
+        nsteps = round(Int, MAX_STEPS * (DT / dt))
+        # Stage 1: mean field only. Half the step budget — it starts from a seed
+        # and only has to reach a physical texture, not the final fixed point.
+        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2)
+        psi_pre = Array(pre.workspace.state.psi)
+
+        # Ask, before spending the second stage, whether a reference is even
+        # defined at the state stage 2 would tabulate from.
+        ip = eu_interaction_params(0.05)
+        zee = ZeemanParams(linear_zeeman_p(Eu151, B, EU_ω_ref), 0.0)
+        n_peak = maximum(sum(abs2, psi_pre; dims=4))
+        growth = try
+            lhy_mean_field_max_growth(; F=6, spinor=_extract_spinor(psi_pre),
+                n0=n_peak, interactions=ip, zeeman=zee, c_dd=EU_c_dd)
+        catch
+            NaN
+        end
+
+        # Stage 2: the arm's own LHY, tabulated from the relaxed ψ.
+        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
         psi_h = Array(gs.workspace.state.psi)
         _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
-        (E=gs.energy, fz=fz, converged=gs.converged,
+        (E=gs.energy, fz=fz, converged=gs.converged, growth=growth,
             # The final dE VALUE, not just the boolean. Without it "not
             # converged" cannot be told apart from "converged, but this
             # criterion never fires" — which is the whole question when a gauge
@@ -119,6 +203,9 @@ function gap(; B, kind, dt, taylor, cap)
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
     (dE=b.E - a.E, sep=sep, distinct=distinct,
         conv=a.converged && b.converged,
+        # The WORSE of the two, because a reference is only defined where BOTH
+        # states have one.
+        growth=max(a.growth, b.growth),
         dEf=max(a.dE_final, b.dE_final), steps=max(a.steps, b.steps),
         wa=a.wind, wb=b.wind)
 end
@@ -169,7 +256,6 @@ end
 
 # --- gap: a small B scan, so the boundary can be located rather than assumed ---
 const BS = (2.6e-9, 3.5e-9, 4.4e-9, 5.2e-9)
-const DT = 0.002
 
 arms = [
     ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false,
@@ -189,28 +275,65 @@ println("  thing that did not fire — read it before believing 'not converged'.
 println("  `distinct` = the two seeds ended in DIFFERENT winding classes. Only")
 println("  those rows are gaps between phases; the rest say there is no second")
 println("  minimum there, which is information rather than a failed measurement.")
-@printf("\n  %-36s %8s %13s %6s %9s %6s %9s\n",
-    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep")
+println("  `max Imω` is the mean field the LHY table was built from. Nonzero ⇒")
+println("  ε_LHY is scheme-dependent for that row and its ΔE is not a gap.")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep", "max Imω")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
     g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
     results[(label, B)] = g
-    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e\n",
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3g\n",
         label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
-        g.distinct ? "yes" : "no", g.sep)
+        g.distinct ? "yes" : "no", g.sep, g.growth)
     GC.gc(true);
     CUDA.reclaim()
 end
 
 # --- verdict --------------------------------------------------------------
+#
+# The classification, not ΔE, is what the claims rest on — so the first thing to
+# report is whether the ARMS AGREE about it. If two accuracy settings put the
+# same (B, seeds) in different winding classes, that disagreement IS the accuracy
+# requirement, stated in the units the claim is made in, and it does not need a
+# converged ΔE or a slope to be meaningful.
+println("\n[classification] does the accuracy setting change the ANSWER?")
+@printf("  %-36s %s\n", "arm", join((@sprintf("%9.2e", B) for B in BS), " "))
+for (label, _) in arms
+    @printf("  %-36s %s\n", label,
+        join((results[(label, B)].distinct ? "  distinct" : "      same" for B in BS), " "))
+end
+let base = [results[(arms[1][1], B)].distinct for B in BS]
+    dis = [(label, B) for (label, _) in arms[2:end], B in BS
+           if results[(label, B)].distinct != base[findfirst(==(B), BS)]]
+    if isempty(dis)
+        println("  All arms agree on every point — so no setting tested here changes")
+        println("  the classification, and the requirement is looser than the coarsest.")
+    else
+        println("  DISAGREEMENT at $(length(dis)) point(s): " *
+                join(("$(l) @ B=$(b)" for (l, b) in dis), "; "))
+        println("  Each is a setting that changes the answer, i.e. an accuracy floor —")
+        println("  but read it against `state sep` in the table: a pair that is already")
+        println("  4 orders closer at that B is a near-degenerate crossover, where any")
+        println("  setting can flip the label and none of them is wrong.")
+    end
+end
+
 println()
 ref = [results[("reference (Euler, full_bdg)", B)] for B in BS]
-usable = [i for i in eachindex(BS) if ref[i].conv && ref[i].distinct]
+usable = [i for i in eachindex(BS)
+          if ref[i].conv && ref[i].distinct && (ref[i].growth == 0)]
 if length(usable) < 2
+    nconv = count(r -> r.conv, ref)
+    ndist = count(r -> r.distinct, ref)
+    nstab = count(r -> r.growth == 0, ref)
     println("""[verdict] The reference arm has $(length(usable)) usable B point(s) — a point is
-usable only if BOTH seeds converged AND ended in different winding classes.
-Fewer than two means the boundary cannot be located here and no δB can be
-quoted. That is the honest outcome, not a number to report.""")
+usable only if BOTH seeds converged, ended in DIFFERENT winding classes, AND the
+mean field the LHY table came from is dynamically stable. Of $(length(BS)) points:
+$(nconv) converged, $(ndist) distinct, $(nstab) stable. Fewer than two usable means
+the boundary cannot be located here and no δB can be quoted — and the breakdown
+says WHICH of the three is missing, so the next run changes that one rather than
+the tolerances.""")
 else
     dEs = [ref[i].dE for i in usable]
     Bs = [BS[i] for i in usable]
