@@ -60,10 +60,11 @@ function main(run_dir)
         ddi_padding=false, ddi_trunc_radius=NaN, backend=CPUBackend())
 
     sm = ws.spin_matrices
-    ddi_term = only(filter(t -> t isa DDITerm, collect(build_h_terms_registry(ws))))
+    reg = SpinorBEC.build_h_terms_registry(ws)
+    ddi_term = only(filter(t -> nameof(typeof(t)) === :DDITerm, collect(reg)))
 
     prod_out = zeros(ComplexF64, size(psi))
-    apply_operator!(prod_out, ddi_term, ws, psi)
+    SpinorBEC.apply_operator!(prod_out, ddi_term, ws, psi)
 
     ref_out = zeros(ComplexF64, size(psi))
     reference_ddi_apply!(ref_out, psi, sm, grid, c_dd; secular=false)
