@@ -210,6 +210,10 @@ const CI_EXTRA = [
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
+    # so the type-C target cannot drift when the fixture or the metric changes.
+    # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
+    "validation/test_matsui_fig4_dip.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
