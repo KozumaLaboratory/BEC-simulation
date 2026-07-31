@@ -10,9 +10,19 @@ name: Nightly heavy YAML
 
 on:
   schedule:
-    # 02:00 UTC every day = 11:00 JST. Skips weekends to save runner
-    # minutes — failures on Mon-Fri are usually enough to catch drift.
-    - cron: "0 2 * * 1-5"
+    # 20:17 UTC = 05:17 JST the NEXT day. The run takes ~40-50 min, so the
+    # result is sitting there before the day starts. The old 02:00 UTC slot was
+    # 11:00 JST — a "nightly" that both started and finished mid-morning, after
+    # the day's work had already begun on an unverified tree.
+    #
+    # Day-of-week is `0-4` (Sun-Thu UTC), NOT `1-5`. cron's dow is evaluated in
+    # UTC, and 20:17 UTC lands on the following JST date, so keeping `1-5` here
+    # would have fired Tue-Sat JST — losing Monday and burning a Saturday.
+    # Sun-Thu UTC is Mon-Fri JST.
+    #
+    # :17 rather than :00 on purpose: GitHub delays scheduled workflows when a
+    # popular cron minute comes round, and the hour mark is the most popular.
+    - cron: "17 20 * * 0-4"
   workflow_dispatch:
 
 concurrency:
