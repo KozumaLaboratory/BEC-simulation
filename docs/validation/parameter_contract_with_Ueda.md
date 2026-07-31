@@ -201,16 +201,34 @@ Both are provable from the files, and both matter for a reproduction:
 1. **`Ntot = 3.5×10⁴`** in `setup_parameters` (line 1667) against published theory
    curves that total **49999.9** — `dataset_fig2_theo` starts at exactly `N_{-6} =
    50000`. The runs behind the figures used `N = 5×10⁴`.
-2. **`initial.f90` and `time.f90` disagree on the interaction.** `initial.f90` line 25
-   ships `cc0_eff = 1, cc1_eff = 0`; `time.f90` line 25 ships `cc0_eff = 0.5,
-   cc1_eff = 50`. As shipped, the state handed to the dynamics is the ground state of
-   a Hamiltonian with **twice** the contact repulsion — `R_TF` larger by `2^0.2 =
-   1.15`, peak density lower by `0.66`. Peak density sets the dipole field, which
-   sets the very resonance offset Fig. 4B measures.
+2. **`initial.f90` and `time.f90` disagree on the interaction — but not in a way
+   that moves the ground state.** `initial.f90` line 25 ships `cc0_eff = 1,
+   cc1_eff = 0`; `time.f90` line 25 ships `cc0_eff = 0.5, cc1_eff = 50`. It looks
+   like a factor 2 in the contact repulsion, and it is not: a **fully polarised**
+   `m = −F` state has `|⟨F⟩| = F n`, so its contact energy density is
+   `(c₀/2)n² + (c₁/2)F²n² = ((c₀ + F²c₁)/2)n²` — only the **combination**
+   `c₀ + 36c₁` enters. Both of their settings give `c₀ + 36c₁ = 8πN a₀/aHO`, and
+   so does every `c1_ratio` on our side, because
+   `interaction_params_from_constraint` holds that sum fixed by construction:
 
-So the parameters have to be **reconstructed**, not read off. `runs/matsui_fig4b/`
-does that, and carries `fig4b_gsvariant_n32.yaml` to price item 2 rather than assume
-it away.
+   | `c1_ratio` | `c₀` | `c₁` | `c₀ + 36c₁` |
+   |---|---|---|---|
+   | 1/36 | 2343.633 | 65.101 | 4687.2663 |
+   | 0 | 4687.266 | 0 | 4687.2663 |
+   | 0.5 | 246.698 | 123.349 | 4687.2663 |
+   | −0.005 | 5716.178 | −28.581 | 4687.2663 |
+
+   **So their polarised ground state is the same state under either setting, and
+   so is ours.** The difference bites only once the spin depolarises, i.e. in the
+   dynamics — where they use `0.5 / 50`, which is exactly the `c1_ratio = 1/36`
+   we match. There is no ground-state ambiguity to price. (The residual real
+   difference is that `initial.f90` runs the ground state with `sn = 1`, no
+   zero-padding, against `time.f90`'s `sn = 2`.)
+
+So `Ntot` has to be **reconstructed**, not read off. `runs/matsui_fig4b/` does that.
+(`fig4b_gsvariant_n32.yaml` was written to price item 2 before item 2 was understood;
+it varies a knob the polarised ground state is degenerate in, and is retained only as
+the record of that.)
 
 ### 0.4 Consequences for the contract as a whole
 
@@ -386,54 +404,42 @@ convergence check do not bracket a dip, and `resonance_dip` applied to them
 returns −5.32 nT, which is an artefact of extrapolating a vertex across a 7.5 nT
 gap. It is reported here only so nobody re-derives it and believes it.
 
-#### Task 3 (their literal ground state) is VOID — the knob did not move
+#### RETRACTED: there is no `c1_ratio` defect — the probe was degenerate
 
-`fig4b_gsvariant_n32.yaml` sets `c1_ratio: 0.0` in the ground-state step, which
-should double `c₀` from 2343.63 to 4687.27 (verified at the function level:
-`compute_eu151_interactions` returns exactly that). It does not reach the run.
-The two arms' converged ground-state energies are **−910.66795 and −910.66985** —
-2×10⁻⁶ relative apart — where a 2× change in `c₀` should move the non-Zeeman part
-of the energy by ~30 %. And the resulting dip centres differ by 0.02 nT.
+This section previously reported a confirmed plumbing defect, on the strength of
+`fig4b_gsvariant_n32.yaml` and `gs_c1ratio_probe.yaml` showing a converged
+ground-state energy that barely moved under a nominal 19× swing in `c₀`:
 
-Two arms that should differ and are numerically indistinguishable is evidence
-about the **plumbing**, not about the physics. The §0.3.5 ground-state ambiguity
-is therefore **still unpriced**, and no conclusion may be drawn from this arm
-until `c1_ratio` in a `ground_state` step is shown to move `c₀` in a run. That is
-the next thing to fix, and it needs a gate that fails when the value does not move.
+| `c1_ratio` | `c₀` | `c₁` | `c₀ + 36c₁` | converged `E` |
+|---|---|---|---|---|
+| 1/36 | 2343.633 | 65.101 | **4687.2663** | −910.6679 |
+| 0 | 4687.266 | 0 | **4687.2663** | −910.6698 |
+| 0.5 | 246.698 | 123.349 | **4687.2663** | −910.6692 |
 
-#### The `c1_ratio` defect is confirmed, and it makes every number above provisional
+The last column is the answer. A fully polarised `m = −F` state feels only
+`c₀ + F²c₁`, and `interaction_params_from_constraint` **holds that sum fixed** —
+that is the `c₀ + 36c₁ = 4π(a_s/a_ho)N` constraint doing its job. The ground-state
+energy is *supposed* to be independent of `c1_ratio` here. **The knob was scanned
+along a direction the observable is degenerate in, and the flat result was the
+correct answer, not a defect.** UGE 8304841 task 6 stands; only its interpretation
+was wrong.
 
-`gs_c1ratio_probe.yaml` is three ground states and nothing else, scanning only
-`c1_ratio`. `c₀ = c_total/(1 + 36·c1_ratio)`, so the three points span a **19×
-range** in `c₀`:
+The error is the one the campaign charter warns about in the other direction:
+a control with no positive arm. Nothing in the probe would have moved even if the
+plumbing were perfect, so "it did not move" carried no information. **A knob-does-
+reach-the-solver test needs an observable that is not degenerate in the knob** —
+for `c1_ratio` that means a state with `|⟨F⟩| < F n`, or a direct read of
+`ws.interactions`, not a polarised ground-state energy.
 
-| `c1_ratio` | `c₀` it should give | converged `E` |
-|---|---|---|
-| 1/36 | 2343.63 | −910.6679 |
-| 0 | 4687.27 | −910.6698 |
-| 0.5 | 246.70 | −910.6692 |
+Consequences of the retraction:
 
-The energies span **1.3×10⁻³** where ~8.6 was due, and they are not even monotonic
-in `c₀`. The non-Zeeman part of this energy is ≈ 12.6 against a non-interacting
-1.59, so the contact term dominates it — this is not a case of a small effect
-hiding under a large one. **`c1_ratio` in a `ground_state` step does not reach
-`c₀`.** UGE 8304841 task 6, commit `0e78456e`, exit 0. Type A.
-
-`load_config` resolves the step's dict correctly (`c1_ratio => 0.0` for the
-variant, `0.0277…` for the scan), so the loss is downstream of parsing. Root
-cause not diagnosed here — the probe isolates it in three ground states and ~3
-minutes, which is the right place to start.
-
-**Consequence.** The dynamics step carries no `interactions` block and inherits
-`ws_prev.interactions` from the ground state, so whatever `c₀`/`c₁` the ground
-state got, the dynamics got too. Rows 3.2/3.3 of §0.3.4 say our `c1_ratio = 1/36`
-reproduces their `cc0_eff = 0.5, cc1_eff = 50` pair exactly — **that is verified
-at the function level and is not verified for what actually ran.** Until the
-defect is fixed and the scan re-run, the Fig. 4B and Fig. 2C numbers above are
-**provisional**: they may have been produced with an unintended `c₀` and with
-`c₁ = 0` rather than `c₀/36`, which is a candidate explanation for both the 20 %
-rate excess and the 15 % width excess and has to be excluded before either is
-attributed anywhere.
+- The Fig. 4B and Fig. 2C numbers above are **not** provisional for this reason.
+  Rows 3.2/3.3 stand as verified.
+- The §0.3.5 ground-state ambiguity **does not exist**: their `initial.f90` and
+  `time.f90` settings produce the same polarised ground state, as does every
+  `c1_ratio` on our side.
+- The 20 % rate excess and the 15 % width excess therefore **lose their leading
+  candidate explanation and remain unexplained.**
 
 #### Experimental corrections that cost no compute
 

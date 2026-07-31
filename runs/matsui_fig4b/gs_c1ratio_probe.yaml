@@ -6,8 +6,16 @@
 # apart where the non-Zeeman part of the energy should have moved ~30 %. Two arms
 # that should differ and do not is evidence about the plumbing.
 #
-# This strips everything except the ground state and scans ONLY c1_ratio, so the
-# answer is one number: does E move.
+# RESULT, AND THE LESSON: E does not move, and that is CORRECT. A fully polarised
+# m=-F state feels only c0 + F^2*c1, and interaction_params_from_constraint holds
+# that sum fixed at 4687.2663 for every c1_ratio — so this probe scans a direction
+# the observable is degenerate in. It has no positive control: nothing here would
+# have moved even with perfect plumbing, so "it did not move" carries no
+# information. Kept as the record of that mistake.
+#
+# A real does-the-knob-reach-the-solver test needs an observable that is NOT
+# degenerate in the knob: a state with |<F>| < F*n, or a direct read of
+# ws.interactions.
 #
 # Target (measured off test/fixtures/matsui2025/dataset_fig4_theo.csv by
 # `resonance_dip`, pinned in test/validation/test_matsui_fig4_dip.jl):
