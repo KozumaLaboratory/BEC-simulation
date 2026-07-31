@@ -23,6 +23,13 @@ export JULIA_NUM_THREADS="${NSLOTS:-8}"
 module load cuda/12.6 2>/dev/null || module load cuda 2>/dev/null || true
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-ddi-conv}"
+# The cell cache lives on the GROUP volume so it survives job-to-job: a run that
+# changes only the reporting reuses every cell and costs no GPU. It is keyed on
+# the tree hash of src/, so a physics change reuses nothing. Smoke and production
+# write separate JSONLs — mixing 8^3 rows into the 32^3 record would be a silent
+# corruption of the thing the report reads.
+export SPINORBEC_GAP_CACHE=/gs/fs/tga-kozuma-kouhi/uk07267/gap_cache
+mkdir -p "$SPINORBEC_GAP_CACHE"
 echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
 nvidia-smi --query-gpu=name --format=csv,noheader || true
 # SMOKE FIRST, at a size that renders every code path in seconds. CLAUDE.md asks
@@ -30,7 +37,8 @@ nvidia-smi --query-gpu=name --format=csv,noheader || true
 # failure on a leftover rename that `submit_load_check.sh` cannot see — that
 # checks src/ loads, not that a bench script runs.
 echo "### SMOKE (tiny)"
-$JULIA --project=. bench/phase_gap_error_budget.jl 8 40 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
+SPINORBEC_GAP_JSONL="$SPINORBEC_GAP_CACHE/smoke.jsonl" \
+    $JULIA --project=. bench/phase_gap_error_budget.jl 8 40 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
 smoke_rc=${PIPESTATUS[0]}
 echo "### smoke rc=$smoke_rc"
 if [ "$smoke_rc" -ne 0 ]; then
