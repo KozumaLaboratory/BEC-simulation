@@ -84,7 +84,10 @@ jobs:
   # automatically when nightly goes green again.
   report:
     name: Report the nightly result
-    needs: heavy
+    # Every other job in this workflow, so `report` runs last. This list has to
+    # be maintained when a job is added — the step below fails loudly if it is
+    # not, rather than reporting on a partial picture.
+    needs: [heavy, mutation]
     if: always() && github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -94,7 +97,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      OUTCOME: ${{ needs.heavy.result }}
+      SELF: "Report the nightly result"
       MARKER: "<!-- nightly-heavy-status -->"
     steps:
       - name: Open, refresh or close the status issue
@@ -106,6 +109,30 @@ jobs:
           existing=$(gh issue list --repo "$REPO" --state open --limit 100 \
             --json number,body \
             --jq "[.[] | select(.body | contains(\"$MARKER\"))] | .[0].number // empty")
+
+          # Derive the verdict from THIS run's jobs rather than from a named
+          # `needs` result. The first version read `needs.heavy.result` alone;
+          # #198 then added a `mutation` job, and a red mutation job with a green
+          # heavy job would have CLOSED the issue and asserted a green nightly.
+          # A status signal that says "green" when it is not is worse than no
+          # signal, which is the whole failure class this job exists to end.
+          jobs=$(gh api "repos/$REPO/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
+            --jq ".jobs[] | select(.name != \"$SELF\") | \"\(.status):\(.conclusion // \"none\")\"")
+
+          # An unfinished sibling means `needs` does not list every job, so the
+          # verdict would be taken on a partial picture. Fail rather than guess.
+          if printf '%s\n' "$jobs" | grep -qv '^completed:'; then
+            echo "::error title=nightly report::a sibling job is unfinished - add it to this job's needs:"
+            printf '%s\n' "$jobs"
+            exit 1
+          fi
+
+          if printf '%s\n' "$jobs" | grep -qvE '^completed:(success|skipped)$'; then
+            OUTCOME=failure
+          else
+            OUTCOME=success
+          fi
+          echo "sibling jobs: $jobs -> $OUTCOME"
 
           if [ "$OUTCOME" = "success" ]; then
             if [ -n "$existing" ]; then
