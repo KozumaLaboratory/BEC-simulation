@@ -51,12 +51,12 @@ from one that condensed without defects — those are opposite outcomes and a ba
 """
 function kz_trajectory(;
     grid, c0, mu, T_hot, T_cold, tau_Q, t_equil, t_hold, gamma, M, k_cut,
-    dt, seed, backend, min_density_frac=0.05,
+    dt, seed, backend, min_density_frac=0.05, c1=0.0, spinor::Bool=false,
 )
     D = SpinSystem(KZ_ATOM.F).n_components
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1, normalize_every=0)
     ws = make_workspace(; grid, atom=KZ_ATOM,
-        interactions=InteractionParams(Dict{Int, Float64}(0 => c0)),
+        interactions=InteractionParams(Dict{Int, Float64}(0 => c0, 1 => c1)),
         potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp, backend)
     seed_device_rng!(backend, seed)
     fill!(ws.state.psi, 0)
@@ -73,8 +73,13 @@ function kz_trajectory(;
     for s in 1:n_steps
         split_step!(ws)
         apply_spgpe_step!(ws, res, dt; t=t, seed=seed + s)
-        @views for c in 1:(D - 1)
-            ws.state.psi[:, :, :, c] .= 0
+        # Scalar limit keeps the empty spin channels empty so reservoir noise
+        # cannot fill them. With `spinor=true` every component evolves — that is
+        # the point — so the zeroing must NOT happen.
+        if !spinor
+            @views for c in 1:(D - 1)
+                ws.state.psi[:, :, :, c] .= 0
+            end
         end
         t += dt
     end
@@ -82,9 +87,14 @@ function kz_trajectory(;
     psi = Array(ws.state.psi)
     dV = cell_volume(grid)
     lines = extract_vortex_lines_per_m(psi, grid; min_density_frac)
-    key = "-$(KZ_ATOM.F)"
-    (; n_vortices=haskey(lines, key) ? length(lines[key]) : 0,
-        N_C=real(sum(abs2, psi)) * dV)
+    # Per-component counts. In a spinor the defect need not live on one component,
+    # and which components carry it is exactly what step 1 is asking — so the
+    # counter's own per-m breakdown is reported rather than collapsed to a scalar.
+    F = KZ_ATOM.F
+    per_m = Dict(m => (haskey(lines, m >= 0 ? "+$m" : "$m") ?
+                       length(lines[m >= 0 ? "+$m" : "$m"]) : 0) for m in (-F):F)
+    pops = [real(sum(abs2, view(psi, :, :, :, c))) * dV for c in 1:size(psi, 4)]
+    (; n_vortices=per_m[-F], per_m, pops, N_C=real(sum(abs2, psi)) * dV)
 end
 
 """
@@ -109,7 +119,7 @@ function kz_scan(;
     t_equil::Float64=40.0, t_hold::Float64=20.0,
     gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
-    k_cut_mult::Float64=1.0,
+    k_cut_mult::Float64=1.0, c1::Float64=0.0, spinor::Bool=false,
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
     # C region holds the hot cloud. `k_cut_mult` moves the boundary WITHOUT
@@ -156,7 +166,10 @@ function kz_scan(;
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
                 t_equil, t_hold, gamma, M, k_cut, dt,
-                seed=10_000 + Int(round(τ)) * 100 + s, backend)
+                seed=10_000 + Int(round(τ)) * 100 + s, backend, c1, spinor)
+            spinor && s == 1 && @printf("    [m-breakdown τ=%.0f seed1] %s  pops %s\n",
+                τ, string(sort(collect(r.per_m))),
+                string(round.(r.pops; sigdigits=3)))
             push!(vs, r.n_vortices)
             push!(ncl, r.N_C)
         end
@@ -264,6 +277,15 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif mode == "spinor1"
+        # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
+        # from the validated scalar case, and it settles the question every later
+        # step depends on — in a spinor the counter reports per-m, and which
+        # components carry the defect is undefined until measured. Counting the
+        # stretched component alone (what the scalar runs did) is an assumption,
+        # not a result. One rate: tau_Q = 4, where the scalar gave 86.75.
+        kz_scan(; tau_Qs=(4.0,), t_hold=1.0, n_seed=8, c1=-0.0095, spinor=true,
+            backend, tag="kz_spinor1")
     elseif startswith(mode, "kcut")
         # Cutoff-robustness of alpha. The whole justification for reporting an
         # exponent instead of a defect count is that a ratio at FIXED cutoff is
