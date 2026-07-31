@@ -7,19 +7,19 @@
 
 using Test
 
-# Standard test-environment preamble. The serial runner historically left these
-# stdlibs in `Main` for later files (whoever `using`d them first leaked them);
-# many test files use `norm`, `I`, `MersenneTwister`, `mean`, `@printf`, … with
-# no local import and only passed by that accident. Each parallel chunk is a
-# fresh process, so a file landing in a chunk with no such sibling would hit
-# `UndefVarError`. Provide them explicitly — alongside the Test + SpinorBEC that
-# both runners already supply — so a file behaves identically run with siblings
-# or alone. This is the test environment contract; files may still import their
-# own extras (FFTW, StaticArrays, …).
-using LinearAlgebra
-using Random
-using Statistics
-using Printf
+# No stdlib preamble. This file used to `using LinearAlgebra / Random /
+# Statistics / Printf` so that files which reach for `norm`, `I`,
+# `MersenneTwister`, `mean` or `@printf` without importing them would still run.
+# That made the environment, not the file, responsible for a file's
+# dependencies — which contradicts the contract CLAUDE.md states ("each test
+# file stays a dependency-free unit") and made "does this file run on its own"
+# depend on which sibling the claim queue handed out first.
+#
+# Every `test_*.jl` now declares what it uses; measured by running all 348 in
+# their own process with no preamble at all. With that in place the whole `ci`
+# tier (273 files, 4 workers) passes with this preamble gone, so it is gone —
+# the contract is now structural rather than a static gate plus a safety net
+# that quietly absorbed violations.
 
 """
     run_test_files(files; dir=@__DIR__) -> (failed::Bool, timings)
