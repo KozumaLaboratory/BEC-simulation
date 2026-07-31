@@ -31,6 +31,7 @@
 
 using Test
 using LinearAlgebra
+using SpinorBEC
 using SpinorBEC:
     _COMP_YOSHIDA, _COMP_SUZUKI, _COMP_BLANES_MOAN_SRKN6B,
     _COMP_OMELYAN_PEFRL, _COMP_YOSHIDA_S6

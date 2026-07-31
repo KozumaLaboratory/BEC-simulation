@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Experiment" begin
     @testset "interpolate_value" begin
         c = ConstantValue(3.0)
