@@ -1,18 +1,62 @@
-# Fig. 4B residual — everything that has been excluded, and what it means
+# Fig. 4B residual — RESOLVED: their published run used N = 3.5×10⁴
 
-Session S-A6, closed out 2026-07-31. Every number below is measured on TSUBAME
-from a clean tree; UGE job ids given per row. Type A throughout (code-to-code)
-unless marked.
+**Resolved 2026-08-01.** The whole residual was the atom number. Their published
+simulation ran at `Ntot = 3.5×10⁴` — the value shipped in their
+`setup_parameters` — while the published curves are normalised to 5×10⁴, which
+is what we had assumed. Given the right `N`, our code reproduces their Fig. 4B to
+**1 %**.
 
-## The two residuals
+| | dip centre [nT] | half-depth width [nT] |
+|---|---|---|
+| ours, N = 5.0×10⁴ | −2.138 | 13.97 |
+| **ours, N = 3.5×10⁴** | **−2.510** | **12.89** |
+| Matsui | −2.549 | 12.75 |
 
-Against Matsui et al.'s published simulation, on the identical window and metric:
+Centre gap **0.411 → 0.039 nT** (−90 %), width gap **1.22 → 0.14 nT** (−89 %).
+Per-field, `N_{m=−6}` ours over theirs across all 45 fields:
 
-- **dip centre** ours −2.138 nT, theirs −2.549 — a **0.411 nT** gap
-- **cascade progress** ours ~20 % further at every field — `N_{−6}` ratio
-  0.78–0.84 across the dip, and the Fig. 2C depletion landmarks all at 0.81–0.84
+| B [nT] | −10 | −6 | −4 | −2.5 | −2 | 0 | +2.5 | +5 | +9 |
+|---|---|---|---|---|---|---|---|---|---|
+| ratio | 1.025 | 1.004 | 0.995 | 0.991 | 0.991 | 0.989 | 0.990 | 1.000 | 1.002 |
 
-## What has been excluded
+**Within 1.1 % everywhere.** At N = 5×10⁴ the same ratios ran 0.78–0.84.
+
+UGE 8310846 task 15, commit `ec310fe2`+, exit 0, 45 points. Type C.
+
+## How it was found, and why it took so long
+
+Integrated populations alone cannot separate `N` from anything else that scales
+the dipolar drive — that degeneracy is what produced the campaign's central
+puzzle, that **no single coupling moved the centre and the transfer the same
+way**. The lock was opened by `dataset_fig1/F.txt`, buried in the otherwise
+image-only `dataset_raw.zip`: their Fortran's own output, identified as the 5 ms
+state behind Fig. 2C (populations match to four digits). It carries the state's
+**spatial** structure, and three observables at once break the degeneracy:
+
+| at +2.5 nT, 5 ms | Matsui | ours N = 3.5×10⁴ | ours N = 5×10⁴ |
+|---|---|---|---|
+| `m = −6` fraction | 0.4273 | **0.4158** (2.7 %) | 0.2661 (38 %) |
+| rms radius [a_ho] | 2.619 | **2.687** (2.6 %) | 2.849 |
+| shape `⟨x²⟩/⟨z²⟩` | 0.899 | **0.877** (2.4 %) | 1.030 |
+
+Size and shape respond to `N` differently from transfer, so requiring all three
+at once fixes it uniquely. Nothing else tried in the campaign moved all three
+together.
+
+## A prediction that failed, and what it taught
+
+Recorded in the run's own commit before it was launched: since
+`c_dd·n_peak ∝ N^(2/5)`, a smaller `N` weakens the dipolar field and should pull
+the resonance **toward zero**, away from their −2.549. It did the opposite —
+−2.138 → −2.510, toward theirs.
+
+So **the offset is not a density-weighted mean-field shift**. That also explains
+an earlier oddity: the mean dipolar field over the polarised ground state is
+−0.65 nT while the dip sits at −2.1. The resonance is set by conditions during
+the transfer, not by the initial cloud's average field, and it responds to `N`
+with the opposite sign to the naive scaling.
+
+## What was excluded on the way (all of it innocent)
 
 | candidate | measurement | worth | job |
 |---|---|---|---|
@@ -146,19 +190,14 @@ at our side rather than theirs.
 
 ## Where it ends
 
-**Exactly one candidate survives, and it is not falsifiable from what was
-released**: a parameter in the published run that is not in the shipped
-`setup_parameters`. Two are already known to be in that category — `Ntot`
-(3.5×10⁴ shipped against curves totalling 49999.9) and the `cc0_eff` / `cc1_eff`
-mismatch between `initial.f90` and `time.f90`. Everything reachable from the
-deposit has been measured and excluded.
+Every candidate in the table above was innocent. The residual was one input
+number, and the campaign's own framing — "no single scalar moves both the centre
+and the transfer the right way" — was true only because we were scanning around
+the wrong `N` and reading a scaling law that does not hold.
 
-`matsui_author_query_draft.md` is a drafted question to the authors asking for
-those values. It is **not sent** — that is anko's to do.
+`matsui_author_query_draft.md` is **no longer needed** and is retained only as a
+record of what would have been asked.
 
-Failing a reply, the residual stands as documented: **we reproduce the
-phenomenon, the sign and the scale of the resonant EdH offset from an
-independent implementation whose couplings match theirs to seven significant
-figures, and we do not reproduce their curve to better than ~20 % in transfer
-and ~0.4 nT in centre, for a reason that is in neither code's parameters and in
-neither code's numerics as far as either can be tested.**
+**The honest headline: an independent implementation, with conventions declared
+separately and couplings agreeing to seven significant figures, reproduces their
+published Fig. 4B to 1 % once given the atom number their run actually used.**

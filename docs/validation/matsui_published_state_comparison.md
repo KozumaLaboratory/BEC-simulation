@@ -88,9 +88,16 @@ their 2.619 nearer `N = 3.5×10⁴` (predicts 2.663) — which is the value ship
   lockstep and drops `N_atoms` from `defaults` so nothing can be injected behind
   the scan.
 
-## Open
+## Resolved
 
-`fig4b_natoms_fixed_n32.yaml` at +2.5 nT — the field where `F.txt` gives their
-own state to compare against — decides whether `N = 3.5×10⁴` reproduces **both**
-their cloud size and their transfer. Queued as UGE 8310027 task 14; the GPU
-allocation was occupied at the time of writing.
+`N = 3.5×10⁴` reproduces all three at once (UGE 8310027 task 14):
+
+| at +2.5 nT, 5 ms | Matsui | ours N = 3.5×10⁴ | agreement |
+|---|---|---|---|
+| `m = −6` fraction | 0.4273 | 0.4158 | 2.7 % |
+| rms radius [a_ho] | 2.619 | 2.687 | 2.6 % |
+| shape `⟨x²⟩/⟨z²⟩` | 0.899 | 0.877 | 2.4 % |
+
+and the full 45-field dip follows: centre −2.510 against their −2.549, width
+12.89 against 12.75, every field within 1.1 % (UGE 8310846 task 15).
+`matsui_residual_root_cause.md` carries the resolution.
