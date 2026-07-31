@@ -21,6 +21,7 @@
 #    6  gs_c1ratio_probe     3 ground states — RETRACTED, see the file's own header
 #    7  fig4b_theirramp_n32  45 fields with THEIR exponential ramp, not our linear one
 #    8  fig4b_scan_n64       the same 45 fields at 64^3, so the dip is measured not inferred
+#    9  fig4b_ddikernel_n32  25 fields x {trunc auto,none} x {padded,unpadded}
 #
 #  Run 2 and 3 are not optional extras. At 32³ the occupied band edge
 #  sqrt(2·mu) ≈ 5.1 sits at 0.81·k_max, so task 1 alone cannot say whether its
@@ -43,7 +44,7 @@
 #$ -N matsui_fig4b
 #$ -l gpu_1=1
 #$ -l h_rt=6:00:00
-#$ -t 1-8
+#$ -t 1-9
 #$ -j n
 
 set -euo pipefail
@@ -73,6 +74,7 @@ else
         6) CONFIG=runs/matsui_fig4b/gs_c1ratio_probe.yaml ;;
         7) CONFIG=runs/matsui_fig4b/fig4b_theirramp_n32.yaml ;;
         8) CONFIG=runs/matsui_fig4b/fig4b_scan_n64.yaml ;;
+        9) CONFIG=runs/matsui_fig4b/fig4b_ddikernel_n32.yaml ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
