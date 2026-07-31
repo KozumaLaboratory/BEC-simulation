@@ -125,6 +125,18 @@ ITP to convergence. Variable: `spinor_lhy` setting only.
 > 閉形式の $N_{atoms}$ 倍、GPU broadcast の silent zero、FM の
 > `kappa < 1e-12 && return 0.0` が負の $g_{2F}$ を飲む件）すべてより前に測られている。
 > 結論そのものの現状は直下の注記を読むこと。
+>
+> **再構成して測り直した (2026-07-31、TSUBAME job 8308113、5 アーム全て converged)。**
+> 消えた config を仮定付きで組み直した結果は
+> [`runs/lhy_mode_ablation_reconstructed/RESULTS.md`](../../../../runs/lhy_mode_ablation_reconstructed/RESULTS.md)。
+> **定性的結論は生き残り、それを支えた数字は生き残らなかった。** 上表の peak density ratio は
+> `off` に対し 0.998 / 1.005 / 0.999 / 1.001 — LHY を 1% 未満の効果としている。現行コードでは
+> **0.956 / 0.951 / 0.951 / 0.953、すなわち約 4.9%** で、5 倍大きく符号も一貫している。
+> 4 つの閉形式どうしは 0.58% で一致するので「closure の選択はほとんど効かない」は成立し、
+> 4.9% は droplet を作る balance でもないので「LHY は sub-leading」も成立する。
+> **vacuous だったのは `off` との一致であり、それこそが本節の引用していた部分だった。**
+> なお上表の filament length (μm) は未検証のまま — 再構成は ITP 基底状態で filament を作らない。
+> また §5.2.2 の `box=10` は姉妹レポートの `box=[20,20,20]` と矛盾しており、再構成は 20 を使った。
 
 | spinor_lhy mode | filament length (μm) | peak density ratio | converged? |
 |---|---|---|---|
