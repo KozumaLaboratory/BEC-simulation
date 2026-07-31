@@ -1,6 +1,6 @@
 # SpinorBEC.jl
 
-[![CI](https://github.com/anko9801/BEC-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/anko9801/BEC-simulation/actions/workflows/ci.yml)
+[![CI](https://github.com/KozumaLaboratory/BEC-simulation/actions/workflows/ci.yml/badge.svg)](https://github.com/KozumaLaboratory/BEC-simulation/actions/workflows/ci.yml)
 
 A general-purpose solver for the spinor Gross–Pitaevskii equation: arbitrary
 spin $F$, 1D/2D/3D, contact + dipolar + LHY + Raman/Zeeman, on CPU or CUDA,
@@ -12,6 +12,10 @@ driven entirely from YAML.
   interactions, observables) works for any $F$, not just $F=1$ or $F=2$.
   Polyhedral state classification verified through $F=12$ (Paper #3);
   routine production runs are ¹⁵¹Eu ($F=6$) and ¹⁶⁴Dy ($F=8$).
+- **A species registry, not a hard-coded atom.** Alkalis (Li, Na, K, Rb, Cs),
+  alkaline earths and Yb, the magnetic species (Cr, Dy, Er, Eu) and metastable
+  He\* ship with their masses, $g_F$ factors and scattering lengths; a run
+  selects one by name.
 - **Dipolar interactions are first-class.** $k$-space convolution in 6 FFTs,
   zero-padded or quasi-2D (erfcx kernel), with the spin-orbital coupling
   needed for Einstein–de Haas dynamics.
@@ -51,10 +55,18 @@ WSL2 GPU users: prepend `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 
 $$H = \sum_m \int \psi_m^\ast \left[ -\tfrac{\nabla^2}{2} + V - p\,m + q\,m^2 + c_0 n + c_1 \langle\mathbf{F}\rangle \cdot \mathbf{F} + H_{\mathrm{ddi}} + c_{\mathrm{LHY}} n^{5/2} + H_{\mathrm{Raman}} \right] \psi_m \, d\mathbf{r}$$
 
-Internal units are dimensionless ($\hbar = m = \omega_{\mathrm{ref}} = 1$);
-the `Units` module handles physical conversion. Higher-rank tensor
-interactions ($S = 4, 6, \ldots$) are built from Clebsch–Gordan coefficients,
-and LHY uses the Lima–Pelster correction.
+— schematic; each term is switched on independently, and the LHY term takes
+several forms (below). Internal units are dimensionless
+($\hbar = m = \omega_{\mathrm{ref}} = 1$); the `Units` module handles physical
+conversion. Higher-rank tensor interactions ($S = 4, 6, \ldots$) are built
+from Clebsch–Gordan coefficients.
+
+The beyond-mean-field (LHY) term is selected explicitly rather than assumed —
+`scalar` and `quasi_2d` for the single-component limits, closed forms for
+polar and ferromagnetic states (contact and dipolar), an icosahedral form,
+and `full_bdg`, which integrates the Bogoliubov spectrum numerically and so
+applies to any $F$ and any spinor. Each has a stated validity domain; the
+closed forms are roughly two orders of magnitude cheaper where they apply.
 
 The solver dispatches on `kind:`:
 
@@ -62,28 +74,37 @@ The solver dispatches on `kind:`:
 - `rotating_basis` — Larmor-following frame, for fast magnetostir and any
   protocol where $\hat B$ rotates faster than $1/\omega_{\mathrm{ref}}$.
 - `binary` — two-component GP.
+- `sgpe` — stochastic GPE, for finite-temperature initial states.
+- `projected_gp` — projected (number-conserving) GP.
+- `twa` — Truncated Wigner sampling over an ensemble of trajectories.
 
 Ground states use imaginary-time propagation or LBFGS; dynamics use
-Strang/Yoshida integrators, with Truncated Wigner sampling, SGPE,
-photon scattering, and three-body loss available as composable per-step
-callbacks.
+Strang/Yoshida integrators, with photon scattering and three-body loss
+available as composable per-step callbacks.
 
 ## Repository layout
 
 ```
 src/    Solvers, Hamiltonian terms, workflow, analysis
 runs/   YAML configs (Klaus magnetostir, Einstein–de Haas, phase diagrams, …)
-docs/   guides/ reference/ design/ theory/ research_notes/ (see docs/index.md)
-test/   ~8600 tests, tiered (fast / ci / full)
+docs/   guides/ reference/ conventions/ design/ validation/ theory/ … (see docs/index.md)
+test/   Tiered suite (fast / ci / oracles / full / physics)
 dashboard/  React + WebGPU dashboard frontend
-ext/    CUDA and Makie extensions
+ext/    CUDA, Makie, HTTP and VTK extensions
 bench/  Benchmarks
 ```
 
+Each Hamiltonian term (kinetic, trap, Zeeman, contact, dipolar, LHY, tensor,
+Raman, light shift, Coriolis, loss) is one unit that declares its sign
+convention once; the propagator, the energy and the gradient are all derived
+from that single declaration, and a suite of oracle tests checks the three
+faces against each other and against an independently written reference
+implementation. `docs/conventions/` documents that discipline.
+
 `docs/reference/yaml_schema_reference.md` is the full YAML schema.
-`CLAUDE.md` documents the internal conventions and architectural
-boundaries used by the code. `docs/index.md` is the documentation map;
-subsystem design notes live under `docs/design/`.
+`docs/index.md` is the documentation map; subsystem design notes live under
+`docs/design/`, and `CLAUDE.md` records the internal conventions and
+architectural boundaries the code is held to.
 
 ## Tests
 
@@ -97,10 +118,16 @@ SPINORBEC_TEST_WORKERS=auto SPINORBEC_TEST_TIER=fast \
 ```
 
 Tiers: `fast` (unit tests only), `ci` (fast + ITP/RTP integration),
-`full` (everything; default), `physics` (analytic-validation only).
-Per-push CI runs `fast`; the nightly workflow runs `full` with
-`SPINORBEC_RUN_HEAVY_YAML=true` to also cover the gated YAML integration
-blocks (see CLAUDE.md "Current cascade cost").
+`full` (everything; default), `physics` (analytic validation only), and
+`oracles` (the cross-checking gates — sign conventions, GPU/CPU parity per
+term, energy-vs-gradient consistency — pulled out so they can run on their
+own). Membership is listed explicitly in `test/_tiers.jl`: a new test is
+added to a tier by hand rather than picked up by discovery, so nothing joins
+or leaves a tier silently.
+
+Per-push CI runs `fast` and `oracles` as separate jobs; the nightly workflow
+runs `full` with `SPINORBEC_RUN_HEAVY_YAML=true` to also cover the gated YAML
+integration blocks.
 
 Runner knobs (all read by `test/runtests.jl`):
 

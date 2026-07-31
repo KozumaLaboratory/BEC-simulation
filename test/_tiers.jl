@@ -348,6 +348,7 @@ const CI_EXTRA = [
     # and still sit outside that mode's domain. The `icosa` cells did, and it
     # reached a committed json, a figure and two claims before anyone noticed.
     "oracles/test_lhy_config_validity_domain.jl",
+    "oracles/test_doc_run_citations_resolve.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
