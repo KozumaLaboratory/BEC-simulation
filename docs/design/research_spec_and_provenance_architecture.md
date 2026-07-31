@@ -69,10 +69,10 @@ CLAUDE.md says sweeps and tests use) has **zero call sites**.
 
 **The confirmed physics losses.** The split-step B path reads `theta_deg`,
 which nothing in `src/` ever writes — 27 tilted-field step instances across 8
-configs silently ran with $\vec B \parallel \hat z$. The mixin merge is
+configs silently ran with **B parallel to z**. The mixin merge is
 shallow, so `runs/saito_li_torus/config.yaml` loses `interactions.c_total: 583`
 — the override that is the entire physics point of that config
-($\varepsilon_{dd} = 1.3$ instead of the natural $0.54$). Neither is detectable
+(`eps_dd = 1.3` instead of the natural `0.54`). Neither is detectable
 after the fact: the detective layer built to find exactly these
 (`inspect_checks.jl:_check_input_resolved_drop`) is **switched off on the
 production path**, because `run_registry.jl:219` calls `audit_loaded_data(data)`
@@ -106,9 +106,9 @@ definitions, 3 of the latter byte-identical.
 **The provenance.** 429 YAML files, 29,449 lines, **4,673 of them comment
 prose**. That prose is the *only* copy of the literature reconstructions —
 which Matsui parameter was read off `time.f90` versus inferred, and what each
-ambiguity is worth ($N=3.5\times10^4$ shipped vs $5.0\times10^4$ published
-$\Rightarrow$ 2× in $c_0$ $\Rightarrow$ 34 % in peak density; $q/h = 1$ Hz
-$\Rightarrow$ 0.68 nT of dip position). The machine-readable half is a
+ambiguity is worth (`N = 3.5e4` shipped vs `5.0e4` published, giving 2x in
+`c_0` and so 34 % in peak density; `q/h = 1 Hz` giving 0.68 nT of dip
+position). The machine-readable half is a
 `metadata:` block that `schema.jl:402` declares *"free-form provenance, ignored
 at runtime"* — **zero of its 45 keys has a reader**. All 22 `generator:`
 scripts cited by 156 files were deleted in `3be5146d`. `claim_type` — the A/B/C
@@ -191,7 +191,7 @@ active(s::LHYSpec) = s.kind !== :none
 `make_workspace(m::Model; psi_init, backend)` is the ONE choke point
 (`src/model/build.jl`, NEW), replacing `pipeline/parsing_blocks.jl` and the 15
 passes. Every derivation that YAML could not express — unit conversion, the
-$c_0 + 36c_1$ constraint, literature reconstruction — lives in ordinary tested
+`c_0 + 36*c_1` constraint, literature reconstruction — lives in ordinary tested
 functions that *build* a `Model`.
 
 `with(m; ddi = with(m.ddi; secular=false))` is a generated reconstructor
@@ -412,7 +412,7 @@ Three things here are mechanism, not prose:
 - **`requires = [differs_only_in(:lhy)]`** diffs the evidence *fingerprints*
   slot by slot and returns `:indeterminate` **naming the extra differing slot**.
   This is exactly what voided the Matsui GS-variant arm (`c1_ratio` set in a
-  `ground_state` step never reached $c_0$) and it is now unreachable.
+  `ground_state` step never reached `c_0`) and it is now unreachable.
 - **`evidence` is a thunk.** Campaigns cost nothing at load; no `expand(...)`
   is executed at precompile time.
 
@@ -486,10 +486,10 @@ stage_id(s::Relax, j::JobEnv) =
     StageId(physics_id(s.model, probe_ws(s)),
             method_id(s.method, j.realization, j.backend_kind, j.dtype),
             input_digest(s.initial),
-            toolchain_id())                       # §2.10
+            toolchain_id(j))                      # §2.10 — scoped by the plan
 stage_id(s::Measure, j::JobEnv) =
     StageId(probe_id(s), method_id(NoMethod(), j.realization, j.backend_kind, j.dtype),
-            input_digest(s.inputs), toolchain_id())
+            input_digest(s.inputs), toolchain_id(j))
 #   ^ a Measure's physics half is the ANALYZER's declaration, so a figure does NOT
 #     depend on the integrator; it depends on the artifacts it reads and nothing else.
 ```
@@ -654,6 +654,23 @@ is removed, so there is nothing left to observe.
 | **`Method`** (`Realization`) | `MEANFIELD_MIDPOINT_ENABLED`, `SPIN_CHAIN_FUSION_ENABLED`, `COMBINED_SPIN_STEP_ENABLED`, plus `fft_flags` | splitting and kernel-selection choices: same physics, different algorithm. |
 | **frozen `const`** | `SPIN_TAYLOR_{ENABLED,TOL,RSAFE,DEGREE_CAP}`, `_SM_EULER_WARP`, `_DDI_EULER_WARP` | not run-selectable at all. A `const` is code; `scope_digest` already covers it. |
 
+**What this does to the accuracy audit, which is not a detail.** A `const`
+cannot be assigned, so `accuracy_knobs.jl:109` — `setter = v -> (SPIN_TAYLOR_TOL[] = v)`
+— stops compiling, and with it `with_reference_accuracy`. That is not collateral
+damage; it is the point. Today the audit flips process-global `Ref`s and re-runs,
+which does **not** change the artifact id, so on a cache hit `audit(exp)` returns
+the production artifact verbatim: the one instrument built to detect a degenerate
+measurement is itself producing one. Under this design the reference-accuracy arm
+becomes `reference_realization(m)` — a `Model` whose `Realization` carries the
+reference settings — and running it yields a **different id**, so the audit is a
+comparison between two properly identified artifacts instead of a run colliding
+with the thing it is supposed to be checking. The knobs that are genuinely
+run-selectable stay in `Realization`; the ones that are accuracy *contracts* of a
+kernel (the Taylor tolerance and the two euler-warp constants) become code, and
+changing them is a `scope_digest` change with an explicit accuracy declaration
+(§2.10.6). `accuracy_knobs.jl` is rewritten rather than deleted: it becomes the
+constructor of reference `Realization`s, not a registry of setters.
+
 **The frozen arm is the cheap one and it is what the files themselves argue
 for.** `spin_rotation_taylor.jl:56-59` on the tolerance: *"the tolerance is not
 a decision the caller should be asked to make; `dt` is the decision, and this
@@ -698,11 +715,24 @@ pre-flip run and a post-flip run both canonicalise to the empty tuple and
 the spin-chain fusion for every `run_yaml` RTP run while `bench/profile_rtp.jl`
 kept measuring the fused path). §2.8's omission rule is licensed by a fact that
 Gate A asserts — an inactive term contributes exactly zero — and a field equal
-to a mutable default contributes something. **The cost is stated rather than
-engineered away:** adding a fifth `Realization` field invalidates every stored
-artifact. The set is four, it is frozen by `test_realization_frozen.jl` (field
-names pinned to a committed list), and adding to it is a reviewed physics event,
-not a routine addition.
+to a mutable default contributes something. The first draft of this section accepted that adding a fifth `Realization`
+field invalidates every stored artifact, and called the cost "stated rather than
+engineered away". That is a direct violation of invariant 3, asserted for term
+slots two sections earlier, and it does not have to be paid.
+
+**A `Realization` field is omitted from the digest when it equals its default,
+exactly as an inactive term is omitted.** The objection to this was the
+`DDI_PADDED_DEFAULT` accident — a default was flipped and silently changed
+behaviour, so "equal to the default" was not a stable statement. The answer is to
+make it stable: **`test_realization_defaults_frozen.jl` pins the default tuple by
+digest.** A default may then never change without an explicit, reviewed migration
+commit that the gate forces someone to acknowledge. With the defaults frozen, a
+field at its default contributes exactly as much as an inactive term — nothing,
+forever — and the asymmetry between the two rules dissolves. Adding a fifth field
+then invalidates **zero** artifacts, because every existing artifact had it at
+the default it was born with. `test_realization_frozen.jl` still pins the field
+names, so adding one remains a reviewed physics event; what it stops being is a
+store-wide invalidation event.
 
 **Feasibility, measured, because the two obvious objections are both false.**
 `Workspace` has 20 type parameters (`src/foundation/types/workspace.jl:69-90`),
@@ -838,18 +868,30 @@ bit-identical.
 
 ```julia
 # src/model/toolchain.jl  (NEW, ~40 LOC)
-const NUMERIC_DEPS = ("CUDA", "FFTW", "SpecialFunctions", "StaticArrays", "JLD2")
+# A dependency enters the KEY only if the plan engages a scope that uses it.
+# This is invariant 3 applied to the toolchain: omit what the run did not use.
+# JLD2 is deliberately absent — it is storage. It can fail to read or corrupt a
+# file, which the witness catches, but it cannot move a number, and putting it
+# in the key would invalidate every artifact in the store on a JLD2 bump.
+const DEP_SCOPE = Dict("CUDA" => :gpu, "FFTW" => :fft,
+                       "SpecialFunctions" => :core, "StaticArrays" => :core)
 
-function toolchain_id()
+engaged(::Val{:core}, plan) = true
+engaged(::Val{:fft},  plan) = true                      # every run FFTs
+engaged(::Val{:gpu},  plan) = plan.backend_kind === :gpu
+
+function toolchain_id(plan)
     parts = Tuple{String,String,String}[]
     for (_, d) in Pkg.dependencies()
-        d.name in NUMERIC_DEPS || continue
+        scope = get(DEP_SCOPE, d.name, nothing)
+        scope === nothing && continue
+        engaged(Val(scope), plan) || continue      # omit what the run cannot use
         push!(parts, (d.name, string(d.version),
                       d.tree_hash === nothing ? "stdlib" : string(d.tree_hash)))
     end
     sort!(parts)
-    length(parts) == length(NUMERIC_DEPS) ||
-        error("NUMERIC_DEPS unresolved: got $(first.(parts))")
+    isempty(parts) &&
+        error("toolchain_id: no numeric dependency resolved; DEP_SCOPE is wrong")
     cf = Base.CacheFlags()
     digest16((deps = parts,
               julia = string(VERSION), llvm = string(Base.libllvm_version),
@@ -868,10 +910,23 @@ tree_hash=d97791feefda45729613fafeccc4fbef3f539151`; the call is ~6 ms warm and
 is memoized per process. `tree_hash` is `nothing` for stdlibs, which the code
 above handles rather than assumes.
 
-`NUMERIC_DEPS` is a hand-written tuple and would rot by default, so
+`DEP_SCOPE` is a hand-written map and would rot by default, so
 **`test_numeric_deps_total.jl`** asserts every `[deps]` entry of `Project.toml`
-is either in `NUMERIC_DEPS` or in a declared, reasoned `NON_NUMERIC_ALLOWLIST`.
-A new numeric dependency cannot be quietly filed as non-numeric.
+is either in `DEP_SCOPE` or in a declared, reasoned `NON_NUMERIC_ALLOWLIST`.
+A new numeric dependency cannot be quietly filed as non-numeric — the gate is a
+total partition of `Project.toml`, so it catches an ADDITION, not only a removal.
+
+**Two properties of this that are easy to get wrong, and were wrong in the first
+draft of this section.** (i) `toolchain_id` takes the `plan`, not nothing. An
+unconditional toolchain term puts CUDA in the key of a CPU-only run, so bumping
+CUDA invalidates artifacts produced on a machine that never loaded it — the
+"it could have been cached, but the hash differs" failure this whole design
+exists to avoid, re-introduced at the last step. (ii) JLD2 is **not** a key
+dependency. Storage cannot change a number; it can only fail, and failing is
+loud. Classifying it as numeric would have made every JLD2 patch release a
+store-wide invalidation. The general rule is the same one the term slots obey:
+**a thing enters the key when it can change the answer, and is omitted when the
+run could not have used it.**
 `Preferences.jl` — the Julia-idiomatic way to add exactly the kind of switch
 §2.10.1 bans, and one that is baked at precompile time and therefore invisible
 to every runtime scan — is named in that allowlist as **forbidden**, not merely
@@ -1336,7 +1391,7 @@ reconstruct!(:matsui2025, :c1_ratio, 1//36,           # Rational. ONE spelling e
 (`0.02778`, `0.0277777778`, `0.027777777777777776`, plus refinement points)
 collapse to one exact rational.
 
-Their DDI kernel is our $Q \times 4\pi$ and their `cdd` absorbs $\mu_0/4\pi$,
+Their DDI kernel is our `Q * 4pi` and their `cdd` absorbs `mu_0 / 4pi`,
 so only the *product* is convention-independent — which is why `c_dd` is
 **built** by `eu151_c_dd()` here and never transcribed.
 
@@ -1476,7 +1531,7 @@ cost. Emitters keep the existing CSV + companion-`.py` shape from
 
 - **The voided GS-variant arm.** `contact_from_ratio` is a function returning
   an `InteractionSpec`; there is no layer that can silently not apply it, and
-  `record.model_toml` carries the resolved $c_0$/$c_1$ in plain text. On top of
+  `record.model_toml` carries the resolved `c_0`/`c_1` in plain text. On top of
   that, `differs_only_in(:zeeman)` would have named `density_c0` as an extra
   differing slot and returned `:indeterminate`.
 - **The 27 silently-untilted B fields.** `ZeemanSpec` is one struct consumed by
@@ -1511,7 +1566,7 @@ whose artifact is written **only on `:pass`**. Lane B's first stages hold
 lane through the same dependency relation that drives the cache — no scheduler
 special case, no ordering check to forget.
 
-Lane A and Lane C hold no ref into anything and start at $t=0$ in parallel;
+Lane A and Lane C hold no ref into anything and start at `t=0` in parallel;
 the CPU/GPU split falls out.
 
 ### 4.2 Lane A item A4 — the F=6 LHY oracle, first job submitted
@@ -1554,14 +1609,14 @@ Three mechanisms, not prose:
 
 - **The `indeterminate` arm is load-bearing.** The recorded gotcha is that
   `full_bdg` LHY has **no stable point in the Eu dipolar regime** — every
-  nonzero $c_{dd}$ is unstable at every $c_1$/$q$/$n$. A green there would be a
+  nonzero `c_dd` is unstable at every `c_1`/`q`/`n`. A green there would be a
   lie, so the verdict abstains and says why.
 - **"UV counterterm in ONE place" is enforced.** All arms read
   `physics_digest(::LHYTerm, …)` and mix `scope_digest(:lhy)`. Two arms with
   different counterterm code carry different scope digests, which
   `differs_only_in(:lhy)` reports as the difference it is.
 - **The control is mandatory.** If doubling the counterterm does not breach
-  $10^{-4}$, the verdict is `:indeterminate`, never `:pass`.
+  `1e-4`, the verdict is `:indeterminate`, never `:pass`.
 
 ### 4.3 Lane B item B3 — the serial continuation axis
 
@@ -1593,7 +1648,7 @@ const B3 = Item(
 ```
 
 `expand(B3.plan(), B3.axes)` returns `Vector{ChainedPlan}` of length
-$3 \times |C_1| \times 4$ — that many GPU jobs, each running a 26-link serial
+`3 * |C_1| * 4` — that many GPU jobs, each running a 26-link serial
 B-chain. A `Chain` in a non-final axis position is an `ArgumentError` at plan
 time, on the login node, in milliseconds.
 
@@ -1606,9 +1661,9 @@ only the second is load-bearing:
    `Vector{Job}` from a chain; `parallelise(::ChainedPlan)` does not exist.
    Asking is a `MethodError`.
 2. **By content addressing — the one that survives someone bypassing the
-   scheduler.** Link $k$'s `Initial` is `FromArtifact(id_{k-1})`, so
-   `stage_id(\text{link}_k).inputs = \mathrm{digest}(id_{k-1})$, so **link
-   $k$'s own artifact id is not computable until link $k-1$ has run**. You
+   scheduler.** Link `k`'s `Initial` is `FromArtifact(id_{k-1})`, so
+   `stage_id(link_k).inputs = digest(id_of(link_{k-1}))`, so **link k's own
+   artifact id is not computable until link k-1 has run**. You
    cannot name the output directory of a continuation point you have not
    reached.
 3. **By guard.** `:seeded_axis_must_be_chain` (`:block`): a stage whose
@@ -1619,8 +1674,8 @@ only the second is load-bearing:
 **Are axis legality and cache invalidation the same object?**
 
 **Yes.** Both are `Stage.inputs`. The fingerprint recursion
-$\mathrm{id}(s) = H(\text{physics}, \text{method}, \{\mathrm{id}(i) : i \in
-\text{inputs}(s)\})$ is simultaneously (a) the cache key, (b) the topological
+`id(s) = H(physics, method, {id(i) for i in inputs(s)})` is simultaneously
+(a) the cache key, (b) the topological
 order the scheduler releases work in, (c) the transitive invalidation set when
 a term's code digest moves, and (d) the reason a chain link is unnameable
 before its predecessor. This is the whole design in one line: there is one
@@ -1652,9 +1707,9 @@ in `applies`, not in a config.
 |---|---|---|---|---|
 | 1 | `tree_contains_fixes` | preflight `:block` | every commit in `REQUIRED_FIXES` is an ancestor of HEAD | plan at `COMMIT_BEFORE_Q_FIX` |
 | 2 | `clean_tree` | preflight `:block` (remote only) | tree not dirty ⇒ the provenance stamp is meaningful | dirty fixture |
-| 3 | `secular_choice_deliberate` | preflight `:block` | at $\omega_L/(c_{dd}\langle n\rangle) > 100$, secular-vs-full must be DECLARED, not defaulted | ratio 1e4, undeclared |
+| 3 | `secular_choice_deliberate` | preflight `:block` | at `omega_L / (c_dd * <n>) > 100`, secular-vs-full must be DECLARED, not defaulted | ratio 1e4, undeclared |
 | 4 | `energy_drift_vs_splitting` | postrun `:error` | `ErrorBudget`: drift compared to the run's OWN accepted splitting error at that `dt`, with a halve-`dt` control that MUST move it | diverged fixture |
-| 5 | `lhy_energy_not_quotable` | prequote **`:redact`** | if LHY active and $\lvert E_{LHY}\rvert/\lvert E_{tot}\rvert > 0.15$, remove `E_lhy`,`E_total` from `quotable` | `E_lhy/E_tot = 0.97` |
+| 5 | `lhy_energy_not_quotable` | prequote **`:redact`** | if LHY active and `|E_lhy| / |E_tot| > 0.15`, remove `E_lhy`,`E_total` from `quotable` | `E_lhy/E_tot = 0.97` |
 | 6 | `converged` | postrun `:error` | `converged == true` (ITP only — the flag means nothing else) | `converged = false` |
 | 7 | `ingest_run_warnings` | postrun `:warn` | the run's own `@warn` stream lands in `record.warnings` | `"full_bdg dynamically unstable"` |
 | 8 | `superfluid_needs_uniform_spin` | prequote `:redact` | `spin_direction_spread > 0.05` ⇒ redact `superfluid_fraction` | spread 0.4 |
@@ -1668,7 +1723,7 @@ Two of these are direct answers to judge findings. **#4 was a hardcoded
 it is now a *relationship* against an already-accepted error with a positive
 control, per the recorded norm "derive tolerances, gate the RELATIONSHIP".
 **#5 was `:error` at 15 %**, which would fire on ¹⁵¹Eu F=6 production (LHY is
-~97 % of $E_{tot}$ there) and produce a scope exemption within a week — the
+~97 % of `E_tot` there) and produce a scope exemption within a week — the
 exact erosion the `applies` predicate exists to prevent. It is now a redaction,
 which is literally what the standing instruction *"do not quote Eu F=6 LHY
 energies"* is.
@@ -1698,7 +1753,7 @@ best(:gpu_step_us, 128) = minimum(history(:gpu_step_us, 128))   # a FUNCTION
 `best` as a function is a two-line deletion that makes a whole class of
 instrument defect impossible: `observability/best.json` currently records
 20094.6 µs for `gpu_step_us/N128` while its own `history.jsonl` holds 17170 for
-the same $N$. A query cannot disagree with the data it queries.
+the same `N`. A query cannot disagree with the data it queries.
 
 ---
 
@@ -1807,8 +1862,8 @@ than an alarm:
    reproducible without giving it up. §10.2 carries this as open.
 
 **The ceiling, quoted whenever the cache is cited as safe:** Gates B and C run
-over the oracle fixtures. A `Model` field that only changes numbers at $F=6$
-with full DDI and a tabulated LHY table will not be exercised by an $F=1$
+over the oracle fixtures. A `Model` field that only changes numbers at `F=6`
+with full DDI and a tabulated LHY table will not be exercised by an `F=1`
 fixture. The meta-test asserts every `Model` field is *active* in at least one
 fixture — that is coverage of fields, not of regimes.
 
@@ -1817,9 +1872,9 @@ fixture — that is coverage of fields, not of regimes.
 many stored fingerprints move. Baseline: 74.3 % of commits move zero (LEDGER's
 measurement; independently reproduced at 71.9 % over
 `src/{hamiltonian,foundation,solvers,analysis,validation}`). Climbing toward
-90 % while physics work is visibly happening $\Rightarrow$ something numeric got
-filed as non-numeric $\Rightarrow$ **silent under-invalidation**. Falling toward
-40 % $\Rightarrow$ `:core` absorbed something churny $\Rightarrow$
+90 % while physics work is visibly happening means something numeric got
+filed as non-numeric, i.e. **silent under-invalidation**. Falling toward
+40 % means `:core` absorbed something churny, i.e.
 over-invalidation. Either direction is a printed number nobody has to remember
 to look for.
 
@@ -1830,7 +1885,7 @@ is recorded on disk: each fan writes `sweep.toml` naming its axis label, its
 values, and its members' ids — closing the manifest hole left when the mutable
 `Batch` type was deleted (memory explicitly forbids resurrecting `Batch`; a
 static TOML is not one). `differs_only_in` reads the axis declaration, so it is
-$O(1)$ per pair rather than an all-pairs `spec_diff` over the store.
+`O(1)` per pair rather than an all-pairs `spec_diff` over the store.
 
 ### 5.3 Content addressing and code-revision binding
 
@@ -1838,7 +1893,7 @@ $O(1)$ per pair rather than an all-pairs `spec_diff` over the store.
 id = H( physics_id(m, ws),
         method_id(method, realization, backend_kind, dtype),
         {id(i) : i in inputs},
-        toolchain_id() )
+        toolchain_id(plan) )
 ```
 
 with `physics_id` already containing per-active-scope tree digests, `method_id`
@@ -1873,7 +1928,7 @@ to hash non-finite floats.
 an id match **plus an admissible completion plus a matching seal** — the
 three-valued probe and the full write protocol are in §2.10.8, and invariant 13
 is the rule. Store layout is sharded: `store/<xx>/<id>/`, so no directory
-exceeds ~256 entries at $10^5$ artifacts. **A hit writes an `Execution` with
+exceeds ~256 entries at `1e5` artifacts. **A hit writes an `Execution` with
 `reused = <id>` into `hits/`**, never onto the producer's file.
 
 **Completion is not identity, and both are required.** An interrupted dynamics
@@ -2340,17 +2395,17 @@ At 5–10× (≈4,000 plans, ≈700 store dirs) nothing in the hot path scans
 everything. Three places checked:
 
 1. **Directory fanout** — sharded `store/<xx>/<id>/`, so no directory exceeds
-   ~256 entries at $10^5$ artifacts. Git-proven shape.
+   ~256 entries at `1e5` artifacts. Git-proven shape.
 2. **Index** — records append to `store/index.jsonl`, read once into memory for
-   query: $O(N)$ to load, $O(1)$ to query, rebuildable and safe to delete.
+   query: `O(N)` to load, `O(1)` to query, rebuildable and safe to delete.
    Following this project's own recorded catalog principle, a real database
-   graduates only past ~$10^4$ rows. **No new dependency now.**
+   graduates only past ~`1e4` rows. **No new dependency now.**
 3. **Scheduling** — the scheduler holds only the *frontier* (stages whose
    inputs are all satisfied), which for the four-lane campaign is ≤ 64 entries.
    A 4,000-node global queue never exists. `Guard.check` is typed
    `(::Job)->GuardResult` / `(::Record)->GuardResult` with **no store handle in
    the signature**, so a guard structurally cannot scan the store — the obvious
-   way this would have gone $O(N)$ per submission.
+   way this would have gone `O(N)` per submission.
 
 **Named superlinear risks and their ceilings.** (i) The **claim gate suite**:
 100 claims each wanting a re-derivation is unaffordable, so it is split by
@@ -2358,8 +2413,8 @@ cost — claim verdicts run against STORED artifacts on every PR (seconds), whil
 re-derivation is the nightly stratified 1 % sample. (ii) **UGE array shape**: a
 4,000-task level against the 300 s billing floor is charged as 4,000 × 300 s;
 the cost model must batch cheap nodes into array tasks. Specified, not
-measured. (iii) The fingerprint gates are $O(\#\text{Model fields} \times
-\#\text{fixtures})$ — constant in campaign size, which is the point of gating
+measured. (iii) The fingerprint gates are `O(#Model fields * #fixtures)` —
+constant in campaign size, which is the point of gating
 the mechanism rather than the instances.
 
 ### 7.5 Anti-accretion — the most important subsection
@@ -2378,7 +2433,7 @@ land. The `Function` clause additionally kills the closure-escape / 30-minute-
 JIT class that today is prevented only by discipline.
 
 **G2 — field-count ratchet.** `test_model_shape.jl` also asserts
-$\sum_{\text{spec}} \#\text{fields}$ against a committed integer. Raising it is
+`sum over specs of #fields` against a committed integer. Raising it is
 a visible diff in the PR, reviewed like a schema change. Today's count is 14
 top-level fields; the alarm threshold is stated (§7.6). This is the gate the
 winner's own risk list admitted "accepts growth, it only makes it visible" —
@@ -2495,7 +2550,7 @@ KEPT, not for what is cut.
 | `autopilot/{queue,queue_toml,tick,on_complete,recipes,trust,qw_history,profile_recommend}.jl` | ~2,500 | The queue IS the frontier of the graph; recipe lineage IS an edge. `backends*.jl`, `ssh_transport.jl`, `breakers.jl`, `budget.jl`, `retry.jl`, `observability.jl` are KEPT verbatim — the UGE knowledge exists nowhere else. |
 | `runs/*.yaml` | 429 files, 29,449 lines | AFTER K1+K2. `metadata:` is declared ignored at runtime and has zero readers; all 22 cited `generator:` scripts were deleted in `3be5146d`; 104 of 151 doc-cited `runs/` paths do not exist. |
 | `scripts/` — 45 hard-dead + 91 archived | ~20,000 | §5.9. Verified: `SpinorBEC.IcosahedralMod` (src defines 5 modules, none of them that), `_grad_zeeman!` (src defines 10 `_grad_*!`; `_grad_zeeman!` appears **only in a comment** at `solvers/lbfgs/energy_gradient.jl:120`), `normalize_rotating!` / `make_rotating_basis_ws` (defined nowhere in `src/` or `ext/` — this is why `build_sysimage.jl` is broken). |
-| `observability/best.json` | 1 file | Records 20094.6 µs for `gpu_step_us/N128` while its own `history.jsonl` holds 17170 for the same $N$. `best(w,n) = minimum(history(w,n))` cannot disagree with its own history. |
+| `observability/best.json` | 1 file | Records 20094.6 µs for `gpu_step_us/N128` while its own `history.jsonl` holds 17170 for the same `N`. `best(w,n) = minimum(history(w,n))` cannot disagree with its own history. |
 | `AGENTS.md` | 138 lines | CLAUDE.md labels it a stale fork. Verified wrong on four counts: cites `src/rotating_basis.jl` and `hamiltonian/{interactions,potentials}/` (all absent), `TwoChannelLHY` and `apply_nematic_step!` (0 hits in `src/`), a `SlurmBackend` that never existed, and `full` as the default test tier. Replace with a one-line pointer. |
 | `.gitignore` `runs/*_[0-9a-f]{8}/` + `runs/<16hex>/` + `figs/**/*.csv` | 4 rules | These ignore the run directory **including the `config.yaml` snapshot written into it** — the mechanical cause of 27 cited directories never committed at any point in history, and of four `.py` files holding pasted numeric tables as the last surviving copy. New rules: commit `record.toml` and figure-input CSVs (KB); ignore `*.jld2` (GB). |
 | `templates` mechanism (`templates_block.jl`, partial) | ~60 of 146 | `__init_templates__()` registers nothing, `register_template!` has no callers, 0 of 429 configs use `template:`. The mixin half is used by 106 configs and its *content* migrates. |
@@ -2521,7 +2576,7 @@ K1's committed harvest is the safety net; K2's gate is the enforcement.
 **Hand-editing a config goes away.** A collaborator opens a Julia file instead
 of a YAML. The resolved TOML *is* editable and will run, but editing it loses
 every derivation (the `q` recomputation, the unit conversion, the
-$c_0 + 36c_1$ constraint). The ergonomic path for anyone not comfortable in
+`c_0 + 36*c_1` constraint). The ergonomic path for anyone not comfortable in
 Julia is genuinely worse, and that cost is paid by exactly the people who did
 not write the code. **Accepted**, and mitigated only by campaigns living
 outside the package (no recompile, no worktree contention).
@@ -2538,7 +2593,7 @@ days) touch shared math / coefficients / integrator and invalidate every
 artifact. Chosen deliberately: a stale artifact is a wrong paper, a recomputed
 one is GPU-hours. `contact/contact.jl` holding three slots means slot-GROUP
 granularity there — a `tensor_interaction.jl` edit invalidates every
-$c_0$/$c_1$ run. **Accepted and quoted**, rather than advertised away.
+`c_0`/`c_1` run. **Accepted and quoted**, rather than advertised away.
 
 **The invalidation oracle proves an implication on fixtures, not universally**
 (§5.1 ceiling). The 1 % nightly recheck is the statistical backstop; if it is
@@ -2614,11 +2669,11 @@ one — is weak. I do not have a strong one.
 **`plan()` builds a probe workspace, and that cost is unmeasured.**
 `physics_digest` reads `ws`, so computing an id costs a `make_workspace` call —
 which for `lhy = :full_bdg` builds a table (~0.41 s) and for `:spatial` runs
-~12 BdG solves, and allocates $\psi$ ($13 \times 128^3$ ComplexF64 $\approx$ 350
+~12 BdG solves, and allocates psi (`13 * 128^3` ComplexF64, about 350
 MB). **This is the single technical assumption I would measure first, in step
 2, before committing to step 3.** Two mitigations exist if it is too slow:
 `fft_flags=ESTIMATE` + one process per campaign, and — if that is not enough —
-digesting the LHY *table specification* (kind + knots + $n_{max}$ + the inputs
+digesting the LHY *table specification* (kind + knots + `n_max` + the inputs
 that determine it) rather than the built table. That fallback weakens the
 "hash the table, not the kind" guarantee to "hash everything that determines the
 table", which is strictly weaker but still catches the 2026-07-28 class,
