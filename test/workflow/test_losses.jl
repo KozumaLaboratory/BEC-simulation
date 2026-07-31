@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Losses" begin
     @testset "LossParams constructors" begin
         lp = LossParams(1e-3, 1e-5)

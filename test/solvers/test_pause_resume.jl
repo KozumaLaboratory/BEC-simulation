@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Pause/Resume/Refine" begin
     @testset "ITP checkpoint save and load" begin
         ckpt_dir = mktempdir()

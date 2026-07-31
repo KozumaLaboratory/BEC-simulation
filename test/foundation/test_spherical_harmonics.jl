@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Spherical Harmonics" begin
     @testset "Y_00 = 1/√(4π)" begin
         val = spherical_harmonic(0, 0, 0.5, 1.0)

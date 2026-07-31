@@ -1,6 +1,9 @@
 # YAML run_config blocks below trip the same JIT inference cascade
 # documented in CLAUDE.md ("Type stability boundaries") on Julia 1.11+.
 # Skip them by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in.
+using Test
+using SpinorBEC
+
 const _SKIP_HEAVY_YAML_ZEEMAN =
     get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
