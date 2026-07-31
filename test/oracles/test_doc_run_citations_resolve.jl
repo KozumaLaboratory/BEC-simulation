@@ -1,11 +1,19 @@
 # Gate: a document may not cite a `runs/` path that does not exist.
 #
-# Measured 2026-07-31: of 70 distinct top-level `runs/` directories cited across
-# `docs/**.md`, 43 are absent, and 27 of those were NEVER COMMITTED at any point
-# in history — they lived in someone's working tree, a document cited them, and
-# the citation is all that survives. `manuscript/shared/figures.md`, the thesis
-# figure registry, names five of them. See
-# `docs/campaign/doc_run_citation_inventory.md`.
+# CORRECTED 2026-07-31 (same day): the first version of this file over-counted by
+# 40 %. Its pattern had two defects, both found by reading the hits rather than
+# the count.
+#
+#   1. `runs/` matched the TAIL of a longer token, so `spinorbec-runs/fig2_k3zero_v2`
+#      — a TSUBAME path a document was recording honestly, one of them annotated
+#      "(862 MB, off-repo)" — was read as a broken in-repo citation. 4 of them.
+#   2. A glob citation like `runs/eu_k3_*` was resolved as a literal directory
+#      named `eu_k3_`, which of course does not exist, while `runs/eu_k3_lhy` sits
+#      right there. 3 of them.
+#
+# At the commit the inventory measured, absent goes 43 -> 26 once both are fixed.
+# See `docs/campaign/doc_run_citation_inventory.md` for the corrected census and
+# for which of the survivors actually back a claim — most do not.
 #
 # That is a different failure from the one `stored_results_vintage_audit.md`
 # tracks. A stale run can be located, dated and disqualified; these cannot be
@@ -29,29 +37,49 @@ const PLACEHOLDERS = Set([
     "tsubame_scan", "_dashboard_cache",
 ])
 
-# Cited, absent, and known. Each is a claim whose evidence cannot be followed.
-# Shrinking this list is the campaign's job; growing it is what this gate stops.
+# Cited, absent, and known. Regenerated 2026-07-31 with the corrected pattern.
+#
+# A NAME list churns: every session that adds a document naming a run it has not
+# produced yet has to edit this file. The better shape is a marker at the citation
+# site — `(planned)`, `(off-repo)`, `(archived)` — so the knowledge lives where the
+# author is, and this list shrinks to the genuinely unexplained. That redesign is
+# deliberately NOT done here, because it means editing ~30 citation sites across
+# documents several sessions are actively rewriting, and it would collide.
 const KNOWN_UNRESOLVED = Set([
-    # never committed — no config, no output, no history
-    "Cr_eps0.15_", "Dy_eps1.39_", "Er_eps0.88_", "Eu_eps0.55_", "Eu151_GS_64g",
-    "ddi_convention_factorial", "ensemble_traces_round5", "eu151_",
-    "eu_k3_", "eu_shape_optimization", "fig2_k3zero_v2", "fig2_k3zero_v3",
-    "fortress_compare", "klaus_", "lhy_ablation_v2", "lhy_mode_ablation",
-    "lyapunov_diagnostic_round6", "paper4_meanfield", "sigma_mu_scan_",
-    "sigma_mu_scan_round5", "species_scan_round6", "sprint5_M1_",
-    "sprint5_M1_multistart_groundstate", "twa_sinatra", "eu151_klaus_lab_units",
-    "eu151_phi_omega", "12174e883326ecac",
-    # once tracked, since removed. `_loop` was retired 2026-06-08 and moved to
-    # BEC-simulation-archive/ deliberately; the rest simply went.
-    "_loop", "eu151_edh_ext", "eu151_mz_scan", "eu151_phase_pq",
-    "klaus_eu151_v2_full", "option_gamma_micro",
+    "12174e883326ecac", "Cr_eps0.15_", "Dy_eps1.39_", "Er_eps0.88_",
+    "Eu151_GS_64g", "Eu_eps0.55_", "_loop", "ddi_convention_factorial",
+    "ensemble_traces_round5", "eu151_b1_c1_sweep_template", "eu151_edh_ext",
+    "eu151_klaus_lab_units", "eu151_mz_scan", "eu151_phase_pq",
+    "eu151_phi_omega", "fortress_compare", "klaus_eu151_mechanism_",
+    "klaus_eu151_spin_excitation", "klaus_eu151_v2_full", "klaus_option_gamma",
+    "klaus_option_gamma_full", "lhy_mode_ablation", "lyapunov_diagnostic_round6",
+    "option_gamma_micro", "option_gamma_smoke", "paper4_meanfield",
+    "sigma_mu_scan_", "sigma_mu_scan_round5", "species_scan_round6",
+    "sprint5_M1_", "sprint5_M1_multistart_groundstate", "twa_sinatra",
+    "validation_level",
 ])
+
+"""A citation resolves if the directory exists, or — for a family written
+`runs/foo_*` — if anything matches the prefix. Treating the stem as a literal
+directory name is what made `runs/eu_k3_*` look broken next to `runs/eu_k3_lhy`."""
+function _resolves(d)
+    isdir(joinpath(_RUNS_DIR, d)) && return true
+    # Prefix-match ONLY for a family stem — the `*` is stripped above, so the
+    # trailing underscore is what is left of `runs/foo_*`. Applying the prefix
+    # rule to every name would let `runs/eu151_edh_ext` resolve against any
+    # directory that merely starts with it, which is a different claim.
+    endswith(d, '_') || return false
+    isdir(_RUNS_DIR) || return false
+    any(startswith(n, d) for n in readdir(_RUNS_DIR))
+end
 
 """Top-level `runs/<dir>` names cited by each doc, with the citing file."""
 function _cited_run_dirs()
     out = Dict{String, Vector{String}}()
     isdir(_DOCS) || return out
-    pat = r"runs/([A-Za-z0-9_][A-Za-z0-9_.*-]*)"
+    # `(?<![\w/-])` keeps `spinorbec-runs/x` and `some/runs/x` out. Without it
+    # the tail of any longer token reads as an in-repo citation.
+    pat = r"(?<![\w/-])runs/([A-Za-z0-9_][A-Za-z0-9_.*-]*)"
     for (root, _, names) in walkdir(_DOCS), n in names
         endswith(n, ".md") || continue
         path = joinpath(root, n)
@@ -75,10 +103,8 @@ end
         @test length(cited) > 20
     end
 
-    unresolved = sort([
-        d for d in keys(cited)
-              if !(d in PLACEHOLDERS) && !isdir(joinpath(_RUNS_DIR, d))
-    ])
+    unresolved = sort([d for d in keys(cited)
+                             if !(d in PLACEHOLDERS) && !_resolves(d)])
 
     @testset "no NEW unresolved citation" begin
         fresh = [d for d in unresolved if !(d in KNOWN_UNRESOLVED)]
@@ -94,8 +120,7 @@ end
         # An entry that now resolves, or that nothing cites any more, is an
         # excuse outliving its reason. Both directions, so the list tracks
         # reality instead of accumulating.
-        resolved_again = sort([d for d in KNOWN_UNRESOLVED
-                                     if isdir(joinpath(_RUNS_DIR, d))])
+        resolved_again = sort([d for d in KNOWN_UNRESOLVED if _resolves(d)])
         @test resolved_again == String[]
         uncited = sort([d for d in KNOWN_UNRESOLVED if !haskey(cited, d)])
         @test uncited == String[]
