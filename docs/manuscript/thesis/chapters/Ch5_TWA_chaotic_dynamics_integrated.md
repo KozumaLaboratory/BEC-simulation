@@ -115,7 +115,9 @@ ITP to convergence. Variable: `spinor_lhy` setting only.
 >
 > 直下の 2026-07-29 注記が参照する再導出は **姉妹 config**
 > (`eu151_edh_postfix_local`) に対するものであって、この ablation そのものではない。
-> パラメータは上に書かれているので**再生成は可能**だが、まだ走らせていない。
+> 上に書かれたパラメータは 4 個だけで、collapse の主張には trap・c₁・B・DDI 扱いも要る。
+> それらは姉妹レポートから借りた**仮定**として明示のうえ再構成し、走らせた（§5.2.3 の
+> 2 つ目の注記）。したがってこれは reproduction ではなく reconstruction である。
 
 ### 5.2.3 結果: 5 modes all collapse to identical filament
 
