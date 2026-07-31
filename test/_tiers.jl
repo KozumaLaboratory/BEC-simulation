@@ -119,6 +119,15 @@ const FAST_TESTS = [
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
     # the accuracy contract turns both red.
     "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
+    # A k-space scratch buffer must carry ψ's precision, because the FFT plan
+    # beside it does. Pairing a ComplexF32 in-place plan with a ComplexF64
+    # buffer degrades `plan * buf` to the out-of-place method, so the buffer is
+    # never transformed and the reduction reads real-space ψ: the F32 kinetic
+    # energy came out 77 % low, silently, on both the energy and the gradient
+    # face. CPU-only and ~10 s, so it belongs where it will actually run —
+    # `gpu/test_mixed_precision*.jl` DID catch this, in a nightly that had not
+    # been green since 2026-05-08.
+    "hamiltonian/test_mixed_precision_kinetic_buffer.jl",
     "foundation/test_clebsch_gordan.jl",
     "foundation/test_general_f.jl",
     "foundation/test_optical_pumping_rate_eq.jl",
@@ -409,6 +418,13 @@ const CI_EXTRA = [
     # rests on; exact number conservation + monotone energy decay (Eq. 29) —
     # the sign oracle for the scattering term.
     "dynamics/test_spgpe.jl",
+    # The configuration every CI runner is in: CUDA.jl loaded, no driver. Runs
+    # a `CUDA_VISIBLE_DEVICES=-1` subprocess, so it is a real skip-path test
+    # even when the host has a GPU. Gates the unguarded scan-loop
+    # `CUDA.reclaim()` and the three GPU test files whose top-level
+    # `return nothing` guard never stopped their own include — between them,
+    # four of the standing `full`-tier reds.
+    "gpu/test_cpu_only_runner.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
@@ -666,6 +682,10 @@ const _COST = Dict{String, Float64}(
     "analysis/test_physics_level0.jl" => 6.1,
     "oracles/test_gpu_cpu_per_term_parity.jl" => 6.1,
     "analysis/test_imaging.jl" => 6.0,
+    "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
+    # 4.8 s here against a warm depot; the CI runner pays a cold precompile
+    # inside the subprocess, so reserve for that rather than under-book it.
+    "gpu/test_cpu_only_runner.jl" => 60.0,
     # ── Heavy `ci`/`full`-tier files, not exercised by the per-push CI jobs;
     # estimates carried over from the full-tier measurement.
     "workflow/test_multi_fidelity_bo.jl" => 161.0,

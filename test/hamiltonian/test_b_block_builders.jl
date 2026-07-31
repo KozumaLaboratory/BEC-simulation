@@ -194,7 +194,11 @@ pipeline:
       interactions: {omega_ref: 314.159}
       B:
         B_mag: 1.0e-4
-        theta_deg: {from: 0.0, to: 35.0}
+        # `theta`, in RADIANS — 0.611 rad = 35°. `theta_deg` is the internal
+        # magnitude-dict spelling `_detect_b_coord` reads AFTER
+        # `_split_B_block!` has run; as a user-facing `B:` key it is rejected,
+        # which is what this testset asserted for as long as no tier ran it.
+        theta: {from: 0.0, to: 0.611}
 """)
         result = SpinorBEC.run_config(cfg)
         @test result.dynamics_result !== nothing
