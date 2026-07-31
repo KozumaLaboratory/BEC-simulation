@@ -51,7 +51,10 @@ fi
 # corruption of the thing the report reads.
 export SPINORBEC_GAP_CACHE=/gs/fs/tga-kozuma-kouhi/uk07267/gap_cache
 mkdir -p "$SPINORBEC_GAP_CACHE"
-echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD)"
+# The dirty count belongs NEXT TO the hash: `git log -1` reports HEAD, which an
+# aborted checkout leaves at the intended commit while the tree holds other files.
+# The hash alone is not evidence about what ran.
+echo "host=$(hostname) date=$(date) commit=$(git rev-parse --short HEAD) dirty=$(git status --porcelain | wc -l)"
 nvidia-smi --query-gpu=name --format=csv,noheader || true
 # SMOKE FIRST, at a size that renders every code path in seconds. CLAUDE.md asks
 # for this before any launch over ~10 min, and skipping it cost a 19-second
