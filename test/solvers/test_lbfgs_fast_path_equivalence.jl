@@ -13,8 +13,8 @@
 #      driver now adopts that iterate instead of recomputing the retraction,
 #      and reuses that energy instead of re-evaluating it, so a mismatch
 #      would silently feed L-BFGS an energy from a different ψ.
-#   4. the threaded axpy is bit-identical to the broadcast it replaces, and the
-#      blocked real-dot — which is NOT bit-identical to the BLAS `zdotc` it
+#   4. the explicit axpy loop is bit-identical to the broadcast it replaces, and
+#      the blocked real-dot — which is NOT bit-identical to the BLAS `zdotc` it
 #      replaces — is no less accurate than a sequential sum.
 #
 # `result.dE` and the line search's workspace-state contract are gated in
@@ -126,21 +126,25 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
         for s in (1.0e-6, 1.0e-4, 1.0e-2, 1.0e-1, 1.0, 10.0), expand in (false, true)
             dirn = (-s) .* g
             slope = real(dot(g, dirn)) * dV
-            α, E, psi_acc = SpinorBEC._line_search_energy_decrease(
+            α, E, psi_acc, n_eval = SpinorBEC._line_search_energy_decrease(
                 psi, dirn, E0, ws, grid, dV, nothing, F;
                 slope=slope, expand=expand,
             )
+            # The reported evaluation count is what the cost model is built on,
+            # so it has to be a count and not a placeholder: at least the one
+            # trial at α_init always happened.
+            @test n_eval >= 1
             α == 0.0 && continue
             copyto!(ws.state.psi, psi_acc)
             @test total_energy(ws) == E
         end
     end
 
-    @testset "threaded axpy is bit-identical to the broadcast" begin
-        # The claim that lets the two-loop recursion be split at all: an
-        # elementwise update rounds the same way whatever the chunking, so
-        # `_axpy_threaded!` must agree with the broadcast to the last bit, at
-        # sizes both below and above its threading threshold.
+    @testset "explicit axpy loop is bit-identical to the broadcast" begin
+        # `_axpy!` replaces `q .-= a .* y` with an explicit `@simd` loop — same
+        # operations in the same order, so it must agree to the last bit. (It is
+        # NOT threaded: splitting these made the two-loop 3x slower, because
+        # each axpy is ~0.5 ms and there are 2m of them per direction.)
         rng = MersenneTwister(20260729)   # seeded: an unseeded draw makes the
         # gate's outcome a per-run lottery
         for len in (1 << 12, 1 << 15, 1 << 17)
@@ -148,18 +152,18 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
             b = randn(rng, ComplexF64, len)
             for c in (0.0, 1.0, -3.7182818, 1.0e-13)
                 want = a .+ c .* b
-                got = SpinorBEC._axpy_threaded!(copy(a), c, b)
+                got = SpinorBEC._axpy!(copy(a), c, b)
                 @test got == want
                 # ...and the sign convention the first loop relies on.
-                @test SpinorBEC._axpy_threaded!(copy(a), -c, b) == a .- c .* b
+                @test SpinorBEC._axpy!(copy(a), -c, b) == a .- c .* b
             end
         end
     end
 
     @testset "blocked real-dot: accuracy and reproducibility" begin
-        # `_realdot_blocked` replaces `real(dot(a,b))` in the two-loop, so it is
-        # NOT bit-identical to what it replaced. The claims are (i) it is no
-        # less accurate than a sequential sum, and (ii) it is reproducible.
+        # `_realdot` replaces `real(dot(a,b))`, so it is NOT bit-identical to
+        # what it replaced. The claims are (i) it is no less accurate than a
+        # sequential sum, and (ii) it is reproducible.
         #
         # The reference is `BigFloat` at 256 bits — exact next to either
         # Float64 result. The comparison partner is a plain single-accumulator
@@ -195,24 +199,23 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
                 1:len,
             )
             scale = sum(i -> abs(a[i]) * abs(b[i]), 1:len)   # Σ|a_i||b_i|
-            err_blocked = abs(BigFloat(SpinorBEC._realdot_blocked(a, b)) - exact)
+            err_blocked = abs(BigFloat(SpinorBEC._realdot(a, b)) - exact)
             err_naive = abs(BigFloat(naive(a, b)) - exact)
             @test err_blocked <= err_naive + eps(scale)
             # Backward-stable in absolute terms too, not merely relatively.
             @test err_blocked <= 64 * eps() * scale
         end
 
-        # Reproducibility: the block count is a constant, not `nthreads()`, so
-        # repeated calls agree bit for bit however the threads are scheduled.
-        # (Across DIFFERENT CPUs the vectorised inner loop may reassociate
-        # differently — as `zdotc` already does — so the claim is thread-count
-        # independence, not machine independence.)
+        # Reproducibility: repeated calls agree bit for bit. (Across DIFFERENT
+        # CPUs the vectorised inner loop may reassociate differently — as
+        # `zdotc` already does — so the claim is run-to-run, not machine,
+        # independence.)
         v = randn(rng, ComplexF64, 1 << 16)
         w = randn(rng, ComplexF64, 1 << 16)
-        first = SpinorBEC._realdot_blocked(v, w)
-        @test all(SpinorBEC._realdot_blocked(v, w) === first for _ in 1:8)
-        # `_realdot_blocked(y, y)` is the `sum(abs2, y)` the two-loop needs.
-        @test SpinorBEC._realdot_blocked(v, v) ≈ sum(abs2, v) rtol = 1.0e-14
+        first = SpinorBEC._realdot(v, w)
+        @test all(SpinorBEC._realdot(v, w) === first for _ in 1:8)
+        # `_realdot(y, y)` is the `sum(abs2, y)` the two-loop needs.
+        @test SpinorBEC._realdot(v, v) ≈ sum(abs2, v) rtol = 1.0e-14
     end
 
     # The `dE` identity lives in `test_lbfgs_line_search_and_de.jl` (it gates a

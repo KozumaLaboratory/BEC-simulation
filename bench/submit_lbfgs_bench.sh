@@ -18,23 +18,27 @@
 #$ -l node_q=1
 #$ -l h_rt=2:00:00
 #$ -j y
-#$ -o /gs/bs/work/7/uk07267/lbfgs-bench/uge.log
+#$ -o /gs/fs/tga-kozuma-kouhi/uk07267/lbfgs-bench/uge.log
 
 set -euo pipefail
 
-ROOTS=${SBEC_ROOTS:-"base:/gs/bs/work/7/uk07267/bec-perf-lbfgs-base opt:/gs/bs/work/7/uk07267/bec-perf-lbfgs"}
+ROOTS=${SBEC_ROOTS:-"base:/gs/fs/tga-kozuma-kouhi/uk07267/wt-lbfgs-base opt:/gs/fs/tga-kozuma-kouhi/uk07267/wt-lbfgs"}
 GRIDS=${SBEC_GRIDS:-}
 BACKENDS=${SBEC_BACKENDS:-"cpu gpu"}
-OUT=/gs/bs/work/7/uk07267/lbfgs-bench
+OUT=/gs/fs/tga-kozuma-kouhi/uk07267/lbfgs-bench
 mkdir -p "$OUT"
 
 . /etc/profile.d/modules.sh
 module load cuda/12.8.0 2>/dev/null || module load cuda 2>/dev/null || true
 [[ -n "${CUDA_HOME:-}" ]] && export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 
-# Writable depot first, shared precompiled depot second (/gs/fs sits at ~98%
-# of the group quota, so nothing new is written there).
-export JULIA_DEPOT_PATH=/gs/bs/work/7/uk07267/perf-lbfgs-depot:/gs/fs/tga-kozuma-kouhi/shared/.julia
+# Node-local NVMe depot first, shared precompiled depot second. The group
+# volumes fill up (2026-07-30: /gs/bs hit 100 % and killed a scan mid-precompile
+# with `LLVM ERROR: IO failure on output stream: Disk quota exceeded`), and a
+# depot on a full volume is an unrecoverable job. $T4_TMPDIR cannot fill up
+# under someone else's campaign.
+export JULIA_DEPOT_PATH="${T4_TMPDIR:-/tmp}/.julia:/gs/fs/tga-kozuma-kouhi/shared/.julia"
+mkdir -p "${T4_TMPDIR:-/tmp}/.julia"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 
 # Fixed thread count so the two revisions are compared like for like.

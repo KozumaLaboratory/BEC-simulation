@@ -7,6 +7,11 @@ using SpinorBEC: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS,
 using SpinorBEC: lima_pelster_Q5
 using Test
 using LinearAlgebra: norm
+# `_build_spinor_lhy` takes the Zeeman field as a required trailing argument
+# since 2026-07-30: `:full_bdg` and `:spatial` solve a BdG problem and need it,
+# and it is deliberately NOT defaulted — a default is how every table came to be
+# built at zero field in the first place.
+const _ZF = SpinorBEC._to_zeeman_field(ZeemanParams(0.0, 0.0), nothing)
 
 # =================================================================
 # PhiOneReg
@@ -438,7 +443,7 @@ end
     g_uniform = Dict(S => c0 for S in (0, 2, 4, 6, 8, 10, 12))
 
     table = SpinorBEC._build_spinor_lhy(
-        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true, LHYTableOpts())
+        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true, LHYTableOpts(), _ZF)
     expected = compute_spinor_lhy_fm_dipolar(;
         F=6, g_dict=g_uniform, eps_dd=expected_eps)
 

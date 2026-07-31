@@ -50,6 +50,11 @@ const FAST_TESTS = [
     "workflow/validation/test_observable_dispatch.jl",
     "workflow/validation/test_open_result.jl",
     "workflow/validation/test_specs_and_check.jl",
+    # The accuracy-knob registry: every entry a real knob, the reference switch
+    # moves and restores all of them (including on exception), and the report
+    # names the per-run knobs it does NOT set.
+    "workflow/validation/test_accuracy_knobs.jl",
+    "workflow/validation/test_accuracy_profiles.jl",
     "workflow/validation/test_save_operator_rhs.jl",
     "workflow/validation/test_show.jl",
     "workflow/validation/test_twin_audit.jl",
@@ -68,6 +73,7 @@ const FAST_TESTS = [
     "manuscript/test_D2_H_irrep_character_proof.jl",
     "manuscript/test_rank2_cross_channel_vanishing.jl",
     "manuscript/test_paper3_audit.jl",
+    "oracles/test_lhy_no_bare_device_broadcast.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
     # Composer order from the COEFFICIENTS, on 8×8 matrices — no grid, no
@@ -120,6 +126,9 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    # energy and gradient must come from the SAME DDI kernel; test_ddi_padded.jl
+    # never calls either face
+    "hamiltonian/test_ddi_gradient_padding_parity.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
@@ -158,6 +167,7 @@ const FAST_TESTS = [
     "hamiltonian/test_spatial_lhy_spin_substep.jl",
     "hamiltonian/test_lhy_gradient_all_modes.jl",
     "hamiltonian/test_spinor_lhy_validation.jl",
+    "hamiltonian/test_lhy_zeeman_reaches_bdg.jl",
     "hamiltonian/test_icosahedral_lhy.jl",
     "hamiltonian/test_lhy_modes_round45.jl",
     "analysis/test_sinatra_diagnostics.jl",
@@ -220,6 +230,10 @@ const CI_EXTRA = [
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
+    # so the type-C target cannot drift when the fixture or the metric changes.
+    # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
+    "validation/test_matsui_fig4_dip.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -350,6 +364,11 @@ const CI_EXTRA = [
     # meta-test that would have RED-flagged padded-DDI and the absorbing
     # epilogue omission (each a gate-less variant of a "covered" term).
     "oracles/test_path_coverage.jl",
+    # Validity-DOMAIN sibling of the above: a config can name a live `lhy.kind`
+    # and still sit outside that mode's domain. The `icosa` cells did, and it
+    # reached a committed json, a figure and two claims before anyone noticed.
+    "oracles/test_lhy_config_validity_domain.jl",
+    "oracles/test_doc_run_citations_resolve.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
@@ -450,12 +469,25 @@ const FULL_EXTRA = [
     # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_lhy_term_faces.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    "gpu/test_lbfgs_stall_fixed_point.jl",   # floor stop gives up nothing, on device
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
     # both the fused spin-density corner write and the rotation's in-place read
     # of a padded Φ. Padding is the DEFAULT since 9c117c05, so this is the
     # production layout; no-op on CPU-only CI.
     "gpu/test_gpu_padded_corner_parity.jl",
+    # Fused k-space DDI contraction vs the three broadcasts it replaces. The
+    # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
+    # a green ci tier says nothing about it.
+    "gpu/test_gpu_ddi_contraction_parity.jl",
+    # the padded DDI GRADIENT face reads a strided corner view of Phi_*_pad;
+    # the contraction gate above stops before apply_operator!
+    "gpu/test_gpu_ddi_gradient_padding_parity.jl",
+    # The fused diagonal kernel with a TABULATED LHY against the generic
+    # broadcast propagator it replaces. Every production Eu run is tabulated and
+    # every one of them took the fallback; GPU-only.
+    "gpu/test_gpu_tabulated_lhy_fused_diagonal_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
@@ -545,6 +577,21 @@ const MANUAL_TESTS_ALLOWLIST = [
 # Auto-maintaining: a new `test/oracles/<x>.jl` added to any tier list is picked
 # up here for free.
 const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA))
+
+# Derived view (NOT a partition list): the `ci`-tier files that no per-PR
+# required check runs. `fast` covers FAST_TESTS and `oracles` covers every
+# `oracles/` gate, which together leave exactly CI_EXTRA's non-oracle files —
+# the ITP/RTP integration tests, ground state, config/experiment plumbing —
+# gated only by the nightly `full` run. That is the same hole the `oracles`
+# pseudo-tier was cut to close, one level out: a PR could break
+# `solvers/test_ground_state.jl` or `hamiltonian/test_split_step.jl` and merge
+# green, because "required checks are green" and "the ci tier passes" were
+# different statements.
+#
+# Running fast + oracles + integration as three per-PR jobs covers the whole
+# `ci` tier without any job paying for all of it serially. Derived from
+# CI_EXTRA rather than hand-listed, so it cannot drift from it.
+const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 
 # ── Parallel-balance cost model ───────────────────────────────────────
 # Per-file cost estimate (seconds) on the GitHub 4-vCPU runner, used only to
@@ -713,6 +760,8 @@ function select_tests(tier::String)
         return PHYSICS_TESTS
     elseif tier == "oracles"
         return ORACLE_TESTS
+    elseif tier == "integration"
+        return INTEGRATION_TESTS
     else
         @warn "Unknown SPINORBEC_TEST_TIER=$tier, falling back to full"
         return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)

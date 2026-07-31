@@ -15,6 +15,12 @@ using JLD2: jldopen
 using SpinorBEC
 using SpinorBEC: _build_spinor_lhy, _resolve_lhy_block!, LHYTableOpts, LHY_SCHEMA
 
+# `_build_spinor_lhy` takes the Zeeman field as a required trailing argument
+# since 2026-07-30: `:full_bdg` and `:spatial` solve a BdG problem and need it,
+# and it is deliberately NOT defaulted — a default is how every table came to be
+# built at zero field in the first place.
+const _ZF = SpinorBEC._to_zeeman_field(ZeemanParams(0.0, 0.0), nothing)
+
 const _F1 = 1
 const _D1 = 3
 
@@ -46,7 +52,7 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         for (np, nm) in ((37, 11.0), (211, 4.5))
             opts = LHYTableOpts(; n_max=nm, n_points=np)
             tbl = _build_spinor_lhy(Val(:polar_contact), atom, inter,
-                _uniform(), 0.0, false, opts)
+                _uniform(), 0.0, false, opts, _ZF)
             @test tbl !== nothing
             @test length(tbl.densities) == np
             @test tbl.densities[end] ≈ nm
@@ -58,7 +64,7 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         psi = _uniform()
         nmax_expected = 3.0 * maximum(sum(abs2, psi; dims=4))
         tbl = _build_spinor_lhy(Val(:polar_contact), atom, inter, psi, 0.0, false,
-            LHYTableOpts())
+            LHYTableOpts(), _ZF)
         @test tbl.densities[end] ≈ nmax_expected
         @test length(tbl.densities) == 200          # the schema default
     end
@@ -69,7 +75,7 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         opts = LHYTableOpts(; n_max=9.0, n_points=53)
         for mode in (:polar_contact, :polar_dipolar, :fm_contact, :fm_dipolar,
             :polar_two_channel, :full_bdg)
-            tbl = _build_spinor_lhy(Val(mode), atom, inter, _uniform(), 0.0, false, opts)
+            tbl = _build_spinor_lhy(Val(mode), atom, inter, _uniform(), 0.0, false, opts, _ZF)
             @test tbl !== nothing
             @test length(tbl.densities) == 53
             @test tbl.densities[end] ≈ 9.0
@@ -78,7 +84,7 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
 
     @testset "spatial builds a SpatialLHY from the texture" begin
         tbl = _build_spinor_lhy(Val(:spatial), atom, inter, _textured(), 0.0, false,
-            LHYTableOpts(; n_bins=6))
+            LHYTableOpts(; n_bins=6), _ZF)
         @test tbl isa SpatialLHY
         @test tbl.F == _F1
         @test length(tbl.polarisations) == length(tbl.e1_values)
@@ -95,14 +101,14 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         # make_workspace's silent-zero guard would THROW, and falling through
         # would run with no LHY. The right answer is the single-spinor table.
         tbl = _build_spinor_lhy(Val(:spatial), atom, inter, _uniform(), 0.0, false,
-            LHYTableOpts())
+            LHYTableOpts(), _ZF)
         @test tbl !== nothing
         @test !(tbl isa SpatialLHY)
         @test tbl isa SpinorBEC.TabulatedLHY
 
         # ...and with no state at all there is no texture to read.
         tbl2 = _build_spinor_lhy(Val(:spatial), atom, inter, nothing, 0.0, false,
-            LHYTableOpts())
+            LHYTableOpts(), _ZF)
         @test tbl2 !== nothing
         @test !(tbl2 isa SpatialLHY)
     end
