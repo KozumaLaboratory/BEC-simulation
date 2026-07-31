@@ -203,13 +203,21 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
         self = abspath(@__FILE__)
         _strip_backlog(txt) = replace(
             txt, r"BACKLOG-BEGIN.*?BACKLOG-END"s => "")
+        # `test/mutation/` IS EXCLUDED. It is a catalogue of DEFECTS, and a
+        # mutant that inserts a new decline reason carries that reason verbatim
+        # in its replacement text. Scanning it lets a mutant arm ITSELF: the
+        # `spin_chain_unlisted_new_reason` mutant — whose whole purpose is to
+        # check that an unlisted entry reddens this gate — escaped on TSUBAME
+        # for exactly that reason (2026-07-31). Quoting a string is not arming
+        # it.
         alltests = join(
             [
                 let p = joinpath(r, f), t = read(p, String)
                     abspath(p) == self ? _strip_backlog(t) : t
                 end
                 for (r, _, fs) in walkdir(testdir) for f in fs
-                if endswith(f, ".jl")
+                if endswith(f, ".jl") &&
+                !occursin(joinpath("test", "mutation"), joinpath(r, f))
             ], "\n")
         unarmed = String[]
         for reason in reasons
