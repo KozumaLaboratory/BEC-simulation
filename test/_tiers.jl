@@ -352,6 +352,7 @@ const CI_EXTRA = [
     # and still sit outside that mode's domain. The `icosa` cells did, and it
     # reached a committed json, a figure and two claims before anyone noticed.
     "oracles/test_lhy_config_validity_domain.jl",
+    "oracles/test_doc_run_citations_resolve.jl",
     # Mode-coverage sibling of the above, one level down: LHYTerm is ONE
     # registry term with ten interchangeable tables behind it, so "the term
     # is gated" was true while three of its faces were broken at once.
@@ -561,6 +562,21 @@ const MANUAL_TESTS_ALLOWLIST = [
 # up here for free.
 const ORACLE_TESTS = filter(t -> startswith(t, "oracles/"), vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA))
 
+# Derived view (NOT a partition list): the `ci`-tier files that no per-PR
+# required check runs. `fast` covers FAST_TESTS and `oracles` covers every
+# `oracles/` gate, which together leave exactly CI_EXTRA's non-oracle files —
+# the ITP/RTP integration tests, ground state, config/experiment plumbing —
+# gated only by the nightly `full` run. That is the same hole the `oracles`
+# pseudo-tier was cut to close, one level out: a PR could break
+# `solvers/test_ground_state.jl` or `hamiltonian/test_split_step.jl` and merge
+# green, because "required checks are green" and "the ci tier passes" were
+# different statements.
+#
+# Running fast + oracles + integration as three per-PR jobs covers the whole
+# `ci` tier without any job paying for all of it serially. Derived from
+# CI_EXTRA rather than hand-listed, so it cannot drift from it.
+const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
+
 # ── Parallel-balance cost model ───────────────────────────────────────
 # Per-file cost estimate (seconds) on the GitHub 4-vCPU runner, used only to
 # balance the parallel chunks (LPT bin-packing in runtests.jl). Only files above
@@ -728,6 +744,8 @@ function select_tests(tier::String)
         return PHYSICS_TESTS
     elseif tier == "oracles"
         return ORACLE_TESTS
+    elseif tier == "integration"
+        return INTEGRATION_TESTS
     else
         @warn "Unknown SPINORBEC_TEST_TIER=$tier, falling back to full"
         return vcat(FAST_TESTS, CI_EXTRA, FULL_EXTRA)
