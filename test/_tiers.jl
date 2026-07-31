@@ -153,6 +153,10 @@ const FAST_TESTS = [
     "analysis/test_fisher.jl",
     "hamiltonian/test_interactions_constraint.jl",
     "workflow/test_io.jl",
+    # The run dir is keyed on the config BYTES, not the commit, so the same YAML
+    # under different code reuses cached points silently. This pins the gate that
+    # stops it, and the widened 16-hex directory suffix.
+    "workflow/test_run_dir_provenance_gate.jl",
     "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",
@@ -328,6 +332,11 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    # The coverage claim `test_term_consistency.jl` makes in its header and does
+    # not keep: `apply_operator!` differenced against `energy_contribution` for
+    # EVERY slot of H_TERMS_CANONICAL_ORDER, with the coverage itself asserted so
+    # a fixture that stops activating a term cannot take its gate with it.
+    "oracles/test_term_fd_registry_coverage.jl",
     # Single-source gate for the F₊ ladder coefficient √(F(F+1)−m(m+1)) and the
     # singlet-pair sign (−1)^{F−m}. Pins every spin-ladder propagator/energy/
     # gradient to `fp_ladder_coeff` / `singlet_pair_sign`, so the formula can no
@@ -657,6 +666,7 @@ const _COST = Dict{String, Float64}(
     "foundation/test_property_based.jl" => 16.0,
     "oracles/test_stability_indeterminate.jl" => 15.5,
     "oracles/test_term_properties.jl" => 15.5,
+    "oracles/test_term_fd_registry_coverage.jl" => 36.0,
     "hamiltonian/test_lhy.jl" => 15.2,
     "analysis/test_phase_classification_polyhedral.jl" => 15.1,
     "oracles/test_registry_completeness.jl" => 14.4,

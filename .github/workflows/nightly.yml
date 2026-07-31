@@ -71,3 +71,83 @@ jobs:
         with:
           name: mutation-report
           path: mutation_out/
+  # A result nobody reads is not a gate. This workflow failed 100+ consecutive
+  # times — every run in the API's history — with no notification of any kind,
+  # so the heavy-YAML surface it exists to cover went unverified for months and
+  # the failures were found only by accident, from an unrelated PR.
+  #
+  # A per-run ping would be the wrong fix: the interesting event is the
+  # TRANSITION, and a job that pings every night for a month trains everyone to
+  # filter it. So this keeps exactly one issue that mirrors the current state —
+  # opened on the first failure, its body refreshed (not commented) on each
+  # subsequent one so the streak is visible without a notification, and closed
+  # automatically when nightly goes green again.
+  report:
+    name: Report the nightly result
+    needs: heavy
+    if: always() && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      OUTCOME: ${{ needs.heavy.result }}
+      MARKER: "<!-- nightly-heavy-status -->"
+    steps:
+      - name: Open, refresh or close the status issue
+        run: |
+          set -euo pipefail
+
+          # The one issue this workflow owns, found by a marker in the body so
+          # the title stays free to edit by hand.
+          existing=$(gh issue list --repo "$REPO" --state open --limit 100 \
+            --json number,body \
+            --jq "[.[] | select(.body | contains(\"$MARKER\"))] | .[0].number // empty")
+
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --repo "$REPO" \
+                --comment "Nightly is green again: $RUN_URL"
+              echo "closed #$existing"
+            else
+              echo "green, nothing open - no action"
+            fi
+            exit 0
+          fi
+
+          # How long has this been broken? A red that has been red for weeks
+          # reads very differently from a fresh one, and that distinction is
+          # exactly what was missing.
+          streak=$(gh run list --repo "$REPO" --workflow=nightly.yml --limit 100 \
+            --json conclusion --jq '[.[].conclusion] | index("success") // length')
+
+          # printf, not a heredoc: a heredoc inside a YAML block scalar carries
+          # the block's indentation into the body, and 10 leading spaces render
+          # the whole issue as a code block.
+          body=$(printf '%s\n' \
+            "$MARKER" \
+            "**Nightly \`full\` tier + \`SPINORBEC_RUN_HEAVY_YAML=true\` is failing.**" \
+            "" \
+            "- latest run: $RUN_URL" \
+            "- consecutive failures: **$streak** (capped at the last 100 runs)" \
+            "" \
+            "This issue is maintained by the workflow: the body is refreshed on every" \
+            "failing run and the issue closes itself when nightly goes green. Closing" \
+            "it by hand only hides the streak." \
+            "" \
+            "The nightly tier covers what per-PR checks cannot: the heavy YAML pipeline" \
+            "blocks behind \`SPINORBEC_RUN_HEAVY_YAML\`, which are SKIPPED in \`fast\` /" \
+            "\`oracles\` / \`integration\` even though the files containing them are" \
+            "gated. While this is red, that surface is unverified.")
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --repo "$REPO" --body "$body"
+            echo "refreshed #$existing (streak $streak)"
+          else
+            gh issue create --repo "$REPO" \
+              --title "Nightly heavy YAML is failing" --body "$body"
+            echo "opened a new status issue (streak $streak)"
+          fi

@@ -13,6 +13,12 @@ using Test, SpinorBEC, LinearAlgebra
 const _N = 16
 const _GRID = make_grid(GridConfig((_N, _N, _N), (8.0, 8.0, 8.0)))
 
+# Transverse-arm fixture constants. Named because the closed forms the two
+# transverse testsets check are written in terms of them.
+const _TRANSVERSE_DT = 0.002
+const _TRANSVERSE_BX = 0.4
+const _TRANSVERSE_BZ = 0.5
+
 # Helper: build a workspace with DDI on, c1 nonzero, non-trivial psi.
 function _make_ws_with_active_spin(dt::Float64; imaginary_time::Bool=false)
     sp = SimParams(; dt=dt, n_steps=1, imaginary_time=imaginary_time)
@@ -104,6 +110,34 @@ end
         @test isapprox(Mz_seq, Mz_comb; atol=0.01)
     end
 
+    # Shared fixture for the two transverse arms below. `q` is a parameter
+    # because the two paths are the same operator only at q = 0 — see the
+    # second arm.
+    function _mk_transverse_ws(; bx, q)
+        sp = SimParams(; dt=_TRANSVERSE_DT, n_steps=1, imaginary_time=false)
+        zeeman = TimeDependentZeeman(
+            ConstantWaveform(_TRANSVERSE_BZ), ConstantWaveform(q),
+            ConstantWaveform(bx), ConstantWaveform(0.0),
+        )
+        ws = make_workspace(;
+            grid=_GRID, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
+            zeeman, potential=HarmonicTrap(1.0, 1.0, 1.0),
+            sim_params=sp,
+            enable_ddi=true, c_dd=100.0,
+        )
+        copyto!(ws.state.psi, init_psi(_GRID, SpinSystem(6); state=:m_plus_F))
+        SpinorBEC._normalize_psi!(ws.state.psi, ws.grid, 13, 3)
+        ws
+    end
+
+    function _fy_total(ws)
+        _, fy, _ = SpinorBEC.spin_density_vector(
+            Array(ws.state.psi), ws.spin_matrices, 3
+        )
+        sum(fy) * SpinorBEC.cell_volume(ws.grid)
+    end
+
     @testset "Transverse Zeeman alive in combined path (App. A defect-8 regression)" begin
         # `zeeman_at` collapses TimeDependentZeeman to a diagonal-only
         # value, so the old `transverse_b(zee, t)` inside
@@ -113,103 +147,78 @@ end
         # pre-fix the combined step left ⟨Fy⟩ at exactly 0 while the
         # sequential path rotated.
         #
-        # q = 0 IS REQUIRED for the cross-path comparison below, and this
-        # testset used q = 0.1 until 2026-07-29. `_rtp_use_combined_step`'s
-        # docstring states the reason: the combined path leaves a lab-z `q F_z²`
-        # in the diagonal step while the sequential path applies the whole
-        # tilted Zeeman `-(b·F) + q(b̂·F)²` as one eigen-exact matrix, and those
-        # are the same operator only for an axial field or q = 0. With
-        # (bx, p, q) = (0.4, 0.5, 0.1) the two therefore disagree BY DESIGN:
-        # measured ⟨Fy⟩ = -0.00163902 sequential vs +0.0048 combined, and a
-        # 13×13 `exp(-i·dt·H)` reproduces the first to all printed digits with
-        # the field-axis quadratic and the second with the lab-z one. The
-        # deliberate divergence is pinned in its own testset below; this one
-        # tests the defect-8 claim, which needs q = 0 to be a fair comparison.
-        dt = 0.002
-        bx = 0.4
-        sp = SimParams(; dt=dt, n_steps=1, imaginary_time=false)
-        zeeman = TimeDependentZeeman(
-            ConstantWaveform(0.5), ConstantWaveform(0.0),
-            ConstantWaveform(bx), ConstantWaveform(0.0),
-        )
-        function _mk_transverse_ws()
-            ws = make_workspace(;
-                grid=_GRID, atom=Eu151,
-                interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
-                zeeman, potential=HarmonicTrap(1.0, 1.0, 1.0),
-                sim_params=sp,
-                enable_ddi=true, c_dd=100.0,
-            )
-            psi0 = init_psi(_GRID, SpinSystem(6); state=:m_plus_F)
-            copyto!(ws.state.psi, psi0)
-            SpinorBEC._normalize_psi!(ws.state.psi, ws.grid, 13, 3)
-            ws
-        end
-        function _fy_total(ws)
-            _, fy, _ = SpinorBEC.spin_density_vector(
-                Array(ws.state.psi), ws.spin_matrices, 3
-            )
-            sum(fy) * SpinorBEC.cell_volume(ws.grid)
-        end
-        ws_seq = _mk_transverse_ws()
+        # q = 0 here, and that is load-bearing. This arm ran at q = 0.1 until
+        # 2026-07-31 and had been red since b3881a23 unified the quadratic
+        # Zeeman to the FIELD AXIS, `q(b̂·F)²`. With b tilted, that term
+        # contributes at first order — the closed form from m = +F is
+        #
+        #   d⟨F_y⟩/dt = bx⟨F_z⟩ − 2q sinθcosθ ⟨F_z² − F_x²⟩
+        #             = 0.4·6 − 2(0.1)(0.4879)(33) = −0.820,
+        #
+        # i.e. −1.64e-3 after one dt — which is exactly what the sequential
+        # path measured. The physics was right and the assertion was stale.
+        # The second arm below pins the divergence itself.
+        ws_seq = _mk_transverse_ws(; bx=_TRANSVERSE_BX, q=0.0)
         SpinorBEC.split_step!(ws_seq)
-        ws_comb = _mk_transverse_ws()
+        ws_comb = _mk_transverse_ws(; bx=_TRANSVERSE_BX, q=0.0)
         SpinorBEC.split_step_combined!(ws_comb)
         fy_seq = _fy_total(ws_seq)
         fy_comb = _fy_total(ws_comb)
-        @test fy_seq > 1e-4                       # sequential sees the drive
-        @test fy_comb > 1e-4                      # combined does too (defect 8)
-        @test isapprox(fy_comb, fy_seq; rtol=0.05)  # same physics, O(dt²) apart
+        # At q = 0 the drive is the whole first-order story, so compare against
+        # the closed form rather than a bare sign — a threshold of 1e-4 against
+        # a 4.8e-3 signal would also pass on a step 48x too small.
+        predicted = _TRANSVERSE_BX * 6 * _TRANSVERSE_DT
+        @test isapprox(fy_seq, predicted; rtol=0.05)   # sequential sees the drive
+        @test isapprox(fy_comb, predicted; rtol=0.05)  # combined does too (defect 8)
+        @test isapprox(fy_comb, fy_seq; rtol=0.05)     # same operator, O(dt²) apart
     end
 
-    @testset "tilted field + q: the two paths differ BY DESIGN" begin
-        # Pins the divergence `_rtp_use_combined_step` exists to keep out of
-        # production, against an exact oracle rather than against each other:
+    @testset "Tilted field with q ≠ 0: the paths differ, and RTP declines" begin
+        # `_apply_combined_spin_step!` folds only the LINEAR transverse
+        # −(bx F_x + by F_y) into its rotation and leaves a lab-z `q F_z²` in
+        # the diagonal step, while the sequential path applies the whole tilted
+        # `−(b·F) + q(b̂·F)²` as one eigen-exact matrix. Those are the same
+        # operator only along ẑ or at q = 0, which `_rtp_use_combined_step`
+        # documents and guards.
         #
-        #   sequential  →  H = -(b·F) + q(b̂·F)²     (the ZeemanTerm the registry
-        #                                            declares; field-axis q)
-        #   combined    →  H = -(b·F) + q F_z²      (lab-z q, left in V_diag)
-        #
-        # Both are exact for their own H, so "which is right" is a convention
-        # question and the convention is the registry's. What must never happen
-        # is production silently taking the other one — hence the selector — and
-        # what must never happen here is this file asserting the two agree.
-        F = 6
-        D = 2F + 1
-        dt = 0.002
-        bx, p, q = 0.4, 0.5, 0.1
-        sm = spin_matrices(F)
-        Fx, Fy, Fz = Matrix(sm.Fx), Matrix(sm.Fy), Matrix(sm.Fz)
-        chi = zeros(ComplexF64, D)
-        chi[1] = 1.0                     # m = +F
-        _fy(H) = (c=exp(-im * dt * H) * chi; real(c' * Fy * c))
+        # The guard is what production depends on, so gate the guard — and gate
+        # that the divergence it exists for is real, otherwise a future change
+        # could make the two paths agree and leave a guard nobody notices is
+        # now pointless.
+        q = 0.1
+        ws_seq = _mk_transverse_ws(; bx=_TRANSVERSE_BX, q)
+        SpinorBEC.split_step!(ws_seq)
+        ws_comb = _mk_transverse_ws(; bx=_TRANSVERSE_BX, q)
+        SpinorBEC.split_step_combined!(ws_comb)
+        fy_seq = _fy_total(ws_seq)
+        fy_comb = _fy_total(ws_comb)
 
-        bhat = (bx, 0.0, p) ./ sqrt(bx^2 + p^2)
-        F_b = bhat[1] * Fx + bhat[3] * Fz
-        fy_axis = _fy(-(bx * Fx + p * Fz) + q * F_b^2)
-        fy_labz = _fy(-(bx * Fx + p * Fz) + q * Fz^2)
-        # The conventions are distinguishable at this (bx, p, q) — otherwise the
-        # rest of this testset would be vacuous.
-        @test !isapprox(fy_axis, fy_labz; rtol=0.05)
+        # Sequential = the field-axis closed form, sign included.
+        θ = atan(_TRANSVERSE_BX, _TRANSVERSE_BZ)
+        predicted_seq = (_TRANSVERSE_BX * 6 - 2q * sin(θ) * cos(θ) * (36 - 3)) *
+                        _TRANSVERSE_DT
+        @test isapprox(fy_seq, predicted_seq; rtol=0.05)
+        @test fy_seq < 0                       # the q term dominates and flips it
 
-        # The registry's own propagator is the field-axis one, and the sequential
-        # split-step is built from that same ZeemanTerm.
-        P = SpinorBEC._zeeman_propagator(sm, SpinorBEC.ZeemanTerm(bx, 0.0, p, q), dt, false)
-        c = Matrix(P) * chi
-        @test isapprox(real(c' * Fy * c), fy_axis; rtol=1e-8)
+        # Combined = the lab-z form, which from a pure m state contributes
+        # nothing at first order, so it lands on the q = 0 answer.
+        @test isapprox(fy_comb, _TRANSVERSE_BX * 6 * _TRANSVERSE_DT; rtol=0.05)
 
-        # And production may not reach the combined path with a tilted field.
-        sp = SimParams(; dt=dt, n_steps=1, imaginary_time=false)
-        ws = make_workspace(;
-            grid=_GRID, atom=Eu151,
-            interactions=InteractionParams(Dict(0 => 50.0, 1 => 1.0)),
-            zeeman=TimeDependentZeeman(
-                ConstantWaveform(p), ConstantWaveform(q),
-                ConstantWaveform(bx), ConstantWaveform(0.0)),
-            potential=HarmonicTrap(1.0, 1.0, 1.0), sim_params=sp,
-            enable_ddi=true, c_dd=100.0,
-        )
-        @test SpinorBEC._rtp_use_combined_step(ws) == false
+        # Hence: production must not take this path here. Both arms run with
+        # COMBINED_SPIN_STEP_ENABLED forced on — it is `false` by default and
+        # is the FIRST thing the guard checks, so a `== false` measured at the
+        # default would pass even with the tilt check deleted. The axial arm is
+        # the positive control: it must come back `true`, or the tilted `false`
+        # is not evidence about the tilt.
+        axial = _mk_transverse_ws(; bx=0.0, q)
+        old = SpinorBEC.COMBINED_SPIN_STEP_ENABLED[]
+        SpinorBEC.COMBINED_SPIN_STEP_ENABLED[] = true
+        try
+            @test SpinorBEC._rtp_use_combined_step(ws_comb) == false
+            @test SpinorBEC._rtp_use_combined_step(axial) == true
+        finally
+            SpinorBEC.COMBINED_SPIN_STEP_ENABLED[] = old
+        end
     end
 
     @testset "Asserts on incompatible workspace" begin
