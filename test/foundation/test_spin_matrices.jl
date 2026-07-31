@@ -82,4 +82,44 @@ using LinearAlgebra
             @test maximum(abs, Fz - Fz') < 1e-14
         end
     end
+
+    @testset "λ_S is the spectrum of the two-body operator F̂₁·F̂₂" begin
+        # Everything above pins ONE-body quantities. `spin_pair_eigenvalue` is a
+        # two-body quantity and had no absolute anchor anywhere: adding a
+        # constant to it left `foundation/`, `analysis/` and `manuscript/` all
+        # green (mutation harness, 2026-07-31). It is a single declaration read
+        # by both the c₀/c₁ → g_S channel map and the Sign-Pattern Lemma's β_S,
+        # so a shift moves the two together and they keep agreeing with each
+        # other. Only an absolute reference sees it — this is that reference.
+        #
+        # The reference is the operator itself, not the closed form restated:
+        # build F̂₁·F̂₂ = Σ_α F̂_α ⊗ F̂_α on the (2F+1)² product space out of the
+        # already-pinned one-body matrices and diagonalise. Its eigenvalues must
+        # be λ_S with degeneracy (2S+1), S = 0…2F. Nothing here mentions
+        # S(S+1) − 2F(F+1).
+        for F in (1, 2, 3)
+            sm = spin_matrices(F)
+            FdotF = sum(kron(Matrix(A), Matrix(A)) for A in
+                                                       (sm.Fx, sm.Fy, sm.Fz))
+            @test maximum(abs, FdotF - FdotF') < 1e-12
+            evals = sort!(real(eigvals(Hermitian(FdotF))))
+
+            # Predicted spectrum: λ_S repeated (2S+1) times. Sorted, because λ_S
+            # increases with S, this is the eigenvalue list in order.
+            predicted = Float64[]
+            for S in 0:(2F), _ in 1:(2S + 1)
+                push!(predicted, spin_pair_eigenvalue(S, F))
+            end
+            sort!(predicted)
+            @test length(evals) == (2F + 1)^2 == length(predicted)
+            @test maximum(abs, evals - predicted) < 1e-10 * F * (F + 1)
+
+            # Trace sum rule, independent of the eigen-decomposition:
+            # tr(A ⊗ B) = tr(A)·tr(B) and every F̂_α is traceless, so
+            # Σ_S (2S+1)·λ_S = 0 exactly. A constant offset c survives the
+            # spectrum comparison only if it also satisfies (2F+1)²·c = 0.
+            @test abs(sum((2S + 1) * spin_pair_eigenvalue(S, F)
+                          for S in 0:(2F))) < 1e-10 * F * (F + 1)
+        end
+    end
 end
