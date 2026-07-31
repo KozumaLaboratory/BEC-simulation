@@ -8,6 +8,7 @@
 #
 # Reference: docs/manuscript/papers/paper3_universal_theorem/sign_pattern_lemma1_general_S.md
 
+using SpinorBEC
 using Test
 
 println("=== Lemma 1 General-S closed form verification ===\n")

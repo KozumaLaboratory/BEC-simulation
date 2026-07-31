@@ -25,6 +25,7 @@
 # direction: an entry that starts resolving must be removed from the list, or the
 # list rots into a permanent excuse the way a stale KNOWN-LIMIT does.
 
+using SpinorBEC
 using Test
 
 const _DOCS = joinpath(@__DIR__, "..", "..", "docs")
@@ -46,16 +47,32 @@ const PLACEHOLDERS = Set([
 # deliberately NOT done here, because it means editing ~30 citation sites across
 # documents several sessions are actively rewriting, and it would collide.
 const KNOWN_UNRESOLVED = Set([
-    "12174e883326ecac", "Cr_eps0.15_", "Dy_eps1.39_", "Er_eps0.88_",
-    "Eu151_GS_64g", "Eu_eps0.55_", "_loop", "ddi_convention_factorial",
-    "ensemble_traces_round5", "eu151_edh_ext",
-    "eu151_klaus_lab_units", "eu151_mz_scan", "eu151_phase_pq",
-    "eu151_phi_omega", "fortress_compare",
+    "12174e883326ecac",
+    "Cr_eps0.15_",
+    "Dy_eps1.39_",
+    "Er_eps0.88_",
+    "Eu151_GS_64g",
+    "Eu_eps0.55_",
+    "_loop",
+    "ddi_convention_factorial",
+    "ensemble_traces_round5",
+    "eu151_edh_ext",
+    "eu151_klaus_lab_units",
+    "eu151_mz_scan",
+    "eu151_phase_pq",
+    "eu151_phi_omega",
+    "fortress_compare",
     "klaus_eu151_v2_full",
-    "lhy_mode_ablation", "lyapunov_diagnostic_round6",
-    "option_gamma_micro", "paper4_meanfield",
-    "sigma_mu_scan_", "sigma_mu_scan_round5", "species_scan_round6",
-    "sprint5_M1_", "sprint5_M1_multistart_groundstate", "twa_sinatra",
+    "lhy_mode_ablation",
+    "lyapunov_diagnostic_round6",
+    "option_gamma_micro",
+    "paper4_meanfield",
+    "sigma_mu_scan_",
+    "sigma_mu_scan_round5",
+    "species_scan_round6",
+    "sprint5_M1_",
+    "sprint5_M1_multistart_groundstate",
+    "twa_sinatra",
 ])
 
 """A citation resolves if the directory exists, or — for a family written
@@ -83,6 +100,22 @@ function _cited_run_dirs()
         endswith(n, ".md") || continue
         path = joinpath(root, n)
         rel = relpath(path, _DOCS)
+        # `docs/archive/` is out of scope. This gate is about LIVE claims: a
+        # document saying "see runs/x" is asserting that evidence can be
+        # followed. Archived documents are, by that directory's own README,
+        # "kept for historical context but not part of the live documentation
+        # set" — a run they name is part of the record of what was done at the
+        # time, not a pointer a reader is meant to follow today.
+        #
+        # Without this, importing a historical document is enough to fail the
+        # gate, and the only ways out are to widen KNOWN_UNRESOLVED (which is
+        # the one thing it exists to stop) or to keep the document out of the
+        # repository. That happened on 2026-07-31 and cost two round trips.
+        #
+        # Measured before making the change: no cited name appears ONLY under
+        # `archive/`, so nothing is hidden today and no KNOWN_UNRESOLVED entry
+        # becomes uncited. This is scope, not amnesty.
+        startswith(rel, "archive" * Base.Filesystem.path_separator) && continue
         for m in eachmatch(pat, read(path, String))
             # Trim trailing punctuation and the glob star a doc writes for a family.
             d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
@@ -95,6 +128,18 @@ end
 
 @testset "documents cite runs/ paths that resolve" begin
     cited = _cited_run_dirs()
+
+    # The scope exclusion is load-bearing, so assert it directly rather than
+    # trusting the `continue` above. Archived docs DO cite runs/ paths (AUDIT_BUG4
+    # and MEASUREMENT_CAMPAIGN_PHASE2 between them name three), so this is not
+    # vacuous: delete the exclusion and those citers reappear here.
+    @testset "archived docs are out of scope" begin
+        from_archive = sort([
+            "$d <- $f" for (d, fs) in cited for f in fs if
+            startswith(f, "archive" * Base.Filesystem.path_separator)
+        ])
+        @test from_archive == String[]
+    end
 
     @testset "the sweep found citations" begin
         # A zero here makes every assertion below vacuous — the same shape this

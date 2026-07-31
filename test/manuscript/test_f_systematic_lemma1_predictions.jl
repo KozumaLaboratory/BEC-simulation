@@ -9,6 +9,7 @@
 # Outputs: predicted β_S^(λ_spin) per channel; identifies sign-change boundary
 # in the discrete channel set; gives Feshbach engineering recipe for high-F species.
 
+using Test
 using SpinorBEC
 using LinearAlgebra
 using Printf

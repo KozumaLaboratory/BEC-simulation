@@ -6,9 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel superseded runs on a PR — pushing a fixup should not leave the previous
+# commit's run burning a runner. Never cancel a push to `main`: that run is the
+# only verification the merged commit ever gets, and `github.ref` is
+# `refs/heads/main` for every one of them, so back-to-back merges were killing
+# each other's. Measured 2026-07-31: 13 of the last 30 `main` runs ended
+# `cancelled`, i.e. 43 % of merges landed with no completed check of the tree
+# they produced. Same group, so rapid merges queue instead of racing; each one
+# still runs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Opt into Node.js 24 ahead of the September 2026 forced migration so we
 # don't carry deprecation warnings on every run.

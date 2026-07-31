@@ -7,6 +7,7 @@
 # 3. ITP convergence: same ground state energy as sequential, within
 #    the order-2 splitting tolerance.
 
+using SpinorBEC
 using Test, SpinorBEC, LinearAlgebra
 
 const _N = 16
