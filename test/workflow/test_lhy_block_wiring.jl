@@ -197,6 +197,50 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         end
     end
 
+    # `_resolve_derived_params!` is the ONLY caller of `_resolve_lhy_block!`,
+    # which writes the internal `lhy_kind` slot every step reads. It used to
+    # return early when `interactions` carried no N_atoms/omega_ref, so the
+    # direct `interactions: {c0, c1}` form silently ran with NO LHY at all.
+    # Latent when found (0 of 360 lhy-bearing configs use that form), which is
+    # exactly why it needs a gate rather than a memory.
+    @testset "lhy: survives the {c0, c1} interactions form" begin
+        mk(inter, kind) = """
+        defaults: {kind: spinor, backend: cpu}
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              interactions: $inter
+              ddi: {enabled: false}
+              lhy: {kind: $kind}
+              initial_state: polar
+              dt: 0.01
+              n_steps: 5
+        """
+        resolved(inter, kind) = begin
+            p = load_config_from_string(mk(inter, kind)).steps[1].params
+            SpinorBEC._resolve_gs_atom(p, nothing; verbose=false)
+            get(p, "lhy_kind", nothing)
+        end
+
+        # The regression: a tabulated kind needs only `kind`, so it must
+        # resolve under BOTH interactions forms.
+        @test resolved("{c0: 1.0, c1: 0.01}", "polar_contact") == "polar_contact"
+        # Positive control — the supported form was never broken, so a gate
+        # that only checked this one would have passed against the defect.
+        @test resolved("{N_atoms: 1000, omega_ref: 100.0}", "polar_contact") ==
+            "polar_contact"
+
+        # `scalar` derives c_lhy FROM (N_atoms, omega_ref), so under {c0, c1}
+        # it genuinely cannot be derived. The kind still resolves, and the
+        # step must SAY that LHY is off rather than leave it to be noticed in
+        # the energy decomposition.
+        @test_logs (:warn, r"LHY is INACTIVE") match_mode = :any begin
+            @test resolved("{c0: 1.0, c1: 0.01}", "scalar") == "scalar"
+        end
+    end
+
     @testset "LHYTableOpts is concrete" begin
         # It rides into make_workspace, the inference hot path. An abstract
         # field here would widen Workspace specialisation.

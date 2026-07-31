@@ -246,7 +246,19 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     inter isa Dict || return nothing
     N_raw = get(inter, "N_atoms", nothing)
     ω_raw = get(inter, "omega_ref", nothing)
-    (N_raw === nothing || ω_raw === nothing) && return nothing
+    if N_raw === nothing || ω_raw === nothing
+        # Everything below derives from (N_atoms, omega_ref) and cannot run —
+        # but the `lhy:` block does NOT. A tabulated kind needs only `kind`,
+        # and this function is the ONLY caller of `_resolve_lhy_block!`, which
+        # writes the internal `lhy_kind` slot the ground-state and dynamics
+        # steps read. Returning here without it meant a config written with the
+        # direct `interactions: {c0, c1}` form silently ran with no LHY at all.
+        # No committed config is currently affected (0 of 360 lhy-bearing
+        # configs omit N_atoms/omega_ref), so this closes a latent footgun
+        # rather than fixing live data.
+        _resolve_lhy_block!(p, inter, atom, NaN, 0.0, 0, NaN)
+        return nothing
+    end
 
     N_atoms = Int(N_raw)
     omega_ref = Float64(ω_raw)
@@ -335,6 +347,14 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
             # the textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
             # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
             lhy_block["c_lhy"] = scalar_lhy_coefficient(atom.a_s / a_ho, N_atoms; eps_dd)
+        elseif isnan(a_ho) || N_atoms == 0
+            # Reached only from the (N_atoms, omega_ref)-absent path above.
+            # `scalar`/`quasi_2d` derive c_lhy from those, so here LHY really
+            # is off — say so rather than leaving it to be discovered in the
+            # energy decomposition.
+            @warn "lhy: {kind: $kind} cannot auto-derive c_lhy without " *
+                "interactions.{N_atoms, omega_ref}: LHY is INACTIVE for this step. " *
+                "Give an explicit lhy.c_lhy, or use the N_atoms/omega_ref form."
         end
     end
     # Normalise to internal fields for downstream consumers.
