@@ -1,5 +1,15 @@
 # M1 sweep — gate (1) ground-state-ness audit (2026-06-08)
 
+> **その sweep は git に無い (2026-07-31)。** `runs/sprint5_M1_multistart_groundstate/`
+> はどの commit にも存在せず、下記の数値は再チェックできない。解析側
+> (`scripts/m1_groundstate_audit.jl`) はコミットされているので手順は再現できるが、
+> 入力の 30 セル (B × Ω, Eu F=6, 24³, 50k) が無い。
+>
+> 再生成は可能だが安くはなく、本監査は自ら **gate (1) のみ**（saddle 除去と
+> vortex 解像度は pending）と述べているので、暫定結果のために sweep を回すのは
+> 優先度が低い。**現状は「証拠を辿れない暫定監査」として読むこと。**
+> 全体像: [`doc_run_citation_inventory.md`](../../campaign/doc_run_citation_inventory.md)。
+
 First physics-gated extraction from the on-disk 30-cell rotating-frame
 sweep (`runs/sprint5_M1_multistart_groundstate/`, B × Ω, Eu F=6, 24³,
 50k atoms). Produced by `scripts/m1_groundstate_audit.jl`.
