@@ -138,8 +138,15 @@ _uge_jobname(cid::AbstractString) = "sb_" * String(cid)
                        cuda_module, jobname, compute_group) -> String
 
 Render the full UGE submission script. The body cd's into `project_root`,
-optionally `module load`s CUDA, and invokes `julia run_yaml <config_path>`
-— same shape as the LocalBackend subprocess invocation, for byte-for-byte run-artifact parity.
+optionally `module load`s CUDA, sets `JULIA_NUM_THREADS` from the slot count
+the profile asked for, and invokes `julia run_yaml <config_path>` — same shape
+as the LocalBackend subprocess invocation, for byte-for-byte run-artifact
+parity.
+
+The script is the job's ENTIRE environment: `_uge_qsub_cmd` passes neither
+`-V` nor `-v`, so anything the run needs from the environment has to be
+exported here. `qsub -v JULIA_NUM_THREADS=<n>` still wins, because the export
+defaults through it.
 """
 function render_uge_script(profile::AbstractString, config_path::AbstractString;
     project_root::AbstractString,
@@ -202,6 +209,17 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     # with "Package X is required but does not seem to be installed".
     # Point at the lab's shared depot installed once on the login node.
     $(depot_line)
+
+    # This script IS the whole environment the job gets: `_uge_qsub_cmd`
+    # passes no `-V` and no `-v`, so nothing is inherited from the submitting
+    # shell. Without this line every autopilot-dispatched run executed Julia
+    # at its default of ONE thread, on a profile that had asked for 48 cores —
+    # and the CPU hot paths are threaded (spin density, spin mixing,
+    # singlet-pair, tensor, the DDI k-space contraction, the Euler spin
+    # rotation, the Bogoliubov scan). UGE exports NSLOTS = the slot count the
+    # profile requested; the `:-4` fallback matches scripts/tsubame_setup.sh
+    # for the case where the rendered script is run by hand outside UGE.
+    export JULIA_NUM_THREADS="\${JULIA_NUM_THREADS:-\${NSLOTS:-4}}"
 
     # Same snippet shape as LocalBackend's _LOCAL_RUN_SNIPPET so local
     # and remote dispatch produce byte-for-byte identical artefacts.
