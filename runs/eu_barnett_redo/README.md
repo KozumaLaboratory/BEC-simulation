@@ -132,57 +132,69 @@ found `n=112` to be ~66× slower per step than `n=80` and abandoned fine grids a
 infeasible — `112 = 2⁴·7`, and that factor-7 transform is a large part of it.
 `96 = 2⁵·3` sits between the two in size and is FFT-friendly.
 
-## Results (2026-07-29)
+## Results
 
-### Converged
+### The claim
 
-Production protocol, cell `plus`, dx-convergence at stir = 30:
+**Of the orbital angular momentum lost after the quench, ~99% becomes spin.**
 
-| dx | J_z at quench start | conversion ΔF_z | leak | leak/conv |
-|---|---|---|---|---|
-| 0.219 | 7.974 | 0.9925 | 0.6718 | 67.7% |
-| 0.175 | 8.502 | 1.0597 | 0.2863 | 27.0% |
-| **0.146** | **8.535** | **1.0658** | **0.2433** | **22.8%** |
+| quantity | value | why it is trustworthy |
+|---|---|---|
+| conversion efficiency `ΔF_z/|ΔL_z|` | **0.991** | identical at box 42 and 46.7 (0.9916 / 0.9912) and flat across the whole quench |
+| `J_z` ledger leak | **0.9%** of the signal | edge fraction 2.4e-10, four orders under target |
+| rotation is the cause | `Ω=0` gives `J_z ≡ 0` | leak 7.5e-07 — a static field exerts no torque |
+| the DDI is the mechanism | DDI off gives `L_z ≡ 0` | leak 2.1e-12; without it the rotating field nucleates nothing |
+| the sign follows the rotation | `±Ω` mirror to four digits | every column, including the leak |
 
-The last refinement moves the stir output +0.4% and the conversion +0.6%, so
-both are converged. **ΔF_z = 1.066 ħ/atom.**
+### Why the efficiency and not ΔF_z
 
-The controls are unaffected by the leak and were clean from the start:
+`ΔF_z` is a **transient**. It rises through the entire quench (0.27 → 1.06 over
+t = 40 → 80, still rising at the end) and it rises with the box:
 
-| cell | result |
+| box | ΔF_z | ΔL_z | efficiency | leak/conv | edge_xy |
+|---|---|---|---|---|---|
+| 35 | 0.9240 | −0.9422 | 0.9806 | 2.0% | 1.95e-05 |
+| 42 | 1.0133 | −1.0218 | 0.9916 | 0.8% | 8.90e-07 |
+| 46.7 | 1.0609 | −1.0704 | 0.9912 | 0.9% | 2.41e-10 |
+
+Same cause for both: once the field is off the cloud expands freely, so a wider
+box or a longer window each let the relaxation run further. Quoting `ΔF_z` means
+quoting the window. The **ratio** removes the window — a 15% spread collapses to
+1.1%, and to 0.04% between the two boxes that meet the edge target.
+
+The stir output is converged (`J_z` at quench start: 8.6904 / 8.7026 / 8.7052,
+last step +0.03%), so the state entering the quench is settled; only the quench
+transient moves.
+
+### Figures
+
+| | |
 |---|---|
-| `zero` (static field, no rotation) | F_z ≡ 0 for all time |
-| `plus_nodd` (DDI off) | L_z ≡ 0, no conversion, leak 1.9e-10 |
-| `minus` | exact mirror of `plus` to all printed digits |
+| `fig1_ledger.png` | `L_z`, `F_z`, `J_z` through stir + quench, with per-axis edge fraction |
+| `fig2_chirality.png` | `F_z(t)` for −Ω / 0 / +Ω |
+| `fig3_mechanism.png` | DDI on vs off |
+| `fig4_efficiency.png` | the transient vs the ratio — the argument in one panel |
 
-### Not converged: the J_z leak, and why
+Figures 1–3 use the box-35 set, the only geometry with all four cells. Generate
+with `--tag=` so cells are never mixed across geometries:
 
-The leak stops scaling: −57% then only −15% for the same 1.2× refinement. The
-per-term torque budget on a **real** post-quench state (`torque_budget.jl`,
-which measures each term's violation of `[H, J_z] = 0` — exactly zero in the
-continuum) locates it:
-
-```
-   t |       DDI     kinetic  contact+LHY        SUM |   observed
-55.00 | +1.36e-03  -7.01e-03   -1.13e-04   -5.77e-03 | -4.55e-03
-80.00 | +4.71e-04  -2.84e-03   -9.64e-05   -2.46e-03 | -3.52e-03
+```bash
+python3 runs/eu_barnett_redo/fig_core.py --tag=_prod_box35
+python3 runs/eu_barnett_redo/fig4_efficiency.py
 ```
 
-The **sum matches the observed dJz/dt**, so the discretised Hamiltonian accounts
-for the leak — not the boundary, not the time stepping. And the **kinetic term
-dominates, ~5× the DDI**, which corrects an earlier reading that blamed the
-dipolar kernel (that scan had measured only the DDI term).
+### What it took to get here, and what to reuse
 
-`−∇²/2` is exact spectrally for a band-limited state, but `L_z` does not map the
-discrete k-grid onto itself, and the quench keeps regenerating structure at the
-Nyquist edge however fine the grid. Hence a leak that refinement cannot remove.
+The `J_z` leak was misdiagnosed four times — as the integrator, the z box, the
+kinetic-term discretisation (predicted dealiasing would fix it; it changed
+nothing), and box 35 being an outlier. Two predictions recorded in PR #177 were
+wrong in opposite directions. Each time, progress came from measuring instead of
+reasoning:
 
-### What this does and does not license
-
-Sound: the conversion value, the mechanism (DDI), the zero point, and the sign
-reversal. The leak is 23% of the signal but **does not track it** — it fell 64%
-across the series while the conversion moved 7% and then settled (`fig4`).
-
-Still open: whether dealiasing removes the residual, and whether any of it is
-boundary or dt after all. Predictions were recorded before those runs finished
-(PR #177): `box35` and `dt5e4` should barely move, `dealias` should help.
+- `torque_budget.jl` measures each term's violation of `[H, J_z] = 0` on a real
+  saved state — exactly zero in the continuum, so anything nonzero is the
+  discretisation, resolved per term. Seconds, against hour-long dynamic A/B runs.
+- One variable at a time, with `dx` held to the last digit (`42/288 = 35/240 =
+  28/192`), separated the box from everything else.
+- The final answer needed **no new run at all** — reading the existing ledgers
+  along the time axis showed the efficiency was already flat.
