@@ -111,6 +111,9 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    # energy and gradient must come from the SAME DDI kernel; test_ddi_padded.jl
+    # never calls either face
+    "hamiltonian/test_ddi_gradient_padding_parity.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
@@ -454,6 +457,9 @@ const FULL_EXTRA = [
     # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
     # a green ci tier says nothing about it.
     "gpu/test_gpu_ddi_contraction_parity.jl",
+    # the padded DDI GRADIENT face reads a strided corner view of Phi_*_pad;
+    # the contraction gate above stops before apply_operator!
+    "gpu/test_gpu_ddi_gradient_padding_parity.jl",
     # The fused diagonal kernel with a TABULATED LHY against the generic
     # broadcast propagator it replaces. Every production Eu run is tabulated and
     # every one of them took the fallback; GPU-only.

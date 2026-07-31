@@ -111,11 +111,43 @@ Computes spin density + DDI potential first, then accumulates.
 function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     ws.ddi !== nothing || return nothing
     sm = ws.spin_matrices
-    F = ws.atom.F
-    bufs = ws.ddi_bufs
-    _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
-    compute_ddi_potential!(ws.ddi, bufs)
-    phi_x, phi_y, phi_z = bufs.Phi_x, bufs.Phi_y, bufs.Phi_z
+    # Branch on padding exactly as `_ddi_energy` does. Until 2026-07-30 this
+    # function did not, so with `ddi_padding` on — the YAML default since
+    # 2026-07-29 — the gradient came from the bare periodic kernel while the
+    # energy came from the padded one, and L-BFGS/Newton descended one operator
+    # toward the minimum of a different one. The two differ by the periodic-image
+    # field error padding exists to remove (2-5 %).
+    #
+    # Both branches now call the SAME convolution the energy face calls, so the
+    # pair cannot drift again by construction rather than by agreement.
+    ddi_padded = ws.ddi_padded
+    if ddi_padded === nothing
+        bufs = ws.ddi_bufs
+        _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
+        compute_ddi_potential!(ws.ddi, bufs)
+        _grad_ddi_accumulate!(
+            grad, psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, ws.atom.F, n_pts, D, Val(N))
+    else
+        _compute_and_convolve_ddi_padded!(psi, sm, ws.ddi, ddi_padded, Val(D), N, n_pts)
+        # `Phi_*_pad` are padded-shaped; the physical field is the `[1:n...]`
+        # CORNER. Cartesian views, not linear indexing — the first `prod(n_pts)`
+        # linear elements walk full padded columns into the pad region for
+        # ndim >= 2 (App. A defect 9).
+        corner = ntuple(d -> 1:n_pts[d], Val(N))
+        _grad_ddi_accumulate!(
+            grad, psi,
+            view(ddi_padded.Phi_x_pad, corner...),
+            view(ddi_padded.Phi_y_pad, corner...),
+            view(ddi_padded.Phi_z_pad, corner...),
+            ws.atom.F, n_pts, D, Val(N))
+    end
+    nothing
+end
+
+# Function barrier: the two branches above hand in differently-typed `phi_*`
+# (a plain array vs a strided corner view), so the accumulation is split out to
+# be specialised on each rather than letting the union leak into the broadcasts.
+function _grad_ddi_accumulate!(grad, psi, phi_x, phi_y, phi_z, F, n_pts, D, ::Val{N}) where {N}
     # Fz part (diagonal)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
