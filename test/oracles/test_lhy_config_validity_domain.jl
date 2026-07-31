@@ -116,7 +116,29 @@ end
             # NaN is how the closed forms say "outside my domain". A run would
             # die at table-build time with an ArgumentError; this says so now.
             @test isfinite(e)
-            @test e >= 0.0        # LHY is a repulsive correction
+            # STRICTLY positive, not `>= 0`. A closed form can also leave its
+            # domain by returning zero, and `isfinite(0.0) && 0.0 >= 0` passes
+            # both assertions above — so the config would look gated while its
+            # LHY term was simply absent, which is precisely the failure mode six
+            # separate paths have already produced by dropping `ws.lhy`.
+            # `lhy_energy_fm` did exactly this until 2026-07-30: its
+            # `kappa < 1e-12 && return 0.0` swallowed NEGATIVE g_{2F} alongside
+            # negligible ones. These configs all have active couplings, so a zero
+            # here is a defect and never the physical answer.
+            @test e > 0.0
         end
+    end
+
+    @testset "a silent zero fails too (canary)" begin
+        # The assertion above is load-bearing only if zero is actually reachable.
+        # F=6: g_{2F} = c₀ + 36 c₁, so c₁/c₀ < −1/36 drives the FM stiffness
+        # negative. Before the fix that returned 0.0 and sailed through
+        # `isfinite` and `>= 0`; it now declines with NaN.
+        g_neg = _c0c1_to_gS(6, 10.0, -0.5)          # g_12 = −8.0
+        @test build_fm_lhy_coefs(6, g_neg).delta_F < 0
+        @test isnan(lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g_neg)))
+        # ...and the healthy side still answers.
+        g_ok = _c0c1_to_gS(6, 10.0, -0.05)          # g_12 = +8.2
+        @test lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g_ok)) > 0
     end
 end

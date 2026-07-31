@@ -1,8 +1,68 @@
+# The Eu F=6 LHY instability is entirely dipolar — and that names the fix
+
+**Corrected 2026-07-30, same day.** The first version of this document concluded
+"there is no usable LHY mode in this regime". That was too strong, and the
+measurement that shows why took one extra column: **switch the DDI off and the
+instability is exactly zero.**
+
+| seed | max Im ω, DDI on | max Im ω, DDI off |
+|---|---:|---:|
+| flower | 0.365 | **0** |
+| polar_core_vortex | 0.926 | **0** |
+| m_plus_F | 0.370 | **0** |
+| polar | 1.030 | **0** |
+
+(texture ladder, N=50000, c₁=0, 50 µG, 16×16×32. Same on the `eu_k3_lhy` ladder:
+`m_minus_F` gives 0.396 with DDI, 0 without.)
+
+So this was never "Eu F=6 is beyond the machinery". The contact problem is
+perfectly stable; **the dipolar term destabilises the spin branch**, at
+`ε_dd = 0.5402`. And with the DDI off, `full_bdg` and the ansatz-matching closed
+form agree to six significant figures — `V(n=3.7e-3)` = 0.380007 vs 0.380006 —
+which is a clean cross-validation of both in the stable regime.
+
+## Two prescriptions for the same physics, and only one is scheme-dependent
+
+- **`full_bdg`** drops the complex branches from the zero-point sum while the
+  counterterms still subtract all `D` of them. That is what its warning means by
+  scheme-dependent, and it is why it flags these states.
+- **the `*_dipolar` closed forms** use Petrov's prescription: `lima_pelster_Q5`
+  zeros the integrand where `1 + ε_dd(3cos²θ − 1) < 0`, so the unstable angles are
+  excluded rather than half-counted. At `ε_dd = 0.5402 < 1` this is inside its
+  domain, and `fm_dipolar` returns a finite, well-defined value (0.553422) with no
+  warning — checked, not silent.
+
+**So the route is a `*_dipolar` closed form whose ansatz matches the state**, not
+`full_bdg`.
+
+## What that means per suite
+
+**`eu_k3_lhy*` — has a valid route.** All twelve arms are `initial_state:
+m_minus_F`, i.e. FM, and `c₁ < 0` makes FM the mean-field ground state, so the FM
+ansatz matches the state. `fm_dipolar` is the correct target — not `full_bdg`,
+which runs but is scheme-dependent at this dipolar strength, and not
+`icosahedral`, which now refuses at `c₁ < 0`.
+
+**The texture campaign — still blocked, for a different reason.** Its job is to
+*compare five distinct textures*. Four of them (flower, csv, pcv, m_plus_F) have
+`|⟨F⟩|/F = 1`, so `fm_dipolar` covers them — a pure direction texture is free,
+ε_LHY being an SO(3) scalar for contact and moving ~0.25 % under DDI. But `polar`
+has `|⟨F⟩|/F = 0` and needs `polar_dipolar`. Comparing an energy *ordering* across
+two different closed forms is not the same measurement as ordering them under one
+functional, and the only single functional covering all five is `full_bdg` — the
+scheme-dependent one. That is the real obstacle, and it is about the comparison,
+not about the atom.
+
+---
+
+## Original measurements (unchanged, re-scoped by the above)
+
 # `full_bdg` ε_LHY is scheme-dependent for Eu F=6 at 50–80 µG
 
-Measured 2026-07-30. **Consequence: the Eu texture campaign's phase ordering is a
-mean-field statement. There is currently no route to a quotable
-beyond-mean-field ordering in this regime.**
+Measured 2026-07-30. **Consequence: the Eu texture campaign's phase ordering is a mean-field
+statement, because no single LHY functional covers all five competing textures
+without being scheme-dependent. Individual FM-magnitude states DO have a valid
+route — see the correction above.**
 
 ## What the code says about itself
 
@@ -16,6 +76,27 @@ mean field at the representative spinor and warns when a branch grows:
 
 So this is not a `full_bdg` defect that switching to `polar_contact` /
 `icosahedral` avoids. It is a statement about the state.
+
+For `icosahedral` the door is shut harder still, and independently. As of
+2026-07-30 `epsilon_LHY_F6_Ih` **returns NaN for `λ_spin < 0`, i.e. for `c₁ < 0`**,
+and `_tabulate_lhy` turns a non-finite table into an `ArgumentError` at build time.
+The closed form is `c₀^(5/2) + 3|λ_spin|^(5/2)`; the `|·|` had made it symmetric
+under `c₁ → −c₁` and returned a real energy exactly where the spin-Goldstone branch
+is dynamically unstable — the same instability this document is about, reached from
+the other side. Measured then: `full_bdg` reports max Im ω = 2.8 at
+(c₀=10, c₁=−0.2), and the closed form ran 0.4 / 2.1 / 11.0 % high at
+c₁ = −0.05 / −0.1 / −0.2.
+
+**`c₁ < 0` is the sign Eu F=6 production uses.** So `icosahedral` does not merely
+inherit the scheme dependence — it now refuses to run at all here, and the
+remaining option is `full_bdg`, which is what this document measures. Both doors
+were found shut on the same day, by different routes:
+
+| mode | status at Eu F=6, c₁ < 0, 50–80 µG |
+|---|---|
+| `icosahedral` | **errors at build time** — closed form invalid where the spin branch is unstable |
+| `polar_contact` | ansatz is polar; inherits the scheme dependence by the warning's own statement |
+| `full_bdg` | runs, but ε_LHY is scheme-dependent — measured below |
 
 ## The three escape routes, all closed
 

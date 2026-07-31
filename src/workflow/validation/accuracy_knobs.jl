@@ -44,9 +44,21 @@ One setting that trades accuracy for speed (or for convenience).
 for a `make_workspace` kwarg / YAML key it cannot — the caller must put those in
 the config, and the distinction is recorded rather than papered over.
 
-`reference` is the most accurate setting, `default` what ships. `note` says what
-the gap costs and where that was measured, so the number is never the only
-justification.
+`reference` is the most accurate setting and `default` what ships.
+
+`ladder` is the measured alternatives: entries `(value, rel_error, rel_cost)`
+where BOTH numbers come from a measurement, `rel_error` on the quantity the knob
+controls and `rel_cost` as a multiple of a production step. A speed profile is
+SOLVED from these against a stated error budget rather than hand-picked —
+`accuracy_profile_for_budget` — so no one gets to decide that a trade is
+acceptable, including me. The first version of this file had a single `fast`
+field that I populated with `ddi_pad_factor = 1.5`, and that value violates the
+criterion in `error_budget.jl`'s own header: its 1.9e-2 residual is 4.4× the
+4.3e-3 the production setting already carries. A budget rule rejects it
+automatically; a hand-picked field did not.
+
+`note` says what the gap costs and where that was measured, so the number is
+never the only justification.
 
 `getter`/`setter` rather than `get`/`set!`: a keyword argument cannot be called
 `set!`, because `set!=nothing` parses as `set != nothing`.
@@ -57,17 +69,22 @@ struct AccuracyKnob
     reference::Any
     default::Any
     note::String
+    accepted_error::Float64          # the error the DEFAULT setting already carries
+    ladder::Vector{NamedTuple{(:value, :rel_error, :rel_cost), Tuple{Any, Float64, Float64}}}
     getter::Union{Nothing, Function}
     setter::Union{Nothing, Function}
 end
 
 function AccuracyKnob(name::Symbol, scope::Symbol, reference, default, note::String;
-    getter=nothing, setter=nothing)
+    accepted_error=NaN,
+    ladder=NamedTuple{(:value, :rel_error, :rel_cost),
+        Tuple{Any, Float64, Float64}}[], getter=nothing, setter=nothing)
     scope in (:global, :per_run) ||
         throw(ArgumentError("scope must be :global or :per_run, got :$scope"))
     scope === :global && (getter === nothing || setter === nothing) &&
         throw(ArgumentError("a :global knob needs both `getter` and `setter`"))
-    AccuracyKnob(name, scope, reference, default, note, getter, setter)
+    AccuracyKnob(name, scope, reference, default, note, Float64(accepted_error),
+        ladder, getter, setter)
 end
 
 """
@@ -100,8 +117,16 @@ contaminates the answer.";
         "Zero-pad multiple for the open-boundary DDI convolution. Measured \
 (bench/ddi_pad_factor_accuracy.jl, H100, Eu151, referenced to pad 3): relative \
 Φ error 4.3e-3 at pad 2, 1.9e-2 at 1.5, 1.3e-1 unpadded, at 3.4×/8×/1× the FFT \
-volume. Lowering it was measured and REJECTED — the residual at 1.5 is the size \
-of the error padding exists to remove."),
+volume. Lowering it was measured and REJECTED for production — the residual at \
+1.5 is the size of the error padding exists to remove — but it is the one knob \
+whose speed AND error are both measured. Cost is GRID-DEPENDENT — pad 1.5 is \
+1.10× at 32³ and 1.28× at 64³ — which is on its own a reason a single 'fast \
+value' is the wrong shape.";
+        accepted_error=4.3e-3,
+        ladder=[(value=3.0, rel_error=1.0e-3, rel_cost=1.507),
+            (value=2.0, rel_error=4.3e-3, rel_cost=1.0),
+            (value=1.5, rel_error=1.9e-2, rel_cost=0.906),
+            (value=1.0, rel_error=1.3e-1, rel_cost=0.75)]),
     AccuracyKnob(:ddi_padding, :per_run, true, true,
         "Open-boundary (zero-padded) DDI convolution. ON is accurate; OFF is the \
 bare periodic kernel, 2-5 % dipolar field error flat in resolution (9c117c05)."),

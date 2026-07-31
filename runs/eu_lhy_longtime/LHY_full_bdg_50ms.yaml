@@ -7,7 +7,7 @@
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
 # Long-time LHY stability ladder — auto-generated.
 # Source: scripts/validation/eu_lhy_longtime_gen.jl
-# LHY = icosahedral, K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
+# LHY = full_bdg (was icosahedral), K3 = 0, duration = 31.42 ω_ref⁻¹ ≈ 50ms
 
 metadata:
   suite: eu_lhy_longtime
@@ -15,7 +15,7 @@ metadata:
   parent_regime: cigar_N30k_omz0p25
   K3_factor: 0
   LHY_kind: full_bdg
-  target_ms: 200ms
+  target_ms: 50ms
   generator: scripts/validation/eu_lhy_longtime_gen.jl
   caveat: |
     Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
@@ -54,7 +54,7 @@ pipeline:
       tol: 1.0e-9
 
   - dynamics:
-      duration: 125.66
+      duration: 31.415
       dt: 0.005
       B:
         Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}

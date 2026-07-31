@@ -5,29 +5,37 @@
 # domain -- `epsilon_LHY_F6_Ih` now returns NaN and the table build throws.
 # `full_bdg` diagonalises the coupled problem with no ansatz and is valid here.
 # Gated by test/oracles/test_lhy_config_validity_domain.jl.
-# K3=0 LHY model control — auto-generated.
-# Source: scripts/validation/eu_k3_lhy_control_gen.jl
-# LHY = icosahedral, K3 = 0, γ_dr = 0.
-# Compare to eu_k3_lhy/LHY_icosahedral.yaml (same LHY, K3=200) to isolate
-# LHY-alone vs LHY+K3 effects.
+# Long-time LHY stability ladder — auto-generated.
+# Source: scripts/validation/eu_lhy_longtime_gen.jl
+# LHY = full_bdg (was icosahedral), K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
 
 metadata:
-  suite: eu_k3_lhy_control
+  suite: eu_lhy_longtime
   ladder_level: 12
   parent_regime: cigar_N30k_omz0p25
   K3_factor: 0
   LHY_kind: full_bdg
-  generator: scripts/validation/eu_k3_lhy_control_gen.jl
+  target_ms: 200ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.
 
 defaults:
   kind: spinor
-  backend: cpu
+  backend: gpu
   interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
 
 pipeline:
   - ground_state:
       atom: Eu151
-      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
       potential: {type: harmonic, omega: [1.0, 1.0, 0.25]}
       interactions:
         N_atoms: 30000
@@ -46,7 +54,7 @@ pipeline:
       tol: 1.0e-9
 
   - dynamics:
-      duration: 20.0
+      duration: 125.66
       dt: 0.005
       B:
         Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
@@ -59,7 +67,7 @@ pipeline:
       seed_amplitude: 1.0e-6
       seed_k_cut: 2.5
       save:
-        every: 50
+        every: 200
         psi: true
         precision: f64
 
