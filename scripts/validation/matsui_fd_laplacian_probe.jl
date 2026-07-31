@@ -55,18 +55,21 @@ function run_one(; B_nT, c0, c1, n, box, fd::Bool, backend)
     # H_Z = -p F_z with p = -g_F mu_B B (Kawaguchi-Ueda), matching Units.bfield_to_p.
     p_of(B_T) = -atom.g_F * mu_B * B_T / (hbar * OMEGA_REF)
     q = 2π * 1.0 / OMEGA_REF                       # their ZeemanQ = 1.0 Hz
+    # Dimensionless, and the same 211.0214 the static comparison matched to
+    # their cdd expression at 7 s.f. make_workspace refuses to guess it.
+    c_dd = compute_c_dd_dimless(atom; N_atoms=50_000, omega_ref=OMEGA_REF)
 
     gs = find_ground_state(; grid, atom, interactions=inter,
         zeeman=ZeemanParams(p_of(1.04e-6), q), potential=pot,
         dt=0.005, n_steps=4000, tol=1e-10, initial_state=:m_minus_F,
-        enable_ddi=true, secular_ddi=true,
+        enable_ddi=true, c_dd, secular_ddi=true,
         ddi_padding=true, ddi_trunc_radius=-1.0, backend, verbose=false)
 
     ws = make_workspace(; grid, atom, interactions=inter,
         zeeman=ZeemanParams(p_of(B_nT * 1e-9), q), potential=pot,
         sim_params=SimParams(; dt=DT, n_steps=round(Int, DURATION / DT),
             save_every=10^9),
-        psi_init=gs.psi, enable_ddi=true, secular_ddi=false,
+        psi_init=gs.psi, enable_ddi=true, c_dd, secular_ddi=false,
         ddi_padding=true, ddi_trunc_radius=-1.0, backend)
     res = run_simulation!(ws)
     psi = Array(res.psi_final)
