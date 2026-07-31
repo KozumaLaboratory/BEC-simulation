@@ -142,6 +142,49 @@ const MUTANTS = Mutant[
         "`_spin_chain_reason` is the one list of what the fused half-step would \
          otherwise silently drop, so every entry in it needs an arm. Removing one \
          makes the fusion swallow an operator that sits between the rotations."),
+    # The Raman entry above is one of fifteen. Three more, chosen because each
+    # disables a DIFFERENT shape of guard: a whole line, a compound condition,
+    # and a negation.
+    Mutant(:spin_chain_fuses_over_light_shift,
+        "src/hamiltonian/integrator/spin_chain.jl",
+        r"    ws\.light_shift === nothing \|\| return \"light shift sits between them\"",
+        "    # mutant: light-shift guard removed",
+        :path_default, :fatal,
+        "gotcha_yaml_default_flip_disabled_rtp_fusion_2026_07_29",
+        "The light shift is a spin rotation sitting between the two spin-mixing \
+         rotations. Fusing over it drops it from every RTP step."),
+    Mutant(:spin_chain_fuses_over_transverse_zeeman,
+        "src/hamiltonian/integrator/spin_chain.jl",
+        r"\(bx != 0\.0 \|\| by != 0\.0\) &&",
+        "false &&",
+        :path_default, :fatal,
+        "gotcha_yaml_default_flip_disabled_rtp_fusion_2026_07_29",
+        "Keeps the reason in the list but makes it unreachable — the shape a \
+         guard takes when a condition is edited rather than deleted, and the one \
+         a text-scanning completeness gate cannot see."),
+    Mutant(:spin_chain_fuses_over_magnetic_gradient,
+        "src/hamiltonian/integrator/spin_chain.jl",
+        r"    ws\.magnetic_gradient === nothing \|\|",
+        "    true ||",
+        :path_default, :fatal,
+        "mistake_config_zeeman_sign_drift_211_files_2026_07_29",
+        "A magnetic gradient mutates V around the diagonal step, so the fused \
+         kernel would carry the wrong diagonal phase."),
+    # Not a physics defect: this one checks that the COMPLETENESS gate works. It
+    # adds a new, plausible entry to the list that no test names. Nothing about
+    # the stepping changes (`ws.loss` is nothing in the fixtures), so every
+    # physics gate stays green — only a test that reads the list itself can see
+    # that an entry was added unarmed, which is the failure mode this list has
+    # had twice.
+    Mutant(:spin_chain_unlisted_new_reason,
+        "src/hamiltonian/integrator/spin_chain.jl",
+        r"    SPIN_CHAIN_FUSION_ENABLED\[\] \|\| return \"SPIN_CHAIN_FUSION_ENABLED\[\] is off\"\n",
+        "    SPIN_CHAIN_FUSION_ENABLED[] || return \"SPIN_CHAIN_FUSION_ENABLED[] is off\"\n" *
+        "    ws.loss !== nothing && return \"a loss channel sits between them\"\n",
+        :missing_gate, :major,
+        "gotcha_cheap_gate_must_canary_and_keep_structure_2026_07_29",
+        "A new decline reason with no arm anywhere under test/. Invisible to \
+         every physics gate by construction."),
 
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where
