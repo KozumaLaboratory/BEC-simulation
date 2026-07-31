@@ -398,6 +398,23 @@ chaos, not species-specific quantum fluctuation.
 
 `runs/twa_sinatra/` で実施した systematic Sinatra criterion test:
 
+> **引用先が違ううえ、下表の数値が出典と合わない (2026-07-31)。**
+>
+> 1. `runs/twa_sinatra/` は git に一度も存在しない。実際の出力は CAS ディレクトリ
+>    `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2` で、これは
+>    [`twa_sinatra_validation.md`](../../../research_notes/twa_sinatra_validation.md)
+>    に書かれている。ディレクトリ名そのものが誤り。
+> 2. その出典 note は冒頭で **"superseded / VERDICT REVISED 2026-05-08"** と宣言し、
+>    正しい読みは [`twa_pinned_16g_result.md`](../../../research_notes/twa_pinned_16g_result.md)
+>    だとしている。**§5.7 の結論（GS-resolution artifact）はその後続に支えられており、
+>    後続の config は `runs/twa_N_scan_pinned_16g/` として実際にコミットされている。**
+>    結論は無事で、根拠の指し先が古い。
+> 3. **下表の中段が出典のどちらとも一致しない。** 出典 note は 16³×box=20 を
+>    σ/μ = **0.042**、Sinatra ratio 5.3 と記録している。下表は同じ行を
+>    σ/μ = **0.31**、r = 0.66 としている。r 列も出典の 42.6 / 5.3 / 5.3 と桁が違う。
+>    第 3 行 (16³ box=10, 0.82) は May-7 の check ではなく後続の N=10⁵ 値である。
+>    どれが正しいか本セッションでは判定できないため、修正せず記録する。
+
 | Grid | box | $r = N_{\rm modes} D / N$ | σ/μ at peak |
 |---|---|---|---|
 | 32³ | 20 | 5.3 | 0.42 |
