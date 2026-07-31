@@ -9,6 +9,7 @@ Anchors:
 - `README.md` / `docs/index.md` — project description + documentation map.
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
 - `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit,adding_new_hamiltonian_term}.md` — physics convention authority + 14-term sign × path audit.
+- `docs/conventions/testing_strategy.md` — what a test may claim when there is no experiment: the five grounding methods (exact / order / invariant / metamorphic / differential) vs the two that are not grounding (pin / api), the claim × path coverage model, and the two instruments (`test/_inventory.jl`, `test/mutation/`).
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
 `AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.

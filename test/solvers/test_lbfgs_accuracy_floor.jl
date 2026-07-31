@@ -97,51 +97,47 @@ using SpinorBEC
         @test abs(r4.energy - 0.5) < 1e-12
     end
 
-    @testset "Newton-CG polish stays at the floor without moving the energy" begin
-        # This testset used to assert `r_poly.grad_norm < 0.5 * r_lbfgs.grad_norm`
-        # — that the opt-in polish buys a clear margin, as the driver's own
-        # comment claims (~10x, 6.6e-8 -> 5e-9). **That did not reproduce**, and
-        # the assertion was a permanent-ish red in `tier=full`:
+    @testset "Newton-CG polish tightens the gradient residual" begin
+        # ASSERTED WHERE THE POLISH HAS ROOM TO WORK. This testset ran at
+        # `n_steps=500, tol=1e-12` and asserted `< 0.5 ×`. At that tolerance the
+        # pre-polish residual IS the finite-difference HvP's own noise floor, so
+        # the assertion was measuring luck; measured ratio polish/lbfgs on the
+        # same commit and problem, one process each:
         #
-        #   * measured on clean `main`, the polish returned a **bit-identical
-        #     psi** — every trust-region step rejected, so the pass was a no-op;
-        #   * and the L-BFGS floor it is compared against is not reproducible
-        #     run to run: 5.7e-10, 1.4e-8 and 2.8e-8 for the SAME commit and
-        #     problem, while the energy is bit-exact at `E - 0.5 = -2.2e-16`.
+        #   0.156 | 0.081 ×3 | 1.000 (bit-identical no-op) | 1.998 (worse)
         #
-        # A ratio between two numbers at a floor that moves 25x is a coin flip,
-        # so the ratio is gone. Whether `newton_cg_ground_state` should buy
-        # ~10x here is a question about that solver — it is energy-gated like
-        # the line search, which is precisely why the driver says it is "NOT a
-        # route below" the floor — and it is NOT settled by weakening this gate.
-        # The pass that does break the floor, `residual_newton_refine`, is
-        # gated in the testset above and passes robustly.
+        # The cause was a real defect in `hessian_vector_product`, since fixed:
+        # it differenced at `ψ ± ε·δ` with ε ABSOLUTE, so with the CG iterates
+        # Newton-CG passes (‖δ‖ ~ 1e-6 after an L-BFGS stage) the perturbation was
+        # ~1e-11 and the quotient was noise amplified by 1/2ε. The step is now
+        # taken along the normalised direction, which restores homogeneity — gated
+        # in test/oracles/test_bdg_fd_hessian.jl.
         #
-        # What is left has teeth: the polish must not move a machine-exact
-        # energy, and must not leave the floor regime. The band is the driver's
-        # own documented constant (‖∇E‖/|E| ≈ 1.4e-7), not a number picked here.
+        # After the fix, at `n_steps=40, tol=1e-6` where L-BFGS stops at 6.299e-6
+        # in EVERY process: ratio 2.6e-3 | 1.4e-4 | 2.6e-3. The bound below is
+        # 1e-2 — four times looser than the worst of those and 100× below the 1.0
+        # a no-op would give, so it separates "works" from "does nothing" without
+        # pinning the value.
+        #
+        # Still open, and deliberately not asserted here: the L-BFGS residual
+        # FLOOR itself varies across processes (3.907e-8 vs 1.259e-8 at
+        # tol=1e-8), so a tight-tolerance comparison remains unsafe.
         grid = make_grid(GridConfig(128, 16.0))
-        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
-        trap = HarmonicTrap(1.0)
-
         base = (;
-            grid, atom=Rb87, interactions, potential=trap,
-            n_steps=500, tol=1e-12, initial_state=:polar, verbose=false,
+            grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            potential=HarmonicTrap(1.0),
+            n_steps=40, tol=1e-6, initial_state=:polar, verbose=false,
         )
         r_lbfgs = find_ground_state_lbfgs(; base...)
         r_poly = find_ground_state_lbfgs(; base..., newton_polish=true)
 
-        floor_scale = 1.4e-7 * abs(r_lbfgs.energy)
-        # The unpolished run really is at its floor — without this the bound
-        # below could pass because the solve stopped somewhere else entirely.
-        @test r_lbfgs.grad_norm < 10 * floor_scale
-        # The polish leaves it there rather than wandering off it.
-        @test r_poly.grad_norm < 10 * floor_scale
-        # And does not move an already machine-exact energy. This is the real
-        # safety property: a polish that drifts fails here.
-        @test abs(r_poly.energy - 0.5) < 1e-12
-        @info "newton_polish on the scalar harmonic" lbfgs = r_lbfgs.grad_norm polish =
-            r_poly.grad_norm ratio =
-            r_poly.grad_norm / r_lbfgs.grad_norm
+        # The first-order stage stopped at its own tolerance, well above the FD
+        # floor — otherwise the comparison below is back to measuring luck.
+        @test r_lbfgs.grad_norm > 1e-7
+        @test r_poly.grad_norm < 1e-2 * r_lbfgs.grad_norm
+        # Variational: the polish may not raise the energy, and must not move it
+        # away from the exact scalar-harmonic value.
+        @test r_poly.energy <= r_lbfgs.energy + 1e-14
+        @test abs(r_poly.energy - 0.5) < 1e-10
     end
 end

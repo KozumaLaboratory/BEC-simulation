@@ -41,6 +41,12 @@ const FAST_TESTS = [
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
     "workflow/test_interactions_roundtrip.jl",
+    # CLAUDE.md commitment #4 (same spec ⇒ same outdir) had no test at all until
+    # the mutation harness reversed the canonical key sort and nothing went red.
+    "workflow/test_content_id_determinism.jl",
+    # `thermal_noise_amplitude` had no test anywhere: dropping the /4 left 57
+    # workflow files green (mutation harness, 2026-07-31).
+    "workflow/test_thermal_seed_amplitude.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
@@ -73,6 +79,18 @@ const FAST_TESTS = [
     "oracles/test_lhy_no_bare_device_broadcast.jl",
     "oracles/test_scalar_lhy_si_roundtrip.jl",
     "oracles/test_dimensionless_coefficient_si_roundtrip.jl",
+    # Composer order from the COEFFICIENTS, on 8×8 matrices — no grid, no
+    # Workspace. Milliseconds for what test_yoshida_ddi_order.jl spends 14 s on
+    # in `full`, and it names the coefficient rather than the stack.
+    "hamiltonian/test_composer_order_conditions.jl",
+    # `_spin_chain_reason` is the one list of what the fused half-step would
+    # otherwise drop, and it has twice gained an entry with no arm. This gates the
+    # list against test/ so an unarmed entry cannot be added silently.
+    "hamiltonian/test_spin_chain_decline_reasons.jl",
+    # Gates the dt < 0 half-line that every high-order composer needs. FAST on
+    # purpose: the order tests that also see this defect are in FULL_EXTRA, so
+    # the PR gate never ran them (PR #183 shipped a 4th → 2nd order collapse).
+    "oracles/test_negative_dt_substeps.jl",
     "validation/test_k3_unit_audit.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
@@ -214,6 +232,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # (physics block × solver path) table: the term must be LIVE on the
+    # Workspace after a YAML run, on every path. Drives run_config, so `ci`
+    # rather than `fast`. Replaces the per-incident plumbing files — a new path
+    # is a row, not a new file.
+    "workflow/test_yaml_physics_reaches_workspace.jl",
     # `SPIN_TAYLOR_TOL` is not a knob a caller should reason about — this pins
     # the RELATIONSHIP it exists to satisfy (truncation ≪ splitting error), so
     # the number can change and the criterion still holds. Runs
