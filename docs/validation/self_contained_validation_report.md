@@ -113,8 +113,21 @@ production runs.
 
 ### Layer F — DDI convention factorial
 
-Script: `test/hamiltonian/test_ddi_convention_factorial.jl`.
-Output: `runs/ddi_convention_factorial/results.jld2`.
+Script: `test/hamiltonian/test_ddi_convention_factorial.jl` — **in `FAST_TESTS`,
+so it runs on every PR.** ~~Output: `runs/ddi_convention_factorial/results.jld2`.~~
+
+> **The authority here is the test, not the table (2026-07-31).**
+> `runs/ddi_convention_factorial/` has never existed in any commit, so the numeric
+> rows below cannot be re-checked. That matters less than it does elsewhere,
+> because what the test asserts is the *relations* — spherical → 0 (traceless Q),
+> prolate along B → E_DDI < 0 (head-to-tail attractive), oblate ⊥ B → E_DDI > 0,
+> and invariance under the axis flip — and those are gated on every push. The
+> vintage audit's own carve-out applies: "everything gated by a test in a tier"
+> is unaffected.
+>
+> So: **the physics stands, the printed numbers are illustration.** They were
+> produced by a run that is not in the repository and are not asserted anywhere.
+> Quote the relations, or re-run the test and quote its output.
 
 Factors: cloud shape ∈ {spherical, prolate, oblate}; B-axis ∈ {z, x};
 secular ∈ {false, true}; grid n ∈ {16, 24}. 24 rows total.
