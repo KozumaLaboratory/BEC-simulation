@@ -19,6 +19,28 @@ exactly **one method per HamTerm** to that layer. It does not propose a
 rather than duplicates PR #200 (campaign charter), #198 (mutation harness),
 #226/#227/#228 (CI and citation gates).
 
+**Audit trail — revision 2, 2026-07-31.** The first draft of this document was
+red-teamed across seven attack surfaces. **47 candidate findings were raised;
+15 survived independent refutation**, and they are recorded verbatim, with
+their file:line evidence and with the list of things that were checked and
+found NOT broken, as **issue #250**. A reader in 2029 who wants to know whether
+this design was ever adversarially tested should start there.
+
+The audit's verdict was one sentence: *the design has a theory of INPUTS and no
+theory of EXECUTION.* Identity was `H(declared inputs)`, so anything undeclared
+that moves a number produced not a different artifact but a **collision**, which
+the cache then served. That is why §2.10 exists, why `stage_id` grew a fourth
+component, and why §2.12 gained three invariants.
+
+Two survivors were **regressions against `main`** and are fixed by name in
+§2.10: `backend` is a hashed schema field today
+(`src/workflow/experiments/schema/schema.jl:306`) and the first draft demoted it
+to a record field; and `dealias` — a top-level block in **75 committed configs**
+(`grep -rl '^dealias:' runs | wc -l` = 75) — is implemented as module-level
+`Ref`s (`src/hamiltonian/integrator/dealias.jl:95,120`) that a `Model`-derived
+fingerprint structurally cannot see. Which findings this revision closes, and
+which it leaves open, is stated in §10.2.
+
 ---
 
 ## 1. The problem, in measurements
@@ -143,7 +165,8 @@ specialises on it, so the 23-parameter `Workspace` explosion cannot be
 triggered from the plan layer.
 """
 struct Model
-    grid::GridSpec                  # n_points, box, dtype
+    grid::GridSpec                  # ndim, n_points, box, dealias_two_thirds, dealias_k_cut
+                                    #   (dealias is PHYSICS — §2.10; dtype is in the method digest)
     atom::AtomSpecies               # from ATOM_REGISTRY, unchanged
     interactions::InteractionSpec   # N_atoms, omega_ref, resolved c0/c1/c_extra
     potential::PotentialSpec        # Harmonic | Ring | Lattice | Tabulated | TimeDep | NoTrap
@@ -232,19 +255,52 @@ schedule(c::ChainedPlan)  = [Job(c)]              # exactly ONE job — no other
 
 ```julia
 # src/store/record.jl  (NEW)
-struct StageId; physics::UInt64; method::UInt64; inputs::UInt64; end
+struct StageId
+    physics::UInt64      # §2.8 — resolved physics × per-active-scope tree digests
+    method::UInt64       # §2.8 — method × Realization × backend_kind × dtype
+    inputs::UInt64       # input_digest of the declared Initial, seed included
+    toolchain::UInt64    # §2.10 — resolved dep tree hashes × julia × codegen flags
+end
 const ArtifactId = String                        # 16 hex of digest(StageId)
 
+"""
+What the PROCESS did, as opposed to what it was asked to do. §2.10. Not part
+of the id — a truncated run and a complete run have identical declarations —
+but a cache hit requires `state === :complete`, so admissibility is a separate
+axis from identity and neither is expressible in terms of the other.
+"""
+struct Completion
+    state::Symbol                                # :complete | :partial | :tainted
+    realized_steps::Int
+    realized_t::Float64
+    stop_reason::Symbol                          # :tol | :n_steps | :interrupted |
+                                                 #   :line_search_stalled | :floor
+    members::Int                                 # ensembles: attempted
+    finite_members::Int                          # ensembles: survived
+end
+
+# --- the id-DETERMINED half. ONE per id. Byte-identical on every host and in
+# --- every worktree that computes it, which is what makes it committable.
 struct Record                                    # serialised as record.toml
-    format::Int                                  # 3
+    format::Int                                  # 4
     id::ArtifactId
     stage_id::StageId
     model_toml::String                           # the RESOLVED model, verbatim, human-readable
-    method::NamedTuple
+    method::NamedTuple                           # incl. `realization` and `backend_kind` (§2.10)
     inputs::Vector{ArtifactId}
     code::NamedTuple                             # per-active-scope tree digests
-    env::NamedTuple                              # julia, Manifest project_hash, head, dirty,
-                                                 #   host, backend, dtype
+    toolchain::NamedTuple                        # per-dep name/version/tree_hash (§2.10)
+end
+
+# --- the EXECUTION half. One per execution, filename carries ts/host/pid, so
+# --- two worktrees cannot collide and nothing is ever rewritten. §2.10.
+struct Execution                                 # store/<xx>/<id>/exec/<ts>-<host>-<pid>.toml
+    format::Int                                  # 4
+    id::ArtifactId
+    seal::ExecutionSeal                          # §2.10 — REQUIRED. what the RUNTIME reported.
+    completion::Completion
+    env::NamedTuple                              # julia, head, dirty, host, device, driver.
+                                                 #   NOT backend/dtype — those are KEY fields now.
     guards::Vector{GuardResult}
     quotable::Vector{Symbol}                     # observables NOT redacted by a guard
     scalars::Dict{String,Float64}
@@ -252,15 +308,29 @@ struct Record                                    # serialised as record.toml
     cost::CostRecord                             # measured µs/step, wall, GPU busy
     reused::Union{Nothing,ArtifactId}            # non-nothing on a CACHE HIT
     provenance::Symbol                           # :run | :scratch | :archival
+    admission::Symbol                            # :ok | :partial | :tainted | :redacted
     reproducible::Bool                           # false when a recorded digest no longer
                                                  #   resolves in git — a QUERYABLE field
 end
 ```
 
-**A cache HIT still writes a Record** (`reused = <id>`). This is AiiDA's
-invariant — *the provenance graph must be identical whether caching is on or
-off* — and it is the difference between "the system reused something" and
-silence.
+**A cache HIT still writes an `Execution`** (`reused = <id>`, into
+`store/<xx>/<id>/hits/`). This is AiiDA's invariant — *the provenance graph must
+be identical whether caching is on or off* — and it is the difference between
+"the system reused something" and silence.
+
+**Why the split.** The first draft had one `record.toml` per id carrying both
+halves. Three audit findings follow from that alone: a hit's record lands on the
+producer's file and overwrites its ingested `@warn` stream and its `env.head`;
+two worktrees running the same `Model` write byte-different records at an
+identical path, which is a recurring add/add conflict whose predictable escape
+(`git checkout --ours store/`) routes around the whole mechanism; and there is
+nowhere to put the per-attempt process state (`attempt`, escalated profile,
+`job_id`, `kill_reason`) that `retry` / `breakers` / `budget` operate on. Making
+`record.toml` a pure function of the id closes the first two by construction and
+gives the third an address. `exec/` and `hits/` are append-only directories of
+uniquely-named files, the shape `observability/history.jsonl` already proves
+here.
 
 ### 2.6 `Guard`
 
@@ -402,17 +472,42 @@ function physics_id(m::Model, ws)
               terms = parts, core = scope_digest(:core)))
 end
 
-stage_id(s::Relax)  = StageId(physics_id(s.model, probe_ws(s)),
-                              method_id(s.method), input_digest(s.initial))
-stage_id(s::Measure)= StageId(probe_id(s), UInt64(0), input_digest(s.inputs))
+# `method_id` is where REALIZATION lives — the choice BETWEEN algorithms that
+# compute the same physics. `Realization`, `backend_kind` and `dtype` are KEY
+# fields, not record fields; §2.10 is the argument and the fix.
+method_id(mth::Method, r::Realization, backend_kind::Symbol, dtype::DataType) =
+    digest16((nameof(typeof(mth)), canonical(mth),
+              canonical(r),            # ALL fields, always — see §2.10 on why not omitted
+              backend_kind,            # :cpu | :cuda   ← closes the `backend` regression
+              nameof(dtype),           # :Float64 | :Float32
+              scope_digest(method_scope(mth))))   # :solve_itp | :solve_rtp | :solve_lbfgs | …
+
+stage_id(s::Relax, j::JobEnv) =
+    StageId(physics_id(s.model, probe_ws(s)),
+            method_id(s.method, j.realization, j.backend_kind, j.dtype),
+            input_digest(s.initial),
+            toolchain_id())                       # §2.10
+stage_id(s::Measure, j::JobEnv) =
+    StageId(probe_id(s), method_id(NoMethod(), j.realization, j.backend_kind, j.dtype),
+            input_digest(s.inputs), toolchain_id())
 #   ^ a Measure's physics half is the ANALYZER's declaration, so a figure does NOT
 #     depend on the integrator; it depends on the artifacts it reads and nothing else.
 ```
 
-**Inactive slots are omitted, not encoded as null.** Adding HamTerm slot #15 in
-2029 therefore invalidates **zero** existing artifacts. This is the single
-property that keeps a derived fingerprint from rotting into a hand-bumped
-version number the first time someone adds a term.
+`JobEnv` is the resolved execution plan — `(realization, backend_kind, dtype,
+fft_flags)` — computed by a **pure function of declared values before anything
+runs** (§2.10). It is not the environment as observed; that is the
+`ExecutionSeal`, and the difference between the two is the whole subject of
+§2.10.
+
+**Inactive TERM slots are omitted, not encoded as null.** Adding HamTerm slot
+#15 in 2029 therefore invalidates **zero** existing artifacts. This is the
+single property that keeps a derived fingerprint from rotting into a hand-bumped
+version number the first time someone adds a term. The rule is licensed by a
+specific fact — an inactive term contributes exactly zero to `energy_contribution`
+and to `apply_operator!`, which Gate A asserts — and it therefore does **not**
+generalise to `Realization`, whose fields select between two non-zero
+alternatives. §2.10 states that boundary and pays for it.
 
 ### 2.9 Code identity — a total, measured, repo-wide partition
 
@@ -475,16 +570,641 @@ with those terms active. LEDGER's independent count: 1,436 of 1,933 commits
 (74.3 %) touch no numeric file at all and invalidate nothing. That is the real
 economics — a factor of a few, not a factor of a thousand.
 
-### 2.10 The layers
+### 2.10 Execution identity — what SHOULD run, and what DID run
+
+§2.8 and §2.9 answer *what should run*: a plan, known before anything executes,
+which is what you need in order to address an output and decide whether to skip
+it. They do not answer *what did run*, which is only knowable at or after the
+run. The first draft answered the first question and then behaved as though it
+had answered the second. This section separates them, and each half gets its own
+mechanism:
+
+| question | when known | mechanism | consequence of a mismatch |
+|---|---|---|---|
+| what SHOULD run | before dispatch | `StageId` — physics × method × inputs × toolchain | a different id, hence a different artifact |
+| what DID run | at step entry / at exit | `ExecutionSeal` + `Completion` | the run **refuses**, or the artifact is not servable |
+
+The rule that makes the first half sound is one sentence, and everything below
+is its consequence:
+
+> **A number the executing kernel reads is either a field of `Model` / `Method`
+> / `Initial`, or a frozen `const` (which the scope digest already covers).
+> A mutable module-level binding is neither, and is banned.**
+
+#### 2.10.1 The leak, measured
+
+`Model` bans `Dict` / `Any` / `Function` slots (invariant 1) because a free-form
+slot lets a number enter the computation without entering the digest. The audit
+found the same slot, relocated to module scope where the ban does not reach.
+Sweeping the eight `NUMERIC_ROOTS` of §2.9:
+
+```
+11 mutable module-level numeric Refs, 68 read+write sites in src/ + ext/,
+89 write sites in test/ + bench/          (measured by grep, this worktree)
+
+src/hamiltonian/integrator/dealias.jl:95      DEALIAS_2_3_ENABLED       = Ref(false)
+src/hamiltonian/integrator/dealias.jl:120     DEALIAS_K_CUTOFF          = Ref{Union{Nothing,Float64}}(nothing)
+src/hamiltonian/integrator/split_step.jl:27   MEANFIELD_MIDPOINT_ENABLED= Ref(true)
+src/hamiltonian/integrator/spin_chain.jl:43   SPIN_CHAIN_FUSION_ENABLED = Ref(true)
+src/hamiltonian/integrator/combined_spin_step.jl:51
+                                              COMBINED_SPIN_STEP_ENABLED= Ref(false)
+src/foundation/spinor_utils/spin_rotation_taylor.jl:31,64,70,89
+                                              SPIN_TAYLOR_{ENABLED,TOL,RSAFE,DEGREE_CAP}
+ext/SpinorBECCUDAExt/gpu_euler_kernel.jl:190   _SM_EULER_WARP           = Ref(true)
+ext/SpinorBECCUDAExt/gpu_euler_kernel.jl:232   _DDI_EULER_WARP          = Ref(true)
+```
+
+They are read at step time — `DEALIAS_2_3_ENABLED[]` inside the DDI apply at
+`src/hamiltonian/terms/ddi/ddi_padded.jl:164` and again at
+`src/hamiltonian/terms/ddi/convolution.jl:184`, `MEANFIELD_MIDPOINT_ENABLED[]`
+at `split_step.jl:36` — and never stored on `Workspace`, so
+`physics_digest(term, m, ws)` (§2.8) returns an identical value either way.
+Gate B perturbs `fieldnames` of `Model`; Gate C instruments `getfield` on
+`Model` inside `make_workspace`. A bare `Ref[]` read inside `split_step!` is
+neither.
+
+The codebase already classifies these as physics rather than as tuning:
+`combined_spin_step.jl:42-46` — *"the two are different SPLITTINGS of the same
+Hamiltonian, agreeing at O(dt³) but not bitwise, so flipping it changes
+published numbers. It is a physics choice the run must make."* The two
+`gpu_euler_kernel.jl` Refs the audit's own grep missed pick between a
+warp-cooperative reduction (`:207`, `:344`) and a per-thread one — a different
+accumulation order, therefore different bits.
+
+Two more members of the same class, outside the `Ref` shape:
+
+- **`ENV`** — `haskey(ENV, "SPINORBEC_NO_AUTO_BACKEND")` at
+  `src/workflow/initialization/make_workspace.jl:857` forces `CPUBackend()`
+  ahead of the auto-pick, so the *mere presence* of an environment variable
+  flips CPU/GPU and no config hash can see it. (Measured: grepping `ENV[` /
+  `haskey(ENV` / `get(ENV` across all eight `NUMERIC_ROOTS` returns **exactly
+  this one site**, which is what makes banning the whole construct cheap.)
+- **27 mutated module-level caches** under `NUMERIC_ROOTS`. These are the
+  performance architecture and are **not** deleted; §2.10.6 brings them under a
+  registration rule instead.
+
+#### 2.10.2 The fix — delete the Refs into three destinations
+
+Each of the eleven goes to exactly one place. Nothing is traced; the variable
+is removed, so there is nothing left to observe.
+
+| destination | which | rationale |
+|---|---|---|
+| **`Model`** (`GridSpec`) | `DEALIAS_2_3_ENABLED`, `DEALIAS_K_CUTOFF` | dealias is an exact spectral projector on the state: two runs that differ in it differ in their answer. It is physics. |
+| **`Method`** (`Realization`) | `MEANFIELD_MIDPOINT_ENABLED`, `SPIN_CHAIN_FUSION_ENABLED`, `COMBINED_SPIN_STEP_ENABLED`, plus `fft_flags` | splitting and kernel-selection choices: same physics, different algorithm. |
+| **frozen `const`** | `SPIN_TAYLOR_{ENABLED,TOL,RSAFE,DEGREE_CAP}`, `_SM_EULER_WARP`, `_DDI_EULER_WARP` | not run-selectable at all. A `const` is code; `scope_digest` already covers it. |
+
+**The frozen arm is the cheap one and it is what the files themselves argue
+for.** `spin_rotation_taylor.jl:56-59` on the tolerance: *"the tolerance is not
+a decision the caller should be asked to make; `dt` is the decision, and this
+follows from it."* `:75-88` on the degree cap: it exists *"so the accuracy
+criterion needs a positive control and nothing else could provide one …
+unclamped in production."* The two euler-warp Refs have **one writer in the
+entire repository** (`bench/verify_euler_warp.jl:20`). Freezing them means the
+parity gates that currently flip a `Ref` call the two implementations directly
+instead — the same comparison, one less ambient variable. Changing a frozen
+`const` is a code edit that moves `scope_digest(:core)` or `scope_digest(:ddi)`,
+which is exactly the right invalidation.
+
+```julia
+# src/plan/realization.jl  (NEW, ~30 LOC)
+"""
+Every numeric switch that chooses BETWEEN algorithms computing the same physics.
+ONE concrete immutable struct; all fields Bool / Int / UInt32, so it adds ZERO
+type parameters to anything it is threaded into.
+
+This type exists because these values were mutable module-level `Ref`s read
+inside `split_step!` — the free-form slot invariant 1 bans, relocated to where
+the ban did not reach. `test_no_ambient_numerics.jl` is what stops them moving
+back.
+"""
+struct Realization
+    midpoint::Bool           # was MEANFIELD_MIDPOINT_ENABLED   split_step.jl:27
+    spin_chain_fusion::Bool  # was SPIN_CHAIN_FUSION_ENABLED    spin_chain.jl:43
+    combined_spin::Bool      # was COMBINED_SPIN_STEP_ENABLED   combined_spin_step.jl:51
+    fft_flags::UInt32        # was an unhashed make_workspace kwarg (:72)
+end
+const PRODUCTION_REALIZATION = Realization(true, true, false, FFTW.MEASURE)
+```
+
+**`canonical(::Realization)` emits ALL FOUR FIELDS, ALWAYS.** It is tempting to
+borrow §2.8's "inactive slots are omitted" and canonicalise only deviations from
+`PRODUCTION_REALIZATION`, which would make adding a fifth switch in 2029 free.
+That is the same defect this section exists to remove: when a default flips, a
+pre-flip run and a post-flip run both canonicalise to the empty tuple and
+**collide**. It is not hypothetical here — `DDI_PADDED_DEFAULT` flipped
+`false → true` at `9c117c05` with a documented incident
+(`src/foundation/voxel_index.jl:14`, `spin_chain.jl:61-64`: the flip declined
+the spin-chain fusion for every `run_yaml` RTP run while `bench/profile_rtp.jl`
+kept measuring the fused path). §2.8's omission rule is licensed by a fact that
+Gate A asserts — an inactive term contributes exactly zero — and a field equal
+to a mutable default contributes something. **The cost is stated rather than
+engineered away:** adding a fifth `Realization` field invalidates every stored
+artifact. The set is four, it is frozen by `test_realization_frozen.jl` (field
+names pinned to a committed list), and adding to it is a reviewed physics event,
+not a routine addition.
+
+**Feasibility, measured, because the two obvious objections are both false.**
+`Workspace` has 20 type parameters (`src/foundation/types/workspace.jl:69-90`),
+every one of them an array / eltype / optional-arm parameter; a `Bool` or
+`UInt32` field adds none, so `typeof(ws)` does not change and the
+`@noinline _step_dispatch!(@nospecialize(step), …)` firewall
+(`src/workflow/experiments/pipeline/runner.jl:244`) is untouched. There is
+exactly **one** positional `Workspace(...)` construction site
+(`make_workspace.jl:465`); `_rebuild_workspace` (`:495-506`) already copies by
+`fieldnames(Workspace)` and its docstring says why — *"Avoids fragile positional
+constructor calls when Workspace gains new fields"* — so it needs no edit at
+all. The CLAUDE.md JIT
+landmine is `Dict{Symbol,Any}` and closures escaping into the Workspace path;
+a concrete scalar struct is its documented opposite — `LHYTableOpts`
+(`make_workspace.jl:33-57`) exists for exactly this reason.
+
+**Dealias threading, the one non-trivial part.** Of the nine step-path reads,
+seven already hold `ws` (`split_step.jl:82,385`, `spin_chain.jl:83`,
+`itp_loop.jl:78,92`, `run_loops.jl:125,136`). The other two
+(`ddi_padded.jl:164`, `convolution.jl:184`) hold a `DDIParams`, a mutable struct
+that **already carries `box_size` for exactly this reason** —
+`src/foundation/types/ddi_loss.jl:25-29`: *"it is carried here because the
+Orszag F-filter's physical `DEALIAS_K_CUTOFF[]` is meaningless without it."*
+So the spec lands on both `Workspace` and `DDIParams` (the psi-filter runs with
+DDI off, so `Workspace` alone is not enough), and a one-line assertion in
+`make_workspace` pins them together: `@assert ws.dealias === ws.ddi.dealias`.
+`_spin_chain_reason` (`spin_chain.jl:83`) must read the same field the DDI path
+reads, or fusion eligibility and the filter can disagree — that is the
+`DDI_PADDED_DEFAULT` shape again, and it is why the assertion is not optional.
+
+**`GridSpec` already declares this, and that is the sharper half of the
+finding.** The in-progress `Model` prototype — *uncommitted*, on branch
+`feat/model-resolved-physics`, and therefore not part of any claim about the
+tree as it stands — carries `dealias_two_thirds::Bool` and `dealias_k_cut::Float64`
+in `GridSpec`, and `physics_id` mixes in `canonical(m.grid)`. What is missing is a
+**consumer**: nothing outside the prototype reads `GridSpec`, and
+`grep dealias src/workflow/initialization/make_workspace.jl` is empty. So the
+prototype would declare a dealias setting the propagator never reads. That
+is *worse* than a collision — a `k_cut` sweep produces N distinct ids with
+bit-identical numbers, which reads as positive evidence that `k_cut` does not
+matter, which is precisely the false null the convergence study exists to avoid.
+`make_workspace(m::Model)` (§2.2) becomes the single writer, and
+`test_declared_equals_observed.jl` hard-errors when the built `Workspace`
+disagrees with the `Model` that built it.
+
+**The 75 configs.** `dealias:` is a top-level block in 75 committed configs, and
+its only writer is `apply_dealias_block!`
+(`src/workflow/experiments/runtime/dealias_block.jl:82-86`), which §6.2 deletes.
+The block becomes a `GridSpec` field mapping in the `Model` builder — a schema
+translation, not a data migration. The `auto_dt` pipeline walk
+(`dealias_block.jl:94-132`) is pure dict manipulation and survives as a `Method`
+builder. `_DEALIAS_PENDING_SNAPSHOT` (`:38`), the two-phase snapshot that can
+strand a toggle at `true` across an exception — the incident is recorded in the
+file itself at `:62-68`, where a stuck toggle silently degraded unrelated tests
+from 1e-12 to 1e-10 — is deleted outright, not ported. With no global there is
+nothing to snapshot.
+
+**`with_reference_accuracy` stops being a null.** `ACCURACY_KNOBS`
+(`src/workflow/validation/accuracy_knobs.jl:96-158`) has three `:global` entries
+— `:spin_taylor` (`:97`), `:spin_taylor_tol` (`:104`), `:dealias_2_3` (`:110`) —
+each a getter/setter closure pair over a Ref that this section deletes, flipped
+by `with_reference_accuracy` (`:170-183`) *without changing the id*. That is the
+degenerate measurement the audit named: the one instrument built to detect
+approximation error returns the production artifact verbatim. Rewritten, a
+reference accuracy run constructs a different `Model` (dealias) or a different
+`Realization`, hence a different `method_id`, hence a different artifact. The
+null becomes a measurement. This is a real rewrite of a 231-line file plus its
+two test files, and it is priced in §9.
+
+#### 2.10.3 `backend` is a KEY field — the first regression, fixed
+
+`Method` in the first draft carried no backend; `backend` sat in `env`, declared
+a record field. That is a **regression against `main`**, where `backend` is a
+hashed schema field (`src/workflow/experiments/schema/schema.jl:306`,
+`enum=["cpu","gpu"]`) and CPU/GPU variants are therefore distinct directories
+under `compute_run_dir`. Backend-only variants are established practice here:
+`runs/eu_ham_only_ramp_quench_24/config.yaml:11` documents itself as
+*"backend: gpu -> cpu (CI-friendly)"*.
+
+The rationale offered in the prototype (uncommitted; *"GPU and CPU are gated to
+bit-parity by Level 0, so the backend cannot move the physics id"*) is false on
+both halves. `test/test_level0_gpu_cpu_consistency.jl` gates at `rtol` 1e-10 /
+1e-8 / 1e-6, never bit-equality, and its fixtures are 1D/2D Rb87 grids that
+`_resolve_backend` (`make_workspace.jl:855-864`) would never send to a GPU. The
+repo's own history is the counterexample: the tabulated-LHY GPU defect ran for
+months with `test_gpu_cpu_per_term_parity.jl` green. And §2.10.1's two
+euler-warp Refs mean even one backend had two bit-different kernels for the same
+rotation.
+
+```julia
+# backend_kind ∈ {:cpu, :cuda} is a KEY field of method_id (§2.8).
+# Device model, driver and GPU UUID stay in the seal — they are observations.
+#
+# RESOLVED AT PLAN TIME by a pure function of declared values, so the id is
+# computable before dispatch:
+resolve_backend(m::Model, requested::Symbol) =
+    requested === :auto ?
+        (m.grid.ndim == 3 && maximum(m.grid.n_points) >= 24 ? :cuda : :cpu) :
+        requested
+```
+
+`SPINORBEC_NO_AUTO_BACKEND` (`make_workspace.jl:857`) is **deleted**: an
+environment variable whose mere presence flips CPU/GPU is the same defect
+wearing a third hat, and its stated use (test isolation, debugging a GPU/CPU
+divergence) is served better by `backend = :cpu` in the plan, which now
+addresses a different artifact.
+
+Note what `resolve_backend` drops relative to `_resolve_backend`: the
+`cuda_functional()` availability check. That is deliberate and it is why the
+seal is required. A plan may declare `:cuda`; a node where the CUDA extension
+fails to load would silently fall back to `CPUBackend()` and stamp the result
+with the `:cuda` `method_id` — *"GPU silent CPU-fallback"* is already a recorded
+TSUBAME failure mode. So `backend_agrees` is an **assertion in the seal**
+(§2.10.5): the observed backend must equal the declared one, or the run refuses
+before the first step. Availability is not a fingerprint input; it is a
+precondition.
+
+The gain is larger than the regression it repairs. Under one `Model`, CPU and
+GPU are now two named artifacts, so "GPU equals CPU" becomes an **observation
+the store can express** — a comparison between two ids — rather than an axiom
+the addressing assumed.
+
+#### 2.10.4 `toolchain_id` — resolved dependency hashes, not `project_hash`
+
+`NUMERIC_ROOTS` (§2.9) is eight paths, all inside this repo, so no dependency
+can move a scope digest. That is deliberate. But the first draft's fallback
+record field is broken on its own terms and the sentence in §5.3 asserting it
+is corrected there: `env.manifest_project_hash` is Pkg's `project_hash`,
+computed by `workspace_resolve_hash` over **dep names, uuids and compat strings
+only** — its own comment says so — never resolved versions. `Project.toml`
+carries `CUDA = "5, 6"`, so a `Pkg.up` anywhere inside that range leaves it
+bit-identical.
+
+```julia
+# src/model/toolchain.jl  (NEW, ~40 LOC)
+const NUMERIC_DEPS = ("CUDA", "FFTW", "SpecialFunctions", "StaticArrays", "JLD2")
+
+function toolchain_id()
+    parts = Tuple{String,String,String}[]
+    for (_, d) in Pkg.dependencies()
+        d.name in NUMERIC_DEPS || continue
+        push!(parts, (d.name, string(d.version),
+                      d.tree_hash === nothing ? "stdlib" : string(d.tree_hash)))
+    end
+    sort!(parts)
+    length(parts) == length(NUMERIC_DEPS) ||
+        error("NUMERIC_DEPS unresolved: got $(first.(parts))")
+    cf = Base.CacheFlags()
+    digest16((deps = parts,
+              julia = string(VERSION), llvm = string(Base.libllvm_version),
+              opt_level = cf.opt_level, check_bounds = cf.check_bounds,
+              inline = cf.inline,
+              cpu_target = unsafe_string(Base.JLOptions().cpu_target)))
+end
+```
+
+`Pkg.dependencies()` gives a resolved `tree_hash` per dependency — the content
+hash of the resolved package — which discriminates exactly what `project_hash`
+cannot. Measured on this machine: `CUDA v5.11.0
+tree_hash=ea6a2ab8307059b6c9ea186ff7dfcd032a13b731`, `FFTW v1.10.0
+tree_hash=97f08406df914023af55ade2f843c39e99c5d969`, `JLD2 v0.5.15
+tree_hash=d97791feefda45729613fafeccc4fbef3f539151`; the call is ~6 ms warm and
+is memoized per process. `tree_hash` is `nothing` for stdlibs, which the code
+above handles rather than assumes.
+
+`NUMERIC_DEPS` is a hand-written tuple and would rot by default, so
+**`test_numeric_deps_total.jl`** asserts every `[deps]` entry of `Project.toml`
+is either in `NUMERIC_DEPS` or in a declared, reasoned `NON_NUMERIC_ALLOWLIST`.
+A new numeric dependency cannot be quietly filed as non-numeric.
+`Preferences.jl` — the Julia-idiomatic way to add exactly the kind of switch
+§2.10.1 bans, and one that is baked at precompile time and therefore invisible
+to every runtime scan — is named in that allowlist as **forbidden**, not merely
+absent.
+
+Cost, honestly: putting `toolchain_id` in the key means a `Pkg.up` of CUDA
+invalidates every GPU artifact. `Manifest.toml` has been committed exactly once
+in repo history, so this is roughly one mass invalidation per year, and it is
+the correct behaviour — the alternative is the finding.
+
+#### 2.10.5 The `ExecutionSeal` — what the RUNTIME reported
+
+Everything above still only describes a plan. The seal is the other half.
+
+The first draft's §5.5 remote assertion — *"the compute node re-plans and
+asserts the fingerprint matches what was shipped"* — cannot detect the failure
+it is aimed at, because **both sides read the same disk**. A PackageCompiler
+`-J` image has `SpinorBEC` as a root module at startup, so `using` returns it
+before any staleness path (Julia 1.12.6 `loading.jl`, `canstart_loading` returns
+`maybe_root_module(modkey)` before `stale_cachefile` is ever consulted), while
+`scope_digest` reads the freshly-rsynced source. Both agree, the artifact is
+stamped `reproducible = true`, and the numbers came from the pre-fix kernel. The
+arming route is live and documented as such:
+`src/workflow/autopilot/backends_uge.jl:184` builds `-J $(sysimage_path)` and
+its own comment at `:190-193` instructs the operator to *"rebuild only on
+Project.toml / Manifest.toml change"*.
+
+The seal breaks the symmetry by putting a **runtime-reported fact** on one side
+of the comparison.
+
+```julia
+# src/run/seal.jl  (NEW, ~120 LOC)
+struct ExecutionSeal
+    # --- ASSERTED. A mismatch REFUSES before the first propagator call. ---
+    image_agrees::Symbol        # :match | :MISMATCH | :from_sysimage
+    backend_agrees::Bool        # observed backend == declared backend_kind (§2.10.3)
+    declared_equals_observed::Bool  # every Model field with a runtime counterpart matches
+    ambient_refs::Vector{Pair{Symbol,Any}}   # reflective scan; MUST be empty (§2.10.6)
+
+    # --- RECORDED. Never a key field, never asserted. ---
+    pkg_source::String          # pathof(SpinorBEC) — the tree the image CLAIMS
+    pkg_build_id::UInt128       # Base.module_build_id(SpinorBEC)     — a NONCE, see below
+    ext_build_id::Union{Nothing,UInt128}     # the CUDA ext has its own PkgId and build id
+    in_sysimage::Bool           # Base.in_sysimage(Base.PkgId(SpinorBEC))
+    image_file::String          # unsafe_string(Base.JLOptions().image_file)
+    cache_flags::NamedTuple     # opt_level, check_bounds, inline, debug_level
+    cpu_target::String          # requested ("native")
+    cpu_name::String            # resolved  (Sys.CPU_NAME)
+    blas_threads::Int; fftw_threads::Int; blas_config::String
+    fft_plans::Vector{UInt64}   # hash(sprint(show, plan)) per plan on the Workspace
+    device::Union{Nothing,NamedTuple}   # name, uuid, capability, nvidia_driver, cufft, cublas
+end
+
+"Is the module the RUNTIME loaded the one the CURRENT on-disk source produces?"
+function image_agreement(m::Module)
+    pid = Base.PkgId(m)
+    Base.in_sysimage(pid) && return :from_sysimage
+    src = Base.locate_package(pid); src === nothing && return :MISMATCH
+    want = Base.module_build_id(m)            # what the RUNTIME loaded
+    for c in Base.find_all_in_cache_path(pid)
+        r = Base.stale_cachefile(src, c)      # `true` == stale against CURRENT source
+        r === true && continue
+        r[3] == want && return :match
+    end
+    :MISMATCH
+end
+```
+
+**A correction to the obvious reading, because it was measured.**
+`Base.module_build_id` is a **per-build nonce, not a content hash**: recompiling
+byte-identical source in a fresh depot yields a different id, and a comment-only
+edit moves it. It therefore can never be a key field and can never be compared
+across hosts. Anyone who hashes it ships a field that differs on every rebuild
+of identical code. Its role here is (a) a record field and (b) one side of a
+**within-process** comparison. The discriminating power comes from the
+*relation* — is the loaded build id among the build ids of the caches that
+`stale_cachefile` reports as **not stale against the current source** — not from
+the id itself.
+
+**When each field is captured, and against what it is compared.**
+
+- **At stage entry, before `make_workspace` returns and therefore before any
+  payload byte.** Not at process exit: `with_reference_accuracy`
+  (`accuracy_knobs.jl:170-183`) and `apply_dealias_block!`
+  (`dealias_block.jl:111-112`) both restore in a `finally`, so an exit-time
+  capture reads the *restored* value, not the value in force during the steps.
+- `image_agrees` is compared against the caches `Base.stale_cachefile` declares
+  fresh **against the current on-disk source**. `:MISMATCH` is a hard error
+  before the first step, not an annotation.
+- `in_sysimage == true` is a **refusal** unless the image carries
+  `SpinorBEC.SYSIMAGE_SCOPE_DIGESTS`, baked by
+  `scripts/build_sysimage_full.jl`, equal to the plan's active scope digests.
+  Day one the builder bakes nothing, so **every `-J` run hard-errors** until
+  someone implements the stamp. That is the correct default: the finding
+  converts from silent-wrong-number to a loud stop. Baking the stamp is real
+  work — the constant cannot live in `SpinorBEC`'s own source, since that source
+  is what the image bakes — and it is listed as open in §10.2.
+- `backend_agrees` and `declared_equals_observed` are compared against the plan
+  (§2.10.3, §2.10.2). Both refuse on mismatch.
+- `ambient_refs` must be empty at entry **and again at exit**; entry ≠ exit ⇒
+  `admission = :tainted`, never servable. This catches a Ref created mid-run,
+  which is the `dealias_block.jl:62-68` incident shape.
+- Everything in the RECORDED block gates nothing. It is what a human reads when
+  two artifacts at one id disagree.
+
+**Cost**: ~554 ms cold, ~26 ms warm per stage (`image_agreement` is 26 ms on the
+real package here, over 10 cache files; `Pkg.dependencies()` ~6 ms warm; the
+reflective scan ~405 ms; an FFTW plan string 208 µs). Against a ~20 s package
+load and stages measured in minutes to hours, this is free. Nothing enters a hot
+loop.
+
+**What the seal cannot catch, stated flatly and required in the schema doc.**
+
+1. It identifies the **loaded image, not which methods were invoked**.
+   `module_build_id` is one `UInt128` for all of `SpinorBEC`, so a change to an
+   uncalled helper and a change to `split_step!` are indistinguishable. It is a
+   *necessary* condition on the executed code, never a sufficient one.
+2. The only general Julia mechanism that observes which code actually executed
+   is `--code-coverage`, which forces source-level recompilation and would
+   therefore destroy the very sysimage it is auditing. Rejected here on that
+   ground, not deferred.
+3. Nothing about **hardware, driver version, or nondeterministic kernels**.
+   CUDA atomic reduction order and multithreaded BLAS / FFTW summation order are
+   recorded (`blas_threads`, `fft_plans`, `device`) and never gated. The
+   measured OpenBLAS level-1 effect — an L-BFGS iteration at 156.6 ms with 192
+   threads against 50.2 ms with one — is a different reduction tree and
+   therefore different bits; the seal tells you which one you got and nothing
+   more.
+4. **Dependency-internal state.** FFTW's chosen codelet tree is *recorded* by
+   `fft_plans`; nothing constrains it. `toolchain_id` reads
+   `Pkg.dependencies()`, i.e. the on-disk manifest, so a sysimage baking CUDA
+   5.9 against a manifest resolving CUDA 5.11 is invisible to both halves. That
+   is the same shape as the sysimage finding, one level down, and it is open
+   (§10.2).
+5. It rests on four unexported `Base` internals — `module_build_id`,
+   `in_sysimage`, `find_all_in_cache_path`, `stale_cachefile` — plus a specific
+   ordering in `loading.jl`. Julia 1.13 may move them. The failure direction
+   matters: a changed tuple shape errors loudly, but a change in *which* caches
+   are reported non-stale would degrade `image_agreement` to always-`:match`.
+   `test_image_agreement_canary.jl` therefore mutates a source file under a
+   running image and asserts `:MISMATCH` — the positive control, run in CI, not
+   once by hand.
+
+#### 2.10.6 The gates
+
+Three gates, all in the FAST tier, all canaried. E1 has two arms — one static,
+one reflective — and §2.10.5's `ambient_refs` runs the reflective one again at
+step entry and exit, so the same predicate is both a CI gate and a runtime
+assertion. The template is in-tree:
+`test/oracles/test_lhy_no_bare_device_broadcast.jl` is 69 lines of `walkdir` +
+comment stripping + explicit allowlist, and critically
+`@test Set(sites) == allow` at `:63` — the assertion that stops an allowlist
+silently ceasing to guard.
+
+**E1 · `test/oracles/test_no_ambient_numerics.jl`.** Over `NUMERIC_ROOTS`,
+RED on any **unregistered mutable module-level binding**, and RED on any
+`ENV[` / `haskey(ENV` read. Registration is the cache list of E2; there is no
+"numeric switch" category to register into, so a switch simply cannot be
+declared. Two arms, both required:
+
+- *syntactic* — `grep -rnE '^(const|global)? *[A-Za-z_]\w*(::.*)? *= *(Ref|Base\.RefValue|Threads\.Atomic|Dict|IdDict)'`. Measured on today's tree: finds
+  11/11 numeric Refs with zero false positives (every other `const … = Ref` in
+  `src/` sits outside `NUMERIC_ROOTS` and is orchestration), and the `ENV` arm
+  finds exactly one site, `make_workspace.jl:857`, whose remediation is
+  deletion. Cost 0.096 s over 393 files.
+- *reflective* — walk `names(m; all=true)` + `getglobal` over `SpinorBEC`, **its
+  real submodules** (`Units`, `Calibration`, `Optimization`, `Dashboard`;
+  `names` does **not** reach submodule bindings, so the walk must recurse) and
+  every loaded extension via `Base.get_extension`. This catches a binding
+  created by `@eval` or a macro, which no regex sees. Two implementation
+  details are load-bearing rather than defensive: the predicate must be
+  `v isa Base.RefValue` and then inspect the value, because
+  `Base.RefValue{Union{Nothing,Float64}}` — i.e. `DEALIAS_K_CUTOFF`, the
+  flagship case — is **not** `isa Base.RefValue{<:Union{Bool,Number}}`; and
+  `isassigned(v) || continue` is mandatory, because CUDA bakes an unassigned
+  `Ref{CuGraphExec}` whose `v[]` throws `UndefRefError` and would take the run
+  down.
+
+Both arms are needed and neither is redundant: reflection cannot see an
+extension that is not loaded, so on a CPU-only CI runner it silently
+under-claims; the regex cannot see a binding that does not appear in source
+form. **Canaries** (without which this is the empty gate `error_budget.jl:33`
+was written to prevent): removing one entry from the expected set must turn E1
+RED; `@eval`-ing a `Ref` into a fixture module under a numeric root must turn
+the reflective arm RED; and after the deletion lands the expected `ambient_refs`
+is the empty set, so the reflective arm carries a **permanent positive control**
+— a fixture module holding one deliberate `Ref` that the scan must always find.
+Without that control, a predicate matching nothing is indistinguishable from a
+correct empty result.
+
+**E2 · `test/oracles/test_cache_key_completeness.jl`.** The 27 mutated caches
+are kept, so they need a rule that is mechanical rather than a review promise.
+Every one must be registered with a **declared determinant list**, and the gate
+asserts two things by measurement, not by judgement: (i) the declared
+determinants are a **superset of the values the `get!` closure reads** — the
+same `getfield`-instrumentation trick Gate C (§5.1) already uses on `Model`;
+(ii) a bare `objectid(x)` in a key is RED unless `x` is retained in the key
+tuple. The second rule alone closes a live defect: `_axis_broadcast`
+(`src/foundation/backend.jl:60-62`) keys on
+`(typeof(template), eltype(vec), length(vec), objectid(vec))` with no pin, four
+lines below `_to_device_cached` whose docstring (`:32-35`) explains that the key
+holds the array itself *"so it is also pinned against GC and no later array can
+reuse its address and inherit its entry"*. Measured on Julia 1.12.6: 40.1 %
+objectid reuse for freed `Vector{Float64}`. Its callers pass `grid.x[1..2]` /
+`grid.k[1..2]`, so two scan points with the same `n_points` and a different
+`box` are the collision case and `length(vec)` cannot separate them. Same shape
+in `_LHY_TABLE_CACHE` / `_SPATIAL_LHY_CACHE`
+(`ext/SpinorBECCUDAExt/gpu_lhy_field.jl:42-49,99-105`). The correct pattern
+already exists in-tree exactly once and is the reference implementation:
+`_DIAG_ZPH_KEY` (`ext/SpinorBECCUDAExt/gpu_diagonal.jl:182-208`) validates the
+cached **content key** on every hit, not just the shape key.
+
+**E3 · `test/oracles/test_numeric_deps_total.jl`** — §2.10.4.
+
+**What the gates cannot catch, exhaustively.**
+
+- A mutable value reached through a **struct field** rather than a module
+  binding. `SCRATCH_REGISTRY` (`src/foundation/scratch.jl:23`, 10+ step-path
+  callers, and its own `:20` concedes *"single-threaded by construction"*) holds
+  arbitrary entries; E1 sees the registry, E2 constrains its keys, neither
+  constrains what a caller puts in it.
+- `task_local_storage`, a `Ref` inside a dependency, and any value baked at
+  precompile time. `Preferences.jl` is the named instance and is banned at the
+  dependency level (§2.10.4) rather than detected.
+- **Semantics.** E1 is structural. The 11/11 precision is an *empirical
+  property of today's tree*, which is why registration — not classification — is
+  the mechanism: there is no way to declare a binding "numeric but fine".
+- **`NUMERIC_ROOTS` itself.** Every gate is scoped to the eight roots.
+  `test_scope_partition.jl` gates ownership *within* them; nothing gates that
+  the roots still cover the numeric surface. `_cuda_functional_callback`
+  (`src/workflow/experiments/pipeline/run_registry.jl:632`, set from
+  `ext/SpinorBECCUDAExt/SpinorBECCUDAExt.jl`) is a live instance outside the
+  roots — whether `import CUDA` ran before `using SpinorBEC` decided CPU vs GPU
+  for every 3D grid at n ≥ 24. This revision removes it along with the auto-pick
+  (§2.10.3), but the general hole stays open and is listed in §10.2.
+
+#### 2.10.7 Declared inputs that do not reach the executed path
+
+One more class, and it is the purest instance of the whole finding.
+`seed_device_rng!` — whose docstring instructs the caller to seed the GPU stream
+once per trajectory — has **zero call sites** in `src/`, `ext/`, `test/`,
+`scripts/` and `bench/`; only the two definitions exist
+(`src/foundation/backend.jl:96`, `ext/SpinorBECCUDAExt/gpu_rng.jl:13`). Every
+GPU stochastic run therefore draws from an unseeded process-global CURAND
+stream, and `src/solvers/spgpe.jl:501` says so in prose: *"seed then only
+controls the CPU path."* So `seed:` is a **declared** input that the digest will
+faithfully hash and that has no effect on the executed GPU path — same id,
+different numbers, by construction.
+
+The fix is one call in `run_stage!` before the first stochastic step, plus
+`test_rng_declared.jl` with a **mandatory positive control**: same seed ⇒
+bit-identical first draw, *and different seed ⇒ different draw*, so the gate is
+not itself a null from a degenerate knob. In the same commit,
+`Random.default_rng()` stops being the `seed === nothing` default at the eleven
+numeric entry points that use it (`spgpe.jl:440`, `sgpe.jl:192`,
+`photon_heating.jl:36`, `scalar_egpe.jl:489`, `hessian.jl:138,275`,
+`stability_spec.jl:76`, `imaging.jl:81,146,258,363`) — `seed::Int` becomes
+required. This must land **before** anything in §2.10 is trusted, because the
+seal would otherwise faithfully certify a cache hit for a run whose numbers are
+not reproducible.
+
+#### 2.10.8 The store write protocol
+
+§5.4 gave a layout and no write order, no completeness marker and no exclusion,
+while the idiom this repo would carry in derives the temp path from the
+destination — `_scratch_tmp_path` returns `final_path * ".tmp"`
+(`run_registry.jl:656-664`), so two writers at one id share an inode. The same
+idiom appears at nine sites, two of them in files this design keeps verbatim,
+and `_move_scratch_to_final` (`:668-677`) documents that a cross-filesystem
+scratch degrades `mv` to copy+delete — non-atomic, and that is the TSUBAME path.
+The probe is a bare `isfile`.
+
+```
+store/<xx>/<id>/
+  CLAIM/                            mkdir(2) — atomic on POSIX. holds host, pid,
+                                    job_name, started_at. Stale claims reconcile
+                                    through find_job_by_name (backends_uge.jl:513)
+                                    and the qstat idiom scripts/eu_campaign_resume.sh:40,71
+                                    already uses.
+  record.toml                       the id-DETERMINED half (§2.5). Byte-identical
+                                    across hosts and worktrees ⇒ committable, and
+                                    two branches cannot produce a merge conflict.
+  psi.jld2                          staged IN THE SAME DIRECTORY as
+                                    psi.jld2.<host>.<pid>.<rand>, fsync, rename(2).
+                                    Renaming within a directory is always atomic and
+                                    takes the cross-filesystem degradation out of the path.
+  exec/<ts>-<host>-<pid>.toml       ONE per execution: seal, completion, env, cost,
+                                    guards, warnings, admission. Append-only, never rewritten.
+  hits/<ts>-<host>-<pid>.toml       ONE per cache hit.
+```
+
+Write order: `CLAIM/` → payload staged, fsync, rename → `record.toml` if absent
+→ `exec/<…>.toml` **last, and it is the completeness marker**. A crash before it
+leaves an artifact nothing will serve. The failure mode is lost work, never a
+wrong number.
+
+```julia
+probe(id, plan) -> :hit | :partial | :claimed | :absent
+#  :hit      an exec/ entry with completion.state === :complete AND admission === :ok
+#            AND a seal whose ASSERTED fields match this process
+#  :partial  an exec/ entry exists but is :partial or :tainted  → recompute, never serve
+#  :claimed  CLAIM/ exists with no complete exec/ entry         → consult the scheduler
+#  :absent   nothing
+```
+
+Three-valued at minimum is not a refinement, it is the point: a `Record` is
+written at completion, so a store probe cannot otherwise distinguish *absent*
+from *running*, and §2.10's more precise key produces **more** cache hits, which
+makes serving a truncated artifact more likely rather than less. `:partial` is
+what stops that. `git rm`-ing `queue.jl` removes the only working
+"don't resubmit what is already running" guard in `src/`; `CLAIM/` plus the
+surviving `find_job_by_name` replaces it. Do **not** port
+`queue.jl:669-695` `_try_acquire_lock` — it is check-then-act (`isfile` then
+`open`) with a comment conceding O_EXCL was rejected. The correct primitives are
+already in-tree three times: `_with_catalog_lock`
+(`src/workflow/io/catalog.jl:41-66`, `mkdir` + stale reclaim, comment
+*"mkdir is atomic on POSIX"*), `with_entry_lock` (`queue.jl:214-260`), and the
+real O_EXCL claim at `test/run_chunk.jl:41-49`. A grep gate bans
+destination-derived temp names across the nine sites.
+
+`.gitattributes` gets a union merge driver for the append-only directories; the
+repo has none today.
+
+### 2.11 The layers
 
 | Layer | src/ path | Status | Responsibility |
 |---|---|---|---|
 | 0 | `src/foundation/`, `src/hamiltonian/`, `src/analysis/`, `src/solvers/`, `src/validation/` | **REPURPOSED** (+1 method per term) | physics, untouched except `physics_digest` beside `sign_oracle` |
 | 1 | `src/model/{model,specs,build,canonical,toml_io,with}.jl` | **NEW** ~900 | `Model` + its 14 specs + `make_workspace(::Model)` + TOML round-trip |
-| 2 | `src/model/{fingerprint,scopes,code_digest}.jl` | **NEW** ~400 | derived identity + the partition + the three gates |
-| 3 | `src/plan/{stage,method,axis,expand}.jl` | **NEW** ~600 | Stage/Method/Initial/Axis; type-level refusal to flatten a Chain |
-| 4 | `src/store/{artifact,record,format,migrate,index}.jl` | **NEW** ~700 | sharded CAS + `record.toml` + format-versioned readers |
-| 5 | `src/run/{run_stage,dispatch,resume,job}.jl` | **NEW** ~600 | execute; the `@noinline @nospecialize` firewall RETAINED verbatim |
+| 2 | `src/model/{fingerprint,scopes,code_digest,toolchain}.jl` | **NEW** ~450 | derived identity + the partition + the three gates + `toolchain_id` (§2.10.4) |
+| 3 | `src/plan/{stage,method,axis,expand,realization}.jl` | **NEW** ~630 | Stage/Method/Initial/Axis/`Realization`; type-level refusal to flatten a Chain |
+| 4 | `src/store/{artifact,record,format,migrate,index,protocol}.jl` | **NEW** ~850 | sharded CAS + `record.toml` / `exec/` split + claim protocol (§2.10.8) + format-versioned readers |
+| 5 | `src/run/{run_stage,dispatch,resume,job,seal}.jl` | **NEW** ~720 | execute; the `ExecutionSeal` (§2.10.5); the `@noinline @nospecialize` firewall RETAINED verbatim |
 | 6 | `src/run/guards.jl` | **NEW** ~300 | the ten guards, declared once, applied unconditionally |
 | 7 | `src/claims/{claim,source,target,verdict,registry}.jl` + `refs/` | **NEW** ~500 | A/B/C as types; targets measured off committed fixtures |
 | 8 | `src/campaign/{lane,budget,cost,schedule}.jl` | **NEW** ~350 | lanes = tag + points cap; gates are Claim nodes |
@@ -504,21 +1224,31 @@ invalidate the SpinorBEC precompile (`src/` is 384 files / 73,786 LOC, and
 known precompile symptom), and ~20 concurrent worktrees do not contend on a
 package source file.
 
-### 2.11 Invariants (numbered, CLAUDE.md style)
+### 2.12 Invariants (numbered, CLAUDE.md style)
+
+Invariants 2, 3 and 5 are amended by §2.10; 11, 12 and 13 are new there.
 
 1. **The resolved physics is a value.** `Model` is one concrete immutable
    struct with no free-form slot. There is no `metadata:`, no `extra::Dict`, no
    `Any` field, no `Function` field. Gated by `test_model_shape.jl`.
 2. **Identity is derived, never listed.** Every artifact id comes from
-   `physics_digest` over the HamTerm registry + `SCOPE_OWNERS` + input ids.
-   No hand-maintained key list exists anywhere.
-3. **Inactive slots are omitted.** Adding physics never invalidates work that
-   did not use it.
+   `physics_digest` over the HamTerm registry + `SCOPE_OWNERS` + input ids +
+   `Realization` + `backend_kind` + `dtype` + `toolchain_id`. No hand-maintained
+   key list exists anywhere. *(AMENDED: the first draft's key had three
+   components; it has four, and the method half now carries the realization and
+   the backend — §2.8, §2.10.3, §2.10.4.)*
+3. **Inactive TERM slots are omitted.** Adding physics never invalidates work
+   that did not use it. *(AMENDED: the rule is licensed by Gate A's fact that an
+   inactive term contributes exactly zero, so it does NOT extend to
+   `Realization`, whose fields select between two non-zero alternatives —
+   §2.10.2.)*
 4. **The dependency relation is the only primitive.** Cache invalidation,
    parallelism legality, gate ordering, and resume are four readings of
    `Stage.inputs`. There is no `parallel:` key and no scheduling flag.
-5. **Every execution writes a Record — including a cache hit.** Silence is
-   never an outcome.
+5. **Every execution writes an `Execution` — including a cache hit.** Silence
+   is never an outcome. *(AMENDED: the id-determined half, `record.toml`, is
+   written once per id; the execution half is one uniquely-named append-only
+   file per execution or per hit — §2.5, §2.10.8.)*
 6. **A number reaches a figure or a claim only through `quote!`**, which runs
    the `:prequote` guards. Guards are scoped by a predicate on the artifact,
    never by a per-campaign list.
@@ -533,6 +1263,28 @@ package source file.
     `@noinline _step_dispatch!(@nospecialize(step), …)` moves verbatim from
     `pipeline/runner.jl:244` into `src/run/dispatch.jl`, with an `@inferred`
     test on the boundary.
+11. **The declaration is numerically closed.** Every number the executing kernel
+    reads is a field of `Model` / `Method` / `Initial`, or a frozen `const`
+    covered by a scope digest. A mutable module-level binding under
+    `NUMERIC_ROOTS` — `Ref`, `Dict`, `Atomic`, or an `ENV` read — is either
+    a registered cache with a declared determinant list, or it is RED. There is
+    no third category, so a numeric switch cannot be declared. Gated by
+    `test_no_ambient_numerics.jl` + `test_cache_key_completeness.jl` (§2.10.6),
+    both canaried, the reflective arm carrying a permanent positive control.
+12. **Identity addresses the plan; the seal asserts the execution.** `StageId`
+    is computable before dispatch and answers *what should run*. `ExecutionSeal`
+    is captured **at stage entry, in the executing process**, and answers *what
+    did run*: the module the runtime loaded, the backend actually resolved, the
+    ambient scan, and `declared == observed` over every `Model` field with a
+    runtime counterpart. Its asserted fields **refuse the run** on mismatch;
+    they are never merely recorded, and `module_build_id` — a per-build nonce —
+    is never a key field (§2.10.5).
+13. **A hit requires completion, not just an id.** Admissibility is a separate
+    axis from identity: `run_stage!` serves an artifact only when an `exec/`
+    entry reports `completion.state === :complete`, `admission === :ok`, and a
+    seal whose asserted fields match this process. Absent, running, partial and
+    tainted are four distinguishable states, and the store write protocol
+    (§2.10.8) makes the completeness marker the last thing written.
 
 ---
 
@@ -999,16 +1751,60 @@ invalidates. This is the designed behaviour and it is why the 2026-07-28
 `gpu_lhy_field.jl` fix invalidates the 12 affected configs — `gpu_lhy_field.jl`
 is claimed by `:lhy`.
 
-**The residual, stated honestly.** Two cases remain:
+**The residual, stated honestly.** Three cases remain:
 (i) a fix in `:core` (shared math, coefficients, `make_workspace`) invalidates
 *everything*, which is correct but expensive — measured 10.6 % of commits;
 (ii) a fix whose numeric effect crosses a scope boundary in a way the partition
-does not model. Case (ii) is closed *statistically*, not structurally, by
-**`spinorbec verify --sample`**: a nightly job that re-runs 1 % of artifacts and
-asserts bit-equality (Sumatra's `smt repeat` in this codebase's idiom, ~40 CPU
-minutes). A mismatch means a code change escaped the fingerprint. This is
-**automatic, not a manual `promote`** — the five-year lens correctly flagged a
-manual escape hatch as a rot site.
+does not model;
+(iii) a number that reaches the kernel without being declared at all. Case
+(iii) was the audit's headline and is closed **structurally** by §2.10 — the
+switch is deleted, the ban is gated, and the seal asserts at entry — except for
+the four holes §2.10.6 enumerates (struct-field mutables, `task_local_storage`,
+dependency-internal state, and the scope of `NUMERIC_ROOTS` itself).
+
+Case (ii) is closed *statistically*, not structurally, by
+**`spinorbec verify --sample`**: a nightly job that re-runs 1 % of artifacts
+(Sumatra's `smt repeat` in this codebase's idiom, ~40 CPU minutes). A mismatch
+means a code change escaped the fingerprint. This is **automatic, not a manual
+`promote`** — the five-year lens correctly flagged a manual escape hatch as a
+rot site.
+
+**What the sampler may assert, corrected.** The first draft had it assert
+bit-equality, which this tree cannot deliver, so the only automatic detector for
+case (ii) would have been permanently red. `fft_flags = FFTW.MEASURE` is the
+default at the production choke point `make_workspace.jl:72` (feeding `:171`,
+`:320`, `:350`) and at `src/foundation/grid.jl:50,65`,
+`src/hamiltonian/terms/ddi/convolution.jl:145`, `src/solvers/ground_state.jl:128`;
+MEASURE picks its codelet sequence by timing trials at plan time, so summation
+order is load-dependent. The memory record `gotcha_lbfgs_grad_floor_not_
+reproducible_2026_07_29` measures a 25× spread in `grad_norm` across three runs
+at one commit on one cluster. The prototype asserts the opposite
+(*"`MEASURE` vs `ESTIMATE` is a planner hint; it moves timing, not numbers"*);
+that claim is wrong and is superseded by §2.10.2, which makes `fft_flags` a
+`Realization` field and therefore a key field.
+
+Four consequences, all of which the sampler needs before it is a gate rather
+than an alarm:
+
+1. It compares only artifacts whose **seal repro-class fields agree**
+   (`cpu_name`, `cache_flags`, `blas_threads`, `fftw_threads`, `fft_plans`,
+   `device.uuid`), and returns `:indeterminate` — reusing `CheckResult`
+   (`src/workflow/validation/specs.jl:33-49`) — otherwise.
+2. It carries a **mandatory positive control**: perturb one coefficient by
+   1e-12 and assert the sampler catches it, so "nothing mismatched" is
+   distinguishable from "the sampler compared nothing". This is
+   `error_budget.jl:11-42`'s discipline, which has already rejected two real
+   gates.
+3. It **reports its own `:indeterminate` fraction**. If most nights compare
+   nothing, the gate is empty and that must be visible as a number.
+4. Bit-equality is not claimed achievable, and this revision does not settle it.
+   The counter-evidence cuts both ways: MEASURE and ESTIMATE were measured to
+   select the *identical* plan string at 64³ on the development host, while the
+   L-BFGS spread above is real on the cluster. Before pinning `ESTIMATE` and
+   paying the planning cost, try the dormant `save_fftw_wisdom` /
+   `load_fftw_wisdom` pair (`src/foundation/grid.jl:85-90`, exported at `:3`,
+   **zero callers**) — recording and replaying the plan may make MEASURE
+   reproducible without giving it up. §10.2 carries this as open.
 
 **The ceiling, quoted whenever the cache is cited as safe:** Gates B and C run
 over the oracle fixtures. A `Model` field that only changes numbers at $F=6$
@@ -1038,16 +1834,33 @@ $O(1)$ per pair rather than an all-pairs `spec_diff` over the store.
 
 ### 5.3 Content addressing and code-revision binding
 
-$$\mathrm{id} = H\big(\text{physics\_id}(m,ws),\; \text{method\_id},\;
-\{\mathrm{id}(i)\}\big)$$
+```
+id = H( physics_id(m, ws),
+        method_id(method, realization, backend_kind, dtype),
+        {id(i) : i in inputs},
+        toolchain_id() )
+```
 
-with `physics_id` already containing per-active-scope tree digests. `Record`
-additionally carries `env.head`, `env.dirty`, `env.julia`,
-`env.manifest_project_hash` (`Manifest.toml` is already git-tracked here) — as
-*record* fields, not key fields, because they answer "what produced this" while
-the key answers "what is this". When a recorded scope digest no longer resolves
-in git, `reproducible = false` becomes a **queryable field**, replacing the
-date heuristic that produced "191 runs predate the q 11× fix yet read recent".
+with `physics_id` already containing per-active-scope tree digests, `method_id`
+carrying the realization and the backend (§2.10.2, §2.10.3), and `toolchain_id`
+carrying the resolved dependency tree hashes and the codegen flags (§2.10.4).
+`record.toml` additionally carries `env.head`, `env.dirty`, `env.julia`, `host`
+and the device — as *record* fields, not key fields, because they answer "what
+produced this" while the key answers "what is this". When a recorded scope
+digest no longer resolves in git, `reproducible = false` becomes a **queryable
+field**, replacing the date heuristic that produced "191 runs predate the q 11×
+fix yet read recent".
+
+**Correction (audit finding D4).** The first draft named
+`env.manifest_project_hash` as the record field that would recover dependency
+versions. It cannot. Pkg's `project_hash` is computed by `workspace_resolve_hash`
+over **dep names, uuids and compat strings only** — its own comment says so —
+never resolved versions, so a `Pkg.up` anywhere inside `Project.toml`'s
+`CUDA = "5, 6"` leaves it bit-identical. `Manifest.toml` is git-tracked here
+(`.gitignore:110-117`), so `env.head` recovers versions *if the bump is
+committed*, which has happened exactly once in repo history; uncommitted, all
+that survives is `env.dirty::Bool`. That field is therefore **replaced**, not
+supplemented, by `toolchain_id`'s per-dependency `tree_hash` (§2.10.4).
 
 `_canonical_bytes!` (`experiment.jl:61-111`) survives verbatim into
 `src/model/canonical.jl` — its determinism across dict-iteration order, Julia
@@ -1057,9 +1870,49 @@ to hash non-finite floats.
 ### 5.4 Resume and caching
 
 `run_stage!` walks a job's `inputs`, probes the store by id, and skips only on
-an id match. Store layout is sharded: `store/<xx>/<id>/{record.toml, psi.jld2}`,
-so no directory exceeds ~256 entries at $10^5$ artifacts. **A hit writes a
-Record with `reused = <id>`.** The date-dependent normalisation bug is
+an id match **plus an admissible completion plus a matching seal** — the
+three-valued probe and the full write protocol are in §2.10.8, and invariant 13
+is the rule. Store layout is sharded: `store/<xx>/<id>/`, so no directory
+exceeds ~256 entries at $10^5$ artifacts. **A hit writes an `Execution` with
+`reused = <id>` into `hits/`**, never onto the producer's file.
+
+**Completion is not identity, and both are required.** An interrupted dynamics
+run currently returns a truncated series as a *success*:
+`src/solvers/simulation/run_loops.jl:203-221` catches `InterruptException`,
+snapshots, and returns **without rethrowing** (identical shape at `:51-63`), so
+`run_pipeline` takes its success path. `SimulationResult`
+(`src/foundation/types/integrator.jl:65-71`) has no completion field at all, so
+the pipeline could not record it if it wanted to, and nothing in `src/` compares
+`times[end]` against the configured duration. Under a declared-inputs key the
+truncated artifact takes the full run's id, because `Strang(dt, duration)` is
+the *requested* duration. The ground-state half is live in production:
+`itp_loop.jl:223-233` sets `interrupted = true` and returns normally with
+`converged = false`, `grep -rn interrupted src/` has zero consumers outside that
+file, and the `_gs_cache_key` hit branch defaults **fail-open** at
+`run_step_ground_state.jl:352` (`get(d, "converged", true)`) while the key at
+`:249-272` contains `n_steps`, so a solve stopped at step 3,721 is stored as
+*the* artifact for the 100,000-step solve. Three submit scripts under
+`runs/eu_gs_phase_c1_B_kappa/` export `SPINORBEC_STAGE_CACHE=1`.
+
+Three edits close it, and none of them is an identity change: add `Completion`
+to `SimulationResult` and to the record (§2.5); make the two interrupt handlers
+rethrow after snapshotting so `runner.jl`'s `completed = false` path fires; make
+the probe fail **closed** on an absent or non-`:complete` completion. A postrun
+`:block` guard `series_reached_declared_extent` gets the canary "a series
+truncated by one save interval". The corresponding L-BFGS facts —
+`stop_reason = :line_search_stalled`, `floor_limited`, `grad_norm` — are already
+computed at `run_step_ground_state.jl:586-588` and thrown away at `:568-570`;
+widening one `jldopen` block carries them into `Completion`.
+
+`_gs_cache_key` is **deleted, not ported**. It is already the derived
+fingerprint in miniature and it already has the hole: a 17-entry hand allowlist
+that omits `backend` and omits `dealias` (the latter because it is a `Ref`),
+guarding a directory that holds 35 ground-state configs spanning six distinct
+dealias settings. Replacing the hand list with `stage_id` closes the collision
+by construction — and the ψ files already in `runs/_stage/gs` need retracting in
+the same session, not just the design (§9).
+
+The date-dependent normalisation bug is
 structurally gone: `calibration_history` without `target_date` resolving
 against `Dates.today()` cannot exist because calibration happens in a `Model`
 *builder*, whose output is the resolved value that gets hashed.
@@ -1074,11 +1927,26 @@ contract is preserved, not ported.
 
 `UGEBackend` and `ssh_transport.jl` move over unchanged. The payload is the
 **resolved `Model` TOML** plus the required tree sha — no re-composition on the
-remote. The compute node **re-plans and asserts the fingerprint matches what
-was shipped**, converting the recorded "a `git fetch` failure silently runs the
+remote. The compute node **re-plans and asserts the fingerprint matches what was
+shipped**, converting the recorded "a `git fetch` failure silently runs the
 previous commit" trap into a hard error. `-g` stays a CLI flag; `$HOME` is not
 expanded in directives; `gpu_1` MIG rejects `h_rt=12h`. These are encoded as
 tests, not comments.
+
+**That assertion is necessary and not sufficient, and the first draft treated it
+as sufficient.** It compares a shipped fingerprint against a recomputed one, and
+**both sides read the same disk**, so under a stale `-J` sysimage they agree
+while the numbers came from the old kernel — see §2.10.5 for the mechanism and
+the `loading.jl` ordering that makes it silent. The remote assertion is
+therefore kept *and* the `ExecutionSeal` is required on every remote stage:
+`image_agrees` puts a runtime-reported fact on one side of the comparison, and
+`in_sysimage == true` refuses unless the image carries baked scope digests.
+Because `scripts/build_sysimage_full.jl` bakes no stamp today, **every `-J` job
+hard-errors on day one** rather than certifying the wrong commit green. Both
+arming routes are live: `SPINORBEC_TSUBAME_SYSIMAGE` (`tick.jl:95`) and
+`docs/guides/tsubame.md:142`, which auto-arms from the mere existence of
+`spinor_sysimage.so`, and `backends_uge.jl:190-193` explicitly tells the
+operator not to rebuild on `src/` changes.
 
 ### 5.6 A/B/C claim taxonomy
 
@@ -1148,6 +2016,30 @@ callers), and a time-dependent trap (`evaluate_potential(::TimeDependentTrap,
 Rough sizes are LOC of new code plus days of judgement work; judgement work is
 the schedule risk, not the code.
 
+**Step 0 — close the ambient leak (~600 LOC, 2–3 days). DEPENDS ON NOTHING;
+land it first and separately.** Everything in §2.10.1, §2.10.2, §2.10.6 and
+§2.10.7 is a defect on `main` today, is independently landable, and needs no
+part of this design: delete the eleven Refs into `GridSpec` / `Realization` /
+frozen `const`s; wire `make_workspace` to read the dealias spec it is handed;
+ship `test_no_ambient_numerics.jl` + `test_cache_key_completeness.jl` +
+`test_numeric_deps_total.jl` with their canaries; add the one missing
+`seed_device_rng!` call with its two-sided positive control; delete
+`SPINORBEC_NO_AUTO_BACKEND`; rewrite `ACCURACY_KNOBS`' three `:global` entries.
+*Works after:* a `k_cut` sweep is N artifacts with N different numbers rather
+than N ids with identical numbers; `with_reference_accuracy` measures something;
+a GPU stochastic run is reproducible from its declared seed.
+*Risk:* low-medium, and localised. The only medium item is dealias, because the
+psi-filter runs with DDI off while the F-filter has no workspace, so the spec
+must live on both `Workspace` and `DDIParams` — mitigated by the single builder
+plus the `ws.dealias === ws.ddi.dealias` assertion (§2.10.2).
+*Before writing any of it,* run the cheap in-repo measurement the audit lists as
+its first unknown, against `_gs_cache_key` specifically: how many of the 35
+ground-state configs in `runs/eu_gs_phase_c1_B_kappa/` — six dealias settings,
+ten with a `backend:` key, `SPINORBEC_STAGE_CACHE=1` in three submit scripts —
+already collide under that key. That turns "the derived key would collide" from
+an argument into a count, and if they do collide the ψ files in `runs/_stage/gs`
+need retracting in the same session.
+
 **Step 1 — `Model` + `make_workspace(::Model)` (~900 LOC, 3 days).**
 Land the struct, the 14 specs, the pure builders, the TOML round-trip, and
 `test_model_shape.jl`. Rewire the **existing** YAML pipeline so its 15 passes
@@ -1189,16 +2081,24 @@ for the first time. Ground-state reuse across configs becomes safe.
 point, but land the fixtures separately so main is not red for days.
 *Depends on:* step 1 (the digest takes a `Model`).
 
-**Step 3 — store, runner, guards (~1,600 LOC, 4 days).**
-`Stage`/`Method`/`Initial`/`Axis`/`ChainedPlan`; `src/store/`; `src/run/` with
-the firewall moved verbatim; the twelve guards with canaries. Port ONE campaign
-end to end — `matsui_fig4b` — and run it on TSUBAME.
+**Step 3 — store, runner, guards, seal (~2,000 LOC, 5 days).**
+`Stage`/`Method`/`Initial`/`Axis`/`ChainedPlan`; `src/store/` including the
+`record.toml` / `exec/` split and the claim protocol (§2.10.8); `src/run/` with
+the firewall moved verbatim and `src/run/seal.jl` (§2.10.5); `Completion`
+threaded through `SimulationResult` and the two interrupt handlers (§5.4); the
+twelve guards with canaries. Port ONE campaign end to end — `matsui_fig4b` —
+and run it on TSUBAME.
 *Works after:* chains and parallel axes are expressible and enforceable; every
-run passes twelve guards; resume is by artifact id; the compute node asserts
-its own fingerprint.
-*Risk:* medium-high. The firewall must move intact or the first sweep hangs for
-30 minutes with no stack trace. Port it FIRST and assert with `@inferred`.
-*Depends on:* steps 1–2.
+run passes twelve guards; resume is by artifact id **and** completion; a stale
+`-J` sysimage refuses instead of certifying itself green; two concurrent writers
+at one id cannot share an inode.
+*Risk:* medium-high, on two axes. The firewall must move intact or the first
+sweep hangs for 30 minutes with no stack trace — port it FIRST and assert with
+`@inferred`. And the seal rests on four unexported `Base` internals, so
+`test_image_agreement_canary.jl` (mutate a source file under a running image,
+assert `:MISMATCH`) is not optional: it is the only thing that will notice a
+Julia upgrade silently degrading `image_agreement` to always-`:match`.
+*Depends on:* steps 0–2.
 
 **Step 4 — the harvest (automated, ~1 day compute, 0 judgement).** See below.
 *Depends on:* nothing. **Run it early, in parallel with steps 1–3.**
@@ -1316,6 +2216,15 @@ After this, the old system is dead. Five things must be true before crossing:
    new runner** and its ten consumers are green.
 5. **The 227 gitignored run directories' `config.yaml` snapshots are committed**
    (K1 prerequisite).
+6. **Step 0 is green.** `git rm -r src/workflow/experiments/` deletes
+   `runtime/dealias_block.jl`, the only writer of `DEALIAS_2_3_ENABLED` /
+   `DEALIAS_K_CUTOFF` anywhere in `src/`. If the Refs still exist when that
+   commit lands, the 75 configs carrying a `dealias:` block lose their setting
+   silently and every one of them runs unfiltered — a wrong number, not a
+   failure. So `test_no_ambient_numerics.jl` must be green and
+   `make_workspace(m::Model)` must be reading `m.grid.dealias_*` **before** flag
+   day, not as part of it. This is the one ordering constraint in the plan that
+   produces a silent wrong answer if violated.
 
 ---
 
@@ -1341,6 +2250,14 @@ predicate, a `_gs_cache_key` line and a docs update — six more files, none of
 them gated. And adding slot #15 invalidates **zero** existing artifacts,
 because inactive slots are omitted.
 
+**And the term may not bring a knob with it.** The historical shape is that a
+new term ships with a module-level `Ref` to switch its own fast path on and off
+— that is where nine of the eleven in §2.10.1 came from. Invariant 11 forbids
+it: the switch is a field of the term's spec (physics), a field of
+`Realization` (realization), or a frozen `const` (neither), and
+`test_no_ambient_numerics.jl` is RED otherwise. This is the one gate in the list
+that fires on a file the author did not think of as identity-relevant.
+
 - **A new atom** is one entry in `ATOM_REGISTRY` (`atoms.jl:339`). Zero model
   files, because `atom::AtomSpecies` is a value, not a string enum.
 - **A new solver** is one `Method` subtype plus one `run_stage!` method. This
@@ -1360,15 +2277,16 @@ Three formats, three lifetimes.
 - **(a) The spec on disk is TOML.** `record.model_toml` holds the *resolved*
   `Model` verbatim, so what a run actually computed is readable with `cat`
   using a Julia-stdlib parser and no SpinorBEC.
-- **(b) `Record` carries `format::Int`** and readers dispatch on it
-  (`read_record(::Val{3}, …)`). Each historical version keeps a reader plus a
-  **committed micro-fixture** (~50 KB), and `test_record_format_readers.jl`
-  asserts every version $1..N$ has both. Migrations are pure functions in
-  `src/store/migrate.jl` and are a chain, not a fork:
-  `migrate(::Val{n}, ::Val{n+1})` must exist for every gap. The existing
-  `open_result.jl` — which already degrades gracefully across four legacy jld2
-  layouts — becomes the `format < 3` reader, so months of legacy data stay
-  readable at zero design cost.
+- **(b) `Record` and `Execution` each carry `format::Int`** (4 — the seal and
+  the record/execution split are a schema change, so 3 never ships) and readers
+  dispatch on it (`read_record(::Val{4}, …)`, `read_exec(::Val{4}, …)`). Each
+  historical version keeps a reader plus a **committed micro-fixture** (~50 KB),
+  and `test_record_format_readers.jl` asserts every version from 1 to N has
+  both. Migrations are pure functions in `src/store/migrate.jl` and are a chain,
+  not a fork: `migrate(::Val{n}, ::Val{n+1})` must exist for every gap. The
+  existing `open_result.jl` — which already degrades gracefully across four
+  legacy jld2 layouts — becomes the `format < 4` reader, so months of legacy
+  data stay readable at zero design cost.
 - **(c) Arrays stay in JLD2 for working use.** `archive(artifact)`
   additionally emits `psi.bin` plus a shape/dtype/endianness declaration in the
   record, readable by numpy/C/Julia forever. `archive()` is **not** a
@@ -1628,9 +2546,55 @@ skipped for a quarter, the design's honesty about its residual class becomes a
 claim rather than a measurement.
 
 **More gates means more red.** Twelve guards on every run, four new
-fingerprint/partition meta-tests, per-guard canaries, per-claim controls. Main
-will be red more often than today's arrangement, which is quiet because it
-checks little. That is the intended trade and it will still be annoying.
+fingerprint/partition meta-tests, three new ambient/toolchain meta-tests
+(§2.10.6), per-guard canaries, per-claim controls. Main will be red more often
+than today's arrangement, which is quiet because it checks little. That is the
+intended trade and it will still be annoying.
+
+**What §2.10 costs, itemised.** The Ref deletion is ~600 LOC across ~25 files —
+68 read+write sites in `src/` + `ext/`, 89 write sites in `test/` + `bench/`,
+measured — of which `test/test_dealias_2_3.jl` (455 lines, ~35 direct Ref
+references) is the single biggest item. Every value is `Bool` / `Float64` /
+`Int` / `UInt32`, adding **zero** type parameters, so there is no measured
+hot-loop or JIT cost and this is a correctness change with a bounded refactor
+bill, not a speed-versus-safety trade. `src/workflow/validation/accuracy_knobs.jl`
+(231 lines) plus its two test files need a real rewrite, because its three
+`:global` entries are getter/setter closures over Refs that no longer exist —
+that work is not optional and was not in the first draft's budget. The gates,
+the seal and the canaries are ~450 LOC. The `record.toml` / `exec/` split and
+the claim protocol add ~250 LOC over the first draft's store. Runtime cost is
+~554 ms cold and ~26 ms warm per stage, against a ~20 s package load.
+
+**A more precise key invalidates more, on purpose.** `toolchain_id` means a
+`Pkg.up` of CUDA invalidates every GPU artifact — roughly one mass invalidation
+per year, calibrated against `Manifest.toml` having been committed exactly once
+in repo history. `backend_kind` in the key doubles the store for any config that
+runs both arms; measured, ten configs in one campaign directory carry a
+`backend:` key, so the actual duplication is small and it is the entire point.
+`Realization` canonicalising all four fields (§2.10.2) means adding a fifth
+switch in 2029 invalidates everything. Each of these is the correct direction
+and each of them will look like an over-reaction the first time it fires.
+
+**The store must be retracted, not just re-keyed.** `runs/_stage/gs` was written
+under `_gs_cache_key`, which omits `backend` and `dealias`, in a campaign
+directory holding 35 configs across six dealias settings with
+`SPINORBEC_STAGE_CACHE=1` live in three submit scripts. Those ψ files are
+suspect *today*, independently of whether this design ships. Retiring them
+belongs to the session that discovers it.
+
+**The seal is coupled to Julia internals, and that coupling is permanent.**
+`module_build_id`, `in_sysimage`, `find_all_in_cache_path` and `stale_cachefile`
+are all unexported, and `stale_cachefile`'s contract (returns `true` for stale,
+otherwise a tuple whose third element is the build id) is undocumented and lives
+in one of the most-churned files in `Base`. A shape change errors loudly; a
+semantic change degrades the check to always-`:match`, which is the silent
+direction. The canary is the whole defence and it must run in CI, not once by
+hand in a scratchpad.
+
+**Some findings are made worse before they are made better.** A more precise key
+produces more cache hits, and until `Completion` lands (§5.4) a truncated
+artifact is served on every one of them. Land the probe's fail-closed default in
+the same step as the key, or the key is a regression.
 
 **Six concepts is more than one Dict.** Seven, honestly. Day-1 onboarding is
 steeper. The bet is that day-30 is much shallower: seven things instead of 141
@@ -1722,4 +2686,108 @@ two ways.
    and deterministic but blind to whatever is not in the set.
    **Recommend (a)** — it is the only automatic detector for a code change
    escaping the fingerprint, and the alternative's blind spot is exactly where
-   novel physics lives.
+   novel physics lives. Note this is now conditional on §5.1's four corrections:
+   without a repro-class filter, an `:indeterminate` verdict, a positive control
+   and a published `:indeterminate` fraction, (a) is a permanently-red alarm
+   rather than a detector.
+
+4. **Is bit-equality achievable at all under `ESTIMATE`?** Unresolved, and it
+   decides whether the sampler is a gate or a report. Measurement: one 32³ Eu
+   ITP run N = 10 times on one host with `MEASURE` and with `ESTIMATE`, counting
+   bit-identical ψ; then the same across two nodes. Try
+   `save_fftw_wisdom` / `load_fftw_wisdom` (`src/foundation/grid.jl:85-90`, zero
+   callers) before paying `ESTIMATE`'s planning cost. Until this is measured the
+   sampler ships with a declared tolerance and an `:indeterminate` arm.
+
+5. **How to bake `SYSIMAGE_SCOPE_DIGESTS` into a PackageCompiler image.**
+   §2.10.5 refuses every `-J` run until the stamp exists, which is the safe
+   default but is not a working configuration for TSUBAME. The constant cannot
+   live in `SpinorBEC`'s own source, because that source is what the image
+   bakes; the options are a generated file written into `src/` immediately
+   before `create_sysimage`, a companion `.toml` beside the `.so` whose path the
+   runner checks, or a policy of "no sysimages for artifact-producing runs",
+   which is defensible and has a JIT-cost consequence
+   (`docs/guides/tsubame.md:285` already lists "~10 min before any output").
+   Undecided.
+
+6. **Dependency identity under `-J`.** `toolchain_id` reads
+   `Pkg.dependencies()`, i.e. the on-disk manifest, while the seal binds only
+   `SpinorBEC` and its CUDA extension to the loaded image. A sysimage baking
+   CUDA 5.9 against a manifest resolving CUDA 5.11 is therefore invisible to
+   both halves — the same shape as the sysimage finding, one level down. The
+   cheap fixes (apply `image_agreement` per numeric dependency, or bake the
+   dependency tree hashes into the stamp) are known and unbudgeted.
+
+7. **`NUMERIC_ROOTS` is not gated for coverage.** `test_scope_partition.jl`
+   gates ownership *within* the eight roots; nothing gates that the roots still
+   cover the numeric surface. Widening them to include the runner would make
+   §2.10.6's gates noisy without making them sound; the intended answer is that
+   the runner has no numerics left to hold, which is an aspiration and not a
+   gate. Named live instances outside the roots: `_cuda_functional_callback`
+   (`run_registry.jl:632`), `SPINORBEC_SCAN_ONLY_INDEX`,
+   `SPINORBEC_LIGHT_POINTS`.
+
+### 10.3 Audit findings — closed, and left open
+
+Against issue #250's 15 survivors. Closing means "a mechanism in this document
+makes the failure unrepresentable or loud", not "a paragraph mentions it".
+
+**Closed (8).**
+
+| # | finding | where |
+|---|---|---|
+| D1 | process-global numeric switches invisible to identity | §2.10.1–2, §2.10.6 — deleted, not traced; ban gated; ambient scan asserted at entry and exit |
+| D2 | stale `-J` sysimage runs old code under a new tree digest | §2.10.5 — `image_agreement` puts a runtime fact against a disk fact; `in_sysimage` refuses |
+| D3 | `backend` collides CPU and GPU artifacts of one `Model` | §2.10.3 — key field, plan-time pure resolution, `backend_agrees` asserted |
+| D4 | dependency versions outside the key; `project_hash` cannot discriminate | §2.10.4, §5.3 — resolved `tree_hash` per dep, totality-gated |
+| S1 | interrupted dynamics returns a truncated series as SUCCESS | §2.5 `Completion`, §5.4 — rethrow, record, fail-closed probe |
+| C1 | no store write protocol; two same-id writers share one temp inode | §2.10.8 — in-directory staging, fsync, rename, last-written marker, grep gate |
+| C2 | resume-as-store-probe cannot see an in-flight job | §2.10.8 — `CLAIM/` plus scheduler consultation |
+| C3 | a cache hit's Record lands on the producer's file | §2.5, §2.10.8 — `hits/` is a separate append-only directory |
+
+**Partly closed (3).**
+
+- **S2** — the *collision* half is closed (`_gs_cache_key` deleted for
+  `stage_id`, which carries `backend` and `dealias`); the *admissibility* half
+  needs §5.4's `Completion` and the fail-closed default, which are specified
+  here but are a separate edit in a file this design deletes.
+- **C4** — the add/add conflict is closed for `record.toml` by making it a pure
+  function of the id (§2.5). It is **not** closed for a store committed across
+  ~20 worktrees in general: `exec/` and `hits/` are conflict-free by filename,
+  but nothing stops someone committing a payload path, and the union merge
+  driver is specified and unwritten.
+- **D5** — `fft_flags` becomes a key field and the FFTW plan digest becomes an
+  instrument, so a disagreement is now diagnosable. Bit-equality is **not**
+  claimed achievable; §10.2 items 3 and 4 carry it.
+
+**Open (4), with the reason each is not an identity problem.**
+
+- **S3 · TWA ensemble opacity.** Member survival, live status and checkpointing
+  are process facts. Nothing about a complete declaration obliges a 50-member
+  accumulator through `Parallel(:seed)`; `twa.jl:43` has no `isfinite` check,
+  `_welford_update!` is cumulative so one NaN poisons every later member, and
+  the TWA branch returns at `run_step_dynamics.jl:352` before the live callback
+  is built, so the divergence reaper is blind to it. `Completion.members` /
+  `finite_members` (§2.5) closes only the silent-green half: 49/50 and 50/50
+  stop being indistinguishable. The rest is an aggregator refactor.
+- **P1 · the kept autopilot files are typed on the deleted `QueueEntry`.**
+  `exec/` (§2.10.8) is where the per-attempt state belongs and makes the port
+  *possible*, but mutable scheduler state — attempt count, escalated resource
+  class, `job_id`, `kill_reason` — is genuinely not artifact identity, and this
+  revision does not do the port. §2.11's "repurposed wholesale" remains
+  aspirational until it is done.
+- **P1b · taint does not travel along `Stage.inputs`.** It cannot be closed by
+  identity without breaking the system: making a guard verdict part of an id
+  would make the id depend on the run's outcome, so it could no longer be
+  computed before the run to decide the skip. `Execution.admission` is the right
+  carrier and the propagation rule — meet the stage's own admission with the
+  minimum over its inputs' admissions — is an admissibility relation over the
+  same edges, i.e. the missing fifth reading of invariant 4. Specified nowhere
+  yet.
+- **P2 · `outcome.toml` has no producer.** A filename bug, not an identity one:
+  `_write_exit_summary` (`runner.jl:126-137`) already writes exactly the keys
+  `classify_failure` reads, and `retry.jl:29-32` reads the wrong name.
+  Independently, `backend_failure_reason(::UGEBackend)` returns qacct strings
+  that `retry.jl:41-47` never matches, so `RESOURCE_PERMANENT` escalation is
+  unreachable on the production backend. Both are one-file fixes outside this
+  design and neither is done.
