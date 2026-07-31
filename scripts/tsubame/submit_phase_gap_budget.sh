@@ -1,7 +1,7 @@
 #!/bin/bash
 #$ -cwd
 #$ -l gpu_1=1
-#$ -l h_rt=1:00:00
+#$ -l h_rt=4:00:00
 #$ -N phase_gap
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
@@ -40,5 +40,5 @@ if [ "$smoke_rc" -ne 0 ]; then
 fi
 
 echo; echo "### PRODUCTION"
-$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-32}" "${SPINORBEC_GAP_STEPS:-30000}" 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
+$JULIA --project=. bench/phase_gap_error_budget.jl "${SPINORBEC_GAP_N:-32}" "${SPINORBEC_GAP_STEPS:-120000}" 2>&1 | grep -vE "loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library"
 echo "ALL DONE $(date)"

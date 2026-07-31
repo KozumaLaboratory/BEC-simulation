@@ -70,6 +70,25 @@
 #     unusable — the honest verdict, and one that costs milliseconds instead of a
 #     30000-step ITP that was never going to land.
 #
+# v4 (2026-07-31). Two defects the v3 run exposed in itself:
+#
+#   * THE dt/2 ARM WAS CONFOUNDED. Every arm got the same step cap, so halving dt
+#     halved the imaginary time reached. Its `state sep` staying at 5e-2 where the
+#     dt arm collapsed to 4e-5 therefore says "less relaxed", not "dt matters" —
+#     the arm meant to measure the discretisation error was measuring its own
+#     shorter run. Steps now scale as DT/dt, so all arms cover the same τ.
+#   * 30000 STEPS DOES NOT CONVERGE THIS PROBLEM. Every arm finished at
+#     dE ≈ 1e-6..1e-5 against a 1e-9 target, and a gap between two unconverged
+#     runs is a gap between two points on two trajectories. The cap is raised.
+#
+# What v3 DID establish, and what to keep looking at: ΔE is not the usable
+# observable here. The reference arm and its own dt/2 baseline disagree by ~7 at
+# a B where ΔE itself is ~8-15, so the discretisation error is of order the
+# observable. `state sep` — how far apart the two converged states are — moved
+# monotonically and by four orders across the B scan, which is a signal. And the
+# positive control fired: with the spin rotation removed, final dE ran 1e-1
+# instead of 1e-6, so the instrument is not blind.
+#
 #   julia --project=. bench/phase_gap_error_budget.jl [n] [max_steps]
 
 using Printf
@@ -82,7 +101,7 @@ using LinearAlgebra: norm
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
-const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 30000
+const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 120000
 const ITP_TOL = 1.0e-9
 # The DENSITY-based, gauge-invariant convergence gate. A texture carries a gauge
 # orbit — a global U(1) phase and a spin rotation about z — that leaves ρ and the
@@ -91,6 +110,9 @@ const ITP_TOL = 1.0e-9
 # `converged = false` after 30000 steps at 32³, so nothing it measured was a gap.
 const ITP_TOL_DRHO = 1.0e-7
 const SEEDS = (:flower, :chiral_spin_vortex)
+# Defined here rather than beside the arms: `relax` scales its step count by
+# DT/dt, so the reference dt has to exist before the first arm runs.
+const DT = 0.002
 
 grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
 
@@ -126,9 +148,14 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
     try
         grid = grid_of()
         seed_psi = init_psi(grid, SpinSystem(6); state=seed)
+        # Steps scale INVERSELY with dt, so every arm covers the same imaginary
+        # time. Without this the dt/2 arm reaches half the τ of the others and
+        # its "smaller error" is just a shorter run — which is exactly what v3
+        # measured and nearly reported as a dt effect.
+        nsteps = round(Int, MAX_STEPS * (DT / dt))
         # Stage 1: mean field only. Half the step budget — it starts from a seed
         # and only has to reach a physical texture, not the final fixed point.
-        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=MAX_STEPS ÷ 2)
+        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2)
         psi_pre = Array(pre.workspace.state.psi)
 
         # Ask, before spending the second stage, whether a reference is even
@@ -144,7 +171,7 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         end
 
         # Stage 2: the arm's own LHY, tabulated from the relaxed ψ.
-        gs = itp(; psi0=psi_pre, B, kind, dt, steps=MAX_STEPS)
+        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
         psi_h = Array(gs.workspace.state.psi)
         _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
@@ -229,7 +256,6 @@ end
 
 # --- gap: a small B scan, so the boundary can be located rather than assumed ---
 const BS = (2.6e-9, 3.5e-9, 4.4e-9, 5.2e-9)
-const DT = 0.002
 
 arms = [
     ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false,
@@ -265,6 +291,34 @@ for (label, a) in arms, B in BS
 end
 
 # --- verdict --------------------------------------------------------------
+#
+# The classification, not ΔE, is what the claims rest on — so the first thing to
+# report is whether the ARMS AGREE about it. If two accuracy settings put the
+# same (B, seeds) in different winding classes, that disagreement IS the accuracy
+# requirement, stated in the units the claim is made in, and it does not need a
+# converged ΔE or a slope to be meaningful.
+println("\n[classification] does the accuracy setting change the ANSWER?")
+@printf("  %-36s %s\n", "arm", join((@sprintf("%9.2e", B) for B in BS), " "))
+for (label, _) in arms
+    @printf("  %-36s %s\n", label,
+        join((results[(label, B)].distinct ? "  distinct" : "      same" for B in BS), " "))
+end
+let base = [results[(arms[1][1], B)].distinct for B in BS]
+    dis = [(label, B) for (label, _) in arms[2:end], B in BS
+           if results[(label, B)].distinct != base[findfirst(==(B), BS)]]
+    if isempty(dis)
+        println("  All arms agree on every point — so no setting tested here changes")
+        println("  the classification, and the requirement is looser than the coarsest.")
+    else
+        println("  DISAGREEMENT at $(length(dis)) point(s): " *
+                join(("$(l) @ B=$(b)" for (l, b) in dis), "; "))
+        println("  Each is a setting that changes the answer, i.e. an accuracy floor —")
+        println("  but read it against `state sep` in the table: a pair that is already")
+        println("  4 orders closer at that B is a near-degenerate crossover, where any")
+        println("  setting can flip the label and none of them is wrong.")
+    end
+end
+
 println()
 ref = [results[("reference (Euler, full_bdg)", B)] for B in BS]
 usable = [i for i in eachindex(BS)
