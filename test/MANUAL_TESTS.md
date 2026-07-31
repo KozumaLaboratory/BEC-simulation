@@ -1,89 +1,76 @@
 # Manual test inventory
 
-Tests under `test/` that are intentionally NOT wired into
-`test/runtests.jl` because they depend on environment conditions the
-default test runner cannot guarantee (GPU, dashboard build, opt-in
-heavy YAML, scenario directories pending schema migration).
+Two files under `test/` are not wired into any tier. Each reason was
+**measured**, not inherited (2026-07-31): every candidate was run, with and
+without `SPINORBEC_RUN_HEAVY_YAML=true`, and the three that passed were moved
+into tiers. What is left is what genuinely cannot run.
 
-Run each manually as documented below.
+The old framing — "depend on environment conditions the default test runner
+cannot guarantee (GPU, dashboard build, opt-in heavy YAML, scenario directories
+pending schema migration)" — had stopped being true for three of the five, and
+nothing had checked since 2026-05-25. Between them those three carried 35
+assertions that no tier ran.
 
-## GPU-dependent
+`MANUAL_TESTS_ALLOWLIST` in `test/_tiers.jl` is the machine-readable copy;
+`test_tier_membership.jl` asserts the two agree.
 
-### `gpu/test_cuda.jl`
+## `workflow/test_klaus_validation.jl` — cannot run as written
 
-Coarse CUDA backend smoke (Workspace creation, split_step, ground
-state on GPU vs CPU). Internally guards on `CUDA.functional()` and
-returns silently when CUDA is unavailable.
+Not an environment problem. Its `ground_state` step uses the real experimental
+field (`B: {Bz: "1.0 Gauss"}`, Dy164, `omega_ref: 314.159`) at `dt: 0.001`.
+That is `p ≈ −3.5e4`, so across `m = ±8` the ITP exponent spans
+`|p·m·dt| ≈ 278` and `exp` overflows on the first step:
 
-```bash
-LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-  julia --project=. -e 'using CUDA; using SpinorBEC; include("test/gpu/test_cuda.jl")'
+```
+ArgumentError: NaN detected in ITP at step 1. Likely DDI or interaction
+overflow. Reduce dt.
 ```
 
-### `rotating_basis/test_rotating_basis_gpu.jl`
+`hamiltonian/test_b_block_builders.jl` documents the same footgun and
+deliberately uses `Bz: 1.0e-4` to avoid it:
 
-Option-γ rotating_basis on GPU. Exercises every public function with
-`CUDA.allowscalar(false)` to surface scalar-indexing bugs. **Errors**
-(not skips) if `CUDA.functional() == false`, so it cannot live in the
-default-loaded tier.
+> Tiny Bz to avoid ITP exp-V underflow at large dimensionless p. Real
+> experimental values (e.g. Klaus 2022 Bz=0.819G) give p≈3e4 which requires
+> matching small dt and physics-aware setup — not a plumbing test.
 
-```bash
-LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-  julia --project=. -e 'using CUDA; using SpinorBEC; include("test/rotating_basis/test_rotating_basis_gpu.jl")'
-```
-
-## Heavy YAML (opt-in via `SPINORBEC_RUN_HEAVY_YAML=true`)
-
-These tests run full `run_yaml` / `run_config` pipelines. CLAUDE.md
-notes a trivial pipeline takes >4 min to first output due to
-`Workspace{...23 type params...}` specialisation. Nightly CI sets
-`SPINORBEC_RUN_HEAVY_YAML=true`; default `Pkg.test()` does not.
-
-### `workflow/test_active_learning_yaml.jl`
-
-Active-learning YAML wrapper end-to-end (R38). Gates on
-`_SKIP_HEAVY_YAML_AL = ENV["SPINORBEC_RUN_HEAVY_YAML"] != "true"`.
+So this is a physics-setup decision (a smaller ground-state field with a ramp,
+or a `dt` matched to `p`), not the "pending schema audit" it was filed under.
+Until that decision is made the file cannot be run at all:
 
 ```bash
-SPINORBEC_RUN_HEAVY_YAML=true \
-  julia --project=. -e 'using SpinorBEC; include("test/workflow/test_active_learning_yaml.jl")'
+SPINORBEC_RUN_HEAVY_YAML=true julia --project=. \
+  -e 'using Test; using SpinorBEC; include("test/workflow/test_klaus_validation.jl")'
 ```
 
-### `workflow/test_multi_fidelity_yaml.jl`
+It is also the only artifact behind the Klaus 2022 entry in the type-C registry
+(`test/validation/test_type_c_claims.jl`), which is why that entry is ungated.
 
-Multi-fidelity BO YAML wrapper (R34). Same gate
-`_SKIP_HEAVY_YAML_MFBO`.
+## `workflow/test_live_monitor.jl` — blocks forever
+
+`serve_dashboard` does not return until the server is closed, and this file's
+close path is never reached, so the run hangs until something kills it
+(measured: SIGTERM at a 2400 s timeout, `Press Ctrl+C to stop` in the log). Its
+own comment states the intent — *"the function blocks until the server is
+closed; we'll close it manually"* — which is exactly what does not happen.
+
+Needs restructuring (serve on a task, assert, close in a `finally`), not a tier
+entry. Run it only if you are prepared to interrupt it:
 
 ```bash
-SPINORBEC_RUN_HEAVY_YAML=true \
-  julia --project=. -e 'using SpinorBEC; include("test/workflow/test_multi_fidelity_yaml.jl")'
+julia --project=. \
+  -e 'using Test; using SpinorBEC; include("test/workflow/test_live_monitor.jl")'
 ```
 
-## Pending Step 2 schema audit (2026-05-25 priorities)
+## Moved into tiers, 2026-07-31
 
-### `workflow/test_klaus_validation.jl`
+| file | was filed as | measured | now |
+|---|---|---|---|
+| `gpu/test_cuda.jl` | "gated, but needs GPU to be useful" | guards on `CUDA.functional()` like every other `gpu/` file; 3.9 s on a GPU host, no-op without one | `FULL_EXTRA` |
+| `workflow/test_active_learning_yaml.jl` | "heavy YAML" | carries its own `_SKIP_HEAVY_YAML_AL`; 0.0 s with the flag off, 19.7 s with it on, passes both ways | `CI_EXTRA` |
+| `workflow/test_multi_fidelity_yaml.jl` | "heavy YAML" | same shape; 0.0 s / 50.2 s | `CI_EXTRA` |
 
-Klaus 2022 minimal regression — Dy164 16²×8 + 0.5 ω_ref⁻¹ stir.
-Uses `initial_state: ferromagnetic_min`, `save: {every: ...}`,
-`Bx: {sinusoidal: ...}`. Confirm each maps to current schema before
-wiring.
-
-```bash
-julia --project=. -e 'using SpinorBEC; include("test/workflow/test_klaus_validation.jl")'
-```
-
-## External-process dependent
-
-### `workflow/test_live_monitor.jl`
-
-Spawns `serve_dashboard` on a port and exercises `/api/lab/image`
-via raw `Sockets`. Requires `dashboard/dist/index.html` (the test
-auto-creates a stub if missing) and a free TCP port. Excluded from
-the default tier because TCP binding can collide on CI agents.
-
-```bash
-julia --project=. -e 'using SpinorBEC; include("test/workflow/test_live_monitor.jl")'
-```
+The heavy-YAML pair needed no guard added — they already had one. The entry in
+this file was the only thing keeping them out of a tier.
 
 ## Re-audit (2026-06-19)
 

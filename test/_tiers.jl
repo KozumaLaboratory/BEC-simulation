@@ -283,6 +283,14 @@ const CI_EXTRA = [
     "dynamics/test_twa_N_scan.jl",
     "solvers/test_absorbing_boundary.jl",
     "workflow/test_infrastructure.jl",
+    # Heavy-YAML Bayesian-optimisation drivers. Both were in the MANUAL
+    # allowlist as "heavy YAML (SPINORBEC_RUN_HEAVY_YAML)" — but they already
+    # carry their own `_SKIP_HEAVY_YAML_*` guard, so with the flag off they cost
+    # 0.0 s and with it on (the nightly) they cost 19.7 s and 50.2 s. Measured
+    # 2026-07-31: both pass, both ways. The environment reason had stopped
+    # being true and nobody had checked.
+    "workflow/test_active_learning_yaml.jl",
+    "workflow/test_multi_fidelity_yaml.jl",
     # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
     # propagation, multi-frame TOF) — integration weight, not fast-tier units.
     "analysis/test_tof.jl",
@@ -489,6 +497,10 @@ const FULL_EXTRA = [
     "workflow/test_calibration_drift.jl",
     "workflow/test_dynamics_knobs.jl",
     "gpu/test_cuda_equivalence.jl",
+    # Coarse CUDA backend smoke. Was MANUAL as "gated, but needs GPU to be
+    # useful" — it guards on `CUDA.functional()` like every other gpu/ file, so
+    # on a CPU-only runner it is the same no-op they are. 3.9 s on a GPU host.
+    "gpu/test_cuda.jl",
     "gpu/test_superfluid_fraction_gpu.jl",
     # Same bug class: a public analysis entry point that scalar-indexed a
     # device array and threw. Lz is the observable the EdH/Barnett J_z ledger
@@ -596,11 +608,26 @@ const PHYSICS_TESTS = [
 # here so the tier-membership meta-test counts them as "accounted for"
 # (i.e. they are deliberately manual, not orphaned). Run them by hand.
 const MANUAL_TESTS_ALLOWLIST = [
-    "gpu/test_cuda.jl",                              # coarse CUDA smoke (gated, but needs GPU to be useful)
-    "workflow/test_active_learning_yaml.jl",         # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
-    "workflow/test_multi_fidelity_yaml.jl",          # heavy YAML (SPINORBEC_RUN_HEAVY_YAML)
-    "workflow/test_klaus_validation.jl",             # heavy YAML scenario pending schema audit
-    "workflow/test_live_monitor.jl",                 # spawns dashboard server on a TCP port
+    # Two files, each with a MEASURED reason (2026-07-31). The other three that
+    # sat here — gpu/test_cuda.jl, workflow/test_{active_learning,multi_fidelity}_yaml.jl
+    # — were run both ways and pass, so they are in tiers now.
+    #
+    # `test_klaus_validation.jl`: cannot run AS WRITTEN, and not for an
+    # environment reason. Its ground_state uses the real experimental field
+    # (`B: {Bz: "1.0 Gauss"}`, Dy164, ω_ref = 314.159) at `dt = 0.001`. That is
+    # p ≈ −3.5e4, so the ITP exponent spans |p·m·dt| ≈ 278 across m = ±8 and
+    # `exp` overflows on the first step: `ArgumentError: NaN detected in ITP at
+    # step 1`. The same footgun is documented in `test_b_block_builders.jl`
+    # ("real experimental values … require matching small dt and physics-aware
+    # setup — not a plumbing test"). Fixing it is a physics-setup decision
+    # (smaller GS field, or a dt that matches p), not a schema audit.
+    "workflow/test_klaus_validation.jl",
+    # `test_live_monitor.jl`: blocks forever. `serve_dashboard` does not return
+    # until the server is closed, and the close path is never reached, so the
+    # file hangs until it is killed (measured: SIGTERM at the 2400 s timeout,
+    # "Press Ctrl+C to stop" in the log). Its own comment says it means to close
+    # the server manually. Needs restructuring, not a tier entry.
+    "workflow/test_live_monitor.jl",
 ]
 
 # Derived view (NOT a partition list): every `oracles/` gate, regardless of which
@@ -720,6 +747,9 @@ const _COST = Dict{String, Float64}(
     "analysis/test_physics_level0.jl" => 6.1,
     "oracles/test_gpu_cpu_per_term_parity.jl" => 6.1,
     "analysis/test_imaging.jl" => 6.0,
+    # 0.0 s with SPINORBEC_RUN_HEAVY_YAML off, these with it on.
+    "workflow/test_multi_fidelity_yaml.jl" => 50.2,
+    "workflow/test_active_learning_yaml.jl" => 19.7,
     "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
     # 4.8 s here against a warm depot; the CI runner pays a cold precompile
     # inside the subprocess, so reserve for that rather than under-book it.
