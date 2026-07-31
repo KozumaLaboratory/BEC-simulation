@@ -38,32 +38,37 @@ function report(rows; io::IO=stdout)
     # The scaffolding check comes FIRST: if the common stage 1 already merged the
     # seeds, nothing below is about the physics, and saying so has to precede
     # saying anything else.
-    println(io, "\n[scaffolding] which leg of sep@0 → sep@1 → sep did the collapsing?")
+    # Two earlier versions of this test used the SEPARATION, and both were wrong
+    # in instructive ways:
+    #   * "sep@1 ≈ sep ⇒ merged" fires when stage 2 did nothing, not when stage 1
+    #     did everything. The smoke refuted it on all 16 points.
+    #   * "which leg closed more of the gap" is ambiguous by construction: stage 1
+    #     closes ~0.94 of the gap in ABSOLUTE terms while stage 2 closes five
+    #     further ORDERS, so absolute and relative give opposite verdicts on the
+    #     same data. It reported 9/16 "scaffolding" where the previous reading of
+    #     the same numbers said none — and neither was answering the question.
+    # The question is whether the arm still had TWO CLASSES to choose between when
+    # it took over. That is `distinct1`: the same winding-class observable the
+    # verdict uses, evaluated at the end of the common stage 1. No threshold, no
+    # ratio, no absolute-vs-relative ambiguity.
+    println(io, "\n[scaffolding] were the seeds still in DIFFERENT classes when the arm took over?")
     let n_total = length(rows),
-        # Stage 1 owns the merge when it closed more of the gap than the arm did.
-        # Only meaningful where a collapse happened at all, so points that never
-        # merged are counted separately rather than folded into either verdict.
-        # An earlier version compared sep@1 to the FINAL sep and called them close
-        # "merged" — which fires when stage 2 did nothing, not when stage 1 did
-        # everything. The smoke refuted it on all 16 points.
-        collapsed = [r for r in rows if r.sep < 0.1 * r.sep0]
+        pre_merged = [r for r in rows if !r.distinct1]
 
-        merged = [r for r in collapsed if (r.sep0 - r.sep1) > (r.sep1 - r.sep)]
-        late = [r for r in collapsed if (r.sep0 - r.sep1) <= (r.sep1 - r.sep)]
-        never = n_total - length(collapsed)
-        @printf(io,
-            "  stage 1 did most of it: %d   the arm did most of it: %d   no collapse: %d   (of %d)\n",
-            length(merged), length(late), never, n_total)
-        if !isempty(merged)
-            println(io, "  The first group's `dist` verdict is about the two-stage scaffolding,")
-            println(io, "  NOT about whether two minima exist. Fix the design before reading")
-            println(io, "  any classification from those points.")
-        elseif never == n_total
-            println(io, "  Nothing collapsed anywhere — the seeds stayed apart, so `dist` is")
-            println(io, "  the arm's own answer (and a too-short run looks like this too:")
-            println(io, "  check `conv` before believing it).")
+        @printf(io, "  arm had a choice: %d   already one class after stage 1: %d   (of %d)\n",
+            n_total - length(pre_merged), length(pre_merged), n_total)
+        if isempty(pre_merged)
+            println(io, "  Every arm inherited two distinct classes, so each `dist` below is")
+            println(io, "  the arm's own answer and not the two-stage scaffolding's.")
+        elseif length(pre_merged) == n_total
+            println(io, "  NONE of them had a choice — the common LHY-free stage 1 merged the")
+            println(io, "  seeds before any arm ran, so no `dist` below says anything about")
+            println(io, "  whether two minima exist. The two-stage design has to change")
+            println(io, "  (seed-specific stage 1, or a shorter one) before this bench can")
+            println(io, "  answer its own question.")
         else
-            println(io, "  The collapse is the arm's own doing, so `dist` is about the physics.")
+            println(io, "  MIXED — only the rows with a choice are readable as physics. Report")
+            println(io, "  those and say which were pre-merged; do not average over both.")
         end
     end
 
@@ -158,7 +163,8 @@ function read_rows(path::AbstractString)
                    v == "true" ? true : v == "false" ? false : parse(Float64, v)
         end
         push!(rows, (arm=d["arm"], B=d["B"], dE=d["dE"], conv=d["conv"],
-            dEf=d["dEf"], distinct=d["distinct"], sep0=d["sep0"],
+            dEf=d["dEf"], distinct=d["distinct"], distinct1=get(d, "distinct1", true),
+            sep0=d["sep0"],
             sep1=d["sep1"], sep=d["sep"], growth=d["growth"]))
     end
     rows

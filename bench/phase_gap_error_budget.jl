@@ -170,9 +170,14 @@ grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
 # and this file exists to catch exactly that kind of silent mismatch.
 const CACHE_DIR = get(ENV, "SPINORBEC_GAP_CACHE",
     joinpath(@__DIR__, "..", ".gap_cache"))
+# Keyed on `src/` AND on this file: the measurement half lives HERE, so a cache
+# that watched only `src/` would happily serve cells produced by a different
+# `relax`. It nearly did — the winding-at-stage-1 field below is a bench-only
+# change that src/'s tree hash cannot see.
 const SRC_REV = try
     isempty(strip(read(`git status --porcelain -- src`, String))) ?
-    strip(read(`git rev-parse HEAD:src`, String)) : nothing
+    string(strip(read(`git rev-parse HEAD:src`, String)), "-",
+        string(hash(read(@__FILE__, String)); base=16)) : nothing
 catch
     nothing
 end
@@ -267,7 +272,16 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         _, _, fz1 = spin_density_vector(psi_pre, sm, 3)
         _, _, fz0 = spin_density_vector(Array(seed_psi), sm, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
-        (E=gs.energy, fz=fz, fz1=fz1, fz0=fz0, converged=gs.converged, growth=growth,
+        # The winding class at the END OF STAGE 1 — the same observable the
+        # verdict classifies by. A separation RATIO cannot answer "did the
+        # scaffolding produce this answer", because absolute and relative give
+        # opposite verdicts on the same data: stage 1 closes ~0.94 of the gap
+        # (so it "did most of it") while stage 2 closes 5 further orders (so it
+        # "did most of it"). Both readings are true and neither is the question.
+        # The question is whether the arm still had two classes to choose
+        # between when it took over, and that is this.
+        w1 = _winding_vector(psi_pre, gs.workspace.grid, 13)
+        (E=gs.energy, fz=fz, fz1=fz1, fz0=fz0, wind1=w1, converged=gs.converged, growth=growth,
             # The final dE VALUE, not just the boolean. Without it "not
             # converged" cannot be told apart from "converged, but this
             # criterion never fires" — which is the whole question when a gauge
@@ -304,7 +318,10 @@ function gap(; B, kind, dt, taylor, cap)
     # treats missing as equal to missing and always returns Bool, so "the same
     # component is empty in both" reads as the same class, which is what it is.
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
-    (dE=b.E - a.E, sep=sep, sep1=sep1, sep0=sep0, distinct=distinct,
+    # Were they ALREADY in one class when the arm took over? If so the arm never
+    # had a choice and its `distinct` says nothing about whether two minima exist.
+    distinct1 = !isequal(a.wind1, b.wind1)
+    (dE=b.E - a.E, sep=sep, sep1=sep1, sep0=sep0, distinct=distinct, distinct1=distinct1,
         conv=a.converged && b.converged,
         # The WORSE of the two, because a reference is only defined where BOTH
         # states have one.
@@ -401,6 +418,7 @@ for (label, a) in arms, B in BS
         println(io, "{\"arm\":\"$(label)\",\"B\":$(B),\"dE\":$(g.dE)," *
                     "\"conv\":$(g.conv),\"dEf\":$(g.dEf),\"distinct\":$(g.distinct)," *
                     "\"sep0\":$(g.sep0),\"sep1\":$(g.sep1),\"sep\":$(g.sep)," *
+                    "\"distinct1\":$(g.distinct1)," *
                     "\"growth\":$(g.growth),\"n\":$(N_GRID),\"steps\":$(MAX_STEPS)," *
                     "\"src\":\"$(SRC_REV === nothing ? "dirty" : SRC_REV)\"}")
     end
