@@ -108,7 +108,7 @@ spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
 LHYTerm, ZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
-struct EnergyContext{ND, PsiT, CT, FFTPlan, SM, NRho, NF}
+struct EnergyContext{ND, PsiT, FFTEltT, FFTPlan, SM, NRho, NF}
     # NOTE: the original definition typed psi_host as Array{ComplexF64, ND}
     # while n_pts/fft_buf are ND-dimensional SPATIAL objects — ψ has ND+1
     # dims, so the constructor could never be called. It had zero callers
@@ -116,13 +116,18 @@ struct EnergyContext{ND, PsiT, CT, FFTPlan, SM, NRho, NF}
     # when the latent mismatch surfaced (dead scaffolding cannot be wrong
     # in a detectable way until something consumes it).
     psi_host::PsiT
-    # `CT`, not a hard-coded ComplexF64: `plans` follows ψ's precision, and an
-    # in-place FFTW plan applied to a buffer of a DIFFERENT eltype silently
-    # falls back to the out-of-place `*`, leaving `fft_buf` untransformed. The
-    # k-space reduction then sums k²|ψ(r)|² over real space and returns a
-    # finite, wrong number — measured 0.115 against an exact 0.500 for the
-    # kinetic energy of a Float32 workspace.
-    fft_buf::Array{CT, ND}
+    # The ELEMENT type of the buffer, parameterised rather than hard-coded to
+    # ComplexF64: `plans` follows ψ's precision, and an in-place FFTW plan
+    # applied to a buffer of a DIFFERENT eltype silently falls back to the
+    # out-of-place `*`, leaving `fft_buf` untransformed. The k-space reduction
+    # then sums k²|ψ(r)|² over real space and returns a finite, wrong number —
+    # measured 0.115 against an exact 0.500 for the kinetic energy of a Float32
+    # workspace.
+    #
+    # Named for what it is, not `CT`. It is not the same object as
+    # `GradientContext`'s `TC`, which is the whole ARRAY type — two parameters
+    # one letter apart meaning different things is how they get swapped.
+    fft_buf::Array{FFTEltT, ND}
     plans::FFTPlan
     spin_matrices::SM
     n_density::NRho
