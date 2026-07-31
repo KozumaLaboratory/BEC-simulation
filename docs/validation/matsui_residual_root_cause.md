@@ -122,8 +122,11 @@ The surviving candidates, in order of what the evidence supports:
 2. **A parameter in their published run that is not in the shipped code.** We
    already know `Ntot` is one such; `cc0_eff` / `cc1_eff` / the trap could be
    others. This is not falsifiable from what they released.
-3. Something in **our** transfer channel that all of the above tests are blind
-   to — none of them varies the spin structure, only the scale.
+3. ~~Something in **our** transfer channel.~~ **EXCLUDED.** The production DDI
+   operator agrees with `reference_rhs/ddi.jl` — an independent statement of the
+   same operator — to **2.6×10⁻¹⁶** on a real textured 5 ms state, per component
+   across all 13, with both positive controls firing (off-diagonal Q zeroed:
+   0.66; `c_dd` × 1.2: exactly 0.200). `matsui_ddi_operator_audit.jl`.
 
 ## The honest bottom line
 
@@ -141,9 +144,21 @@ is the dip width, and there their simulation tracks their experiment better than
 ours does (+1.8 % against +9.6 %), which is the single piece of evidence pointing
 at our side rather than theirs.
 
-## Next, if this is picked up again
+## Where it ends
 
-- Implement a 3-point FD Laplacian as a **diagnostic**, not a production mode,
-  and run one field. If it moves the transfer 20 %, candidate 1 is the answer.
-- Ask the authors for the `setup_parameters` behind the published figures. Two
-  parameters in the release are already known not to be the ones used.
+**Exactly one candidate survives, and it is not falsifiable from what was
+released**: a parameter in the published run that is not in the shipped
+`setup_parameters`. Two are already known to be in that category — `Ntot`
+(3.5×10⁴ shipped against curves totalling 49999.9) and the `cc0_eff` / `cc1_eff`
+mismatch between `initial.f90` and `time.f90`. Everything reachable from the
+deposit has been measured and excluded.
+
+`matsui_author_query_draft.md` is a drafted question to the authors asking for
+those values. It is **not sent** — that is anko's to do.
+
+Failing a reply, the residual stands as documented: **we reproduce the
+phenomenon, the sign and the scale of the resonant EdH offset from an
+independent implementation whose couplings match theirs to seven significant
+figures, and we do not reproduce their curve to better than ~20 % in transfer
+and ~0.4 nT in centre, for a reason that is in neither code's parameters and in
+neither code's numerics as far as either can be tested.**
