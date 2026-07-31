@@ -132,7 +132,11 @@ function build_energy_context(psi_host::Array{<:Complex, ND_psi}, ws) where {ND_
         :energy_context, (eltype(psi_host), n_pts)
     ) do
         (
-            zeros(ComplexF64, n_pts), zeros(Float64, n_pts),
+            # `eltype(psi_host)`, not ComplexF64: the scratch key already
+            # discriminates on it, and `ws.fft_plans` follows ψ's precision —
+            # a mismatched buffer turns the in-place FFT into an out-of-place
+            # one and the k-space reduction reads real-space ψ.
+            zeros(eltype(psi_host), n_pts), zeros(Float64, n_pts),
             zeros(Float64, n_pts), zeros(Float64, n_pts), zeros(Float64, n_pts),
         )
     end

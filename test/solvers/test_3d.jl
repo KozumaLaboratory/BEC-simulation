@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "3D Support" begin
     @testset "3D grid construction" begin
         config = GridConfig((16, 16, 16), (10.0, 10.0, 10.0))

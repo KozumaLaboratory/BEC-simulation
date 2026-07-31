@@ -1,4 +1,5 @@
 using Test
+using SpinorBEC
 using SpinorBEC: polyhedral_fingerprint, polyhedral_candidate_spinors,
     classify_polyhedral, direct_eff_coupling, direct_eff_coupling_delta
 
