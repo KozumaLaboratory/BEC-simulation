@@ -71,8 +71,8 @@ function run_one(; B_nT, c0, c1, n, box, fd::Bool, backend)
             save_every=10^9),
         psi_init=Array(gs.workspace.state.psi), enable_ddi=true, c_dd, secular_ddi=false,
         ddi_padding=true, ddi_trunc_radius=-1.0, backend)
-    res = run_simulation!(ws)
-    psi = Array(res.psi_final)
+    run_simulation!(ws)                             # mutates ws in place
+    psi = Array(ws.state.psi)
     w = [sum(abs2, selectdim(psi, 4, c)) for c in 1:size(psi, 4)]
     w[end] / sum(w)                                 # m = -F fraction
 end
