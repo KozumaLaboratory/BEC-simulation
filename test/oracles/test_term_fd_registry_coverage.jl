@@ -34,27 +34,17 @@ include(joinpath(@__DIR__, "..", "helpers", "oracle_fixtures.jl"))
 #      stops activating a term takes its coverage with it and the suite stays
 #      green — which is exactly how "for every HamTerm" came to mean three.
 #
-# Two slots are excluded, each with a ratchet below so the exclusion cannot
-# outlive its reason:
+# One slot is excluded: `:loss`. `LossTerm` is non-Hermitian and declares both
+# faces nil on purpose (`apply_operator!(out, ::LossTerm, …) = out`,
+# `energy_contribution = 0.0`), so there is no variational gradient to
+# difference. Non-unitarity is gated by `oracles/test_loss_nonunitarity.jl`, and
+# the ratchet below keeps the exclusion honest.
 #
-# `:loss` — LossTerm is non-Hermitian and declares both faces nil on purpose
-# (`apply_operator!(out, ::LossTerm, …) = out`, `energy_contribution = 0.0`), so
-# there is no variational gradient to difference. Non-unitarity is gated by
-# `oracles/test_loss_nonunitarity.jl`.
-#
-# `:raman` — RamanTerm has an ENERGY and no gradient: `apply_operator!` is nil
-# by an explicit KNOWN-LIMIT at `terms/raman.jl:132`. That is not a harmless
-# omission, and the ratchet below states it rather than the comment doing so:
-# with a Raman coupling active, `energy_gradient!` (registry-only since
-# 2026-06-09, so L-BFGS and Newton-CG both ride it) descends a functional that
-# EXCLUDES the Raman term while `total_energy` reports one that INCLUDES it, and
-# nothing warns. The Tensor slot was in the same state until 2026-06-09 and was
-# fixed rather than excluded; this one should go the same way. Fixing it means
-# CPU + GPU together — `ext/.../gpu_energy.jl` accumulates Raman's gradient
-# through the same nil `apply_operator!` while computing its energy on a host
-# copy — so it is out of scope here, but it is now a red test away, not a
-# comment away.
-const _FD_EXCLUDED = Set([:loss, :raman])
+# `:raman` was the other one when this file landed: it had an energy and a nil
+# gradient, so L-BFGS descended a functional excluding the Raman term while
+# `total_energy` reported one including it. The gradient landed 2026-07-31 and
+# the slot is now differenced like every other.
+const _FD_EXCLUDED = Set([:loss])
 
 # A term is exercised here only if it actually acts on this fixture's ψ. The
 # threshold is on ‖g‖ relative to ‖ψ‖, so it does not silently pass a term
@@ -140,16 +130,16 @@ end
         union!(covered, _fd_check_fixture("spatial_zeeman", ws, psi; rng))
     end
 
-    # Ratchet on the one excluded slot that is NOT nil on both faces. When the
-    # Raman gradient lands this goes red, which is the point: the exclusion
-    # cannot outlive the limitation quietly.
-    @testset "ratchet: :raman has an energy and no gradient" begin
+    # Ratchet on the excluded slot: nil on BOTH faces is what earns an
+    # exclusion. A slot with an energy and no gradient does not — that was
+    # `:raman` until its gradient landed.
+    @testset "ratchet: :loss is nil on both faces" begin
         ws, psi = aux_ws()
-        term = registry_term(ws, SpinorBEC.RamanTerm)
+        term = registry_term(ws, SpinorBEC.LossTerm)
         g = zero(psi)
         apply_operator!(g, term, ws, psi)
-        @test sqrt(sum(abs2, g)) == 0.0                     # gradient: nil
-        @test abs(energy_contribution(term, psi, ws)) > 1.0e-6   # energy: not
+        @test sqrt(sum(abs2, g)) == 0.0
+        @test energy_contribution(term, psi, ws) == 0.0
     end
 
     @testset "coverage: every slot differenced, or declared excluded" begin

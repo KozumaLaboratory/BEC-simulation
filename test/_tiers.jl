@@ -379,7 +379,7 @@ const CI_EXTRA = [
     # Master oracle: dumb reference vs production registry per term —
     # the gated-redundancy mechanism behind commitment #3. Includes the
     # set-equivalence meta-test and both sides of the declared
-    # KNOWN-LIMIT gaps (raman/tensor RHS).
+    # KNOWN-LIMIT gaps (empty since the raman RHS landed 2026-07-31).
     "oracles/test_master_oracle.jl",
     # Propagator references: per-term dt-valleys (step residual vs the
     # dumb RHS, slope ≈ 1) + Strang order slope vs dumb RK4 (slope ≈ 2).
