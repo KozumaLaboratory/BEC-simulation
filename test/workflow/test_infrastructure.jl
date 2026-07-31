@@ -703,8 +703,8 @@ pipeline:
       duration: 0.02
       dt: 0.001
       pulse_sequence:
-        - {t: 0.0, apply: zeeman, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
-        - {t: 0.01, apply: zeeman, duration: 0.01, p: 10.0, q: 0.5}
+        - {t: 0.0, apply: B, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
+        - {t: 0.01, apply: B, duration: 0.01, p: 10.0, q: 0.5}
 """)
         result = SpinorBEC.run_config(cfg)
         @test result.dynamics_result !== nothing
