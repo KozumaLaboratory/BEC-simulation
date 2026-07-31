@@ -33,9 +33,20 @@ using SpinorBEC:
         grid, atom=Na23,
         interactions=InteractionParams(Dict(0 => 20.0, 1 => -0.5)),
         potential=HarmonicTrap((1.0, 1.0, 1.0)),
-        initial_state=:polar, verbose=false, n_steps=60, tol=1.0e-8,
+        initial_state=:polar, verbose=false, n_steps=60, tol=1.0e-5,
         m_lbfgs=8,
     )
+    # `tol` ABOVE the L-BFGS energy-comparison floor, on purpose. At the 1e-8
+    # this asked for originally, both solves ended `floor_limited = true` with
+    # an EMPTY curvature history (measured: `rho` length 0, grad_norm 1.04e-8 /
+    # 1.22e-7), so "the run really used it" indexed `s64[1]` into a 0-element
+    # vector and the file was red on `main` from the moment it merged — its own
+    # `Integration gates` check was already failing when it went in.
+    # 1e-5 converges normally (history length 8, `floor_limited = false`, 15
+    # steps, both precisions), which is what this file needs to inspect. This
+    # is not a step budget tuned until green: it is asking the solver for an
+    # accuracy it can deliver, the distinction `test_lbfgs_stall_fixed_point.jl`
+    # draws in its own header.
 
     @testset "the history is actually narrowed" begin
         psi = zeros(ComplexF64, 4, 4, 4, 3)
