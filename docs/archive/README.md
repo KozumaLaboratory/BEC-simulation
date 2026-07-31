@@ -30,7 +30,7 @@ decision was reached — **none of them is a live specification**; the live equi
 - **`hamiltonian_layered_architecture_arc_2026-06-05.md`** — round-by-round log of the layered-Hamiltonian redesign. Live SSoT is `design/hamiltonian_layered_architecture.md`; this is only the reasoning trail that produced it.
 - **`sprint3_static_gate_baseline_2026-06-01.md`** — static-gate measurement baseline for Sprint 3. Live equivalent: the oracle suite under `test/oracles/`.
 - **`integrator_modernization_status_2026-05.md`** — May-2026 status snapshot. Live equivalent: `design/integrator_modernization_plan.md` + `design/integrator_ch3_plan.md`.
-- **`option_gamma_rotating_basis_design.md`** — design for the instantaneous local-frame spinor GPE (Option γ). Implemented; live reference is `reference/dynamics.md` plus `src/hamiltonian/integrator/rotating_basis*`.
+- **`option_gamma_rotating_basis_design.md`** — design for the instantaneous local-frame spinor GPE (Option γ). Implemented; live reference is `reference/dynamics.md` plus `src/workflow/experiments/pipeline/run_step_rotating/` and `src/workflow/experiments/analyzers/rotating_basis.jl`.
 - **`validation_ladder_2026-05-22.md`** — the 13-level ladder as first written down. Live equivalent: the validation-ladder table in `CLAUDE.md` + `docs/validation/`.
 - **`klaus_quench_protocol_pivot_2026-05-26.md`** — record of the rotation+quench magnetostir protocol pivot. Live equivalent: `guides/klaus_regime.md`.
 
