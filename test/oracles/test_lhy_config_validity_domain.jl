@@ -26,20 +26,35 @@ using Test
 using YAML
 using SpinorBEC
 using SpinorBEC: _parse_gs_interactions, resolve_atom, _c0c1_to_gS,
-    epsilon_LHY_F6_Ih, lhy_energy_polar, lhy_energy_fm, build_fm_lhy_coefs
+    epsilon_LHY_F6_Ih, lhy_energy_polar, lhy_energy_fm, build_fm_lhy_coefs,
+    lhy_energy_fm_dipolar, compute_a_dd
 
 const _RUNS = joinpath(@__DIR__, "..", "..", "runs")
 
 # kind => (F restriction, energy at n=1 from a g_dict). `nothing` for F means any.
 const _CLOSED_FORMS = Dict{String, Any}(
-    "icosahedral" => (6, (F, g) -> epsilon_LHY_F6_Ih(1.0, g)),
-    "polar_contact" => (nothing, (F, g) -> lhy_energy_polar(1.0, F, g)),
-    "fm_contact" => (nothing, (F, g) -> lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))),
+    "icosahedral" => (6, (F, g, _eps) -> epsilon_LHY_F6_Ih(1.0, g)),
+    "polar_contact" => (nothing, (F, g, _eps) -> lhy_energy_polar(1.0, F, g)),
+    "fm_contact" => (nothing, (F, g, _eps) -> lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))),
+    # The dipolar members belong here too. They were out of scope while nothing
+    # used them; the eu_k3_lhy suites now do, and a mode that leaves this gate's
+    # reach is the opposite of what finding them this way was for. Evaluated at
+    # each config's OWN eps_dd, not at a placeholder — at Eu151 that is 0.5402
+    # and gives 2.93e7 where eps_dd = 0 would give 2.01e7, so the threading is
+    # live rather than degenerating to the contact limit.
+    #
+    # NOTE: the NaN mechanism does NOT cover the eps_dd domain. `lima_pelster_Q5`
+    # applies Petrov's prescription — it zeros the integrand where
+    # 1 + eps_dd(3cos²θ − 1) < 0 and returns a finite number, measured 3.23e8 at
+    # eps_dd = 3, far past the eps_dd = 1 cut. So the g_dict domain is what NaN
+    # catches here; eps_dd is asserted separately below.
+    "fm_dipolar" => (nothing,
+        (F, g, eps_dd) -> lhy_energy_fm_dipolar(1.0, F, g, eps_dd)),
 )
 
 """Every `(path, kind, F, c₀, c₁)` a committed config asks for, closed forms only."""
 function _lhy_cells()
-    out = Tuple{String, String, Int, Float64, Float64}[]
+    out = Tuple{String, String, Int, Float64, Float64, Float64}[]
     isdir(_RUNS) || return out
     for f in sort(
         collect(
@@ -77,7 +92,12 @@ function _lhy_cells()
                 catch
                     continue
                 end
-                push!(out, (relpath(f, _RUNS), kind, atom.F, ip[0], ip[1]))
+                # eps_dd = a_dd/a_s, which is what the c_dd/g_{2F} conversion in
+                # `_build_spinor_lhy(::Val{:fm_dipolar})` reduces to (see the
+                # note at fm_dipolar.jl:18-24). A property of the atom, so it is
+                # the same at every N.
+                eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+                push!(out, (relpath(f, _RUNS), kind, atom.F, ip[0], ip[1], eps_dd))
             end
         end
     end
@@ -102,7 +122,7 @@ end
         @test isfinite(epsilon_LHY_F6_Ih(1.0, g_ok))
     end
 
-    for (path, kind, F, c0, c1) in cells
+    for (path, kind, F, c0, c1, eps_dd) in cells
         @testset "$path [$kind]" begin
             F_req, energy_at_1 = _CLOSED_FORMS[kind]
             if F_req !== nothing && F != F_req
@@ -112,7 +132,17 @@ end
                 continue
             end
             g = _c0c1_to_gS(F, c0, c1)
-            e = energy_at_1(F, g)
+            # eps_dd's domain needs its own assertion: past the Petrov cut the
+            # closed form still returns a finite value, so the NaN test below
+            # would pass for an eps_dd it has no business at.
+            if endswith(kind, "_dipolar")
+                eps_dd < 1.0 ||
+                    @info """A `*_dipolar` closed form at eps_dd >= 1 — beyond the Petrov cut, \
+where the unstable angular region is zeroed rather than treated. The value stays \
+finite, so nothing else here would notice.""" path kind eps_dd
+                @test eps_dd < 1.0
+            end
+            e = energy_at_1(F, g, eps_dd)
             # NaN is how the closed forms say "outside my domain". A run would
             # die at table-build time with an ArgumentError; this says so now.
             @test isfinite(e)
