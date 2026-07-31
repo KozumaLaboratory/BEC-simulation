@@ -201,6 +201,46 @@ A related caveat: the harness spawns `run_chunk.jl` directly, so files needing a
 test-only dependency (e.g. `workflow/test_vtk_export.jl`) are red at baseline and
 excluded. They are not evaluated, not exonerated.
 
+### Reading an escape: three questions, in order
+
+An escaped mutant means one of three things, and they are not interchangeable.
+Over four rounds on `test/workflow/` the split was three genuine gaps and three
+bad mutants, so the diagnosis step is not optional.
+
+1. **Is the mutant effective?** Does it change observable behaviour at all?
+   Dropping the key sort from `_canonical_bytes!` looked fatal and was a no-op:
+   Julia's `Dict` iteration order is a function of the key hashes, not of
+   insertion order, so the canonical bytes were unchanged. Reversing the sort was
+   the effective form. *Measure the mutant's effect before concluding anything
+   about the tests.*
+2. **Does the fixture reach it?** A mutant on a code path no probe file exercises
+   escapes for a reason that says nothing about coverage. Folding `analyze` into
+   the ground-state cache key escaped because the test's `p` had no `analyze` key
+   to differ on.
+3. **Only then: is it a real gap?** Three were. `content_id` had no test at all;
+   the parameterised state-zoo wrappers were checked for running, not for
+   forwarding their arguments; and the cache's analyze-insensitivity row did not
+   vary `analyze`.
+
+Two of those three were testsets whose NAME claimed the coverage their body did
+not have — the same shape as `test_term_consistency.jl` advertising "every term in
+the HamTerm registry" while covering 5 of 14. A name is not a gate.
+
+### Write mutants in pairs where the claim has two directions
+
+The ground-state stage cache must be SENSITIVE to physics and INSENSITIVE to
+everything else. Modelling one direction leaves the other reading as proven:
+`gs_cache_key_ignores_interactions` and `gs_cache_key_includes_metadata` are both
+needed, and only together do they measure the contract. The first is the dangerous
+one — a changed `c0` hitting a stale ground state, with the run reporting success.
+
+### Mutate behaviour, not prose
+
+An early attempt reworded an error message and escaped, correctly: the test
+asserts `@test_throws ArgumentError`, which pins the exception type. A
+message-pinning test would be a pin, and there rightly is none. The mutant has to
+break what the code DOES.
+
 Cost is one package precompile per mutant, so this is an on-demand and nightly
 instrument, never a PR gate.
 

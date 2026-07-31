@@ -74,6 +74,10 @@ const FAST_TESTS = [
     # Workspace. Milliseconds for what test_yoshida_ddi_order.jl spends 14 s on
     # in `full`, and it names the coefficient rather than the stack.
     "hamiltonian/test_composer_order_conditions.jl",
+    # `_spin_chain_reason` is the one list of what the fused half-step would
+    # otherwise drop, and it has twice gained an entry with no arm. This gates the
+    # list against test/ so an unarmed entry cannot be added silently.
+    "hamiltonian/test_spin_chain_decline_reasons.jl",
     # Gates the dt < 0 half-line that every high-order composer needs. FAST on
     # purpose: the order tests that also see this defect are in FULL_EXTRA, so
     # the PR gate never ran them (PR #183 shipped a 4th → 2nd order collapse).
