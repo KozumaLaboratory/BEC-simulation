@@ -33,6 +33,7 @@
 # - depends on: the vortex counter gate, test/analysis/test_vortex_counter_control.jl
 
 using SpinorBEC
+using FFTW
 using Printf
 using Statistics
 
@@ -86,6 +87,13 @@ function kz_trajectory(;
 
     psi = Array(ws.state.psi)
     dV = cell_volume(grid)
+    # Coherence length alongside the count. g1 needs HOST plans; psi is already
+    # on the host here. Computing it inline avoids saving snapshots just to
+    # post-process them.
+    hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
+    rr, g1 = first_order_correlation(psi, grid, hplans)
+    ξ_hat = coherence_length(rr, g1)
+
     lines = extract_vortex_lines_per_m(psi, grid; min_density_frac)
     # Per-component counts. In a spinor the defect need not live on one component,
     # and which components carry it is exactly what step 1 is asking — so the
@@ -94,7 +102,8 @@ function kz_trajectory(;
     per_m = Dict(m => (haskey(lines, m >= 0 ? "+$m" : "$m") ?
                        length(lines[m >= 0 ? "+$m" : "$m"]) : 0) for m in (-F):F)
     pops = [real(sum(abs2, view(psi, :, :, :, c))) * dV for c in 1:size(psi, 4)]
-    (; n_vortices=per_m[-F], per_m, pops, N_C=real(sum(abs2, psi)) * dV)
+    (; n_vortices=per_m[-F], per_m, pops, xi_hat=ξ_hat,
+        N_C=real(sum(abs2, psi)) * dV)
 end
 
 """
@@ -165,10 +174,14 @@ function kz_scan(;
     means = Float64[]
     sems = Float64[]
     ncs = Float64[]
-    @printf("\n  %-8s %-10s %-10s %-10s\n", "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩")
+    xihats = Float64[]
+    xisems = Float64[]
+    @printf("\n  %-8s %-10s %-10s %-10s %-9s %-8s\n",
+        "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩", "⟨ξ̂⟩", "sem")
     for τ in tau_Qs
         vs = Int[]
         ncl = Float64[]
+        xis = Float64[]
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
                 t_equil, t_hold, gamma, M, k_cut, dt,
@@ -178,12 +191,17 @@ function kz_scan(;
                 string(round.(r.pops; sigdigits=3)))
             push!(vs, r.n_vortices)
             push!(ncl, r.N_C)
+            isfinite(r.xi_hat) && push!(xis, r.xi_hat)
         end
         m = mean(vs)
         push!(means, m)
         push!(sems, n_seed > 1 ? std(vs) / sqrt(n_seed) : 0.0)
         push!(ncs, mean(ncl))
-        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g\n", τ, m, sems[end], ncs[end])
+        ξm = isempty(xis) ? NaN : mean(xis)
+        ξs = length(xis) > 1 ? std(xis) / sqrt(length(xis)) : 0.0
+        push!(xihats, ξm); push!(xisems, ξs)
+        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g %-9.3f %-8.3f\n",
+            τ, m, sems[end], ncs[end], ξm, ξs)
         flush(stdout)
     end
 
@@ -212,9 +230,10 @@ function kz_scan(;
     csv = joinpath(OUTDIR, "$(tag).csv")
     open(csv, "w") do io
         println(io, "# alpha=$(α) alpha_err=$(α_err) gamma=$gamma mu=$mu k_cut=$k_cut grid=$grid_n")
-        println(io, "tau_Q,N_v_mean,N_v_sem,N_C_mean")
+        println(io, "tau_Q,N_v_mean,N_v_sem,N_C_mean,xi_hat_mean,xi_hat_sem")
         for (i, τ) in enumerate(tau_Qs)
-            @printf(io, "%.4f,%.6f,%.6f,%.6g\n", τ, means[i], sems[i], ncs[i])
+            @printf(io, "%.4f,%.6f,%.6f,%.6g,%.6f,%.6f\n",
+                τ, means[i], sems[i], ncs[i], xihats[i], xisems[i])
         end
     end
     @printf("  wrote %s\n", csv)
@@ -283,6 +302,19 @@ end
 function main(mode::String="smoke"; backend=CPUBackend())
     if mode == "smoke"
         smoke(; backend)
+    elseif startswith(mode, "xi")
+        # Re-measure the SAME scalar quench with the coherence length instead of
+        # the defect count. PREDICTION, recorded before running: in 3D the number
+        # of vortex lines through the cloud goes as (R/ξ̂)², so N_v ∝ ξ̂^-2 and
+        #
+        #     b = alpha/2 = 0.47 ± 0.04     from alpha = 0.93 ± 0.08
+        #
+        # Agreement means two independent observables on the same physics. A miss
+        # means one of them is measuring something else, and the count is the one
+        # already known to be fragile.
+        τ = parse(Float64, mode[3:end])
+        kz_scan(; tau_Qs=(τ,), t_hold=1.0, n_seed=8, backend,
+            tag="kz_xi_r$(replace(string(τ), "." => "p"))")
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
