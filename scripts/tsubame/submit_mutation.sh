@@ -19,7 +19,13 @@ set -u
 
 MUT_PROBE=${MUT_PROBE:?set MUT_PROBE}
 MUT_MUTANTS=${MUT_MUTANTS:-}
-ROOT=${MUT_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-mutation}
+# ONE CHECKOUT PER JOB, keyed by tag. The harness patches real files under
+# src/, so two jobs sharing a tree read each other's defects. Two jobs were
+# submitted against one tree on 2026-07-31 and the second had to be qdel'd
+# seconds after it started — making the root tag-specific removes the footgun
+# instead of relying on remembering it.
+ROOT=${MUT_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-mut-${MUT_TAG:-run}}
+MUT_REF=${MUT_REF:-test/layered-gates-and-mutation-harness}
 OUT=${MUT_OUT:-/gs/fs/tga-kozuma-kouhi/uk07267/mutation-out}/${MUT_TAG:-run}
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
@@ -39,7 +45,18 @@ MUT_PROBE=${MUT_PROBE//:/,}
 MUT_MUTANTS=${MUT_MUTANTS//:/,}
 
 mkdir -p "$OUT"
+
+# Materialise this job's own checkout, and pin it to the ref by SHA. A failed
+# fetch that leaves the previous commit in place is a known TSUBAME failure
+# mode, so the SHA is printed and compared, not assumed.
+if [ ! -d "$ROOT/.git" ]; then
+    git clone -q /gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation "$ROOT" ||
+        git clone -q https://github.com/KozumaLaboratory/BEC-simulation.git "$ROOT"
+fi
 cd "$ROOT"
+git remote set-url origin https://github.com/KozumaLaboratory/BEC-simulation.git
+git fetch -q origin "$MUT_REF" || { echo "FETCH FAILED — refusing to run a stale tree"; exit 1; }
+git checkout -q -f FETCH_HEAD
 
 echo "host=$(hostname) date=$(date)"
 echo "commit=$(git rev-parse HEAD)"
