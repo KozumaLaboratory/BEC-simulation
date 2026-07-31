@@ -216,8 +216,14 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
                     abspath(p) == self ? _strip_backlog(t) : t
                 end
                 for (r, _, fs) in walkdir(testdir) for f in fs
+                # `normpath` is load-bearing: walkdir yields the root it was
+                # given, so the raw path reads `…/test/hamiltonian/../mutation/…`
+                # and an `occursin("test/mutation", …)` on it never matches. The
+                # first version of this exclusion did exactly that, and the
+                # mutant kept escaping — which is how it was found.
                 if endswith(f, ".jl") &&
-                !occursin(joinpath("test", "mutation"), joinpath(r, f))
+                !occursin(
+                    joinpath("test", "mutation"), normpath(abspath(joinpath(r, f))))
             ], "\n")
         unarmed = String[]
         for reason in reasons
