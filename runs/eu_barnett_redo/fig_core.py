@@ -21,6 +21,13 @@ FIGS = HERE / "figures"
 FIGS.mkdir(exist_ok=True)
 
 PREFIX = "smoke_" if "--smoke" in sys.argv else ""
+# Cell ledgers carry the geometry tag they were run with (e.g. _prod_box35), and
+# a chirality figure is only meaningful if every cell in it came from the SAME
+# geometry. Pass --tag to select one consistent set rather than silently mixing.
+TAG = ""
+for _a in sys.argv[1:]:
+    if _a.startswith("--tag="):
+        TAG = _a.split("=", 1)[1]
 T_STIR = 0.4 if PREFIX else 30.0
 
 C = {"plus": "#1b6ca8", "minus": "#c0392b", "zero": "#7f8c8d", "plus_nodd": "#e08214"}
@@ -32,7 +39,7 @@ plt.rcParams.update({
 
 
 def load(cell):
-    p = DATA / f"ledger_{PREFIX}{cell}.csv"
+    p = DATA / f"ledger_{PREFIX}{cell}{TAG}.csv"
     if not p.exists():
         return None
     return np.genfromtxt(p, delimiter=",", names=True)

@@ -1,0 +1,113 @@
+# LHY kind was `icosahedral` until 2026-07-30, then `full_bdg`, now `fm_dipolar`.
+#
+# 1. `icosahedral` is invalid here. `IcosahedralLHY`'s closed form is
+#    c0^(5/2) + 3|lambda_spin|^(5/2); the absolute value made it symmetric under
+#    c1 -> -c1 and returned a real energy where the spin-Goldstone branch is
+#    dynamically unstable. This config runs at c1_ratio < 0, i.e. OUTSIDE that
+#    domain -- `epsilon_LHY_F6_Ih` returns NaN and the table build throws.
+#
+# 2. `full_bdg` RUNS here but is not quotable. It has no ansatz to violate, but
+#    it has its own validity condition -- mean-field stability -- and these
+#    parameters break it: max Im omega = 0.396 at (c0=3270.05, c1=-16.35,
+#    m_minus_F). Its own warning: the zero-point sum drops the complex branches
+#    while the counterterms still subtract all 13, so eps_LHY is
+#    SCHEME-DEPENDENT there.
+#
+# 3. `fm_dipolar` is valid, and it is the ansatz that matches the state.
+#    Measured 2026-07-30:
+#      * the instability is ENTIRELY DIPOLAR -- switch the DDI off and
+#        max Im omega is exactly 0. eps_dd = 0.5402.
+#      * `lima_pelster_Q5` applies Petrov's prescription, zeroing the integrand
+#        where 1 + eps_dd(3cos^2 t - 1) < 0, so the unstable angles are excluded
+#        rather than half-counted. eps_dd < 1 is inside that domain
+#        (fm_dipolar.jl:26) -- checked, not merely silent.
+#      * with the DDI off, full_bdg and the FM closed form agree to six
+#        significant figures (0.380007 vs 0.380006), cross-validating both.
+#      * this suite's state is `initial_state: m_minus_F`, i.e. FM, and c1 < 0
+#        makes FM the mean-field ground state -- so the FM ansatz matches.
+#    V_LHY(n=3.7e-3) = 0.553422, finite and unwarned.
+#
+# Filename now matches the content (CLAUDE.md: file name = content). It said
+# `icosahedral` while carrying `full_bdg`, which the naming convention forbids.
+# Record: docs/validation/full_bdg_scheme_dependence_eu_f6.md
+# Gated by test/oracles/test_lhy_config_validity_domain.jl.
+#
+# ┌ PAIRED ARM (2026-07-31). A sibling `LHY_full_bdg*` config runs the SAME cell
+# │ with `kind: full_bdg`. Both exist because two independent renames of the old
+# │ `LHY_icosahedral*` file chose different targets; kept deliberately, because
+# │ the pair measures the size of full_bdg's scheme dependence at this ladder:
+# │ 0.59327 there vs 0.553422 here, a 7 % spread. THIS arm is the one whose
+# │ ansatz matches the state; that one is the comparator.
+# │
+# └ `factorial_2x4.json` has NO row for either arm — it predates them and its
+#   rows are measured values nobody has re-run.
+# Long-time LHY stability ladder — auto-generated.
+# Source: scripts/validation/eu_lhy_longtime_gen.jl
+# LHY = fm_dipolar (was icosahedral, then full_bdg), K3 = 0, duration = 31.42 ω_ref⁻¹ ≈ 50ms
+
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: fm_dipolar
+  target_ms: 50ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 30000, omega_ref: 628.3}
+
+dealias:
+  enabled: true
+  k_cut: 16.0
+  auto_dt: true
+  dt_safety: 10.0
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 0.25]}
+      interactions:
+        N_atoms: 30000
+        omega_ref: 628.3
+        c1_ratio: -0.005
+      ddi:
+        enabled: true
+        secular: false
+      lhy: {kind: fm_dipolar}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 2000
+      tol: 1.0e-9
+
+  - dynamics:
+      duration: 31.415
+      dt: 0.005
+      B:
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        secular: false
+      lhy: {kind: fm_dipolar}
+      # NO loss block — K3 = 0
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save:
+        every: 200
+        psi: true
+        precision: f64
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}

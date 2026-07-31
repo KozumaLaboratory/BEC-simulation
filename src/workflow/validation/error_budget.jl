@@ -29,13 +29,24 @@
 #   :fail           the approximation is not negligible.
 #   :pass           it is, and the criterion was reachable.
 #
-# The control being MANDATORY is the whole point, and it is not hypothetical.
-# The first gate written for `SPIN_TAYLOR_TOL` used a loosened tolerance as its
-# control and could not breach: the Taylor degree is floored at 2, so at
-# production rotation angles the schedule returns degree 2 for every tolerance
-# over ten decades, and the floor alone already passed. The criterion was held
-# by the degree floor, not by the tolerance. Without a control that gate would
-# have sat green forever while asserting nothing. Here that outcome is
+# The control being MANDATORY is the whole point, and it is not hypothetical: it
+# rejected TWO gates written for `SPIN_TAYLOR_TOL` before one stood up.
+#
+#   1. Control = loosen the tolerance. Cannot breach — the Taylor degree is
+#      floored at 2, so at production rotation angles the schedule returns 2 for
+#      every tolerance over ten decades, and that floor alone already passed.
+#   2. Control = lower the floor to 1. ALSO cannot breach — an order-1 rotation
+#      is still ~1e-8 relative, four orders inside the splitting error. So the
+#      criterion is not held by the floor either, which is what had been claimed
+#      after (1) and is retracted here.
+#
+# What holds it is that the rotation angle is tiny: the rotation is not the
+# binding error at ANY order ≥ 1. The control that worked removes the operator
+# outright, and that is the general form — show the observable MOVES when the
+# operator is absent, or "negligible" was never a claim about anything.
+#
+# Both wrong controls would have shipped as green gates asserting nothing, and
+# would have been reported as "the criterion holds". Here that outcome is
 # `:indeterminate` by construction rather than a silent pass.
 #
 # WHAT THIS DOES NOT DO. Three preconditions, none of which it can check for you:

@@ -131,12 +131,25 @@ use a per-job script of the form:
 source scripts/tsubame_setup.sh
 export SPINORBEC_SCRATCH_DIR=$T3TMPDIR
 
+# Name the binary. There is NO julia modulefile on TSUBAME 4 — `module load
+# julia` fails and `tsubame_setup.sh` swallows it, so a bare `julia` in a UGE
+# job dies with "command not found". A login shell only works because the
+# lab profile puts the shared juliaup on PATH, which qsub does not inherit.
+JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
+
 # Sysimage support (optional):
 SYSIMAGE_FLAG=""
 [ -f "spinor_sysimage.so" ] && SYSIMAGE_FLAG="--sysimage=spinor_sysimage.so"
 
-julia --project=. $SYSIMAGE_FLAG scripts/cli.jl launch <run_name>
+"$JULIA" --project=. $SYSIMAGE_FLAG scripts/cli.jl launch <run_name>
 ```
+
+For a project tree synced fresh (a new `$HOME/<name>` rather than an
+established one), also point the depot at the warm shared one —
+`export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia` **before**
+sourcing `tsubame_setup.sh`, which otherwise defaults it to node-local NVMe and
+precompiles SpinorBEC from an empty cache. `tsubame_setup.sh` only sets the
+depot when it is unset, so the export wins.
 
 Add `#$ -t 1-N` + `#$ -tc K` for array jobs; `mapfile -t CONFIGS < <(ls -d runs/<batch>/*/ | sort)`
 then `RUN_NAME="${CONFIGS[$((SGE_TASK_ID - 1))]}"` to pick the per-task

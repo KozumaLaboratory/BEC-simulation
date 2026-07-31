@@ -141,9 +141,11 @@ function _project_constraints!(
     D = 2F + 1
 
     # 1. Remove ψ-direction: grad -= Re⟨ψ|grad⟩ × ψ
-    #    (chemical potential projection). `dot(a, b) = sum(conj(a)*b)`,
-    #    no `conj.(psi)` and no broadcast-product temporary.
-    μ_real = real(dot(psi, grad)) * dV
+    #    (chemical potential projection). `_realdot` rather than `real(dot(...))`:
+    #    `dot` on ComplexF64 goes to OpenBLAS `zdotc`, whose thread team is sized
+    #    from the machine, and on a few-MB array that call is nearly all team
+    #    overhead. This one runs twice per gradient. See `_realdot`.
+    μ_real = _realdot(psi, grad) * dV
     grad .-= μ_real .* psi
 
     # 2. Magnetization conservation
