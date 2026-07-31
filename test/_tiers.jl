@@ -456,6 +456,9 @@ const FULL_EXTRA = [
     # contraction was 25-31 % of the padded convolution on an H100; GPU-only, so
     # a green ci tier says nothing about it.
     "gpu/test_gpu_ddi_contraction_parity.jl",
+    # the padded DDI GRADIENT face reads a strided corner view of Phi_*_pad;
+    # the contraction gate above stops before apply_operator!
+    "gpu/test_gpu_ddi_gradient_padding_parity.jl",
     # The fused diagonal kernel with a TABULATED LHY against the generic
     # broadcast propagator it replaces. Every production Eu run is tabulated and
     # every one of them took the fallback; GPU-only.
