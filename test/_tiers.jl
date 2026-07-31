@@ -44,6 +44,9 @@ const FAST_TESTS = [
     # CLAUDE.md commitment #4 (same spec ⇒ same outdir) had no test at all until
     # the mutation harness reversed the canonical key sort and nothing went red.
     "workflow/test_content_id_determinism.jl",
+    # `thermal_noise_amplitude` had no test anywhere: dropping the /4 left 57
+    # workflow files green (mutation harness, 2026-07-31).
+    "workflow/test_thermal_seed_amplitude.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
