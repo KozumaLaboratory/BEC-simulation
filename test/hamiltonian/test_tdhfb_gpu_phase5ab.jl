@@ -9,22 +9,24 @@ using Printf
 #
 # Tests skip on missing CUDA (CI without GPU).
 
-try
+# `return` at the top level of an included file does not stop the include —
+# Julia evaluates each top-level expression on its own, so the old
+# `try … return nothing … end` guard logged "skipping" and then fell straight
+# through to `CUDA.reclaim()`. On every CPU-only runner this file died with
+# `LoadError: CUDA driver not functional` instead of skipping. The guard has to
+# sit inside each `@testset`, whose body IS a function.
+const HAS_CUDA = try
     @eval using CUDA
-    if !CUDA.functional()
-        @info "CUDA not functional — skipping TDHFB GPU phase5ab tests"
-        return nothing
-    end
-catch e
-    @info "CUDA not available — skipping TDHFB GPU phase5ab tests"
-    return nothing
+    CUDA.functional()
+catch
+    false
 end
 
 # Reset GPU state between tests
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())
 
 @testset "TDHFB GPU phase5a: state allocation" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CUDA.zeros(ComplexF32, 16, 16, 16, 13)
     state = init_tdhfb_vacuum(psi)
     @test typeof(state.phi) <: CuArray
@@ -41,6 +43,7 @@ CUDA.reclaim()
 end
 
 @testset "TDHFB GPU phase5a: 32³ F=6 memory budget" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CUDA.zeros(ComplexF32, 32, 32, 32, 13)
     state = init_tdhfb_vacuum(psi)
     total_mb = (sizeof(state.phi) + sizeof(state.rho) + sizeof(state.kappa)) / 1024 / 1024
@@ -49,6 +52,7 @@ end
 end
 
 @testset "TDHFB GPU phase5a: Hermiticity check on vacuum" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CUDA.zeros(ComplexF32, 8, 8, 8, 13)
     state = init_tdhfb_vacuum(psi)
     rho_dev, kappa_dev = tdhfb_hermiticity_check(state)
@@ -57,6 +61,7 @@ end
 end
 
 @testset "TDHFB GPU phase5a: V-step broadcast" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CUDA.zeros(ComplexF32, 8, 8, 8, 13)
     psi .= ComplexF32(1.0) + 0.0im * ComplexF32(0.0)
     state = init_tdhfb_vacuum(psi; alias=true)
@@ -70,6 +75,7 @@ end
 end
 
 @testset "TDHFB GPU phase5b: K-step matches CPU at F64" begin
+    HAS_CUDA || (@test true; return nothing)
     N_grid = 16
     D = 13
     # Deterministic random state to compare CPU vs GPU
@@ -87,6 +93,7 @@ end
 end
 
 @testset "TDHFB GPU phase5b: K-step preserves norm" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CUDA.zeros(ComplexF32, 16, 16, 16, 13)
     psi .= randn(ComplexF32) * Float32(0.1)
     phi = copy(psi)
@@ -99,6 +106,7 @@ end
 end
 
 @testset "TDHFB GPU phase5b: K-step F32 standalone" begin
+    HAS_CUDA || (@test true; return nothing)
     psi = CuArray(randn(ComplexF32, 16, 16, 16, 13))
     phi_before = copy(psi)
     SpinorBEC._tdhfb_kinetic_step!(psi, 0.01)
@@ -108,5 +116,4 @@ end
 end
 
 # Cleanup
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())
