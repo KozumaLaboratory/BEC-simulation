@@ -186,6 +186,59 @@ const MUTANTS = Mutant[
         "A new decline reason with no arm anywhere under test/. Invisible to \
          every physics gate by construction."),
 
+    # ── workflow layer: claims nothing modelled ───────────────────────
+    # Five more surfaces where a wrong value reaches every run without ever
+    # touching a Hamiltonian term, so no term-level oracle can see it.
+    Mutant(:atom_eu_g_f_swaps_I_and_J,
+        "src/workflow/initialization/atoms.jl",
+        r"lande_g_factor\(6, 5 // 2, 7 // 2; g_J=_EU_G_J\)",
+        "lande_g_factor(6, 7 // 2, 5 // 2; g_J=_EU_G_J)",
+        :factor, :fatal,
+        "the hand-typed 7/12·g_J this line replaced",
+        "Swaps the nuclear and electronic spins in Eu151's Landé factor, so \
+         g_F is wrong and every Zeeman energy, every B→p conversion and the \
+         auto-derived q scale with it. The value stays plausible, which is how \
+         the hand-typed 7/12·g_J survived. Anchored on the Eu151 line \
+         specifically: Eu153 repeats every constant, so a bare match is not \
+         unique."),
+    Mutant(:thermal_seed_drops_the_quarter,
+        "src/workflow/initialization/thermal_noise.jl",
+        r"    sqrt\(T_over_Tc\^3 / 4\)",
+        "    sqrt(T_over_Tc^3)",
+        :factor, :major,
+        "the heuristic seed is documented as η = √((T/T_c)³/4)",
+        "Doubles the symmetry-breaking kick. The seed is a HEURISTIC, so no \
+         physics oracle can bound it — the only claim available is that it is \
+         the documented formula, and that claim needs a test or the formula is \
+         decoration."),
+    Mutant(:quadratic_zeeman_linear_in_p,
+        "src/hamiltonian/coefficients.jl",
+        r"    Float64\(p_dimless\)\^2 \* omega_ref",
+        "    Float64(p_dimless) * omega_ref",
+        :factor, :fatal,
+        "gotcha_b_mag_spherical_form",
+        "q ∝ B² is what makes the B-block's auto-derived q a function of |B|. \
+         Linear in p, it is still monotonic in B and still zero at zero field, \
+         so a scan reads as merely rescaled."),
+    Mutant(:inspect_demotes_block_to_warn,
+        "src/workflow/experiments/inspect_checks.jl",
+        r"sev = rule\.zero_meaning === :error \? :block : :warn",
+        "sev = :warn",
+        :missing_gate, :major,
+        "the 4-severity pre-flight inspector; :block is what stops a launch",
+        "Demotes every boundary-value blocker to a warning, so autopilot \
+         launches a config the inspector already knows is degenerate. The run \
+         then fails as :killed_bug hours later on a GPU node."),
+    Mutant(:save_every_off_by_one,
+        "src/workflow/experiments/pipeline/pipeline_dispatch.jl",
+        r"        return Int\(save_block\[\"every\"\]\)",
+        "        return Int(save_block[\"every\"]) + 1",
+        :off_by_one, :major,
+        "gotcha_scan_point_jld2_reading_pitfalls",
+        "Shifts which steps are saved. `save.every` must DIVIDE the step count \
+         or the last snapshot is not the final state — the +1 breaks exactly \
+         that divisibility while leaving a plausible number of snapshots."),
+
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where
     # every term-level oracle is green by construction because it never goes
