@@ -28,7 +28,22 @@ export JULIA_DEPOT_PATH="$HOME/.julia"
 export JULIA_NUM_THREADS="${NSLOTS:-8}"
 module load cuda/12.6 2>/dev/null || module load cuda 2>/dev/null || true
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
-cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-ddi-conv}"
+# A worktree of its OWN. `bec-ddi-conv` is shared, and on 2026-07-31 another
+# session's uncommitted edits to src/ (LBFGS, make_workspace, a new analysis file)
+# were present while this bench ran there — so a run logged as "commit=56149613"
+# was executing different code, and my repeated `git reset --hard` on that
+# directory may have destroyed that session's work. One worktree per running job.
+cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-gapbench}"
+
+# Refuse rather than produce an unattributable result. The cache already declines
+# to LOAD when src/ is dirty; that is not enough, because the run still happens
+# and its rows still get written under a commit hash that does not describe them.
+if [ -n "$(git status --porcelain -- src)" ]; then
+    echo "REFUSING: src/ is dirty in $(pwd) — this run would not be attributable"
+    git status --porcelain -- src
+    echo "ALL DONE $(date)"
+    exit 1
+fi
 # The cell cache lives on the GROUP volume so it survives job-to-job: a run that
 # changes only the reporting reuses every cell and costs no GPU. It is keyed on
 # the tree hash of src/, so a physics change reuses nothing. Smoke and production
