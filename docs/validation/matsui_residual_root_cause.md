@@ -22,6 +22,7 @@ Against Matsui et al.'s published simulation, on the identical window and metric
 | bare periodic kernel (neither code uses it) | as above | 0.053 nT | static |
 | grid resolution | 45 fields at `dx` 0.5 → 0.25 a_ho | **0.007 nT**, ≤0.06 % in `N` | 8307358.8 |
 | **box size** | 16 / 24 / 32 a_ho at **fixed** `dx` | **1 part in 10⁶** | 8307989.11 |
+| **their grid, exactly** | 128³, box 36.2 a_ho, `dx` = 0.4 aHO — theirs to the digit | **0.007 nT**, 3×10⁻⁵ in `N` | 8307989.10 |
 | time step | `dt` 1e-3 → 2.5e-4 (2nd order ⇒ converged) | 0.031 nT, 1.3 % | 8307989.12 |
 | ramp shape | their exact `exp(−t/50 µs)` vs our linear 150 µs | 0.070 nT, ~0 in `N` | 8307358.7 |
 | three-body loss | `K₃` × {1, 3, 10} of the published value | ~0 (real loss is 0.2 %) | 8304841.5 |
@@ -33,9 +34,15 @@ Against Matsui et al.'s published simulation, on the identical window and metric
 Sum of everything that moves the centre: **~0.11 nT, about 26 %** of the gap.
 Sum of everything that moves the transfer: **under 7 %** of the 20 %.
 
-Two of these nulls carry an explicit positive control, because two earlier nulls
-did not and were wrong: the box arms are demonstrably different grids (saved ψ at
-32³ / 48³ / 64³), and the `N` arms demonstrably differ (0.195 vs 0.309).
+Three of these nulls carry an explicit positive control, because two earlier
+nulls did not and were wrong: the box arms are demonstrably different grids
+(saved ψ at 32³ / 48³ / 64³), the `N` arms demonstrably differ (0.195 vs 0.309),
+and the 128³ run took **219 s per point against 5.2 s at 32³** — a factor 42 for
+64× the cells, which only happens if it really ran at 128³.
+
+**Running on their exact grid changes nothing**: centre −2.145 against our
+−2.138, `N_{−6}` fraction 0.195195 against 0.195201. Grid, box and resolution are
+now excluded together and independently.
 
 ## The structural finding
 
