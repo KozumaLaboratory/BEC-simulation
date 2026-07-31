@@ -92,6 +92,10 @@ const FAST_TESTS = [
     # the PR gate never ran them (PR #183 shipped a 4th → 2nd order collapse).
     "oracles/test_negative_dt_substeps.jl",
     "validation/test_k3_unit_audit.jl",
+    # The type-C registry: which published numbers this repo actually checks
+    # itself against, and — the load-bearing half — which of the targets
+    # CLAUDE.md names have no gate at all. Pure table + file/tier lookups.
+    "validation/test_type_c_claims.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
