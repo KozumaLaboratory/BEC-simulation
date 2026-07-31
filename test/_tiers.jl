@@ -98,6 +98,10 @@ const FAST_TESTS = [
     # vortex-free field (a KZ defect count sits on a thermal background), and
     # threshold-independent.
     "analysis/test_vortex_counter_control.jl",
+    # g1(r) + coherence length: the KZ observable that replaced defect counting.
+    # Gated on a coherent field (no decay), white noise (decay within a cell), and
+    # recovery of an IMPOSED correlation length as it is scaled.
+    "analysis/test_coherence_length.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
