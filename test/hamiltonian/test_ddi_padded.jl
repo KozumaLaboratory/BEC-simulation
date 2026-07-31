@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "DDI Zero-Padding" begin
     @testset "make_ddi_padded creates correct shapes" begin
         config = GridConfig(64, 20.0)

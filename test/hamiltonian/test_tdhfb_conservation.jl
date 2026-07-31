@@ -3,7 +3,9 @@
 # C1: ρ Hermiticity preserved across N=200 coupled Strang steps
 # C2: κ symmetry preserved across N=200 coupled Strang steps
 # C3: Particle number N = ∫(|φ|² + tr ρ) conserved, finite g_S, finite κ
-# C4: Total energy E[φ, ρ, κ] relative drift < 1e-6 over T = 5 ω⁻¹
+# C4: Total energy E[φ, ρ, κ] does NOT drift by more or less than it does
+#     today — the engine has an open EOM/E inconsistency and the measured
+#     1.52e-2 is pinned as a band, not passed as a tolerance. See the testset.
 # C5: ρ=κ=0 limit ⇒ pure F=1 GP equivalence (catches BdG-vs-GP factor errors)
 # C6: κ kinematic motion — starting from κ=0 with finite g_S and nonzero φ,
 #     after one BdG step κ ≠ 0 AND κ symmetric (proves κ evolution is wired,
@@ -134,14 +136,17 @@ using SpinorBEC
         # Particle number is conserved by the FULL coupled TDHFB dynamics
         # (Δ^φ φ* condensate loss balanced by Δ^R κ̄ - κ Δ̄^R quasi-particle
         # gain).
-        # 2026-05-12: with the current EOM/E factor mismatch (under audit),
-        # observed N drift is ~4.7e-2 at g_S = (0.5, 0.1), T=2. Relaxed to
-        # 1e-1 until the variational consistency fix lands. Should be
-        # tightened back to 1e-6 once corrected.
-        @test abs(N1 - N0) < 1e-1
+        # The `< 1e-1` bound and its "observed ~4.7e-2" justification were
+        # written on 2026-05-12 and never revisited. Re-measured 2026-07-31,
+        # bit-identical over three runs: |ΔN| = 1.2951e-4 at N₀ = 2.6317, i.e.
+        # 4.9e-5 relative — 360x better than the comment claimed and 772x
+        # inside the bound, so a 700x regression in N conservation would have
+        # passed. Pinned at the measured value with ~8x headroom for
+        # FFTW-plan variation across machines.
+        @test abs(N1 - N0) < 1e-3
     end
 
-    @testset "C4: Energy conservation (relative drift < 1e-6 over T=5)" begin
+    @testset "C4: Energy is NOT conserved — the drift is pinned, not passed" begin
         nx = 16
         F = 1
         D = 3
@@ -177,15 +182,18 @@ using SpinorBEC
         E1 = tdhfb_energy(state, F, gS, V_ext)
 
         rel_drift = abs(E1 - E0) / max(abs(E0), 1e-12)
-        # 2026-05-12: observed drift is dt-INDEPENDENT and scales linearly
-        # with g_S, indicating a per-step EOM/E functional inconsistency
-        # (under investigation — see memory/tdhfb_perf_findings.md). At
-        # g_S = (0.3, 0.05) and T=2 the drift is ~1.4e-2; at g_S × 0.1 it
-        # is ~1.1e-3. Once the EOM/E factor is identified and fixed, this
-        # tolerance should be tightened back to 1e-3. The current relaxed
-        # bound (2e-2) is the operational ceiling that still catches O(1)
-        # sign-flip / wrong-channel bugs.
-        @test rel_drift < 2e-2
+        # The engine does not conserve E. The drift is dt-INDEPENDENT and
+        # linear in g_S — a per-step EOM/E-functional inconsistency open since
+        # 2026-05-12. Measured 2026-07-31, bit-identical over three runs:
+        # 1.5215e-2 at g_S = (0.3, 0.05), T = 2.
+        #
+        # The old one-sided `< 2e-2` sat 1.31x from red, so it was both close
+        # to flaking and unable to notice a fix. A BAND is the honest
+        # instrument for a known-broken quantity: it fails on a regression AND
+        # on an improvement, so the number cannot drift in either direction
+        # without someone coming back to this comment. Tighten the band —
+        # do not widen it — when the EOM/E factor is corrected.
+        @test 1.0e-2 < rel_drift < 2.0e-2
     end
 
     @testset "C5: ρ=κ=0 ⇒ pure GP equivalence (F=1 c0/c1, perturbative)" begin

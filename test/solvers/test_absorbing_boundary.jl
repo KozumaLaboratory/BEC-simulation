@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Absorbing Boundary" begin
     @testset "AbsorbingBoundary constructors" begin
         ab = AbsorbingBoundary(10.0, 3.0, 2)

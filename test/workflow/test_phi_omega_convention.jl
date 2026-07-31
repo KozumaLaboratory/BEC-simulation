@@ -8,6 +8,7 @@
 # the 2π drop silently.
 
 using Test
+using SpinorBEC
 using SpinorBEC: _parse_dimless_freq
 
 @testset "phi_omega Hz convention (Klaus 2022 magnetostir 2π footgun)" begin

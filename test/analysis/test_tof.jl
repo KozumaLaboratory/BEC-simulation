@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "TOF / Stern-Gerlach" begin
     @testset "1D Gaussian TOF width" begin
         F = 1
