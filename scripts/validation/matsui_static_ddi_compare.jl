@@ -75,7 +75,10 @@ mu_tf = 0.5 * wbar * (15 * c_tot / (4π))^(2 / 5)
 n_peak = mu_tf / c_tot
 R_x = sqrt(2 * mu_tf)
 @printf("  µ_TF        = %.4f  ħω_ref\n", mu_tf)
-@printf("  n_peak      = %.6e  a_ho^-3     (= %.4e m^-3)\n", n_peak, n_peak / a_ho^3)
+# ψ is normalised to 1, so the DIMENSIONLESS n is a probability density: the
+# physical density carries the extra factor N.
+@printf("  n_peak      = %.6e  a_ho^-3     (= %.4e m^-3, physical)\n",
+    n_peak, n_peak * N_ATOMS / a_ho^3)
 @printf("  R_TF,x      = %.4f a_ho\n", R_x)
 @printf("  healing ξ   = %.4f a_ho   (dx = 0.5 at 32³, 0.25 at 64³)\n",
     1 / sqrt(2 * mu_tf))
