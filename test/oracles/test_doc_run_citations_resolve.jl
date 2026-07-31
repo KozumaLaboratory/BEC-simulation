@@ -56,6 +56,20 @@ function _cited_run_dirs()
         endswith(n, ".md") || continue
         path = joinpath(root, n)
         rel = relpath(path, _DOCS)
+        # `docs/archive/` is out of scope, deliberately. An archive is a RECORD of
+        # what was thought at a date, not a live claim, so requiring its citations
+        # to resolve contradicts what archiving it means — and the alternative,
+        # pinning them in KNOWN_UNRESOLVED, grows the very list this gate exists to
+        # stop growing.
+        #
+        # Not hypothetical: #221 imported research notes into docs/archive/ AFTER
+        # #220 measured this gate's baseline, which put main red on 7 names
+        # (eu151_b1_c1_sweep_template, klaus_eu151_mechanism_,
+        # klaus_eu151_spin_excitation, klaus_option_gamma, klaus_option_gamma_full,
+        # option_gamma_smoke, validation_level) cited from exactly two archived
+        # files and from nothing live. Nobody saw it because the required checks do
+        # not cover the ci or oracles tiers.
+        startswith(rel, "archive/") && continue
         for m in eachmatch(pat, read(path, String))
             # Trim trailing punctuation and the glob star a doc writes for a family.
             d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
