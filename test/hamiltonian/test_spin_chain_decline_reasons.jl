@@ -66,7 +66,7 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
         psi_mf = copy(ws.state.psi)          # frozen mean field: not the reason
         reason = _spin_chain_reason(ws, ws.interactions, psi_mf)
         @test reason !== nothing
-        @test occursin("Raman", reason)
+        @test occursin("Raman sits between", reason)
 
         # Positive control: the SAME workspace without Raman must NOT decline,
         # otherwise the row above passes for an unrelated reason.
@@ -128,11 +128,29 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
                 ), inter)),
         ("magnetic gradient", "a magnetic gradient",
             () -> (_ws(; magnetic_gradient=MagneticGradient{3}(0.1, 1, 1.0)), inter)),
+        # c₂ is the singlet-pair substep, which sits between the rotations for
+        # the same reason the tensor channels do.
+        ("c₂ ≠ 0", "c₂ ≠ 0",
+            () -> (_ws(), InteractionParams(Dict(0 => 20.0, 1 => -0.4, 2 => 0.1)))),
+        # A tabulated LHY is a lookup, not the closed-form `V + c₀n + c·n^{3/2}`
+        # phase the fused kernel carries.
+        ("tabulated LHY", "a tabulated LHY",
+            () -> (_ws(; spinor_lhy=:polar_contact), inter)),
     ]
         ws, ip = build()
         reason = _spin_chain_reason(ws, ip, copy(ws.state.psi))
         @test reason !== nothing
         @test occursin(expect, reason)
+    end
+
+    @testset "arm: the mean field is not frozen" begin
+        # The one reason that is about the CALLER rather than the workspace:
+        # without a frozen mean field there is no midpoint predictor-corrector
+        # to fuse against. `psi_mf === nothing` is how the caller says so.
+        ws = _ws()
+        @test occursin("the mean field is not frozen",
+            _spin_chain_reason(ws, inter, nothing))
+        @test _spin_chain_reason(ws, inter, copy(ws.state.psi)) === nothing
     end
 
     @testset "arm: global toggles" begin
