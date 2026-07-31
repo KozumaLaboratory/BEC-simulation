@@ -64,7 +64,18 @@ function find_ground_state_lbfgs(;
     m_lbfgs::Int=20,   # history depth. 20 measured ~9× lower grad_norm floor +
     # ~30% fewer line-search backtracks vs 10 on Eu F=6+DDI
     # 16³ (m=30 was worse). Memory ~ 2·m·|ψ|: reduce to 10 if
-    # VRAM-constrained at large grids.
+    # VRAM-constrained at large grids. Lowering it to buy a cheaper
+    # two-loop does NOT pay: measured across three c1_ratio values at
+    # 24³, the per-iteration cost is linear in m (0.2-0.4 ms per unit)
+    # but the +DDI iteration COUNT rises as m falls, and total wall is
+    # flat over m = 5..40. `history_precision` is the lever instead.
+    history_precision::DataType=Float64,   # element type of the s/y history.
+    # `Float32` halves the two-loop's traffic, which is what it costs:
+    # 4m reads of a ψ-sized array per direction (230 MB at m=20, 24³,
+    # D=13) at one core's ~23 GB/s. The history only steers the SEARCH
+    # DIRECTION — the line search still accepts on a full-precision
+    # energy and `rho_hist`/`grad` stay Float64 — so this trades
+    # curvature resolution, not correctness.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     # Spinor (tabulated) LHY. Until 2026-07-29 these kwargs did not exist, so
@@ -115,7 +126,8 @@ function find_ground_state_lbfgs(;
             pin, epsilon_ramp, grid, atom, interactions, zeeman, potential,
             n_steps, tol, initial_state, init_state_params, psi_init, ws_init,
             enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
-            quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
+            quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs,
+            history_precision, verbose,
             light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
             rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
             spinor_lhy, lhy_opts,
@@ -209,11 +221,12 @@ function find_ground_state_lbfgs(;
 
     # L-BFGS history — warm-start from a supplied history when threading across
     # ε-continuation rungs (copied so the caller's vectors are not mutated).
+    HT = _history_array_type(psi, history_precision)
     s_hist, y_hist, rho_hist = if lbfgs_history === nothing
-        (typeof(psi)[], typeof(psi)[], Float64[])
+        (HT[], HT[], Float64[])
     else
-        (typeof(psi)[copy(s) for s in lbfgs_history[1]],
-            typeof(psi)[copy(y) for y in lbfgs_history[2]],
+        (HT[_history_copy(HT, s) for s in lbfgs_history[1]],
+            HT[_history_copy(HT, y) for y in lbfgs_history[2]],
             Float64[ρ for ρ in lbfgs_history[3]])
     end
 
@@ -349,8 +362,8 @@ function find_ground_state_lbfgs(;
                 push!(s_hist, s_slot)
                 push!(y_hist, y_slot)
             else
-                push!(s_hist, copy(s_k))
-                push!(y_hist, copy(y_k))
+                push!(s_hist, _history_copy(HT, s_k))
+                push!(y_hist, _history_copy(HT, y_k))
             end
             push!(rho_hist, 1.0 / ys)
         else
