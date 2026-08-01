@@ -311,6 +311,11 @@ const CI_EXTRA = [
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",
+    # Dashboard HTTP round-trip. Was the last MANUAL entry ("spawns dashboard
+    # server on a TCP port"); it hung forever for two reasons, both fixed
+    # 2026-08-02 — a keep-alive read with no `Connection: close`, and a
+    # teardown by `Base.throwto` on a task parked in `accept`. 10 s.
+    "workflow/test_live_monitor.jl",
     # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
     # propagation, multi-frame TOF) — integration weight, not fast-tier units.
     "analysis/test_tof.jl",
@@ -642,20 +647,20 @@ const PHYSICS_TESTS = [
 # documented in test/MANUAL_TESTS.md with the exact invocation. Listed
 # here so the tier-membership meta-test counts them as "accounted for"
 # (i.e. they are deliberately manual, not orphaned). Run them by hand.
-const MANUAL_TESTS_ALLOWLIST = [
-    # One file. `test_live_monitor.jl` blocks forever: `serve_dashboard` does not
-    # return until the server is closed and this file's close path is never
-    # reached, so the run hangs until it is killed (measured: SIGTERM at a
-    # 2400 s timeout, "Press Ctrl+C to stop" in the log). Its own comment says
-    # it means to close the server manually. Needs restructuring — serve on a
-    # task, assert, close in a `finally` — not a tier entry.
-    #
-    # The other four that sat here are in tiers as of 2026-07-31/08-01, each
-    # after being run rather than re-inheriting its reason: gpu/test_cuda.jl,
-    # workflow/test_{active_learning,multi_fidelity}_yaml.jl and
-    # workflow/test_klaus_validation.jl.
-    "workflow/test_live_monitor.jl"
-]
+# EMPTY, 2026-08-02. Every `test_*.jl` under test/ is now in a tier.
+#
+# This held five files / 53 assertions that no tier ran, untouched since
+# 2026-05-25, each with an environment reason nobody had rechecked. Run one by
+# one, three needed no code change at all; the two that did were broken for
+# reasons that had nothing to do with the environment they were filed under
+# (an inverted `initial_state`, and an HTTP read that never saw EOF).
+#
+# Keep it empty. A file that cannot run is a file to fix or delete — parking it
+# here is how 53 assertions stopped being tests for ten weeks. If something
+# genuinely must be manual, it needs an entry in test/MANUAL_TESTS.md stating a
+# reason that was MEASURED, and the tier-membership meta-test asserts the two
+# lists agree.
+const MANUAL_TESTS_ALLOWLIST = String[]
 
 # Derived view (NOT a partition list): every `oracles/` gate, regardless of which
 # tier list it lives in. The `oracles` pseudo-tier runs JUST these so the per-PR
@@ -786,6 +791,7 @@ const _COST = Dict{String, Float64}(
     # 68 s here; declared high because a runner estimate is what this model
     # needs and the nightly timing table will correct it downward if generous.
     "workflow/test_klaus_validation.jl" => 180.0,
+    "workflow/test_live_monitor.jl" => 30.0,   # 10 s here; a runner is slower
     "workflow/test_active_learning_yaml.jl" => 21.7,
     "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
     # 4.8 s here against a warm depot; the CI runner pays a cold precompile
