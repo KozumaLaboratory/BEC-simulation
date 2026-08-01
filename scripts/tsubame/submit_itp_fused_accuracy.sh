@@ -1,7 +1,7 @@
 #!/bin/bash
 #$ -cwd
 #$ -l gpu_1=1
-#$ -l h_rt=3:00:00
+#$ -l h_rt=4:00:00
 #$ -N itp_facc
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/

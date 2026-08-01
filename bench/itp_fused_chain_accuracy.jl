@@ -124,9 +124,16 @@ println("="^78)
 S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS)
 B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS)
 F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS)
+# A THIRD dt, which is what turns "closer to the dt/2 reference" into a statement
+# about accuracy. With only dt and dt/2 there is no way to tell a smaller error
+# from a different one that happens to land nearby, and the first run of this
+# bench was read exactly that far and no further.
+R = relax(half_separate!; dt=DT / 4, max_steps=4 * MAX_STEPS)
+Fh = relax(half_fused!; dt=DT / 2, max_steps=2 * MAX_STEPS)
 
 @printf("\n  %-28s %14s %6s %10s %8s\n", "arm", "E", "conv", "final dE", "steps")
-for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B), ("F fused, dt", F))
+for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B),
+    ("R separate, dt/4", R), ("F fused, dt", F), ("F fused, dt/2", Fh))
     @printf("  %-28s %14.8f %6s %10.2e %8d\n", name, r.E, r.conv ? "yes" : "NO",
         r.dE, r.steps)
 end
@@ -164,10 +171,42 @@ println("    > 1  it is worse, and the speed does not buy it")
 println("  Both columns have to agree. Energy alone cannot settle it: one scalar")
 println("  can coincide between states that differ.")
 
-if !(S.conv && B.conv && F.conv)
+# --- Richardson: does each chain CONVERGE, and at what rate? ---------------
+#
+# Against the finest reference R = separate at dt/4, a second-order chain should
+# have its error fall ~4× per halving. That rate is what distinguishes "smaller
+# error" from "different error that happens to land near dt/2", and without it
+# `|F−B| ≪ |S−B|` cannot be called accuracy.
+#
+# The practical question is on the same table: if the fused chain at dt is closer
+# to R than the separate chain at dt/2 is, then it wins twice — 0.70× the step AND
+# half the steps for the same distance to the reference.
+println("\n  distance to R = separate at dt/4 (the finest reference here)")
+@printf("  %-32s %12s %12s\n", "", "density", "energy")
+rows = (("S separate, dt", S), ("S separate, dt/2", B),
+    ("F fused, dt", F), ("F fused, dt/2", Fh))
+for (name, r) in rows
+    @printf("  %-32s %12.4e %12.4e\n", name,
+        ddist(r.psi, R.psi), abs(r.E - R.E) / abs(R.E))
+end
+let sd = ddist(S.psi, R.psi), bd = ddist(B.psi, R.psi),
+    fd = ddist(F.psi, R.psi), fhd = ddist(Fh.psi, R.psi)
+
+    @printf("\n  %-32s %12.2f %12.2f\n", "order rate  S(dt)/S(dt/2), F(dt)/F(dt/2)",
+        sd / max(bd, eps()), fd / max(fhd, eps()))
+    println("    ~4 = second order and converging. Far from it ⇒ the arm is not in")
+    println("    its asymptotic regime and no order can be read from these three.")
+    println(fd < bd ?
+            "\n  F at dt is CLOSER to R than S at dt/2 is — the fused chain wins twice:
+  0.70× the step AND half the steps for the same distance to the reference." :
+            "\n  F at dt is NOT closer to R than S at dt/2 — the fusion buys step time
+  only, and the step-count comparison has to be made on equal footing.")
+end
+
+if !(S.conv && B.conv && F.conv && R.conv && Fh.conv)
     println("""
 
-  AT LEAST ONE ARM DID NOT CONVERGE. Every ratio above is then a comparison of
+  AT LEAST ONE OF THE FIVE ARMS DID NOT CONVERGE. Every ratio above is then a comparison of
   points on trajectories rather than of fixed points, and none of them decides
   anything. Raise max_steps and re-run before reading further.""")
 end
