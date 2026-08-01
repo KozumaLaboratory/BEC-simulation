@@ -53,6 +53,9 @@ const FAST_TESTS = [
     # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
     # OOM-is-permanent, and the on_complete lineage bound.
     "workflow/test_autopilot_invariants.jl",
+    # Analyzer-name routing and the ground-state interactions precedence —
+    # 64 workflow files covered neither (mutation, 2026-08-01).
+    "workflow/test_pipeline_name_and_precedence.jl",
     "workflow/test_auto_grid_derivation.jl",
     "workflow/test_b_block_spherical_angles.jl",
     "workflow/validation/test_error_budget_positive_control.jl",
