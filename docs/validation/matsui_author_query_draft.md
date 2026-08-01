@@ -1,4 +1,11 @@
-# Draft query to Matsui et al. — NOT SENT
+# Draft query to Matsui et al. — NOT SENT, AND NO LONGER NEEDED
+
+> **Superseded 2026-08-01.** The question this asks was answered from the
+> deposit itself: their published run used `Ntot = 3.5e4`, the value shipped
+> in `setup_parameters`, with the output normalised to 5e4 for plotting.
+> Given that `N`, our code reproduces Fig. 4B to 1 %. See
+> `matsui_residual_root_cause.md`. Kept as a record of what would have been
+> asked and of how close the campaign came to needing to ask it.
 
 Everything reachable from the released material has been exhausted (see
 `matsui_residual_root_cause.md`). One candidate survives and it is not

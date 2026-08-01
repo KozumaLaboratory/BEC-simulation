@@ -414,10 +414,25 @@ propagator. `nothing` keeps the historical leapfrog loop (merged V blocks).
 standard dynamics step was a silent no-op. Silently ignoring an accuracy knob is
 worse than not offering it, so unsupported values now raise.
 
-`midpoint` is the one that matters for dipolar dynamics: plain `split_step!`
-freezes the DDI mean field at each V(dt/2) boundary and is only 1st-order in
-time when `c_dd > 0`, while `split_step_midpoint!` restores 2nd order at ~1.5-2×
-the per-step cost.
+`midpoint` buys less than this docstring used to claim. `split_step!` ALREADY
+dispatches to `_half_potential_step_midpoint!` whenever DDI is active
+(`MEANFIELD_MIDPOINT_ENABLED`), so the default is 2nd order on the dipolar path —
+measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
+1st order when `c_dd > 0`" warning describes the LEGACY path with that toggle
+off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
+~1.3× the step, for 1.49× the per-step cost. Close to a wash.
+
+`rk4ip` is 4th order and, measured on an Eu-like 12³ DDI config, **cheaper per
+step than the default** (2.61 ms against 3.00; `midpoint` is 4.46) because the
+default runs the predictor-corrector twice per step while RK4IP makes four
+accumulating registry passes. Net of the larger step it holds: **2.7× at a 1e-4
+error budget, 4.9× at 1e-5**. Those are CPU at 12³; the GPU ratio is unmeasured
+and RK4IP's five scratch buffers are ~2.2 GB at 128³ F64 D=13, so check both
+before assuming it transfers. Two more things to know. It is not
+norm-conserving — the drift is a free error monitor, and `normalize_every` is not
+honoured. And its failure mode is a wall rather than a slope: measured on an
+Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns
+4e40 at 5e-2, where a unitary split-step merely degrades. Real time only.
 """
 function _resolve_dynamics_stepper(spec)
     spec === nothing && return nothing
@@ -427,12 +442,15 @@ function _resolve_dynamics_stepper(spec)
         return nothing
     elseif name == "midpoint"
         return split_step_midpoint!
+    elseif name == "rk4ip"
+        return rk4ip_step!
     else
         throw(
             ArgumentError(
                 "dynamics integrator \"$name\" is not implemented on the standard " *
-                "path. Supported: \"strang\" (default leapfrog) or \"midpoint\" " *
-                "(2nd-order with DDI). The rotating_basis path has its own set."),
+                "path. Supported: \"strang\" (default leapfrog), \"midpoint\" " *
+                "(2nd-order, explicit) or \"rk4ip\" (4th order, cheaper per step than " *
+                "the default, real time only). The rotating_basis path has its own set."),
         )
     end
 end

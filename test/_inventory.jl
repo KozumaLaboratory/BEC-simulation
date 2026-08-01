@@ -46,6 +46,15 @@ const _MARKERS = [
         # "bit-identity" is not "bit-identical", and the file whose whole title
         # is "HamTerm ↔ independent statement bit-identity" was landing in :pin.
         r"bit[-_ ]?identit"i, r"↔",
+        # "A agrees with B" is the differential claim in words. NOT a bare
+        # `match`: tried, and it promoted 41 files that were correctly
+        # :metamorphic / :invariant / :exact into :differential — a stronger
+        # claim they do not carry (`analysis/test_bogoliubov.jl` compares a
+        # dispersion to its closed form; that is exact, not differential).
+        # Re-labelling a grounded file is not the safe direction the header
+        # licenses; only moving an UNgrounded one into grounded is.
+        r"\bagree(s|ment)?\s+with\b"i, r"\b≡\b",
+        r"\bmatch(es)?\s+(the\s+)?(per[-_ ]component|reference|legacy|dumb|independent)"i,
         r"registry.{0,40}(≈|isapprox)"i, r"cpu.{0,30}gpu"i, r"gpu.{0,30}cpu"i,
         r"bit[-_ ]?identical"i, r"cross[-_ ]?check"i, r"\btwin\b"i,
         r"independent(ly)?\s+(computed|stated|implement)"i,
@@ -64,6 +73,9 @@ const _MARKERS = [
         # "conservation": Σ parts == total, and the accumulate contract.
         r"total.{0,30}(≈|==).{0,10}(Σ|sum|parts)"i, r"Σ\s*parts"i,
         r"accumulat"i,
+        # "preserved" is "conserved" said the other way. `Norm preserved by
+        # batched step` was :api.
+        r"\bpreserv"i,
         r"conserv"i, r"\bdrift\b"i, r"hermitic"i, r"unitar"i,
         r"norm\w*\s*.{0,20}(≈|isapprox)\s*1", r"sum[_ ]rule"i,
         r"positive[-_ ]?(semi)?definite"i, r"virial"i, r"trace"i,
@@ -74,6 +86,17 @@ const _MARKERS = [
         # `E = Re⟨ψ|Hψ⟩·dV`, `E = −Ω·⟨L_z⟩`, `= ψ†·F_α·ψ`, `v = k` — none of
         # which contains the word "analytic", so all of them were :pin.
         r"⟨ψ\s*\|", r"ψ†", r"Re⟨", r"⟨L_z⟩", r"⟨F", r"·dV\b",
+        # "X is zero / vanishes / is null" is a closed form — the closed form
+        # is 0. `probability_current zero for real Gaussian`, `plane wave has
+        # zero vorticity`, `Nyquist-null in FFT first-derivatives`,
+        # `orbital_angular_momentum returns 0 for 1D` were all :pin.
+        r"\b(is|are|returns?|gives?)\s+(exactly\s+)?(zero|0\b)"i,
+        r"\bzero\s+(for|at|in|when)\b"i, r"\bvanish"i, r"[-_ ]null\b"i,
+        # Closed-form shapes: a beam profile, a peak position, a limit value.
+        # NOT a bare `profile`: it is a common noun here (density profile,
+        # beam profile, "profiling") and it dragged two meta gates into :exact.
+        r"\bpeak\s+at\b"i, r"(gaussian|transverse|radial|density)\s+profile"i,
+        r"\blimit\b.{0,30}(≈|isapprox|==)"i,
         r"analytic"i, r"\bexact\b"i, r"closed[-_ ]form"i, r"theoretical"i,
         r"gauss[-_ ]hermite"i, r"manufactured"i, r"\bclosed form\b"i,
         r"known\s+(solution|answer|value)"i, r"first[-_ ]principles"i,

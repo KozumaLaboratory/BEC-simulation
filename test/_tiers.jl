@@ -53,6 +53,9 @@ const FAST_TESTS = [
     # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
     # OOM-is-permanent, and the on_complete lineage bound.
     "workflow/test_autopilot_invariants.jl",
+    # Analyzer-name routing and the ground-state interactions precedence —
+    # 64 workflow files covered neither (mutation, 2026-08-01).
+    "workflow/test_pipeline_name_and_precedence.jl",
     "workflow/test_auto_grid_derivation.jl",
     "workflow/test_b_block_spherical_angles.jl",
     "workflow/validation/test_error_budget_positive_control.jl",
@@ -150,6 +153,9 @@ const FAST_TESTS = [
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
     # the accuracy contract turns both red.
     "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
+    # RK4IP must be MEASURED at order 4, with the DDI-off control: composition
+    # schemes hit nominal order without the DDI and collapse to ~1 with it.
+    "hamiltonian/test_rk4ip_convergence_order.jl",
     # A k-space scratch buffer must carry ψ's precision, because the FFT plan
     # beside it does. Pairing a ComplexF32 in-place plan with a ComplexF64
     # buffer degrades `plan * buf` to the out-of-place method, so the buffer is
@@ -276,6 +282,7 @@ const CI_EXTRA = [
     "solvers/test_lbfgs_line_search_and_de.jl",
     "solvers/test_lbfgs_fast_path_equivalence.jl",
     "solvers/test_lbfgs_history_precision.jl",
+    "solvers/test_lbfgs_line_search_fused_gradient.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
@@ -300,6 +307,10 @@ const CI_EXTRA = [
     # being true and nobody had checked.
     "workflow/test_active_learning_yaml.jl",
     "workflow/test_multi_fidelity_yaml.jl",
+    # Klaus 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
+    # pending schema audit" since 2026-05-25; the schema was fine and the
+    # `initial_state` was inverted (see the file header). Runs in ~68 s.
+    "workflow/test_klaus_validation.jl",
     # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
     # propagation, multi-frame TOF) — integration weight, not fast-tier units.
     "analysis/test_tof.jl",
@@ -632,26 +643,18 @@ const PHYSICS_TESTS = [
 # here so the tier-membership meta-test counts them as "accounted for"
 # (i.e. they are deliberately manual, not orphaned). Run them by hand.
 const MANUAL_TESTS_ALLOWLIST = [
-    # Two files, each with a MEASURED reason (2026-07-31). The other three that
-    # sat here — gpu/test_cuda.jl, workflow/test_{active_learning,multi_fidelity}_yaml.jl
-    # — were run both ways and pass, so they are in tiers now.
+    # One file. `test_live_monitor.jl` blocks forever: `serve_dashboard` does not
+    # return until the server is closed and this file's close path is never
+    # reached, so the run hangs until it is killed (measured: SIGTERM at a
+    # 2400 s timeout, "Press Ctrl+C to stop" in the log). Its own comment says
+    # it means to close the server manually. Needs restructuring — serve on a
+    # task, assert, close in a `finally` — not a tier entry.
     #
-    # `test_klaus_validation.jl`: cannot run AS WRITTEN, and not for an
-    # environment reason. Its ground_state uses the real experimental field
-    # (`B: {Bz: "1.0 Gauss"}`, Dy164, ω_ref = 314.159) at `dt = 0.001`. That is
-    # p ≈ −3.5e4, so the ITP exponent spans |p·m·dt| ≈ 278 across m = ±8 and
-    # `exp` overflows on the first step: `ArgumentError: NaN detected in ITP at
-    # step 1`. The same footgun is documented in `test_b_block_builders.jl`
-    # ("real experimental values … require matching small dt and physics-aware
-    # setup — not a plumbing test"). Fixing it is a physics-setup decision
-    # (smaller GS field, or a dt that matches p), not a schema audit.
-    "workflow/test_klaus_validation.jl",
-    # `test_live_monitor.jl`: blocks forever. `serve_dashboard` does not return
-    # until the server is closed, and the close path is never reached, so the
-    # file hangs until it is killed (measured: SIGTERM at the 2400 s timeout,
-    # "Press Ctrl+C to stop" in the log). Its own comment says it means to close
-    # the server manually. Needs restructuring, not a tier entry.
-    "workflow/test_live_monitor.jl",
+    # The other four that sat here are in tiers as of 2026-07-31/08-01, each
+    # after being run rather than re-inheriting its reason: gpu/test_cuda.jl,
+    # workflow/test_{active_learning,multi_fidelity}_yaml.jl and
+    # workflow/test_klaus_validation.jl.
+    "workflow/test_live_monitor.jl"
 ]
 
 # Derived view (NOT a partition list): every `oracles/` gate, regardless of which
@@ -780,6 +783,9 @@ const _COST = Dict{String, Float64}(
     # 30668378491, 2026-07-31: all four workers killed, zero assertion
     # failures). Longest file in the suite; it must be handed out first.
     "workflow/test_multi_fidelity_yaml.jl" => 776.0,
+    # 68 s here; declared high because a runner estimate is what this model
+    # needs and the nightly timing table will correct it downward if generous.
+    "workflow/test_klaus_validation.jl" => 180.0,
     "workflow/test_active_learning_yaml.jl" => 21.7,
     "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
     # 4.8 s here against a warm depot; the CI runner pays a cold precompile
@@ -806,6 +812,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "solvers/test_lbfgs_history_precision.jl" => 8.0,
+    "solvers/test_lbfgs_line_search_fused_gradient.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
     "solvers/test_3d.jl" => 5.0,

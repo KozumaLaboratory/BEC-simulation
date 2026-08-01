@@ -11,7 +11,7 @@
 # this uses its own checkout (`bec-mutation`) and not the shared one.
 #
 #   qsub -g tga-kozuma-kouhi \
-#        -v MUT_PROBE=<spec+spec>,MUT_MUTANTS=<id:id:…>,MUT_TAG=<name> \
+#        -v MUT_PROBE=<spec+spec>,MUT_MUTANTS=<id:id:…>,MUT_TAG=<name>[,MUT_SHARD=k_n] \
 #        scripts/tsubame/submit_mutation.sh
 #
 # Everything it writes lands under /gs/fs (group volume), never $HOME.
@@ -72,6 +72,8 @@ $JULIA --project=. -e 'using Pkg; Pkg.instantiate()' 2>&1 | tail -3
 ARGS=(--probe "$MUT_PROBE" --workers "${MUT_WORKERS:-8}"
       --max-cost "${MUT_MAX_COST:-300}" --out "$OUT")
 [ -n "${MUT_MUTANTS:-}" ] && ARGS+=(--mutants "$MUT_MUTANTS")
+# `k/n` — the same sharding the nightly uses, so a shard can be reproduced here.
+[ -n "${MUT_SHARD:-}" ] && ARGS+=(--shard "${MUT_SHARD//_//}")
 
 $JULIA --project=. --startup-file=no test/mutation/run.jl "${ARGS[@]}" 2>&1
 echo "MUT_RC=$?"
