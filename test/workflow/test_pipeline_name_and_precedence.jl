@@ -35,11 +35,17 @@ using SpinorBEC: _run_analyzer, _resolve_gs_interactions, resolve_atom, make_gri
         # RESULT SHAPE, not by whether they throw.
         a = _run_analyzer(:phase_classify, psi, grid, atom, Dict{Any, Any}())
         b = _run_analyzer(:phase_classify_distance, psi, grid, atom, Dict{Any, Any}())
-        @test a isa AbstractDict
-        @test b isa AbstractDict
-        # The claim: they are not the same analyzer. If the dispatch chain ever
-        # routes one to the other, this is what notices.
-        @test keys(a) != keys(b) || a != b
+        @test a isa NamedTuple
+        @test b isa NamedTuple
+
+        # `phase_classify_distance` returns a SUPERSET of `phase_classify`'s
+        # fields — same classification plus the distance and the ranking. So
+        # "not the same analyzer" has to be said in terms of the fields only
+        # the second one has; a mis-route puts them on the first.
+        for k in (:phase_distance, :distance, :ranking)
+            @test k ∈ keys(b)
+            @test k ∉ keys(a)
+        end
 
         # And an unknown name must not quietly resolve to anything at all.
         @test_throws Exception _run_analyzer(
