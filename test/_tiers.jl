@@ -49,6 +49,10 @@ const FAST_TESTS = [
     "workflow/test_thermal_seed_amplitude.jl",
     # auto_grid, the spherical B angles and the error budget's positive-control
     # guard were each invisible to all 59 workflow files (mutation, 2026-07-31).
+    # Four autopilot invariants that 63 workflow files did not cover
+    # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
+    # OOM-is-permanent, and the on_complete lineage bound.
+    "workflow/test_autopilot_invariants.jl",
     "workflow/test_auto_grid_derivation.jl",
     "workflow/test_b_block_spherical_angles.jl",
     "workflow/validation/test_error_budget_positive_control.jl",

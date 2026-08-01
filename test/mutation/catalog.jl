@@ -292,6 +292,56 @@ const MUTANTS = Mutant[
          every higher even-rank channel while c₀ and c₁ survive. The file \
          opens, the state loads, the physics is a different Hamiltonian."),
 
+    # ── autopilot: the invariants, not the arithmetic ─────────────────
+    # CLAUDE.md lists these as permanent invariants of the meta-loop. None of
+    # them is a physics claim and none can be caught by an oracle; each one
+    # fails by spending money or by losing the ability to recover, quietly.
+    Mutant(:budget_gate_ignores_queued_work,
+        "src/workflow/autopilot/budget.jl",
+        r"        if realized \+ predicted > b\.quarter_cap_gpu_hours",
+        "        if realized > b.quarter_cap_gpu_hours",
+        :missing_gate, :fatal,
+        "the budget gate is checked once per tick, before submitting",
+        "Judges the quarter cap on hours ALREADY SPENT and ignores the queue \
+         that is about to spend more. The gate still exists, still trips \
+         eventually, and admits an entire over-cap queue first — which is the \
+         one moment it was there to stop."),
+    Mutant(:budget_daily_cap_never_checked,
+        "src/workflow/autopilot/budget.jl",
+        r"    if b\.daily_cap_gpu_hours > 0 && b\.realized_today > b\.daily_cap_gpu_hours",
+        "    if false",
+        :missing_gate, :major,
+        "quarter + daily GPU·h caps, refreshed from realized hours",
+        "Removes the daily cap while leaving the quarterly one, so a runaway \
+         loop burns a quarter's allocation in a day and every individual \
+         decision looks affordable."),
+    Mutant(:on_complete_lineage_unbounded,
+        "src/workflow/autopilot/on_complete.jl",
+        r"    if _descendant_count\(entry, config\.qr\) >= config\.on_complete_max_descendants",
+        "    if false",
+        :missing_gate, :fatal,
+        "on_complete recipes are bounded by on_complete_max_descendants (64)",
+        "Lets a recipe lineage breed without limit. Each descendant is a \
+         legitimate run and the queue looks healthy the whole way down."),
+    Mutant(:oom_classified_as_transient,
+        "src/workflow/autopilot/tick.jl",
+        r"        return :killed_bug, \"OOM: \$\(reason\)\"",
+        "        return :killed_data, \"OOM: \$(reason)\"",
+        :path_default, :major,
+        "OOM is resource-permanent — retry escalates the resource class",
+        "Classifies an out-of-memory kill as a DATA failure, so the retry \
+         re-runs the same recipe at the same resource class and OOMs again. \
+         The queue makes progress in the sense that it keeps trying."),
+    Mutant(:rotating_frames_default_swapped,
+        "src/workflow/experiments/pipeline/pipeline_dispatch.jl",
+        r"    return max\(1, total ÷ \(n_steps === nothing \? 20 : 100\)\)",
+        "    return max(1, total ÷ (n_steps === nothing ? 100 : 20))",
+        :path_default, :major,
+        "100 frames for rotating_basis (n_steps known), 20 otherwise",
+        "Swaps the two default frame counts, so a run saves 5× too few or 5× \
+         too many snapshots. The file is valid either way and the physics is \
+         unchanged — only the record of it is."),
+
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where
     # every term-level oracle is green by construction because it never goes
