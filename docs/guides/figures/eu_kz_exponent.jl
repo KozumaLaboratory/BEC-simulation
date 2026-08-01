@@ -92,7 +92,8 @@ function kz_trajectory(;
     # post-process them.
     hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
     rr, g1 = first_order_correlation(psi, grid, hplans)
-    ξ_hat = coherence_length(rr, g1)
+    _cl = coherence_length(rr, g1)
+    ξ_hat = _cl.xi
 
     lines = extract_vortex_lines_per_m(psi, grid; min_density_frac)
     # Per-component counts. In a spinor the defect need not live on one component,
@@ -102,7 +103,7 @@ function kz_trajectory(;
     per_m = Dict(m => (haskey(lines, m >= 0 ? "+$m" : "$m") ?
                        length(lines[m >= 0 ? "+$m" : "$m"]) : 0) for m in (-F):F)
     pops = [real(sum(abs2, view(psi, :, :, :, c))) * dV for c in 1:size(psi, 4)]
-    (; n_vortices=per_m[-F], per_m, pops, xi_hat=ξ_hat,
+    (; n_vortices=per_m[-F], per_m, pops, xi_hat=ξ_hat, f_inf=_cl.f_inf,
         N_C=real(sum(abs2, psi)) * dV)
 end
 
@@ -176,12 +177,15 @@ function kz_scan(;
     ncs = Float64[]
     xihats = Float64[]
     xisems = Float64[]
-    @printf("\n  %-8s %-10s %-10s %-10s %-9s %-8s\n",
-        "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩", "⟨ξ̂⟩", "sem")
+    fmeans = Float64[]
+    nfins = Int[]
+    @printf("\n  %-8s %-10s %-10s %-10s %-9s %-8s %-6s %-8s\n",
+        "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩", "⟨ξ̂⟩", "sem", "n_fin", "⟨f_∞⟩")
     for τ in tau_Qs
         vs = Int[]
         ncl = Float64[]
         xis = Float64[]
+        fis = Float64[]
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
                 t_equil, t_hold, gamma, M, k_cut, dt,
@@ -192,6 +196,7 @@ function kz_scan(;
             push!(vs, r.n_vortices)
             push!(ncl, r.N_C)
             isfinite(r.xi_hat) && push!(xis, r.xi_hat)
+            isfinite(r.f_inf) && push!(fis, r.f_inf)
         end
         m = mean(vs)
         push!(means, m)
@@ -200,8 +205,15 @@ function kz_scan(;
         ξm = isempty(xis) ? NaN : mean(xis)
         ξs = length(xis) > 1 ? std(xis) / sqrt(length(xis)) : 0.0
         push!(xihats, ξm); push!(xisems, ξs)
-        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g %-9.3f %-8.3f\n",
-            τ, m, sems[end], ncs[end], ξm, ξs)
+        push!(fmeans, isempty(fis) ? NaN : mean(fis))
+        push!(nfins, length(xis))
+        # n_fin and f_inf are printed because their absence hid a broken ξ̂: the
+        # scan once reported sem = 0.000 at every τ_Q, which is what a single
+        # contributing seed (or a constant condensate fraction read as a length)
+        # looks like. Zero scatter across independent stochastic seeds is a bug
+        # signal, not a tight measurement.
+        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g %-9.3f %-8.3f %-6d %-8.3f\n",
+            τ, m, sems[end], ncs[end], ξm, ξs, length(xis), fmeans[end])
         flush(stdout)
     end
 
@@ -230,10 +242,10 @@ function kz_scan(;
     csv = joinpath(OUTDIR, "$(tag).csv")
     open(csv, "w") do io
         println(io, "# alpha=$(α) alpha_err=$(α_err) gamma=$gamma mu=$mu k_cut=$k_cut grid=$grid_n")
-        println(io, "tau_Q,N_v_mean,N_v_sem,N_C_mean,xi_hat_mean,xi_hat_sem")
+        println(io, "tau_Q,N_v_mean,N_v_sem,N_C_mean,xi_hat_mean,xi_hat_sem,n_finite,f_inf_mean")
         for (i, τ) in enumerate(tau_Qs)
-            @printf(io, "%.4f,%.6f,%.6f,%.6g,%.6f,%.6f\n",
-                τ, means[i], sems[i], ncs[i], xihats[i], xisems[i])
+            @printf(io, "%.4f,%.6f,%.6f,%.6g,%.6f,%.6f,%d,%.6f\n",
+                τ, means[i], sems[i], ncs[i], xihats[i], xisems[i], nfins[i], fmeans[i])
         end
     end
     @printf("  wrote %s\n", csv)
