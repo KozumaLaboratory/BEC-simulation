@@ -496,6 +496,21 @@ const CI_EXTRA = [
     # `return nothing` guard never stopped their own include — between them,
     # four of the standing `full`-tier reds.
     "gpu/test_cpu_only_runner.jl",
+
+    # Moved up from FULL_EXTRA 2026-08-02, on mutation-sweep evidence (#276,
+    # jobs 8315814/8315815). It is the SOLE file that catches two cataloged
+    # defect classes, and it was in no required check — required is
+    # fast + oracles + integration, and integration derives from THIS list:
+    #
+    #   yaml_calibration_not_applied  [fatal] — `p_mv`/`coil_mode` stop resolving
+    #     to Gauss before parsing, so every downstream number is off by the coil
+    #     calibration factor while the run looks entirely normal.
+    #   save_every_off_by_one         [major] — `save.every` no longer divides the
+    #     step count, so the last snapshot is not the final state.
+    #
+    # Every other escapee from that sweep had a catcher already inside a required
+    # tier. These two did not, and the file costs 17 s.
+    "workflow/test_pipeline.jl",
 ]
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
@@ -515,7 +530,6 @@ const FULL_EXTRA = [
     "hamiltonian/test_tensor_interaction.jl",
     "solvers/test_lbfgs.jl",
     "solvers/test_lbfgs_accuracy_floor.jl",
-    "workflow/test_pipeline.jl",
     "solvers/test_pause_resume.jl",
     "dynamics/test_twa.jl",
     "solvers/test_binary_simulation.jl",
