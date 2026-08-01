@@ -49,7 +49,8 @@ at t = 5 ms; widths on the matched window [−12, +9]:
 | baseline (`dt` = 1e-3) | −2.5099 | 12.740 | — |
 | `dt` refined 4× | −2.5100 | 12.740 | **−0.0001** |
 | ramp segment alone refined 4× | −2.5099 | 12.740 | −0.0000 |
-| + their exponential ramp | −2.5865 | 12.797 | −0.0766 |
+| + their exponential ramp | −2.5865 | 12.753 | −0.0766 |
+| + their exponential ramp, knots 4× finer | −2.5867 | 12.753 | −0.0768 |
 | + grid (32³/box 16 → 64³) | — | — | −0.007 |
 | + DDI kernel (cutoff on/off) | — | — | −0.002 |
 | **Matsui** | **−2.5495** | **12.752** | **−0.0396 needed** |
@@ -62,13 +63,61 @@ nothing either. Adaptive stepping would buy nothing here.
 The only candidate that moves the centre by the right order of magnitude is
 **their exponential ramp**, and it **overshoots by about 2×**: −0.0766 against
 the −0.0396 needed. Adopting their ramp shape swaps a +0.040 nT error for a
-−0.037 nT one. So the ramp is implicated but not as a simple substitution — some
-part of the ramp difference is right and some is not, and that has not been
-separated.
+−0.037 nT one.
 
-**0.0396 nT (1.6 %) of the centre remains unexplained.** It is bounded well
-inside the ~1 nT field fluctuation the paper itself quotes, so it does not
-threaten the reproduction; it is simply not accounted for.
+### The ramp's discretisation is excluded on both of its axes
+
+Their Fortran evaluates `B(t)` in closed form every step; we encode it as a
+piecewise-linear waveform. Two independent things could therefore go wrong, and
+the dt sweep above only bounds one of them — a finer `dt` samples the *same*
+piecewise-linear waveform more densely, it does not move that waveform closer to
+the exponential.
+
+The second axis is the knot spacing. A chord across a convex decaying exponential
+lies above it everywhere, so `τ/6` knots run the field systematically high: the
+excess time-integrated field over the 5 ms hold is 0.0848 nT·t.u., which is a
+**+0.0245 nT DC-equivalent offset**, with a 3.6 nT peak instantaneous excess.
+Refining to `τ/24` cuts both 12×.
+
+**Prediction, recorded in the config before the run: the centre moves +0.0245 nT,
+to about −2.562. It did not.**
+
+| their exponential ramp | centre [nT] | width [nT] |
+|---|---|---|
+| knots `τ/6` | −2.5865 | 12.7530 |
+| knots `τ/24` | **−2.5867** | 12.7529 |
+
+−0.0002 nT — two orders below the prediction. UGE 8314874 task 21, commit
+`b634f400`, clean tree, exit 0, 45 points.
+
+So a 3.6 nT transient error during the 350 µs ramp is worth 0.0002 nT of
+resonance position, and the DC-equivalent mapping that made it look like 0.0245
+is simply wrong. **A time-averaged field is not the quantity the resonance
+responds to** — the same lesson the campaign already learned when the mean
+dipolar field over the ground state came out −0.65 nT while the dip sat at −2.1.
+The resonance is set by conditions during the transfer.
+
+Between them the two axes exclude ramp discretisation entirely, and with it any
+gain from exact `∫B(t)dt` in the Zeeman exponent: the midpoint quadrature error
+it would remove is O(dt³) and the dt sweep bounds it 64× below a null.
+
+### What the ramp shape does settle: the width
+
+| arm | centre [nT] | Δ vs Matsui | width [nT] | Δ vs Matsui |
+|---|---|---|---|---|
+| our linear 150 µs ramp | −2.5099 | **+0.0396** | 12.7400 | −0.0124 (0.10 %) |
+| their exponential ramp | −2.5865 | −0.0370 | **12.7530** | **+0.0006 (0.005 %)** |
+| Matsui | −2.5495 | — | 12.7524 | — |
+
+Their ramp closes the width to 0.005 % — better than the linear stand-in by 20× —
+while overshooting the centre by almost exactly what the linear ramp undershoots
+it. The two observables therefore point at *different* arms, which is itself
+information: whatever remains is not a single scalar in the ramp, or one arm
+would win both.
+
+**0.037–0.040 nT (1.5 %) of the centre remains unexplained**, bounded well inside
+the ~1 nT field fluctuation the paper itself quotes, so it does not threaten the
+reproduction; it is simply not accounted for.
 
 **The ground-state DDI is excluded**, and by a wide margin. Their
 `timeGP_3D_spin1_fix` carries `+cdd·INT0_n·MatSZ(im)` while **both calls that
@@ -81,7 +130,9 @@ the GS shape goes 0.7786 → 1.3858, the bare-trap value being 1.3967). Matsui s
 field is effectively self-consistent, because the TF seed's dipolar field is
 already close to the converged one.
 
-**No unexplained physics remains in the centre.**
+So the centre's remaining 0.037–0.040 nT is not the time step, not the knot
+spacing, not the grid, not the DDI kernel and not the ground-state DDI. It is
+bounded, it is small, and it is open.
 
 ## The width DOES close — the 2 % was a window mismatch
 
