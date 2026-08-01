@@ -87,7 +87,31 @@ and physical — so the headline stands. But the stored figure's *transition* to
 the old numbers been right, that transition was never within reach of Eu's
 physics.
 
-## Do not quote the high-K3 rows yet
+## The high-K3 drift is physical, not numerical — settled 2026-08-01
+
+The write-up below withheld the high-K3 rows because `energy_rel_drift` climbs to
+0.92 and I had not separated K3's physical (non-Hermitian) energy loss from
+numerical error. Settled by halving dt twice on `K3x300p0` — TSUBAME job 8315303:
+
+| dt | `energy_rel_drift` | `norm_rel_drift` |
+|---|---:|---:|
+| 0.005 | 0.921524 | 0.710369 |
+| 0.0025 | 0.921540 | 0.710330 |
+| 0.00125 | 0.921544 | 0.710311 |
+
+**Quartering dt moves the drift by 2.2e-5 relative.** Numerical error would fall
+with dt — by 4× if first order, 16× under Strang. It does not move at all.
+
+The corroboration is in the same table: `norm_rel_drift = 0.71`, i.e. **the run
+loses 71 % of its atoms.** A 92 % energy decrease alongside a 71 % atom loss is
+what a three-body loss channel does; it is the physics the config asks for.
+
+So the integration is sound at every K3 in the sweep, and the earlier caution was
+misplaced. **The reason not to quote the high-K3 rows is the other one: the
+parameter is not Eu's.** Factor 300 is 250× the measured K₃, and no amount of
+numerical accuracy makes that row a statement about ¹⁵¹Eu.
+
+## Superseded caution (kept for the record)
 
 `energy_rel_drift` climbs monotonically with K3, from 7.1e-07 to **0.92**. K3 is
 a non-Hermitian three-body loss, so energy *should* fall — but I have not
