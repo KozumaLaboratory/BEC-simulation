@@ -51,7 +51,8 @@ cd "$PROJECT_ROOT"
 
 source scripts/tsubame_setup.sh
 . /etc/profile.d/modules.sh
-module load "${SPINORBEC_TSUBAME_CUDA_MODULE:-cuda/12.8.0}"
+# BLAS pin, $HOME check, quota headroom, runs/ presence, cuda module — #272.
+source scripts/tsubame/preflight.sh --gpu
 
 # Node-local depot first so 58 precompiles never touch the group quota.
 SHARED_DEPOT=${SPINORBEC_TSUBAME_DEPOT:-/gs/fs/tga-kozuma-kouhi/shared/.julia}
@@ -61,8 +62,6 @@ if [ -n "${T4_TMPDIR:-}" ] && [ -w "${T4_TMPDIR}" ]; then
 else
     export JULIA_DEPOT_PATH="$SHARED_DEPOT"
 fi
-export OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-1}
-export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
 
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
