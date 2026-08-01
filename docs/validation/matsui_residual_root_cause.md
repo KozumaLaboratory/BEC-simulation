@@ -6,47 +6,69 @@ simulation ran at `Ntot = 3.5×10⁴` — the value shipped in their
 is what we had assumed. Given the right `N`, our code reproduces their Fig. 4B to
 **1 %**.
 
+Both columns read from the final `psi`; widths on the matched window [−12, +9]
+(see "the width DOES close" below for why the window has to be stated).
+
 | | dip centre [nT] | half-depth width [nT] |
 |---|---|---|
-| ours, N = 5.0×10⁴ | −2.138 | 13.97 |
-| **ours, N = 3.5×10⁴** | **−2.510** | **12.89** |
-| Matsui | −2.549 | 12.75 |
+| ours, N = 5.0×10⁴ | −2.1381 | 13.813 |
+| **ours, N = 3.5×10⁴** | **−2.5099** | **12.740** |
+| Matsui | −2.5495 | 12.752 |
 
-Centre gap **0.411 → 0.039 nT** (−90 %), width gap **1.22 → 0.14 nT** (−89 %).
-Per-field, `N_{m=−6}` ours over theirs across all 45 fields:
+Centre gap **0.411 → 0.040 nT** (−90 %), width gap **1.061 → 0.012 nT** (−99 %).
+Per-field, `N_{m=−6}` ours over theirs on the 41 fields where the two scans share
+an abscissa:
 
-| B [nT] | −10 | −6 | −4 | −2.5 | −2 | 0 | +2.5 | +5 | +9 |
+| B [nT] | −12 | −10 | −6 | −4 | −2 | 0 | +2 | +5 | +9 |
 |---|---|---|---|---|---|---|---|---|---|
-| ratio | 1.025 | 1.004 | 0.995 | 0.991 | 0.991 | 0.989 | 0.990 | 1.000 | 1.002 |
+| ratio | 1.020 | 1.025 | 1.004 | 0.995 | 0.991 | 0.989 | 0.989 | 1.000 | 1.002 |
 
-**Within 1.1 % everywhere.** At N = 5×10⁴ the same ratios ran 0.78–0.84.
+**rms deviation 1.10 %, worst 2.57 %** (at −10 nT, on the left wing where we run
+systematically high). At N = 5×10⁴ the same ratios ran 0.78–0.84.
 
 UGE 8310846 task 15, commit `ec310fe2`+, exit 0, 45 points. Type C.
 
-## Error budget for the last 0.039 nT — it is our time step
+## Error budget for the last 0.039 nT — it is NOT our time step
 
-Baseline: N = 3.5×10⁴ with our defaults, centre **−2.510** against their
-**−2.549**. Each candidate turned on alone, signed (UGE 8313740, both arms
-exit 0, 45 points each):
+> **Retracted 2026-08-01.** This section previously read "it is our time step"
+> and reported that refining `dt` 4× moved the centre by −0.040 nT, landing on
+> −2.550 against their −2.549. **That measurement was invalid.** The refined-`dt`
+> run's `save.every` did not land on the final step, so its last saved series
+> sample is at t = 3.348 against the baseline's 3.456 — a 3.1 % shorter
+> evolution. The −0.040 nT was that 3.1 %, not the time step. Read from the
+> saved final `psi` instead, both arms end at 5 ms and the answer changes sign
+> and three orders of magnitude. The lesson is filed below.
+
+Baseline: N = 3.5×10⁴ with our defaults, centre **−2.5099** against their
+**−2.5495**. Each candidate turned on alone (UGE 8313740 / 8314269, all arms
+exit 0, 45 points each). All figures read from the final `psi`, verified to be
+at t = 5 ms; widths on the matched window [−12, +9]:
 
 | arm | centre [nT] | width [nT] | Δcentre |
 |---|---|---|---|
-| baseline | −2.510 | 12.89 | — |
-| **+ `dt` refined 4×** | **−2.550** | 13.00 | **−0.040** |
-| + their exponential ramp | −2.587 | 12.90 | −0.077 |
-| + grid (32³/box 16 → 128³/box 36.2) | — | — | −0.007 |
+| baseline (`dt` = 1e-3) | −2.5099 | 12.740 | — |
+| `dt` refined 4× | −2.5100 | 12.740 | **−0.0001** |
+| ramp segment alone refined 4× | −2.5099 | 12.740 | −0.0000 |
+| + their exponential ramp | −2.5865 | 12.797 | −0.0766 |
+| + grid (32³/box 16 → 64³) | — | — | −0.007 |
 | + DDI kernel (cutoff on/off) | — | — | −0.002 |
-| **Matsui** | **−2.549** | 12.75 | **−0.039 needed** |
+| **Matsui** | **−2.5495** | **12.752** | **−0.0396 needed** |
 
-**Converging our time step alone lands on −2.550 against their −2.549 — 0.001 nT
-apart.** The residual was our own `dt = 1e-3` discretisation. They run the same
-`dt` but with Crank–Nicolson iterated to self-consistency, where we use a Strang
-split-step; both are 2nd order and theirs simply carries the smaller coefficient.
+**Our time step is converged.** Refining it 4× moves the per-field `m = −6`
+populations by 8–9×10⁻⁵ and the centre by 0.0001 nT — 400× smaller than the
+residual. Refining only the ramp segment, where the field moves fastest, does
+nothing either. Adaptive stepping would buy nothing here.
 
-The ramp **overshoots**: −0.077 against the −0.039 needed. And the two are not
-independent — summing them gives −0.117, three times the residual — so refining
-`dt` and fixing the ramp are partly capturing the same discretisation. That was
-not separated further; the point is made either way.
+The only candidate that moves the centre by the right order of magnitude is
+**their exponential ramp**, and it **overshoots by about 2×**: −0.0766 against
+the −0.0396 needed. Adopting their ramp shape swaps a +0.040 nT error for a
+−0.037 nT one. So the ramp is implicated but not as a simple substitution — some
+part of the ramp difference is right and some is not, and that has not been
+separated.
+
+**0.0396 nT (1.6 %) of the centre remains unexplained.** It is bounded well
+inside the ~1 nT field fluctuation the paper itself quotes, so it does not
+threaten the reproduction; it is simply not accounted for.
 
 **The ground-state DDI is excluded**, and by a wide margin. Their
 `timeGP_3D_spin1_fix` carries `+cdd·INT0_n·MatSZ(im)` while **both calls that
@@ -61,13 +83,52 @@ already close to the converged one.
 
 **No unexplained physics remains in the centre.**
 
-## The width does NOT close, and is left open
+## The width DOES close — the 2 % was a window mismatch
 
-`dt` and the ramp both move the width the *wrong* way: 12.89 → 13.00 and 12.90
-against their 12.75. Centre agrees to 0.001 nT while the width stays 0.25 nT
-(2 %) apart. The width is measured against an endpoint baseline and their grid is
-1 nT where ours is 0.5 nT, so part of this is sampling rather than physics — but
-that has not been separated. Open.
+> **Corrected 2026-08-01.** This section previously reported a 2 % width gap as
+> open physics. It was an artefact of comparing the two curves over windows that
+> were not actually the same.
+
+`resonance_dip` sets the half-depth level from the **endpoints**, so `width` is
+a property of the curve *and the window it is measured over*. On the Matsui
+theory curve alone, one dataset:
+
+| window [nT] | their width [nT] |
+|---|---|
+| [−20, +20] (their full scan) | 15.022 |
+| [−13, +9] | 13.073 |
+| [−10, +9] | 11.791 |
+
+A 21 % spread with no physics involved. Our scan runs [−13, +9] at 0.5 nT
+throughout; theirs runs [−20, +20] at 0.5 nT **only inside ±10 nT** and 1 nT
+outside. So "restrict both to [−12.5, +9]" left our outermost sample at −12.5 and
+theirs — which has no −12.5 node — at −12. That half step is the whole reported
+disagreement:
+
+| common window | ours | Matsui | Δ |
+|---|---|---|---|
+| [−12.5, +9] (endpoints ½ step apart) | 12.885 | 12.752 | +1.04 % |
+| **[−12, +9] (endpoints identical)** | **12.740** | **12.752** | **−0.10 %** |
+| [−10, +9] | 11.828 | 11.791 | +0.31 % |
+
+**On a genuinely matched window the widths agree to 0.1 %.** Centre and width
+are therefore both closed to ~1.6 % and ~0.1 % respectively.
+
+Two further traps this exposed, both now pinned by
+`test/validation/test_matsui_fig4_dip.jl`:
+
+- **`point_001` is not the state its field label claims.** Our B = −13 nT point
+  reads exactly 1.000000 — the untouched ground state — against 0.7047 at the
+  neighbouring −12.5 nT. Because that point is the *left endpoint*, it set the
+  baseline, and every width we computed over the full [−13, +9] range was
+  inflated to ~14.95. It is the known multi-point-scan defect; the campaign's
+  own `matsui_ddi_operator_audit.jl` already skips `point_001` for this reason.
+- The fixture's own theory-vs-experiment width consistency check was comparing
+  [−20, +20] against [−17.5, +17.5]. Now trimmed to the common range.
+
+`center` carries none of this — it is a parabolic vertex through the minimum and
+its two neighbours, invariant under the window to 1e-6. That is why it is the
+number this campaign quotes.
 
 ## How it was found, and why it took so long
 
