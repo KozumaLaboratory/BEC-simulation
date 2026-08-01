@@ -79,19 +79,21 @@ function main()
     n0 = norm(p0)
     @printf("Eu-like %d^3, T = %.2f (omega_ref units), DDI on\n\n", N, T)
 
-    # The reference is RK4IP at T/512 — self-referential, so CHECK it: an
-    # independent Strang run at the same dt must agree far below the errors being
-    # measured, or the fine end of the table is measuring the reference.
-    ref = evolve(rk4ip_step!, p0, T / 512)
-    ref_alt = evolve(split_step!, p0, T / 512)
-    ref_gap = norm(ref .- ref_alt) / norm(ref)
-    @printf("reference cross-check: RK4IP vs Strang, both at dt = %.2e -> %.3e\n",
-        T / 512, ref_gap)
-    println(ref_gap < 1e-7 ? "  sound: far below the smallest error tabulated below" :
-            "  WARNING: comparable to the table's fine end — read those rows as the reference's own error")
-    println()
+    # The reference is RK4IP at T/4096, and it has to be CHECKED or the fine end
+    # of the table measures the reference rather than the integrators.
+    #
+    # The check must be Richardson on the reference's OWN method: comparing it
+    # against Strang at the same dt would measure Strang's error, which is orders
+    # larger and says nothing about the reference. (That was this script's first
+    # version, and it duly fired a warning about a reference that was fine.)
+    # At order 4, ||y(h) - y(2h)|| bounds y(h)'s own error by ~1/15 of itself.
+    ref = evolve(rk4ip_step!, p0, T / 4096)
+    ref_half = evolve(rk4ip_step!, p0, T / 2048)
+    ref_err = norm(ref .- ref_half) / norm(ref) / 15
+    @printf("reference: RK4IP at dt = %.2e; Richardson bound on its own error %.2e\n",
+        T / 4096, ref_err)
 
-    steps = [T / k for k in (256, 128, 64, 32, 16, 8, 4)]
+    steps = [T / k for k in (1024, 512, 256, 128, 64, 32, 16, 8, 4)]
     errs = Dict(:rk4ip => Float64[], :strang => Float64[])
 
     @printf("%10s %14s %14s %14s %14s\n",
@@ -109,8 +111,12 @@ function main()
                 e = NaN
                 dn = NaN
             end
+            # Below the reference's own error the number is the reference, not
+            # the integrator. Drop it rather than tabulate it as accuracy.
+            isfinite(e) && e < 10 * ref_err && (e = NaN)
             push!(errs[key], e)
-            push!(row, isfinite(e) ? @sprintf("%14.3e", e) : rpad("  DIVERGED", 14))
+            push!(row, isfinite(e) ? @sprintf("%14.3e", e) :
+                       rpad(isfinite(dn) ? "  <reference" : "  DIVERGED", 14))
             push!(row, isfinite(dn) ? @sprintf("%14.3e", dn) : rpad("       —", 14))
         end
         println(join(row, " "))

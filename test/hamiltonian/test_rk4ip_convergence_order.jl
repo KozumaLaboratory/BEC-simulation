@@ -80,6 +80,39 @@ end
         @test p < 4.4
     end
 
+    # RK4IP's failure mode is a wall, not a slope: it holds ~1e-1 relative error
+    # and then returns 1e40. A unitary split-step forgives an over-large dt and
+    # this does not, so it must compose with the existing controller rather than
+    # need a parallel one. The `dt` keyword is the whole interface.
+    @testset "drives the existing adaptive controller" begin
+        ws = _rk_workspace(; enable_ddi=true, dt=_RK_T / 16)
+        copyto!(ws.state.psi, _rk_psi0(ws))
+        ws.state.t = 0.0
+
+        # A deliberately over-large starting dt, past where the fixed-step probe
+        # measures divergence. The controller must pull it back rather than
+        # integrate the blow-up.
+        st = AdaptiveDtState(_RK_T / 2)
+        t_end = _RK_T
+        n = 0
+        while ws.state.t < t_end - 1e-12 && n < 500
+            st.dt = min(st.dt, t_end - ws.state.t)
+            # `step!=rk4ip_step!` without the spaces lexes as `step != ...`.
+            adaptive_step!(ws, st; tol_abs=1e-10, tol_rel=1e-8, p=4, (step!)=(rk4ip_step!))
+            n += 1
+        end
+
+        @test ws.state.t ≈ t_end atol = 1e-9
+        @test all(isfinite, ws.state.psi)               # the wall was not walked into
+        @test st.n_accept > 0
+        @test st.dt < _RK_T / 2                          # it shrank from the bad guess
+
+        # And the result is actually accurate — an adaptive loop that accepts
+        # everything would also satisfy every assertion above.
+        ref = _evolve(_rk_psi0(ws); enable_ddi=true, dt=_RK_T / 128)
+        @test norm(Array(ws.state.psi) .- ref) / norm(ref) < 1e-5
+    end
+
     @testset "refuses imaginary time rather than silently doing the wrong thing" begin
         grid = make_grid(GridConfig((_RK_N, _RK_N, _RK_N), (_RK_L, _RK_L, _RK_L)))
         ws = make_workspace(; grid, atom=Eu151,

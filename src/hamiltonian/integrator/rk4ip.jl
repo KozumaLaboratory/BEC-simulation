@@ -91,20 +91,38 @@ function _rk4ip_scratch(psi::A) where {A <: AbstractArray}
 end
 
 """
-    rk4ip_step!(ws)
+    rk4ip_step!(ws; dt=ws.sim_params.dt)
 
-One RK4IP step. Mutates `ws.state.psi` and advances `ws.state.t` by `dt`.
+One RK4IP step. Mutates `ws.state.psi`, advances `ws.state.t` by `dt` and
+increments `ws.state.step`.
 
     run_simulation!(ws; stepper=rk4ip_step!)
 
-Real time only — in imaginary time the interaction-picture factor is a decaying
+The `dt` keyword is what makes this usable with the existing controller —
+
+    adaptive_step!(ws, AdaptiveDtState(dt0); step! = rk4ip_step!, p = 4)
+
+which supplies the Richardson defect estimate and the Söderlind PI3.4 proposal.
+That matters more here than for a split-step: RK4IP has a hard stability wall
+rather than a graceful one. Measured on an Eu-like 12³ DDI config
+(`scripts/validation/rk4ip_step_size_probe.jl`) it holds 2.4× Strang's step at a
+1e-4 error budget and 4.2× at 1e-5, then **diverges outright** between dt = 2.5e-2
+and 5e-2 — 1.5e-1 relative error becomes 4e40. A unitary split-step degrades
+instead of exploding, so it forgives an over-large `dt` and this does not.
+
+Real time only — in imaginary time the interaction-picture factor is a growing
 exponential and the RK stages are not a descent. Use `split_step!` for ITP.
+
+`normalize_every` is deliberately NOT honoured. RK4IP is not norm-conserving, so
+its norm drift is a free running error monitor (it tracks the L2 error to within
+an order over four decades of `dt`); renormalising would erase the one diagnostic
+the method hands you for nothing. Reach for `split_step!` if you want the norm
+pinned.
 """
-function rk4ip_step!(ws::Workspace)
+function rk4ip_step!(ws::Workspace; dt::Float64=ws.sim_params.dt)
     ws.sim_params.imaginary_time &&
         throw(ArgumentError("rk4ip_step! is real-time only; use split_step! for ITP"))
 
-    dt = ws.sim_params.dt
     t = ws.state.t
     psi = ws.state.psi
     psi_I, k1, k2, k3, tmp = _rk4ip_scratch(psi)
@@ -147,5 +165,6 @@ function rk4ip_step!(ws::Workspace)
     @. psi = psi_I + (dt / 6) * k2
 
     ws.state.t = t + dt
+    ws.state.step += 1
     psi
 end
