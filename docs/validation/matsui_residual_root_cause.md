@@ -1,18 +1,220 @@
-# Fig. 4B residual — everything that has been excluded, and what it means
+# Fig. 4B residual — RESOLVED: their published run used N = 3.5×10⁴
 
-Session S-A6, closed out 2026-07-31. Every number below is measured on TSUBAME
-from a clean tree; UGE job ids given per row. Type A throughout (code-to-code)
-unless marked.
+**Resolved 2026-08-01.** The whole residual was the atom number. Their published
+simulation ran at `Ntot = 3.5×10⁴` — the value shipped in their
+`setup_parameters` — while the published curves are normalised to 5×10⁴, which
+is what we had assumed. Given the right `N`, our code reproduces their Fig. 4B to
+**1 %**.
 
-## The two residuals
+Both columns read from the final `psi`; widths on the matched window [−12, +9]
+(see "the width DOES close" below for why the window has to be stated).
 
-Against Matsui et al.'s published simulation, on the identical window and metric:
+| | dip centre [nT] | half-depth width [nT] |
+|---|---|---|
+| ours, N = 5.0×10⁴ | −2.1381 | 13.813 |
+| **ours, N = 3.5×10⁴** | **−2.5099** | **12.740** |
+| Matsui | −2.5495 | 12.752 |
 
-- **dip centre** ours −2.138 nT, theirs −2.549 — a **0.411 nT** gap
-- **cascade progress** ours ~20 % further at every field — `N_{−6}` ratio
-  0.78–0.84 across the dip, and the Fig. 2C depletion landmarks all at 0.81–0.84
+Centre gap **0.411 → 0.040 nT** (−90 %), width gap **1.061 → 0.012 nT** (−99 %).
+Per-field, `N_{m=−6}` ours over theirs on the 41 fields where the two scans share
+an abscissa:
 
-## What has been excluded
+| B [nT] | −12 | −10 | −6 | −4 | −2 | 0 | +2 | +5 | +9 |
+|---|---|---|---|---|---|---|---|---|---|
+| ratio | 1.020 | 1.025 | 1.004 | 0.995 | 0.991 | 0.989 | 0.989 | 1.000 | 1.002 |
+
+**rms deviation 1.10 %, worst 2.57 %** (at −10 nT, on the left wing where we run
+systematically high). At N = 5×10⁴ the same ratios ran 0.78–0.84.
+
+UGE 8310846 task 15, commit `ec310fe2`+, exit 0, 45 points. Type C.
+
+## Error budget for the last 0.039 nT — it is NOT our time step
+
+> **Retracted 2026-08-01.** This section previously read "it is our time step"
+> and reported that refining `dt` 4× moved the centre by −0.040 nT, landing on
+> −2.550 against their −2.549. **That measurement was invalid.** The refined-`dt`
+> run's `save.every` did not land on the final step, so its last saved series
+> sample is at t = 3.348 against the baseline's 3.456 — a 3.1 % shorter
+> evolution. The −0.040 nT was that 3.1 %, not the time step. Read from the
+> saved final `psi` instead, both arms end at 5 ms and the answer changes sign
+> and three orders of magnitude. The lesson is filed below.
+
+Baseline: N = 3.5×10⁴ with our defaults, centre **−2.5099** against their
+**−2.5495**. Each candidate turned on alone (UGE 8313740 / 8314269, all arms
+exit 0, 45 points each). All figures read from the final `psi`, verified to be
+at t = 5 ms; widths on the matched window [−12, +9]:
+
+| arm | centre [nT] | width [nT] | Δcentre |
+|---|---|---|---|
+| baseline (`dt` = 1e-3) | −2.5099 | 12.740 | — |
+| `dt` refined 4× | −2.5100 | 12.740 | **−0.0001** |
+| ramp segment alone refined 4× | −2.5099 | 12.740 | −0.0000 |
+| + their exponential ramp | −2.5865 | 12.753 | −0.0766 |
+| + their exponential ramp, knots 4× finer | −2.5867 | 12.753 | −0.0768 |
+| + grid (32³/box 16 → 64³) | — | — | −0.007 |
+| + DDI kernel (cutoff on/off) | — | — | −0.002 |
+| **Matsui** | **−2.5495** | **12.752** | **−0.0396 needed** |
+
+**Our time step is converged.** Refining it 4× moves the per-field `m = −6`
+populations by 8–9×10⁻⁵ and the centre by 0.0001 nT — 400× smaller than the
+residual. Refining only the ramp segment, where the field moves fastest, does
+nothing either. Adaptive stepping would buy nothing here.
+
+The only candidate that moves the centre by the right order of magnitude is
+**their exponential ramp**, and it **overshoots by about 2×**: −0.0766 against
+the −0.0396 needed. Adopting their ramp shape swaps a +0.040 nT error for a
+−0.037 nT one.
+
+### The ramp's discretisation is excluded on both of its axes
+
+Their Fortran evaluates `B(t)` in closed form every step; we encode it as a
+piecewise-linear waveform. Two independent things could therefore go wrong, and
+the dt sweep above only bounds one of them — a finer `dt` samples the *same*
+piecewise-linear waveform more densely, it does not move that waveform closer to
+the exponential.
+
+The second axis is the knot spacing. A chord across a convex decaying exponential
+lies above it everywhere, so `τ/6` knots run the field systematically high: the
+excess time-integrated field over the 5 ms hold is 0.0848 nT·t.u., which is a
+**+0.0245 nT DC-equivalent offset**, with a 3.6 nT peak instantaneous excess.
+Refining to `τ/24` cuts both 12×.
+
+**Prediction, recorded in the config before the run: the centre moves +0.0245 nT,
+to about −2.562. It did not.**
+
+| their exponential ramp | centre [nT] | width [nT] |
+|---|---|---|
+| knots `τ/6` | −2.5865 | 12.7530 |
+| knots `τ/24` | **−2.5867** | 12.7529 |
+
+−0.0002 nT — two orders below the prediction. UGE 8314874 task 21, commit
+`b634f400`, clean tree, exit 0, 45 points.
+
+So a 3.6 nT transient error during the 350 µs ramp is worth 0.0002 nT of
+resonance position, and the DC-equivalent mapping that made it look like 0.0245
+is simply wrong. **A time-averaged field is not the quantity the resonance
+responds to** — the same lesson the campaign already learned when the mean
+dipolar field over the ground state came out −0.65 nT while the dip sat at −2.1.
+The resonance is set by conditions during the transfer.
+
+Between them the two axes exclude ramp discretisation entirely, and with it any
+gain from exact `∫B(t)dt` in the Zeeman exponent: the midpoint quadrature error
+it would remove is O(dt³) and the dt sweep bounds it 64× below a null.
+
+### What the ramp shape does settle: the width
+
+| arm | centre [nT] | Δ vs Matsui | width [nT] | Δ vs Matsui |
+|---|---|---|---|---|
+| our linear 150 µs ramp | −2.5099 | **+0.0396** | 12.7400 | −0.0124 (0.10 %) |
+| their exponential ramp | −2.5865 | −0.0370 | **12.7530** | **+0.0006 (0.005 %)** |
+| Matsui | −2.5495 | — | 12.7524 | — |
+
+Their ramp closes the width to 0.005 % — better than the linear stand-in by 20× —
+while overshooting the centre by almost exactly what the linear ramp undershoots
+it. The two observables therefore point at *different* arms, which is itself
+information: whatever remains is not a single scalar in the ramp, or one arm
+would win both.
+
+**0.037–0.040 nT (1.5 %) of the centre remains unexplained**, bounded well inside
+the ~1 nT field fluctuation the paper itself quotes, so it does not threaten the
+reproduction; it is simply not accounted for.
+
+**The ground-state DDI is excluded**, and by a wide margin. Their
+`timeGP_3D_spin1_fix` carries `+cdd·INT0_n·MatSZ(im)` while **both calls that
+would update `INT0` inside the CN iteration are commented out** (`initial.f90`),
+so `INT0` is frozen at the value computed once from the Thomas-Fermi seed. That
+looked like a live candidate — until measured. Turning our GS DDI fully off
+moves the centre to **−3.205**, a bracket **0.695 nT** wide (positive control:
+the GS shape goes 0.7786 → 1.3858, the bare-trap value being 1.3967). Matsui sit
+**0.039 nT from the self-consistent end** and 0.656 from the other. Their frozen
+field is effectively self-consistent, because the TF seed's dipolar field is
+already close to the converged one.
+
+So the centre's remaining 0.037–0.040 nT is not the time step, not the knot
+spacing, not the grid, not the DDI kernel and not the ground-state DDI. It is
+bounded, it is small, and it is open.
+
+## The width DOES close — the 2 % was a window mismatch
+
+> **Corrected 2026-08-01.** This section previously reported a 2 % width gap as
+> open physics. It was an artefact of comparing the two curves over windows that
+> were not actually the same.
+
+`resonance_dip` sets the half-depth level from the **endpoints**, so `width` is
+a property of the curve *and the window it is measured over*. On the Matsui
+theory curve alone, one dataset:
+
+| window [nT] | their width [nT] |
+|---|---|
+| [−20, +20] (their full scan) | 15.022 |
+| [−13, +9] | 13.073 |
+| [−10, +9] | 11.791 |
+
+A 21 % spread with no physics involved. Our scan runs [−13, +9] at 0.5 nT
+throughout; theirs runs [−20, +20] at 0.5 nT **only inside ±10 nT** and 1 nT
+outside. So "restrict both to [−12.5, +9]" left our outermost sample at −12.5 and
+theirs — which has no −12.5 node — at −12. That half step is the whole reported
+disagreement:
+
+| common window | ours | Matsui | Δ |
+|---|---|---|---|
+| [−12.5, +9] (endpoints ½ step apart) | 12.885 | 12.752 | +1.04 % |
+| **[−12, +9] (endpoints identical)** | **12.740** | **12.752** | **−0.10 %** |
+| [−10, +9] | 11.828 | 11.791 | +0.31 % |
+
+**On a genuinely matched window the widths agree to 0.1 %.** Centre and width
+are therefore both closed to ~1.6 % and ~0.1 % respectively.
+
+Two further traps this exposed, both now pinned by
+`test/validation/test_matsui_fig4_dip.jl`:
+
+- **`point_001` is not the state its field label claims.** Our B = −13 nT point
+  reads exactly 1.000000 — the untouched ground state — against 0.7047 at the
+  neighbouring −12.5 nT. Because that point is the *left endpoint*, it set the
+  baseline, and every width we computed over the full [−13, +9] range was
+  inflated to ~14.95. It is the known multi-point-scan defect; the campaign's
+  own `matsui_ddi_operator_audit.jl` already skips `point_001` for this reason.
+- The fixture's own theory-vs-experiment width consistency check was comparing
+  [−20, +20] against [−17.5, +17.5]. Now trimmed to the common range.
+
+`center` carries none of this — it is a parabolic vertex through the minimum and
+its two neighbours, invariant under the window to 1e-6. That is why it is the
+number this campaign quotes.
+
+## How it was found, and why it took so long
+
+Integrated populations alone cannot separate `N` from anything else that scales
+the dipolar drive — that degeneracy is what produced the campaign's central
+puzzle, that **no single coupling moved the centre and the transfer the same
+way**. The lock was opened by `dataset_fig1/F.txt`, buried in the otherwise
+image-only `dataset_raw.zip`: their Fortran's own output, identified as the 5 ms
+state behind Fig. 2C (populations match to four digits). It carries the state's
+**spatial** structure, and three observables at once break the degeneracy:
+
+| at +2.5 nT, 5 ms | Matsui | ours N = 3.5×10⁴ | ours N = 5×10⁴ |
+|---|---|---|---|
+| `m = −6` fraction | 0.4273 | **0.4158** (2.7 %) | 0.2661 (38 %) |
+| rms radius [a_ho] | 2.619 | **2.687** (2.6 %) | 2.849 |
+| shape `⟨x²⟩/⟨z²⟩` | 0.899 | **0.877** (2.4 %) | 1.030 |
+
+Size and shape respond to `N` differently from transfer, so requiring all three
+at once fixes it uniquely. Nothing else tried in the campaign moved all three
+together.
+
+## A prediction that failed, and what it taught
+
+Recorded in the run's own commit before it was launched: since
+`c_dd·n_peak ∝ N^(2/5)`, a smaller `N` weakens the dipolar field and should pull
+the resonance **toward zero**, away from their −2.549. It did the opposite —
+−2.138 → −2.510, toward theirs.
+
+So **the offset is not a density-weighted mean-field shift**. That also explains
+an earlier oddity: the mean dipolar field over the polarised ground state is
+−0.65 nT while the dip sits at −2.1. The resonance is set by conditions during
+the transfer, not by the initial cloud's average field, and it responds to `N`
+with the opposite sign to the naive scaling.
+
+## What was excluded on the way (all of it innocent)
 
 | candidate | measurement | worth | job |
 |---|---|---|---|
@@ -146,19 +348,14 @@ at our side rather than theirs.
 
 ## Where it ends
 
-**Exactly one candidate survives, and it is not falsifiable from what was
-released**: a parameter in the published run that is not in the shipped
-`setup_parameters`. Two are already known to be in that category — `Ntot`
-(3.5×10⁴ shipped against curves totalling 49999.9) and the `cc0_eff` / `cc1_eff`
-mismatch between `initial.f90` and `time.f90`. Everything reachable from the
-deposit has been measured and excluded.
+Every candidate in the table above was innocent. The residual was one input
+number, and the campaign's own framing — "no single scalar moves both the centre
+and the transfer the right way" — was true only because we were scanning around
+the wrong `N` and reading a scaling law that does not hold.
 
-`matsui_author_query_draft.md` is a drafted question to the authors asking for
-those values. It is **not sent** — that is anko's to do.
+`matsui_author_query_draft.md` is **no longer needed** and is retained only as a
+record of what would have been asked.
 
-Failing a reply, the residual stands as documented: **we reproduce the
-phenomenon, the sign and the scale of the resonant EdH offset from an
-independent implementation whose couplings match theirs to seven significant
-figures, and we do not reproduce their curve to better than ~20 % in transfer
-and ~0.4 nT in centre, for a reason that is in neither code's parameters and in
-neither code's numerics as far as either can be tested.**
+**The honest headline: an independent implementation, with conventions declared
+separately and couplings agreeing to seven significant figures, reproduces their
+published Fig. 4B to 1 % once given the atom number their run actually used.**

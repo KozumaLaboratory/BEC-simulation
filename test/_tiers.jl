@@ -153,6 +153,9 @@ const FAST_TESTS = [
     # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
     # the accuracy contract turns both red.
     "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
+    # RK4IP must be MEASURED at order 4, with the DDI-off control: composition
+    # schemes hit nominal order without the DDI and collapse to ~1 with it.
+    "hamiltonian/test_rk4ip_convergence_order.jl",
     # A k-space scratch buffer must carry ψ's precision, because the FFT plan
     # beside it does. Pairing a ComplexF32 in-place plan with a ComplexF64
     # buffer degrades `plan * buf` to the out-of-place method, so the buffer is
