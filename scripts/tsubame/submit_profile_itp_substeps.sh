@@ -21,8 +21,8 @@ echo "### SMOKE"
 $JULIA --project=. bench/profile_itp_substeps.jl 8 3 2>&1 | grep --line-buffered -vE "$FILT"
 rc=${PIPESTATUS[0]}; echo "### smoke rc=$rc"
 [ "$rc" -ne 0 ] && { echo "SMOKE FAILED"; echo "ALL DONE $(date)"; exit 1; }
-for n in 32 64; do
-    for lhy in polar_contact none; do
+for n in 64 96; do
+    for lhy in polar_contact; do
         echo; echo "### n=$n lhy=$lhy"
         $JULIA --project=. bench/profile_itp_substeps.jl $n 50 $lhy 2>&1 | grep --line-buffered -vE "$FILT"
     done

@@ -99,6 +99,25 @@ function full_step!()
     SpinorBEC._normalize_psi!(psi, ws.grid, nc, 3)
 end
 
+# V is the second-largest share at 64³ (0.97 of 2.51 ms/step, 39 %) and it is not
+# one operator. At the production shape `_outer_operators_fwd!` reduces to exactly
+# two — the diagonal step and the spin-mixing rotation — because light_shift,
+# spatial-LHY spin, c₂, transverse/spatial Zeeman and Raman are all inactive here.
+# Splitting them decides the next move: the RTP path already FUSES the
+# `V DDI V` sandwich (`_apply_spin_chain!`, bit-identical), and ITP declines it
+# only because `psi_mf === nothing`. That fusion is worth building iff the
+# spin-mixing half is the expensive one.
+const IP = ws.interactions
+const ZD = SpinorBEC._resolve_zeeman_diag(ws, ws.state.t)
+v_parts = [
+    ("  ├ diagonal (fused kernel)",
+        () -> SpinorBEC._dispatch_diagonal_step!(ws, Val(3), ZD, dt / 4, true, IP;
+            psi_mf=nothing)),
+    ("  └ spin-mixing rotation",
+        () -> SpinorBEC.apply_spin_mixing_step!(ws.state.psi, ws.spin_matrices,
+            IP[1], dt / 4, 3; imaginary_time=true, psi_mf=nothing)),
+]
+
 # Per-step multiplicity: the chain runs V and DDI twice, K and normalize once.
 const MULT = Dict("V fwd (dt/4)  diag+spin-mix" => 2, "DDI (dt/2)    6 FFT + contract" => 2,
     "V bwd (dt/4)  diag+spin-mix" => 2, "K (dt)        batched FFT" => 1,
@@ -121,6 +140,17 @@ total = sum(t * m for (_, t, m) in parts)
 @printf("\n  %-34s %28.4f\n", "SUM OF PARTS", total)
 @printf("  %-34s %28.4f\n", "MEASURED FULL STEP", step_ms)
 @printf("  %-34s %27.1f%%\n", "parts / step", 100 * total / step_ms)
+
+# The V split, printed against the V total so the shares are of the same thing.
+v_meas = [(name, best_ms(f)) for (name, f) in v_parts]
+v_total = sum(t for (_, t) in v_meas)
+v_measured = parts[1][2]          # V fwd, one call
+@printf("\n  %-34s %10s %6s %10s\n", "inside ONE V(dt/4)", "ms", "", "% of V")
+for (name, t) in v_meas
+    @printf("  %-34s %10.4f %6s %9.1f%%\n", name, t, "", 100 * t / v_measured)
+end
+@printf("  %-34s %10.4f %6s %9.1f%%\n", "  = sum", v_total, "", 100 * v_total / v_measured)
+@printf("  %-34s %10.4f\n", "  measured V fwd", v_measured)
 
 println("""
 
