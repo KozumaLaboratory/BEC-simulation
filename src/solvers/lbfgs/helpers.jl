@@ -275,3 +275,46 @@ function _line_search_energy_decrease(
     # No sufficient decrease found — return zero step.
     (0.0, E0, psi, n_eval)
 end
+
+"""
+    _history_array_type(psi, history_precision) → Type
+
+Array type for the L-BFGS `s`/`y` history.
+
+The two-loop recursion reads `s_i` and `y_i` once in each of its two loops —
+`4m` streaming reads of a ψ-sized array per direction, 230 MB at `m = 20`,
+24³, D = 13. Measured at 10.3 ms on one core, i.e. ~23 GB/s, so it is bandwidth
+and nothing else, and halving the element size is the only lever left: threading
+it is negative (see `_axpy!`) and lowering `m` is paid back in iterations.
+
+Never UPCASTS: a Float32 workspace (`dtype = :f32`) keeps a Float32 history
+whatever is asked for, because a Float64 history of a Float32 iterate stores
+precision that is not there.
+
+Float32 on the GPU is refused rather than silently allowed: `_realdot` there is
+`real(dot(a, b))`, and cuBLAS has no mixed-precision `dot`, so the mixed call
+would fall out to a generic reduction — a correctness-neutral but
+unmeasured path. The saving this exists for is a CPU-bandwidth one.
+"""
+function _history_array_type(psi::AbstractArray, history_precision::DataType)
+    history_precision === Float64 && return typeof(psi)
+    history_precision === Float32 || throw(ArgumentError(
+        "history_precision must be Float32 or Float64, got $history_precision"))
+    psi isa Array || throw(
+        ArgumentError(
+            "history_precision=Float32 is CPU-only: the device `_realdot` is " *
+            "cuBLAS `dot`, which has no mixed-precision form. Leave it at Float64 " *
+            "on a GPU workspace."),
+    )
+    R = real(eltype(psi))
+    sizeof(R) <= sizeof(Float32) && return typeof(psi)
+    return Array{Complex{Float32}, ndims(psi)}
+end
+
+"""
+    _history_copy(HT, x) → HT
+
+`copy(x)` into the history's element type. `HT === typeof(x)` is the ordinary
+case and just copies.
+"""
+_history_copy(::Type{HT}, x) where {HT} = HT === typeof(x) ? copy(x) : convert(HT, x)

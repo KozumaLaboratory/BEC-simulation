@@ -160,7 +160,8 @@ The historical pattern: same physics in N hand-duplicated locations; one drift, 
 5. Register in `src/hamiltonian.jl` include list AND `build_h_terms_registry` AND `H_TERMS_CANONICAL_ORDER`.
 6. Add a directional test to `test/oracles/test_hamiltonian_sign_oracles.jl`. If term has `sign(E) = sign(c)·X²` shape (tautology), additionally add a physics-anchored oracle to `test/oracles/test_physics_aware_sign_oracles.jl`.
 7. Run the oracle suite — every gate must pass:
-   - `test_term_consistency.jl` (FD oracle: `apply_operator!` ↔ FD of `energy_contribution`).
+   - `test_term_fd_registry_coverage.jl` (FD oracle over EVERY registry slot: `apply_operator!` ↔ FD of `energy_contribution`, with the coverage asserted — a new term with no active fixture fails here, it does not silently skip).
+   - `test_term_consistency.jl` (the same identity, per-slot detail for Zeeman / Tensor / SpatialZeeman only).
    - `test_gpu_cpu_per_term_parity.jl` (per-term GPU↔CPU; closes blind spot where term contributes zero in aggregate test).
    - `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` (registry vs hand-written bit-identity).
    - `test_magnetic_gradient_gap.jl` style: per-term audit gate when term has a non-obvious path (transverse, off-diagonal, propagator that mutates V).
@@ -177,7 +178,8 @@ Tier membership is **explicit in `test/runtests.jl`** — no auto-discovery.
 |---|---|
 | `test_hamiltonian_sign_oracles.jl` | Directional physics per HamTerm: `+p ⇒ ⟨F_z⟩ > 0`, `+Ω ⇒ ⟨L_z⟩ > 0`, `+g_F·grad ⇒ ⟨x⟩ < 0`, etc. |
 | `test_physics_aware_sign_oracles.jl` | Physics-anchored oracles for terms with tautology-shape directional tests (SpinC1, DDI, LHY, Tensor). |
-| `test_term_consistency.jl` | FD oracle: `apply_operator!` vs finite-difference of `energy_contribution`. Catches energy ↔ gradient drift. |
+| `test_term_fd_registry_coverage.jl` | FD oracle over EVERY registry slot: `apply_operator!` vs finite-difference of `energy_contribution`, plus the meta-assertion that the set of slots actually differenced equals the canonical order minus the declared exclusions. Catches energy ↔ gradient drift, and catches a fixture quietly dropping a term. |
+| `test_term_consistency.jl` | The same identity with per-slot detail, for **three** slots (Zeeman diagonal/transverse/full, F-swept Tensor, arbitrary-B(r) SpatialZeeman). Its header claimed all fourteen until 2026-07-31. |
 | `test_gpu_cpu_per_term_parity.jl` | One-term-active GPU vs CPU `energy_decomposition` and `Hψ`. Forbids "term contributes zero in test config, missing GPU path invisible". |
 | `test_registry_{energy_decomposition,gradient}_parity.jl` | Registry path identities (legacy shape; ctx vs plain faces). The strang-step variant was deleted 2026-06-06 (post-B3 near-self-comparison); the propagator gate is the dt-valley + RK4-slope suite vs the dumb reference. |
 | `test_term_legacy_equivalence.jl` | Per-term: new HamTerm `apply_step!` vs legacy routine. |

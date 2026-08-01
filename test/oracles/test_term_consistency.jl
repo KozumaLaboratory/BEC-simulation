@@ -1,7 +1,7 @@
 # test/oracles/test_term_consistency.jl
 #
-# Per-HamTerm consistency check (the structural anti-recurrence gate
-# for sign-bug class). For every HamTerm, we verify:
+# Zeeman (diagonal / transverse / full), Tensor and SpatialZeeman — the three
+# slots whose faces are checked HERE. Two checks each:
 #
 #   1. `energy_contribution` and `apply_operator!` are FD-consistent:
 #         (E(ψ + ε·δψ) - E(ψ)) / ε ≈ Re⟨grad, δψ⟩
@@ -12,8 +12,16 @@
 #      with the term active. This catches sign-inversion bugs of the
 #      kind found in 2026-06-03 Coriolis + 2026-06-04 transverse Zeeman.
 #
-# Running this for every term in the HamTerm registry is the CI gate
-# that makes the bug class structurally impossible.
+# SCOPE. This header used to say "For every HamTerm" and "Running this for every
+# term in the HamTerm registry is the CI gate that makes the bug class
+# structurally impossible". It never ran more than three of the fourteen slots,
+# and a reader had no way to tell — which is the same failure the tests here
+# exist to prevent, one level up. Registry-wide coverage of check (1), with the
+# coverage itself asserted so a fixture that stops activating a term cannot take
+# its gate with it, lives in `test_term_fd_registry_coverage.jl` (2026-07-31);
+# check (2) is registry-wide in `test_hamiltonian_sign_oracles.jl`. What is left
+# here is the per-slot detail those two do not carry: the F-swept Tensor cases
+# (F=2/3/6, several channel sets) and the arbitrary-B(r) SpatialZeeman field.
 
 using Test
 using FFTW
