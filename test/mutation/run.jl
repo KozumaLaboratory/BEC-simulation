@@ -35,6 +35,14 @@ const ALLOW_DIRTY = "--allow-dirty" in ARGS
 
 const MAX_COST = parse(Float64, _arg("--max-cost", "15"))
 
+# Files `--max-cost` removed from the probe. Reported beside every escape claim:
+# an escape is relative to the probe that ran, and this is the part of the suite
+# that did not. Measured 2026-08-02 (#276): all SIX mutants that escaped the
+# default `grounded_cheap` / 15 s probe were caught once the whole `full` tier
+# ran with the cap lifted — four of them by a single file, one of which
+# (workflow/test_lhy_block_wiring.jl, 256 s) this cap is what removes.
+const EXCLUDED_BY_COST = String[]
+
 function probe_files()
     spec = _arg("--probe", "grounded_cheap")
     # A comma-separated spec is a UNION of specs, resolved one at a time. The
@@ -87,6 +95,7 @@ function _probe_spec(spec::AbstractString)
     keep = filter(f -> _cost(f) <= MAX_COST, sel)
     isempty(keep) && error("--max-cost $MAX_COST removed every probe file; raise it.")
     dropped = setdiff(sel, keep)
+    append!(EXCLUDED_BY_COST, dropped)
     isempty(dropped) || println("  probe: dropped $(length(dropped)) file(s) over \
         --max-cost=$MAX_COST (", round(Int, sum(_cost, dropped)), "s): ",
         join(first(sort(dropped; by=_cost, rev=true), 5), ", "), " …")
@@ -335,7 +344,7 @@ function main()
             if n == 0
                 (
                     if u == 0
-                        "ESCAPED — no test caught it"
+                        "ESCAPED THIS PROBE — no probe file caught it"
                     else
                         "UNRESOLVED — nothing caught it, but $u file(s) never reported"
                     end
@@ -400,7 +409,19 @@ function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{
     escaped = [m for m in nothing_caught if isempty(_unk(m))]
     unresolved = [m for m in nothing_caught if !isempty(_unk(m))]
 
-    println(io, "## Escaped — a real gap ($(length(escaped)))\n")
+    println(io, "## Caught by nothing in the probe ($(length(escaped)))\n")
+    # NOT "a real gap", which is what this said until 2026-08-02 and which the
+    # numbers do not support: escaping a 264-file grounded/<=15 s probe is not
+    # escaping the suite. All six escapes from that probe were caught by the full
+    # tier. State the probe's boundary next to the claim so the claim cannot be
+    # quoted without it.
+    if !isempty(EXCLUDED_BY_COST)
+        println(io, "Relative to THIS probe. `--max-cost=$MAX_COST` held back ",
+            "$(length(EXCLUDED_BY_COST)) file(s) totalling ",
+            round(Int, sum(_cost, EXCLUDED_BY_COST)), "s, and `grounded_cheap` ",
+            "excludes pins and API-spelling tests entirely. Re-probe an escape ",
+            "with `--probe dir: --max-cost 400` before calling it a gap.\n")
+    end
     isempty(escaped) && println(io, "(none)\n")
     for m in sort(escaped; by=m -> (m.severity != :fatal, m.severity != :gross))
         println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] `$(m.file)`  \n",
