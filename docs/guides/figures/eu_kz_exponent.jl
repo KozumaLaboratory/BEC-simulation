@@ -371,6 +371,28 @@ function main(mode::String="smoke"; backend=CPUBackend())
             kz_scan(; tau_Qs=(16.0,), t_hold=th, n_seed=1, backend,
                 dump_g1=true, tag="kz_g1hold_t$(replace(string(th), "." => "p"))")
         end
+    elseif startswith(mode, "holdg")
+        # Is there a time at which the field has BOTH a condensate and defects?
+        # At γ = 0.002 there is not: N_v goes 30 → 1 → 0 by t_hold = 40 while
+        # f_∞ goes 0.00 → 0.46 → 0.80 over t_hold = 1 → 40 → 200. Defects are
+        # gone before the condensate exists, so every Kibble-Zurek point was
+        # counting phase noise in an uncondensed field.
+        #
+        # The cause is that 1/(2γμ) ≈ 17 exceeds every τ_Q in the scan, making
+        # the ramp effectively sudden — which is why ξ̂ was flat in τ_Q. Raising γ
+        # shortens it (1.7 at γ = 0.02) and puts the ramp rate back in
+        # competition. γ was lowered to 0.002 for being "too fast", but KZ
+        # freeze-out comes from the relaxation time DIVERGING at the transition,
+        # not from it being uniformly slow.
+        #
+        # If no hold time has both, the SPGPE cannot host KZ defects here and
+        # that is the answer.
+        γ = parse(Float64, mode[6:end])
+        for th in (1.0, 3.0, 10.0, 30.0, 100.0)
+            kz_scan(; tau_Qs=(16.0,), t_hold=th, n_seed=1, gamma=γ, backend,
+                dump_g1=true,
+                tag="kz_holdg$(replace(string(γ), "." => "p"))_t$(replace(string(th), "." => "p"))")
+        end
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
