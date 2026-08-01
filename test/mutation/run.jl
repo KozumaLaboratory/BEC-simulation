@@ -95,7 +95,11 @@ function _probe_spec(spec::AbstractString)
     keep = filter(f -> _cost(f) <= MAX_COST, sel)
     isempty(keep) && error("--max-cost $MAX_COST removed every probe file; raise it.")
     dropped = setdiff(sel, keep)
-    append!(EXCLUDED_BY_COST, dropped)
+    # UNION, not append: `probe_files` calls this once per comma-separated spec,
+    # so a union like `dir:a,dir:b` would otherwise count a shared dropped file
+    # twice — in the one section whose whole job is to state the probe's boundary
+    # honestly.
+    append!(EXCLUDED_BY_COST, setdiff(dropped, EXCLUDED_BY_COST))
     isempty(dropped) || println("  probe: dropped $(length(dropped)) file(s) over \
         --max-cost=$MAX_COST (", round(Int, sum(_cost, dropped)), "s): ",
         join(first(sort(dropped; by=_cost, rev=true), 5), ", "), " …")
