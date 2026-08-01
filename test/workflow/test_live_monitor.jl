@@ -17,13 +17,14 @@ using SpinorBEC
 
         # Spawn the dashboard server in an async task
         # (the function blocks until the server is closed; we'll close it manually)
+        srv_ref = Ref{Any}(nothing)
         srv_task = @async begin
             try
                 # Build minimal HTML so serve_dashboard doesn't error on missing dist
                 webdir = joinpath(@__DIR__, "..", "..", "dashboard", "dist")
                 indexhtml = joinpath(webdir, "index.html")
                 isfile(indexhtml) || (mkpath(webdir); write(indexhtml, "<html></html>"))
-                serve_dashboard(port; base_dir=tmp)
+                serve_dashboard(port; base_dir=tmp, server_ref=srv_ref)
             catch e
                 e isa Base.IOError || rethrow(e)
             end
@@ -37,6 +38,9 @@ using SpinorBEC
         write(sock, "Host: localhost:$(port)\r\n")
         write(sock, "Content-Length: $(length(body))\r\n")
         write(sock, "Content-Type: image/png\r\n")
+        # `read(sock, String)` reads to EOF; HTTP/1.1 keeps the connection
+        # alive by default, so without this the read never returns.
+        write(sock, "Connection: close\r\n")
         write(sock, "\r\n")
         write(sock, body)
         flush(sock)
@@ -55,12 +59,13 @@ using SpinorBEC
         first_file = joinpath(out_dir, sort(files)[1])
         @test read(first_file) == body
 
-        # Tear down — interrupt the server task
-        try
-            Base.throwto(srv_task, InterruptException())
-        catch e
-            # ignore
-        end
+        # Tear down by closing the listen socket. The task is parked in
+        # `accept`, and `Base.throwto` switches to it without reliably coming
+        # back — that is why this file used to leave the server running and
+        # hang until something killed the process. `wait` makes it
+        # deterministic.
+        srv_ref[] === nothing || close(srv_ref[])
+        wait(srv_task)
     end
 end
 
@@ -80,16 +85,25 @@ end
             stale_path,
             """{"step":1,"t":0.0,"energy":0.0,"norm":1.0,"populations":[1.0],"updated_ms":1}""",
         )
-        old_t = time() - 600  # 10 minutes ago
-        Base.Filesystem.touch(stale_path; times=(old_t, old_t))
+        # Back-date the file, because `/api/live/list` ages a run by its
+        # mtime (`routes/lab_live.jl`), not by the `updated_ms` in the JSON.
+        # `touch(path; times=…)` is not a Julia method — this errored with
+        # `MethodError: no method matching touch(::String; times=…)` the first
+        # time anything ran the file, which was 2026-08-02, because the hang
+        # above had kept it from ever getting here. `Base.Filesystem.futime`
+        # is not usable either (checked). coreutils `touch -d @epoch` is.
+        old_t = round(Int, time()) - 600  # 10 minutes ago
+        run(pipeline(`touch -d @$(old_t) $(stale_path)`; stdout=devnull, stderr=devnull))
+        @test time() - mtime(stale_path) > 500   # the back-dating really took
 
         port = 8900 + (getpid() % 100)
+        srv_ref = Ref{Any}(nothing)
         srv_task = @async begin
             try
                 webdir = joinpath(@__DIR__, "..", "..", "dashboard", "dist")
                 indexhtml = joinpath(webdir, "index.html")
                 isfile(indexhtml) || (mkpath(webdir); write(indexhtml, "<html></html>"))
-                serve_dashboard(port; base_dir=tmp)
+                serve_dashboard(port; base_dir=tmp, server_ref=srv_ref)
             catch e
                 e isa Base.IOError || rethrow(e)
             end
@@ -130,9 +144,12 @@ end
         close(sock)
         @test occursin("HTTP/1.1 404", miss_resp)
 
-        try
-            Base.throwto(srv_task, InterruptException())
-        catch e
-        end
+        # Tear down by closing the listen socket. The task is parked in
+        # `accept`, and `Base.throwto` switches to it without reliably coming
+        # back — that is why this file used to leave the server running and
+        # hang until something killed the process. `wait` makes it
+        # deterministic.
+        srv_ref[] === nothing || close(srv_ref[])
+        wait(srv_task)
     end
 end
