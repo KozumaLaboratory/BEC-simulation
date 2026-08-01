@@ -61,6 +61,13 @@ function _probe_spec(spec::AbstractString)
         # pool, not a grounding-filtered subset of it.
         pre = spec[5:end]
         filter(f -> startswith(f, pre), select_tests("full"))
+    elseif spec == "tiered"
+        # EVERY file in a tier. The honest probe for "does anything catch this",
+        # because it applies no filter of its own — `grounded_cheap` is a
+        # physics-grounding filter and structurally cannot see a gate the
+        # inventory labels `pin` or `unclassified`, which is how two working
+        # gates were reported as gaps (2026-08-01).
+        select_tests("full")
     elseif spec == "grounded_cheap"
         # Files that can ground a claim (not pins, not API spellings). The pool
         # is deliberately wide: the question is WHICH file catches a defect, so
@@ -307,10 +314,30 @@ end
 function report(muts, files, catches, already_red)
     io = IOBuffer()
     println(io, "# Mutation report — ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
-    println(io, "\n$(length(muts)) cataloged defect classes × $(length(files)) probe files.\n")
+    spec = _arg("--probe", "grounded_cheap")
+    println(
+        io,
+        "\n$(length(muts)) cataloged defect classes × $(length(files)) probe \
+         files (`--probe $spec`).\n",
+    )
 
     escaped = [m for m in muts if isempty(get(catches, m.id, String[]))]
-    println(io, "## Escaped — a real gap ($(length(escaped)))\n")
+    # NOT "a real gap". An escape is relative to the probe that ran, and the
+    # default probe is a PHYSICS-grounding filter: a gate the inventory labels
+    # `pin` or `unclassified` is excluded from it by construction. Two gates
+    # written on 2026-08-01 — the error-budget positive control and the
+    # analyzer-name routing — were reported as gaps by this section while
+    # provably killing their mutants, because a claim about validation
+    # discipline or about dispatch is not a physics claim and the filter cannot
+    # see it. Saying "gap" there is the tool overclaiming about itself.
+    println(io, "## Not caught by this probe ($(length(escaped)))\n")
+    println(
+        io,
+        "Escapes are relative to `--probe $spec`. Before calling one a \
+         gap, re-probe against the files that would own the claim — a \
+         grounding-filtered probe cannot see a gate labelled `pin` or \
+         `unclassified`, however good that gate is.\n",
+    )
     isempty(escaped) && println(io, "(none)\n")
     for m in sort(escaped; by=m -> (m.severity != :fatal, m.severity != :gross))
         println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] `$(m.file)`  \n",

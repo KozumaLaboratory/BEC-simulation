@@ -249,8 +249,18 @@ its timeout every night from the day it landed and produced nothing; sharding
 the catalog did not save it, because the cost is dominated by the probe and not
 by the mutant count.
 
-    qsub -g <group> -v MUT_SHARD=k_7,MUT_TAG=sweep \
+    qsub -g <group> -v MUT_PROBE=tiered,MUT_SHARD=k_7,MUT_TAG=sweep \
          scripts/tsubame/submit_mutation.sh
+
+Measured on a 16-core node with 8 workers: one 1/7 shard (9 classes x 283 files)
+is **73 minutes**. An earlier draft of this section said "minutes" — written
+before it was measured, and wrong by a factor of 20.
+
+Use `--probe tiered`, not the `grounded_cheap` default, for any sweep whose
+result will be read as coverage. `grounded_cheap` is a physics-grounding filter,
+so a gate the inventory labels `pin` or `unclassified` is excluded from it by
+construction: a class whose only defender is such a gate reports as an escape
+while provably killing its mutant. Two did, on 2026-08-01.
 
 What CI keeps is the anchor check — a catalog entry whose regex no longer
 matches tests NOTHING and says so nowhere. That is a pure source scan with no
