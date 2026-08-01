@@ -97,26 +97,47 @@ using SpinorBEC
         @test abs(r4.energy - 0.5) < 1e-12
     end
 
-    @testset "Newton-CG polish tightens the gradient floor" begin
-        # L-BFGS is first-order, so its projected gradient floors near
-        # √(machine-eps)·scale even at a machine-exact energy. The opt-in
-        # `newton_polish` second-order pass drives the stationarity residual
-        # below that floor (≈10× on the scalar harmonic) without moving the
-        # (already converged) energy.
+    @testset "Newton-CG polish tightens the gradient residual" begin
+        # ASSERTED WHERE THE POLISH HAS ROOM TO WORK. This testset ran at
+        # `n_steps=500, tol=1e-12` and asserted `< 0.5 ×`. At that tolerance the
+        # pre-polish residual IS the finite-difference HvP's own noise floor, so
+        # the assertion was measuring luck; measured ratio polish/lbfgs on the
+        # same commit and problem, one process each:
+        #
+        #   0.156 | 0.081 ×3 | 1.000 (bit-identical no-op) | 1.998 (worse)
+        #
+        # The cause was a real defect in `hessian_vector_product`, since fixed:
+        # it differenced at `ψ ± ε·δ` with ε ABSOLUTE, so with the CG iterates
+        # Newton-CG passes (‖δ‖ ~ 1e-6 after an L-BFGS stage) the perturbation was
+        # ~1e-11 and the quotient was noise amplified by 1/2ε. The step is now
+        # taken along the normalised direction, which restores homogeneity — gated
+        # in test/oracles/test_bdg_fd_hessian.jl.
+        #
+        # After the fix, at `n_steps=40, tol=1e-6` where L-BFGS stops at 6.299e-6
+        # in EVERY process: ratio 2.6e-3 | 1.4e-4 | 2.6e-3. The bound below is
+        # 1e-2 — four times looser than the worst of those and 100× below the 1.0
+        # a no-op would give, so it separates "works" from "does nothing" without
+        # pinning the value.
+        #
+        # Still open, and deliberately not asserted here: the L-BFGS residual
+        # FLOOR itself varies across processes (3.907e-8 vs 1.259e-8 at
+        # tol=1e-8), so a tight-tolerance comparison remains unsafe.
         grid = make_grid(GridConfig(128, 16.0))
-        interactions = InteractionParams(Dict(0 => 0.0, 1 => 0.0))
-        trap = HarmonicTrap(1.0)
-
         base = (;
-            grid, atom=Rb87, interactions, potential=trap,
-            n_steps=500, tol=1e-12, initial_state=:polar, verbose=false,
+            grid, atom=Rb87, interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            potential=HarmonicTrap(1.0),
+            n_steps=40, tol=1e-6, initial_state=:polar, verbose=false,
         )
         r_lbfgs = find_ground_state_lbfgs(; base...)
         r_poly = find_ground_state_lbfgs(; base..., newton_polish=true)
 
-        # Polish lowers the gradient residual by a clear margin.
-        @test r_poly.grad_norm < 0.5 * r_lbfgs.grad_norm
-        # Energy stays at machine precision (polish must not regress it).
-        @test abs(r_poly.energy - 0.5) < 1e-12
+        # The first-order stage stopped at its own tolerance, well above the FD
+        # floor — otherwise the comparison below is back to measuring luck.
+        @test r_lbfgs.grad_norm > 1e-7
+        @test r_poly.grad_norm < 1e-2 * r_lbfgs.grad_norm
+        # Variational: the polish may not raise the energy, and must not move it
+        # away from the exact scalar-harmonic value.
+        @test r_poly.energy <= r_lbfgs.energy + 1e-14
+        @test abs(r_poly.energy - 0.5) < 1e-10
     end
 end

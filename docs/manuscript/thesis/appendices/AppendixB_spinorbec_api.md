@@ -168,18 +168,18 @@ before `using SpinorBEC`. Then `backend = CUDABackend()` enables GPU kernels.
 | Path | Purpose | Backend |
 |---|---|---|
 | `runs/F6_phase_diagram/config.yaml` | Eu F=6 phase diagram (paper #2 primary) | CUDA, 32³ |
-| `runs/Eu151_GS_64g/` | Eu ground state 64³ verification | CUDA |
-| `runs/samples/eu151_klaus_lab_units/` | Klaus 2022 magnetostir lab-units | CUDA |
+| `runs/Eu151_GS_64g/` (gone) | Eu ground state 64³ verification | CUDA |
+| `runs/samples/eu151_klaus_lab_units/` (example) | Klaus 2022 magnetostir lab-units | CUDA |
 
 ### B.5.2 LHY mode ablation (Ch.5 §5.2, T3.1)
 
 | Path | spinor_lhy mode | Purpose |
 |---|---|---|
-| `runs/lhy_mode_ablation/off/` | LHY disabled | baseline |
-| `runs/lhy_mode_ablation/scalar/` | scalar Lima-Pelster | warning issued |
-| `runs/lhy_mode_ablation/polar_contact/` | polar contact-only | F-polar approx |
-| `runs/lhy_mode_ablation/polar_dipolar/` | polar + $Q_5$ DDI | full polar |
-| `runs/lhy_mode_ablation/full_bdg/` | direct BdG sum | exact spin sector |
+| `runs/lhy_mode_ablation/off/` (gone) | LHY disabled | baseline |
+| `runs/lhy_mode_ablation/scalar/` (gone) | scalar Lima-Pelster | warning issued |
+| `runs/lhy_mode_ablation/polar_contact/` (gone) | polar contact-only | F-polar approx |
+| `runs/lhy_mode_ablation/polar_dipolar/` (gone) | polar + $Q_5$ DDI | full polar |
+| `runs/lhy_mode_ablation/full_bdg/` (gone) | direct BdG sum | exact spin sector |
 
 ### B.5.3 TWA chaos (Ch.5 §5.4-5.7, T3.2-T3.3)
 
@@ -188,16 +188,16 @@ before `using SpinorBEC`. Then `backend = CUDABackend()` enables GPU kernels.
 | `runs/twa_N_scan/N{1000,10000,100000}_<hash>/` | Coupling-strength scan (Finding A/B) |
 | `runs/twa_N_scan_pinned_16g/N{...}_pinned_16g_<hash>/` | Sinatra-clean 1/N test |
 | `runs/twa_eps_dd_scan/{Cr,Eu,Er,Dy}_eps<value>_<hash>/` | Species universality |
-| `runs/twa_sinatra/` | 32³ vs 16³×box=20 vs 16³×box=10 (GS-resolution lesson) |
+| `runs/twa_sinatra/` (gone) | 32³ vs 16³×box=20 vs 16³×box=10 (GS-resolution lesson) |
 
 ### B.5.4 Eu-specific verification
 
 | Path | Purpose |
 |---|---|
-| `runs/Cr_eps0.15_*/` | Cr F=3, $\epsilon_{dd}$=0.15 mimic |
-| `runs/Eu_eps0.55_*/` | Eu F=6, $\epsilon_{dd}$=0.55 (sub-marginal) |
-| `runs/Er_eps0.88_*/` | Er F=6, $\epsilon_{dd}$=0.88 |
-| `runs/Dy_eps1.39_*/` | Dy F=8, $\epsilon_{dd}$=1.39 (Eu-equivalent) |
+| `runs/Cr_eps0.15_*/` (gone) | Cr F=3, $\epsilon_{dd}$=0.15 mimic |
+| `runs/Eu_eps0.55_*/` (gone) | Eu F=6, $\epsilon_{dd}$=0.55 (sub-marginal) |
+| `runs/Er_eps0.88_*/` (gone) | Er F=6, $\epsilon_{dd}$=0.88 |
+| `runs/Dy_eps1.39_*/` (gone) | Dy F=8, $\epsilon_{dd}$=1.39 (Eu-equivalent) |
 
 ---
 

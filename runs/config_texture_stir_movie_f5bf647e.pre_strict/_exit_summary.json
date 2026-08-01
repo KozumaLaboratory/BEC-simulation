@@ -1,9 +1,0 @@
-{
-  "nan_encountered": false,
-  "oom_killed": false,
-  "runtime_seconds": 1443.9826538562775,
-  "written_at": "2026-07-29T00:09:22.835",
-  "completed": true,
-  "exception_type": null,
-  "last_step": 3
-}

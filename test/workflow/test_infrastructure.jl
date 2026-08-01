@@ -667,9 +667,12 @@ pipeline:
 
     @testset "P1.4: Pulse sequence parse + compile" begin
         raw = [
-            Dict{String, Any}("t" => 0.0, "apply" => "zeeman", "duration" => 0.5,
+            # `apply: B`, not `zeeman`: the unified B block renamed the target,
+            # and `zeeman` is now rejected rather than silently compiled to
+            # nothing (which is what this test was actually asserting).
+            Dict{String, Any}("t" => 0.0, "apply" => "B", "duration" => 0.5,
                 "p" => Dict{String, Any}("from" => 0.0, "to" => 100.0)),
-            Dict{String, Any}("t" => 0.5, "apply" => "zeeman", "duration" => 0.5,
+            Dict{String, Any}("t" => 0.5, "apply" => "B", "duration" => 0.5,
                 "p" => 100.0),
         ]
         events = SpinorBEC.parse_pulse_sequence(raw, 1.0)
@@ -700,8 +703,12 @@ pipeline:
       duration: 0.02
       dt: 0.001
       pulse_sequence:
-        - {t: 0.0, apply: zeeman, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
-        - {t: 0.01, apply: zeeman, duration: 0.01, p: 10.0, q: 0.5}
+        # `apply: B`, not `zeeman`: the unified B block renamed the target and
+        # `parse_pulse_sequence` now rejects the old name outright. #198 fixed
+        # the dict-form occurrence a few testsets up; this YAML one is the same
+        # rename, and it was the last red left in the `full` tier.
+        - {t: 0.0, apply: B, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
+        - {t: 0.01, apply: B, duration: 0.01, p: 10.0, q: 0.5}
 """)
         result = SpinorBEC.run_config(cfg)
         @test result.dynamics_result !== nothing
@@ -710,7 +717,7 @@ pipeline:
     @testset "P1: Schema validates dynamics pulse_sequence" begin
         d = Dict{String, Any}(
             "duration" => 1.0, "dt" => 0.001,
-            "pulse_sequence" => [Dict("t" => 0.0, "apply" => "zeeman")],
+            "pulse_sequence" => [Dict("t" => 0.0, "apply" => "B")],
         )
         SpinorBEC.validate_config!(d, SpinorBEC.DYNAMICS_SCHEMA, "test")
     end

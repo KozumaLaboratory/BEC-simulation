@@ -559,7 +559,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             delete!(patched, "scan")
 
             started_at = _now_iso()
-            t_start = time()
+            t_start = time_ns()
 
             # Continuation: inject previous psi as initial condition
             prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
@@ -579,7 +579,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 checkpoint_dir=ckpt_dir, live_status_path=live_path)
 
             finished_at = _now_iso()
-            duration = time() - t_start
+            duration = elapsed_s(t_start)
 
             psi_host = _to_host(result.psi)
             energy = get(result, :ground_state_energy, NaN)
@@ -757,7 +757,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     end
 
     started_at = _now_iso()
-    t_start = time()
+    t_start = time_ns()
 
     _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
     config = parse_pipeline(data)
@@ -768,7 +768,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         live_status_path=live_path)
 
     finished_at = _now_iso()
-    duration = time() - t_start
+    duration = elapsed_s(t_start)
 
     psi_host = _to_host(result.psi)
     energy = get(result, :ground_state_energy, NaN)

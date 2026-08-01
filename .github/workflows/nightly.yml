@@ -10,9 +10,19 @@ name: Nightly heavy YAML
 
 on:
   schedule:
-    # 02:00 UTC every day = 11:00 JST. Skips weekends to save runner
-    # minutes — failures on Mon-Fri are usually enough to catch drift.
-    - cron: "0 2 * * 1-5"
+    # 20:17 UTC = 05:17 JST the NEXT day. The run takes ~40-50 min, so the
+    # result is sitting there before the day starts. The old 02:00 UTC slot was
+    # 11:00 JST — a "nightly" that both started and finished mid-morning, after
+    # the day's work had already begun on an unverified tree.
+    #
+    # Day-of-week is `0-4` (Sun-Thu UTC), NOT `1-5`. cron's dow is evaluated in
+    # UTC, and 20:17 UTC lands on the following JST date, so keeping `1-5` here
+    # would have fired Tue-Sat JST — losing Monday and burning a Saturday.
+    # Sun-Thu UTC is Mon-Fri JST.
+    #
+    # :17 rather than :00 on purpose: GitHub delays scheduled workflows when a
+    # popular cron minute comes round, and the hour mark is the most popular.
+    - cron: "17 20 * * 0-4"
   workflow_dispatch:
 
 concurrency:
@@ -36,6 +46,14 @@ jobs:
       # the two long poles (BO ~161 s, triple-point ~127 s) and the cold F32
       # JIT land on separate chunks. Total serial ~14 min → makespan ~4-5 min.
       SPINORBEC_TEST_WORKERS: "4"
+      # Per-worker wall-clock cap. The default 1800 s is a hang guard sized for
+      # the per-push tiers; `full` on a 4-vCPU runner is 6317 s of measured work
+      # (run 30668378491), i.e. a perfectly-packed makespan of ~1580 s — 12 %
+      # of headroom, and any imbalance eats it. That run died with all four
+      # workers killed at the cap and ZERO assertion failures. 2700 s keeps the
+      # hang guard well inside the 90-minute job timeout while leaving the
+      # margin the arithmetic says this tier needs.
+      SPINORBEC_TEST_TIMEOUT: "2700"
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -46,3 +64,135 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         with:
           coverage: false   # see .github/workflows/ci.yml for rationale
+
+  mutation:
+    name: Mutation catalog (defect classes vs the suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      # Injects each cataloged defect class into src/ and records which test
+      # files go red — see docs/conventions/testing_strategy.md. Costs one
+      # package precompile per mutant, so it is nightly and never a PR gate.
+      # It does NOT fail the job on escapes: an escaped mutant is a coverage
+      # gap to triage from the report, not a broken build. A STALE anchor DOES
+      # fail, because a catalog entry that quietly tests nothing is the exact
+      # failure mode the catalog exists to prevent.
+      - run: julia --project=. --startup-file=no test/mutation/run.jl --workers 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: mutation_out/
+  # A result nobody reads is not a gate. This workflow failed 100+ consecutive
+  # times — every run in the API's history — with no notification of any kind,
+  # so the heavy-YAML surface it exists to cover went unverified for months and
+  # the failures were found only by accident, from an unrelated PR.
+  #
+  # A per-run ping would be the wrong fix: the interesting event is the
+  # TRANSITION, and a job that pings every night for a month trains everyone to
+  # filter it. So this keeps exactly one issue that mirrors the current state —
+  # opened on the first failure, its body refreshed (not commented) on each
+  # subsequent one so the streak is visible without a notification, and closed
+  # automatically when nightly goes green again.
+  report:
+    name: Report the nightly result
+    # Every other job in this workflow, so `report` runs last. This list has to
+    # be maintained when a job is added — the step below fails loudly if it is
+    # not, rather than reporting on a partial picture.
+    needs: [heavy, mutation]
+    if: always() && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      SELF: "Report the nightly result"
+      MARKER: "<!-- nightly-heavy-status -->"
+    steps:
+      - name: Open, refresh or close the status issue
+        run: |
+          set -euo pipefail
+
+          # The one issue this workflow owns, found by a marker in the body so
+          # the title stays free to edit by hand.
+          existing=$(gh issue list --repo "$REPO" --state open --limit 100 \
+            --json number,body \
+            --jq "[.[] | select(.body | contains(\"$MARKER\"))] | .[0].number // empty")
+
+          # Derive the verdict from THIS run's jobs rather than from a named
+          # `needs` result. The first version read `needs.heavy.result` alone;
+          # #198 then added a `mutation` job, and a red mutation job with a green
+          # heavy job would have CLOSED the issue and asserted a green nightly.
+          # A status signal that says "green" when it is not is worse than no
+          # signal, which is the whole failure class this job exists to end.
+          jobs=$(gh api "repos/$REPO/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
+            --jq ".jobs[] | select(.name != \"$SELF\") | \"\(.status):\(.conclusion // \"none\")\"")
+
+          # An unfinished sibling means `needs` does not list every job, so the
+          # verdict would be taken on a partial picture. Fail rather than guess.
+          if printf '%s\n' "$jobs" | grep -qv '^completed:'; then
+            echo "::error title=nightly report::a sibling job is unfinished - add it to this job's needs:"
+            printf '%s\n' "$jobs"
+            exit 1
+          fi
+
+          if printf '%s\n' "$jobs" | grep -qvE '^completed:(success|skipped)$'; then
+            OUTCOME=failure
+          else
+            OUTCOME=success
+          fi
+          echo "sibling jobs: $jobs -> $OUTCOME"
+
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --repo "$REPO" \
+                --comment "Nightly is green again: $RUN_URL"
+              echo "closed #$existing"
+            else
+              echo "green, nothing open - no action"
+            fi
+            exit 0
+          fi
+
+          # How long has this been broken? A red that has been red for weeks
+          # reads very differently from a fresh one, and that distinction is
+          # exactly what was missing.
+          streak=$(gh run list --repo "$REPO" --workflow=nightly.yml --limit 100 \
+            --json conclusion --jq '[.[].conclusion] | index("success") // length')
+
+          # printf, not a heredoc: a heredoc inside a YAML block scalar carries
+          # the block's indentation into the body, and 10 leading spaces render
+          # the whole issue as a code block.
+          body=$(printf '%s\n' \
+            "$MARKER" \
+            "**Nightly \`full\` tier + \`SPINORBEC_RUN_HEAVY_YAML=true\` is failing.**" \
+            "" \
+            "- latest run: $RUN_URL" \
+            "- consecutive failures: **$streak** (capped at the last 100 runs)" \
+            "" \
+            "This issue is maintained by the workflow: the body is refreshed on every" \
+            "failing run and the issue closes itself when nightly goes green. Closing" \
+            "it by hand only hides the streak." \
+            "" \
+            "The nightly tier covers what per-PR checks cannot: the heavy YAML pipeline" \
+            "blocks behind \`SPINORBEC_RUN_HEAVY_YAML\`, which are SKIPPED in \`fast\` /" \
+            "\`oracles\` / \`integration\` even though the files containing them are" \
+            "gated. While this is red, that surface is unverified.")
+
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --repo "$REPO" --body "$body"
+            echo "refreshed #$existing (streak $streak)"
+          else
+            gh issue create --repo "$REPO" \
+              --title "Nightly heavy YAML is failing" --body "$body"
+            echo "opened a new status issue (streak $streak)"
+          fi

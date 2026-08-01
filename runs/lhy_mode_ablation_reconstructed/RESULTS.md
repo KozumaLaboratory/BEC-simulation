@@ -30,6 +30,16 @@ table, not a scalar coefficient. The scalar arm stores 529.4.)
 
 ## What it says about §5.2
 
+> **Caveat on the `full_bdg` row (added 2026-08-01).** At this ladder its own BdG
+> check reports the uniform mean field dynamically unstable, `max Im ω = 207.2`, so
+> `ε_LHY` is scheme-dependent there — the zero-point sum drops the complex branches
+> while all `D` counterterms are still subtracted. **That row is not quotable on its
+> own.** The conclusion below does not rest on it: `scalar` / `polar_contact` /
+> `polar_dipolar` give 0.956 / 0.951 / 0.951 without it. Gated by
+> `test/oracles/test_full_bdg_config_stability.jl`, which flagged this config on its
+> first run against main; background in
+> `docs/validation/full_bdg_scheme_dependence_eu_f6.md`.
+
 **The qualitative conclusion survives.** A 4.9 % suppression of peak density is
 not an LHY-balanced droplet; mean-field DDI still dominates. §5.2's
 "LHY is sub-leading" holds, and so does its "closure choice barely matters" —
