@@ -3,7 +3,7 @@
 #
 #   qsub -g tga-kozuma-kouhi -o $HOME/runs/mutation/uge.log \
 #        -l h_rt=8:00:00 \
-#        -v SPINORBEC_TSUBAME_PROJECT_ROOT=<checkout>,SBEC_MUT_ARGS="--probe grounded_cheap" \
+#        -v SPINORBEC_TSUBAME_PROJECT_ROOT=<checkout>,SBEC_MUT_PROBE=grounded_cheap \
 #        scripts/submit_mutation_sweep.sh
 #
 # Why a GPU node, and why that is not optional. `test/mutation/run.jl` credits a
@@ -39,12 +39,19 @@ if [ "$(readlink -f "$PROJECT_ROOT")" = "$(readlink -f "$SHARED_ROOT")" ]; then
     exit 2
 fi
 
-# UGE splits `-v` on commas, so `SBEC_MUT_ARGS="--mutants a,b,c"` arrives as three
-# broken assignments and qsub then tries to open `b` as the script file. Write
-# `+` where the harness wants `,` and it survives the transport:
-#     -v SBEC_MUT_ARGS="--mutants a+b+c --probe oracles"
-MUT_ARGS=${SBEC_MUT_ARGS:-}
-MUT_ARGS=${MUT_ARGS//+/,}
+# qsub's `-v` value cannot carry a command line. It splits on BOTH commas (the
+# separator between assignments) and spaces (end of the argument), so
+# `SBEC_MUT_ARGS="--mutants a,b,c --probe oracles"` loses everything after the
+# first space and qsub then tries to open `a` — or `zeeman_quadratic_sign` — as
+# the script file. Quoting does not help; the split is qsub's, not the shell's.
+#
+# So the knobs are separate variables whose values contain neither, and the
+# command line is assembled HERE. `+` stands in for the harness's `,`.
+MUT_IDS=${SBEC_MUT_IDS:-}
+MUT_PROBE=${SBEC_MUT_PROBE:-grounded_cheap}
+MUT_ARGS=(--probe "${MUT_PROBE//+/,}")
+[ -n "$MUT_IDS" ] && MUT_ARGS+=(--mutants "${MUT_IDS//+/,}")
+[ -n "${SBEC_MUT_MAXCOST:-}" ] && MUT_ARGS+=(--max-cost "$SBEC_MUT_MAXCOST")
 # Same reasoning as submit_test_tier.sh: each worker is an independent julia
 # process holding SpinorBEC + CUDA, so memory and not the node's 384 cores is
 # what bounds this.
@@ -70,7 +77,7 @@ fi
 
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
-echo "[sbec_mutation] host=$(hostname)  workers=${WORKERS}  args=${MUT_ARGS}"
+echo "[sbec_mutation] host=$(hostname)  workers=${WORKERS}  args=${MUT_ARGS[*]}"
 echo "[sbec_mutation] root=$PROJECT_ROOT"
 echo "[sbec_mutation] HEAD=$(git rev-parse HEAD)  $(git log -1 --format=%s)"
 # The sha above is the whole provenance of the result, so print the src/ diff
@@ -86,9 +93,8 @@ git status --porcelain -- src test | head -20
 }
 
 set +e
-# shellcheck disable=SC2086
 "$JULIA" --project=. test/mutation/run.jl \
-    --workers "$WORKERS" --out "$OUT_DIR" $MUT_ARGS \
+    --workers "$WORKERS" --out "$OUT_DIR" "${MUT_ARGS[@]}" \
     > "$OUT_DIR/sweep.out" 2>&1
 status=$?
 set -e
