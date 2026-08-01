@@ -39,7 +39,12 @@ if [ "$(readlink -f "$PROJECT_ROOT")" = "$(readlink -f "$SHARED_ROOT")" ]; then
     exit 2
 fi
 
+# UGE splits `-v` on commas, so `SBEC_MUT_ARGS="--mutants a,b,c"` arrives as three
+# broken assignments and qsub then tries to open `b` as the script file. Write
+# `+` where the harness wants `,` and it survives the transport:
+#     -v SBEC_MUT_ARGS="--mutants a+b+c --probe oracles"
 MUT_ARGS=${SBEC_MUT_ARGS:-}
+MUT_ARGS=${MUT_ARGS//+/,}
 # Same reasoning as submit_test_tier.sh: each worker is an independent julia
 # process holding SpinorBEC + CUDA, so memory and not the node's 384 cores is
 # what bounds this.
