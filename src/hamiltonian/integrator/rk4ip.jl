@@ -14,11 +14,17 @@
 # diagonal-in-k part — is absorbed into an interaction picture and applied
 # exactly, so it does not limit `dt`.
 #
-# Cost: 4 nonlinear evaluations + 4 kinetic half-exponentials per step. Our Strang
-# step already costs 4 nonlinear evaluations, because
-# `_half_potential_step_midpoint!` is a predictor-corrector and each V(dt/2)
-# evaluates the DDI twice. **Order 2 → 4 at equal cost**, and about half the
-# repaired Y4.
+# Cost, MEASURED rather than counted (Eu-like 12³ with DDI, CPU, ms/step):
+# `split_step!` 3.00, `split_step_midpoint!` 4.46, `rk4ip_step!` **2.61**. RK4IP
+# is cheaper per step than the default, because `split_step!` auto-dispatches to
+# the midpoint predictor-corrector whenever DDI is active (~1.5× a plain V step,
+# twice per step) while RK4IP makes four accumulating registry passes.
+#
+# Combined with the step sizes each holds under a fixed error budget
+# (`scripts/validation/rk4ip_step_size_probe.jl`), the net is **2.7× at a 1e-4
+# budget and 4.9× at 1e-5**. Both numbers are one config on CPU; the GPU cost
+# ratio is unmeasured, and the five scratch buffers below are ~2.2 GB at 128³
+# F64 D=13, which is the thing to check before assuming this transfers.
 #
 # What it gives up: neither symplectic nor exactly norm-conserving. Over the
 # 5-40 ms real-time windows this program runs that is not a constraint, and the
