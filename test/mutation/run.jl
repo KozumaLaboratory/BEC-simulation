@@ -122,7 +122,10 @@ precompile_package() = run(
 )
 
 """
-    run_probe(files, nworkers) -> Dict{String, Bool}   (true = file went RED)
+    run_probe(files, nworkers) -> Dict{String, Symbol}
+
+`:green` passed, `:red` failed, `:unknown` never reported a verdict (its worker
+died). `:unknown` is deliberately not merged into either — see the comment below.
 """
 function run_probe(files::Vector{String}, nworkers::Int)
     qdir = mktempdir()
@@ -137,12 +140,29 @@ function run_probe(files::Vector{String}, nworkers::Int)
                 stdout=devnull, stderr=devnull),
         )
     end
-    out = Dict{String, Bool}()
+    out = Dict{String, Symbol}()
     for (i, f) in enumerate(files)
         marker = joinpath(qdir, "done_$i")
-        # No marker = the file never completed (worker died). Treat as red: an
-        # unrun file must never read as "this mutant escaped".
-        out[f] = !isfile(marker) || startswith(read(marker, String), "FAIL")
+        # THREE outcomes, not two. Folding a missing marker into FAIL is wrong in
+        # a way that is invisible and that removes coverage rather than adding it:
+        # a file whose worker died is then CREDITED with catching the mutant, so a
+        # real gap is booked as covered and never re-probed. Which is the opposite
+        # of the intent — the original comment reasoned only about the escape
+        # direction ("an unrun file must never read as escaped") and that half is
+        # still honoured below, because :unknown is not an escape either.
+        #
+        # Found 2026-08-01: the smoke run reported `oracles/test_continuity_equation.jl`
+        # RED before any mutation, and it passes in isolation on the same commit and
+        # the same node type through this very code path (`PASS 9.48`). It has no
+        # randomness and one deterministic assertion, so it was never red — its
+        # marker was missing. 12 workers, `maxrss` 51 GB in a 4-slot allocation.
+        out[f] = if !isfile(marker)
+            :unknown
+        elseif startswith(read(marker, String), "FAIL")
+            :red
+        else
+            :green
+        end
     end
     rm(qdir; recursive=true, force=true)
     return out
@@ -212,34 +232,61 @@ function main()
     println("\n[baseline] precompiling + running probe set unmutated…")
     precompile_package()
     baseline = run_probe(files, NWORKERS)
-    already_red = sort([f for (f, red) in baseline if red])
+    already_red = sort([f for (f, s) in baseline if s === :red])
+    base_unknown = sort([f for (f, s) in baseline if s === :unknown])
     if !isempty(already_red)
         println("  $(length(already_red)) file(s) already RED before any mutation \
                  — excluded from the catch matrix:")
         foreach(f -> println("    ", f), already_red)
     end
-    live = filter(f -> !baseline[f], files)
+    if !isempty(base_unknown)
+        println("  $(length(base_unknown)) file(s) never reported a verdict in the \
+                 baseline (worker died — NOT a red test). Lower --workers; each one \
+                 holds SpinorBEC + CUDA. Excluded:")
+        foreach(f -> println("    ", f), base_unknown)
+    end
+    live = filter(f -> baseline[f] === :green, files)
 
-    # catch[mutant id] = set of files that went red under it
+    # catch[mutant id] = files that went red under it. `unknowns` is kept SEPARATE:
+    # a file that never reported cannot be credited with a catch (that books a real
+    # gap as covered), and cannot be called green either.
     catches = Dict{Symbol, Vector{String}}()
+    unknowns = Dict{Symbol, Vector{String}}()
     for (k, m) in enumerate(muts)
         print("\n[$k/$(length(muts))] $(m.id) ($(m.class), $(m.severity)) … ")
         apply!(m)
         try
             precompile_package()
             res = run_probe(live, NWORKERS)
-            catches[m.id] = sort([f for (f, red) in res if red])
+            catches[m.id] = sort([f for (f, s) in res if s === :red])
+            unknowns[m.id] = sort([f for (f, s) in res if s === :unknown])
         finally
             restore!(m)
         end
         n = length(catches[m.id])
-        println(n == 0 ? "ESCAPED — no test caught it" : "caught by $n file(s)")
+        u = length(unknowns[m.id])
+        # An escape claim is only as good as the completeness of the probe that
+        # produced it, so it is stated with the unknown count attached rather than
+        # asserted flatly.
+        println(
+            if n == 0
+                (
+                    if u == 0
+                        "ESCAPED — no test caught it"
+                    else
+                        "UNRESOLVED — nothing caught it, but $u file(s) never reported"
+                    end
+                )
+            else
+                (u == 0 ? "caught by $n file(s)" : "caught by $n file(s) ($u unreported)")
+            end,
+        )
     end
 
     git_src_dirty() && @error "src/ is dirty after the run — inspect `git diff -- src`"
 
     write_matrix(muts, live, catches)
-    report(muts, live, catches, already_red)
+    report(muts, live, catches, already_red, unknowns, base_unknown)
 end
 
 function write_matrix(muts, files, catches)
@@ -276,17 +323,52 @@ function min_cover(muts, files, catches)
     picked
 end
 
-function report(muts, files, catches, already_red)
+function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{String}}(),
+    base_unknown=String[])
     io = IOBuffer()
     println(io, "# Mutation report — ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
     println(io, "\n$(length(muts)) cataloged defect classes × $(length(files)) probe files.\n")
 
-    escaped = [m for m in muts if isempty(get(catches, m.id, String[]))]
+    _unk(m) = get(unknowns, m.id, String[])
+    nothing_caught = [m for m in muts if isempty(get(catches, m.id, String[]))]
+    # An escape is a claim about the WHOLE probe set having run. Where files went
+    # unreported, the honest verdict is unresolved — reported separately so it can
+    # be re-probed, not averaged into either bucket.
+    escaped = [m for m in nothing_caught if isempty(_unk(m))]
+    unresolved = [m for m in nothing_caught if !isempty(_unk(m))]
+
     println(io, "## Escaped — a real gap ($(length(escaped)))\n")
     isempty(escaped) && println(io, "(none)\n")
     for m in sort(escaped; by=m -> (m.severity != :fatal, m.severity != :gross))
         println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] `$(m.file)`  \n",
             "  $(strip(m.note))  \n  incident: $(m.incident)")
+    end
+
+    if !isempty(unresolved)
+        println(io, "\n## UNRESOLVED — nothing caught it, but the probe was incomplete ",
+            "($(length(unresolved)))\n")
+        println(io, "Not an escape and not a catch. Re-probe these with fewer ",
+            "workers.\n")
+        for m in sort(unresolved; by=m -> (m.severity != :fatal, m.severity != :gross))
+            println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] — ",
+                "$(length(_unk(m))) file(s) never reported: ",
+                join(first(_unk(m), 4), ", "))
+        end
+    end
+
+    # A file credited with a catch it did not report would book a real gap as
+    # covered, so say where verdicts went missing at all, not only where it
+    # changed the verdict.
+    noisy = [m for m in muts if !isempty(_unk(m)) && !isempty(get(catches, m.id, String[]))]
+    if !isempty(noisy) || !isempty(base_unknown)
+        println(io, "\n## Probe completeness\n")
+        isempty(base_unknown) ||
+            println(io, "- baseline: $(length(base_unknown)) file(s) never reported ",
+                "(worker died, NOT red): ", join(first(base_unknown, 5), ", "))
+        for m in noisy
+            println(io, "- `$(m.id)`: caught, but $(length(_unk(m))) file(s) never ",
+                "reported — the catch stands, the coverage count is a lower bound")
+        end
     end
 
     println(io, "\n## Catches per mutant\n")
