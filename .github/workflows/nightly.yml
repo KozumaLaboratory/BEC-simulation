@@ -65,51 +65,36 @@ jobs:
         with:
           coverage: false   # see .github/workflows/ci.yml for rationale
 
-  mutation:
-    name: Mutation catalog (defect classes vs the suite)
+  # The SWEEP does not live here. Measured: 23.7 worker-seconds per file-run on
+  # a 16-core node, 243 probe files after --max-cost, and a 2-core runner is
+  # ~3x slower — 96 minutes PER MUTANT, 14.4 hours for a 1/7 shard. It was
+  # killed at its timeout every single night from the day it landed, reported
+  # as `cancelled`, and produced nothing. Sharding the catalog did not help
+  # because the cost is dominated by the PROBE, not the mutant count.
+  #
+  # It runs on TSUBAME instead, where that same shard is minutes:
+  #   qsub -g <group> -v MUT_SHARD=k_7,MUT_TAG=nightly \
+  #        scripts/tsubame/submit_mutation.sh
+  #
+  # What stays here is the part that is cheap and must not rot: a catalog entry
+  # whose anchor no longer matches tests NOTHING, and says so nowhere. That is
+  # a pure regex scan over src/ with no package load and no test runs.
+  mutation_anchors:
+    name: Mutation catalog anchors still match
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.12"
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      # Injects each cataloged defect class into src/ and records which test
-      # files go red — see docs/conventions/testing_strategy.md. Costs one
-      # package precompile per mutant, so it is nightly and never a PR gate.
-      # It does NOT fail the job on escapes: an escaped mutant is a coverage
-      # gap to triage from the report, not a broken build. A STALE anchor DOES
-      # fail, because a catalog entry that quietly tests nothing is the exact
-      # failure mode the catalog exists to prevent.
-      # ONE SEVENTH of the catalog per night, chosen by day-of-year, so the
-      # whole thing sweeps weekly and every night FINISHES. Asking for the
-      # full catalog cost 53 classes x every probe file x one package load
-      # each, which ran into the 180-minute timeout and produced nothing —
-      # every night, reported as `cancelled` (2026-08-01). The harness names
-      # the classes it skipped, so a shard report cannot be mistaken for a
-      # clean bill of health.
       - run: |
-          SHARD=$(( $(date -u +%j) % 7 ))
-          julia --project=. --startup-file=no test/mutation/run.jl \
-            --workers 3 --shard "$SHARD/7"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: mutation-report
-          path: mutation_out/
-  # A result nobody reads is not a gate. This workflow failed 100+ consecutive
-  # times — every run in the API's history — with no notification of any kind,
-  # so the heavy-YAML surface it exists to cover went unverified for months and
-  # the failures were found only by accident, from an unrelated PR.
-  #
-  # A per-run ping would be the wrong fix: the interesting event is the
-  # TRANSITION, and a job that pings every night for a month trains everyone to
-  # filter it. So this keeps exactly one issue that mirrors the current state —
-  # opened on the first failure, its body refreshed (not commented) on each
-  # subsequent one so the streak is visible without a notification, and closed
-  # automatically when nightly goes green again.
+          julia --startup-file=no -e '
+            include("test/mutation/catalog.jl")
+            stale = check_anchors(".")
+            isempty(stale) || (foreach(x -> println("STALE: ", x[1].id, " matched ", x[2], "x"), stale); exit(1))
+            println(length(MUTANTS), " anchors OK")'
+
   report:
     name: Report the nightly result
     # Every other job in this workflow, so `report` runs last. This list has to

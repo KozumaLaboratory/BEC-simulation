@@ -241,8 +241,20 @@ asserts `@test_throws ArgumentError`, which pins the exception type. A
 message-pinning test would be a pin, and there rightly is none. The mutant has to
 break what the code DOES.
 
-Cost is one package precompile per mutant, so this is an on-demand and nightly
-instrument, never a PR gate.
+Cost is one package precompile per mutant, so this is an on-demand instrument
+and never a PR gate. It runs **on TSUBAME**, not in CI: measured at 23.7
+worker-seconds per file-run on a 16-core node against 243 probe files, a 2-core
+GitHub runner needs ~96 minutes PER MUTANT. The CI job that tried was killed at
+its timeout every night from the day it landed and produced nothing; sharding
+the catalog did not save it, because the cost is dominated by the probe and not
+by the mutant count.
+
+    qsub -g <group> -v MUT_SHARD=k_7,MUT_TAG=sweep \
+         scripts/tsubame/submit_mutation.sh
+
+What CI keeps is the anchor check — a catalog entry whose regex no longer
+matches tests NOTHING and says so nowhere. That is a pure source scan with no
+package load, and it is seconds.
 
 ### `test/oracles/` — the standing gates
 
