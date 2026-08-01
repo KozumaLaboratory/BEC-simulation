@@ -6,7 +6,8 @@
 #$ -cwd
 #$ -N rk4ip_gpu
 #$ -l gpu_1=1
-#$ -l h_rt=1:00:00
+#$ -l h_rt=2:00:00
+#$ -t 1-3
 #$ -j n
 
 set -euo pipefail
@@ -22,6 +23,11 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.jul
 echo "[src]   $(git rev-parse HEAD)  $(git status --porcelain -- src | wc -l) dirty src files"
 nvidia-smi -L || true
 
-"$JULIA" --project=. scripts/validation/rk4ip_gpu_cost_probe.jl
+case "${SGE_TASK_ID:-1}" in
+    1) "$JULIA" --project=. scripts/validation/rk4ip_gpu_cost_probe.jl ;;
+    2) "$JULIA" --project=. scripts/validation/rk4ip_time_to_solution_gpu.jl 64 ;;
+    3) "$JULIA" --project=. scripts/validation/rk4ip_time_to_solution_gpu.jl 128 ;;
+    *) echo "no task ${SGE_TASK_ID}"; exit 1 ;;
+esac
 
 echo "[done]"
