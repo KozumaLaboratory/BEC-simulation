@@ -5,7 +5,8 @@
 `summary.json` of 2026-05-26 — one of the 230 that predate every correction and
 carry no producing commit.
 
-`runs/eu_k3_sweep/summary.json` (gone) is the data behind **Fig 3 (a, b)** of
+`runs/eu_k3_sweep/`'s `summary.json` — the configs are tracked, the summary was
+never committed — is the data behind **Fig 3 (a, b)** of
 `four_figure_spec_2026_05_26.md` and behind claim row 5 of
 `day_inventory_2026_05_26.md`, *"K3 not primary arrest mechanism"*.
 
@@ -111,5 +112,6 @@ diffing the two files mechanically.
   used the peak of the **final** state, which is a different quantity; it is not
   reported here. The classification comparison above is like-for-like because
   both sides compute it the same way from their own run.
-- `runs/eu_k3_sweep_96/*.yaml` (gone) — the 96³ anchor for the same figure — is
+- `runs/eu_k3_sweep_96/`'s configs are tracked but its stored summary is not — the
+  96³ anchor for the same figure is
   not re-run here.
