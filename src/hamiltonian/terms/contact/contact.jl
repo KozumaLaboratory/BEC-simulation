@@ -38,6 +38,11 @@ function apply_operator!(out::AbstractArray, term::DensityC0Term, ws, psi::Abstr
     return out
 end
 
+"""Energy is `0.5 · Re⟨ψ, H·ψ⟩ · dV` for this term — mean field: E = ½c₀∫n² while H·ψ = c₀nψ.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::DensityC0Term) = 0.5
+
 function energy_contribution(term::DensityC0Term, psi::AbstractArray{<:Complex}, ws)
     # Mean-field: E = (1/2) · Re⟨ψ, apply_op(ψ)⟩ · dV = (c0/2)·∫n²·dV.
     # Device-generic derived body; Array specialization below is the
@@ -209,6 +214,11 @@ function apply_operator!(out::AbstractArray, term::SpinC1Term, ws, psi::Abstract
     return out
 end
 
+"""Energy is `0.5 · Re⟨ψ, H·ψ⟩ · dV` for this term — mean field: E = ½c₁∫|f|² while H·ψ = c₁(f·F)ψ.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::SpinC1Term) = 0.5
+
 function energy_contribution(term::SpinC1Term, psi::AbstractArray{<:Complex}, ws)
     # Mean-field: E = (1/2)·Re⟨ψ, apply_op(ψ)⟩·dV = (c1/2)·∫|F|²·dV.
     # Device-generic derived body; the fused CPU body and the
@@ -299,6 +309,11 @@ function _singlet_pair_energy(psi, F, c2, ndim, n_pts, dV)
     A = singlet_pair_amplitude(psi, F, ndim)
     0.5 * c2 * sum(abs2, A) * dV
 end
+
+"""Energy is `0.5 · Re⟨ψ, H·ψ⟩ · dV` for this term — mean field in every channel — c₂ singlet pairing and the higher-rank tensor_cache terms are all density-quadratic.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::TensorTerm) = 0.5
 
 function energy_contribution(::TensorTerm, psi::AbstractArray{<:Complex}, ws)
     F = ws.spin_matrices.system.F

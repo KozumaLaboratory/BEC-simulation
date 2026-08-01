@@ -34,6 +34,11 @@ function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+"""Energy is `0.4 · Re⟨ψ, H·ψ⟩ · dV` for this term — ε ∝ n^(5/2) and V = dε/dn, so n·V = (5/2)ε.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::LHYTerm) = 0.4
+
 function energy_contribution(::LHYTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))

@@ -110,6 +110,11 @@ function _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     nothing
 end
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body AC-Stark.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::LightShiftTerm) = 1.0
+
 function energy_contribution(::LightShiftTerm, psi::AbstractArray{<:Complex}, ws)
     ws.light_shift === nothing && return 0.0
     N = ndims(psi) - 1

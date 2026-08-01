@@ -365,6 +365,7 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    "oracles/test_energy_operator_ratio.jl",
     # The coverage claim `test_term_consistency.jl` makes in its header and does
     # not keep: `apply_operator!` differenced against `energy_contribution` for
     # EVERY slot of H_TERMS_CANONICAL_ORDER, with the coverage itself asserted so
