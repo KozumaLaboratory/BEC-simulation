@@ -326,7 +326,7 @@ const MUTANTS = Mutant[
     Mutant(:oom_classified_as_transient,
         "src/workflow/autopilot/tick.jl",
         r"        return :killed_bug, \"OOM: \$\(reason\)\"",
-        "        return :killed_data, \"OOM: $(reason)\"",
+        "        return :killed_data, \"OOM: \$(reason)\"",
         :path_default, :major,
         "OOM is resource-permanent — retry escalates the resource class",
         "Classifies an out-of-memory kill as a DATA failure, so the retry \
