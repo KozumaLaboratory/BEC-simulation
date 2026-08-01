@@ -1,0 +1,164 @@
+# Is the ITP fused chain's splitting change SMALLER than the one dt already costs?
+#
+# Cost is settled: fusing the ITP `V DDI V` sandwich saves 30.6 % of the step at
+# 64³ and 29.3 % at 96³ (bench/itp_spin_chain_prize.jl), against a threshold of
+# 20 % fixed before the run. What is not settled is what it costs in accuracy, and
+# it is NOT free the way the RTP fusion is: RTP freezes ψ_mf in its midpoint
+# predictor-corrector, so one ⟨F⟩ serves all three substeps and the fusion is
+# bit-identical (gated, 4/4 including the tabulated arm). ITP has no frozen field
+# — its substeps see ⟨F⟩(ψ₀), ⟨F⟩(ψ₁), ⟨F⟩(ψ₂) — so fusing it is a different
+# splitting.
+#
+# THE QUESTION IS NOT "is the change small". It is "is the change small against an
+# error we have ALREADY ACCEPTED". Choosing dt accepts an O(dt²) splitting error;
+# the honest yardstick is therefore the separate chain at dt vs at dt/2, which is
+# that accepted error made visible. A fusion whose effect sits well under it
+# changes nothing anyone was relying on. One quoted as "1e-5, small" would be a
+# number with no scale attached.
+#
+#   arm S   separate chain, dt        the current production behaviour
+#   arm B   separate chain, dt/2      S's own accepted error, made visible
+#   arm F   fused chain,    dt        the proposal
+#
+#   verdict:  |F − S| / |S − B|   ≪ 1  admissible,  ≳ 1  not
+#
+# Everything is compared at the CONVERGED state, not after a fixed step count: ITP
+# is a relaxation and the fixed point is the object, so an arm that takes a
+# different path there is not thereby wrong. Arms run to the same tolerance and
+# the same imaginary time, with dt/2 given twice the steps.
+#
+#   julia --project=. bench/itp_fused_chain_accuracy.jl [n] [max_steps]
+
+using Printf
+using LinearAlgebra: norm
+import CUDA
+using SpinorBEC
+
+include(joinpath(@__DIR__, "eu151_params.jl"))
+
+const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 64
+const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 40000
+const DT = 0.002
+const TOL = 1.0e-10
+
+function build(dt)
+    grid = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
+    psi0 = init_psi(grid, SpinSystem(6); state=:spin_coherent,
+        init_theta=π / 4, init_phi=0.3)
+    ws = make_workspace(;
+        grid, atom=Eu151, interactions=eu_interaction_params(0.05),
+        zeeman=ZeemanParams(EU_p_weak, 0.0),
+        potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
+        sim_params=SimParams(; dt=dt, n_steps=1, imaginary_time=true,
+            save_every=10^9),
+        psi_init=psi0, enable_ddi=true, c_dd=EU_c_dd,
+        ddi_padding=true, ddi_trunc_radius=-1.0,
+        spinor_lhy=:polar_contact, backend=CUDABackend())
+    ws
+end
+
+"The current ITP half: three operators, each seeing its own ⟨F⟩."
+function half_separate!(ws, dt, nc)
+    SpinorBEC._outer_potential_fwd!(ws, dt / 4, nc, 3, true)
+    SpinorBEC._ddi_step!(ws, dt / 2, 3, true)
+    SpinorBEC._outer_potential_bwd!(ws, dt / 4, nc, 3, true)
+end
+
+"The proposal: one pass, ⟨F⟩ frozen at the ψ entering the half."
+function half_fused!(ws, dt, nc)
+    zd = SpinorBEC._resolve_zeeman_diag(ws, ws.state.t)
+    psi = ws.state.psi
+    SpinorBEC._apply_spin_chain!(psi, ws, dt / 2, 3, true, ws.interactions,
+        psi, zd, zd, psi)
+end
+
+"""Relax to the fixed point and return the converged ψ (host) plus diagnostics.
+
+`n_steps` scales as 1/dt so every arm covers the same imaginary time — without
+that the dt/2 arm is a shorter run wearing a smaller-error label, which is a
+mistake this project has already made once in this bench family."""
+function relax(half!; dt, max_steps)
+    ws = build(dt)
+    nc = ws.spin_matrices.system.n_components
+    psi = ws.state.psi
+    SpinorBEC._normalize_psi!(psi, ws.grid, nc, 3)
+    e_prev = SpinorBEC.total_energy(ws)
+    conv, last = false, 0
+    dE = NaN
+    for step in 1:max_steps
+        half!(ws, dt, nc)
+        SpinorBEC.apply_step!(SpinorBEC.KineticTerm(), psi, 0.0, false, ws)
+        half!(ws, dt, nc)
+        SpinorBEC._normalize_psi!(psi, ws.grid, nc, 3)
+        if step % 200 == 0
+            e = SpinorBEC.total_energy(ws)
+            dE = abs(e - e_prev) / max(abs(e), eps())
+            e_prev = e
+            last = step
+            if dE < TOL
+                conv = true
+                break
+            end
+        end
+    end
+    CUDA.synchronize()
+    (psi=Array(psi), E=SpinorBEC.total_energy(ws), conv=conv, dE=dE, steps=last)
+end
+
+"Relative L2 distance between two states' DENSITIES.
+
+Density, not ψ: ITP leaves a global U(1) phase and a z-spin rotation free, so a
+ψ-difference reports gauge as if it were physics. This is the same reason
+`tol_drho` exists."
+function ddist(a, b)
+    na = dropdims(sum(abs2, a; dims=4); dims=4)
+    nb = dropdims(sum(abs2, b; dims=4); dims=4)
+    norm(vec(na) .- vec(nb)) / max(norm(vec(na)), eps())
+end
+
+println("="^78)
+println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, tol=$(TOL), $(CUDA.name(CUDA.device()))")
+println("verdict = |F−S| / |S−B|, where S−B is the error dt ALREADY costs")
+println("="^78)
+
+S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS)
+B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS)
+F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS)
+
+@printf("\n  %-28s %14s %6s %10s %8s\n", "arm", "E", "conv", "final dE", "steps")
+for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B), ("F fused, dt", F))
+    @printf("  %-28s %14.8f %6s %10.2e %8d\n", name, r.E, r.conv ? "yes" : "NO",
+        r.dE, r.steps)
+end
+
+d_FS = ddist(F.psi, S.psi)
+d_SB = ddist(S.psi, B.psi)
+e_FS = abs(F.E - S.E) / max(abs(S.E), eps())
+e_SB = abs(S.E - B.E) / max(abs(S.E), eps())
+
+@printf("\n  %-28s %12s %12s\n", "", "density", "energy")
+@printf("  %-28s %12.4e %12.4e\n", "|F − S|  the proposal", d_FS, e_FS)
+@printf("  %-28s %12.4e %12.4e\n", "|S − B|  dt's own cost", d_SB, e_SB)
+@printf("  %-28s %12.3f %12.3f\n", "ratio  (≪1 admissible)",
+    d_FS / max(d_SB, eps()), e_FS / max(e_SB, eps()))
+
+if !(S.conv && B.conv && F.conv)
+    println("""
+
+  AT LEAST ONE ARM DID NOT CONVERGE. Every ratio above is then a comparison of
+  points on trajectories rather than of fixed points, and none of them decides
+  anything. Raise max_steps and re-run before reading further.""")
+end
+
+println("""
+
+[read] The denominator is the point. `|S − B|` is what choosing dt already costs,
+measured rather than assumed, so the ratio says whether the fusion moves the
+answer by more or less than a knob already set. A small `|F − S|` quoted alone
+would be a number with no scale.
+
+If the ratio is ≪ 1 the fusion is admissible AT THIS dt and grid, and the saving
+is 30.6 % of the step at 64³. If it is ≳ 1 the fusion is a real change to the
+answer and the speed does not buy it — the correct move then is dt/2 with the
+fused chain, which costs 2× the steps at 0.70× the step and is therefore a LOSS,
+i.e. the idea dies.""")
