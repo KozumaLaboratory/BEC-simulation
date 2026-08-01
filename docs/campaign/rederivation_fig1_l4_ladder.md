@@ -113,6 +113,31 @@ a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
   summaries contain `N_trajectory` and nothing else, so there is no like-for-like
   density number to put beside the panel's table.
 
+## The inset survives where the main panel does not
+
+The inset's two lossy arms were re-run on TSUBAME. Its quantity is the surviving
+fraction N(T)/N(0), which the stored summaries record as
+`N_trajectory.N_final_ratio` and the v3 extractor as `1 − norm_rel_drift` — the
+same number by construction, unlike ΔF_z below.
+
+| config | stored | re-derived | change |
+|---|---:|---:|---:|
+| `matsui_40ms_lossy_medium` | 0.516038 | 0.516901 | **+0.17 %** |
+| `matsui_40ms_lossy_strong` | 0.244302 | 0.243647 | **−0.27 %** |
+
+**Two to three tenths of a percent, against −16.5 % on the same figure's main
+panel.** The inset does not need redrawing.
+
+That is a discrimination rather than a reassurance: both panels went through the
+same pipeline on the same day and only one moved. Peak density is a local maximum
+of the field and rides on the corrected LHY and dealias paths; the surviving
+fraction is a volume integral of a K3 decay and does not. A campaign that had
+re-derived only the inset would have concluded the figure was fine.
+
+The re-derived runs also classify — `stable_arrest` (medium),
+`sacrificial_arrest` (strong) — where the stored summaries classify nothing. New
+information, not a comparison.
+
 ## Not covered
 
 - Fig 1 (d)'s density slice is an analysis of `matsui_5ms_morphology_n64`, which
