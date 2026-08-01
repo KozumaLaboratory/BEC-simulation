@@ -33,9 +33,14 @@ SpinorBEC.backend_failure_reason(b::_ReasonBackend, ::QueueEntry) = b.reason
     # The queue only needs a spec it can content-address and a store to put it
     # in; nothing here runs physics, so the emptiest valid spec is the honest
     # fixture. `tag` keeps the content ids distinct.
-    _exp(tmp, tag) = Experiment(
+    # The store must live AT the queue root: `list_queue` scans `qr.path`, so
+    # an experiment stored anywhere else is enqueued into a directory the gate
+    # never reads, and every count comes back 0. That is what the first version
+    # of this file did, and both the budget and lineage rows failed with a
+    # perfectly plausible "nothing queued".
+    _exp(qr, tag) = Experiment(
         Dict{Any, Any}("pipeline" => [], "note" => tag);
-        store=CASStore(joinpath(tmp, "store")))
+        store=CASStore(qr.path))
 
     @testset "the quarter cap counts work that is QUEUED, not just spent" begin
         mktempdir() do tmp
@@ -52,7 +57,7 @@ SpinorBEC.backend_failure_reason(b::_ReasonBackend, ::QueueEntry) = b.reason
             # a gate that looks only at realized hours still says yes — and by
             # the time it says no, the hours are gone. That is the whole point
             # of checking before dispatch.
-            enqueue!(_exp(tmp, "over"); estimated_walltime_hours=200.0,
+            enqueue!(_exp(qr, "over"); estimated_walltime_hours=200.0,
                 kick_tick=false, qr=qr)
             d = budget_gate(; qr=qr)
             @test !d.allow
@@ -86,7 +91,7 @@ SpinorBEC.backend_failure_reason(b::_ReasonBackend, ::QueueEntry) = b.reason
     @testset "OOM is resource-permanent, not a data failure" begin
         mktempdir() do tmp
             qr = QueueRoot(joinpath(tmp, "runs"))
-            e = enqueue!(_exp(tmp, "oom"); kick_tick=false, qr=qr)
+            e = enqueue!(_exp(qr, "oom"); kick_tick=false, qr=qr)
             # The distinction is load-bearing: :killed_data sends the retry back
             # to the same recipe at the same resource class, which OOMs again.
             # :killed_bug is what escalates.
@@ -111,9 +116,9 @@ SpinorBEC.backend_failure_reason(b::_ReasonBackend, ::QueueEntry) = b.reason
                 return SpinorBEC.Experiment[]
             end
 
-            parent = enqueue!(_exp(tmp, "p"); recipe_name=:_bound_probe,
+            parent = enqueue!(_exp(qr, "p"); recipe_name=:_bound_probe,
                 kick_tick=false, qr=qr)
-            child = enqueue!(_exp(tmp, "c"); recipe_name=:_bound_probe,
+            child = enqueue!(_exp(qr, "c"); recipe_name=:_bound_probe,
                 parent_id=parent.content_id, kick_tick=false, qr=qr)
             @test _descendant_count(parent, qr) >= 1
 
