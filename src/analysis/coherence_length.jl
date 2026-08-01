@@ -97,66 +97,110 @@ function first_order_correlation(
 end
 
 """
-    coherence_length(r, g1; plateau_frac=0.7, min_points=4) -> (; xi, f_inf)
+    coherence_length(r, g1; r_fit_max=nothing, min_points=5) -> (; xi, f_inf, resid, window)
 
-Decay length of the CONNECTED part of `g₁`, with the condensate plateau removed
-first:
+Fit `g₁(r) ≈ f_∞ + A exp(−r/ξ)` and return the decay length `ξ` and the plateau
+`f_∞` separately. `ξ` is scanned on a log grid and the linear parameters
+`(f_∞, A)` are solved exactly at each `ξ`, so there is no initial guess and no
+iteration to diverge.
 
-    g₁(r) ≈ f_∞ + (1 − f_∞) exp(−r/ξ)
+`r_fit_max` bounds the fit. With `nothing` it is chosen self-consistently: fit
+the first few bins, then refit over `6ξ`. Pass an explicit value when the cloud
+radius is known.
 
-`f_∞` is the mean of `g₁` over the outer `plateau_frac`…1 of the measured range
-(the condensate fraction, up to finite-size effects); `ξ` comes from a
-least-squares line through `log(g₁ − f_∞)` over the points where that residual is
-positive and above the plateau noise.
+# Why the fit is bounded at all
 
-# Why not a 1/e threshold
+A measured `g₁` has three parts, and only the first two are what this function
+is for. On a condensed cloud (`t_hold = 200`, `μ = 15`, `R_TF = 5.48`):
 
-The first version returned the separation where `g₁` first fell to `1/e`, and
-that number is not a length — it is where the plateau happens to cross 0.368.
-Measured on synthetic fields with a known condensate fraction `f`:
+    r     0.07  0.22  0.36  0.51  0.66  0.80  1.09  1.97  3.13  4.30  6.04  7.79
+    g₁    1.00  0.96  0.91  0.86  0.84  0.84  0.83  0.79  0.72  0.61  0.41  0.17
 
-    f       g₁(r→0⁺)   g₁(far)   1/e crossing
-    0.00      0.002     0.001     0.354
-    0.30      0.301     0.184     0.439
-    0.60      0.600     0.368     7.966      <- plateau sits ON 1/e
-    0.90      0.899     0.551     NaN        <- never reaches it
-    0.99      0.988     0.606     NaN
+a fast drop over `r ≲ 0.65`, a plateau at 0.835 — the condensate fraction — and
+then a slow decline that is cloud structure: the condensate fraction is not
+uniform, so dividing by the amplitude autocorrelation does not flatten it. An
+unbounded fit charges that structural tail to the coherence length, and reading
+the plateau off the outer end of the measured range reports 0.12 for a plateau
+of 0.835 because that range ends at `r = 10` while the cloud ends at 5.48.
 
-Below `f = 1/e` it reports the thermal decay (a couple of grid cells), near it the
-crossing runs away, above it there is no crossing at all. In the Kibble-Zurek scan
-that produced `ξ̂ = 0.367, 0.374, 0.386, 0.405` across an 8× change in quench rate
-with the per-seed spread reported as exactly zero — a constant condensate fraction
-masquerading as a constant length, which broke the prediction `b = α/2 = 0.47`
-(measured 0.073) and made the observable, not the defect count, the thing at
-fault.
+# History
 
-Returns `xi = NaN` when fewer than `min_points` usable points remain, rather than
-extrapolating from two.
+This is the third statement of this function; the first two were wrong in ways
+the returned number could not show.
+
+  - A `1/e` threshold is not a length. It reported where the plateau happened to
+    cross 0.368: `0.354 / 0.439 / 7.966 / NaN / NaN` for known coherent fractions
+    `0.0 / 0.3 / 0.6 / 0.9 / 0.99`.
+  - Normalising by `⟨n⟩` left the envelope autocorrelation in `g₁`, so the far
+    field measured the cloud's finite size rather than its coherence.
+
+Both produced `ξ̂ = 0.367 … 0.405` across an 8× change in quench rate with the
+per-seed spread reported as exactly 0.000, and turned a Kibble–Zurek prediction
+of `b = 0.47 ± 0.04` into `0.073`.
+
+`resid` is returned so a fit that does not describe the data is visible rather
+than silent.
 """
 function coherence_length(
     r::AbstractVector, g1::AbstractVector;
-    plateau_frac::Real=0.7, min_points::Int=4,
+    r_fit_max::Union{Nothing, Real}=nothing, min_points::Int=5,
 )
     length(r) == length(g1) || throw(DimensionMismatch("r and g1 length mismatch"))
     n = length(r)
-    n >= 6 || return (; xi=NaN, f_inf=NaN)
+    n >= min_points || return (; xi=NaN, f_inf=NaN, resid=NaN, window=NaN)
 
-    i0 = max(2, Int(floor(plateau_frac * n)))
-    f_inf = sum(@view g1[i0:n]) / (n - i0 + 1)
-    # Scatter of the plateau itself sets the floor: below it, g₁ − f_∞ is noise.
-    σ = sqrt(sum((g1[i] - f_inf)^2 for i in i0:n) / max(n - i0, 1))
-    floor_ = max(3σ, 1e-6)
+    r_fit_max === nothing && (r_fit_max = _knee_window(r, g1))
+    imax = something(findlast(<=(r_fit_max), r), n)
+    imax >= min_points || (imax = min_points)
+    fit = _fit_plateau_exp(r, g1, imax)
+    (; fit.xi, fit.f_inf, fit.resid, window=r[imax])
+end
 
-    idx = [i for i in 1:(i0 - 1) if g1[i] - f_inf > floor_]
-    length(idx) >= min_points || return (; xi=NaN, f_inf)
+# The fit window has to come from the shape, not from a bin count: the same
+# curve sampled coarsely put a count-based window out in the structural tail and
+# turned a plateau of 0.835 into 0.611. The knee — where the decay rate has
+# fallen to 15% of its steepest — is a property of the curve, so it lands in the
+# same place at any sampling. Three times the knee gives the fit enough of the
+# decay to constrain ξ while staying clear of the tail.
+function _knee_window(r::AbstractVector, g1::AbstractVector)
+    n = length(r)
+    n >= 4 || return r[n]
+    slope = [(g1[i + 1] - g1[i]) / (r[i + 1] - r[i]) for i in 1:(n - 1)]
+    imax = argmax(abs.(slope))
+    thr = 0.15 * abs(slope[imax])
+    knee = something(findfirst(i -> abs(slope[i]) < thr, (imax + 1):(n - 1)), n - 1 - imax)
+    clamp(3 * r[min(imax + knee, n)], r[min(4, n)], r[n])
+end
 
-    x = [r[i] for i in idx]
-    y = [log(g1[i] - f_inf) for i in idx]
-    x̄ = sum(x) / length(x);
-    ȳ = sum(y) / length(y)
-    Sxx = sum((a - x̄)^2 for a in x)
-    Sxx > 0 || return (; xi=NaN, f_inf)
-    slope = sum((a - x̄) * (b - ȳ) for (a, b) in zip(x, y)) / Sxx
-    slope < 0 || return (; xi=NaN, f_inf)      # not a decay
-    (; xi=-1 / slope, f_inf)
+# ξ enters only through exp(-r/ξ), so scanning it and solving the two linear
+# parameters in closed form at each node beats any gradient method here: no
+# starting point, no local minimum, and the cost is one 2×2 solve per node.
+function _fit_plateau_exp(r::AbstractVector, g1::AbstractVector, imax::Int)
+    rr = @view r[1:imax]
+    yy = @view g1[1:imax]
+    best = (; xi=NaN, f_inf=NaN, resid=Inf)
+    lo, hi = log(r[1] / 4), log(r[imax] * 4)
+    for lξ in range(lo, hi; length=400)
+        ξ = exp(lξ)
+        S1 = float(imax)
+        Se = Sf = Sy = Sey = 0.0
+        for i in 1:imax
+            e = exp(-rr[i] / ξ)
+            Se += e;
+            Sf += e * e
+            Sy += yy[i];
+            Sey += e * yy[i]
+        end
+        det = S1 * Sf - Se^2
+        abs(det) > 1e-14 || continue
+        f = (Sf * Sy - Se * Sey) / det
+        A = (S1 * Sey - Se * Sy) / det
+        A > 1e-3 || continue                      # no decaying component to speak of
+        res = 0.0
+        for i in 1:imax
+            res += (yy[i] - (f + A * exp(-rr[i] / ξ)))^2
+        end
+        res < best.resid && (best = (; xi=ξ, f_inf=f, resid=res))
+    end
+    best.resid === Inf ? (; xi=NaN, f_inf=(sum(g1[1:imax]) / imax), resid=NaN) : best
 end
