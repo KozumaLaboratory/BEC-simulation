@@ -135,9 +135,14 @@ is fine for *"stop citing these as evidence"* and is not fit to drive `rm`.
 ## The disposable set: 207 directories, 82 of them still on disk
 
 Under the loosest matcher — any backticked token in a live document that names or
-prefixes the directory — 267 of the 474 are mentioned somewhere and 207 are not.
-Of those 207, 82 still exist under `runs/` in the main checkout, totalling
-**60.6 GiB against a 261 GiB `runs/` tree**.
+prefixes the directory — 263 of the 474 are mentioned somewhere and 211 are not.
+Four of those 211 are scan families, kept by rule 5, leaving **207**. Of the 207,
+82 still exist under `runs/` in the main checkout, totalling **60.6 GiB against a
+261 GiB `runs/` tree**.
+
+Rule 5 removes only four here, against 105 under the first matcher, because the
+corrected matcher already keeps most scan families for the better reason: a
+document names them.
 
 Each of the 207 satisfies all of:
 
