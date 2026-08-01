@@ -104,7 +104,7 @@ Coverage gaps (intentional, deferred):
 | Grid n=16/24/32 at fixed box | Width converges to ≤ 1% | `test/test_level11_convergence_sweep.jl` |
 | Box L=6/8/12 at fixed dx≈0.4 | ≥ 10× boundary-density tightening per L-doubling | `test/test_level11_convergence_sweep.jl` |
 | Seed reproducibility | Bit-identical | `test/test_level11_convergence_sweep.jl` |
-| **Eu F=6 Ham-only, cross-grid** | `ΔF_z = 0.00886` at N=64/96/128 (5-digit agreement) at `dt=0.005, k_cut=16.0, dealias enabled` | `runs/verification_suite/L4_eu_matsui_hamiltonian_only_{64,96,128}` (2026-05-24); discussed in `memory:validation_ladder_2026_05_22` |
+| **Eu F=6 Ham-only, cross-grid** | `ΔF_z = 0.00886` at N=64/96/128 (5-digit agreement) at `dt=0.005, k_cut=16.0, dealias enabled` | `runs/L4_eu_matsui_hamiltonian_only_{64,96,128}_*` (untracked) (2026-05-24); discussed in `memory:validation_ladder_2026_05_22` |
 
 The Eu F=6 cross-grid result is **the canonical Hamiltonian-only
 prediction** of this codebase. Reported as `ΔF_z(t = T_evolution)`

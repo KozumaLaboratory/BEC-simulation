@@ -19,6 +19,12 @@
 #   (gone)      never committed, or removed. The citation cannot be followed and
 #               the claim on it needs regenerating or retracting — see
 #               docs/campaign/doc_run_citation_inventory.md.
+#   (untracked) it names a run OUTPUT directory. Configs under `runs/` are
+#               tracked; outputs are not, so whether the path is on disk is a
+#               property of the machine and the checkout, not of the document.
+#               `runs/L4_eu_matsui_hamiltonian_only_*` resolves in the main
+#               checkout and not in a worktree, and CI has neither. Without this
+#               marker the gate flaps by checkout, which is worse than silent.
 #
 # Fenced code blocks are out of scope: a path inside a shell example is a command
 # to type, not a claim that evidence exists. Measured when this was written — 27
@@ -37,22 +43,61 @@ const _DOCS = joinpath(@__DIR__, "..", "..", "docs")
 const _RUNS_DIR = joinpath(@__DIR__, "..", "..", "runs")
 const _SEP = Base.Filesystem.path_separator
 
-const MARKERS = ("example", "planned", "archived", "gone")
+const MARKERS = ("example", "planned", "archived", "gone", "untracked")
 const _MARKER_RE = Regex("\\((" * join(MARKERS, "|") * ")\\)")
 
+# `/` is INSIDE the character class on purpose. Until 2026-08-02 it was not, so a
+# nested citation was captured at its first segment only: `runs/verification_suite/
+# L4_eu_matsui_hamiltonian_only_*` resolved as `runs/verification_suite`, which
+# exists, and the part naming the evidence was never checked. That is how the
+# runs behind "the canonical Eu Hamiltonian-only prediction for this codebase"
+# (self_contained_validation_report.md:107) reached a disposal manifest.
+#
 # `(?<![\w/-])` keeps `spinorbec-runs/x` and `some/runs/x` out. Without it the
 # tail of any longer token reads as an in-repo citation — that defect put a 40 %
 # over-count into a merged PR (#220, corrected in #227).
-const _CITE_RE = r"(?<![\w/-])runs/([A-Za-z0-9_][A-Za-z0-9_.*-]*)"
+#
+# The glob metacharacters are in the class so a family citation is captured
+# WHOLE. Leaving them out truncates at the first one — `runs/twa_N_scan/N{1000,
+# 10000,100000}_<hash>` was captured as `twa_N_scan/N` and then reported as a
+# broken citation, which is a defect in the matcher wearing the costume of a
+# defect in the document.
+const _CITE_RE = r"(?<![\w/-])runs/([A-Za-z0-9_][A-Za-z0-9_./*?{},<>-]*)"
+const _META = ('*', '?', '{', '<')
 
-"""A citation resolves if the directory exists, or — for a family written
-`runs/foo_*` — if anything matches the prefix. Treating the stem as a literal
-directory name is what made `runs/eu_k3_*` look broken next to `runs/eu_k3_lhy`."""
+"""A citation resolves if the path exists under `runs/`, or — for a family
+written `runs/a/b_*` — if anything in the parent matches the stem. Resolution is
+per PATH, not per top-level name: the last segment is the one carrying the claim.
+
+Treating the stem as a literal directory name is what made `runs/eu_k3_*` look
+broken next to `runs/eu_k3_lhy`."""
 function _resolves(d)
-    isdir(joinpath(_RUNS_DIR, d)) && return true
-    endswith(d, '_') || return false
-    isdir(_RUNS_DIR) || return false
-    any(startswith(n, d) for n in readdir(_RUNS_DIR))
+    dir = _RUNS_DIR
+    segs = split(d, '/'; keepempty=false)
+    for (i, seg) in enumerate(segs)
+        isdir(dir) || return false
+        j = findfirst(in(_META), seg)
+        if j !== nothing
+            # A family. We cannot descend past a glob, so the question becomes
+            # whether the literal prefix matches anything here — which is the
+            # whole claim `runs/eu_k3_*` makes. Treating the stem as a literal
+            # name is what made it look broken next to `runs/eu_k3_lhy`.
+            stem = seg[1:prevind(seg, j)]
+            isempty(stem) && return true
+            return any(startswith(n, stem) for n in readdir(dir))
+        end
+        # A citation ending in a file is adjudicated at its PARENT. Run outputs
+        # (`summary.json`, `result.jld2`) are untracked by design, so whether one
+        # is on disk is a property of the checkout, not of the document: in a
+        # worktree `runs/klaus_quench/` holds only the tracked YAML, while the
+        # same path in the main checkout has the summary. Judging the file would
+        # make this gate report a different verdict per checkout, and marking
+        # those citations `(gone)` from a worktree would write a falsehood into
+        # the document.
+        i == length(segs) && occursin('.', seg) && return true
+        dir = joinpath(dir, seg)
+    end
+    ispath(dir)
 end
 
 """Walk live docs, yielding `(doc, line, name, resolves, marked, fenced)` for
@@ -76,7 +121,10 @@ function _citations()
             end
             marked = occursin(_MARKER_RE, line)
             for m in eachmatch(_CITE_RE, line)
-                d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
+                # `*` is NOT stripped: _resolves needs it to tell a family from
+                # a literal name. `.` is, so a citation at the end of a sentence
+                # does not become a path with a trailing dot.
+                d = rstrip(m.captures[1], ['.', ',', ')', ';', ':', '`', '/'])
                 isempty(d) && continue
                 push!(out, (doc=rel, line=i, name=d, ok=_resolves(d),
                     marked=marked, fenced=fenced))
@@ -127,6 +175,23 @@ end
             ]),
         )
         @test stale == String[]
+    end
+
+    @testset "nested citations are checked at the last segment" begin
+        # The canary for the 2026-08-02 fix. Drop `/` from _CITE_RE and this goes
+        # green for the wrong reason: every nested citation collapses to its
+        # first segment, which is a directory that exists.
+        #
+        # Both arms are asserted because only the pair is discriminating. A
+        # matcher that ignores the tail passes the first and fails the second; a
+        # matcher that never resolves anything fails the first.
+        # Tracked paths only, so the canary means the same thing in a worktree,
+        # in the main checkout and in CI.
+        @test _resolves("verification_suite/checks")
+        @test !_resolves("verification_suite/no_such_run_")
+
+        nested = [c for c in cites if occursin('/', c.name)]
+        @test !isempty(nested)   # else the assertions above test nothing real
     end
 
     @testset "fenced blocks are out of scope, and that exclusion is load-bearing" begin

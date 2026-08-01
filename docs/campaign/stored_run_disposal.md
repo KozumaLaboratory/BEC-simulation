@@ -90,27 +90,78 @@ Two facts, measured:
 Disposal therefore needs *all* of: uncited, untracked, unstamped, superseded by a
 correction — **and not a scan family.**
 
-## The disposable set: 280 directories
+## Second correction: the count was a property of the matcher
 
-392 uncited, minus 7 tracked, minus 105 scan families.
+Raised by anko — *"that's still a lot."* It was, and chasing that produced the
+finding that matters more than any of the numbers below.
 
-Every one satisfies all of:
+**The size of the disposable set moved every time the citation matcher was fixed:
+385 → 280 → 259 → 207.** Three separate defects, each found only because the
+previous number was questioned:
 
-1. no live document cites it, by name or by family glob;
+1. **Nested citations were read at their first segment only.** The matcher keyed
+   on the top-level directory, so `runs/verification_suite/L4_eu_matsui_hamiltonian_only_*` (gone)
+   resolved to `verification_suite` and the 13 directories it names were
+   scored uncited. `self_contained_validation_report.md:107` calls those runs
+   *the canonical Eu Hamiltonian-only prediction for this codebase*. They were on
+   the disposal list. Fixing the matcher then showed the citation itself was
+   wrong: nothing named `L4_eu_matsui_hamiltonian_only_*` has ever existed under
+   `verification_suite/`, in this worktree or the main checkout. The runs are at
+   the top level of `runs/`, and three documents pointed at a path that was never
+   there — invisibly, because the gate stopped at the first segment.
+2. **Brace expansion was not expanded.** `day_inventory_2026_05_26.md:61` cites
+   `L4_K3_n{64,96,128}_*_<hash>`; only the `n64` arm was matched. The `n96` and
+   `n128` arms are 91 GiB — 55 % of the bytes then marked disposable.
+3. **Only `runs/`-prefixed tokens counted.** That citation is a bare directory
+   name in a table cell, with no `runs/` in front of it. A name in backticks is
+   a citation whether or not it carries a path prefix.
+
+Defects 1 and 3 are also present in `test/oracles/test_doc_run_citations_resolve.jl`,
+whose `_CITE_RE` excludes `/` from the captured name — so for a nested citation the
+gate checks that `runs/verification_suite` exists and never looks at the rest of
+the path. The gate is weaker than it reads.
+
+**What this means for disposal.** Every fix moved directories *out* of the
+disposable set, never in. The criterion is not converging on a property of the
+data; it is measuring how good the regex is that week. A list produced this way
+is fine for *"stop citing these as evidence"* and is not fit to drive `rm`.
+
+## The disposable set: 207 directories, 82 of them still on disk
+
+Under the loosest matcher — any backticked token in a live document that names or
+prefixes the directory — 267 of the 474 are mentioned somewhere and 207 are not.
+Of those 207, 82 still exist under `runs/` in the main checkout, totalling
+**60.6 GiB against a 261 GiB `runs/` tree**.
+
+Each of the 207 satisfies all of:
+
+1. no live document mentions it, by name, prefix, glob or brace expansion;
 2. it is not tracked in git;
-3. its `summary.json` carries no producing commit — like all 481, it is not
+3. its `summary.json` carries no producing commit — like all 474, it is not
    reproducible from the repository;
 4. it predates the 2026-06/07 corrections, so any number in it is superseded by
    construction;
-5. **it is not a scan, sweep, ladder or phase map.**
+5. it is not a scan, sweep, ladder or phase map.
 
-The remainder is mostly single-cell validation-ladder runs
-(`00_scalar_free_uniform_stationary_*`, `02_spin1_polar_contact_ground_*`, …) —
-cheap to regenerate because a tiered test regenerates them.
+**Reclaim by bytes, not by count.** The distribution is concentrated: the largest
+5 directories are 38 % of the 60.6 GiB, and the largest 15 are most of it.
 
-**Even so, read the list before moving anything.** Rule 5 is a name-pattern match,
-and a name pattern is not a semantic classifier; something valuable with an
-unlucky name will not be caught by it.
+| GiB | directory |
+|---|---|
+| 9.44 | `LHY_polar_contact_200ms_d82e14b5` |
+| 4.73 | `LHY_polar_contact_100ms_283e1a72` |
+| 3.36 | `L4dealiasv6_kcut11_eu_matsui_hamiltonian_only_96_f7d8dbf9` |
+| 3.35 | `L4dealiasv4_eu_matsui_hamiltonian_only_96_6d8d0a7a` |
+| 2.42 | `LHY_polar_contact_50ms_3e2af5d3` |
+
+That is a short enough list to read one directory at a time, which is the only
+review this evidence supports. The 125 entries with no directory on disk and the
+tail of small ones are not worth a decision — 29 of the 82 are under 100 MiB.
+
+**Rule 5 is a name-pattern match, and a name pattern is not a semantic
+classifier.** `L4_K3_n{64,96,128}` is a grid-convergence ladder whose name
+contains none of the words the rule looks for; it survived only because defect 2
+was found first.
 
 ## Procedure — move, do not delete
 
