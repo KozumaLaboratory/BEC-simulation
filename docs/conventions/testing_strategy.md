@@ -201,6 +201,41 @@ A related caveat: the harness spawns `run_chunk.jl` directly, so files needing a
 test-only dependency (e.g. `workflow/test_vtk_export.jl`) are red at baseline and
 excluded. They are not evaluated, not exonerated.
 
+### Question zero: escaping the probe is not escaping the suite
+
+The escape list is relative to whatever probe ran. The default — and the
+nightly's — is `grounded_cheap` with `--max-cost 15`: 264 files, no pins, no
+API-spelling tests, nothing over 15 s.
+
+Measured on the first full-catalog sweep (2026-08-02, #276, 58 mutants on
+TSUBAME): **six mutants escaped that probe and the whole `full` tier caught all
+six.** One of the catchers is `workflow/test_lhy_block_wiring.jl` at 256 s, which
+is exactly what the 15 s cap removes.
+
+So before question 1, re-probe: `--probe dir: --max-cost 400`. Until then the
+report says "Caught by nothing in the probe", not "a gap" — it used to say the
+latter, and the label was read as a suite result.
+
+**Then look at the catchers, because that is where the finding usually is.** Four
+of the six had exactly ONE catcher, so the live question is which tier that file
+is in. Required is `fast` + `oracles` + `integration`, and
+`INTEGRATION_TESTS = filter(!startswith("oracles/"), CI_EXTRA)`, so **`FULL_EXTRA`
+is reachable from no required check**. `workflow/test_pipeline.jl` — 17 s, then in
+`FULL_EXTRA` — was the sole catcher of `yaml_calibration_not_applied` (fatal:
+`p_mv`/`coil_mode` stop resolving to Gauss before parsing, so every downstream
+number is off by the coil calibration factor while the run looks normal) and of
+`save_every_off_by_one`. Moved to `CI_EXTRA`.
+
+Two harness defects surfaced in the same sweep, both fixed: a missing marker was
+folded into `FAIL` — crediting a dead worker with a catch, which books a real gap
+as covered — and every second in the report was `_DEFAULT_COST = 3.0` for files
+outside `_COST`'s 88 entries, so `min_cover`'s total and its tie-breaks ran on
+placeholders while `run_chunk.jl` had been writing a real measurement into every
+marker all along.
+
+Run it on a GPU node. A skipped test is green and therefore catches nothing, so a
+CPU node reports every GPU-gated mutant as escaped.
+
 ### Reading an escape: three questions, in order
 
 An escaped mutant means one of three things, and they are not interchangeable.
