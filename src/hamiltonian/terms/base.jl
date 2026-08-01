@@ -108,7 +108,7 @@ spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
 LHYTerm, ZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
-struct EnergyContext{ND, PsiT, FFTEltT, FFTPlan, SM, NRho, NF}
+struct EnergyContext{ND, PsiT, FFTEltT, FFTPlan, SM, DensityT, SpinFieldT}
     # NOTE: the original definition typed psi_host as Array{ComplexF64, ND}
     # while n_pts/fft_buf are ND-dimensional SPATIAL objects — ψ has ND+1
     # dims, so the constructor could never be called. It had zero callers
@@ -130,10 +130,10 @@ struct EnergyContext{ND, PsiT, FFTEltT, FFTPlan, SM, NRho, NF}
     fft_buf::Array{FFTEltT, ND}
     plans::FFTPlan
     spin_matrices::SM
-    n_density::NRho
-    fx::NF
-    fy::NF
-    fz::NF
+    n_density::DensityT
+    fx::SpinFieldT
+    fy::SpinFieldT
+    fz::SpinFieldT
     dV::Float64
     n_pts::NTuple{ND, Int}
 end
@@ -147,12 +147,16 @@ density, FFT buffer, and a `deriv_buf` scratch so the registry path
 matches the legacy `_grad_*` helpers' allocation pattern (no extra
 allocs vs the hand-written sum in `energy_gradient!`).
 """
-struct GradientContext{N, TF, TC, TD}
-    fft_buf::TC
-    deriv_buf::TC
-    fx::TF
-    fy::TF
-    fz::TF
-    n_density::TD
-    n_pts::NTuple{N, Int}
+struct GradientContext{ND, ComplexBufT, DensityT, SpinFieldT}
+    # These are the SAME objects `EnergyContext` carries, so they carry the same
+    # names. They used to be `TF`, `TC`, `TD` here and `NF`, `NRho` there —
+    # one struct's `TC` was the whole ARRAY type while the other's `CT` was an
+    # ELEMENT type, which is a swap waiting to happen.
+    fft_buf::ComplexBufT
+    deriv_buf::ComplexBufT
+    fx::SpinFieldT
+    fy::SpinFieldT
+    fz::SpinFieldT
+    n_density::DensityT
+    n_pts::NTuple{ND, Int}
 end

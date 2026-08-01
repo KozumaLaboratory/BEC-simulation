@@ -33,9 +33,20 @@ using SpinorBEC:
         grid, atom=Na23,
         interactions=InteractionParams(Dict(0 => 20.0, 1 => -0.5)),
         potential=HarmonicTrap((1.0, 1.0, 1.0)),
-        initial_state=:polar, verbose=false, n_steps=60, tol=1.0e-8,
+        initial_state=:polar, verbose=false, n_steps=60, tol=1.0e-5,
         m_lbfgs=8,
     )
+    # `tol` ABOVE the L-BFGS energy-comparison floor, on purpose. At the 1e-8
+    # this asked for originally, both solves ended `floor_limited = true` with
+    # an EMPTY curvature history (measured: `rho` length 0, grad_norm 1.04e-8 /
+    # 1.22e-7), so "the run really used it" indexed `s64[1]` into a 0-element
+    # vector and the file was red on `main` from the moment it merged — its own
+    # `Integration gates` check was already failing when it went in.
+    # 1e-5 converges normally (history length 8, `floor_limited = false`, 15
+    # steps, both precisions), which is what this file needs to inspect. This
+    # is not a step budget tuned until green: it is asking the solver for an
+    # accuracy it can deliver, the distinction `test_lbfgs_stall_fixed_point.jl`
+    # draws in its own header.
 
     @testset "the history is actually narrowed" begin
         psi = zeros(ComplexF64, 4, 4, 4, 3)
@@ -61,23 +72,40 @@ using SpinorBEC:
     @testset "the run really used it" begin
         # Without this the agreement below could hold because the kwarg never
         # reached the history at all.
-        s64, _, rho = r64.lbfgs_history
+        #
+        # Asserted on the CONTAINER's element type, not on `s[1]`. The first
+        # version indexed, and it errored on main: the driver empties the
+        # history on a line-search failure and `stop_at_floor` then breaks
+        # immediately, so a run that ends at its gradient floor returns EMPTY
+        # vectors. The container type is what the kwarg actually chose and it
+        # survives that, so this gate no longer depends on how the solve
+        # happened to stop.
+        s64, y64, _ = r64.lbfgs_history
         s32, y32, _ = r32.lbfgs_history
-        @test !isempty(rho)
-        @test eltype(s64[1]) === ComplexF64
-        @test eltype(s32[1]) === ComplexF32
-        @test eltype(y32[1]) === ComplexF32
+        @test eltype(s64) === Array{ComplexF64, 4}
+        @test eltype(y64) === Array{ComplexF64, 4}
+        @test eltype(s32) === Array{ComplexF32, 4}
+        @test eltype(y32) === Array{ComplexF32, 4}
     end
 
     @testset "the direction is still a descent direction" begin
-        s32, y32, rho32 = r32.lbfgs_history
-        ws = r32.workspace
-        dV = cell_volume(ws.grid)
-        g = similar(ws.state.psi)
-        fill!(g, zero(eltype(g)))
-        SpinorBEC.energy_gradient!(g, ws.state.psi, ws; k_squared_dev=ws.grid.k_squared)
-        SpinorBEC._project_constraints!(g, ws.state.psi, ws.grid, nothing, 1)
-        d = _lbfgs_direction(g, s32, y32, rho32, dV)
+        # Built from a SYNTHETIC curvature pair rather than from whatever the
+        # solve happened to leave behind: a run that stops at its gradient
+        # floor returns an empty history, and a two-loop over an empty history
+        # is just steepest descent, which is trivially a descent direction.
+        # That would be a gate that cannot fail.
+        dV = 0.125
+        n = (4, 4, 4, 3)
+        g = ComplexF64[cis(0.3i) * (1 + 0.01i) for i in 1:prod(n)]
+        g = reshape(g, n)
+        s = ComplexF32.(reshape(ComplexF64[cis(0.7i) for i in 1:prod(n)], n))
+        # ⟨s,y⟩ > 0 is the curvature condition the driver enforces before
+        # storing a pair, so a valid history has it by construction.
+        y = ComplexF32.(0.4f0 .* s)
+        rho = [1.0 / (_realdot(s, y) * dV)]
+        @test rho[1] > 0
+        d = _lbfgs_direction(g, [s], [y], rho, dV)
+        @test eltype(d) === ComplexF64          # F32 history, F64 direction
         @test _realdot(g, d) * dV < 0
     end
 
@@ -89,6 +117,10 @@ using SpinorBEC:
         # count differing.
         @test isapprox(r32.energy, r64.energy; rtol=1.0e-6)
         @test r32.grad_norm < 1.0e-4
+        # Whichever way each run stopped, it has to have taken real steps —
+        # two solves that both did nothing would also agree.
+        @test r64.last_step > 5
+        @test r32.last_step > 5
     end
 
     @testset "refused where it has not been measured" begin
