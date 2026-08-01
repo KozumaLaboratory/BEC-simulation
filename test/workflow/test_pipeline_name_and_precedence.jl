@@ -52,6 +52,38 @@ using SpinorBEC: _run_analyzer, _resolve_gs_interactions, resolve_atom, make_gri
             :not_an_analyzer, psi, grid, atom, Dict{Any, Any}())
     end
 
+    @testset "EVERY analyzer name routes to its own function" begin
+        # The row above tests ONE pair. There are 38 branches, so a pair-wise
+        # gate leaves 37 names undefended and reads as if it covered routing.
+        # This one states the convention itself and checks every branch: the
+        # dispatch chain is `name == :x` → `_analyze_x`, and any branch that
+        # departs from it is either a rename that lost its partner or an alias.
+        #
+        # Text-scanning, like the spin-chain decline-reason gate, and with the
+        # same limit: it cannot check that `_analyze_x` COMPUTES x. What it
+        # makes impossible is the silent half — a name pointing at somebody
+        # else's implementation.
+        src = read(
+            joinpath(dirname(pathof(SpinorBEC)), "workflow", "experiments",
+                "pipeline", "pipeline_analyzers.jl"), String)
+        branches = [
+            (m.captures[1], m.captures[2]) for m in eachmatch(
+                r"name == :(\w+)\s*\n\s*return (_analyze_\w+)\(", src)
+        ]
+        # Vacuity guard: if the chain is ever restructured out of this shape,
+        # the scan finds nothing and would pass silently.
+        @test length(branches) >= 30
+
+        mismatched = [(n, f) for (n, f) in branches if f != "_analyze_" * n]
+        isempty(mismatched) ||
+            @info "analyzer names routed to another analyzer's function" mismatched
+        @test isempty(mismatched)
+
+        # Every branch name is dispatchable — a name in the chain that
+        # `_run_analyzer` cannot actually reach is a different way to be wrong.
+        @test length(unique(first.(branches))) == length(branches)
+    end
+
     @testset "a step's own interactions: outrank the inherited ones" begin
         atom = resolve_atom(:Rb87)
         # A workspace-like carrier is all `_resolve_gs_interactions` reads.
