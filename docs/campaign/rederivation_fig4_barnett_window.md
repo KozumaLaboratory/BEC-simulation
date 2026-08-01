@@ -43,6 +43,48 @@ decimals (0.0414 both), ±0.5 likewise (0.0843), ±0.7 to 0.0002, ±0.9 to 13 %.
 - `N50k` is a real outlier: ΔF_z = **1.683**, forty times the N = 10⁴ value at the
   same Ω. Atom number matters far more than Ω does in the re-derived data.
 
+## Settled 2026-08-02: ±Ω was never a symmetry operation
+
+The question "which dataset is right" dissolves. Neither measures chirality,
+because the pair being compared is not related by a symmetry.
+
+`barnett_eu_window` drives the rotation through `rotating_frame_omega` — a
+rotating *frame*, not the sinusoidal Bx/By field of `eu_barnett_rotfield_clean`
+that [[mistake_barnett_chirality_arms_not_mirror_images_2026_07_28]] was about. For
+a rotating frame the reflection in any plane containing z sends
+
+    Ω_z → −Ω_z,   B_z → −B_z,   F_z → −F_z,   L_z → −L_z
+
+because Ω and B are **both axial**. The committed ±Ω pair holds `Bz` fixed at +z
+and flips only Ω, so it is not a reflection of anything.
+
+**The true mirror holds to six digits.** Running
+`(Ω = +0.5, Bz < 0, m = +F)` — the reflection of the committed
+`(Ω = −0.5, Bz > 0, m = −F)` — TSUBAME job 8316097:
+
+| run | Ω | Bz | F_z(0) | ΔF_z |
+|---|---:|---|---:|---:|
+| `barnett_eu_omm0p5_DDIon` | −0.5 | +z | −6.0000 | **+0.084327** |
+| `mirror_omp0p5_Bzneg` | +0.5 | **−z** | +6.0000 | **−0.084327** |
+
+Exact sign reversal, identical magnitude. **The code respects the reflection
+symmetry.** Nothing is wrong with the solver, and nothing was wrong with either
+dataset's arithmetic.
+
+What was wrong is the comparison. The stored figure's 85× separation between
+Ω = ±0.3 and this re-derivation's near-equality are both measurements of a
+non-symmetry pair — they can take any value without saying anything about
+chirality. That the two datasets disagree so violently is a statement about the
+2026-06/07 corrections, not about a physical asymmetry.
+
+This lands in the same place as #217, which made the conversion efficiency the
+converged quantity rather than raw ΔF_z.
+
+**Consequence for Fig 4: the panel as specified has no well-defined observable.**
+It should not be redrawn from either dataset. A chirality figure needs mirror
+pairs — (Ω, B_z) flipped together — and by construction those give exactly
+antisymmetric ΔF_z, so the interesting quantity has to be something else.
+
 ## What this does NOT establish
 
 **Which dataset is right.** Both are internally consistent; the stored one was
