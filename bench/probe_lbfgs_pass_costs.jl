@@ -83,7 +83,10 @@ for (label, ddi) in (("contact", false), ("+DDI", true))
     ws = r.workspace
     psi = copy(ws.state.psi)
     g = similar(psi)
-    k2 = ws.grid.k_squared
+    # `Grid.k_squared` is a HOST array even for a GPU workspace — the driver
+    # keeps a device copy. Timing `energy_gradient!` against the host one would
+    # measure a per-call H2D transfer that production does not pay.
+    k2 = SpinorBEC._to_device_cached(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
 
     t_E = timed(() -> total_energy(ws))
@@ -113,14 +116,29 @@ for (label, ddi) in (("contact", false), ("+DDI", true))
         t_EG.med < t_E.med + t_G.med ? "fusing saves $(round(t_E.med + t_G.med - t_EG.med; digits=2)) ms" :
         "NO saving as built")
 
-    # Reconcile against a measured iteration. n_ls energy passes + 1 gradient
-    # + two-loop + projection, against the slope of wall vs n_steps.
-    n_lo, n_hi = 25, 125
-    t_lo = @elapsed find_ground_state_lbfgs(; cell..., n_steps=n_lo, tol=0.0, m_lbfgs=20)
+    # Reconcile against a measured iteration.
+    #
+    # NOT `tol = 0.0`. The first version used it so that `n_steps` would be
+    # exact for the slope, and on the contact cell — which converges in 36
+    # iterations — that made every one of the differenced steps a
+    # POST-CONVERGENCE one at ~5 line-search evaluations each. The breakdown
+    # came out at 207 % and the guard below correctly refused to certify it.
+    # A reachable `tol` costs an inexact step count and buys a slope over
+    # steps that are doing work; `last_step` is read back rather than assumed.
+    r_lo = find_ground_state_lbfgs(; cell..., n_steps=4000, tol=1.0e-5, m_lbfgs=20)
+    t_lo = @elapsed find_ground_state_lbfgs(; cell..., n_steps=4000, tol=1.0e-5, m_lbfgs=20)
     r_hi = nothing
-    t_hi = @elapsed (r_hi = find_ground_state_lbfgs(; cell..., n_steps=n_hi, tol=0.0, m_lbfgs=20))
+    t_hi = @elapsed (r_hi = find_ground_state_lbfgs(; cell..., n_steps=4000, tol=1.0e-7, m_lbfgs=20))
+    n_lo, n_hi = r_lo.last_step, r_hi.last_step
+    if n_hi <= n_lo + 5
+        @printf("  ---- reconcile SKIPPED: the two tolerances took %d and %d steps\n",
+            n_lo, n_hi)
+        println()
+        continue
+    end
     per_iter = 1000 * (t_hi - t_lo) / (n_hi - n_lo)
     n_ls = r_hi.n_line_search_evals / max(r_hi.last_step, 1)
+    @printf("  ---- slope over %d..%d iterations (tol 1e-5 -> 1e-7)\n", n_lo, n_hi)
     parts = n_ls * t_E.med + t_G.med + (isnan(t_2L.med) ? 0.0 : t_2L.med) + t_P.med
     @printf("  ---- reconcile: measured %.2f ms/it  vs parts %.2f ms (n_ls=%.2f) => %.0f%%\n",
         per_iter, parts, n_ls, 100 * parts / per_iter)
