@@ -7,6 +7,27 @@ export find_ground_state_lbfgs
 # preconditioning — the physical convergence certificate). Single source so the
 # initial and per-step gradient (reused across steps, not recomputed) precondition
 # identically. Mirrors the former inline block exactly ⇒ bit-identical trajectory.
+# Everything after the raw gradient: constraint projection, the projected-raw
+# residual, preconditioning. Split out so the fused line-search path — which
+# already holds `H·ψ` at the accepted iterate — can finish it without repeating
+# the pass that produced it.
+@inline function _lbfgs_grad_finish!(
+    g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64,
+)
+    _project_constraints!(g, psi, grid, target_magnetization, F)
+    grad_norm = sqrt(sum(abs2, g) * dV)
+    if precond_alpha_v >= 0
+        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
+        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    elseif sobolev_alpha > 0
+        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    end
+    grad_norm
+end
+
 @inline function _lbfgs_grad!(
     g, psi, ws, k_squared_dev, grid, target_magnetization, F,
     precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64;
@@ -23,16 +44,9 @@ export find_ground_state_lbfgs
         gradient_only!(g, psi, ws)
         E_known
     end
-    _project_constraints!(g, psi, grid, target_magnetization, F)
-    grad_norm = sqrt(sum(abs2, g) * dV)
-    if precond_alpha_v >= 0
-        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
-        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
-        _project_constraints!(g, psi, grid, target_magnetization, F)
-    elseif sobolev_alpha > 0
-        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
-        _project_constraints!(g, psi, grid, target_magnetization, F)
-    end
+    grad_norm = _lbfgs_grad_finish!(
+        g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+        precond_alpha_v, precond_alpha_k, sobolev_alpha, dV)
     (E, grad_norm)
 end
 
@@ -304,9 +318,21 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        α, E_trial, psi_accepted, n_ls = _line_search_energy_decrease(
+        # Fuse the first trial with the gradient where that is free. On the
+        # GPU `energy_gradient!` and `gradient_only!` are the SAME fused kernel
+        # (1.383 vs 1.382 ms at 24³ D=13) because the energy falls out of the
+        # pass that forms H·ψ, so evaluating the α=1 trial that way and reusing
+        # its gradient removes a whole `total_energy` — 1.306 ms of a measured
+        # 5.83 ms iteration, on the ~85 % of iterations where α=1 is accepted.
+        #
+        # NOT done on the CPU, and that is a measurement: there
+        # `energy_gradient!` traverses the term registry twice, 12.80 ms
+        # against 6.57 + 6.11 for the two passes separately, so fusing would
+        # cost 0.1 ms rather than save.
+        fused_grad = _is_gpu(psi) ? grad_new : nothing
+        α, E_trial, psi_accepted, n_ls, grad_ready = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
-            slope=slope, expand=is_sd,
+            slope=slope, expand=is_sd, grad_out=fused_grad, k_squared_dev,
         )
         n_line_search_evals += n_ls
 
@@ -345,11 +371,24 @@ function find_ground_state_lbfgs(;
         # Gradient at the new ψ — same preconditioning as the initial gradient so
         # it can be carried to the next iteration. grad_norm_new is the projected-
         # raw residual used by the next convergence test.
-        E_new, grad_norm_new = _lbfgs_grad!(
-            grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
-            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV;
-            E_known=Float64(E_trial),
-        )
+        E_new, grad_norm_new = if grad_ready
+            # `grad_new` already holds 2·δE/δψ̄ at exactly this iterate — the
+            # line search accepted the trial it was evaluated at, and the
+            # driver adopted that trial's ψ. Only the projection and
+            # preconditioning are left.
+            (
+                Float64(E_trial),
+                _lbfgs_grad_finish!(
+                    grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+                    precond_alpha_v, precond_alpha_k, sobolev_alpha, dV),
+            )
+        else
+            _lbfgs_grad!(
+                grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+                precond_alpha_v, precond_alpha_k, sobolev_alpha, dV;
+                E_known=Float64(E_trial),
+            )
+        end
 
         # L-BFGS history update — `real(dot(s_k, y_k))` is the same
         # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
