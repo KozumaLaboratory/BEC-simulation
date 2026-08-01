@@ -53,7 +53,7 @@ from one that condensed without defects — those are opposite outcomes and a ba
 function kz_trajectory(;
     grid, c0, mu, T_hot, T_cold, tau_Q, t_equil, t_hold, gamma, M, k_cut,
     dt, seed, backend, min_density_frac=0.05, c1=0.0, spinor::Bool=false,
-    physical::Bool=false, cutoff_n_T::Float64=1.0,
+    physical::Bool=true, cutoff_n_T::Float64=1.0,
 )
     D = SpinSystem(KZ_ATOM.F).n_components
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1, normalize_every=0)
@@ -89,8 +89,12 @@ function kz_trajectory(;
     end
 
     n_steps = round(Int, (t_equil + tau_Q + t_hold) / dt)
+    equil_step = round(Int, t_equil / dt)
+    N_equil = NaN
     t = 0.0
     for s in 1:n_steps
+        s == equil_step &&
+            (N_equil = real(sum(abs2, ws.state.psi)) * cell_volume(grid))
         split_step!(ws)
         apply_spgpe_step!(ws, res, dt; t=t, seed=seed + s)
         # Scalar limit keeps the empty spin channels empty so reservoir noise
@@ -123,7 +127,7 @@ function kz_trajectory(;
                        length(lines[m >= 0 ? "+$m" : "$m"]) : 0) for m in (-F):F)
     pops = [real(sum(abs2, view(psi, :, :, :, c))) * dV for c in 1:size(psi, 4)]
     (; n_vortices=per_m[-F], per_m, pops, xi_hat=ξ_hat, f_inf=_cl.f_inf,
-        N_C=real(sum(abs2, psi)) * dV, g1_r=rr, g1=g1)
+        N_C=real(sum(abs2, psi)) * dV, N_equil, g1_r=rr, g1=g1)
 end
 
 """
@@ -138,18 +142,30 @@ turn "the slow end saturates at zero defects" into a steeper apparent exponent.
 """
 function kz_scan(;
     grid_n::Int=138, box::Float64=20.1, c0::Float64=0.19,
-    mu::Float64=15.0, T_hot::Float64=30.0, T_cold::Float64=2.0,
+    # T_hot and T_cold STRADDLE T_c. At mu = 15, c0 = 0.19 the self-consistent
+    # classical-field HF puts T_c = 49.0 — the thermal cloud's mean-field shift
+    # 2 c0 n_th reaching mu — and the previous defaults, 30 -> 2, ran ENTIRELY
+    # inside the condensed phase. At T = 30 the equilibrium condensate fraction is
+    # already 0.33 (N_0 = 9155, N_th = 18650), so no symmetry was ever broken and
+    # there was no critical point for anything to freeze out at. The driver's own
+    # comment claimed "the transition is crossed by cooling"; it was never checked.
+    #
+    # 80 -> 20 crosses it: N_0/N goes 0 -> 0.68 (N_0 = 15810, N_th = 7311 at 20).
+    mu::Float64=15.0, T_hot::Float64=80.0, T_cold::Float64=20.0,
     # Window found by the scalar control, not guessed: at 48³ the first scan used
     # τ_Q = 20…320 and every point came back with ZERO vortices at healthy N_C —
     # condensed, but too slowly to trap defects. The smoke at τ_Q = 8 had 12.5.
     # So the measurable band is the FAST side, and 32 is kept as the bridge to the
     # zero-defect regime whose upper edge the first scan established.
-    tau_Qs=(2.0, 4.0, 8.0, 16.0, 32.0),
-    t_equil::Float64=40.0, t_hold::Float64=20.0,
+    tau_Qs=(3.0, 6.0, 12.0, 25.0, 50.0, 100.0, 200.0),
+    # 1/(2 gamma mu) is 15 at T_hot and 24.7 AT T_c — the response time that
+    # sets the freeze-out, not the 622 at T = 2 deep in the condensed phase. So
+    # tau_Q wants to straddle ~25, and t_equil must be several times 15.
+    t_equil::Float64=150.0, t_hold::Float64=20.0,
     gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
     k_cut_mult::Float64=1.0, c1::Float64=0.0, spinor::Bool=false,
-    dump_g1::Bool=false, physical::Bool=false,
+    dump_g1::Bool=false, physical::Bool=true,
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
     # C region holds the hot cloud. `k_cut_mult` moves the boundary WITHOUT
@@ -199,13 +215,14 @@ function kz_scan(;
     xisems = Float64[]
     fmeans = Float64[]
     nfins = Int[]
-    @printf("\n  %-8s %-10s %-10s %-10s %-9s %-8s %-6s %-8s\n",
-        "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩", "⟨ξ̂⟩", "sem", "n_fin", "⟨f_∞⟩")
+    @printf("\n  %-8s %-10s %-10s %-10s %-9s %-8s %-6s %-8s %-10s\n",
+        "τ_Q", "⟨N_v⟩", "sem", "⟨N_C⟩", "⟨ξ̂⟩", "sem", "n_fin", "⟨f_∞⟩", "N_equil")
     for τ in tau_Qs
         vs = Int[]
         ncl = Float64[]
         xis = Float64[]
         fis = Float64[]
+        neq = Float64[]
         seed_idx = 0
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
@@ -218,6 +235,7 @@ function kz_scan(;
             push!(ncl, r.N_C)
             isfinite(r.xi_hat) && push!(xis, r.xi_hat)
             isfinite(r.f_inf) && push!(fis, r.f_inf)
+            push!(neq, r.N_equil)
             seed_idx += 1
             if dump_g1
                 mkpath(OUTDIR)
@@ -249,8 +267,13 @@ function kz_scan(;
         # contributing seed (or a constant condensate fraction read as a length)
         # looks like. Zero scatter across independent stochastic seeds is a bug
         # signal, not a tight measurement.
-        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g %-9.3f %-8.3f %-6d %-8.3f\n",
-            τ, m, sems[end], ncs[end], ξm, ξs, length(xis), fmeans[end])
+        # N_equil against the independently computed HF equilibrium is the
+        # positive control on the INITIAL state. Filling the C region from vacuum
+        # is what the derived rates could not do (N_C = 22 against N_TF = 21720),
+        # and pinning gamma was what hid it.
+        @printf("  %-8.0f %-10.3f %-10.3f %-10.4g %-9.3f %-8.3f %-6d %-8.3f %-10.4g\n",
+            τ, m, sems[end], ncs[end], ξm, ξs, length(xis), fmeans[end],
+            isempty(neq) ? NaN : mean(neq))
         flush(stdout)
     end
 
@@ -434,6 +457,22 @@ function main(mode::String="smoke"; backend=CPUBackend())
                 dump_g1=true,
                 tag="kz_fastq$(replace(string(γ), "." => "p"))_r$(replace(string(τ), "." => "p"))")
         end
+    elseif mode == "designcheck"
+        # One trajectory of the CORRECTED protocol before any campaign. Two
+        # numbers decide whether it is sound, both against an independent
+        # self-consistent HF calculation of the same classical field:
+        #
+        #   N_equil ≈ 1.52e5   the T = 80 equilibrium, i.e. the C region actually
+        #                      filled — the derived rates could not fill it from
+        #                      vacuum at T_cold (N_C = 22 against N_TF = 21720)
+        #                      and pinning gamma is what hid that
+        #   N_C     ≈ 2.31e4   the T = 20 equilibrium (N_0 = 15810 + N_th = 7311)
+        #   f_∞      > 0.5     and a condensate exists to host defects at all
+        #
+        # If N_equil comes out orders below 1.52e5 the field is still filling and
+        # nothing downstream means anything, exactly as before.
+        kz_scan(; tau_Qs=(25.0,), n_seed=1, backend, dump_g1=true,
+            tag="kz_designcheck")
     elseif startswith(mode, "physq")
         # ONE trajectory with the reservoir rates derived rather than pinned, to
         # answer the only question that matters before costing a campaign: with
