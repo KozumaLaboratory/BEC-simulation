@@ -342,6 +342,28 @@ const MUTANTS = Mutant[
          too many snapshots. The file is valid either way and the physics is \
          unchanged — only the record of it is."),
 
+    # ── pipeline: the name and the inheritance order ──────────────────
+    Mutant(:analyzer_name_routes_to_neighbour,
+        "src/workflow/experiments/pipeline/pipeline_analyzers.jl",
+        r"        return _analyze_phase_classify\(psi, grid, atom, params, ws_prev\)",
+        "        return _analyze_phase_classify_distance(psi, grid, atom, params, ws_prev)",
+        :path_default, :fatal,
+        "CLAUDE.md: a YAML analyzer name must be the real implementation",
+        "Routes one analyzer name to its neighbour. The run succeeds and writes \
+         data labelled `phase_classify` that a different analyzer produced — \
+         the aliased-dispatch silent-bug factory the convention exists to stop."),
+    Mutant(:gs_interactions_inherit_over_explicit,
+        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+        r"    if haskey\(p, \"interactions\"\)\n        return _parse_gs_interactions\(p\[\"interactions\"\], atom\)\n    elseif ws_prev !== nothing\n        return ws_prev\.interactions",
+        "    if ws_prev !== nothing\n        return ws_prev.interactions\n    elseif haskey(p, \"interactions\")\n        return _parse_gs_interactions(p[\"interactions\"], atom)",
+        :path_default, :fatal,
+        "project_matsui_fig4b_reproduction_2026_07_30 — a c1_ratio in a ground_state step never reached c0",
+        "Inverts the precedence, so a step's OWN `interactions:` block loses to \
+         whatever the previous workspace carried. Every run completes and every \
+         scan point differs from its neighbours; the axis is just not the one \
+         the config asked for. This is the defect that voided a published \
+         comparison arm."),
+
     # ── workflow layer: the parser is a physics surface ───────────────
     # These reproduce defects that lived entirely above the Hamiltonian, where
     # every term-level oracle is green by construction because it never goes
