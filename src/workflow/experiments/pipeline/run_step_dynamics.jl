@@ -418,6 +418,14 @@ worse than not offering it, so unsupported values now raise.
 freezes the DDI mean field at each V(dt/2) boundary and is only 1st-order in
 time when `c_dd > 0`, while `split_step_midpoint!` restores 2nd order at ~1.5-2×
 the per-step cost.
+
+`rk4ip` is 4th order on the same path at the SAME per-step cost as `midpoint`
+(both evaluate the mean field 4× per step), which buys 2.4× the step at a 1e-4
+error budget and 4.2× at 1e-5. Two things to know before selecting it. It is not
+norm-conserving — the drift is a free error monitor, and `normalize_every` is not
+honoured. And its failure mode is a wall rather than a slope: measured on an
+Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns
+4e40 at 5e-2, where a unitary split-step merely degrades. Real time only.
 """
 function _resolve_dynamics_stepper(spec)
     spec === nothing && return nothing
@@ -427,12 +435,15 @@ function _resolve_dynamics_stepper(spec)
         return nothing
     elseif name == "midpoint"
         return split_step_midpoint!
+    elseif name == "rk4ip"
+        return rk4ip_step!
     else
         throw(
             ArgumentError(
                 "dynamics integrator \"$name\" is not implemented on the standard " *
-                "path. Supported: \"strang\" (default leapfrog) or \"midpoint\" " *
-                "(2nd-order with DDI). The rotating_basis path has its own set."),
+                "path. Supported: \"strang\" (default leapfrog), \"midpoint\" " *
+                "(2nd-order with DDI) or \"rk4ip\" (4th order, same per-step cost " *
+                "as midpoint, real time only). The rotating_basis path has its own set."),
         )
     end
 end
