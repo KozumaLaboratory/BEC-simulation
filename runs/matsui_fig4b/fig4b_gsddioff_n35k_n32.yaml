@@ -18,11 +18,17 @@
 #   ddi.enabled: false  -> THIS FILE, the far end of the bracket
 # The dynamics keeps the full MDDI in both; only the initial state differs.
 #
-# Two ARMS IN ONE PROCESS was the first attempt and it hung: a `product` scan
-# over `pipeline.0.ddi.enabled` puts a with-DDI and a without-DDI Workspace into
-# the same run, and the second type triggers a full re-specialisation of the
-# dynamics step — the 30-minute JIT cascade CLAUDE.md warns about. UGE 8313218
-# sat 30 min on point_046 and was killed. One Workspace type per process.
+# The first attempt (UGE 8313218) DIED rather than hung, and I misread it as a
+# JIT cascade and polled a dead job for 30 minutes. The actual error:
+#
+#   ArgumentError: enable_ddi=true for dipolar atom 151Eu but c_dd not specified
+#     at _run_step(::DynamicsStep, ...)
+#
+# Switching the ground state's DDI off means the dynamics step can no longer
+# inherit c_dd from ws_prev, and it refuses to derive one. So `c_dd` has to be
+# stated explicitly on the dynamics block — 147.715012, which is
+# compute_c_dd_dimless(Eu151; N_atoms = 35000, omega_ref = 691.1504), the same
+# expression the with-DDI arm resolves internally.
 #
 # If the bracket is much wider than the 1.2 % rms residual, the frozen field is a
 # live candidate for it. If it is much narrower, the GS DDI is not the answer and
@@ -124,6 +130,8 @@ pipeline:
         q: 0.00909116
       ddi:
         enabled: true
+        c_dd: 147.715012         # must be explicit: with the GS DDI off there is
+                                 # no ws_prev to inherit it from
         secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
         padded: true
         pad_factor: 2
