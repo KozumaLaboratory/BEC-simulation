@@ -5,10 +5,12 @@ rung of `runs/l4_k3_ladder/*.yaml` and the two `runs/matsui_baseline/*_n64.yaml`
 against their stored summaries of 2026-05-26 — among the 230 that predate every
 correction and carry no producing commit.
 
-`runs/l4_k3_ladder/summary.json` (gone) is the data behind **Fig 1 (a, b)** of
+`runs/l4_k3_ladder/`'s `summary.json` — the configs are tracked, the summary was
+never committed — is the data behind **Fig 1 (a, b)** of
 `four_figure_spec_2026_05_26.md` and behind claim row 1 of
 `day_inventory_2026_05_26.md`, *"L4 isotropic no-collapse"*.
-`runs/matsui_baseline/summary.json` (gone) is behind **Fig 1 (c, d)**.
+`runs/matsui_baseline/`'s `summary.json`, likewise uncommitted, is behind
+**Fig 1 (c, d)**.
 
 ## The comparison, on the same quantity
 
