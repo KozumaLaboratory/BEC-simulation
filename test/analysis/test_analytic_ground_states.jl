@@ -1,3 +1,5 @@
+using Test
+using SpinorBEC
 using FFTW
 
 @testset "F=1 analytic ground states" begin

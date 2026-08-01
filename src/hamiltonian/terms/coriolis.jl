@@ -159,8 +159,8 @@ function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::Abstra
     (N >= 2 && is_active(term.Ω, ROTATION_TOL)) || return out
     D = ws.spin_matrices.system.n_components
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    fft_buf = similar(psi, ComplexF64, n_pts...)
-    deriv_buf = similar(psi, ComplexF64, n_pts...)
+    fft_buf = similar(psi, n_pts...)
+    deriv_buf = similar(psi, n_pts...)
     Ω_save = ws.sim_params.rotating_frame_omega
     @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
         isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm Ω mismatch with workspace"

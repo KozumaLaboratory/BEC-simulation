@@ -1,111 +1,137 @@
-# Gate: a document may not cite a `runs/` path that does not exist.
+# Gate: a document may not cite a `runs/` path that does not exist, unless the
+# citation says so on the spot.
 #
-# Measured 2026-07-31: of 70 distinct top-level `runs/` directories cited across
-# `docs/**.md`, 43 are absent, and 27 of those were NEVER COMMITTED at any point
-# in history — they lived in someone's working tree, a document cited them, and
-# the citation is all that survives. `manuscript/shared/figures.md`, the thesis
-# figure registry, names five of them. See
-# `docs/campaign/doc_run_citation_inventory.md`.
+# The first two versions kept a central `KNOWN_UNRESOLVED` name list. It needed
+# three resyncs in a single day (2026-07-31) — twice by me, once by #232 —
+# because every session that adds a document naming a run it has not produced yet
+# had to edit a list in a test file. A list in one place cannot track documents
+# several sessions are rewriting in parallel, and it cannot say WHY a citation is
+# unresolved, which is the part a reader actually needs.
 #
-# That is a different failure from the one `stored_results_vintage_audit.md`
-# tracks. A stale run can be located, dated and disqualified; these cannot be
-# compared against anything, because there is nothing to compare to.
+# So the knowledge moved to where the author is. An unresolved citation is
+# allowed when its line carries one of:
 #
-# This gate is a RATCHET, not a cliff. Failing on all 33 today would put main red
-# and teach nothing, so the existing breakage is pinned in `KNOWN_UNRESOLVED` and
-# what is asserted is that the set does not GROW. It is also checked in the other
-# direction: an entry that starts resolving must be removed from the list, or the
-# list rots into a permanent excuse the way a stale KNOWN-LIMIT does.
+#   (example)   invented for a tutorial — `runs/foo`, `runs/today`. Not evidence.
+#   (planned)   intended, not yet produced. The `placeholder` rows of
+#               manuscript/shared/figures.md are the bulk of these.
+#   (archived)  it exists outside this repository. `runs/_loop/**` lives in
+#               BEC-simulation-archive/loop_record_2026_06_08/, moved on purpose.
+#   (gone)      never committed, or removed. The citation cannot be followed and
+#               the claim on it needs regenerating or retracting — see
+#               docs/campaign/doc_run_citation_inventory.md.
+#
+# Fenced code blocks are out of scope: a path inside a shell example is a command
+# to type, not a claim that evidence exists. Measured when this was written — 27
+# unresolved citations sat inside fences and 8 names appeared ONLY there, which is
+# precisely the population the old PLACEHOLDERS list existed to excuse.
+# `docs/archive/` stays out of scope for the reason #235 gave.
+#
+# What this cannot do: tell a truthful marker from a lazy one. `(gone)` is cheap
+# to type. It makes the state visible and local; the inventory document is what
+# tracks whether the underlying claim was dealt with.
 
+using SpinorBEC
 using Test
 
 const _DOCS = joinpath(@__DIR__, "..", "..", "docs")
 const _RUNS_DIR = joinpath(@__DIR__, "..", "..", "runs")
+const _SEP = Base.Filesystem.path_separator
 
-# Names that are illustrative by construction — tutorials and cookbooks invent a
-# run to show a command. They are not evidence and must never be.
-const PLACEHOLDERS = Set([
-    "foo", "today", "samples", "baseline", "perturbed", "N", "lab", "shared",
-    "tsubame_scan", "_dashboard_cache",
-])
+const MARKERS = ("example", "planned", "archived", "gone")
+const _MARKER_RE = Regex("\\((" * join(MARKERS, "|") * ")\\)")
 
-# Cited, absent, and known. Each is a claim whose evidence cannot be followed.
-# Shrinking this list is the campaign's job; growing it is what this gate stops.
-const KNOWN_UNRESOLVED = Set([
-    # never committed — no config, no output, no history
-    "Cr_eps0.15_", "Dy_eps1.39_", "Er_eps0.88_", "Eu_eps0.55_", "Eu151_GS_64g",
-    "ddi_convention_factorial", "ensemble_traces_round5", "eu151_",
-    "eu_k3_", "eu_shape_optimization", "fig2_k3zero_v2", "fig2_k3zero_v3",
-    "fortress_compare", "klaus_", "lhy_ablation_v2", "lhy_mode_ablation",
-    "lyapunov_diagnostic_round6", "paper4_meanfield", "sigma_mu_scan_",
-    "sigma_mu_scan_round5", "species_scan_round6", "sprint5_M1_",
-    "sprint5_M1_multistart_groundstate", "twa_sinatra", "eu151_klaus_lab_units",
-    "eu151_phi_omega", "12174e883326ecac",
-    # once tracked, since removed. `_loop` was retired 2026-06-08 and moved to
-    # BEC-simulation-archive/ deliberately; the rest simply went.
-    "_loop", "eu151_edh_ext", "eu151_mz_scan", "eu151_phase_pq",
-    "klaus_eu151_v2_full", "option_gamma_micro",
-])
+# `(?<![\w/-])` keeps `spinorbec-runs/x` and `some/runs/x` out. Without it the
+# tail of any longer token reads as an in-repo citation — that defect put a 40 %
+# over-count into a merged PR (#220, corrected in #227).
+const _CITE_RE = r"(?<![\w/-])runs/([A-Za-z0-9_][A-Za-z0-9_.*-]*)"
 
-"""Top-level `runs/<dir>` names cited by each doc, with the citing file."""
-function _cited_run_dirs()
-    out = Dict{String, Vector{String}}()
+"""A citation resolves if the directory exists, or — for a family written
+`runs/foo_*` — if anything matches the prefix. Treating the stem as a literal
+directory name is what made `runs/eu_k3_*` look broken next to `runs/eu_k3_lhy`."""
+function _resolves(d)
+    isdir(joinpath(_RUNS_DIR, d)) && return true
+    endswith(d, '_') || return false
+    isdir(_RUNS_DIR) || return false
+    any(startswith(n, d) for n in readdir(_RUNS_DIR))
+end
+
+"""Walk live docs, yielding `(doc, line, name, resolves, marked, fenced)` for
+every `runs/` citation. One pass so the four testsets cannot disagree about what
+the tree contains."""
+function _citations()
+    out = NamedTuple{(:doc, :line, :name, :ok, :marked, :fenced),
+        Tuple{String, Int, String, Bool, Bool, Bool}}[]
     isdir(_DOCS) || return out
-    pat = r"runs/([A-Za-z0-9_][A-Za-z0-9_.*-]*)"
     for (root, _, names) in walkdir(_DOCS), n in names
         endswith(n, ".md") || continue
-        path = joinpath(root, n)
-        rel = relpath(path, _DOCS)
-        for m in eachmatch(pat, read(path, String))
-            # Trim trailing punctuation and the glob star a doc writes for a family.
-            d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
-            isempty(d) && continue
-            push!(get!(out, d, String[]), rel)
+        rel = relpath(joinpath(root, n), _DOCS)
+        # Archived documents are a record of what was done, not a pointer a
+        # reader is meant to follow today (#235).
+        startswith(rel, "archive" * _SEP) && continue
+        fenced = false
+        for (i, line) in enumerate(eachline(joinpath(root, n)))
+            if startswith(lstrip(line), "```")
+                fenced = !fenced
+                continue
+            end
+            marked = occursin(_MARKER_RE, line)
+            for m in eachmatch(_CITE_RE, line)
+                d = rstrip(m.captures[1], ['*', '.', ',', ')', ';', ':', '`'])
+                isempty(d) && continue
+                push!(out, (doc=rel, line=i, name=d, ok=_resolves(d),
+                    marked=marked, fenced=fenced))
+            end
         end
     end
     out
 end
 
-@testset "documents cite runs/ paths that resolve" begin
-    cited = _cited_run_dirs()
+@testset "documents cite runs/ paths that resolve, or say why not" begin
+    cites = _citations()
 
-    @testset "the sweep found citations" begin
-        # A zero here makes every assertion below vacuous — the same shape this
-        # file exists to catch elsewhere.
-        @test length(cited) > 20
+    @testset "the sweep is not vacuous" begin
+        # If the walk, the regex or the fence tracking breaks, everything below
+        # passes for the wrong reason. There ARE unresolved citations in the tree
+        # — 45 outside fences when this was written — so an empty result is a bug
+        # in the gate, not a clean repository.
+        @test count(c -> !c.ok && !c.fenced, cites) > 0
     end
 
-    unresolved = sort([
-        d for d in keys(cited)
-              if !(d in PLACEHOLDERS) && !isdir(joinpath(_RUNS_DIR, d))
-    ])
-
-    @testset "no NEW unresolved citation" begin
-        fresh = [d for d in unresolved if !(d in KNOWN_UNRESOLVED)]
-        for d in fresh
-            @info "Document cites runs/$d, which does not exist" citers=cited[d]
+    @testset "every unresolved citation declares itself" begin
+        undeclared = sort([
+            "$(c.doc):$(c.line) runs/$(c.name)"
+            for c in cites if !c.ok && !c.fenced && !c.marked
+        ])
+        for u in undeclared
+            @info "Unresolved runs/ citation with no marker" location = u markers = MARKERS
         end
-        # Naming them rather than asserting a count: a bare number tells the next
-        # reader nothing about which citation they just broke.
-        @test fresh == String[]
+        # Named, not counted: a bare number tells the next reader nothing about
+        # which citation they just broke.
+        @test undeclared == String[]
     end
 
-    @testset "the known-unresolved list does not rot" begin
-        # An entry that now resolves, or that nothing cites any more, is an
-        # excuse outliving its reason. Both directions, so the list tracks
-        # reality instead of accumulating.
-        resolved_again = sort([d for d in KNOWN_UNRESOLVED
-                                     if isdir(joinpath(_RUNS_DIR, d))])
-        @test resolved_again == String[]
-        uncited = sort([d for d in KNOWN_UNRESOLVED if !haskey(cited, d)])
-        @test uncited == String[]
+    @testset "a marker may not outlive its citation" begin
+        # Otherwise `(gone)` accumulates on paths that came back and the marker
+        # stops meaning anything — the rot the old name list was prone to.
+        #
+        # Per LINE, not per citation: a marker applies to its line, and a line can
+        # legitimately name one path that resolves and one that does not. Two do
+        # today (`guides/pipeline_cookbook.md:3`,
+        # `research_notes/twa_pinned_16g_result.md:63`). Only a marked line with
+        # NO unresolved citation on it is stale.
+        live = Set((c.doc, c.line) for c in cites if !c.ok && !c.fenced)
+        stale = sort(
+            unique([
+                "$(c.doc):$(c.line)" for c in cites
+                if c.marked && !c.fenced && !((c.doc, c.line) in live)
+            ]),
+        )
+        @test stale == String[]
     end
 
-    @testset "placeholders stay placeholders" begin
-        # If a tutorial name ever becomes a real directory, the allowlist starts
-        # hiding a real citation instead of an invented one.
-        for d in PLACEHOLDERS
-            @test !isdir(joinpath(_RUNS_DIR, d))
-        end
+    @testset "fenced blocks are out of scope, and that exclusion is load-bearing" begin
+        # Delete the fence tracking and these reappear as failures, so this is
+        # scope rather than a hole nobody looks at.
+        @test count(c -> !c.ok && c.fenced, cites) > 0
     end
 end

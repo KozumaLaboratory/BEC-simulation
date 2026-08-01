@@ -108,7 +108,7 @@ julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
 For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the rendered
 script — extend `UGE_PROFILE_DIRECTIVES` with a new `"scan_array"`
 profile carrying the array directive, or pipe `render_uge_script`
-output through `sed`. Each task writes `runs/foo/point_NNN.jld2`;
+output through `sed`. Each task writes `runs/foo/point_NNN.jld2` (example);
 resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
 env var inside `_run_yaml_scan`).
 
@@ -214,14 +214,14 @@ Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png ht
 `run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
 For multi-attempt mixes of crashes + preemption: enqueue via
-`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml`
+`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` (example)
 and let the autopilot's `retry_failed!` (called per-tick by the systemd
 timer) handle re-dispatch with profile escalation on OOM/TIMEOUT.
 
-## High-res scan inventory (target table for `runs/tsubame_scan/`)
+## High-res scan inventory (target table for `runs/tsubame_scan/` (example))
 
 Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
-on `runs/klaus_eu151_v2_full/config.yaml` as the template:
+on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
 
 ### Dy164 (3 configs)
 | name | grid | duration | est. wall (H100) |
@@ -288,4 +288,4 @@ julia --project=. -e '
 | Job killed at exact wall-clock limit | job not rerunnable | re-submit (or `#$ -r y`); resumes from checkpoint |
 | Phase-diagram scan progresses one-at-a-time | not using array job | switch to a `scan_array` profile with `#$ -t 1-N -tc K` |
 | GC pressure on big ψ across many scan points | implicit retention | `GC.gc()` between phases; `CUDA.memory_status()` to inspect |
-| FFTW wisdom replanning on each new node | wisdom not shared | bake wisdom into `runs/shared/fftw.wisdom` if hopping CPU generations |
+| FFTW wisdom replanning on each new node | wisdom not shared | bake wisdom into `runs/shared/fftw.wisdom` (example) if hopping CPU generations |

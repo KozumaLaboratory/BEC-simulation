@@ -117,7 +117,16 @@ const OMEGA_TRAP = (1.0, 1.0, 2.0)
 const N_ATOMS = 30000
 const OMEGA_REF = 628.3                  # rad/s
 const B_GAUSS = 9.216e-4                 # |p| = 15 (magnetostriction regime)
-const OMEGA   = CELL == "zero" ? 0.0 : 0.74
+# Stir rate. `zero` pins it to 0 regardless — that cell IS the no-rotation
+# control and must not be reachable by a typo in BR_OMEGA.
+#
+# The efficiency dF_z/|dL_z| = 0.99 was measured at Omega = 0.74 only. Whether it
+# is universal or an accident of that rate is the obvious next question, and it
+# has a prediction attached: the efficiency follows from J_z conservation plus
+# the DDI being the only spin-orbit channel, neither of which references Omega,
+# so it should be FLAT. The injected L_z, by contrast, is a driven response and
+# should depend on Omega strongly.
+const OMEGA   = CELL == "zero" ? 0.0 : parse(Float64, get(ENV, "BR_OMEGA", "0.74"))
 const DDI_ON  = CELL != "plus_nodd"
 # Overridable so a short job can measure s/step on the PRODUCTION grid and set
 # the batch walltime from a number instead of an estimate. A 20-minute probe
@@ -363,6 +372,20 @@ frames = Tuple{Float64, Array{ComplexF32, 4}}[]
 
 tag = (SMOKE ? "smoke_$CELL" : CELL) * TAG_SUFFIX
 ledger = joinpath(OUT, "ledger_$tag.csv")
+# Refuse to share an output file with a concurrent job. Four Omega-scan runs once
+# resolved to the same ledger name (the geometry selector overwrote BR_TAG) and
+# raced on write_csv's tmp+rename until two died with ENOENT -- and the two that
+# survived had silently overwritten each other's data. A lock file makes that a
+# startup error instead of a corrupted result.
+let lock = ledger * ".lock"
+    if isfile(lock) && time() - mtime(lock) < 86400
+        error("$ledger is already claimed by a running job (see $lock). " *
+              "Two jobs resolving to one output name will race and corrupt it — " *
+              "give this run its own BR_TAG.")
+    end
+    write(lock, string(get(ENV, "JOB_ID", "?"), " ", gethostname()))
+    atexit(() -> (rm(lock; force=true); nothing))
+end
 
 psi_gs = run_gs()
 psi_stir = run_dynamics(psi_gs, :stir, 0.0, rows, frames; ledger_path=ledger)

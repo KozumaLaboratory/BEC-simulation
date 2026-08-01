@@ -68,7 +68,11 @@ function find_ground_state_polished(
         add_white_noise!(psi_init, noise_amp, noise_seed, preset.grid)
     end
 
-    t0 = time()
+    # `time_ns()`, not `time()`: the wall clock is not monotonic and a single NTP
+    # step during the stage makes the reported duration NEGATIVE. Measured
+    # -0.322 s for t_itp on 2026-07-29 (WSL2 steps its clock on resume), which is
+    # what `test_polished_ground_state.jl`'s `t_itp > 0` was catching.
+    t0 = time_ns()
     r_itp = find_ground_state(;
         grid=preset.grid, atom=preset.atom,
         interactions=preset.interactions,
@@ -79,19 +83,19 @@ function find_ground_state_polished(
         enable_ddi=enable_ddi, c_dd=preset.c_dd, secular_ddi=secular_ddi,
         rotating_frame_omega=omega, backend=backend,
     )
-    t_itp = time() - t0
+    t_itp = (time_ns() - t0) / 1e9
     ws_itp = r_itp.workspace
     E_itp = r_itp.energy
 
     if n_lbfgs > 0
-        t0 = time()
+        t0 = time_ns()
         r_lbfgs = find_ground_state_lbfgs(;
             ws_init=ws_itp,
             n_steps=n_lbfgs, tol=tol_lbfgs,
             verbose=false, sobolev_alpha=sobolev_alpha,
             newton_polish=newton_polish,
         )
-        t_lbfgs = time() - t0
+        t_lbfgs = (time_ns() - t0) / 1e9
         ws = r_lbfgs.workspace
         E = r_lbfgs.energy
         converged = r_lbfgs.converged

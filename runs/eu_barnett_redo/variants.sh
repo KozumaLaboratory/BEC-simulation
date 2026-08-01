@@ -84,7 +84,12 @@ br_select_prod() {
   local tag=$1
   [[ -n "${BR_PROD_VARIANTS[$tag]:-}" ]] || { echo "unknown prod variant: $tag" >&2; return 1; }
   IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_PROD_VARIANTS[$tag]}"
-  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_$tag"
+  # BR_TAG names the OUTPUT file, so it must not be clobbered by the geometry.
+  # A caller sweeping another axis (BR_OMEGA) passes its own tag; overwriting it
+  # here pointed four concurrent jobs at one ledger, and they raced on the
+  # tmp+rename and killed each other with ENOENT. Append instead of assign.
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC
+  export BR_TAG="${BR_TAG:-}_$tag"
 }
 
 # Export BR_N / BR_BOX / BR_PAD / BR_DT / BR_TRUNC for one variant name.
@@ -92,5 +97,6 @@ br_select_variant() {
   local tag=$1
   [[ -n "${BR_VARIANTS[$tag]:-}" ]] || { echo "unknown variant: $tag" >&2; return 1; }
   IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_VARIANTS[$tag]}"
-  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_probe_$tag"
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC
+  export BR_TAG="${BR_TAG:-}_probe_$tag"
 }
