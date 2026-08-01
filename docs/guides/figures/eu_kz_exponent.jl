@@ -104,7 +104,7 @@ function kz_trajectory(;
                        length(lines[m >= 0 ? "+$m" : "$m"]) : 0) for m in (-F):F)
     pops = [real(sum(abs2, view(psi, :, :, :, c))) * dV for c in 1:size(psi, 4)]
     (; n_vortices=per_m[-F], per_m, pops, xi_hat=ξ_hat, f_inf=_cl.f_inf,
-        N_C=real(sum(abs2, psi)) * dV)
+        N_C=real(sum(abs2, psi)) * dV, g1_r=rr, g1=g1)
 end
 
 """
@@ -130,6 +130,7 @@ function kz_scan(;
     gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
     k_cut_mult::Float64=1.0, c1::Float64=0.0, spinor::Bool=false,
+    dump_g1::Bool=false,
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
     # C region holds the hot cloud. `k_cut_mult` moves the boundary WITHOUT
@@ -186,6 +187,7 @@ function kz_scan(;
         ncl = Float64[]
         xis = Float64[]
         fis = Float64[]
+        seed_idx = 0
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
                 t_equil, t_hold, gamma, M, k_cut, dt,
@@ -197,6 +199,22 @@ function kz_scan(;
             push!(ncl, r.N_C)
             isfinite(r.xi_hat) && push!(xis, r.xi_hat)
             isfinite(r.f_inf) && push!(fis, r.f_inf)
+            seed_idx += 1
+            if dump_g1
+                mkpath(OUTDIR)
+                gf = joinpath(OUTDIR,
+                    "g1_tau$(replace(string(τ), "." => "p"))_s$(seed_idx).csv")
+                open(gf, "w") do io
+                    println(io, "# tau_Q=$τ seed=$seed_idx N_v=$(r.n_vortices) " *
+                                "N_C=$(r.N_C) xi_hat=$(r.xi_hat) f_inf=$(r.f_inf) " *
+                                "R_TF=$(sqrt(2mu)) xi=$(1 / sqrt(2mu)) dx=$(box / grid_n)")
+                    println(io, "r,g1")
+                    for i in eachindex(r.g1_r)
+                        @printf(io, "%.6f,%.8f\n", r.g1_r[i], r.g1[i])
+                    end
+                end
+                @printf("    wrote %s\n", gf); flush(stdout)
+            end
         end
         m = mean(vs)
         push!(means, m)
@@ -327,6 +345,16 @@ function main(mode::String="smoke"; backend=CPUBackend())
         τ = parse(Float64, mode[3:end])
         kz_scan(; tau_Qs=(τ,), t_hold=1.0, n_seed=8, backend,
             tag="kz_xi_r$(replace(string(τ), "." => "p"))")
+    elseif mode == "g1shape"
+        # Dump g₁(r) itself at the two ends of the τ_Q range, through kz_scan so
+        # the configuration is bit-identical to the ξ̂ points. Every ξ̂ number so
+        # far was fitted without anyone looking at the curve it was fitted to, and
+        # both defects already found in this observable would have been visible in
+        # one plot. The plateau window is also under suspicion: it sits at
+        # r ∈ [7, 10] while R_TF = sqrt(2μ) = 5.5, i.e. in vacuum, which is what
+        # f_∞ ≈ 0.003 beside a condensate of 2e4 atoms looks like.
+        kz_scan(; tau_Qs=(2.0, 16.0), t_hold=1.0, n_seed=2, backend,
+            dump_g1=true, tag="kz_g1shape")
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
