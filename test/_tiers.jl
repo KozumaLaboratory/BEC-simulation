@@ -47,6 +47,11 @@ const FAST_TESTS = [
     # `thermal_noise_amplitude` had no test anywhere: dropping the /4 left 57
     # workflow files green (mutation harness, 2026-07-31).
     "workflow/test_thermal_seed_amplitude.jl",
+    # auto_grid, the spherical B angles and the error budget's positive-control
+    # guard were each invisible to all 59 workflow files (mutation, 2026-07-31).
+    "workflow/test_auto_grid_derivation.jl",
+    "workflow/test_b_block_spherical_angles.jl",
+    "workflow/validation/test_error_budget_positive_control.jl",
     "workflow/test_b_block_normalize.jl",
     "workflow/test_waveform_inner_duration.jl",
     "workflow/validation/test_run_result.jl",
