@@ -109,14 +109,15 @@ println("ITP substep budget — Eu F=6 D=13, $(N_GRID)³, lhy=$(LHY), $(CUDA.nam
 println("="^78)
 
 step_ms = best_ms(full_step!)
+# Measured first, printed second — accumulating inside a top-level `for` puts
+# `total` in Julia's soft scope, where it becomes a NEW local each iteration and
+# the loop ends with it undefined. That killed the first run at smoke.
+parts = [(name, best_ms(f), MULT[name]) for (name, f) in substeps]
 @printf("\n  %-34s %10s %6s %10s\n", "substep", "ms (each)", "×/step", "ms/step")
-total = 0.0
-for (name, f) in substeps
-    t = best_ms(f)
-    m = MULT[name]
-    total += t * m
+for (name, t, m) in parts
     @printf("  %-34s %10.4f %6d %10.4f\n", name, t, m, t * m)
 end
+total = sum(t * m for (_, t, m) in parts)
 @printf("\n  %-34s %28.4f\n", "SUM OF PARTS", total)
 @printf("  %-34s %28.4f\n", "MEASURED FULL STEP", step_ms)
 @printf("  %-34s %27.1f%%\n", "parts / step", 100 * total / step_ms)
