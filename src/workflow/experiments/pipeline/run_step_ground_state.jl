@@ -7,76 +7,15 @@
 # See: CLAUDE.md §"Type stability boundaries", MEMORY pitfall_pipeline_inference
 
 # --- GroundStateStep dispatch + parsing helpers ---
-
-# --- Step dispatch ---
-
-"""
-Resolve the atom for a GS step: parse from p["atom"] when present (and
-populate derived params), else inherit from atom_prev. Throws when neither
-is available. @noinline boundary plus the `::AtomSpecies` return assertion
-in the caller keeps the `Dict{String,Any}` typed parsing local — preserving
-the inference fence pattern that prevents a Workspace JIT cascade
-(see CLAUDE.md "Type stability boundaries").
-"""
-@noinline function _resolve_gs_atom(p::Dict{String, Any}, atom_prev; verbose::Bool=true)
-    if haskey(p, "atom")
-        a = resolve_atom(Symbol(p["atom"]))
-        _resolve_derived_params!(p, a; verbose)
-        return a
-    elseif atom_prev !== nothing
-        return atom_prev
-    else
-        throw(ArgumentError("ground_state step requires 'atom' (no previous step to inherit from)"))
-    end
-end
-
-@noinline function _resolve_gs_grid(p::Dict{String, Any}, grid_prev)
-    if haskey(p, "grid")
-        return _setup_grid_from_params(p)
-    elseif grid_prev !== nothing
-        return (grid_prev, length(grid_prev.config.n_points))
-    else
-        throw(ArgumentError("ground_state step requires 'grid' (no previous step to inherit from)"))
-    end
-end
-
-@noinline function _resolve_gs_interactions(p::Dict{String, Any}, ws_prev, atom)
-    if haskey(p, "interactions")
-        return _parse_gs_interactions(p["interactions"], atom)
-    elseif ws_prev !== nothing
-        return ws_prev.interactions
-    else
-        return _parse_gs_interactions(Dict{String, Any}(), atom)
-    end
-end
-
-"""
-DDI resolution with inheritance: explicit `ddi:` re-parses; otherwise
-inherit from `ws_prev.ddi`; final fallback derives from `interactions:`
-alone (works only on a fresh GS step where N_atoms+omega_ref are both
-present).
-"""
-@noinline function _resolve_gs_ddi_inheritance(p::Dict{String, Any}, ws_prev, atom)
-    if haskey(p, "ddi")
-        return _parse_gs_ddi(p["ddi"], get(p, "interactions", Dict()), atom)
-    elseif ws_prev !== nothing && ws_prev.ddi !== nothing
-        return (true, ws_prev.ddi.C_dd, false, false, 0.0, NaN, false, 2.0)
-    elseif haskey(p, "interactions")
-        return _parse_gs_ddi(Dict{String, Any}(), p["interactions"], atom)
-    else
-        return (false, NaN, false, false, 0.0, NaN, false, 2.0)
-    end
-end
-
-@noinline function _resolve_gs_potential(p::Dict{String, Any}, ws_prev, ndim::Int)
-    if haskey(p, "potential")
-        return _parse_and_build_potential(p["potential"], ndim)
-    elseif ws_prev !== nothing
-        return ws_prev.potential
-    else
-        return _parse_and_build_potential(Dict("type" => "harmonic", "omega" => ones(ndim)), ndim)
-    end
-end
+#
+# The per-slot resolvers this file used to open with (`_resolve_gs_atom`,
+# `_resolve_gs_grid`, `_resolve_gs_interactions`, `_resolve_gs_ddi_inheritance`,
+# `_resolve_gs_potential`) moved to `resolve_gs.jl` together with the light
+# shift / LHY / rotating-frame reads that used to sit ~170 lines below the cache
+# branch. There is now ONE resolution of a `ground_state:` block, and this method
+# is one of its two consumers; `yaml_to_model` is the other. A second reader of
+# `potential:` / `B:` / `lhy:` / `ddi:` anywhere is the failure that extraction
+# exists to prevent.
 
 # --- seed_from: warm-start a GS solve from a prior run's converged ψ, spectrally
 #     upsampled to this step's grid. Cost-compressed continuation
@@ -288,34 +227,25 @@ function _run_step(
     # narrow — see pipeline_types.jl. Falling back here would
     # re-introduce the JIT cascade.
 
-    method = Symbol(get(p, "method", "itp"))
-
-    atom = _resolve_gs_atom(p, atom_prev; verbose)::AtomSpecies
-    grid, ndim = _resolve_gs_grid(p, grid_prev)
-    interactions = _resolve_gs_interactions(p, ws_prev, atom)::InteractionParams
-    gs_ddi = _resolve_gs_ddi_inheritance(p, ws_prev, atom)
-    enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc, ddi_padded_b, ddi_pf = gs_ddi
-    potential = _resolve_gs_potential(p, ws_prev, ndim)
-
-    backend = if haskey(p, "backend")
-        _resolve_backend(Symbol(p["backend"]))
-    elseif ws_prev !== nothing
-        ws_prev.backend
-    else
-        CPUBackend()
-    end
-
-    tol = Float64(get(p, "tol", 1e-8))
-    n_steps = Int(get(p, "n_steps", method === :lbfgs ? 500 : 100000))
-    dt = Float64(get(p, "dt", 0.001))
-    duration = dt * n_steps
-    zeeman = if haskey(p, "B")
-        _build_zeeman_from_b_block(p["B"], duration, atom, p)
-    elseif ws_prev !== nothing
-        ws_prev.zeeman
-    else
-        _parse_zeeman(Dict(), duration)
-    end
+    # THE shared resolution. Every slot below is read off `r`; nothing in this
+    # method parses a physics block. `yaml_to_model` consumes the same call.
+    r = resolve_gs(p, grid_prev, atom_prev, ws_prev; verbose)::GSResolved
+    method = r.method
+    atom = r.atom
+    grid, ndim = r.grid, r.ndim
+    interactions = r.interactions
+    gs_ddi = gs_ddi_tuple(r)
+    enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc, ddi_padded_b, ddi_pf = r.enable_ddi, r.c_dd,
+    r.secular, r.quasi_2d_ddi, r.l_z_ddi,
+    r.ddi_trunc, r.ddi_padded, r.ddi_pad_factor
+    potential = r.potential
+    backend = r.backend
+    tol, n_steps, dt = r.tol, r.n_steps, r.dt
+    zeeman = r.zeeman
+    gs_light_shift = r.light_shift
+    spinor_lhy_mode = r.spinor_lhy
+    gs_lhy_opts = r.lhy_opts
+    gs_rf_omega = r.rf_omega
 
     # --- Cache: skip ITP/LBFGS if file exists, but build a workspace so
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
@@ -359,6 +289,17 @@ function _run_step(
         psi_out = d["psi"]
         energy = get(d, "energy", NaN)
         converged = get(d, "converged", true)
+        # [KNOWN-GAP, made VISIBLE by cutover step 1b, deliberately not closed
+        # here] This call passes no `light_shift`, no `spinor_lhy`, no
+        # `lhy_opts` and no `rotating_frame_omega`, so a cache HIT hands
+        # downstream analyzers a workspace whose Hamiltonian is missing LHY, the
+        # light shift and the rotating frame. Before this step those four were
+        # resolved ~170 lines below, past this `return`, so the omission was not
+        # even expressible; `r` now carries all four. Closing it CHANGES what a
+        # cache hit computes, which is step 3's job and needs its own gate — see
+        # `docs/design/research_spec_and_provenance_architecture.md` §6. Current
+        # exposure: every committed `cache:` artifact is absent from disk and no
+        # ground-state step declares `light_shift`.
         ws_cached = make_workspace(;
             grid, atom, interactions, zeeman, potential,
             sim_params=SimParams(; dt, n_steps=1, save_every=1),
@@ -485,24 +426,6 @@ function _run_step(
         cb(ws, step, ns);
     end
 
-    V_trap_for_ls = evaluate_potential(potential, grid)
-    ls_raw = get(p, "light_shift", nothing)
-    gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
-    # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
-    # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
-    # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old
-    # YAML key — which was never written by the new resolver, silently
-    # disabling non-scalar LHY modes (polar_contact / icosahedral / ...)
-    # for every YAML pipeline run.
-    spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
-        v === nothing ? nothing : Symbol(String(v))
-    end
-    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
-    # "type stability boundaries": an Any-typed local reaching make_workspace
-    # is what turns into a multi-minute JIT hang with no stack trace.
-    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
-
-    gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
     tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;

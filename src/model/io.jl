@@ -70,8 +70,34 @@ function _enc(x::T) where {T}
             "_enc has no encoding for $T — a value with no fields would serialise as an " *
             "empty table, which is indistinguishable from an empty struct"),
     )
-    Dict{String, Any}(String(f) => _enc(getfield(x, f)) for f in fieldnames(T))
+    Dict{String, Any}(
+        String(f) => _enc_field(fieldtype(T, f), getfield(x, f))
+        for f in fieldnames(T)
+    )
 end
+
+# --- optional scalars ---------------------------------------------------------
+#
+# TOML has no null (`TOML.print` errors on `nothing`), and `_enc(nothing)` is
+# refused above for a load-bearing reason: `Nothing` is fieldless, so the generic
+# struct arm would launder it into `{}` and past `_canonical_bytes!`. That
+# refusal must stay, so an optional field is encoded by its DECLARED type rather
+# than by its value — `_enc_field` is the only place in the codec that looks at
+# `fieldtype`, and it exists so a `Union{Nothing, Float64}` field can pick a
+# spelling for its `nothing` arm without weakening the value-directed encoder.
+#
+# The spelling is a String, discriminated from a radius by TOML type exactly as
+# `ModelWaveform`'s two arms are discriminated by number-vs-table. It cannot
+# collide with any radius, and `_canonical_bytes!` hashes it distinctly, so
+# auto / off / explicit take three different `artifact_id`s.
+"How `nothing` is written for a `Union{Nothing, Float64}` field. Outside the numeric domain, so it cannot collide with a value."
+const OPTIONAL_FLOAT_NOTHING = "auto"
+
+const _OPTIONAL_FLOAT = Union{Nothing, Float64}
+
+_enc_field(::Type{FT}, v) where {FT} = _enc(v)
+_enc_field(::Type{_OPTIONAL_FLOAT}, ::Nothing) = OPTIONAL_FLOAT_NOTHING
+_enc_field(::Type{_OPTIONAL_FLOAT}, v::Float64) = _enc(v)
 
 # Explicit rather than via the struct arm: `Stage.params` with no entries is an
 # EMPTY NamedTuple, which has no fields and would hit the refusal above. An
@@ -190,6 +216,23 @@ end
 
 _dec(::Type{ModelWaveform}, v::Real) = Float64(v)
 _dec(::Type{ModelWaveform}, v::AbstractDict) = _dec(PiecewiseLinearWaveform, v)
+
+# The `Union{Nothing, Float64}` arms. Three methods rather than one plus the
+# generic fallback: the fallback is `_dec(::Type{T}, v)`, which is AMBIGUOUS with
+# `_dec(::Type{T}, ::AbstractDict)` for a union `T`, and without the dict arm a
+# malformed file raises a `MethodError` from `fieldnames(Union{...})` instead of
+# the `ArgumentError` the format's closedness is stated in.
+_dec(::Type{_OPTIONAL_FLOAT}, v::Real) = Float64(v)
+function _dec(::Type{_OPTIONAL_FLOAT}, v::AbstractString)
+    String(v) == OPTIONAL_FLOAT_NOTHING || throw(
+        ArgumentError(
+            "an optional float is either a number or the string " *
+            "$(repr(OPTIONAL_FLOAT_NOTHING)); got $(repr(String(v)))"),
+    )
+    nothing
+end
+_dec(::Type{_OPTIONAL_FLOAT}, v::AbstractDict) = throw(
+    ArgumentError("an optional float is a number or $(repr(OPTIONAL_FLOAT_NOTHING)), not a table"))
 
 function _dec(::Type{T}, v::AbstractVector) where {T <: Tuple}
     fts = fieldtypes(T)

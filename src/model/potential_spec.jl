@@ -184,10 +184,14 @@ Transverse beam profile `V = amplitude · ρ^(2l) · exp(-ρ²)` with `ρ = √2
 doughnut.
 
 **`waist` is the 1/e² intensity radius**, the standard optics convention and the
-one `LaguerreGaussBeam` uses. `PlugBeam`'s evaluator computes
-`strength · exp(-r²/2w²)`, i.e. its `w` is *twice* the 1/e² radius — two
+one `LaguerreGaussBeam` uses (`evaluate_potential.jl:117-131` computes
+`ρ = √2 r / waist`, i.e. `exp(-2r²/waist²)`). `PlugBeam`'s evaluator computes
+`strength · exp(-r²/2w²)` (`:133-144`), whose 1/e² point is at `r = 2w` — so its
+`w` is HALF the 1/e² radius, and `BeamSpec.waist = 2 · PlugBeam.waist`. Two
 definitions of "waist" live in the current tree. The conversion belongs in the
-builder, once, and the spec carries the physical number.
+translator, once (`resolve_gs.jl`), and the spec carries the physical number;
+`test/model/test_yaml_to_model.jl` gates it against the evaluator numerically
+rather than against this paragraph, which said "twice" before it was measured.
 """
 struct BeamSpec <: ModelValue
     amplitude::Float64

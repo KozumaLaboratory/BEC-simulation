@@ -31,6 +31,15 @@
 # "off", `LHYTableOpts.n_max=NaN` "derive from psi_init") are therefore all
 # resolved *before* a Model exists; see each spec's docstring for what replaced
 # them.
+#
+# The one place a sentinel is replaced by a UNION rather than by a resolved
+# number is `DDISpec.trunc_radius`, and the reason is that its "auto" state is
+# not resolvable to one number: `make_workspace` derives TWO radii from it, one
+# for the unpadded kernel and one for the padded one. `Union{Nothing, Float64}`
+# says that in the type instead of encoding it as `-1.0`. That is not a sentinel
+# by another name — `nothing` is outside the value domain, so it cannot collide
+# with a radius, and `==`/`hash` treat it as its own value rather than as a
+# number that fails to equal itself.
 
 export GridSpec, InteractionSpec, DDISpec, LHYSpec
 
@@ -209,12 +218,14 @@ InteractionSpec(; n_atoms::Integer, omega_ref::Real, c0::ModelWaveform=0.0,
 
 """
     DDISpec(; c_dd=0.0, secular=false, padded=true, pad_factor=(2.0,2.0,2.0),
-              trunc_radius=0.0, quasi_2d=false, l_z=0.0)
+              trunc_radius=nothing, quasi_2d=false, l_z=0.0)
 
 Magnetic dipole-dipole interaction. Convention `c_dd = μ₀μ²` (no 4π),
 `Q_αβ = k̂_α k̂_β − δ_αβ/3`, `Q(k=0) = 0` — self-consistent, do not "fix".
 
-**Inactive value: `DDISpec()`** — `c_dd = 0`, every other field at its zero.
+**Inactive value: `DDISpec()`** — `c_dd = 0`, every other field at its zero;
+`trunc_radius` normalises to `0.0` there, because a kernel that does not exist
+is not truncated and has no box to derive a radius from.
 
 **There is no `enabled` flag.** `enable_ddi` and `c_dd` are two declarations of
 one fact and they already disagree by default between the library
@@ -223,13 +234,41 @@ says whether there is a dipole interaction by carrying its strength. `c_dd = NaN
 meaning "derive from `atom.mu_mag`" is likewise resolved away: a builder calls
 `compute_c_dd`, and the model stores the number.
 
-`trunc_radius = 0.0` means "no real-space truncation" — a zero cutoff radius
-would zero the whole kernel and so is unambiguous as an off value, unlike the
-three-way `Float64` the YAML layer uses (`NaN` off / `≤0` auto / `>0` explicit),
-which resolves to *two different radii* for the padded and unpadded kernels
-(`make_workspace.jl:228-241`). A model carries the one radius its own `padded`
-setting selects. `pad_factor`'s negative "auto" sentinel is likewise resolved by
-`auto_ddi_pad_factor` before the model exists.
+# `trunc_radius` is three-valued, and the three are different physics
+
+| value | meaning |
+|---|---|
+| `nothing` | auto — derive the radius from the box at build time |
+| `0.0` | off: the bare periodic kernel, no real-space truncation |
+| `> 0.0` | that explicit radius |
+
+`0.0` is unambiguous as the off value because a zero cutoff radius would zero
+the whole kernel, so it cannot also mean a truncation someone wanted.
+
+**Auto is `nothing` rather than a resolved number because it is not ONE
+number.** `make_workspace.jl:228-241` derives two radii from the same input —
+`auto_ddi_trunc_radius(box)` for the unpadded kernel and
+`auto_ddi_trunc_radius(box, pad_factor)` for the padded one — and when
+`padded = true` it builds BOTH objects, the padded one being what the propagator
+reads. A single `Float64` cannot represent that pair, so resolving auto into the
+model would have to pick one of two radii and silently discard the other.
+
+It is nonetheless a *derivable* value, not an unknown: `box`, `padded` and
+`pad_factor` are all in the model already, so the radius is a pure function of
+the model at the point of use. That is what separates `nothing` here from the
+`-1.0` the YAML layer uses, which is a number inside the value domain that
+happens to be excluded by a range check.
+
+**Watch the polarity when converting.** `nothing` means AUTO here and OFF two
+layers down (`make_ddi_params(trunc_radius=nothing)` →
+`_build_q_tensor!`'s `do_trunc = trunc_radius !== nothing`, `qtensor.jl:145`),
+and `make_workspace` reads `<= 0.0` as auto — so the identity map is wrong in
+both directions. The conversion is `ddi_trunc_radius_kwarg` below, and it exists
+exactly once.
+
+`pad_factor`'s negative "auto" sentinel is a sibling of the same defect, and is
+still resolved by `auto_ddi_pad_factor` before the model exists; the union has
+not been extended to it because nothing in the corpus writes `pad_factor: auto`.
 
 **`quasi_2d`/`l_z` here are the DDI-kernel pair, not the contact rescale.**
 The doc's sketch puts `quasi_2d_ddi`/`l_z_ddi` in `geometry`; they are arguments
@@ -248,30 +287,88 @@ struct DDISpec <: ModelValue
     secular::Bool
     padded::Bool
     pad_factor::NTuple{3, Float64}
-    trunc_radius::Float64
+    trunc_radius::Union{Nothing, Float64}
     quasi_2d::Bool
     l_z::Float64
 
     function DDISpec(c_dd::Float64, secular::Bool, padded::Bool,
-        pad_factor::NTuple{3, Float64}, trunc_radius::Float64, quasi_2d::Bool, l_z::Float64)
+        pad_factor::NTuple{3, Float64}, trunc_radius::Union{Nothing, Float64},
+        quasi_2d::Bool, l_z::Float64)
         isfinite(c_dd) || throw(ArgumentError("c_dd must be finite; got $c_dd"))
         if !is_active(c_dd)
             return new(0.0, false, false, (1.0, 1.0, 1.0), 0.0, false, 0.0)
         end
         all(>=(1.0), pad_factor) ||
             throw(ArgumentError("pad_factor must be >= 1 per axis; got $pad_factor"))
-        trunc_radius >= 0 ||
-            throw(ArgumentError("trunc_radius must be >= 0 (0 = untruncated); got $trunc_radius"))
+        if trunc_radius !== nothing
+            # `NaN >= 0` is false, so the range check alone already rejected NaN
+            # — but by a message about the range, which reads as a bound the
+            # caller could satisfy rather than as "this is the YAML `none`
+            # sentinel and it has a different spelling here".
+            isfinite(trunc_radius) || throw(
+                ArgumentError(
+                    "trunc_radius must be finite; got $trunc_radius. `NaN` is the YAML " *
+                    "layer's spelling of \"no truncation\" — in a model that is 0.0, and " *
+                    "`nothing` is auto"),
+            )
+            trunc_radius >= 0 || throw(
+                ArgumentError(
+                    "trunc_radius must be >= 0 (0 = untruncated, nothing = auto); " *
+                    "got $trunc_radius"),
+            )
+        end
         quasi_2d && !(l_z > 0) &&
             throw(ArgumentError("quasi-2D DDI needs l_z > 0; got $l_z"))
         new(c_dd, secular, padded, pad_factor, trunc_radius, quasi_2d, l_z)
     end
 end
 
+# `trunc_radius = nothing` (auto) rather than `0.0` (the bare periodic kernel):
+# the YAML surface defaults to auto (`DDI_TRUNC_RADIUS_DEFAULT = -1.0`,
+# `schema/parsing_blocks.jl:398`), and a library default that disagreed with it
+# would re-create, one layer up, exactly the split this spec's missing `enabled`
+# flag was removed to close. The bare kernel carries a 2-5 % dipolar field error
+# that is flat in resolution, so "the default is the cheap wrong one" is not a
+# neutral choice.
 DDISpec(; c_dd::Real=0.0, secular::Bool=false, padded::Bool=true,
-    pad_factor=(2.0, 2.0, 2.0), trunc_radius::Real=0.0, quasi_2d::Bool=false,
-    l_z::Real=0.0) = DDISpec(Float64(c_dd), secular, padded,
-    _pad3(pad_factor, 1.0, Float64), Float64(trunc_radius), quasi_2d, Float64(l_z))
+    pad_factor=(2.0, 2.0, 2.0), trunc_radius::Union{Nothing, Real}=nothing,
+    quasi_2d::Bool=false, l_z::Real=0.0) = DDISpec(Float64(c_dd), secular, padded,
+    _pad3(pad_factor, 1.0, Float64),
+    trunc_radius === nothing ? nothing : Float64(trunc_radius), quasi_2d, Float64(l_z))
+
+"""
+    ddi_trunc_radius_kwarg(d::DDISpec) -> Float64
+
+`d.trunc_radius` in the spelling `make_workspace` / `find_ground_state` take.
+
+The ONE conversion between the two vocabularies, and it is non-identity in both
+directions:
+
+| `DDISpec.trunc_radius` | kwarg | why |
+|---|---|---|
+| `nothing` (auto) | `-1.0` | `make_workspace` reads `<= 0` as auto |
+| `0.0` (off) | `NaN` | `make_workspace` reads `NaN` as off, and `0.0` as AUTO |
+| `r > 0` | `r` | the one value both layers agree on |
+
+Mapping `0.0` through unchanged would turn every untruncated model into an
+auto-truncated one; mapping `nothing` to `0.0` would do the same. Both are
+silent — the run succeeds and the dipolar field is wrong by 2-5 %.
+"""
+ddi_trunc_radius_kwarg(d::DDISpec) =
+    d.trunc_radius === nothing ? -1.0 : (d.trunc_radius == 0.0 ? NaN : d.trunc_radius)
+
+"""
+    ddi_trunc_radius_from_kwarg(x::Real) -> Union{Nothing, Float64}
+
+Inverse of `ddi_trunc_radius_kwarg`, over the whole `Float64` the YAML layer can
+produce: `NaN` ⇒ `0.0` (off), `<= 0` ⇒ `nothing` (auto — `_parse_ddi_trunc_radius`
+returns `-1.0`, but a hand-written `trunc_radius: 0` reaches `make_workspace`'s
+auto branch too and must resolve the same way), `> 0` ⇒ itself.
+"""
+ddi_trunc_radius_from_kwarg(x::Real) =
+    isnan(x) ? 0.0 : (x <= 0 ? nothing : Float64(x))
+
+export ddi_trunc_radius_kwarg, ddi_trunc_radius_from_kwarg
 
 # Drop the padding of axes the grid does not have. `Model`'s constructor calls
 # this; see the comment there for why this one tuple is normalised rather than

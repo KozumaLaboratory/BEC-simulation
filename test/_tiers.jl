@@ -60,10 +60,21 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
-    # Model / Stage layer + the provenance cutover's steps 1 and 2.
+    # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
     "model/test_artifact_id.jl",
+    # Step 1b. `yaml_to_model` is the resolver from raw YAML to a `Model`;
+    # `test_resolve_gs_is_shared.jl` is what keeps it and `_run_step` from
+    # becoming two parsers of the same physics; `test_ddi_trunc_radius…` gates
+    # the three-state union that unblocks the corpus.
+    "model/test_yaml_to_model.jl",
+    "model/test_resolve_gs_is_shared.jl",
+    "model/test_ddi_trunc_radius_three_states.jl",
+    # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
+    # EVERY config under `runs/`, with the ones it cannot resolve listed by name
+    # and reason so the list only shrinks deliberately.
+    "model/test_corpus_resolves.jl",
     "model/test_admission_requires_marker.jl",
     "model/test_record_provenance.jl",
     "model/test_completion_marker.jl",
@@ -644,6 +655,17 @@ const _COST = Dict{String, Float64}(
     # two `run_registry.jl` writer sites cannot be reached any other way.
     "model/test_record_provenance.jl" => 46.0,
     "model/test_model_toml_roundtrip.jl" => 9.0,
+    # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
+    "model/test_yaml_to_model.jl" => 12.0,
+    # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to
+    # actually run, or arm C observes only one of the two consumers.
+    "model/test_resolve_gs_is_shared.jl" => 20.0,
+    # Three 16³ Q-tensor builds plus pure value work.
+    "model/test_ddi_trunc_radius_three_states.jl" => 6.0,
+    # 429 configs resolved, 351 of them also round-tripped through TOML and
+    # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
+    # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
+    "model/test_corpus_resolves.jl" => 22.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,

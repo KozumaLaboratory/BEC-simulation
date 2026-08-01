@@ -557,8 +557,121 @@ mode-enum plus value (two fields that can disagree).
 
 Scope: resolve `ground_state` blocks only — that is what admission keys on.
 `Initial`, `InitialSpec` and the dynamics half stay out. The gate is that
-`yaml_to_model` round-trips all 407 committed `ground_state` steps, with any
-config it cannot resolve listed by name and reason rather than skipped.
+`yaml_to_model` round-trips all committed `ground_state` steps, with any config
+it cannot resolve listed by name and reason rather than skipped.
+
+**The architectural requirement, and the shape it forces.** Re-interpreting
+`potential:` / `B:` / `lhy:` / `ddi:` from raw YAML would be a second
+declaration of the same physics — two readers, each self-consistent, drifting
+silently. So the resolution was EXTRACTED rather than duplicated:
+`resolve_gs(p, grid_prev, atom_prev, ws_prev) -> GSResolved`
+(`src/workflow/experiments/pipeline/resolve_gs.jl`) is the one resolver, and it
+has two consumers — `_run_step(::GroundStateStep, …)`, which reads the solver
+faces off it, and `gs_model(r) -> Model`, which is a pure function of the same
+struct and touches no dict. Everything `gs_model` needs that the solver does not
+(`N_atoms`, `omega_ref`, the light-shift coupling triple, the dealias globals)
+is read in the resolver and carried. `test/model/test_resolve_gs_is_shared.jl`
+gates the property with three independent arms — the runner's lowered code names
+`resolve_gs`; the runner's source calls no physics parser; and both consumers
+reproduce the same LITERAL pinned numbers — because a second parser reappearing
+is the failure this step exists to prevent.
+
+Model-construction failures live in `gs_model`, not `resolve_gs`, so
+`_run_step`'s behaviour does not change: a config with no `N_atoms` still
+*solves*, it just has no model. Verified by a 10-scenario before/after probe
+(itp, lbfgs, no ddi, scalar LHY, no potential, `trunc_radius: none`, explicit
+radius, no `B`, chained inheritance) diffing byte-identical on energies to 14
+digits, ψ samples and workspace digests.
+
+**`yaml_to_model` had to be made PURE in the dealias globals.** Found by the
+corpus gate, not by reading: `_run_yaml_prepare` is only the prepare half of a
+prepare/execute pair — it applies a top-level `dealias:` block to
+`DEALIAS_2_3_ENABLED[]` / `DEALIAS_K_CUTOFF[]` and leaves them set, and it is
+`run_yaml`'s execute half that restores them in a `finally`
+(`run_registry.jl:421-445`). `yaml_to_model` runs prepare alone, so until it did
+the same restore, resolving a config that carried the block **rewrote the
+`GridSpec` of every config resolved after it in the same session**:
+`runs/validation_level10/L10_F1_smoke.yaml` measured
+`dealias_two_thirds=false, k_cut=0.0` alone and `true, 10.0` after
+`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml`, and the two models
+compared unequal. For a resolver whose output is a content id that is fatal, and
+it is invisible to any single-config test. Both the Refs and the pending-snapshot
+slot are now restored in a `finally`; the order-independence arm of
+`test/model/test_corpus_resolves.jl` gates it, with the disagreeing pair asserted
+so the equality cannot pass vacuously.
+
+**Three corrections to what this section said before it was implemented.**
+
+1. **The premise that `light_shift` / `lhy_kind` / `lhy_opts` /
+   `rotating_frame_omega` had already been hoisted above the cache branch was
+   FALSE.** They sat ~170 lines below the cache-hit `return`; `git log -S` finds
+   no hoist commit on any branch. Step 1b does the hoist. That closes a live
+   gap as a side effect — the cache-hit `make_workspace` could not have been
+   given those four, because they were not resolved yet — but the call itself is
+   left unchanged, since passing them would change what a cache hit computes.
+   Marked `[KNOWN-GAP]` at the site for step 3.
+
+2. **`nothing` means AUTO in `DDISpec` and OFF in `make_ddi_params`**
+   (`_build_q_tensor!`'s `do_trunc = trunc_radius !== nothing`,
+   `qtensor.jl:145`), and `make_workspace` reads `<= 0.0` as auto — so the
+   identity map is wrong in *both* directions and a naive conversion silently
+   turns every untruncated run into an auto-truncated one. The conversion is
+   `ddi_trunc_radius_kwarg` / `ddi_trunc_radius_from_kwarg`, declared once in
+   `specs.jl`, and it is non-identity on `0.0` by construction. Also corrected:
+   `DDISpec`'s docstring claimed "a model carries the one radius its own `padded`
+   setting selects", which is false — `make_workspace` derives TWO radii from the
+   one input and builds both objects, which is *why* auto cannot be resolved to a
+   number before the model exists.
+
+3. **The "364 / 407" measurement used 4 of the 14 slots**, so it saw only the
+   `trunc_radius` defect. Over all 14, on the 429 config files under `runs/`
+   — of which **407 carry a spinor `ground_state:` step** in the YAML, six of
+   those being refused by `_run_yaml_prepare` before any resolver runs, so 401
+   reach one:
+
+   ```
+   351  resolve AND round-trip through TOML unchanged
+    22  tabulated LHY with no resolved n_max (NaN = "3x max|psi_init|^2")
+    16  no N_atoms anywhere (bare c0/c1 verification configs)
+    15  no spinor ground_state step (rotating_basis path)
+     9  strict-schema failures that predate this step (`omega_ref` at step level)
+     5  two ground_state steps, index required rather than guessed
+     5  87Rb + auto-derived q, which `_resolve_q_waveform` refuses
+     2  a B tilt the spinor runner drops (`B_direction`; klaus_hybrid)
+     4  not pipeline configs / not parseable YAML
+   ```
+
+   351 + 56 in scope + 22 out of scope = 429. The list is not a report: it is
+   `CORPUS_UNRESOLVED` in `test/model/test_corpus_resolves.jl`, config by config
+   with its reason, gated in both directions — a config that stops resolving is
+   red until someone writes down why, and one that starts resolving is red until
+   it leaves the list. That gate also re-reads all 351 resolved models against
+   their own YAML (5 255 checks: atom, grid, N, ω_ref, the c₀/c₁ constraint,
+   c_dd, secular, LHY kind, trap ω, p, q) so that "constructs" and "carries the
+   physics" are separate claims.
+
+   The nine `:schema_strict` refusals are `_run_yaml_prepare`'s, and that is the
+   same function `run_yaml` calls (`run_registry.jl:205`), so **those nine are
+   unrunnable today** — independently of anything in this layer.
+
+   One pre-existing defect the sweep surfaced and this step does NOT fix:
+   `_parse_gs_interactions` (`parsing_blocks.jl:363-391`) tries `c_total`, then
+   `N_atoms + omega_ref`, then explicit `c0`/`c1`, with **no warning when a
+   later-priority key is present**. Two configs —
+   `runs/verification_suite/yamls/L7{,clean}_loss_only_uniform_K3.yaml`, whose
+   header says "no trap, no DDI, no contact, no LHY" — declare
+   `{N_atoms: 100000, omega_ref: 628.3, c0: 0.0, c1: 0.0}` and therefore run
+   with `c0 = 5338.9`, not 0. The model is faithful (both consumers share the
+   resolver, so the run uses the same number); it is the config that is not
+   doing what it says. Fixing the precedence changes what those runs compute and
+   needs its own gate plus a retraction of any L7 claim, so it is filed here
+   rather than done inside a cutover step.
+
+   Every one of the 22 + 16 + 5 + 2 is a REAL gap in the config, not in the
+   resolver: `gs_model` refuses rather than substituting a default, because a
+   model that guessed would be a wrong answer wearing a content id in a shared
+   store. The 2 `B_direction` configs are the pair that silently run with **B
+   along +z instead of −z** today.
 
 **Step 3 — flip admission to `artifact_id`.** One-line change once steps 1, 1b and 2
 are green. `git rm src/workflow/experiments/pipeline/run_step_ground_state.jl`'s

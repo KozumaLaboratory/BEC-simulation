@@ -2,10 +2,22 @@
 #
 # `docs/design/research_spec_and_provenance_architecture.md` §2.2, §2.10, §2.11.
 #
-# Step 1a is PURELY ADDITIVE: nothing outside `src/model/` references `Model`,
-# so this increment cannot change the behaviour of any existing run. The
-# rewiring — `yaml_to_model`, `make_workspace(::Model)`, and the retirement of
-# the fifteen YAML normalisation passes — is Step 1b.
+# Step 1a was PURELY ADDITIVE: nothing outside `src/model/` referenced `Model`,
+# so that increment could not change the behaviour of any existing run.
+#
+# Step 1b added the first consumer: `yaml_to_model`
+# (`workflow/experiments/pipeline/resolve_gs.jl`), which resolves a
+# `ground_state:` block to a `Model`. It shares ONE resolver with
+# `_run_step(::GroundStateStep, …)` rather than re-reading the YAML — a second
+# reader of `potential:` / `B:` / `lhy:` / `ddi:` is a parallel declaration of
+# the same physics, which is what this layer exists to delete.
+#
+# What that consumer reaches is measured, not assumed: `test_corpus_resolves.jl`
+# resolves all 429 configs under `runs/` (351 succeed) and lists every one that
+# does not, by name and reason, so step 3's scope can only change deliberately.
+#
+# Still to come: `make_workspace(::Model)` and the retirement of the fifteen
+# YAML normalisation passes.
 #
 # Loaded after `hamiltonian.jl` because `GaussianBeam`
 # (`hamiltonian/terms/trap/optical_trap.jl`) is the one physics type outside
