@@ -70,6 +70,18 @@ const _KNOWN_UNSTABLE = Dict(
     "eu_gs_phase_c1_B_kappa/config_texture_stir_movie.yaml" =>
         "movie config (#164): observable is vortex nucleation under a rotating " *
         "b_perp, not eps_LHY",
+
+    # The five-mode ablation reconstruction (c58106a6). `full_bdg` is one of five
+    # arms compared against each other, so it is a comparator by construction —
+    # and at that suite's ladder (c1_ratio = -0.005, DDI on, Eu F=6) it sits at
+    # max Im omega = 207.2, the same scheme-dependent regime as everything else
+    # here. Its 0.953 ratio is one of the four the suite's "~4.9 %" rests on; the
+    # other three (scalar / polar_contact / polar_dipolar, 0.956 / 0.951 / 0.951)
+    # agree without it, so the conclusion does not hinge on this arm — but the arm
+    # itself is not quotable alone. Noted in that suite's RESULTS.md.
+    "lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml" =>
+        "one of five compared arms (c58106a6); scheme-dependent at this ladder, " *
+        "and the suite's conclusion is carried by the other three",
 )
 
 const _RUNS = abspath(joinpath(@__DIR__, "..", "..", "runs"))
