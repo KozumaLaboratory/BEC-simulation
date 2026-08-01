@@ -77,42 +77,6 @@ loss does.
 either dataset — but every number under it moved by 16.5 %, and the figure should
 be redrawn rather than re-captioned.
 
-## Fig 1's inset: the two lossy arms
-
-Re-run on TSUBAME (`gpu_h`, 64³, `import CUDA` first). The inset plots
-N(t)/N(0), so the comparable quantity is the surviving fraction at 40 ms.
-
-| config | stored `N_final_ratio` | re-derived `1 − norm_rel_drift` | change |
-|---|---:|---:|---:|
-| `matsui_40ms_lossy_medium` | 0.516038 | 0.516901 | **+0.17 %** |
-| `matsui_40ms_lossy_strong` | 0.244302 | 0.243647 | **−0.27 %** |
-
-**The inset survives the corrections.** Both arms move by less than a third of a
-percent, against the −16.5 % that moved every peak-density number in the panel
-above. That is not a contradiction: `peak_max` is a density, sensitive to the
-DDI-padding and LHY corrections, while N(t)/N(0) is set by K₃ acting on a decay
-that the corrections barely touch — the same insensitivity Fig 3's re-derivation
-found from the other direction.
-
-The re-derivation also classifies the two arms, which the stored summaries do
-not: `stable_arrest` (medium) and `sacrificial_arrest` (strong).
-
-### What could not be compared, and why
-
-The extractor schema changed between the two epochs. The stored summaries carry
-a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
-`_extractor_version: 3` emits `Fz_drift`, `Mz` and `norm_rel_drift` instead.
-
-- **ΔF_z is NOT reported here.** Stored `DeltaFz` is 3.478276 (medium) and
-  re-derived `Fz_drift` is 3.328342, which looks like a −4.3 % shift — but
-  `DeltaFz` is a per-atom difference over the `Fz_per_N` series and `Fz_drift`
-  comes from a different extractor, and I did not confirm the two definitions
-  agree. Quoting the ratio would repeat the Fig 3 error of comparing a
-  time-maximum against a final-state value because both were called "peak".
-- **`peak_max` has no stored counterpart** for these two configs. Their stored
-  summaries contain `N_trajectory` and nothing else, so there is no like-for-like
-  density number to put beside the panel's table.
-
 ## The inset survives where the main panel does not
 
 The inset's two lossy arms were re-run on TSUBAME. Its quantity is the surviving
@@ -137,6 +101,22 @@ re-derived only the inset would have concluded the figure was fine.
 The re-derived runs also classify — `stable_arrest` (medium),
 `sacrificial_arrest` (strong) — where the stored summaries classify nothing. New
 information, not a comparison.
+
+### What could not be compared, and why
+
+The extractor schema changed between the two epochs. The stored summaries carry
+a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
+`_extractor_version: 3` emits `Fz_drift`, `Mz` and `norm_rel_drift` instead.
+
+- **ΔF_z is NOT reported here.** Stored `DeltaFz` is 3.478276 (medium) and
+  re-derived `Fz_drift` is 3.328342, which looks like a −4.3 % shift — but
+  `DeltaFz` is a per-atom difference over the `Fz_per_N` series while `Fz_drift`
+  comes from a different extractor, and I did not confirm the two definitions
+  agree. Quoting the ratio would repeat the Fig 3 error of comparing a
+  time-maximum against a final-state value because both were called "peak".
+- **`peak_max` has no stored counterpart** for these two configs. Their stored
+  summaries contain `N_trajectory` and nothing else, so there is no like-for-like
+  density number to put beside the main panel's table.
 
 ## Not covered
 
