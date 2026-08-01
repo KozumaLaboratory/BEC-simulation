@@ -131,16 +131,38 @@ for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B), ("F fused, dt"
         r.dE, r.steps)
 end
 
-d_FS = ddist(F.psi, S.psi)
-d_SB = ddist(S.psi, B.psi)
-e_FS = abs(F.E - S.E) / max(abs(S.E), eps())
-e_SB = abs(S.E - B.E) / max(abs(S.E), eps())
-
-@printf("\n  %-28s %12s %12s\n", "", "density", "energy")
-@printf("  %-28s %12.4e %12.4e\n", "|F − S|  the proposal", d_FS, e_FS)
-@printf("  %-28s %12.4e %12.4e\n", "|S − B|  dt's own cost", d_SB, e_SB)
-@printf("  %-28s %12.3f %12.3f\n", "ratio  (≪1 admissible)",
-    d_FS / max(d_SB, eps()), e_FS / max(e_SB, eps()))
+# The FULL pairwise matrix, because the first version of this printed only
+# |F−S| and |S−B| and that was the wrong pair. The verdict it computed —
+# |F−S|/|S−B| — measures how far the proposal sits from the CURRENT behaviour,
+# and treats "differs from what we do now" as "wrong". But S is not the truth; B
+# (dt/2) is the better estimate of it, and the run showed F landing on B in
+# energy to 1.5e-7 while S sits 3.0e-4 away. Under the old rule that read as
+# ratio ≈ 1 and "the idea dies", when the arithmetic was saying the opposite.
+#
+# So the quantity that decides is |F−B| against |S−B|: distance from the best
+# available reference, for each of the two candidates at dt.
+#
+# And |F−B| is needed in DENSITY, not only energy. Energy is one scalar and two
+# different states can share it; the earlier run's energy agreement is not by
+# itself evidence that the states agree.
+dist = (
+    ("|S − B|  current vs dt/2", ddist(S.psi, B.psi), abs(S.E - B.E) / abs(B.E)),
+    ("|F − B|  proposal vs dt/2", ddist(F.psi, B.psi), abs(F.E - B.E) / abs(B.E)),
+    ("|F − S|  proposal vs current", ddist(F.psi, S.psi), abs(F.E - S.E) / abs(S.E)),
+)
+@printf("\n  %-32s %12s %12s\n", "", "density", "energy")
+for (name, d, e) in dist
+    @printf("  %-32s %12.4e %12.4e\n", name, d, e)
+end
+d_SB, d_FB = dist[1][2], dist[2][2]
+e_SB, e_FB = dist[1][3], dist[2][3]
+@printf("\n  %-32s %12.4f %12.4f\n", "VERDICT  |F−B| / |S−B|",
+    d_FB / max(d_SB, eps()), e_FB / max(e_SB, eps()))
+println("    < 1  the fusion is CLOSER to the dt/2 reference than the current chain")
+println("    ≈ 1  it is a different error of the same size — a lateral move")
+println("    > 1  it is worse, and the speed does not buy it")
+println("  Both columns have to agree. Energy alone cannot settle it: one scalar")
+println("  can coincide between states that differ.")
 
 if !(S.conv && B.conv && F.conv)
     println("""
@@ -153,12 +175,16 @@ end
 println("""
 
 [read] The denominator is the point. `|S − B|` is what choosing dt already costs,
-measured rather than assumed, so the ratio says whether the fusion moves the
-answer by more or less than a knob already set. A small `|F − S|` quoted alone
-would be a number with no scale.
+measured rather than assumed, so the ratio puts the proposal on the scale of a
+knob already set. A distance quoted alone would be a number with no scale.
 
-If the ratio is ≪ 1 the fusion is admissible AT THIS dt and grid, and the saving
-is 30.6 % of the step at 64³. If it is ≳ 1 the fusion is a real change to the
-answer and the speed does not buy it — the correct move then is dt/2 with the
-fused chain, which costs 2× the steps at 0.70× the step and is therefore a LOSS,
-i.e. the idea dies.""")
+CAVEAT ON B. dt/2 is a BETTER estimate of the dt→0 limit than dt, not the limit
+itself, so `|F−B| ≪ |S−B|` says the fusion agrees with a better estimate — it does
+not by itself prove convergence to the true fixed point. Confirming that needs a
+third dt (a Richardson check), and this bench does not do it. Say "closer to the
+dt/2 reference", not "more accurate", until it does.
+
+If the verdict is < 1 in BOTH columns the fusion is admissible at this dt and
+grid, and it saves 30.6 % of the step at 64³. If it is ≳ 1 the fusion is a real
+change to the answer and the speed does not buy it — the fallback, dt/2 with the
+fused chain, is 2× the steps at 0.70× the step, i.e. a loss, so the idea dies.""")
