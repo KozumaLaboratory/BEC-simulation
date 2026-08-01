@@ -698,7 +698,7 @@ const _COST = Dict{String, Float64}(
     "foundation/test_property_based.jl" => 16.0,
     "oracles/test_stability_indeterminate.jl" => 15.5,
     "oracles/test_term_properties.jl" => 15.5,
-    "oracles/test_term_fd_registry_coverage.jl" => 36.0,
+    "oracles/test_term_fd_registry_coverage.jl" => 125.0,  # 36 s locally, 125.4 s on the runner
     "hamiltonian/test_lhy.jl" => 15.2,
     "analysis/test_phase_classification_polyhedral.jl" => 15.1,
     "oracles/test_registry_completeness.jl" => 14.4,
@@ -748,12 +748,19 @@ const _COST = Dict{String, Float64}(
     "oracles/test_gpu_cpu_per_term_parity.jl" => 6.1,
     "analysis/test_imaging.jl" => 6.0,
     # 0.0 s with SPINORBEC_RUN_HEAVY_YAML off, these with it on.
-    "workflow/test_multi_fidelity_yaml.jl" => 50.2,
-    "workflow/test_active_learning_yaml.jl" => 19.7,
+    # MEASURED ON THE RUNNER, not on a workstation. 50.2 s was this file on a
+    # 10-core box with a warm depot; the 4-vCPU CI runner takes 776.3 s — 15x —
+    # because it is GP fitting, and `_COST` sets the HAND-OUT ORDER. Declared at
+    # 50 s it was handed out late, so a worker was still inside it at the
+    # 1800 s cap and the whole `full` tier died with "unrun files" (nightly run
+    # 30668378491, 2026-07-31: all four workers killed, zero assertion
+    # failures). Longest file in the suite; it must be handed out first.
+    "workflow/test_multi_fidelity_yaml.jl" => 776.0,
+    "workflow/test_active_learning_yaml.jl" => 21.7,
     "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
     # 4.8 s here against a warm depot; the CI runner pays a cold precompile
     # inside the subprocess, so reserve for that rather than under-book it.
-    "gpu/test_cpu_only_runner.jl" => 60.0,
+    "gpu/test_cpu_only_runner.jl" => 9.0,   # reserved 60 for a cold subprocess precompile; measured 8.7
     # ── Heavy `ci`/`full`-tier files, not exercised by the per-push CI jobs;
     # estimates carried over from the full-tier measurement.
     "workflow/test_multi_fidelity_bo.jl" => 161.0,
