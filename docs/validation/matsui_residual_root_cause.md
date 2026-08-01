@@ -23,6 +23,52 @@ Per-field, `N_{m=−6}` ours over theirs across all 45 fields:
 
 UGE 8310846 task 15, commit `ec310fe2`+, exit 0, 45 points. Type C.
 
+## Error budget for the last 0.039 nT — it is our time step
+
+Baseline: N = 3.5×10⁴ with our defaults, centre **−2.510** against their
+**−2.549**. Each candidate turned on alone, signed (UGE 8313740, both arms
+exit 0, 45 points each):
+
+| arm | centre [nT] | width [nT] | Δcentre |
+|---|---|---|---|
+| baseline | −2.510 | 12.89 | — |
+| **+ `dt` refined 4×** | **−2.550** | 13.00 | **−0.040** |
+| + their exponential ramp | −2.587 | 12.90 | −0.077 |
+| + grid (32³/box 16 → 128³/box 36.2) | — | — | −0.007 |
+| + DDI kernel (cutoff on/off) | — | — | −0.002 |
+| **Matsui** | **−2.549** | 12.75 | **−0.039 needed** |
+
+**Converging our time step alone lands on −2.550 against their −2.549 — 0.001 nT
+apart.** The residual was our own `dt = 1e-3` discretisation. They run the same
+`dt` but with Crank–Nicolson iterated to self-consistency, where we use a Strang
+split-step; both are 2nd order and theirs simply carries the smaller coefficient.
+
+The ramp **overshoots**: −0.077 against the −0.039 needed. And the two are not
+independent — summing them gives −0.117, three times the residual — so refining
+`dt` and fixing the ramp are partly capturing the same discretisation. That was
+not separated further; the point is made either way.
+
+**The ground-state DDI is excluded**, and by a wide margin. Their
+`timeGP_3D_spin1_fix` carries `+cdd·INT0_n·MatSZ(im)` while **both calls that
+would update `INT0` inside the CN iteration are commented out** (`initial.f90`),
+so `INT0` is frozen at the value computed once from the Thomas-Fermi seed. That
+looked like a live candidate — until measured. Turning our GS DDI fully off
+moves the centre to **−3.205**, a bracket **0.695 nT** wide (positive control:
+the GS shape goes 0.7786 → 1.3858, the bare-trap value being 1.3967). Matsui sit
+**0.039 nT from the self-consistent end** and 0.656 from the other. Their frozen
+field is effectively self-consistent, because the TF seed's dipolar field is
+already close to the converged one.
+
+**No unexplained physics remains in the centre.**
+
+## The width does NOT close, and is left open
+
+`dt` and the ramp both move the width the *wrong* way: 12.89 → 13.00 and 12.90
+against their 12.75. Centre agrees to 0.001 nT while the width stays 0.25 nT
+(2 %) apart. The width is measured against an endpoint baseline and their grid is
+1 nT where ours is 0.5 nT, so part of this is sampling rather than physics — but
+that has not been separated. Open.
+
 ## How it was found, and why it took so long
 
 Integrated populations alone cannot separate `N` from anything else that scales
