@@ -89,23 +89,35 @@ antisymmetric ΔF_z, so the interesting quantity has to be something else.
 
 **Which dataset is right.** Both are internally consistent; the stored one was
 produced before the 2026-06 integrator corrections, the 2026-07-08 q fix and the
-DDI padding default, and this re-run has none of that as a control.
+DDI padding default, and this re-run has none of that as a control. The section
+above supersedes this: the question does not have an answer, because neither
+number measures the quantity the figure names.
 
-**That any chirality claim is settled.** ±Ω is *not* the mirror operation here:
-`mistake_barnett_chirality_arms_not_mirror_images_2026_07_28` records that
-`SinusoidalWaveform` is a sine, so mirroring requires negating `By` as well.
-A ±Ω asymmetry therefore was never a clean chirality test in either dataset — the
-stored figure's 85× and this re-run's near-symmetry are both measurements of
-something less specific than "chirality".
+> **CORRECTED 2026-08-02.** This paragraph originally read: *"±Ω is not the mirror
+> operation here: `SinusoidalWaveform` is a sine, so mirroring requires negating
+> `By` as well."* **That is wrong for this suite.** It transplanted
+> `mistake_barnett_chirality_arms_not_mirror_images_2026_07_28`, which is about
+> `eu_barnett_rotfield_clean` — a suite that builds a rotating field from
+> sinusoidal `Bx`/`By` waveforms. `barnett_eu_window` uses a rotating **frame**
+> (`rotating_frame_omega`) with a static axial `Bz`, so the mirror negates **`Bz`**,
+> not `By`. Measured above: the (Ω, B_z) mirror is exact to six digits.
+>
+> The conclusion the wrong reasoning reached — that ±Ω was never a clean chirality
+> test — happens to be right, which is why it survived review. **Right answer,
+> wrong mechanism, and it named the wrong field to negate**, so anyone acting on
+> it would have run a second meaningless pair.
 
 The Barnett arc is also being actively rewritten (#217 established the conversion
 efficiency as the converged quantity; #219 retracted the superseded rotating-field
-study), so Fig 4's question may be superseded independently of which number is
-correct.
+study), so Fig 4's question was already being superseded from that direction.
 
 ## Status of the figure
 
 Fig 4 as drawn shows a strong ±Ω asymmetry that the current code does not
-reproduce. It should not be redrawn from either dataset until the mirror
-operation is fixed — negate `By` with Ω — and the result is checked against #217's
-conversion-efficiency framing.
+reproduce — and the asymmetry was never a chirality measurement in the first
+place, because ±Ω at fixed `Bz` is not a reflection.
+
+**It should not be redrawn from either dataset.** The true mirror, (Ω, B_z)
+flipped together, is exactly antisymmetric by construction — verified to six
+digits — so it carries no information either. A chirality figure needs a different
+observable; #217's conversion efficiency is the candidate already on the table.
