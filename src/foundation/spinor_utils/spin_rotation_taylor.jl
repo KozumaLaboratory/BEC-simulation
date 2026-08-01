@@ -61,7 +61,15 @@ the same conclusion measured on that device.
 The relationship, not this number, is what is gated:
 `test_cpu_spin_rotation_taylor_parity.jl` fails if the truncation error stops
 being negligible against the splitting error."""
-const SPIN_TAYLOR_TOL = Ref(1.0e-13)
+# 1e-15, not 1e-13. The tighter value is FREE — the degree is floored at 2 and at
+# production `R ≈ 1e-5` the schedule returns 2 for every tolerance over ten
+# decades — so shipping the loose one offered a choice that could only ever be
+# equal or worse. A setting that gives accuracy away without buying speed is not a
+# trade, and the way to remove one is to stop shipping it.
+#
+# The knob stays registered because it CAN bind at large rotation angles, where it
+# is a real control; it is simply not one at any angle this code runs at.
+const SPIN_TAYLOR_TOL = Ref(1.0e-15)
 
 """Angle above which a voxel halves its rotation and applies it twice (repeated
 squaring — exact). Production `R` is 0.01–0.2 so no voxel ever halves; the

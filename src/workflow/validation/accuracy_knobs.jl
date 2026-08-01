@@ -131,11 +131,14 @@ against a splitting error of 7.6e-3, i.e. 3e-11 of it — but measured on ENERGY
 only. Gated by test_taylor_tolerance_criterion.jl, which therefore licenses an \
 energy claim and not a phase-classification one.";
         getter=() -> SPIN_TAYLOR_ENABLED[], setter=v -> (SPIN_TAYLOR_ENABLED[] = v)),
-    AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-13,
-        "Backward-error target for the Taylor degree. Measured irrelevant across \
-ten decades (the degree floor of 2 already puts the truncation 4.5 orders under \
-the splitting error at production rotation angles), so the reference value is \
-tighter for form's sake and costs nothing.";
+    AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-15,
+        "Backward-error target for the Taylor degree. INERT at production angles: \
+the degree is floored at 2 and at R ≈ 1e-5 the schedule returns 2 for every \
+tolerance across ten decades, so this cannot change the answer OR the cost here. \
+It shipped at 1e-13 with 1e-15 as the 'reference' — a choice that could only be \
+equal or worse, offered for nothing — so the tighter value is now simply the \
+default and the choice is gone. Still registered because it CAN bind at large \
+rotation angles.";
         getter=() -> SPIN_TAYLOR_TOL[], setter=v -> (SPIN_TAYLOR_TOL[] = v)),
     AccuracyKnob(:dealias_2_3, :global, true, false,
         "Orszag 2/3 filter on ψ and on the bilinear DDI field. NOTE the \
@@ -172,7 +175,12 @@ be removed without removing the rotating-basis path. Buys NO speed — measured 
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \
 general-spinor path, gated to ~1e-4 against the closed forms in their own \
-regimes, and ~100× dearer."),
+regimes. The '~100× dearer' this note used to carry is FALSE per step: measured \
+0.997× against 0.987× for polar_contact at 32³, i.e. both are free, and the \
+difference is a ONE-TIME table build (0.41-0.71 s vs 0.05 s). So the closed forms \
+buy no per-step speed and the reason to prefer one is its ansatz matching the \
+state — or, at Eu, that full_bdg has no dynamically stable mean field to \
+linearise around at all (see check_accuracy_preconditions)."),
     AccuracyKnob(:spatial_lhy, :per_run, true, false,
         "Whether ε_LHY tracks the local polarisation. Without it one spinor is \
 used for the whole cloud: ~5 % on converged weak-field Eu textures with a SIGN \

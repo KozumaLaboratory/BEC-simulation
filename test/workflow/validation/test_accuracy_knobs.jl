@@ -26,8 +26,12 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
             @test k.scope in (:global, :per_run)
             # A reference equal to the default means the entry claims a choice
             # that does not exist.
+            # `reference == default` is allowed only where the knob is not a
+            # trade: either it has no less-accurate setting worth shipping, or —
+            # `spin_taylor_tol` — the accurate value was measured FREE and is now
+            # the only one shipped, which is what removing a non-trade looks like.
             @test k.reference != k.default || k.name in (:ddi_padding, :secular_ddi,
-                :dtype, :temperature_ratio)
+                :dtype, :temperature_ratio, :spin_taylor_tol)
             @test length(k.note) > 40          # a cost, not a label
             if k.scope === :global
                 @test k.getter !== nothing && k.setter !== nothing
