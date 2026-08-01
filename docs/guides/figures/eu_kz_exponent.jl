@@ -53,6 +53,7 @@ from one that condensed without defects — those are opposite outcomes and a ba
 function kz_trajectory(;
     grid, c0, mu, T_hot, T_cold, tau_Q, t_equil, t_hold, gamma, M, k_cut,
     dt, seed, backend, min_density_frac=0.05, c1=0.0, spinor::Bool=false,
+    physical::Bool=false, cutoff_n_T::Float64=1.0,
 )
     D = SpinSystem(KZ_ATOM.F).n_components
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1, normalize_every=0)
@@ -67,7 +68,22 @@ function kz_trajectory(;
     T_of = PiecewiseLinearWaveform(
         [0.0, t_equil, t_equil + tau_Q, t_equil + tau_Q + t_hold],
         [T_hot, T_hot, T_cold, T_cold])
-    res = SPGPEReservoir(; T=T_of, mu=mu, a_s=0.01, k_cut=k_cut, gamma=gamma, M=M)
+    # `physical` derives gamma and Mbar from (mu, T, eps_cut) via Rooney Eq. 19/26
+    # and lets the cutoff track the reservoir, instead of pinning both by hand.
+    # Pinning them was a fit — the very thing the exponent was supposed to avoid —
+    # and an expensive one: the physical gamma at (mu=15, a_s=0.01, eps_cut-mu=T)
+    # is 8.2e-4 at T=30 falling to 5.4e-5 at T=2, so 1/(2 gamma mu) runs 40 to 622
+    # while every tau_Q in the scan was 2 to 32. Holding eps_cut at its T_hot value
+    # is worse still: gamma collapses to 2.4e-17 by T_cold, the reservoir simply
+    # disconnecting.
+    res = if physical
+        tt = [0.0, t_equil, t_equil + tau_Q, t_equil + tau_Q + t_hold]
+        SPGPEReservoir(; T=T_of, mu=mu, a_s=0.01,
+            k_cut=tracking_cutoff(tt, fill(mu, 4),
+                [T_hot, T_hot, T_cold, T_cold]; n_T=cutoff_n_T))
+    else
+        SPGPEReservoir(; T=T_of, mu=mu, a_s=0.01, k_cut=k_cut, gamma=gamma, M=M)
+    end
 
     n_steps = round(Int, (t_equil + tau_Q + t_hold) / dt)
     t = 0.0
@@ -130,7 +146,7 @@ function kz_scan(;
     gamma::Float64=0.002, M::Float64=0.0, dt::Float64=0.002,
     n_seed::Int=8, backend=CPUBackend(), tag::String="kz_scalar",
     k_cut_mult::Float64=1.0, c1::Float64=0.0, spinor::Bool=false,
-    dump_g1::Bool=false,
+    dump_g1::Bool=false, physical::Bool=false,
 )
     grid = make_grid(GridConfig((grid_n, grid_n, grid_n), (box, box, box)))
     # C region holds the hot cloud. `k_cut_mult` moves the boundary WITHOUT
@@ -191,7 +207,7 @@ function kz_scan(;
         for s in 1:n_seed
             r = kz_trajectory(; grid, c0, mu, T_hot, T_cold, tau_Q=τ,
                 t_equil, t_hold, gamma, M, k_cut, dt,
-                seed=10_000 + Int(round(τ)) * 100 + s, backend, c1, spinor)
+                seed=10_000 + Int(round(τ)) * 100 + s, backend, c1, spinor, physical)
             spinor && s == 1 && @printf("    [m-breakdown τ=%.0f seed1] %s  pops %s\n",
                 τ, string(sort(collect(r.per_m))),
                 string(round.(r.pops; sigdigits=3)))
@@ -415,6 +431,20 @@ function main(mode::String="smoke"; backend=CPUBackend())
                 dump_g1=true,
                 tag="kz_fastq$(replace(string(γ), "." => "p"))_r$(replace(string(τ), "." => "p"))")
         end
+    elseif startswith(mode, "physq")
+        # ONE trajectory with the reservoir rates derived rather than pinned, to
+        # answer the only question that matters before costing a campaign: with
+        # the physical gamma, does this system condense at all on a quench
+        # timescale we can afford?
+        #
+        # tau_Q must straddle 1/(2 gamma mu), which the derived rates put at 40
+        # (T_hot) to 622 (T_cold) — so the whole previous scan, tau_Q = 2 to 32,
+        # sat entirely on the sudden side. t_equil is raised to 200 for the same
+        # reason: 40 was one response time at best.
+        τ = parse(Float64, mode[6:end])
+        kz_scan(; tau_Qs=(τ,), t_equil=200.0, t_hold=50.0, n_seed=1, backend,
+            physical=true, dump_g1=true,
+            tag="kz_phys_r$(replace(string(τ), "." => "p"))")
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
