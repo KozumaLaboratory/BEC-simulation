@@ -422,13 +422,22 @@ measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
 off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
 ~1.3× the step, for 1.49× the per-step cost. Close to a wash.
 
-`rk4ip` is 4th order and, measured on an Eu-like 12³ DDI config, **cheaper per
-step than the default** (2.61 ms against 3.00; `midpoint` is 4.46) because the
-default runs the predictor-corrector twice per step while RK4IP makes four
-accumulating registry passes. Net of the larger step it holds: **2.7× at a 1e-4
-error budget, 4.9× at 1e-5**. Those are CPU at 12³; the GPU ratio is unmeasured
-and RK4IP's five scratch buffers are ~2.2 GB at 128³ F64 D=13, so check both
-before assuming it transfers. Two more things to know. It is not
+`rk4ip` is 4th order, and whether that is worth taking depends on the backend —
+the CPU answer reverses on GPU. It applies `e^{K dt/2}` FOUR times per step where
+Strang applies `e^{K dt}` once; each is an FFT pair, so on CPU (mean-field
+dominated) the extra work hides and on GPU (FFT dominated) it is the whole cost.
+ms/step, `split_step!` / `midpoint` / `rk4ip`:
+
+    CPU 12³            3.00 / 4.46 / 2.61      rk4ip 0.87x
+    RTX 5070 Ti 128³ 175.21 / 257.83 / 258.15  rk4ip 1.47x
+    H100 128³         25.13 /  36.73 /  72.07  rk4ip 2.87x
+
+Net = the step it holds (2.4x at a 1e-4 error budget, 4.2x at 1e-5) over that
+cost. **On the H100 at 128³: 0.84x at 1e-4 — slower than the default — and 1.46x
+at 1e-5.** On CPU: 2.7x and 4.9x. Select it for tight tolerances or CPU work, not
+as a general speedup. Memory is the other constraint: five full-state scratch
+buffers, measured 12.9 GiB allocator high-water for one 128³ step on the H100 and
+4.8 GiB of a 15.9 GiB consumer card. Two more things to know. It is not
 norm-conserving — the drift is a free error monitor, and `normalize_every` is not
 honoured. And its failure mode is a wall rather than a slope: measured on an
 Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns

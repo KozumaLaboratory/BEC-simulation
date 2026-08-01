@@ -14,17 +14,33 @@
 # diagonal-in-k part — is absorbed into an interaction picture and applied
 # exactly, so it does not limit `dt`.
 #
-# Cost, MEASURED rather than counted (Eu-like 12³ with DDI, CPU, ms/step):
-# `split_step!` 3.00, `split_step_midpoint!` 4.46, `rk4ip_step!` **2.61**. RK4IP
-# is cheaper per step than the default, because `split_step!` auto-dispatches to
-# the midpoint predictor-corrector whenever DDI is active (~1.5× a plain V step,
-# twice per step) while RK4IP makes four accumulating registry passes.
+# COST — and the CPU answer does not survive contact with the GPU.
 #
-# Combined with the step sizes each holds under a fixed error budget
-# (`scripts/validation/rk4ip_step_size_probe.jl`), the net is **2.7× at a 1e-4
-# budget and 4.9× at 1e-5**. Both numbers are one config on CPU; the GPU cost
-# ratio is unmeasured, and the five scratch buffers below are ~2.2 GB at 128³
-# F64 D=13, which is the thing to check before assuming this transfers.
+# ms/step, Eu F=6 D=13 with padded DDI, `split_step!` / `midpoint` / `rk4ip`:
+#
+#   CPU 12³            3.00 / 4.46 / 2.61      rk4ip 0.87× the default
+#   RTX 5070 Ti 128³ 175.21 / 257.83 / 258.15  rk4ip 1.47×
+#   H100 128³         25.13 /  36.73 /  72.07  rk4ip **2.87×**
+#   H100  64³          2.77 /   4.04 /   9.16  rk4ip 3.30×
+#   H100  32³          0.62 /   0.92 /   4.63  rk4ip 7.44×
+#
+# The mechanism is the interaction picture itself: **this applies e^{K dt/2} four
+# times per step (lines below) where Strang applies e^{K dt} once.** Each is an
+# FFT pair. On CPU the mean-field and DDI work dominates and that 4× is invisible
+# — RK4IP even comes out cheaper, because `split_step!` auto-dispatches to the
+# midpoint predictor-corrector whenever DDI is active. On a GPU the FFTs dominate
+# and the 4× is the whole story.
+#
+# Net speedup = the step ratio RK4IP holds under a fixed error budget
+# (`scripts/validation/rk4ip_step_size_probe.jl`: 2.4× at 1e-4, 4.2× at 1e-5)
+# divided by the cost ratio above. On the H100 at 128³ that is **0.84× at a 1e-4
+# budget — a net LOSS — and 1.46× at 1e-5**. On CPU it is 2.7× and 4.9×.
+#
+# So: worth selecting when the tolerance is tight (≲1e-5) or on CPU; not worth it
+# at ordinary tolerances on the production GPU, and not a candidate for the
+# default. Memory is the other reason: the five scratch buffers below are 436 MB
+# each at 128³ F64 D=13, and the measured allocator high-water for one step is
+# 12.9 GiB on the H100 and 4.8 GiB of a 15.9 GiB consumer card.
 #
 # What it gives up: neither symplectic nor exactly norm-conserving. Over the
 # 5-40 ms real-time windows this program runs that is not a constraint, and the
