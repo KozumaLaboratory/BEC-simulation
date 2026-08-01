@@ -109,6 +109,27 @@ end
 
 const _JL = Base.julia_cmd()
 
+# file => every per-pass runtime this sweep observed, filled by `run_probe`.
+# `cost_of` prefers the median of these over `_cost`'s estimate.
+const MEASURED = Dict{String, Vector{Float64}}()
+
+"""
+    cost_of(f) -> Float64
+
+Seconds for one run of `f`: the median MEASURED on this machine when the sweep
+has run it, else `_cost`'s hand-entered/`_DEFAULT_COST` estimate. Which one it
+was is reported, because a set cover minimises whatever cost it is handed and a
+tier recommendation is only as good as those seconds.
+"""
+function cost_of(f)
+    v = get(MEASURED, f, Float64[])
+    isempty(v) && return _cost(f)
+    sort!(v)
+    n = length(v)
+    isodd(n) ? v[(n + 1) ÷ 2] : (v[n ÷ 2] + v[n ÷ 2 + 1]) / 2
+end
+is_measured(f) = !isempty(get(MEASURED, f, Float64[]))
+
 # The harness spawns `run_chunk.jl` directly, so it does NOT inherit the
 # deterministic FFT planning that `test/runtests.jl` sets. Without this a mutant
 # would be compared against a baseline planned differently — round-off differences
@@ -156,12 +177,26 @@ function run_probe(files::Vector{String}, nworkers::Int)
         # the same node type through this very code path (`PASS 9.48`). It has no
         # randomness and one deterministic assertion, so it was never red — its
         # marker was missing. 12 workers, `maxrss` 51 GB in a 4-slot allocation.
-        out[f] = if !isfile(marker)
+        txt = isfile(marker) ? read(marker, String) : ""
+        out[f] = if isempty(txt)
             :unknown
-        elseif startswith(read(marker, String), "FAIL")
+        elseif startswith(txt, "FAIL")
             :red
         else
             :green
+        end
+        # `run_chunk.jl` writes "<PASS|FAIL> <secs> <file>", so every pass has
+        # already MEASURED this file on the machine that will schedule it. The
+        # harness was discarding that and falling back to `_cost`, which is
+        # `_DEFAULT_COST = 3.0` for everything outside its 88 hand-entered files
+        # — measured on a 4-vCPU GitHub runner, and low by 3x for at least one
+        # file (test_continuity_equation.jl: 3.0 declared, 9.48 s measured here).
+        # Keep them: a report whose verdicts are measured and whose seconds are a
+        # placeholder invites the placeholder to be quoted.
+        parts = split(txt)
+        if length(parts) >= 2
+            s = tryparse(Float64, parts[2])
+            s === nothing || push!(get!(MEASURED, f, Float64[]), s)
         end
     end
     rm(qdir; recursive=true, force=true)
@@ -305,7 +340,7 @@ any file catches. This is what a `fast` tier should be — not the files that
 happen to run quickly."""
 function min_cover(muts, files, catches)
     remaining = Set(m.id for m in muts if !isempty(get(catches, m.id, String[])))
-    cost = Dict(f => _cost(f) for f in files)
+    cost = Dict(f => cost_of(f) for f in files)
     picked = String[]
     while !isempty(remaining)
         best, best_score = "", -Inf
@@ -381,20 +416,31 @@ function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{
 
     caught_by = Dict(f => count(m -> f in get(catches, m.id, String[]), muts)
                      for f in files)
-    dead = sort([f for f in files if caught_by[f] == 0]; by=_cost, rev=true)
+    dead = sort([f for f in files if caught_by[f] == 0]; by=cost_of, rev=true)
     println(io, "\n## Caught nothing in this catalog ($(length(dead)) files, ",
-        round(Int, sum(_cost, dead; init=0.0)), "s)\n")
+        round(Int, sum(cost_of, dead; init=0.0)), "s)\n")
     println(io, "Evidence, not proof: these defend claims the catalog does not ",
         "exercise. Read them\nagainst the claim they name — a file that names ",
         "no claim and catches no cataloged\ndefect is the deletion candidate.\n")
-    foreach(f -> println(io, "- `$f` ($(round(Int, _cost(f)))s)"), dead)
+    foreach(f -> println(io, "- `$f` ($(round(Int, cost_of(f)))s)"), dead)
 
     cover = min_cover(muts, files, catches)
     println(io, "\n## Minimum-cost cover ($(length(cover)) files, ",
-        round(Int, sum(_cost, cover; init=0.0)), "s)\n")
+        round(Int, sum(cost_of, cover; init=0.0)), "s)\n")
     println(io, "Catches every class any file catches. This is the evidence-based ",
         "`fast` tier.\n")
-    foreach(f -> println(io, "- `$f` ($(round(Int, _cost(f)))s)"), cover)
+    # A set cover minimises the cost it is handed, so say where those seconds came
+    # from. `_cost` is `_DEFAULT_COST = 3.0` for every file outside its 88
+    # hand-entered ones, measured on a 4-vCPU GitHub runner — quoting a total built
+    # from placeholders as "the evidence-based fast tier" would be the instrument
+    # overstating itself.
+    nest = count(f -> !is_measured(f), cover)
+    nest == 0 || println(io, "**$(nest) of $(length(cover)) seconds above are ",
+        "`_cost` ESTIMATES, not measurements** (this sweep did not record a time ",
+        "for them).\n")
+    foreach(
+        f -> println(io, "- `$f` ($(round(Int, cost_of(f)))s",
+            is_measured(f) ? " measured" : " est.", ")"), cover)
 
     if !isempty(already_red)
         println(io, "\n## Excluded: red before any mutation\n")
