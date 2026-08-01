@@ -25,6 +25,8 @@
 #   10  fig4b_theirgrid_n128 THEIR grid exactly: 128^3, box 36.2 a_ho, dx 0.4 aHO
 #   11  fig4b_boxscan_n32    box 16/24/32 at FIXED dx = 0.5 — box vs resolution
 #   12  fig4b_dtconv_n32     dt 1e-3 vs 2.5e-4 — is OUR integrator converged
+#   21  budget_ramp_fine     their exp ramp with knots tau/6 -> tau/24: is the
+#                            0.037 nT overshoot a quadrature artifact?
 #   13  fig4b_natoms_n32     RETRACTED — overrode N in one of three places
 #   14  fig4b_natoms_fixed_n32  N in lockstep everywhere, at +2.5 nT where F.txt
 #                            gives us their own 5 ms state to compare against
@@ -50,7 +52,7 @@
 #$ -N matsui_fig4b
 #$ -l gpu_1=1
 #$ -l h_rt=8:00:00
-#$ -t 1-20
+#$ -t 1-21
 #$ -j n
 
 set -euo pipefail
@@ -92,6 +94,7 @@ else
        18) CONFIG=runs/matsui_fig4b/budget_ramp_n35k_n32.yaml ;;
        19) CONFIG=runs/matsui_fig4b/budget_dt_n35k_n32.yaml ;;
        20) CONFIG=runs/matsui_fig4b/dt_where_n35k_n32.yaml ;;
+       21) CONFIG=runs/matsui_fig4b/budget_ramp_fine_n35k_n32.yaml ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
