@@ -35,6 +35,14 @@ const ALLOW_DIRTY = "--allow-dirty" in ARGS
 
 const MAX_COST = parse(Float64, _arg("--max-cost", "15"))
 
+# Files `--max-cost` removed from the probe. Reported beside every escape claim:
+# an escape is relative to the probe that ran, and this is the part of the suite
+# that did not. Measured 2026-08-02 (#276): all SIX mutants that escaped the
+# default `grounded_cheap` / 15 s probe were caught once the whole `full` tier
+# ran with the cap lifted — four of them by a single file, one of which
+# (workflow/test_lhy_block_wiring.jl, 256 s) this cap is what removes.
+const EXCLUDED_BY_COST = String[]
+
 function probe_files()
     spec = _arg("--probe", "grounded_cheap")
     # A comma-separated spec is a UNION of specs, resolved one at a time. The
@@ -87,6 +95,11 @@ function _probe_spec(spec::AbstractString)
     keep = filter(f -> _cost(f) <= MAX_COST, sel)
     isempty(keep) && error("--max-cost $MAX_COST removed every probe file; raise it.")
     dropped = setdiff(sel, keep)
+    # UNION, not append: `probe_files` calls this once per comma-separated spec,
+    # so a union like `dir:a,dir:b` would otherwise count a shared dropped file
+    # twice — in the one section whose whole job is to state the probe's boundary
+    # honestly.
+    append!(EXCLUDED_BY_COST, setdiff(dropped, EXCLUDED_BY_COST))
     isempty(dropped) || println("  probe: dropped $(length(dropped)) file(s) over \
         --max-cost=$MAX_COST (", round(Int, sum(_cost, dropped)), "s): ",
         join(first(sort(dropped; by=_cost, rev=true), 5), ", "), " …")
@@ -137,6 +150,27 @@ end
 
 const _JL = Base.julia_cmd()
 
+# file => every per-pass runtime this sweep observed, filled by `run_probe`.
+# `cost_of` prefers the median of these over `_cost`'s estimate.
+const MEASURED = Dict{String, Vector{Float64}}()
+
+"""
+    cost_of(f) -> Float64
+
+Seconds for one run of `f`: the median MEASURED on this machine when the sweep
+has run it, else `_cost`'s hand-entered/`_DEFAULT_COST` estimate. Which one it
+was is reported, because a set cover minimises whatever cost it is handed and a
+tier recommendation is only as good as those seconds.
+"""
+function cost_of(f)
+    v = get(MEASURED, f, Float64[])
+    isempty(v) && return _cost(f)
+    sort!(v)
+    n = length(v)
+    isodd(n) ? v[(n + 1) ÷ 2] : (v[n ÷ 2] + v[n ÷ 2 + 1]) / 2
+end
+is_measured(f) = !isempty(get(MEASURED, f, Float64[]))
+
 # The harness spawns `run_chunk.jl` directly, so it does NOT inherit the
 # deterministic FFT planning that `test/runtests.jl` sets. Without this a mutant
 # would be compared against a baseline planned differently — round-off differences
@@ -150,7 +184,10 @@ precompile_package() = run(
 )
 
 """
-    run_probe(files, nworkers) -> Dict{String, Bool}   (true = file went RED)
+    run_probe(files, nworkers) -> Dict{String, Symbol}
+
+`:green` passed, `:red` failed, `:unknown` never reported a verdict (its worker
+died). `:unknown` is deliberately not merged into either — see the comment below.
 """
 function run_probe(files::Vector{String}, nworkers::Int)
     qdir = mktempdir()
@@ -165,12 +202,43 @@ function run_probe(files::Vector{String}, nworkers::Int)
                 stdout=devnull, stderr=devnull),
         )
     end
-    out = Dict{String, Bool}()
+    out = Dict{String, Symbol}()
     for (i, f) in enumerate(files)
         marker = joinpath(qdir, "done_$i")
-        # No marker = the file never completed (worker died). Treat as red: an
-        # unrun file must never read as "this mutant escaped".
-        out[f] = !isfile(marker) || startswith(read(marker, String), "FAIL")
+        # THREE outcomes, not two. Folding a missing marker into FAIL is wrong in
+        # a way that is invisible and that removes coverage rather than adding it:
+        # a file whose worker died is then CREDITED with catching the mutant, so a
+        # real gap is booked as covered and never re-probed. Which is the opposite
+        # of the intent — the original comment reasoned only about the escape
+        # direction ("an unrun file must never read as escaped") and that half is
+        # still honoured below, because :unknown is not an escape either.
+        #
+        # Found 2026-08-01: the smoke run reported `oracles/test_continuity_equation.jl`
+        # RED before any mutation, and it passes in isolation on the same commit and
+        # the same node type through this very code path (`PASS 9.48`). It has no
+        # randomness and one deterministic assertion, so it was never red — its
+        # marker was missing. 12 workers, `maxrss` 51 GB in a 4-slot allocation.
+        txt = isfile(marker) ? read(marker, String) : ""
+        out[f] = if isempty(txt)
+            :unknown
+        elseif startswith(txt, "FAIL")
+            :red
+        else
+            :green
+        end
+        # `run_chunk.jl` writes "<PASS|FAIL> <secs> <file>", so every pass has
+        # already MEASURED this file on the machine that will schedule it. The
+        # harness was discarding that and falling back to `_cost`, which is
+        # `_DEFAULT_COST = 3.0` for everything outside its 88 hand-entered files
+        # — measured on a 4-vCPU GitHub runner, and low by 3x for at least one
+        # file (test_continuity_equation.jl: 3.0 declared, 9.48 s measured here).
+        # Keep them: a report whose verdicts are measured and whose seconds are a
+        # placeholder invites the placeholder to be quoted.
+        parts = split(txt)
+        if length(parts) >= 2
+            s = tryparse(Float64, parts[2])
+            s === nothing || push!(get!(MEASURED, f, Float64[]), s)
+        end
     end
     rm(qdir; recursive=true, force=true)
     return out
@@ -240,34 +308,61 @@ function main()
     println("\n[baseline] precompiling + running probe set unmutated…")
     precompile_package()
     baseline = run_probe(files, NWORKERS)
-    already_red = sort([f for (f, red) in baseline if red])
+    already_red = sort([f for (f, s) in baseline if s === :red])
+    base_unknown = sort([f for (f, s) in baseline if s === :unknown])
     if !isempty(already_red)
         println("  $(length(already_red)) file(s) already RED before any mutation \
                  — excluded from the catch matrix:")
         foreach(f -> println("    ", f), already_red)
     end
-    live = filter(f -> !baseline[f], files)
+    if !isempty(base_unknown)
+        println("  $(length(base_unknown)) file(s) never reported a verdict in the \
+                 baseline (worker died — NOT a red test). Lower --workers; each one \
+                 holds SpinorBEC + CUDA. Excluded:")
+        foreach(f -> println("    ", f), base_unknown)
+    end
+    live = filter(f -> baseline[f] === :green, files)
 
-    # catch[mutant id] = set of files that went red under it
+    # catch[mutant id] = files that went red under it. `unknowns` is kept SEPARATE:
+    # a file that never reported cannot be credited with a catch (that books a real
+    # gap as covered), and cannot be called green either.
     catches = Dict{Symbol, Vector{String}}()
+    unknowns = Dict{Symbol, Vector{String}}()
     for (k, m) in enumerate(muts)
         print("\n[$k/$(length(muts))] $(m.id) ($(m.class), $(m.severity)) … ")
         apply!(m)
         try
             precompile_package()
             res = run_probe(live, NWORKERS)
-            catches[m.id] = sort([f for (f, red) in res if red])
+            catches[m.id] = sort([f for (f, s) in res if s === :red])
+            unknowns[m.id] = sort([f for (f, s) in res if s === :unknown])
         finally
             restore!(m)
         end
         n = length(catches[m.id])
-        println(n == 0 ? "ESCAPED — no test caught it" : "caught by $n file(s)")
+        u = length(unknowns[m.id])
+        # An escape claim is only as good as the completeness of the probe that
+        # produced it, so it is stated with the unknown count attached rather than
+        # asserted flatly.
+        println(
+            if n == 0
+                (
+                    if u == 0
+                        "ESCAPED THIS PROBE — no probe file caught it"
+                    else
+                        "UNRESOLVED — nothing caught it, but $u file(s) never reported"
+                    end
+                )
+            else
+                (u == 0 ? "caught by $n file(s)" : "caught by $n file(s) ($u unreported)")
+            end,
+        )
     end
 
     git_src_dirty() && @error "src/ is dirty after the run — inspect `git diff -- src`"
 
     write_matrix(muts, live, catches)
-    report(muts, live, catches, already_red)
+    report(muts, live, catches, already_red, unknowns, base_unknown)
 end
 
 function write_matrix(muts, files, catches)
@@ -286,7 +381,7 @@ any file catches. This is what a `fast` tier should be — not the files that
 happen to run quickly."""
 function min_cover(muts, files, catches)
     remaining = Set(m.id for m in muts if !isempty(get(catches, m.id, String[])))
-    cost = Dict(f => _cost(f) for f in files)
+    cost = Dict(f => cost_of(f) for f in files)
     picked = String[]
     while !isempty(remaining)
         best, best_score = "", -Inf
@@ -304,17 +399,64 @@ function min_cover(muts, files, catches)
     picked
 end
 
-function report(muts, files, catches, already_red)
+function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{String}}(),
+    base_unknown=String[])
     io = IOBuffer()
     println(io, "# Mutation report — ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
     println(io, "\n$(length(muts)) cataloged defect classes × $(length(files)) probe files.\n")
 
-    escaped = [m for m in muts if isempty(get(catches, m.id, String[]))]
-    println(io, "## Escaped — a real gap ($(length(escaped)))\n")
+    _unk(m) = get(unknowns, m.id, String[])
+    nothing_caught = [m for m in muts if isempty(get(catches, m.id, String[]))]
+    # An escape is a claim about the WHOLE probe set having run. Where files went
+    # unreported, the honest verdict is unresolved — reported separately so it can
+    # be re-probed, not averaged into either bucket.
+    escaped = [m for m in nothing_caught if isempty(_unk(m))]
+    unresolved = [m for m in nothing_caught if !isempty(_unk(m))]
+
+    println(io, "## Caught by nothing in the probe ($(length(escaped)))\n")
+    # NOT "a real gap", which is what this said until 2026-08-02 and which the
+    # numbers do not support: escaping a 264-file grounded/<=15 s probe is not
+    # escaping the suite. All six escapes from that probe were caught by the full
+    # tier. State the probe's boundary next to the claim so the claim cannot be
+    # quoted without it.
+    if !isempty(EXCLUDED_BY_COST)
+        println(io, "Relative to THIS probe. `--max-cost=$MAX_COST` held back ",
+            "$(length(EXCLUDED_BY_COST)) file(s) totalling ",
+            round(Int, sum(_cost, EXCLUDED_BY_COST)), "s, and `grounded_cheap` ",
+            "excludes pins and API-spelling tests entirely. Re-probe an escape ",
+            "with `--probe dir: --max-cost 400` before calling it a gap.\n")
+    end
     isempty(escaped) && println(io, "(none)\n")
     for m in sort(escaped; by=m -> (m.severity != :fatal, m.severity != :gross))
         println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] `$(m.file)`  \n",
             "  $(strip(m.note))  \n  incident: $(m.incident)")
+    end
+
+    if !isempty(unresolved)
+        println(io, "\n## UNRESOLVED — nothing caught it, but the probe was incomplete ",
+            "($(length(unresolved)))\n")
+        println(io, "Not an escape and not a catch. Re-probe these with fewer ",
+            "workers.\n")
+        for m in sort(unresolved; by=m -> (m.severity != :fatal, m.severity != :gross))
+            println(io, "- **$(m.id)** [$(m.severity)/$(m.class)] — ",
+                "$(length(_unk(m))) file(s) never reported: ",
+                join(first(_unk(m), 4), ", "))
+        end
+    end
+
+    # A file credited with a catch it did not report would book a real gap as
+    # covered, so say where verdicts went missing at all, not only where it
+    # changed the verdict.
+    noisy = [m for m in muts if !isempty(_unk(m)) && !isempty(get(catches, m.id, String[]))]
+    if !isempty(noisy) || !isempty(base_unknown)
+        println(io, "\n## Probe completeness\n")
+        isempty(base_unknown) ||
+            println(io, "- baseline: $(length(base_unknown)) file(s) never reported ",
+                "(worker died, NOT red): ", join(first(base_unknown, 5), ", "))
+        for m in noisy
+            println(io, "- `$(m.id)`: caught, but $(length(_unk(m))) file(s) never ",
+                "reported — the catch stands, the coverage count is a lower bound")
+        end
     end
 
     println(io, "\n## Catches per mutant\n")
@@ -327,20 +469,31 @@ function report(muts, files, catches, already_red)
 
     caught_by = Dict(f => count(m -> f in get(catches, m.id, String[]), muts)
                      for f in files)
-    dead = sort([f for f in files if caught_by[f] == 0]; by=_cost, rev=true)
+    dead = sort([f for f in files if caught_by[f] == 0]; by=cost_of, rev=true)
     println(io, "\n## Caught nothing in this catalog ($(length(dead)) files, ",
-        round(Int, sum(_cost, dead; init=0.0)), "s)\n")
+        round(Int, sum(cost_of, dead; init=0.0)), "s)\n")
     println(io, "Evidence, not proof: these defend claims the catalog does not ",
         "exercise. Read them\nagainst the claim they name — a file that names ",
         "no claim and catches no cataloged\ndefect is the deletion candidate.\n")
-    foreach(f -> println(io, "- `$f` ($(round(Int, _cost(f)))s)"), dead)
+    foreach(f -> println(io, "- `$f` ($(round(Int, cost_of(f)))s)"), dead)
 
     cover = min_cover(muts, files, catches)
     println(io, "\n## Minimum-cost cover ($(length(cover)) files, ",
-        round(Int, sum(_cost, cover; init=0.0)), "s)\n")
+        round(Int, sum(cost_of, cover; init=0.0)), "s)\n")
     println(io, "Catches every class any file catches. This is the evidence-based ",
         "`fast` tier.\n")
-    foreach(f -> println(io, "- `$f` ($(round(Int, _cost(f)))s)"), cover)
+    # A set cover minimises the cost it is handed, so say where those seconds came
+    # from. `_cost` is `_DEFAULT_COST = 3.0` for every file outside its 88
+    # hand-entered ones, measured on a 4-vCPU GitHub runner — quoting a total built
+    # from placeholders as "the evidence-based fast tier" would be the instrument
+    # overstating itself.
+    nest = count(f -> !is_measured(f), cover)
+    nest == 0 || println(io, "**$(nest) of $(length(cover)) seconds above are ",
+        "`_cost` ESTIMATES, not measurements** (this sweep did not record a time ",
+        "for them).\n")
+    foreach(
+        f -> println(io, "- `$f` ($(round(Int, cost_of(f)))s",
+            is_measured(f) ? " measured" : " est.", ")"), cover)
 
     if !isempty(already_red)
         println(io, "\n## Excluded: red before any mutation\n")
