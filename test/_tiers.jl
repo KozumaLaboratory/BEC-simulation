@@ -272,6 +272,7 @@ const CI_EXTRA = [
     "solvers/test_lbfgs_line_search_and_de.jl",
     "solvers/test_lbfgs_fast_path_equivalence.jl",
     "solvers/test_lbfgs_history_precision.jl",
+    "solvers/test_lbfgs_line_search_fused_gradient.jl",
     "analysis/test_energy.jl",
     # Evaporation OPTIMIZATION/SCAN tools run the scalar model in loops
     # (optimizer, parameter scans, K3 fit) — aggregate-heavy, kept out of the
@@ -787,6 +788,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "solvers/test_lbfgs_history_precision.jl" => 8.0,
+    "solvers/test_lbfgs_line_search_fused_gradient.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
     "solvers/test_3d.jl" => 5.0,
