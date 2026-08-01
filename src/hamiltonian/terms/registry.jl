@@ -247,8 +247,10 @@ function operator_and_energy_via_registry!(grad, ws, dV::Float64)
         apply_operator!(grad, term, ws, psi, ctx)
         r = energy_operator_ratio(term)
         if isnan(r)
-            # Not derivable from the operator (LossTerm): ask the term.
-            E += energy_contribution(term, psi, ws, ctx)
+            # Not derivable from the operator (LossTerm): ask the term. The
+            # 3-arg form, not the ctx one — `ctx` here is a GradientContext and
+            # the ctx-aware `energy_contribution` takes an EnergyContext.
+            E += energy_contribution(term, psi, ws)
             # ...and re-anchor, since this term may still have written to grad.
             cum_prev = _realdot(psi, grad)
         else

@@ -70,7 +70,11 @@ end
             # counted separately so the summary below cannot be all zeros.
             if abs(E_own) > 1.0e-12
                 n_checked += 1
-                @test isapprox(E_derived, E_own; rtol=1.0e-10)
+                ok = isapprox(E_derived, E_own; rtol=1.0e-10)
+                ok || @info("ratio does not reproduce this term's energy",
+                    term=nameof(typeof(term)), ratio=r, derived=E_derived,
+                    own=E_own, implied_ratio=E_own / (E_derived / r))
+                @test ok
             else
                 @test abs(E_derived) < 1.0e-12
             end
