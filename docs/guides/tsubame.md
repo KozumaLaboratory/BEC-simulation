@@ -47,11 +47,23 @@ Throughput on H100 at 128³ × D=13:
 
 128³ × 107.6 ω⁻¹ at dt=1e-4 ≈ 2.5 h walltime. 256³ ≈ 15 h.
 
+## Pre-flight
+
+```bash
+source scripts/tsubame/preflight.sh          # or --gpu for a CUDA job
+```
+
+Four environment requirements have each cost a whole job batch, and all four were
+already documented — two of them in this file. Reading them did not prevent it, so
+they are now asserted at second zero with the fix in the message: BLAS threads
+pinned, project root off `$HOME`, group-volume headroom, `runs/` present, and (for
+`--gpu`) the `import CUDA` ordering. The script says why for each.
+
 ## Filesystem layout
 
 | path                   | type                | use                        |
 |------------------------|---------------------|----------------------------|
-| `$HOME`                | Lustre, 30 GB quota | tiny (no project dirs)     |
+| `$HOME`                | Lustre, **25 GB** quota | tiny (no project dirs) — measured 2026-08-01 with `t4-user-info disk home`; the 30 GB here was wrong and a batch died on it |
 | `$T4_GROUP`            | Lustre, TB-scale    | code + finalised results   |
 | `$T4_LOCAL`/`$T4_TMPDIR` | node-local NVMe   | depots, scratch snapshots  |
 | `/scratch`             | per-node, ephemeral | cleared at job end         |
