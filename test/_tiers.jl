@@ -60,6 +60,12 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
+    # Model / Stage layer + the provenance cutover's step 1.
+    "model/test_model_shape.jl",
+    "model/test_model_toml_roundtrip.jl",
+    "model/test_artifact_id.jl",
+    "model/test_admission_unchanged.jl",
+    "model/test_record_provenance.jl",
     "manuscript/test_lemma1_general_S.jl",
     "manuscript/test_f5_f7_polyhedral.jl",
     "manuscript/test_f9_f11_polyhedral.jl",
@@ -601,6 +607,13 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_ddi.jl" => 33.6,
     "dynamics/test_tdhfb_f1_validation.jl" => 30.3,
     "oracles/test_bdg_fd_hessian.jl" => 23.8,
+    # A real (tiny) ITP solve: the cache MISS arm has to actually solve, or the
+    # positive control that arms the whole gate is not there.
+    "model/test_admission_unchanged.jl" => 27.0,
+    # Two real `run_yaml` round trips (1-D, 16 points, 20 ITP steps) — the
+    # two `run_registry.jl` writer sites cannot be reached any other way.
+    "model/test_record_provenance.jl" => 46.0,
+    "model/test_model_toml_roundtrip.jl" => 9.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,

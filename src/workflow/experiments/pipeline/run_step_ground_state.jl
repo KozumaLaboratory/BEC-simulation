@@ -568,6 +568,14 @@ function _run_step(
                 f["psi"] = psi_host
                 f["energy"] = gs_energy
                 f["converged"] = gs.converged
+                # Provenance cutover step 1: the id that DECIDES admission is
+                # written into the artifact beside the code revision the new
+                # `artifact_id` digests. Recorded only — the `isfile(cache_path)`
+                # test that admits this file is untouched, which is what makes
+                # the step revertable.
+                stage_ref === nothing || (f["gs_cache_key"] = stage_ref)
+                code_rev = _code_rev_or_nothing()
+                code_rev === nothing || (f["code_rev"] = code_rev)
             end
             mv(tmp, cache_path; force=true)
             verbose && println("  Cached GS to $cache_path")

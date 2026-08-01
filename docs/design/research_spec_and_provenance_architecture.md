@@ -8,7 +8,7 @@ candidate findings, 15 survivors, recorded with file:line evidence as issue
 lines, and was then reconciled against its own 13 numbered invariants: **64
 findings, zero invariants clean, 15 still open at the end**. Two of its
 invariants were false about this codebase on the day they were written, and one
-fix shipped as dead code (`plan.backend_kind === :cuda`, when `_resolve_backend`
+fix was written as dead code (`plan.backend_kind === :cuda`, when `_resolve_backend`
 at `src/foundation/backend.jl:99-105` accepts `:cpu`/`:gpu` and *throws* on
 `:cuda`) because it had no positive control. Revision 3 is a **deletion pass**:
 no new mechanism, scope cut where a capability cost more concepts than it was
@@ -432,7 +432,9 @@ its *need* is verified, which is why it is here and not in §4.
 `:pass`/`:fail`/`:indeterminate` (`src/workflow/validation/specs.jl:33-48`); the
 same shape ships as a canary in `test/validation/test_matsui_fig4_dip.jl:122`.
 This is the one discipline that would have caught
-`engaged(::Val{:gpu}, p) = p.backend_kind === :cuda` before it shipped.
+`engaged(::Val{:gpu}, p) = p.backend_kind === :cuda`. It was caught in review
+before it was committed, by reading `backend.jl` rather than by a test — which is
+luck, not process, and is why the control is required rather than encouraged.
 
 ---
 

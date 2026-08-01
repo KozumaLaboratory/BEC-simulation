@@ -255,7 +255,12 @@ function _extract_metadata(data::Dict)
         if startswith(k, "env/") || startswith(k, "units/")
             meta[k] = v
         elseif k in ("converged", "energy", "duration_seconds",
-            "started_at", "finished_at", "run_name", "scan_index")
+            "started_at", "finished_at", "run_name", "scan_index",
+            # Provenance cutover step 1. Whitelisted, or the ids the writers
+            # now record would be silently dropped here and never reach
+            # `summary.json` — "every new run records a complete id" has to
+            # survive the reader, not just the writer.
+            "code_rev", "gs_cache_key")
             meta[k] = v
         elseif k == "conventions"
             meta["conventions"] = v
