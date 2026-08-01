@@ -100,6 +100,18 @@ const _MARKERS = [
         r"analytic"i, r"\bexact\b"i, r"closed[-_ ]form"i, r"theoretical"i,
         r"gauss[-_ ]hermite"i, r"manufactured"i, r"\bclosed form\b"i,
         r"known\s+(solution|answer|value)"i, r"first[-_ ]principles"i,
+        # The ASSERTION, not the prose. Every marker above needs the author to
+        # have said a word; this one needs only that they wrote the identity —
+        # `@test f(5.0) ≈ a_bg * (1 - Δ/(5.0 - B0))` computes the closed form
+        # right there and says nothing "analytic" anywhere. Five files in the
+        # ungrounded bucket were exactly that shape (audit, 2026-08-01),
+        # i.e. 5 of 47 deletion candidates were grounded — the direction this
+        # file's header claims cannot happen.
+        #
+        # Multiplicative structure only (`*`, `/`, `^`) on a NAMED quantity: a
+        # bare `≈ 0.5` is a pin, and `≈ x - 1` is too weak a signature to
+        # separate a formula from an offset.
+        r"@test[^\n]*(≈|isapprox\()[^\n]*[a-zA-Z_]\w*\s*[*/^]\s*[a-zA-Z_(]",
     ],
 ]
 
