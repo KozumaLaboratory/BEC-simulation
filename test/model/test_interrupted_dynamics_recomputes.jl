@@ -192,11 +192,17 @@ const DYN_DURATION = 100.0
         # existence is proof that the GS finished and the RTP loop is running —
         # i.e. the interrupt below lands in the dynamics, not in the GS.
         @test isfile(live)
-        @test !istaskdone(task)
+        # A lost race must be a clean FAILURE that names itself, never an
+        # ErrorException("schedule: Task not runnable") that aborts the whole FILE
+        # and takes its sibling gates with it.
+        won_race = !istaskdone(task)
+        won_race || @warn "interrupt harness LOST THE RACE: the run finished before " *
+            "the interrupt landed; this gate measured nothing"
+        @test won_race
         live_step = JSON.parse(read(live, String))["step"]
         @test live_step >= 1
 
-        schedule(task, InterruptException(); error=true)
+        won_race && schedule(task, InterruptException(); error=true)
         task_returned_normally = try
             wait(task)
             true

@@ -1,8 +1,10 @@
 # `artifact_id(::Stage)` and `code_tree_hash()` — cutover step 1.
 #
 # Invariant 1: identity is the WHOLE declaration, never a selection from it. The
-# gate is therefore one assertion per field, so a field that stops entering the
-# digest names itself instead of hiding behind a sibling that still moves.
+# gate is therefore one assertion per field — `Stage`'s six, plus `model`'s
+# fourteen slots enumerated from `fieldnames(Model)` — so a field that stops
+# entering the digest names itself instead of hiding behind a sibling that still
+# moves.
 #
 # Invariant 3: code identity is one tree hash of `src/` and `ext/`. It is a
 # CONTENT hash, not a git revision — the autopilot rsyncs code to TSUBAME with
@@ -15,7 +17,10 @@ using Test
 using SHA
 using SpinorBEC
 using SpinorBEC: Model, Stage, stage, artifact_id, code_tree_hash, content_id,
-    GridSpec, InteractionSpec, DDISpec, PotentialSpec, HarmonicSpec, resolve_atom,
+    GridSpec, InteractionSpec, DDISpec, LHYSpec, PotentialSpec, HarmonicSpec,
+    ZeemanSpec, RamanSpec, LightShiftSpec, GradientSpec, FrameSpec, GeometrySpec,
+    ReservoirSpec, LossParams, AbsorbingBoundary, AtomSpecies,
+    PiecewiseLinearWaveform, resolve_atom, with, _speceq,
     model_toml_dict, _enc, _package_root, _code_tree_paths, _CODE_TREE_HASH_MEMO,
     STAGE_KINDS
 
@@ -28,6 +33,53 @@ probe_model() = Model(;
 probe_stage(; model=probe_model(), kind=:relax, method=:itp, backend=:cpu,
     from=nothing, params=(dt=1.0e-3, n_steps=2000, tol=1.0e-8)) =
     Stage(kind, model, method, from, params, backend)
+
+# `AtomSpecies` is a reused foundation type, not a `ModelValue`, so `with` does
+# not reach it, and it has no all-positional form — `a_s` and `q_geometry` are
+# DERIVED inside the constructor. Rebuilding by hand is the only way to move one
+# of its fields.
+heavier(a::AtomSpecies) = AtomSpecies(a.name, a.mass * 1.01, a.F, a.a0, a.a2,
+    a.mu_mag, a.g_F, copy(a.scattering_lengths);
+    a.Delta_E_hf, a.g_J, a.nuclear_I, a.electronic_J)
+
+# One perturbation per `Model` slot, keyed by slot name, with the key set pinned
+# to `fieldnames(Model)` by the testset below.
+#
+# What this replaces: a single nudge of `interactions.c1`, which put all fourteen
+# slots on one assertion. Adding `f === :light_shift && continue` to
+# `model_toml_dict` — i.e. removing that slot from the digest ENTIRELY — left
+# this file 57/57 green. `light_shift` is one of exactly two slots the cutover
+# exists to stop losing: `_gs_cache_key` omitted `light_shift` and
+# `rotating_frame_omega` while passing both to the solver.
+#
+# Each entry maps a slot's OLD value to a new one and can see nothing else, so a
+# perturbation cannot reach a sibling and let a dropped slot ride on it.
+#
+# The set-equality assertion is the load-bearing half. Without it, a slot added
+# in 2029 would simply go unperturbed and this enumeration would rot exactly like
+# the hand-listed key set it replaces; with it, adding a slot without deciding
+# how to perturb it is RED.
+#
+# `grid`, `atom` and `interactions` have no inactive value and `potential` is
+# populated in `probe_model`, so those four are perturbed in place. The other ten
+# are switched ON: inactive → active is the difference an omitted slot hides,
+# since an inactive slot is legitimately absent from the serialised form.
+const MODEL_SLOT_PERTURBATION = Dict{Symbol, Function}(
+    :grid => g -> with(g; dealias_two_thirds=true),
+    :atom => heavier,
+    :interactions => i -> with(i; c1=-0.31),
+    :potential => _ -> PotentialSpec(; harmonic=[HarmonicSpec(; omega=(1.0, 1.0, 2.0))]),
+    :zeeman => _ -> ZeemanSpec(; p=0.1),
+    :ddi => _ -> DDISpec(; c_dd=0.4),
+    :lhy => _ -> LHYSpec(; kind=:scalar, c_lhy=0.05),
+    :raman => _ -> RamanSpec(; omega_r=0.5),
+    :light_shift => _ -> LightShiftSpec(; eta_vector=0.2),
+    :magnetic_gradient => _ -> GradientSpec(; gradient=0.1, axis=3, g_F=1.163),
+    :frame => _ -> FrameSpec(; rotating_omega=0.3),
+    :geometry => _ -> GeometrySpec(; absorbing=AbsorbingBoundary(0.5, 1.0, 4)),
+    :reservoir => _ -> ReservoirSpec(; sgpe_gamma=0.01),
+    :loss => _ -> LossParams(; L3=1.0e-4),
+)
 
 # The Eu F=6 channel set, and the same keys in a table grown to a different
 # capacity: equal contents, different iteration order.
@@ -62,9 +114,43 @@ end
     # One assertion per field. A field silently dropped from the digest fails
     # here alone; it cannot be masked by a sibling that still moves the id.
     @testset "sensitivity — one field at a time" begin
+        # `model` is FOURTEEN fields, so it gets fourteen assertions. The
+        # enumeration is `fieldnames(Model)` — the compiler's answer, which
+        # cannot drift from the struct — and never a list written here.
         @testset "model" begin
-            m2 = SpinorBEC.with(m; interactions=SpinorBEC.with(m.interactions; c1=-0.31))
-            @test artifact_id(probe_stage(; model=m2)) != artifact_id(s)
+            @testset "every slot has a perturbation, and every perturbation a slot" begin
+                # The part that stops the enumeration rotting: adding a slot
+                # without deciding how to perturb it reddens HERE, rather than
+                # silently leaving the new slot untested.
+                absent = setdiff(fieldnames(Model), keys(MODEL_SLOT_PERTURBATION))
+                extra = setdiff(keys(MODEL_SLOT_PERTURBATION), fieldnames(Model))
+                isempty(absent) || println("  Model slots with no perturbation: ", absent)
+                isempty(extra) || println("  perturbations naming no Model slot: ", extra)
+                @test Set(keys(MODEL_SLOT_PERTURBATION)) == Set(fieldnames(Model))
+            end
+            for f in fieldnames(Model)
+                @testset "$f" begin
+                    v = MODEL_SLOT_PERTURBATION[f](getfield(m, f))
+                    m2 = with(m; NamedTuple{(f,)}((v,))...)
+                    # The fixture must BE one. A value the constructor normalises
+                    # straight back (invariant 3 does exactly that to an inactive
+                    # spec's secondary fields) would make the id assertion vacuous
+                    # and green.
+                    @test !_speceq(getfield(m2, f), getfield(m, f))
+                    # ... and it must move ONLY this slot. `Model`'s constructor
+                    # rewrites two of them (`_trim_pad_factor`, the `LossParams`
+                    # rebuild), and a perturbation that reached a sibling would let
+                    # a slot dropped from the digest ride on that sibling — which
+                    # is precisely the failure the single-assertion `model` arm had.
+                    also = [
+                        g for g in fieldnames(Model)
+                        if g !== f && !_speceq(getfield(m2, g), getfield(m, g))
+                    ]
+                    isempty(also) || println("  perturbing $f also moved: ", also)
+                    @test isempty(also)
+                    @test artifact_id(probe_stage(; model=m2)) != artifact_id(s)
+                end
+            end
         end
         @testset "kind" begin
             @test artifact_id(probe_stage(; kind=:evolve)) != artifact_id(s)
@@ -127,9 +213,8 @@ end
         @test fieldcount(Stage) == 6
         # A constant trace and a bare number are the same static knob;
         # `canonical_waveform` collapses the trace so they cannot take two ids.
-        flat = SpinorBEC.PiecewiseLinearWaveform([0.0, 1.0], [10.0, 10.0])
-        m_flat = SpinorBEC.with(m;
-            interactions=SpinorBEC.with(m.interactions; c0=flat))
+        flat = PiecewiseLinearWaveform([0.0, 1.0], [10.0, 10.0])
+        m_flat = with(m; interactions=with(m.interactions; c0=flat))
         @test artifact_id(probe_stage(; model=m_flat)) == artifact_id(s)
         # Dict iteration order in `AtomSpecies.scattering_lengths` — the one
         # hash-ordered field reachable from a Model. Reordering the CONSTRUCTOR
@@ -142,8 +227,8 @@ end
         d2 = grown_dict(EU_CHANNELS)
         @test collect(keys(d1)) != collect(keys(d2))   # the fixture must BE one
         @test d1 == d2
-        a1 = SpinorBEC.AtomSpecies("probe", 1.0e-25, 6, 1.0e-9, 1.1e-9, 0.0, 0.5, d1)
-        a2 = SpinorBEC.AtomSpecies("probe", 1.0e-25, 6, 1.0e-9, 1.1e-9, 0.0, 0.5, d2)
+        a1 = AtomSpecies("probe", 1.0e-25, 6, 1.0e-9, 1.1e-9, 0.0, 0.5, d1)
+        a2 = AtomSpecies("probe", 1.0e-25, 6, 1.0e-9, 1.1e-9, 0.0, 0.5, d2)
         mk(a) = probe_stage(;
             model=Model(;
                 grid=GridSpec(; ndim=1, n_points=(8,), box=(4.0,)), atom=a,

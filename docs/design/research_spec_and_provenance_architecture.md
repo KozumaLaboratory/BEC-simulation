@@ -513,7 +513,54 @@ watching the suite stay green (canary pass, 2026-08-01):
    alias is now published only into a name no point writer has claimed, and a
    rejection on a symlink says so instead of reporting truncation.
 
-**Step 3 — flip admission to `artifact_id`.** One-line change once steps 1 and 2
+**Step 1b — `yaml_to_model` (ADDED 2026-08-01, after step 3 was attempted and
+refused).** The plan as first written went from step 1 to step 3 assuming a
+resolver from raw YAML to a `Model`, and there is none: `src/model.jl:8` itself
+says the rewiring "is Step 1b" while section 6 listed no such step. That is a
+hole in this plan, not in the code. Step 3 cannot flip admission to
+`artifact_id` because nothing at the flip site can build the `Model` the id is
+derived from.
+
+Measured before writing this, on the 407 committed configs that carry a
+`ground_state` step, attempting only 4 of the 14 slots (grid, atom,
+interactions, ddi) with the same preprocessing `run_yaml` applies:
+
+```
+Model built:  42 / 407
+        364   ArgumentError: trunc_radius must be >= 0 (0 = untruncated); got -1.0
+          1   KeyError: "omega"   (one lab-calibration config)
+```
+
+**89.4 % fail on a single defect, and it is a representation defect rather than
+a parsing one.** `_parse_ddi_trunc_radius`
+(`src/workflow/experiments/schema/parsing_blocks.jl:468-482`) is THREE-valued:
+
+```
+absent / "auto" / "box_half"  ->  -1.0    auto — derive from the box (283 configs)
+"none" / "off"                ->   NaN    no truncation, bare periodic kernel
+a number                      ->  itself  explicit radius
+```
+
+`DDISpec.trunc_radius::Float64` accepts only `>= 0` with `0.0` meaning
+untruncated, so it **has no representation for auto at all**, and the obvious
+`NaN -> 0.0` mapping would collide *auto* with *none*. Those are different
+physics: the bare kernel carries a 2-5 % dipolar field error that is flat in
+resolution and does not go away by refining. A wrong translation here is a
+physics collision, not a hashing detail.
+
+**Decision: `trunc_radius::Union{Nothing, Float64}`**, `nothing` meaning auto.
+A small closed union is the same shape the design already accepts for
+`ModelWaveform`, it makes the third state unrepresentable-as-a-number rather
+than encoded in a sentinel, and sentinels are precisely what this design exists
+to delete. Rejected: keeping `-1.0` (a sentinel by another name), and a
+mode-enum plus value (two fields that can disagree).
+
+Scope: resolve `ground_state` blocks only — that is what admission keys on.
+`Initial`, `InitialSpec` and the dynamics half stay out. The gate is that
+`yaml_to_model` round-trips all 407 committed `ground_state` steps, with any
+config it cannot resolve listed by name and reason rather than skipped.
+
+**Step 3 — flip admission to `artifact_id`.** One-line change once steps 1, 1b and 2
 are green. `git rm src/workflow/experiments/pipeline/run_step_ground_state.jl`'s
 `_gs_cache_key` (`:249-271`) and its `_hashable` helpers (`:235-241`) in the same
 commit.

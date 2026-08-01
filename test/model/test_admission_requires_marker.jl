@@ -260,8 +260,14 @@ end
                         sleep(0.02)
                     end
                     @test isfile(itp_ckpt)
-                    @test !istaskdone(task)
-                    schedule(task, InterruptException(); error=true)
+                    # A lost race must be a clean FAILURE that names itself, never an
+                    # ErrorException("schedule: Task not runnable") that aborts the whole FILE
+                    # and takes its sibling gates with it.
+                    won_race = !istaskdone(task)
+                    won_race || @warn "interrupt harness LOST THE RACE: the run finished before " *
+                        "the interrupt landed; this gate measured nothing"
+                    @test won_race
+                    won_race && schedule(task, InterruptException(); error=true)
                     try
                         wait(task)
                         fetch(task)
