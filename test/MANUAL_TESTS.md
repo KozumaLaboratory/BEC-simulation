@@ -1,49 +1,16 @@
 # Manual test inventory
 
-Two files under `test/` are not wired into any tier. Each reason was
-**measured**, not inherited (2026-07-31): every candidate was run, with and
-without `SPINORBEC_RUN_HEAVY_YAML=true`, and the three that passed were moved
-into tiers. What is left is what genuinely cannot run.
+**One** file under `test/` is not wired into any tier. Its reason was measured,
+not inherited: every candidate was run, and the four that could be made to run
+were moved into tiers (2026-07-31 / 2026-08-01).
 
 The old framing — "depend on environment conditions the default test runner
 cannot guarantee (GPU, dashboard build, opt-in heavy YAML, scenario directories
-pending schema migration)" — had stopped being true for three of the five, and
-nothing had checked since 2026-05-25. Between them those three carried 35
-assertions that no tier ran.
+pending schema migration)" — was true for none of those four. Between them they
+carried 39 assertions that no tier ran, since 2026-05-25.
 
 `MANUAL_TESTS_ALLOWLIST` in `test/_tiers.jl` is the machine-readable copy;
 `test_tier_membership.jl` asserts the two agree.
-
-## `workflow/test_klaus_validation.jl` — cannot run as written
-
-Not an environment problem. Its `ground_state` step uses the real experimental
-field (`B: {Bz: "1.0 Gauss"}`, Dy164, `omega_ref: 314.159`) at `dt: 0.001`.
-That is `p ≈ −3.5e4`, so across `m = ±8` the ITP exponent spans
-`|p·m·dt| ≈ 278` and `exp` overflows on the first step:
-
-```
-ArgumentError: NaN detected in ITP at step 1. Likely DDI or interaction
-overflow. Reduce dt.
-```
-
-`hamiltonian/test_b_block_builders.jl` documents the same footgun and
-deliberately uses `Bz: 1.0e-4` to avoid it:
-
-> Tiny Bz to avoid ITP exp-V underflow at large dimensionless p. Real
-> experimental values (e.g. Klaus 2022 Bz=0.819G) give p≈3e4 which requires
-> matching small dt and physics-aware setup — not a plumbing test.
-
-So this is a physics-setup decision (a smaller ground-state field with a ramp,
-or a `dt` matched to `p`), not the "pending schema audit" it was filed under.
-Until that decision is made the file cannot be run at all:
-
-```bash
-SPINORBEC_RUN_HEAVY_YAML=true julia --project=. \
-  -e 'using Test; using SpinorBEC; include("test/workflow/test_klaus_validation.jl")'
-```
-
-It is also the only artifact behind the Klaus 2022 entry in the type-C registry
-(`test/validation/test_type_c_claims.jl`), which is why that entry is ungated.
 
 ## `workflow/test_live_monitor.jl` — blocks forever
 
@@ -61,16 +28,16 @@ julia --project=. \
   -e 'using Test; using SpinorBEC; include("test/workflow/test_live_monitor.jl")'
 ```
 
-## Moved into tiers, 2026-07-31
+## Moved into tiers
 
 | file | was filed as | measured | now |
 |---|---|---|---|
 | `gpu/test_cuda.jl` | "gated, but needs GPU to be useful" | guards on `CUDA.functional()` like every other `gpu/` file; 3.9 s on a GPU host, no-op without one | `FULL_EXTRA` |
-| `workflow/test_active_learning_yaml.jl` | "heavy YAML" | carries its own `_SKIP_HEAVY_YAML_AL`; 0.0 s with the flag off, 19.7 s with it on, passes both ways | `CI_EXTRA` |
-| `workflow/test_multi_fidelity_yaml.jl` | "heavy YAML" | same shape; 0.0 s / 50.2 s | `CI_EXTRA` |
+| `workflow/test_active_learning_yaml.jl` | "heavy YAML" | already carried `_SKIP_HEAVY_YAML_AL`; 0.0 s with the flag off, 21.7 s on the runner | `CI_EXTRA` |
+| `workflow/test_multi_fidelity_yaml.jl` | "heavy YAML" | same shape; 0.0 s / **776 s on the runner** — see `_COST` | `CI_EXTRA` |
+| `workflow/test_klaus_validation.jl` | "heavy YAML scenario pending schema audit" | the schema was fine. `initial_state: m_plus_F` was inverted against the field sign, so ITP underflowed every surviving component and the state normalised to NaN. `m_minus_F` runs it at the real 1 Gauss field, unchanged `dt`, in 68 s | `CI_EXTRA` |
 
-The heavy-YAML pair needed no guard added — they already had one. The entry in
-this file was the only thing keeping them out of a tier.
+Three of the four needed no code change at all — only for someone to run them.
 
 ## Re-audit (2026-06-19)
 
