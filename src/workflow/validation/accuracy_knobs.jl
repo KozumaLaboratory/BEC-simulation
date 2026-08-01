@@ -33,7 +33,8 @@
 # value actually differs from its default — a knob whose "reference" equals its
 # default is either mis-recorded or not a knob.
 
-export AccuracyKnob, ACCURACY_KNOBS, with_reference_accuracy, accuracy_report
+export AccuracyKnob, ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
+    dominated_knobs
 
 """
     AccuracyKnob
@@ -73,19 +74,48 @@ struct AccuracyKnob
     ladder::Vector{NamedTuple{(:value, :rel_error, :rel_cost), Tuple{Any, Float64, Float64}}}
     getter::Union{Nothing, Function}
     setter::Union{Nothing, Function}
+    # Measured cost of the APPROXIMATE direction relative to `reference`, or NaN
+    # when nobody has measured it. `< 1` means the approximation is faster and the
+    # knob is a real trade; `>= 1` means it gives accuracy away and buys nothing,
+    # which is not a trade at all — see `dominated_knobs`.
+    approx_rel_cost::Float64
 end
 
 function AccuracyKnob(name::Symbol, scope::Symbol, reference, default, note::String;
     accepted_error=NaN,
     ladder=NamedTuple{(:value, :rel_error, :rel_cost),
-        Tuple{Any, Float64, Float64}}[], getter=nothing, setter=nothing)
+        Tuple{Any, Float64, Float64}}[], getter=nothing, setter=nothing,
+    approx_rel_cost=NaN)
     scope in (:global, :per_run) ||
         throw(ArgumentError("scope must be :global or :per_run, got :$scope"))
     scope === :global && (getter === nothing || setter === nothing) &&
         throw(ArgumentError("a :global knob needs both `getter` and `setter`"))
     AccuracyKnob(name, scope, reference, default, note, Float64(accepted_error),
-        ladder, getter, setter)
+        ladder, getter, setter, Float64(approx_rel_cost))
 end
+
+"""
+    dominated_knobs() -> Vector{AccuracyKnob}
+
+Knobs whose APPROXIMATE setting gives accuracy away and is not measurably faster.
+
+Such a setting is not a trade — it is strictly worse on both axes, and there is no
+budget under which anyone should pick it. The rule is the user's, and it is sharp:
+*if a setting is less accurate and not faster, it should not be on offer.*
+
+Deleting them is not always possible (`secular_ddi` is required by the
+rotating-frame path, so it stays as a PHYSICS choice), so this is the next best
+thing: naming them, mechanically, so no report or profile can present one as a
+performance option. `accuracy_profile_for_budget` already cannot select one — the
+budget picks the cheapest ADMISSIBLE rung, and a dominated setting is never
+cheaper — but that only holds where a ladder exists, and most knobs have none.
+
+`approx_rel_cost` is NaN until someone measures it, and an unmeasured knob is not
+reported here: "nobody has measured it" is a different statement from "it buys
+nothing", and conflating them would let this list grow by neglect.
+"""
+dominated_knobs() = filter(k -> isfinite(k.approx_rel_cost) &&
+            k.approx_rel_cost >= 0.98, ACCURACY_KNOBS)
 
 """
     ACCURACY_KNOBS
@@ -136,7 +166,8 @@ approximation valid when ω_L ≫ c_dd⟨n⟩; make_workspace advises when that 
 Required (ArgumentError) when spin_rotating_frame_omega ≠ 0, so this knob cannot \
 be removed without removing the rotating-basis path. Buys NO speed — measured \
 0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
-3-component convolution with all 6 FFTs. Choose it for the physics or not at all."),
+3-component convolution with all 6 FFTs. Choose it for the physics or not at all.";
+        approx_rel_cost=0.986),
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \
@@ -209,6 +240,17 @@ function accuracy_report(; io::IO=stdout)
     println(io, "\n`with_reference_accuracy` does NOT set these — put them in the config:")
     for k in per_run
         println(io, "    $(k.name) = $(repr(k.reference))")
+    end
+    dom = dominated_knobs()
+    if !isempty(dom)
+        println(io, "\nNOT A TRADE — less accurate and not measurably faster:")
+        for k in dom
+            @printf(io, "    %-18s approximate setting costs %.3f× (≥ 1 means it buys nothing)\n",
+                k.name, k.approx_rel_cost)
+        end
+        println(io, "  Never select one of these for performance. Where a knob is kept for")
+        println(io, "  another reason — secular_ddi is required by the rotating-frame path —")
+        println(io, "  it is a PHYSICS choice and the speed argument for it does not exist.")
     end
     nothing
 end
