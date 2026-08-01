@@ -393,6 +393,28 @@ function main(mode::String="smoke"; backend=CPUBackend())
                 dump_g1=true,
                 tag="kz_holdg$(replace(string(γ), "." => "p"))_t$(replace(string(th), "." => "p"))")
         end
+    elseif startswith(mode, "fastq")
+        # At γ = 0.02 the field is condensed by t_hold = 1 (f_∞ = 0.64, rising to
+        # 0.81 by t = 30), which removes the defect that invalidated every earlier
+        # point — but τ_Q = 16 gives N_v = 0 at every hold, as a quench ten times
+        # slower than the response 1/(2γμ) = 1.7 should.
+        #
+        # So push τ_Q under the response time. This also settles what the
+        # observable has to be: once the domains merge, g₁ plateaus and its decay
+        # length is the healing length, not the KZ domain size — measured ξ̂ sits
+        # at 0.38-0.49 against ξ = 0.18 and FALLS with hold time. The KZ length
+        # lives in the defect density; g₁'s job is to certify that a condensate
+        # exists to host the defects.
+        #
+        # Two points and two seeds before committing to the full scan: if the
+        # fastest quench available cannot put a vortex in a condensate, no amount
+        # of τ_Q resolution will.
+        γ = parse(Float64, mode[6:end])
+        for τ in (0.25, 1.0)
+            kz_scan(; tau_Qs=(τ,), t_hold=1.0, n_seed=2, gamma=γ, backend,
+                dump_g1=true,
+                tag="kz_fastq$(replace(string(γ), "." => "p"))_r$(replace(string(τ), "." => "p"))")
+        end
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
