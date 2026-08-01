@@ -422,22 +422,29 @@ measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
 off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
 ~1.3× the step, for 1.49× the per-step cost. Close to a wash.
 
-`rk4ip` is 4th order, and whether that is worth taking depends on the backend —
-the CPU answer reverses on GPU. It applies `e^{K dt/2}` FOUR times per step where
-Strang applies `e^{K dt}` once; each is an FFT pair, so on CPU (mean-field
-dominated) the extra work hides and on GPU (FFT dominated) it is the whole cost.
-ms/step, `split_step!` / `midpoint` / `rk4ip`:
+`rk4ip` is 4th order, and whether that is worth taking is a question about the
+required TOLERANCE, not about the order. Full measurement:
+`docs/validation/rk4ip_cost_on_gpu.md`.
 
-    CPU 12³            3.00 / 4.46 / 2.61      rk4ip 0.87x
-    RTX 5070 Ti 128³ 175.21 / 257.83 / 258.15  rk4ip 1.47x
-    H100 128³         25.13 /  36.73 /  72.07  rk4ip 2.87x
+At the same `dt` it is more accurate and dearer — H100 64³, `dt` = 7.81e-4:
+**7090x the accuracy at 3.28x the cost per step**. At the same accuracy, time to
+solution (measured at 64³):
 
-Net = the step it holds (2.4x at a 1e-4 error budget, 4.2x at 1e-5) over that
-cost. **On the H100 at 128³: 0.84x at 1e-4 — slower than the default — and 1.46x
-at 1e-5.** On CPU: 2.7x and 4.9x. Select it for tight tolerances or CPU work, not
-as a general speedup. Memory is the other constraint: five full-state scratch
-buffers, measured 12.9 GiB allocator high-water for one 128³ step on the H100 and
-4.8 GiB of a 15.9 GiB consumer card. Two more things to know. It is not
+    budget    rk4ip dt    split dt    TIME RATIO
+     1e-3     4.23e-2     2.62e-2       0.49x
+     1e-4     2.34e-2     8.29e-3       0.86x
+     1e-5     1.31e-2     2.62e-3       1.53x
+     1e-6     7.38e-3     8.29e-4       2.71x
+
+**Break-even is between 1e-4 and 1e-5**, and production sits near 1e-4 — so at
+default tolerances this is slower for the same answer. Select it when the
+tolerance is tight, or on CPU, where it is cheaper per step outright (2.61 ms
+against `split_step!`'s 3.00 at 12³; on the H100 it is 2.87x at 128³, 3.28x at
+64³, 7.44x at 32³, because it applies `e^{K dt/2}` four times per step where
+Strang applies `e^{K dt}` once and the GPU is FFT-bound). Memory is the other
+constraint: five full-state scratch buffers, measured 12.9 GiB allocator
+high-water for one 128³ step on the H100 and 4.8 GiB of a 15.9 GiB consumer
+card. Two more things to know. It is not
 norm-conserving — the drift is a free error monitor, and `normalize_every` is not
 honoured. And its failure mode is a wall rather than a slope: measured on an
 Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns

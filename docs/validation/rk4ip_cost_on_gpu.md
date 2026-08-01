@@ -1,9 +1,13 @@
-# RK4IP: the CPU cost result does not transfer to the GPU
+# RK4IP on GPU: correct to round-off, and worth taking only below ~1e-5
 
-Measured 2026-08-02. `scripts/validation/rk4ip_gpu_cost_probe.jl`, commit
-`e6084559`, clean `src`. UGE 8316108 (H100) and a local RTX 5070 Ti. Type A.
+Measured 2026-08-02 on an H100 (UGE 8316108 / 8316433 / 8316492) and a local
+RTX 5070 Ti. Commits `e6084559` … `9af38974`, clean `src`. Type A.
 
-## Correctness first
+> **Two earlier framings in this branch were wrong and are retracted at the
+> bottom.** The short version: accuracy and cost were collapsed into a single
+> "net speedup" built from measurements taken on different problems.
+
+## 1. Correctness transfers
 
 One RK4IP step, GPU against CPU from the same start, Eu F=6 (D=13), DDI on and
 zero-padded:
@@ -13,61 +17,95 @@ zero-padded:
 | 16 | 5.5×10⁻¹⁶ | 5.9×10⁻¹⁶ |
 | 32 | 6.9×10⁻¹⁶ | 7.2×10⁻¹⁶ |
 
-Round-off in every one of the 13 channels, on both cards. **Every HamTerm's
-`apply_operator!` face already had a GPU path** — RK4IP had never been executed
-on a GPU before this, so that was not a given. Compared per component because a
-term missing its GPU path can contribute nothing to the aggregate while being
-wrong in one m channel.
+Round-off in every one of the 13 channels, on both cards. RK4IP had never been
+executed on a GPU before this, so it was not a given that every HamTerm's
+`apply_operator!` face had a GPU path — they all do. Compared per component
+because a term missing its GPU path can contribute nothing to the aggregate
+while being wrong in one m channel.
 
-## Cost, and the reversal
+## 2. The two axes, kept apart
 
-ms/step, `split_step!` / `split_step_midpoint!` / `rk4ip_step!`:
+### Axis 1 — same `dt`: RK4IP is more accurate and dearer
+
+H100, 64³, at `dt = 7.81×10⁻⁴` (the sampled step nearest production's 1e-3):
+
+- **7090× more accurate** (1.25×10⁻¹⁰ against 8.88×10⁻⁷ relative L2 over T = 0.05)
+- **3.28× the cost per step**
+
+If the extra accuracy is not needed, that is the whole story and it is a loss.
+For the Fig. 4B observable it is not needed: `dt = 1e-3` is converged there to
+0.0001 nT (`matsui_residual_root_cause.md`), so every one of those 7090× is
+unspendable.
+
+### Axis 2 — same accuracy: time to solution
+
+Both halves measured at 64³ on the H100, every row a genuine two-sided
+interpolation:
+
+| error budget | rk4ip `dt` | split_step! `dt` | step ratio | **time ratio** |
+|---|---|---|---|---|
+| 1e-3 | 4.23×10⁻² | 2.62×10⁻² | 1.62 | **0.49×** |
+| 1e-4 | 2.34×10⁻² | 8.29×10⁻³ | 2.82 | **0.86×** |
+| 1e-5 | 1.31×10⁻² | 2.62×10⁻³ | 5.00 | **1.53×** |
+| 1e-6 | 7.38×10⁻³ | 8.29×10⁻⁴ | 8.90 | 2.71× |
+| 1e-7 | 4.15×10⁻³ | 2.62×10⁻⁴ | 15.84 | 4.83× |
+
+**Break-even sits between 1e-4 and 1e-5.** Above it — looser tolerances — RK4IP
+costs more wall-clock for the same answer.
+
+## 3. What depends on `n`, and what does not
+
+**Accuracy does not.** The error columns at 64³ and 128³ agree to the digits
+printed:
+
+| `dt` | split_step! @64³ | split_step! @128³ |
+|---|---|---|
+| 3.91×10⁻⁴ | 2.220×10⁻⁷ | 2.220×10⁻⁷ |
+| 7.81×10⁻⁴ | 8.878×10⁻⁷ | 8.878×10⁻⁷ |
+| 1.56×10⁻³ | 3.551×10⁻⁶ | 3.551×10⁻⁶ |
+
+Refining the grid at fixed box does not change the time-discretisation error
+here, because the state is smooth and the added high-`k` modes are empty. (The
+plausible-sounding argument that Strang's `[K,[K,V]]` grows with `k_max²` and so
+the step ratio must move with `n` is therefore **not** what happens for this
+problem. It was the stated reason for re-measuring; it did not survive.)
+
+**Cost does.** ms/step, `split_step!` / `split_step_midpoint!` / `rk4ip_step!`:
 
 | device | n | split_step! | midpoint | rk4ip | rk4ip vs split |
 |---|---|---|---|---|---|
 | CPU | 12 | 3.00 | 4.46 | **2.61** | **0.87×** |
-| RTX 5070 Ti | 128 | 175.21 | 257.83 | 258.15 | 1.47× |
-| H100 | 128 | 25.13 | 36.73 | 72.07 | **2.87×** |
-| H100 | 64 | 2.77 | 4.04 | 9.16 | 3.30× |
 | H100 | 32 | 0.62 | 0.92 | 4.63 | 7.44× |
+| H100 | 64 | 2.75 | 4.04 | 9.05 | 3.28× |
+| H100 | 128 | 25.10 | 36.73 | 72.04 | 2.87× |
+| RTX 5070 Ti | 128 | 175.21 | 257.83 | 258.15 | 1.47× |
 
-**On CPU RK4IP is cheaper per step than the default; on the H100 it is 2.9×
-dearer.** The sign of the comparison flips with the backend.
+**On CPU RK4IP is cheaper per step; on the H100 it is 2.9–7.4× dearer.** The
+mechanism is the interaction picture: RK4IP applies `e^{K dt/2}` **four times per
+step** (`rk4ip.jl:143, 144, 162, 167`) where Strang applies `e^{K dt}` **once**
+(`split_step.jl:96`), and each is an FFT pair. On CPU the mean-field and DDI work
+dominates — and the default is itself paying for a predictor-corrector, since
+`split_step!` auto-dispatches to `_half_potential_step_midpoint!` whenever DDI is
+active — so the 4× hides. On GPU the FFTs dominate and it is the whole cost. The
+gap *widens* as `n` falls because the FFTs go launch-bound: four launches to one.
 
-### Why
+Because accuracy is `n`-independent and cost is not, the break-even budget moves
+with grid size. Composing the measured 64³ step ratios with each measured cost
+ratio:
 
-RK4IP applies `e^{K dt/2}` **four times per step** — `rk4ip.jl:143, 144, 162,
-167` — where Strang applies `e^{K dt}` **once** (`split_step.jl:96`). Each is an
-FFT pair.
+| budget | 32³ | 64³ | 128³ |
+|---|---|---|---|
+| 1e-4 | 0.38× | 0.86× | 0.98× |
+| 1e-5 | 0.67× | **1.53×** | **1.74×** |
+| 1e-6 | **1.20×** | 2.71× | 3.10× |
 
-On CPU the mean-field and DDI work dominates a step, and the default is itself
-paying for a predictor-corrector (`split_step!` auto-dispatches to
-`_half_potential_step_midpoint!` whenever DDI is active), so the 4× kinetic cost
-is invisible and RK4IP wins. On a GPU the FFTs dominate and that 4× is the whole
-story. The gap widens as `n` falls, which is the same effect: at 32³ the FFTs are
-launch-bound and RK4IP is paying four launches to Strang's one.
+Break-even ≈ 1e-6 at 32³, ≈ 2×10⁻⁵ at 64³, ≈ 1×10⁻⁴ at 128³.
 
-## Net
+## 4. Memory
 
-Net speedup = the step RK4IP holds under a fixed error budget
-(`rk4ip_step_size_probe.jl`) divided by the cost above.
-
-| device / n | at 1e-4 (step 2.4×) | at 1e-5 (step 4.2×) |
-|---|---|---|
-| CPU 12³ | 2.7× | 4.9× |
-| RTX 5070 Ti 128³ | 1.6× | 2.9× |
-| **H100 128³** | **0.84× — a net loss** | **1.46×** |
-
-The step ratios are CPU-measured. They are a property of the method and the
-problem's stiffness rather than of the hardware, but they have not been
-re-measured on GPU, so the H100 row is the cost measurement combined with a CPU
-accuracy measurement and should be read as an estimate.
-
-## Memory
-
-Five full-state scratch buffers: 436 MB each at 128³ F64 D=13, so 2.2 GB
-nominal. Measured allocator high-water across one step, which also carries the
-padded DDI transforms the four registry passes each trigger:
+Five full-state scratch buffers, 436 MB each at 128³ F64 D=13. Measured
+allocator high-water for one step, which also carries the padded DDI transforms
+each of the four registry passes triggers:
 
 | device | n | high-water | of total |
 |---|---|---|---|
@@ -75,19 +113,34 @@ padded DDI transforms the four registry passes each trigger:
 | RTX 5070 Ti | 128 | 4.78 GiB | **30 % of 15.9** |
 | H100 | 64 | 2.56 GiB | — |
 
-On the consumer card a single 128³ RK4IP step reserves nearly a third of the
-device.
+## 5. Conclusions
 
-## Conclusions
+- **Not a default.** Production runs at roughly the 1e-4 accumulated-error scale,
+  which is on the losing side of break-even at every grid size measured.
+- **Keep it opt-in** (`integrator: rk4ip`) and select it when the tolerance is
+  tight — below ~1e-5 at 64³ and above — or on CPU, where it is cheaper per step
+  outright.
+- The lever is the kinetic count. Four half-exponentials is intrinsic to the
+  standard RK4IP formulation; going below it means a different scheme.
 
-- **Do not make RK4IP the default.** At ordinary tolerances on the production
-  GPU it is slower than what it would replace.
-- **Keep it opt-in** (`integrator: rk4ip`), and select it for tight tolerances
-  (≲1e-5), for CPU work, or when 4th order is wanted for its own sake.
-- The obvious optimisation is the kinetic count. Four half-exponentials is
-  intrinsic to the standard RK4IP formulation; getting below it means a
-  different scheme, not a tuning of this one.
-- **The CPU/GPU reversal is the transferable lesson.** A cost ratio between two
-  integrators is not a property of the integrators — it is a property of which
-  part of the step dominates, and that changes with the backend. Any
-  "integrator A is cheaper than B" claim needs the device attached.
+## 6. Retracted
+
+**"Order 2 → 4 at equal cost."** From counting mean-field evaluations on CPU. The
+count was right and irrelevant: on GPU the kinetic FFTs dominate and RK4IP does
+four of them per step.
+
+**"Net 2.7× at a 1e-4 budget, 4.9× at 1e-5."** Built by dividing a step ratio
+measured on a **12³ CPU** config by a cost ratio measured on a **128³ GPU**
+config. Those do not compose — the cost ratio is strongly `n`-dependent. The
+measured 128³ figures are 0.98× and 1.74×.
+
+**"The step ratio is strongly size-dependent, which is why this had to be
+re-measured."** Argued from `[K,[K,V]] ~ k_max²`. Measured: the error columns at
+64³ and 128³ are identical. The re-measurement was still necessary, but for the
+cost ratio, not the step ratio.
+
+**A capped crossing reported as a measurement.** The first 64³ run's sweep did
+not go coarse enough for either integrator to leave a 1e-3 or 1e-4 budget, and
+`crossing` returned the coarsest sample — printing "we did not look far enough"
+as a number. The script now tags each row `measured` / `LOWER BOUND` and the
+sweep was extended two octaves.

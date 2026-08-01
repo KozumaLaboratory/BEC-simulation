@@ -14,33 +14,49 @@
 # diagonal-in-k part — is absorbed into an interaction picture and applied
 # exactly, so it does not limit `dt`.
 #
-# COST — and the CPU answer does not survive contact with the GPU.
+# WHEN IT PAYS. Two axes, and they must not be collapsed into one number — see
+# `docs/validation/rk4ip_cost_on_gpu.md` for the full measurement and for what
+# earlier drafts of this comment got wrong.
 #
-# ms/step, Eu F=6 D=13 with padded DDI, `split_step!` / `midpoint` / `rk4ip`:
+# At the SAME dt (H100 64³, dt = 7.81e-4, Eu F=6 D=13 padded DDI): RK4IP is
+# **7090× more accurate at 3.28× the cost per step**. If that accuracy is not
+# wanted, that is the whole story and it is a loss.
 #
-#   CPU 12³            3.00 / 4.46 / 2.61      rk4ip 0.87× the default
+# At the SAME accuracy, time to solution (all rows measured at 64³):
+#
+#   budget     rk4ip dt    split dt   step ratio   TIME RATIO
+#    1e-3      4.23e-2     2.62e-2       1.62        0.49×
+#    1e-4      2.34e-2     8.29e-3       2.82        0.86×
+#    1e-5      1.31e-2     2.62e-3       5.00        1.53×
+#    1e-6      7.38e-3     8.29e-4       8.90        2.71×
+#
+# **Break-even is between 1e-4 and 1e-5.** Production sits at roughly the 1e-4
+# accumulated-error scale, i.e. on the losing side — hence opt-in, not default.
+#
+# Cost per step, `split_step!` / `midpoint` / `rk4ip`:
+#
+#   CPU 12³            3.00 / 4.46 / 2.61      rk4ip 0.87×  (CHEAPER)
+#   H100  32³          0.62 / 0.92 / 4.63      rk4ip 7.44×
+#   H100  64³          2.75 / 4.04 / 9.05      rk4ip 3.28×
+#   H100 128³         25.10 / 36.73 / 72.04    rk4ip 2.87×
 #   RTX 5070 Ti 128³ 175.21 / 257.83 / 258.15  rk4ip 1.47×
-#   H100 128³         25.13 /  36.73 /  72.07  rk4ip **2.87×**
-#   H100  64³          2.77 /   4.04 /   9.16  rk4ip 3.30×
-#   H100  32³          0.62 /   0.92 /   4.63  rk4ip 7.44×
 #
 # The mechanism is the interaction picture itself: **this applies e^{K dt/2} four
 # times per step (lines below) where Strang applies e^{K dt} once.** Each is an
-# FFT pair. On CPU the mean-field and DDI work dominates and that 4× is invisible
-# — RK4IP even comes out cheaper, because `split_step!` auto-dispatches to the
-# midpoint predictor-corrector whenever DDI is active. On a GPU the FFTs dominate
-# and the 4× is the whole story.
+# FFT pair. On CPU the mean-field and DDI work dominates — and the default is
+# itself paying for a predictor-corrector, since `split_step!` auto-dispatches to
+# `_half_potential_step_midpoint!` whenever DDI is active — so the 4× hides and
+# RK4IP comes out cheaper. On GPU the FFTs dominate and it is the whole cost; the
+# gap widens as n falls because the FFTs go launch-bound, four launches to one.
 #
-# Net speedup = the step ratio RK4IP holds under a fixed error budget
-# (`scripts/validation/rk4ip_step_size_probe.jl`: 2.4× at 1e-4, 4.2× at 1e-5)
-# divided by the cost ratio above. On the H100 at 128³ that is **0.84× at a 1e-4
-# budget — a net LOSS — and 1.46× at 1e-5**. On CPU it is 2.7× and 4.9×.
+# Accuracy, by contrast, is n-independent here: the error-vs-dt columns at 64³
+# and 128³ agree to the digits printed, because the state is smooth and the added
+# high-k modes are empty. So the break-even budget moves only through the cost:
+# ≈1e-6 at 32³, ≈2e-5 at 64³, ≈1e-4 at 128³.
 #
-# So: worth selecting when the tolerance is tight (≲1e-5) or on CPU; not worth it
-# at ordinary tolerances on the production GPU, and not a candidate for the
-# default. Memory is the other reason: the five scratch buffers below are 436 MB
-# each at 128³ F64 D=13, and the measured allocator high-water for one step is
-# 12.9 GiB on the H100 and 4.8 GiB of a 15.9 GiB consumer card.
+# Memory: the five scratch buffers below are 436 MB each at 128³ F64 D=13, and
+# the measured allocator high-water for one step is 12.9 GiB on the H100 and
+# 4.8 GiB of a 15.9 GiB consumer card.
 #
 # What it gives up: neither symplectic nor exactly norm-conserving. Over the
 # 5-40 ms real-time windows this program runs that is not a constraint, and the
