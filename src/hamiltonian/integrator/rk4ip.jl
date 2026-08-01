@@ -170,6 +170,15 @@ function rk4ip_step!(ws::Workspace; dt::Float64=ws.sim_params.dt)
     _rk4ip_nonkinetic!(k2, ws, tmp, t + dt)
     @. psi = psi_I + (dt / 6) * k2
 
+    # Loss and the absorbing boundary are excluded from the RK stages above
+    # (`_rk4ip_accumulate!` skips `LossTerm`) because they are not part of the
+    # Hamiltonian flow, so they ride the same real-time epilogue every other RTP
+    # step loop uses. Omitting this is not a small error: it makes every `loss:`
+    # config run silently loss-free. `test/oracles/test_path_coverage.jl` gates
+    # exactly that — any `src` file that advances `ws.state.step` must either
+    # call this or be listed as an explicit exception.
+    apply_rt_dissipation!(ws, dt, size(psi, ndims(psi)), ndims(psi) - 1)
+
     ws.state.t = t + dt
     ws.state.step += 1
     psi

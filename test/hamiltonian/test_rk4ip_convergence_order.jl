@@ -113,6 +113,51 @@ end
         @test norm(Array(ws.state.psi) .- ref) / norm(ref) < 1e-5
     end
 
+    # Loss is excluded from the RK stages (it is not Hamiltonian flow), so it has
+    # to ride the real-time epilogue instead. Getting that wrong makes every
+    # `loss:` config run silently loss-free — and `integrator: rk4ip` is now
+    # reachable from YAML, so this is a live path, not a hypothetical one.
+    # `test/oracles/test_path_coverage.jl` gates that the CALL exists; this gates
+    # that it does something.
+    @testset "three-body loss is applied, not dropped" begin
+        function _norm_after(; with_loss::Bool, stepper)
+            grid = make_grid(GridConfig((_RK_N, _RK_N, _RK_N), (_RK_L, _RK_L, _RK_L)))
+            kw = (; grid, atom=Eu151,
+                interactions=InteractionParams(Dict(0 => 40.0, 1 => 3.0)),
+                zeeman=ZeemanParams(0.7, 0.05),
+                potential=HarmonicTrap((1.0, 1.0, 1.2)),
+                sim_params=SimParams(; dt=1e-3, n_steps=50, save_every=10^9),
+                backend=CPUBackend())
+            ws = if with_loss
+                make_workspace(; kw..., loss=LossParams(0.0, 5.0))
+            else
+                make_workspace(; kw...)
+            end
+            copyto!(ws.state.psi, _rk_psi0(ws))
+            ws.state.t = 0.0
+            for _ in 1:50
+                stepper(ws)
+            end
+            norm(Array(ws.state.psi))
+        end
+
+        n0 = norm(_rk_psi0(_rk_workspace(; enable_ddi=false, dt=1e-3)))
+        base = _norm_after(; with_loss=false, stepper=(rk4ip_step!))
+        lossy = _norm_after(; with_loss=true, stepper=(rk4ip_step!))
+
+        # Positive control against the state's OWN starting norm — this is the
+        # bare array L2 norm, not the grid-integrated one, so it starts at
+        # 1/sqrt(dV) and not at 1. Without loss it must be essentially unchanged,
+        # or "the norm dropped" would prove nothing about the loss channel.
+        @test isapprox(base, n0; rtol=1e-3)
+        @test lossy < base * (1 - 1e-4)
+
+        # And it must lose the SAME amount the split-step does — the loss substep
+        # is shared, so a different number means it is being applied differently.
+        lossy_ss = _norm_after(; with_loss=true, stepper=(split_step!))
+        @test isapprox(lossy, lossy_ss; rtol=1e-3)
+    end
+
     @testset "refuses imaginary time rather than silently doing the wrong thing" begin
         grid = make_grid(GridConfig((_RK_N, _RK_N, _RK_N), (_RK_L, _RK_L, _RK_L)))
         ws = make_workspace(; grid, atom=Eu151,
