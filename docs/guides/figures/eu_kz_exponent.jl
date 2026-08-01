@@ -203,9 +203,9 @@ function kz_scan(;
             if dump_g1
                 mkpath(OUTDIR)
                 gf = joinpath(OUTDIR,
-                    "g1_tau$(replace(string(τ), "." => "p"))_s$(seed_idx).csv")
+                    "g1_$(tag)_tau$(replace(string(τ), "." => "p"))_s$(seed_idx).csv")
                 open(gf, "w") do io
-                    println(io, "# tau_Q=$τ seed=$seed_idx N_v=$(r.n_vortices) " *
+                    println(io, "# tau_Q=$τ t_hold=$t_hold seed=$seed_idx N_v=$(r.n_vortices) " *
                                 "N_C=$(r.N_C) xi_hat=$(r.xi_hat) f_inf=$(r.f_inf) " *
                                 "R_TF=$(sqrt(2mu)) xi=$(1 / sqrt(2mu)) dx=$(box / grid_n)")
                     println(io, "r,g1")
@@ -355,6 +355,22 @@ function main(mode::String="smoke"; backend=CPUBackend())
         # f_∞ ≈ 0.003 beside a condensate of 2e4 atoms looks like.
         kz_scan(; tau_Qs=(2.0, 16.0), t_hold=1.0, n_seed=2, backend,
             dump_g1=true, tag="kz_g1shape")
+    elseif mode == "g1hold"
+        # POSITIVE CONTROL for the claim that the quench runs are measured before
+        # the field condenses. g₁ showed a floor of 0.003 — a condensate fraction
+        # of 0.3% — at EVERY quench rate, on a curve that decays in three grid
+        # cells. Either the field never condensed, or g₁ is wrong; a null with no
+        # positive control cannot tell those apart.
+        #
+        # Same quench, held at T_cold for increasing times. The relaxation time is
+        # 1/(2γμ) ≈ 17 at γ = 0.002, so t_hold = 1 (what every point so far used)
+        # is 0.06 of it. If f_∞ climbs toward a large value by t_hold ≈ 200 the
+        # instrument is sound and the KZ points were taken too early; if it stays
+        # at 0.003 the instrument or the reservoir is at fault.
+        for th in (1.0, 10.0, 40.0, 100.0, 200.0)
+            kz_scan(; tau_Qs=(16.0,), t_hold=th, n_seed=1, backend,
+                dump_g1=true, tag="kz_g1hold_t$(replace(string(th), "." => "p"))")
+        end
     elseif mode == "spinor1"
         # Step 1 of the ladder: c1 ON, DDI still off, F=1. Cheapest possible change
         # from the validated scalar case, and it settles the question every later
