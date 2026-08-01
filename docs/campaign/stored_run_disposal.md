@@ -64,9 +64,35 @@ scope for disposal on that ground alone.
 Over 400 GB, against a 2 TB group quota that is already 1.2 TB used. This is worth
 acting on, which is why the manifest exists.
 
-## The disposable set: 385 directories
+## Correction: citation is necessary but not sufficient
 
-392 uncited, minus the 7 tracked ones.
+Raised by anko — *"at least keep the phase diagrams."* Right, and my criterion was
+wrong.
+
+**"No live document cites it" is a reason to stop treating something as evidence.
+It is not a reason to delete it.** A phase-diagram scan, a resolution ladder, a
+Ω- or B-sweep is an expensive, reusable input whose value does not depend on
+whether a markdown file happens to name it today. Deleting one because nobody
+wrote it down is exactly the failure this campaign exists to stop, running the
+other way.
+
+Two facts, measured:
+
+1. **The phase diagrams were never in scope.** This manifest's population is the
+   474 directories that hold a `summary.json`. `F6_phase_diagram`,
+   `eu_gs_phase_c1_B_kappa` and `berry_crossover_scan` carry none, so they were
+   never candidates. That was luck, not design — the criterion would not have
+   protected them.
+2. **105 of the 385 are scan or sweep families** — `bzsweep_*`, `fieldsweep_*`,
+   `omsweep_*`, `p2sweep_*`, `scan2d_*`, `dense_omega_*`, `dense_field_*`,
+   `*_phase_*`, resolution ladders. **These are now KEEP**, regardless of citation.
+
+Disposal therefore needs *all* of: uncited, untracked, unstamped, superseded by a
+correction — **and not a scan family.**
+
+## The disposable set: 280 directories
+
+392 uncited, minus 7 tracked, minus 105 scan families.
 
 Every one satisfies all of:
 
@@ -75,7 +101,16 @@ Every one satisfies all of:
 3. its `summary.json` carries no producing commit — like all 481, it is not
    reproducible from the repository;
 4. it predates the 2026-06/07 corrections, so any number in it is superseded by
-   construction.
+   construction;
+5. **it is not a scan, sweep, ladder or phase map.**
+
+The remainder is mostly single-cell validation-ladder runs
+(`00_scalar_free_uniform_stationary_*`, `02_spin1_polar_contact_ground_*`, …) —
+cheap to regenerate because a tiered test regenerates them.
+
+**Even so, read the list before moving anything.** Rule 5 is a name-pattern match,
+and a name pattern is not a semantic classifier; something valuable with an
+unlucky name will not be caught by it.
 
 ## Procedure — move, do not delete
 
