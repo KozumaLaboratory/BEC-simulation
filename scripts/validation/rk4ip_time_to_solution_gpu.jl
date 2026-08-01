@@ -86,14 +86,17 @@ end
 # Refuses to extrapolate past the sampled range.
 function crossing(dts, errs, budget)
     ok = [i for i in eachindex(errs) if isfinite(errs[i])]
-    length(ok) >= 2 || return NaN
+    length(ok) >= 2 || return (NaN, :nodata)
     lo = findlast(i -> errs[i] <= budget, ok)
-    lo === nothing && return NaN
+    lo === nothing && return (NaN, :budget_below_every_sample)
     i = ok[lo]
-    lo == length(ok) && return dts[i]
+    # Under budget even at the COARSEST sample: the true crossing is somewhere
+    # past the sweep, so this is a LOWER BOUND, not a measurement. Reporting it
+    # as a crossing silently turns "we did not look far enough" into a number.
+    lo == length(ok) && return (dts[i], :capped)
     j = ok[lo + 1]
     p = log(errs[j] / errs[i]) / log(dts[j] / dts[i])
-    dts[i] * (budget / errs[i])^(1 / p)
+    (dts[i] * (budget / errs[i])^(1 / p), :interpolated)
 end
 
 function main()
@@ -109,7 +112,7 @@ function main()
     @printf("reference RK4IP at dt = %.2e; Richardson bound on its own error %.2e\n\n",
         T / 4096, ref_err)
 
-    steps = [T / k for k in (512, 256, 128, 64, 32, 16)]
+    steps = [T / k for k in (512, 256, 128, 64, 32, 16, 8, 4)]
     errs = Dict(:rk4ip => Float64[], :strang => Float64[])
     @printf("%12s %16s %16s\n", "dt", "rk4ip err", "split_step! err")
     for dt in steps
@@ -142,13 +145,16 @@ function main()
     println("  If that accuracy is not needed, this is a pure loss.")
 
     println("\n--- AXIS 2: fixed accuracy. Time to solution. ---")
-    @printf("%12s %14s %14s %14s\n", "budget", "rk4ip dt", "split dt", "time ratio")
-    for b in (1e-3, 1e-4, 1e-5, 1e-6)
-        a = crossing(steps, errs[:rk4ip], b)
-        s = crossing(steps, errs[:strang], b)
+    @printf("%12s %14s %14s %14s   %s\n",
+        "budget", "rk4ip dt", "split dt", "time ratio", "quality")
+    for b in (1e-3, 1e-4, 1e-5, 1e-6, 1e-7)
+        a, qa = crossing(steps, errs[:rk4ip], b)
+        s, qs = crossing(steps, errs[:strang], b)
         r = (a / s) / (c_rk / c_ss)
-        @printf("%12.0e %14.3e %14.3e %14s\n", b, a, s,
-            isfinite(r) ? @sprintf("%.2fx", r) : "—")
+        q = (qa === :interpolated && qs === :interpolated) ? "measured" :
+            (qa === :capped || qs === :capped) ? "LOWER BOUND ($qa/$qs)" : "$qa/$qs"
+        @printf("%12.0e %14.3e %14.3e %14s   %s\n", b, a, s,
+            isfinite(r) ? @sprintf("%.2fx", r) : "—", q)
     end
     println("\n>1 means rk4ip reaches that accuracy sooner. Both columns are measured")
     println("HERE, at this n on this device — the previous write-up divided a 12^3 CPU")
