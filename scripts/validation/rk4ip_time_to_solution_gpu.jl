@@ -112,7 +112,7 @@ function main()
     @printf("reference RK4IP at dt = %.2e; Richardson bound on its own error %.2e\n\n",
         T / 4096, ref_err)
 
-    steps = [T / k for k in (512, 256, 128, 64, 32, 16, 8, 4)]
+    steps = [T / k for k in (512, 256, 128, 64, 32, 16, 8, 4, 2, 1)]
     errs = Dict(:rk4ip => Float64[], :strang => Float64[])
     @printf("%12s %16s %16s\n", "dt", "rk4ip err", "split_step! err")
     for dt in steps
