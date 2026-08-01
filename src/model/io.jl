@@ -95,18 +95,46 @@ _enc(f::Function) = throw(
 # The derived fields are deliberately NOT written. Writing a value the reader
 # recomputes and ignores is a drift surface: the file would be able to disagree
 # with the constructor and nothing would notice.
+# Recomputed by the constructor from the fields above, so they are skipped for
+# the reason in the comment above this block. Declaring them here rather than by
+# omission is what lets the gate below tell "deliberately derived" apart from
+# "forgotten", which a hand-written key list cannot.
+const _ATOM_DERIVED = (:a_s, :q_geometry)
+
+# Enumerated from `fieldnames`, not listed. A 15th `AtomSpecies` field is either
+# encoded here or declared derived; it cannot be silently dropped from the
+# digest. The hand-written 13-key version of this function did exactly that —
+# removing "g_F" from it left the discrimination gate fully green.
 function _enc_atom(a::AtomSpecies)
-    ch = sort!(collect(keys(a.scattering_lengths)))
-    Dict{String, Any}(
-        "name" => a.name, "mass" => a.mass, "F" => a.F,
-        "a0" => a.a0, "a2" => a.a2, "mu_mag" => a.mu_mag, "g_F" => a.g_F,
-        "channel_S" => ch, "channel_a" => Float64[a.scattering_lengths[k] for k in ch],
-        "Delta_E_hf" => a.Delta_E_hf, "g_J" => a.g_J,
-        "nuclear_I" => a.nuclear_I, "electronic_J" => a.electronic_J)
+    d = Dict{String, Any}()
+    for f in fieldnames(AtomSpecies)
+        f in _ATOM_DERIVED && continue
+        v = getfield(a, f)
+        if f === :scattering_lengths
+            # One field, two keys: a Dict has no canonical order, so the channel
+            # list is sorted and the amplitudes ride in that order.
+            ch = sort!(collect(keys(v)))
+            d["channel_S"] = ch
+            d["channel_a"] = Float64[v[k] for k in ch]
+        else
+            d[String(f)] = v
+        end
+    end
+    d
 end
 
-const _ATOM_KEYS = ("name", "mass", "F", "a0", "a2", "mu_mag", "g_F", "channel_S",
-    "channel_a", "Delta_E_hf", "g_J", "nuclear_I", "electronic_J")
+# Derived from the same two declarations, at the TYPE level — no atom instance
+# and no registry lookup, so it cannot depend on load order.
+const _ATOM_KEYS = Tuple(
+    sort!(
+        vcat(
+            String[
+                String(f) for f in fieldnames(AtomSpecies)
+                if !(f in _ATOM_DERIVED) && f !== :scattering_lengths
+            ],
+            String["channel_S", "channel_a"]),
+    ),
+)
 
 """
     model_toml_dict(m::Model) -> Dict{String,Any}

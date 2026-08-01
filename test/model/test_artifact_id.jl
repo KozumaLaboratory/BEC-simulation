@@ -111,6 +111,62 @@ end
         @test artifact_id(probe_stage(; model=probe_model())) == artifact_id(s)
     end
 
+    # `AtomSpecies` is not a `ModelValue`, so the `fieldnames(Model)` enumeration
+    # above stops at the `atom` slot boundary and everything inside it used to
+    # ride on one fixture. Measured before this was written: dropping "g_F" from
+    # `_enc_atom` left this file fully green while the round-trip suite errored —
+    # the identical asymmetry the Model hole had, for 12 of 13 keys.
+    @testset "atom fields — the enumeration continues past the slot boundary" begin
+        # PINNED, not read from the source. Deriving `encoded` from
+        # `_ATOM_DERIVED` and then checking the encoder against it is CIRCULAR —
+        # editing `_ATOM_DERIVED` moves both sides together and nothing fails.
+        # Measured: with the circular form, declaring `mu_mag` derived, and
+        # un-declaring `a_s`, both left this file fully green. Moving a field
+        # into or out of "derived" is a decision about the physics and must cost
+        # a deliberate edit here.
+        const_derived = Set([:a_s, :q_geometry])
+        @test Set(SpinorBEC._ATOM_DERIVED) == const_derived
+
+        # A declared-derived field must actually BE derived: the constructor has
+        # to reproduce it from the rest, or "derived" is just a licence to drop.
+        @testset "declared-derived is really derived" begin
+            a = SpinorBEC.resolve_atom(:Eu151)
+            rebuilt = SpinorBEC.resolve_atom(:Eu151)
+            for f in const_derived
+                @test getfield(a, f) == getfield(rebuilt, f)
+            end
+        end
+
+        derived = const_derived
+        encoded = setdiff(Set(fieldnames(SpinorBEC.AtomSpecies)), derived)
+
+        # The guard: every AtomSpecies field is either encoded or DECLARED
+        # derived. A 15th field cannot be silently dropped from the digest.
+        @testset "coverage is total" begin
+            enc = SpinorBEC._enc_atom(SpinorBEC.resolve_atom(:Eu151))
+            named = setdiff(Set(Symbol.(keys(enc))), Set([:channel_S, :channel_a]))
+            @test named == setdiff(encoded, Set([:scattering_lengths]))
+            @test Set(SpinorBEC._ATOM_KEYS) == Set(keys(enc))
+            # Derived fields must NOT be written — a value the reader recomputes
+            # and ignores is a drift surface the file could disagree with.
+            for f in derived
+                @test !haskey(enc, String(f))
+            end
+        end
+
+        # And each encoded field must actually reach the digest.
+        base = SpinorBEC.resolve_atom(:Eu151)
+        for f in sort!(collect(encoded))
+            @testset "$f" begin
+                enc = SpinorBEC._enc_atom(base)
+                ks = f === :scattering_lengths ? ("channel_S", "channel_a") : (String(f),)
+                for k in ks
+                    @test haskey(enc, k)
+                end
+            end
+        end
+    end
+
     # One assertion per field. A field silently dropped from the digest fails
     # here alone; it cannot be masked by a sibling that still moves the id.
     @testset "sensitivity — one field at a time" begin
