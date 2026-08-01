@@ -2,6 +2,7 @@
 #
 #   julia --project=. test/mutation/run.jl [options]
 #     --mutants a,b,…     subset of catalog ids            (default: all)
+#     --shard k/n         every n-th class from k         (default: no sharding)
 #     --probe NAME|list   grounded_cheap | oracles | fast  (default: grounded_cheap)
 #                         or a comma-separated list of test files
 #     --workers N         parallel test processes          (default: CPU threads − 2)
@@ -94,12 +95,39 @@ end
 
 function chosen_mutants()
     ids = _arg("--mutants", "")
-    isempty(ids) && return MUTANTS
-    want = Set(Symbol.(split(ids, ",")))
-    sel = filter(m -> m.id in want, MUTANTS)
-    length(sel) == length(want) ||
-        error("unknown mutant id(s): $(setdiff(want, Set(m.id for m in sel)))")
-    sel
+    sel = if isempty(ids)
+        MUTANTS
+    else
+        want = Set(Symbol.(split(ids, ",")))
+        got = filter(m -> m.id in want, MUTANTS)
+        length(got) == length(want) ||
+            error("unknown mutant id(s): $(setdiff(want, Set(m.id for m in got)))")
+        got
+    end
+    _shard(sel)
+end
+
+# `--shard k/n` takes every n-th class starting at k. A full pass costs
+# n_mutants × n_probe_files package loads, which on one runner is hours: the
+# nightly job asked for the whole catalog and was killed at its 180-minute
+# timeout every night, doing nothing at all (2026-08-01). Sharding turns that
+# into a sweep that completes over n nights and finishes every night.
+#
+# What is dropped is NAMED, not silently cut — a report that covers 1/7th of
+# the catalog and does not say so reads as a clean bill of health.
+function _shard(sel)
+    spec = _arg("--shard", "")
+    isempty(spec) && return sel
+    parts = split(spec, "/")
+    length(parts) == 2 || error("--shard takes k/n, got $spec")
+    k, n = parse(Int, parts[1]), parse(Int, parts[2])
+    (n >= 1 && 0 <= k < n) || error("--shard k/n needs 1 ≤ n and 0 ≤ k < n, got $spec")
+    out = [m for (i, m) in enumerate(sel) if (i - 1) % n == k]
+    isempty(out) && error("--shard $spec selected no classes out of $(length(sel))")
+    println("  shard $k/$n: $(length(out)) of $(length(sel)) classes — NOT a full \
+             catalog pass. Skipped: ", join(
+            [String(m.id) for m in sel if !(m in out)], ", "))
+    out
 end
 
 # ── running one probe pass ─────────────────────────────────────────

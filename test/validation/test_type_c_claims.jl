@@ -78,8 +78,12 @@ const TYPE_C_CLAIMS = TypeCClaim[
         "carries a ±10 nT offset, so only the WIDTH arbitrates."),
     TypeCClaim(
         "Klaus et al. 2022", "magnetostirring vortex nucleation", "—", nothing,
-        "workflow/test_klaus_validation.jl exists but is in MANUAL_TESTS_ALLOWLIST " *
-        "('heavy YAML scenario pending schema audit') and untouched since 2026-05-25"),
+        "workflow/test_klaus_validation.jl now RUNS (2026-08-01 — it was not a " *
+        "schema problem, its `initial_state` was inverted against the field sign) " *
+        "and is in CI_EXTRA. It stays ungated here because its own header says " *
+        "what it is: a plumbing smoke for the magnetostir path, NOT a physics " *
+        "validation of the published vortex-stripe count, which needs the full " *
+        "64x64x32 + 1 s stir"),
     TypeCClaim(
         "Matsui et al. (Eu Bogoliubov cascade)", "spin-excitation cascade", "—", nothing,
         "no test"),

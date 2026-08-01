@@ -207,6 +207,17 @@ function _line_search_energy_decrease(
     α_init::Float64=1.0, shrink::Float64=0.5, grow::Float64=2.0,
     c1::Float64=1.0e-4, max_iter::Int=30, max_expand::Int=6,
     expand::Bool=false,
+    # When given, the FIRST trial evaluates `energy_gradient!` into this buffer
+    # instead of `total_energy`, and the returned `grad_valid` says whether the
+    # step that was accepted is the one it was evaluated at. On the GPU that
+    # gradient is free — measured at 24³ D=13, `energy_gradient!` costs 1.383 ms
+    # against `gradient_only!`'s 1.382, because both are the same fused kernel
+    # and the energy falls out of it — so the caller can skip its own gradient
+    # pass and save a whole `total_energy` (1.306 ms of a 5.83 ms iteration).
+    # On the CPU it is NOT free: `energy_gradient!` runs the term registry
+    # twice, 12.80 ms against 6.57 + 6.11 separately, so the caller does not
+    # pass this there.
+    grad_out=nothing, k_squared_dev=nothing,
 )
     D = 2F + 1
     N_dim = length(grid.config.n_points)
@@ -226,9 +237,18 @@ function _line_search_energy_decrease(
         nothing
     end
     n_eval = 0
+    fused_done = false
     eval_energy = function (α)
         retract!(α)
         n_eval += 1
+        if grad_out !== nothing && !fused_done
+            fused_done = true
+            # `retract!` has already placed `psi_trial` in `ws.state.psi`; the
+            # copy inside `energy_gradient!` repeats it. Kept rather than
+            # special-cased because it is one device copy against the 1.3 ms
+            # this saves.
+            return energy_gradient!(grad_out, psi_trial, ws; k_squared_dev)
+        end
         total_energy(ws)
     end
 
@@ -259,9 +279,11 @@ function _line_search_energy_decrease(
             # (`best_E` is already known), which is why this is `retract!` and
             # not the `eval_energy` the fix on main used.
             last_α == best_α || retract!(best_α)
-            return best_α, best_E, psi_trial, n_eval
+            # The expansion phase moved on from the point `grad_out` was taken
+            # at, so the caller must not reuse it.
+            return best_α, best_E, psi_trial, n_eval, false
         end
-        return α, E_trial, psi_trial, n_eval
+        return α, E_trial, psi_trial, n_eval, grad_out !== nothing
     end
 
     # Backtracking from α_init.
@@ -269,11 +291,12 @@ function _line_search_energy_decrease(
         α *= shrink
         E_trial = eval_energy(α)
         if accept(α, E_trial)
-            return α, E_trial, psi_trial, n_eval
+            # Backtracked: `grad_out` was evaluated at α_init, not here.
+            return α, E_trial, psi_trial, n_eval, false
         end
     end
     # No sufficient decrease found — return zero step.
-    (0.0, E0, psi, n_eval)
+    (0.0, E0, psi, n_eval, false)
 end
 
 """

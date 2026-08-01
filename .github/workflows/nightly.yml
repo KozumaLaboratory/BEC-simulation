@@ -68,7 +68,7 @@ jobs:
   mutation:
     name: Mutation catalog (defect classes vs the suite)
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -83,7 +83,17 @@ jobs:
       # gap to triage from the report, not a broken build. A STALE anchor DOES
       # fail, because a catalog entry that quietly tests nothing is the exact
       # failure mode the catalog exists to prevent.
-      - run: julia --project=. --startup-file=no test/mutation/run.jl --workers 3
+      # ONE SEVENTH of the catalog per night, chosen by day-of-year, so the
+      # whole thing sweeps weekly and every night FINISHES. Asking for the
+      # full catalog cost 53 classes x every probe file x one package load
+      # each, which ran into the 180-minute timeout and produced nothing —
+      # every night, reported as `cancelled` (2026-08-01). The harness names
+      # the classes it skipped, so a shard report cannot be mistaken for a
+      # clean bill of health.
+      - run: |
+          SHARD=$(( $(date -u +%j) % 7 ))
+          julia --project=. --startup-file=no test/mutation/run.jl \
+            --workers 3 --shard "$SHARD/7"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
