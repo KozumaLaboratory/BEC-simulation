@@ -17,7 +17,7 @@ using Test
 using Dates
 using SpinorBEC
 using SpinorBEC: QueueRoot, budget_gate, get_budget, set_budget!, AutopilotBudget,
-    enqueue!, config, ground_state, Experiment, ExperimentStore,
+    enqueue!, Experiment, CASStore,
     _classify_terminal_failure, _resolve_save_every, _descendant_count,
     _maybe_fire_on_complete!, AutopilotConfig, AutopilotStats, AutopilotBackend,
     register_on_complete!, list_queue, QueueEntry
@@ -30,9 +30,12 @@ end
 SpinorBEC.backend_failure_reason(b::_ReasonBackend, ::QueueEntry) = b.reason
 
 @testset "autopilot invariants" begin
+    # The queue only needs a spec it can content-address and a store to put it
+    # in; nothing here runs physics, so the emptiest valid spec is the honest
+    # fixture. `tag` keeps the content ids distinct.
     _exp(tmp, tag) = Experiment(
-        config([ground_state(; n_atoms=1.0e4, note=tag)]);
-        store=ExperimentStore(joinpath(tmp, "store")))
+        Dict{Any, Any}("pipeline" => [], "note" => tag);
+        store=CASStore(joinpath(tmp, "store")))
 
     @testset "the quarter cap counts work that is QUEUED, not just spent" begin
         mktempdir() do tmp
