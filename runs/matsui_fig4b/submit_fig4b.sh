@@ -50,7 +50,7 @@
 #$ -N matsui_fig4b
 #$ -l gpu_1=1
 #$ -l h_rt=8:00:00
-#$ -t 1-15
+#$ -t 1-16
 #$ -j n
 
 set -euo pipefail
@@ -87,6 +87,7 @@ else
        13) CONFIG=runs/matsui_fig4b/fig4b_natoms_n32.yaml ;;
        14) CONFIG=runs/matsui_fig4b/fig4b_natoms_fixed_n32.yaml ;;
        15) CONFIG=runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml ;;
+       16) CONFIG=runs/matsui_fig4b/fig4b_gsddi_n35k_n32.yaml ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
