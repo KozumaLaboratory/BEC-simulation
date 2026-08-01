@@ -10,11 +10,17 @@ and four worktrees.
 
 474 run directories hold a stored `summary.json` (481 files).
 
-| class | dirs | what cites it |
-|---|---:|---|
-| **exact name** | 10 | a live document names the directory |
-| **glob family** | 72 | a live document names `runs/<stem>_*` |
-| **uncited** | 392 | nothing in `docs/**` outside `archive/` |
+| class | dirs (first matcher) | dirs (corrected) | what cites it |
+|---|---:|---:|---|
+| **exact name** | 10 | 21 | a live document names the directory |
+| **glob family** | 72 | 242 | a live document names `runs/<stem>_*`, a brace set, or a bare prefix |
+| **uncited** | 392 | 211 | nothing in `docs/**` outside `archive/` |
+
+**Both columns are shown because the difference is the finding.** The left column
+is what the first matcher reported and what the sections below were written
+against; the right is after the three defects in *"the count was a property of
+the matcher"* were fixed. Read the left column as a record of what was believed,
+not as a count of anything.
 
 ### The 10 exact-named are the four figures — and those are now re-derived
 
@@ -43,7 +49,7 @@ one than "data behind the figures".
 Sixty-five of the seventy-two are cited by one research-log entry, in the column
 that says where a *deleted* script used to get its input.
 
-### 7 of the 392 "uncited" are tracked in git
+### 7 of the first matcher's 392 "uncited" are tracked in git
 
 `eu_collapse_search`, `eu_ham_only_conservation`, `eu_ham_only_ramp_quench_24`,
 `matsui_edh_baseline_529e3a77`, `matsui_edh_baseline_9ca97308`, `saito_li_torus`,
