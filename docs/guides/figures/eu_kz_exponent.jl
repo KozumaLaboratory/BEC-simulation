@@ -82,7 +82,10 @@ function kz_trajectory(;
             k_cut=tracking_cutoff(tt, fill(mu, 4),
                 [T_hot, T_hot, T_cold, T_cold]; n_T=cutoff_n_T))
     else
-        SPGPEReservoir(; T=T_of, mu=mu, a_s=0.01, k_cut=k_cut, gamma=gamma, M=M)
+        # The pinned branch is kept only so the retracted points can be
+        # reproduced; it must SAY that it is unphysical rather than pass silently.
+        SPGPEReservoir(; T=T_of, mu=mu, a_s=0.01, k_cut=k_cut, gamma=gamma, M=M,
+            allow_unphysical_rates=true)
     end
 
     n_steps = round(Int, (t_equil + tau_Q + t_hold) / dt)
