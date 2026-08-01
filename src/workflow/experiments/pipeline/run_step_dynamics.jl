@@ -379,10 +379,19 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
+    # Cutover step 2, invariant 4: the RTP loops swallow `InterruptException`
+    # exactly as the ITP does (`simulation/run_loops.jl:51`, `:207`) — they
+    # record a final snapshot, print, and return normally, so a killed dynamics
+    # run is otherwise INDISTINGUISHABLE from a finished one. `converged` cannot
+    # cover it either: there is no GS step in a dynamics-only pipeline, so
+    # `run_registry.jl` records `converged = true` unconditionally. This Ref is
+    # the only signal, and it is what withholds the completion marker.
+    rtp_interrupted = Ref(false)
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
         extra_on_step=extra_cb,
         stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
+        interrupted=rtp_interrupted,
     )
 
     if verbose
@@ -399,6 +408,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         :save_snapshot_compression => save_compress,
         :snapshot_tmp_path => snap_tmp_path,
         :snapshot_count => snap_count,
+        :interrupted => rtp_interrupted[],
     )
     (psi_out, grid, atom, ws, step_result)
 end
@@ -453,11 +463,12 @@ function _run_dynamics_with_optional_streaming!(
     snap_type::Type{<:Complex}=ComplexF32;
     extra_on_step::Union{Nothing, Function}=nothing,
     stepper::Union{Nothing, Function}=nothing,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
              SimulationCallbacks(; on_step=extra_on_step)
-        return (run_simulation!(ws; callbacks=cb, stepper), nothing, 0)
+        return (run_simulation!(ws; callbacks=cb, stepper, interrupted), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -489,6 +500,7 @@ function _run_dynamics_with_optional_streaming!(
             ),
             stream_snapshots=true,
             stepper,
+            interrupted,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]

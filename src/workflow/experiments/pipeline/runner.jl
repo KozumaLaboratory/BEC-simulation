@@ -310,7 +310,17 @@ end
             end
             results[:rotating_basis_history] = rb_history
         end
+        # `:interrupted` is the ONE key that must survive `merge!` (cutover step
+        # 2, invariant 4). Plain `merge!` is last-writer-wins, so a GS step that
+        # was killed followed by a dynamics step that ran to completion would
+        # end with `:interrupted => false` and the run would be marked complete
+        # on a half-relaxed ψ. Accumulate with `|`. Gated by the second testset
+        # in `test/model/test_interrupted_run_recomputes.jl`, which interrupts
+        # the GS of a two-step pipeline and lets the dynamics step finish.
+        was = get(results, :interrupted, false) === true
         merge!(results, step_result)
+        now_ = get(step_result, :interrupted, false) === true
+        results[:interrupted] = was || now_
     end
     return (psi_out, grid_out, atom_out, workspace_out)
 end

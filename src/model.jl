@@ -23,3 +23,4 @@ include("model/active.jl")            # every `active` method, in ONE file
 include("model/io.jl")                # TOML round-trip
 include("model/stage.jl")             # Stage: one computation over one Model
 include("model/identity.jl")          # code_tree_hash + artifact_id
+include("model/complete.jl")          # the completion marker + the one admission decision

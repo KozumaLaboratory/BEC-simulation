@@ -3,6 +3,37 @@
 #   _run_simulation_leapfrog! — merges adjacent V(dt/2) blocks between
 #                                non-checkpoint steps for real-time dynamics
 
+"""
+    _trim_interrupted_traces!(times, energies, norms, mags, snapshots, keep_psi) -> Int
+
+Drop a half-written observation row, so the trace an interrupted run hands back
+is rectangular.
+
+`_record_snapshot!` pushes `times`, then `energies`, then `norms`, then `mags`,
+then (optionally) `snapshots`. A scheduler-delivered `InterruptException` can
+land BETWEEN those pushes — measured on the leapfrog loop, 2026-08-01:
+`times = 6` while `energies = norms = mags = snapshots = 5`. Every consumer
+indexes the four together (`_concat_dynamics_phases`, `save_rotating_result.jl`,
+which reads `dr.norms[k]` for `k in eachindex(dr.times)`), so the ragged tail
+raised a `BoundsError` inside the pipeline's dynamics auto-save. That auto-save
+is wrapped in `try`/`@warn`, so the visible effect was an interrupted dynamics
+run writing NO `result.jld2` at all — losing both the forensic record and the
+tombstone that marks it as not-to-be-served.
+
+Truncating from the END is the correct repair, not a heuristic: the only row
+that can be partial is the one being written when the exception arrived.
+"""
+function _trim_interrupted_traces!(times, energies, norms, mags, snapshots,
+    keep_psi::Bool)
+    n = min(length(times), length(energies), length(norms), length(mags))
+    keep_psi && (n = min(n, length(snapshots)))
+    for v in (times, energies, norms, mags)
+        length(v) > n && resize!(v, n)
+    end
+    keep_psi && length(snapshots) > n && resize!(snapshots, n)
+    n
+end
+
 function _run_simulation_standard!(
     ws::Workspace{N},
     sp,
@@ -15,6 +46,7 @@ function _run_simulation_standard!(
     callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
     stepper::S=(split_step!),
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 ) where {N, S}
     t_start = time()
     try
@@ -49,6 +81,11 @@ function _run_simulation_standard!(
         end
     catch e
         if e isa InterruptException
+            # Record the interrupt BEFORE the snapshot, so a failure inside
+            # `_record_snapshot!` cannot leave the run looking complete.
+            interrupted === nothing || (interrupted[] = true)
+            _trim_interrupted_traces!(
+                times, energies, norms, mags, snapshots, !stream_snapshots)
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;
                 keep_psi=(!stream_snapshots),
@@ -102,6 +139,7 @@ function _run_simulation_leapfrog!(
     snapshots,
     callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -201,6 +239,9 @@ function _run_simulation_leapfrog!(
         end
     catch e
         if e isa InterruptException
+            interrupted === nothing || (interrupted[] = true)
+            _trim_interrupted_traces!(
+                times, energies, norms, mags, snapshots, !stream_snapshots)
             # Close the open half-step so psi is in a valid Strang-split state
             _rtp_half_V!(
                 combined_V, ws, dt / 2, n_comp, N;

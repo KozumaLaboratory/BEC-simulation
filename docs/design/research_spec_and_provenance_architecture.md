@@ -455,6 +455,64 @@ a test that `kill -INT`s an ITP mid-run and asserts the next `run!` recomputes.
 **Do not merge this step without that test** — that is the failure mode this
 whole pass exists to stop.
 
+*As landed* (`src/model/complete.jl`, four deviations a future reader should not
+undo):
+
+1. **Sidecar, not one file per directory.** `<payload>.complete.toml`. Every
+   admission site in the tree tests ONE file, a scan directory is written by N
+   independent processes under `SPINORBEC_SCAN_ONLY_INDEX`, and the sidecar sorts
+   *after* its payload under `rsync`, so a collect cannot expose a marker whose
+   bytes have not landed.
+2. **Arm (b): a payload with NO marker is still admitted**, as `:unmarked`, warned
+   once per store. Measured at cutover: 671 `.jld2` under `runs/`, zero markers.
+   A cold flip meant recomputing the tree. Deleting arm (b) is step 3's business
+   and it needs a dated cutoff.
+3. **A tombstone, `<payload>.incomplete.toml`, written by a run that knows it did
+   not finish.** Without it the mandatory control *cannot pass*: a run killed
+   after its payload lands and before its marker is written is byte-identical to
+   a pre-cutover artifact, so arm (b) would serve it and nothing would recompute.
+   The tombstone is the discriminator; `write_complete_marker` clears it.
+4. **The control does not use `kill -INT`, and the design's suggestion to is
+   wrong.** Julia 1.12 script mode has `exit_on_sigint == true`, so a real SIGINT
+   aborts the process before `itp_loop.jl:223` runs — nothing is written, the next
+   run recomputes because there is nothing to serve, and the test is green before
+   *and* after this step. `schedule(task, InterruptException(); error=true)` on an
+   `@async` task reaches the swallow path, which is where the payload gets
+   written. `Base.throwto` deadlocks; `Threads.@spawn` aborts the process.
+
+The defect measured before the fix: a 64-point ITP killed at step 20 000 of
+2 000 000 wrote a full `point_001.jld2` at E = 0.96272 against a converged
+0.94108, `_exit_summary.json` said `completed: true`, the interrupt checkpoint
+was deleted as "point completed successfully", and the next run served it in
+0.008 s.
+
+Two more things the same step had to close, found by corrupting the fix and
+watching the suite stay green (canary pass, 2026-08-01):
+
+5. **There are THREE swallowing loops, not one.** `itp_loop.jl:223` and both RTP
+   loops (`simulation/run_loops.jl`). Forcing `interrupted[] = false` in the two
+   RTP loops left every suite green, because the only interrupt test's kill
+   landed in the GS and rode the `|` accumulation in `_step_dispatch!` — so a
+   dynamics-only run killed mid-evolution was still certified and served.
+   `test_interrupted_dynamics_recomputes.jl` drives both loops directly and then
+   kills a `run_yaml` mid-dynamics, waiting on `_live_status.json` (written by
+   the dynamics step and by nothing else) as the "the GS is done and the RTP is
+   running" signal.
+   A scheduler-delivered `InterruptException` can also land BETWEEN the pushes
+   inside `_record_snapshot!` (measured: `times = 6`, everything else 5), and the
+   ragged tail made the pipeline's dynamics auto-save raise — so the interrupted
+   run wrote no `result.jld2` at all, losing both the forensic record and the
+   tombstone. `_trim_interrupted_traces!` drops the partial row.
+
+6. **`point_001.jld2` was not always a payload.** `save_rotating_basis_result!`
+   published it as a symlink to `result.jld2` and `rm`'d whatever was there
+   first; `run_pipeline` calls that once per scan point, so in a multi-point scan
+   the name ended up on the LAST point's data (3 such symlinks under `runs/`,
+   one in a 3-point scan). Pre-existing, surfaced by this step because the marker
+   written for the real point 1 then disagreed with the link's target size. The
+   alias is now published only into a name no point writer has claimed, and a
+   rejection on a symlink says so instead of reporting truncation.
+
 **Step 3 — flip admission to `artifact_id`.** One-line change once steps 1 and 2
 are green. `git rm src/workflow/experiments/pipeline/run_step_ground_state.jl`'s
 `_gs_cache_key` (`:249-271`) and its `_hashable` helpers (`:235-241`) in the same

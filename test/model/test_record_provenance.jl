@@ -3,7 +3,7 @@
 #
 # THREE places write `code_rev` / `gs_cache_key`: the stage artifact
 # (`run_step_ground_state.jl:576-578`), the scan point (`run_registry.jl:576-578`)
-# and the single point (`run_registry.jl:746-749`). `test_admission_unchanged.jl`
+# and the single point (`run_registry.jl:746-749`). `test_admission_requires_marker.jl`
 # calls `_run_step(GroundStateStep(...))` directly, so it reaches the first and
 # only the first — deleting both `run_registry.jl` blocks left every model suite
 # green. Those two are the ones every `run_yaml` goes through, i.e. the ones a

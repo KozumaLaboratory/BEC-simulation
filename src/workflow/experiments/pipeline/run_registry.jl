@@ -484,8 +484,13 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
         for (run_name, cmp_override) in runs
             psi_file = joinpath(run_dir, _point_filename(i, run_name))
 
-            if isfile(psi_file)
-                verbose && println("  ✓ $(basename(psi_file)) (cached)")
+            # Cutover step 2, invariant 4. This is the worst of the three point
+            # admissions: under `scan.continuation` the admitted ψ SEEDS point
+            # i+1, so one truncated or half-relaxed point silently poisons every
+            # point downstream of it while each of them looks complete.
+            adm = admit_payload(psi_file)
+            if adm.hit
+                verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
                 if scan.continuation
                     d = JLD2.load(psi_file)
                     psi_c =
@@ -602,8 +607,13 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 @warn "run summary emit failed (non-fatal)" run_dir exception=err
             end
 
-            # Clean up checkpoint (point completed successfully)
-            isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
+            _cleanup_checkpoint!(ckpt_dir, result)
+
+            # LAST — see `_finish_point!`. `result.jld2` is deliberately NOT
+            # named here: `run_pipeline` rewrites it once per scan point, so a
+            # marker recording point 1's size would disagree with the tree the
+            # moment point 2 lands, and point 1 would be rejected forever.
+            _finish_point!(psi_file, result, psi_host, gs_ref; light_point, verbose)
 
             if scan.continuation
                 chain_state[run_name] = (psi=psi_host, mz_actual=mz_actual)
@@ -705,8 +715,9 @@ end
 function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
-    if isfile(psi_file)
-        verbose && println("  ✓ $(basename(psi_file)) (cached)")
+    adm = admit_payload(psi_file)
+    if adm.hit
+        verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
         return nothing
     end
 
@@ -777,8 +788,109 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         @warn "run summary emit failed (non-fatal)" run_dir exception=err
     end
 
-    isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
+    _cleanup_checkpoint!(ckpt_dir, result)
+
+    # LAST. After the payload is at its final path, after the derived summary,
+    # after the checkpoint cleanup — so anything that can still fail fails
+    # before the run claims to be complete. `result.jld2` gets its own marker
+    # inside `save_rotating_basis_result!`, which owns it.
+    _finish_point!(psi_file, result, psi_host, get(result, :gs_stage_ref, nothing);
+        light_point=false, verbose)
+
     verbose && @printf("    E=%.4f conv=%s\n", energy, converged)
+end
+
+"""
+    _cleanup_checkpoint!(ckpt_dir, result)
+
+Delete the point's checkpoint directory — unless the run was interrupted, in
+which case it is the only thing left that says so.
+
+`_run_itp_loop!:235` writes `itp_checkpoint.jld2` on the interrupt path, and
+before cutover step 2 this line deleted it again on the very same pass, under
+the comment "point completed successfully". It had not. That erased both the
+resume artifact and the last forensic trace, which is why an interrupted run was
+indistinguishable from a finished one on disk.
+"""
+function _cleanup_checkpoint!(ckpt_dir::AbstractString, result)
+    isdir(ckpt_dir) || return nothing
+    if get(result, :interrupted, false) === true
+        @warn "run was interrupted — KEEPING its checkpoint (resume artifact + " *
+            "forensic record)" ckpt_dir
+        return nothing
+    end
+    rm(ckpt_dir; recursive=true, force=true)
+    nothing
+end
+
+"""
+    _finish_point!(psi_file, result, psi_host, stage_ref; light_point, verbose)
+
+Write the point's completion marker — or refuse to, and say why.
+
+Three ways a run reaches this line without having produced a usable answer, and
+only the first is visible in the payload itself:
+
+  1. **Interrupted.** Both the ITP and the two RTP loops CATCH
+     `InterruptException` and return normally, so the pipeline runs on and
+     `_exit_summary.json` records `completed = true`. Measured before this
+     cutover: a 32³ ITP killed at step 5323/100000 wrote a full 1.58 MB point
+     file whose energy was 0.64 % off, and the next `run_yaml` served it in
+     0.01 s. `:interrupted` is accumulated across steps in `_step_dispatch!`.
+  2. **Diverged.** A non-finite ψ is a completed run whose answer is NaN.
+     Nothing else in the pipeline stops it from being cached.
+  3. **Threw.** Needs no check: the marker is written after the payload, so an
+     exception anywhere upstream leaves the payload unmarked by construction.
+
+A refusal writes a TOMBSTONE (`<payload>.incomplete.toml`) rather than merely
+omitting the marker. Omitting it is not enough: "payload present, no marker" is
+byte-for-byte what the 671 pre-cutover artifacts look like, so arm (b) of
+`admit_payload` would serve the killed run anyway and the next run would NOT
+recompute. The payload itself stays on disk as the forensic record — the
+tombstone rejects it, and `write_complete_marker` clears the tombstone once a
+later run succeeds over it.
+"""
+function _finish_point!(psi_file::AbstractString, result, psi_host,
+    stage_ref::Union{Nothing, AbstractString};
+    light_point::Bool=false, verbose::Bool=true)
+    reason = if get(result, :interrupted, false) === true
+        "the run was INTERRUPTED mid-solve"
+    elseif !all(isfinite, psi_host)
+        "psi is not finite (the run diverged)"
+    else
+        nothing
+    end
+    if reason !== nothing
+        @warn "$reason — writing a TOMBSTONE instead of a completion marker; the " *
+            "next run will recompute this point rather than serve a partial answer" point = basename(
+            psi_file
+        )
+        try
+            write_incomplete_marker(psi_file, String[String(psi_file)];
+                kind="point", reason=reason, artifact_id=stage_ref)
+        catch err
+            @warn "tombstone write failed; this partial payload will be admitted " *
+                "as :unmarked" psi_file exception = err
+        end
+        return nothing
+    end
+    payloads = String[String(psi_file)]
+    # A light point stores `gs_ref` INSTEAD of ψ, so its bytes are not all in
+    # its own file. Naming the stage artifact turns "someone pruned the shared
+    # ψ" from a throw inside `_load_stage_psi` into an ordinary miss.
+    if light_point && stage_ref !== nothing
+        push!(payloads, joinpath(_gs_stage_dir(), stage_ref * ".jld2"))
+    end
+    try
+        write_complete_marker(psi_file, payloads; kind="point", artifact_id=stage_ref)
+        verbose && println("    ✓ complete.toml ($(length(payloads)) file(s))")
+    catch err
+        # A completed multi-hour run must not acquire a new way to fail. The
+        # degraded outcome is an unmarked payload, i.e. exactly arm (b).
+        @warn "completion marker write failed (non-fatal); this artifact will be " *
+            "admitted as :unmarked" psi_file exception = err
+    end
+    nothing
 end
 
 """

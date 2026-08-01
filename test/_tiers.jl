@@ -60,12 +60,25 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
-    # Model / Stage layer + the provenance cutover's step 1.
+    # Model / Stage layer + the provenance cutover's steps 1 and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
     "model/test_artifact_id.jl",
-    "model/test_admission_unchanged.jl",
+    "model/test_admission_requires_marker.jl",
     "model/test_record_provenance.jl",
+    "model/test_completion_marker.jl",
+    # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
+    # assert the next run recomputes instead of serving the partial output.
+    # Nothing else in the suite exercises the swallowed `InterruptException`.
+    # Two files because there are two swallowing loops — the ITP and the two
+    # RTP loops — and forcing the RTP half to report "not interrupted" left the
+    # ITP file green (canary B6, 2026-08-01).
+    "model/test_interrupted_run_recomputes.jl",
+    "model/test_interrupted_dynamics_recomputes.jl",
+    # The writer / admission sites a YAML SCAN and `Experiment` actually use.
+    # Four independent canaries (D1 / D2 / D3b / D4b) passed against the suite
+    # without it, which is step 1's finding M10 in the scan path.
+    "model/test_scan_path_admission.jl",
     "manuscript/test_lemma1_general_S.jl",
     "manuscript/test_f5_f7_polyhedral.jl",
     "manuscript/test_f9_f11_polyhedral.jl",
@@ -607,9 +620,26 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_ddi.jl" => 33.6,
     "dynamics/test_tdhfb_f1_validation.jl" => 30.3,
     "oracles/test_bdg_fd_hessian.jl" => 23.8,
-    # A real (tiny) ITP solve: the cache MISS arm has to actually solve, or the
-    # positive control that arms the whole gate is not there.
-    "model/test_admission_unchanged.jl" => 27.0,
+    # Five real (tiny) ITP solves plus one interrupted 2e6-step solve: the cache
+    # MISS arms have to actually solve, or the positive controls that arm the
+    # whole gate are not there.
+    "model/test_admission_requires_marker.jl" => 29.0,
+    # One `run_yaml` interrupted mid-ITP + one full recomputation of the same
+    # cell (2e6-step budget, 64 points, 1-D, CPU).
+    #
+    # These five, like every other entry here, are SERIAL measurements. Under
+    # `SPINORBEC_TEST_WORKERS=auto` (10 workers on this box) the first three took
+    # 110.3 / 62.3 / 3.2 s — roughly 2.2× on the two that solve, and ~1× on the
+    # one that only touches the filesystem. `_COST` is only the hand-out order,
+    # so what has to be right is the ranking, not the absolute number.
+    "model/test_interrupted_run_recomputes.jl" => 50.0,
+    "model/test_completion_marker.jl" => 3.0,
+    # Two RTP loops driven directly (5.9 s) + one `run_yaml` interrupted
+    # mid-dynamics and recomputed in full, 1e6 steps (48.8 s).
+    "model/test_interrupted_dynamics_recomputes.jl" => 55.0,
+    # Six 2-point `run_yaml` scans (47.8 s) + a scan with a dynamics step
+    # (4.7 s) + filesystem-only `Experiment` admission arms (0.6 s).
+    "model/test_scan_path_admission.jl" => 53.0,
     # Two real `run_yaml` round trips (1-D, 16 points, 20 ITP steps) — the
     # two `run_registry.jl` writer sites cannot be reached any other way.
     "model/test_record_provenance.jl" => 46.0,

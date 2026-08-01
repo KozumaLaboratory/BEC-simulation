@@ -340,9 +340,18 @@ function _run_step(
             verbose && println("  GS stage-cache key → $(stage_ref)")
         end
     end
-    if cache_path !== nothing && isfile(cache_path)
+    # Cutover step 2, invariant 4: `isfile(cache_path)` was the admission. It is
+    # the highest-blast-radius one in the tree — the key is content-addressed
+    # over resolved physics precisely so that ANY other config reuses the
+    # artifact, so one truncated or half-relaxed file is served to N unrelated
+    # cells. `admit_payload` requires a marker to have been written last, or
+    # (arm b) no marker at all. Measured at cutover: `runs/_stage` did not exist
+    # and no config carried an explicit `cache:` key, so arm (b) has no legacy
+    # population HERE — this is the site step 3 can make strict first.
+    gs_admission = cache_path === nothing ? nothing : admit_payload(cache_path)
+    if gs_admission !== nothing && gs_admission.hit
         if verbose
-            println("  Loading cached GS from $cache_path")
+            println("  Loading cached GS from $cache_path ($(gs_admission.provenance))")
             flush(stdout);
             ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
         end
@@ -362,6 +371,7 @@ function _run_step(
         step_result = Dict{Symbol, Any}(
             :ground_state_energy => energy,
             :ground_state_converged => converged,
+            :ground_state_provenance => String(gs_admission.provenance),
             :workspace => ws_cached,
             :gs_stage_ref => stage_ref,
         )
@@ -558,8 +568,21 @@ function _run_step(
     gs_energy = hasproperty(gs, :E0_extrap) ? gs.E0_extrap : gs.energy
     verbose && _print_gs_summary(psi_out, grid, atom, gs)
 
+    # THE defect this cutover exists to close. `_run_itp_loop!` swallows
+    # `InterruptException` (`solvers/ground_state/itp_loop.jl:223-233`) and
+    # returns an ordinary NamedTuple, so before this line a run killed at 1 % of
+    # its step budget wrote its half-relaxed ψ into a CONTENT-ADDRESSED store
+    # that every other config with the same physics then reads. `gs.interrupted`
+    # existed the whole time and had exactly two consumers: that file's
+    # checkpoint branch and a `println`. This is its third.
+    #
+    # Withheld, not marked-as-partial: a partial GS in a shared store is not
+    # data with a caveat, it is a wrong answer waiting for a different config.
+    # `find_ground_state_lbfgs` reports no such field, hence the `get` default.
+    gs_interrupted = Bool(get(gs, :interrupted, false))
+
     # Save to cache if specified
-    if cache_path !== nothing
+    if cache_path !== nothing && !gs_interrupted
         mkpath(dirname(cache_path))
         psi_host = _to_host(psi_out)
         tmp = cache_path * ".tmp"
@@ -570,24 +593,35 @@ function _run_step(
                 f["converged"] = gs.converged
                 # Provenance cutover step 1: the id that DECIDES admission is
                 # written into the artifact beside the code revision the new
-                # `artifact_id` digests. Recorded only — the `isfile(cache_path)`
-                # test that admits this file is untouched, which is what makes
-                # the step revertable.
+                # `artifact_id` digests.
                 stage_ref === nothing || (f["gs_cache_key"] = stage_ref)
                 code_rev = _code_rev_or_nothing()
                 code_rev === nothing || (f["code_rev"] = code_rev)
             end
             mv(tmp, cache_path; force=true)
+            # LAST, and after the `mv`: the marker must certify bytes that are
+            # already at their final path. Same directory, so this rename is a
+            # real `rename(2)` and a reader never sees a partial marker.
+            write_complete_marker(cache_path, [cache_path];
+                kind="ground_state", artifact_id=stage_ref)
             verbose && println("  Cached GS to $cache_path")
         catch err
             isfile(tmp) && rm(tmp; force=true)
             @warn "Failed to save GS cache: $err"
         end
+    elseif cache_path !== nothing && gs_interrupted
+        # Nothing is written here, so there is no payload to tombstone — the
+        # partial ψ never reaches the shared store at all. A tombstone would be
+        # worse than useless: the key is content-addressed, so it would poison
+        # the cell for every OTHER config that resolves to the same physics.
+        @warn "ground state was INTERRUPTED — not caching the partial ψ" cache_path last_step = get(
+            gs, :last_step, -1)
     end
 
     step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
+        :interrupted => gs_interrupted,
         # `converged=false` alone cannot tell a run that failed from one that
         # reached the method's floor with an unattainable `tol` asked of it.
         # ITP has no line search and reports neither key.

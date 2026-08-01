@@ -244,8 +244,8 @@ results.
 
 Writes to `<run_dir>/result.jld2` in the streamed snapshot layout that
 the dashboard's `dynamics/psi_snapshots_streamed/...` reader path
-expects, plus a `point_001.jld2` symlink so the run shows up in the
-dashboard's run list.
+expects, plus — only when no point writer has claimed the name — a
+`point_001.jld2` symlink so the run shows up in the dashboard's run list.
 
 The canonical layout:
     psi                                          # GS / first snapshot (4D)
@@ -323,6 +323,13 @@ function save_rotating_basis_result!(
 
     isdir(run_dir) || mkpath(run_dir)
     out_path = joinpath(run_dir, "result.jld2")
+    # Cutover step 2. This was the ONE payload writer in the tree with no
+    # tmp+rename at all: `jldopen(out_path, "w")` built a multi-GB file in place,
+    # so a kill mid-write left a truncated `result.jld2` that `_has_result`
+    # admitted. Same directory as the final path, so this `mv` is a real
+    # `rename(2)` — unlike the point writers', which fall back to `cp` when
+    # `SPINORBEC_SCRATCH_DIR` points at another filesystem.
+    tmp_path = out_path * ".tmp." * string(getpid())
 
     snaps = get(dyn, :psi_snapshots, Any[])
     n_snaps = length(snaps)
@@ -338,109 +345,157 @@ function save_rotating_basis_result!(
     # `compress=false` to opt out (e.g. when bypassing for performance bench).
     compressor = compress ? ZstdCompressor() : nothing
 
-    JLD2.jldopen(out_path, "w"; compress=compressor) do f
-        # GS (or first snapshot) for the dashboard's volume renderer entry point.
-        if n_snaps >= 1
-            f["psi"] = Array{ComplexF64}(snaps[1])
-        end
+    try
+        JLD2.jldopen(tmp_path, "w"; compress=compressor) do f
+            # GS (or first snapshot) for the dashboard's volume renderer entry point.
+            if n_snaps >= 1
+                f["psi"] = Array{ComplexF64}(snaps[1])
+            end
 
-        f["dynamics/times"] = collect(Float64, dyn[:times])
-        f["dynamics/norms"] = collect(Float64, dyn[:norms])
-        # Lz / Fx / Fy are populated by the rotating_basis path but absent in
-        # the lab-frame spinor path (only times/norms/Fz are guaranteed by
-        # SimulationResult). Guard each write so spinor dynamics still saves.
-        haskey(dyn, :Lz) && (f["dynamics/Lz"] = collect(Float64, dyn[:Lz]))
-        haskey(dyn, :Fz) && (f["dynamics/Fz"] = collect(Float64, dyn[:Fz]))
-        haskey(dyn, :Fx) && (f["dynamics/Fx"] = collect(Float64, dyn[:Fx]))
-        haskey(dyn, :Fy) && (f["dynamics/Fy"] = collect(Float64, dyn[:Fy]))
-        if !isempty(pm_mat)
-            f["dynamics/per_m_history"] = pm_mat
-        end
+            f["dynamics/times"] = collect(Float64, dyn[:times])
+            f["dynamics/norms"] = collect(Float64, dyn[:norms])
+            # Lz / Fx / Fy are populated by the rotating_basis path but absent in
+            # the lab-frame spinor path (only times/norms/Fz are guaranteed by
+            # SimulationResult). Guard each write so spinor dynamics still saves.
+            haskey(dyn, :Lz) && (f["dynamics/Lz"] = collect(Float64, dyn[:Lz]))
+            haskey(dyn, :Fz) && (f["dynamics/Fz"] = collect(Float64, dyn[:Fz]))
+            haskey(dyn, :Fx) && (f["dynamics/Fx"] = collect(Float64, dyn[:Fx]))
+            haskey(dyn, :Fy) && (f["dynamics/Fy"] = collect(Float64, dyn[:Fy]))
+            if !isempty(pm_mat)
+                f["dynamics/per_m_history"] = pm_mat
+            end
 
-        # Per-frame populations (rows = time, cols = m component) for the
-        # dashboard's spinor-population time-series tab.
-        if n_snaps >= 1
-            psi1 = snaps[1]
-            D = size(psi1)[end]
-            ndim = ndims(psi1) - 1
-            n_pts = ntuple(d -> size(psi1, d), ndim)
-            pops = zeros(Float64, n_snaps, D)
-            for (s, psi) in enumerate(snaps)
-                total = sum(abs2, psi)
-                for c in 1:D
-                    idx = ntuple(d -> d <= ndim ? Colon() : c, ndim + 1)
-                    pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, 1e-30)
+            # Per-frame populations (rows = time, cols = m component) for the
+            # dashboard's spinor-population time-series tab.
+            if n_snaps >= 1
+                psi1 = snaps[1]
+                D = size(psi1)[end]
+                ndim = ndims(psi1) - 1
+                n_pts = ntuple(d -> size(psi1, d), ndim)
+                pops = zeros(Float64, n_snaps, D)
+                for (s, psi) in enumerate(snaps)
+                    total = sum(abs2, psi)
+                    for c in 1:D
+                        idx = ntuple(d -> d <= ndim ? Colon() : c, ndim + 1)
+                        pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, 1e-30)
+                    end
+                end
+                f["dynamics/component_populations"] = pops
+
+                # Streamed snapshot layout (one HDF5 dataset per frame).
+                f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
+                f["dynamics/psi_snapshots_streamed/spatial_shape"] = collect(Int, n_pts)
+                f["dynamics/psi_snapshots_streamed/n_components"] = D
+                for (s, psi) in enumerate(snaps)
+                    key = "dynamics/psi_snapshots_streamed/frame_" *
+                          lpad(string(s), 5, '0')
+                    f[key] = Array{snap_eltype}(psi)
                 end
             end
-            f["dynamics/component_populations"] = pops
 
-            # Streamed snapshot layout (one HDF5 dataset per frame).
-            f["dynamics/psi_snapshots_streamed/n_snapshots"] = n_snaps
-            f["dynamics/psi_snapshots_streamed/spatial_shape"] = collect(Int, n_pts)
-            f["dynamics/psi_snapshots_streamed/n_components"] = D
-            for (s, psi) in enumerate(snaps)
-                key = "dynamics/psi_snapshots_streamed/frame_" *
-                      lpad(string(s), 5, '0')
-                f[key] = Array{snap_eltype}(psi)
+            # Integrator metadata (added 2026-04-28 audit) — preserved if present.
+            for (src_key, dst_key) in (
+                (:dt_used, "dt_used"),
+                (:integrator, "integrator"),
+                (:epsilon_target, "epsilon_target"),
+                (:p_zeeman, "p_zeeman"),
+                (:F_atom, "F_atom"),
+                (:larmor_phase_per_step, "larmor_phase_per_step"),
+                (:theta_const, "theta_const"),
+                (:phi_omega, "phi_omega"),
+            )
+                haskey(dyn, src_key) && (f["dynamics/integrator_meta/" * dst_key] = dyn[src_key])
             end
-        end
 
-        # Integrator metadata (added 2026-04-28 audit) — preserved if present.
-        for (src_key, dst_key) in (
-            (:dt_used, "dt_used"),
-            (:integrator, "integrator"),
-            (:epsilon_target, "epsilon_target"),
-            (:p_zeeman, "p_zeeman"),
-            (:F_atom, "F_atom"),
-            (:larmor_phase_per_step, "larmor_phase_per_step"),
-            (:theta_const, "theta_const"),
-            (:phi_omega, "phi_omega"),
-        )
-            haskey(dyn, src_key) && (f["dynamics/integrator_meta/" * dst_key] = dyn[src_key])
-        end
-
-        # TWA ensemble persistence (added 2026-05-07): if any dynamics phase
-        # ran as a Truncated Wigner ensemble, write per-phase mean / variance /
-        # n_trajectories per observable. Without this only the last
-        # trajectory's psi survived through `dr.psi_snapshots`, and the
-        # ensemble statistics computed via Welford accumulation were lost
-        # at save time.
-        ensembles = get(dyn, :ensembles, Tuple{Int, Any}[])
-        for (phase_idx, ens) in ensembles
-            base = "dynamics/ensemble/phase_" * lpad(string(phase_idx), 2, '0')
-            f[base * "/n_trajectories"] = ens.n_trajectories
-            f[base * "/times"] = collect(Float64, ens.times)
-            for (sym, mean_traj) in ens.mean
-                key = base * "/" * String(sym) * "/mean"
-                # Each entry is a Vector of T arrays (one per snapshot time).
-                # Stack into a higher-rank array so it's a single dataset.
-                isempty(mean_traj) && continue
-                shape = size(mean_traj[1])
-                stacked = zeros(Float64, shape..., length(mean_traj))
-                for (t, arr) in enumerate(mean_traj)
-                    selectdim(stacked, ndims(stacked), t) .= arr
+            # TWA ensemble persistence (added 2026-05-07): if any dynamics phase
+            # ran as a Truncated Wigner ensemble, write per-phase mean / variance /
+            # n_trajectories per observable. Without this only the last
+            # trajectory's psi survived through `dr.psi_snapshots`, and the
+            # ensemble statistics computed via Welford accumulation were lost
+            # at save time.
+            ensembles = get(dyn, :ensembles, Tuple{Int, Any}[])
+            for (phase_idx, ens) in ensembles
+                base = "dynamics/ensemble/phase_" * lpad(string(phase_idx), 2, '0')
+                f[base * "/n_trajectories"] = ens.n_trajectories
+                f[base * "/times"] = collect(Float64, ens.times)
+                for (sym, mean_traj) in ens.mean
+                    key = base * "/" * String(sym) * "/mean"
+                    # Each entry is a Vector of T arrays (one per snapshot time).
+                    # Stack into a higher-rank array so it's a single dataset.
+                    isempty(mean_traj) && continue
+                    shape = size(mean_traj[1])
+                    stacked = zeros(Float64, shape..., length(mean_traj))
+                    for (t, arr) in enumerate(mean_traj)
+                        selectdim(stacked, ndims(stacked), t) .= arr
+                    end
+                    f[key] = stacked
                 end
-                f[key] = stacked
-            end
-            for (sym, var_traj) in ens.var
-                key = base * "/" * String(sym) * "/variance"
-                isempty(var_traj) && continue
-                shape = size(var_traj[1])
-                stacked = zeros(Float64, shape..., length(var_traj))
-                for (t, arr) in enumerate(var_traj)
-                    selectdim(stacked, ndims(stacked), t) .= arr
+                for (sym, var_traj) in ens.var
+                    key = base * "/" * String(sym) * "/variance"
+                    isempty(var_traj) && continue
+                    shape = size(var_traj[1])
+                    stacked = zeros(Float64, shape..., length(var_traj))
+                    for (t, arr) in enumerate(var_traj)
+                        selectdim(stacked, ndims(stacked), t) .= arr
+                    end
+                    f[key] = stacked
                 end
-                f[key] = stacked
             end
         end
+        mv(tmp_path, out_path; force=true)
+    catch err
+        isfile(tmp_path) && rm(tmp_path; force=true)
+        rethrow(err)
     end
 
     # Dashboard's run-list filter requires a `point_NNN.jld2` file. Symlink
     # to the canonical result so we don't duplicate the multi-GB snapshot data.
+    #
+    # NEVER over a real file, and this is a data-integrity fix, not a tidy-up.
+    # `run_pipeline` calls this once per scan point (`runner.jl:218-231`), and
+    # the unconditional `rm` it replaces fired on every one of them: point 2's
+    # save deleted the REAL `point_001.jld2` the scan writer had just produced
+    # and re-pointed the name at point 2's `result.jld2`. Reading `point_001`
+    # then returned the LAST point's data under point 1's name. Verified in the
+    # store before the fix: 3 symlinked `point_001.jld2` under `runs/`, one of
+    # them in `runs/eu151_edh_k3_compare`, a 3-point scan.
+    #
+    # `point_001.jld2` belongs to the point writer (`run_registry.jl`), which
+    # writes it AFTER `run_pipeline` returns. This publishes the dashboard alias
+    # only into a name that writer has not claimed — which is exactly the
+    # single-run case the alias was added for.
     point_link = joinpath(run_dir, "point_001.jld2")
-    islink(point_link) && rm(point_link)
-    isfile(point_link) && rm(point_link)
-    symlink("result.jld2", point_link)
+    if !islink(point_link) && !ispath(point_link)
+        symlink("result.jld2", point_link)
+    end
+
+    # LAST, after the alias (cutover step 2, invariant 4). `result.jld2` is one
+    # of the two names `Experiment`'s admission tests, so without a marker here
+    # every dynamics run would stay arm-(b) forever. Only `result.jld2` is named:
+    # `point_001.jld2` is either a symlink to it (and `filesize` follows symlinks,
+    # so naming both would record the same bytes twice) or a real point payload
+    # that `_finish_point!` marks for itself.
+    #
+    # `:interrupted` is threaded through `_step_dispatch!`; a killed RTP loop
+    # returns normally with a final snapshot recorded, so this is the only thing
+    # that distinguishes it from a finished run.
+    if get(result, :interrupted, false) === true
+        @warn "dynamics run was INTERRUPTED — tombstoning result.jld2 so it is " *
+            "recomputed rather than served" run_dir
+        try
+            write_incomplete_marker(out_path, [out_path];
+                kind="dynamics", reason="the run was INTERRUPTED mid-evolution")
+        catch err
+            @warn "tombstone write failed" out_path exception = err
+        end
+    else
+        try
+            write_complete_marker(out_path, [out_path]; kind="dynamics")
+        catch err
+            @warn "completion marker write failed (non-fatal); result.jld2 will be " *
+                "admitted as :unmarked" out_path exception = err
+        end
+    end
 
     out_path
 end
