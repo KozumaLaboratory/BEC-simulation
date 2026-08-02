@@ -26,6 +26,7 @@ const FAST_TESTS = [
     "analysis/test_spinor_fingerprint.jl",
     "analysis/test_larmor_adiabaticity.jl",
     "analysis/test_dipole_field.jl",
+    "analysis/test_resonance_dip_nonuniform.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
