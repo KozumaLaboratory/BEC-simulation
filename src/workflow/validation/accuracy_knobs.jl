@@ -171,6 +171,16 @@ be removed without removing the rotating-basis path. Buys NO speed — measured 
 0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
 3-component convolution with all 6 FFTs. Choose it for the physics or not at all.";
         approx_rel_cost=0.986),
+    # `:none` IS REACHABLE AND DIVERGES at the production shape. Measured
+    # 2026-08-02, Eu F=6 64³ with c_dd = 211: every arm of
+    # `bench/itp_fused_chain_accuracy.jl` returned NaN at c₁/c₀ = −0.05, and at
+    # +0.05 it ran the full 40000-step cap to dE = 2.3e-6 (target 1e-10) landing
+    # at E = 7.86 against 776.7 with a table — a different state, not a
+    # less-converged one. LHY is the term that arrests dipolar collapse, so
+    # turning it off is not "the same physics without a correction".
+    #
+    # This is the shipped DEFAULT, which is the uncomfortable part: `:none` is
+    # what a config gets by omitting the block.
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \

@@ -115,14 +115,23 @@ function relax(half!; dt, max_steps, label="")
         end
     end
     CUDA.synchronize()
+    # DIVERGED is not UNCONVERGED. A NaN energy was being folded into `conv=false`
+    # and printed beside runs that were merely slow, so `c₁ < 0, lhy=none` — which
+    # blows up — read as "did not reach tolerance" for a whole job. They are
+    # different events and the second is not a weaker form of the first: an
+    # unconverged run has a state, a diverged one does not.
+    E_final = SpinorBEC.total_energy(ws)
+    psi_h = Array(psi)
+    diverged = !isfinite(E_final) || !all(isfinite, psi_h)
     # ONE LINE PER ARM, flushed. Without it a config prints nothing until all five
     # relaxations finish, so a slow arm and a hung one look identical from
     # outside — which is how a run sat unreadable for 2.5 h before being killed.
     # "Absent" was being read as "still fine".
-    @printf("    %-18s dt=%.1e  %6d steps  dE=%.2e  conv=%-3s  %6.1f s\n",
-        label, dt, last, dE, conv ? "yes" : "NO", time() - t0)
+    @printf("    %-18s dt=%.1e  %6d steps  dE=%.2e  %-9s %6.1f s\n",
+        label, dt, last, dE,
+        diverged ? "DIVERGED" : (conv ? "conv=yes" : "conv=NO"), time() - t0)
     flush(stdout)
-    (psi=Array(psi), E=SpinorBEC.total_energy(ws), conv=conv, dE=dE, steps=last)
+    (psi=psi_h, E=E_final, conv=conv, dE=dE, steps=last, diverged=diverged)
 end
 
 "Relative L2 distance between two states' DENSITIES.
@@ -222,6 +231,20 @@ let sd = ddist(S.psi, R.psi), bd = ddist(B.psi, R.psi),
   0.70× the step AND half the steps for the same distance to the reference." :
             "\n  F at dt is NOT closer to R than S at dt/2 — the fusion buys step time
   only, and the step-count comparison has to be made on equal footing.")
+end
+
+# Divergence is reported FIRST and separately, because "no arm converged" invites
+# raising the step cap, and no step count fixes a blow-up.
+let arms = (S, B, R, F, Fh), div = count(a -> a.diverged, (S, B, R, F, Fh))
+    if div > 0
+        println("""
+
+  $(div) OF 5 ARMS DIVERGED — the state left the finite range, so every number
+  above is NaN-contaminated and none of them measures anything. This is NOT a
+  tolerance or step-count problem: no larger cap fixes a blow-up. At Eu with an
+  active dipole the LHY is the term that arrests collapse, so `lhy=none` is the
+  first thing to suspect, and `c₁ < 0` the second.""")
+    end
 end
 
 if !(S.conv && B.conv && F.conv && R.conv && Fh.conv)
