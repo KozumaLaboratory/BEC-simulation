@@ -64,6 +64,14 @@ const KZ_AS = KZ_G1 / 2
 # trajectory, since each step draws with `seed + s`. The longest run here is
 # (1000 + 2e⁸ + 1000)/dt ≈ 8×10⁵ steps at dt = 0.01.
 const KZ_SEED_STRIDE = 10_000_000
+# The paper's system is a SCALAR field. Running it on an F=1 species gives three
+# components, and the reservoir noise is added to every one of them — so the two
+# empty spin channels fill thermally and feed the density term c₀n = c₀Σ_c|ψ_c|²,
+# shifting the effective chemical potential. A spinless (F=0) species makes the
+# field genuinely one-component. The species identity is otherwise irrelevant
+# here: in internal units ℏ = m = ω_perp = 1 the mass scales out, and c₀ is
+# supplied directly as g₁ rather than taken from the atom's a_s.
+const KZ_ATOM = Sr88
 const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT", "runs/kz_toroidal")
 
 """
@@ -138,10 +146,14 @@ function kz_trajectory_torus(;
     grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
-    ws = make_workspace(; grid, atom=Rb87,
+    ws = make_workspace(; grid, atom=KZ_ATOM,
         interactions=InteractionParams(Dict{Int, Float64}(0 => KZ_G1)),
         potential=HarmonicTrap{1}((0.0,)),      # ring: no confinement along it
         sim_params=sp, backend, fft_flags=FFTW.ESTIMATE)
+    size(ws.state.psi, 2) == 1 || error(
+        "kz_toroidal_winding is a SCALAR reproduction and the field has " *
+        "$(size(ws.state.psi, 2)) components; reservoir noise would populate the " *
+        "spin channels and shift mu through c0*n.")
     seed_device_rng!(backend, seed)
     fill!(ws.state.psi, 0)
     dV = cell_volume(grid)
@@ -222,8 +234,8 @@ function kz_winding_scan(;
     @printf("  M_damp=%.3g  %s   dt=%.4g  M_grid=%d (k_max=%.2f, %.1fx k_cut)   %d traj/point\n",
         M_damp, M_damp > 0 ? "FULL SPGPE" : "number-damping only", dt, M_grid,
         π * M_grid / KZ_L, π * M_grid / KZ_L / sqrt(2eps_cut), n_traj)
-    @printf("\n  %-10s %-9s %-9s %-10s %-10s %-10s\n",
-        "tau_Q", "sigma(W)", "err", "<W>", "<N_equil>", "<N_final>")
+    @printf("\n  %-10s %-9s %-9s %-10s %-10s %-10s %-8s\n",
+        "tau_Q", "sigma(W)", "err", "<W>", "<N_equil>", "<N_final>", "int(W)")
     flush(stdout)
 
     σs, errs = Float64[], Float64[]
@@ -242,6 +254,13 @@ function kz_winding_scan(;
         # mean far from zero means the trajectories are not independent (or the
         # winding is being computed with a bias). This is the check that caught
         # trajectory seeds separated by 1.
+        # W must come out near-integer. A c-field's phase is not perfectly smooth,
+        # but a well-formed condensate winds by whole turns — and the run that was
+        # accidentally three-component returned 2.25. This is a free check that
+        # the field being measured is a condensate at all.
+        frac_int = count(w -> abs(w - round(w)) < 0.1, Ws) / length(Ws)
+        frac_int < 0.8 && @warn "only $(round(100frac_int))% of windings are " *
+                                "near-integer — the phase is not a clean condensate" τ
         z_mean = abs(mean(Ws)) / (σ / sqrt(n_traj) + eps())
         z_mean > 4 && @warn "⟨W⟩ is $(round(z_mean; digits=1))σ from zero — the " *
                             "ensemble is not independent or W is biased" τ mean_W=mean(Ws) σ
@@ -250,8 +269,8 @@ function kz_winding_scan(;
         e = σ / sqrt(2 * (n_traj - 1))
         push!(σs, σ);
         push!(errs, e)
-        @printf("  %-10.1f %-9.4f %-9.4f %-10.4f %-10.4g %-10.4g\n",
-            τ, σ, e, mean(Ws), mean(Ne), mean(Nf))
+        @printf("  %-10.1f %-9.4f %-9.4f %-10.4f %-10.4g %-10.4g %-8.2f\n",
+            τ, σ, e, mean(Ws), mean(Ne), mean(Nf), frac_int)
         flush(stdout)
     end
 
@@ -301,8 +320,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # A cheaper setting is only allowed if sigma(W) does not move. That is
         # the same discipline the literature applies to the cutoff itself
         # (results must be stable under a 10-15% variation).
-        for (dt, Mg) in ((0.01, 1024), (0.005, 1024), (0.02, 1024),
-            (0.01, 512), (0.01, 256), (0.05, 256))
+        # Ordered by what decides the question, not by cost: the paper's setting
+        # and the cheap candidate first, so a job that runs out of wall time still
+        # answers it.
+        for (dt, Mg) in ((0.01, 1024), (0.05, 256), (0.01, 256),
+            (0.02, 1024), (0.01, 512), (0.005, 1024))
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=64, dt, M_grid=Mg, backend,
                 tag="kz_torus_conv_dt$(replace(string(dt), "." => "p"))_M$(Mg)")
         end
