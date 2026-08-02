@@ -11,7 +11,7 @@
 # Output: spinor_sysimage.so (typically 200-400 MB, depends on Julia version)
 
 using Pkg
-Pkg.activate(@__DIR__ * "/../..")
+Pkg.activate(joinpath(@__DIR__, ".."))   # the repo, not its parent
 
 # PackageCompiler is itself a heavy dep — install on demand only when this
 # script runs, so the regular project doesn't carry the weight.

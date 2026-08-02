@@ -1,0 +1,91 @@
+# UNPADDED DDI kernel — a speed/accuracy A/B against fig4b_scan_n35k_n32.yaml.
+#
+# Zero-padding the DDI convolution costs, measured on the H100 (UGE 8318420):
+# 21 % of the step at 32^3 (0.604 -> 0.477 ms) and 50 % at 128^3 (25.07 ->
+# 12.50). Over this 45-point campaign that is ~19 s of the 528 s job.
+#
+# It is not free: unpadded is the periodic kernel, so the cloud sees its own
+# images. The campaign's kernel factorial (fig4b_ddikernel_n32) put the effect
+# on the dip centre at 0.0016 nT — but that was measured at N = 5e4, and this
+# config runs N = 3.5e4. Whether a kernel difference transfers across a 30 %
+# change in atom number is exactly the kind of assumption this campaign has been
+# burned by, so it is being re-measured here rather than inherited.
+#
+# PREDICTION, recorded before the run: centre within 0.005 nT of the padded
+# -2.5099 and width within 0.02 nT of 12.740. If the centre moves by more than
+# 0.01 nT the saving is not worth taking, because the unexplained residual is
+# only 0.040 nT and this would eat a quarter of it.
+#
+# Everything else is bit-identical to fig4b_scan_n35k_n32.yaml.
+
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n35k_unpadded
+  grid_n: 32
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776       # 1/36
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: false            # UNPADDED — see this file's header
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: false            # UNPADDED — see this file's header
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}
