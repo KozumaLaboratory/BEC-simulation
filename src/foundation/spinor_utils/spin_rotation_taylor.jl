@@ -33,11 +33,31 @@ const SPIN_TAYLOR_ENABLED = Ref(true)
 """Backward-error target for the per-voxel Taylor degree: the smallest `k ≥ 2`
 with `R^k / k! ≤ tol` is used.
 
-This is NOT a knob to expose. `bench/taylor_tolerance_sweep.jl` measured it
-against the thing that actually binds the answer — the splitting error the
-caller already accepted when they chose `dt`. At Eu F=6, 32³, dt = 0.002, that
-splitting error (`|E(dt) − E(dt/2)|`, exact rotation both arms) is 7.6e-3, and
-the Taylor truncation sits at:
+FROZEN (cutover step 4). It was a `Ref` until this commit, i.e. ambient state a
+run could assign after load — which moves the numbers and moves no
+`artifact_id`, since the id hashes the declaration and the code bytes and this
+was neither. It is now a literal, so `code_tree_hash` covers it completely and
+there is nothing left to declare.
+
+Freezing rather than promoting to a stage field, because the gap is not a
+choice: the registered "reference" value 1e-15 against this default measured
+**6.46e-16 relative on ψ** (Eu F=6 16³, 4 real-time steps) — 100× BELOW what
+flipping the realization itself costs (6.15e-14) and eleven orders under the
+splitting error. `ACCURACY_KNOBS` lost its `:spin_taylor_tol` row in the same
+commit for that reason; its own criterion is that a knob whose reference equals
+its default is not a knob, and this is that criterion one decimal further along.
+
+The measurement that licenses the freeze is `bench/taylor_tolerance_sweep.jl`,
+retired in the same commit because its whole-run arm could only sweep through
+the global. Its output is the table below and its own written conclusion was
+"if it is flat across tol, the tolerance is free and should be pinned at machine
+precision rather than exposed". Re-measuring means un-freezing this line, which
+is a one-line revert.
+
+It measured against the thing that actually binds the answer — the splitting
+error the caller already accepted when they chose `dt`. At Eu F=6, 32³,
+dt = 0.002, that splitting error (`|E(dt) − E(dt/2)|`, exact rotation both arms)
+is 7.6e-3, and the Taylor truncation sits at:
 
     tol     |ΔE| vs exact   as a fraction of the splitting error   mean degree
     1e-5      2.5e-7                     3.3e-5                       2.00
@@ -61,13 +81,21 @@ the same conclusion measured on that device.
 The relationship, not this number, is what is gated:
 `test_cpu_spin_rotation_taylor_parity.jl` fails if the truncation error stops
 being negligible against the splitting error."""
-const SPIN_TAYLOR_TOL = Ref(1.0e-13)
+const SPIN_TAYLOR_TOL = 1.0e-13
 
 """Angle above which a voxel halves its rotation and applies it twice (repeated
 squaring — exact). Production `R` is 0.01–0.2 so no voxel ever halves; the
 branch exists so the Taylor path is exact at ANY `R` and the caller never has
-to ask."""
-const SPIN_TAYLOR_RSAFE = Ref(1.0)
+to ask.
+
+FROZEN (cutover step 4), for the same reason as `SPIN_TAYLOR_TOL` and with less
+to argue about: it has no `ACCURACY_KNOBS` entry, no config sets it, and moving
+it to 0.01 — where every production voxel halves — measured rel|Δψ| of exactly
+0.0 over 4 real-time steps and 2.68e-15 over 20 ITP steps. The RT zero is not a
+degenerate probe: at dt = 2e-4 no voxel's `R` reached 0.01 at all, so none
+halved; at ITP's dt = 2e-3 some did, and 2.7e-15 is the FP reassociation of
+repeated squaring, which is exact in real arithmetic."""
+const SPIN_TAYLOR_RSAFE = 1.0
 
 """Degree ceiling. With the halving above it is never approached."""
 const SPIN_TAYLOR_RK_MAX = 40
@@ -229,8 +257,8 @@ function _spin_taylor_cpu_kernel!(
     mz, sxu, syu = bands
     N = size(P, 1)
     rk = _cpu_spin_rk(T, scale)
-    tol2 = T(SPIN_TAYLOR_TOL[])^2
-    rsafe2 = T(SPIN_TAYLOR_RSAFE[])^2
+    tol2 = T(SPIN_TAYLOR_TOL)^2
+    rsafe2 = T(SPIN_TAYLOR_RSAFE)^2
     F2 = F * F
     K = SPIN_TAYLOR_RK_MAX
     CT = Complex{T}

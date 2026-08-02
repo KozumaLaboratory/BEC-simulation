@@ -101,12 +101,16 @@ against a splitting error of 7.6e-3, i.e. 3e-11 of it — but measured on ENERGY
 only. Gated by test_taylor_tolerance_criterion.jl, which therefore licenses an \
 energy claim and not a phase-classification one.";
         getter=() -> SPIN_TAYLOR_ENABLED[], setter=v -> (SPIN_TAYLOR_ENABLED[] = v)),
-    AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-13,
-        "Backward-error target for the Taylor degree. Measured irrelevant across \
-ten decades (the degree floor of 2 already puts the truncation 4.5 orders under \
-the splitting error at production rotation angles), so the reference value is \
-tighter for form's sake and costs nothing.";
-        getter=() -> SPIN_TAYLOR_TOL[], setter=v -> (SPIN_TAYLOR_TOL[] = v)),
+    # DELETED in cutover step 4: `:spin_taylor_tol`, reference 1e-15 / default
+    # 1e-13. Its own note already said "measured irrelevant across ten decades …
+    # the reference value is tighter for form's sake and costs nothing", and the
+    # gap was then measured on the state rather than on the degree: rel|Δψ| =
+    # 6.46e-16 (Eu F=6 16³, 4 real-time steps). That is 100× BELOW what flipping
+    # the realization itself costs (`:spin_taylor`, 6.15e-14) and eleven orders
+    # under the splitting error — i.e. it is this file's own criterion
+    # ("a knob whose reference equals its default is either mis-recorded or not a
+    # knob") one decimal further along. `SPIN_TAYLOR_TOL` is now a frozen const,
+    # so `code_tree_hash` covers it and there is no setter to register.
     AccuracyKnob(:dealias_2_3, :global, true, false,
         "Orszag 2/3 filter on ψ and on the bilinear DDI field. NOTE the \
 direction: ON is the accurate setting. OFF does not remove the above-cut \

@@ -103,13 +103,6 @@ CPU-only CI nothing exercises it",
 5-stage, on BOTH devices and on the ITP path (measured 3.6e-13 over 20 ITP steps). Wants \
 a declared per-run field; the parity gates on both devices flip it, so it needs an \
 argument path first",
-    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_TOL") =>
-        "[STEP-4] backward-error target for the Taylor degree. Reference-vs-default is \
-1e-15 vs 1e-13 and the gap measures 6.5e-16 on psi — 100x BELOW what flipping the \
-realization itself costs. Freeze",
-    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_RSAFE") =>
-        "[STEP-4] angle above which a voxel halves and squares (exact in real \
-arithmetic). Measured 0.0 in RT and 2.7e-15 in ITP. Freeze",
     ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP") =>
         "[STEP-4] NOT a numerics choice: the positive control for \
 test_taylor_tolerance_criterion.jl, whose NegligibleErrorSpec returns :indeterminate \
@@ -118,14 +111,6 @@ ambient, rename to say so, and guard at the pipeline boundary so a clamped cap c
 file an artifact under a production id",
 
     # --- session state: caches, registries, callback slots, snapshots -----
-    ("ext/SpinorBECCUDAExt/gpu_euler_kernel.jl", "_SM_EULER_WARP") =>
-        "[STEP-4] launch-geometry choice for the fused spin-mixing Euler kernel, \
-reachable only when the Taylor plan declines. Measured bitwise-equal to the legacy \
-kernel. Becomes a keyword argument",
-    ("ext/SpinorBECCUDAExt/gpu_euler_kernel.jl", "_DDI_EULER_WARP") =>
-        "[STEP-4] same for the fused DDI Euler kernel. bench/verify_euler_warp.jl is \
-supposed to gate it and does not — it never turns the Taylor path off, so it compares \
-the Taylor kernel against itself and prints OK. Becomes a keyword argument",
     ("src/workflow/experiments/inspect.jl", "CHECK_REGISTRY") =>
         "the pre-flight check registry; populated at load, read by the inspector, never \
 by a kernel",

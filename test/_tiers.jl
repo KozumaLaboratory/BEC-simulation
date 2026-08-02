@@ -157,7 +157,7 @@ const FAST_TESTS = [
     "hamiltonian/test_ddi_gradient_padding_parity.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
-    # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
+    # replaces. Reads the same SPIN_TAYLOR_TOL as the CUDA gate, so relaxing
     # the accuracy contract turns both red.
     "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
     "foundation/test_clebsch_gordan.jl",
@@ -492,6 +492,12 @@ const FULL_EXTRA = [
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_lhy_term_faces.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    # The OTHER pair of realizations on the device: the warp-cooperative fused
+    # Euler kernels vs the one-thread-per-voxel ones. Replaces
+    # `bench/verify_euler_warp.jl`, which flipped `_DDI_EULER_WARP[]` and then
+    # called a path that takes Taylor first for D ≤ 16 — it compared the Taylor
+    # kernel against itself and printed OK. `_SM_EULER_WARP` had no coverage.
+    "gpu/test_gpu_euler_warp_parity.jl",
     "gpu/test_lbfgs_stall_fixed_point.jl",   # floor stop gives up nothing, on device
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
     # both the fused spin-density corner write and the rotation's in-place read

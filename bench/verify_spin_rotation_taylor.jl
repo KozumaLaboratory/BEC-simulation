@@ -38,7 +38,7 @@ for T in (Float64, Float32)
             tay = run(true, sm, psi, px, py, pz, dt, it)
             relerr = norm(Array(tay) .- Array(eul)) / norm(Array(eul))
             tol = T == Float64 ? 1e-11 : 5e-5
-            tag = R > SpinorBEC.SPIN_TAYLOR_RSAFE[] ? "halved" : "direct"
+            tag = R > SpinorBEC.SPIN_TAYLOR_RSAFE ? "halved" : "direct"
             ok = relerr < tol
             println("  T=$T R=$(round(R,digits=4)) it=$it  $tag  relerr=$relerr  ",
                 ok ? "OK" : "*** FAIL ***")
