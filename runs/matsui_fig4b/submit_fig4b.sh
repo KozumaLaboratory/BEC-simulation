@@ -52,7 +52,7 @@
 #$ -N matsui_fig4b
 #$ -l gpu_1=1
 #$ -l h_rt=8:00:00
-#$ -t 1-21
+#$ -t 1-22
 #$ -j n
 
 set -euo pipefail
@@ -69,6 +69,16 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.jul
 # failure mode is EDQUOT + mmap SIGBUS, not anything that says "disk full".
 export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/runs}"
 mkdir -p "$SPINORBEC_STORE"
+
+# The scan axis is `pipeline.1.B.Bz.to` — inside the DYNAMICS block — so all 45
+# points share one ground state, and without this each recomputes it. Measured
+# 5.44 -> 3.93 s/point, -27.8 % (UGE 8318863, 3-point A/B on this exact config).
+# Off by default; other submit scripts in this repo already set it.
+#
+# SPINORBEC_LIGHT_POINTS is deliberately NOT set: it replaces each point's inline
+# psi with a `gs_ref` pointer, which `open_result` resolves but the ad-hoc
+# readers under scripts/validation/ do not.
+export SPINORBEC_STAGE_CACHE=1
 
 if [ "${1:-}" = "SMOKE" ]; then
     CONFIG=runs/matsui_fig4b/fig4b_smoke_n32.yaml
@@ -95,6 +105,7 @@ else
        19) CONFIG=runs/matsui_fig4b/budget_dt_n35k_n32.yaml ;;
        20) CONFIG=runs/matsui_fig4b/dt_where_n35k_n32.yaml ;;
        21) CONFIG=runs/matsui_fig4b/budget_ramp_fine_n35k_n32.yaml ;;
+       22) CONFIG=runs/matsui_fig4b/fig4b_unpadded_n35k_n32.yaml ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
@@ -105,7 +116,16 @@ echo "[store] $SPINORBEC_STORE"
 nvidia-smi -L || true
 
 # Guard silent CPU fallback (a broken-CUDA node otherwise burns hours on CPU).
-"$JULIA" --project=. -e '
+# Optional sysimage (scripts/build_sysimage_matsui.jl). Measured baseline
+# without one: 528.5 s for 45 points, of which ~277 s is first-point JIT and
+# ~115 s startup. Set SPINORBEC_SYSIMAGE to a built .so to skip most of that.
+SYSIMG_ARG=""
+if [ -n "${SPINORBEC_SYSIMAGE:-}" ] && [ -f "${SPINORBEC_SYSIMAGE}" ]; then
+    SYSIMG_ARG="--sysimage=${SPINORBEC_SYSIMAGE}"
+    echo "[sysimage] $SPINORBEC_SYSIMAGE"
+fi
+
+"$JULIA" --project=. $SYSIMG_ARG -e '
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
