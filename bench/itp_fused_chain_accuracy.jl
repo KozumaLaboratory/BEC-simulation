@@ -89,7 +89,8 @@ end
 `n_steps` scales as 1/dt so every arm covers the same imaginary time — without
 that the dt/2 arm is a shorter run wearing a smaller-error label, which is a
 mistake this project has already made once in this bench family."""
-function relax(half!; dt, max_steps)
+function relax(half!; dt, max_steps, label="")
+    t0 = time()
     ws = build(dt)
     nc = ws.spin_matrices.system.n_components
     psi = ws.state.psi
@@ -114,6 +115,13 @@ function relax(half!; dt, max_steps)
         end
     end
     CUDA.synchronize()
+    # ONE LINE PER ARM, flushed. Without it a config prints nothing until all five
+    # relaxations finish, so a slow arm and a hung one look identical from
+    # outside — which is how a run sat unreadable for 2.5 h before being killed.
+    # "Absent" was being read as "still fine".
+    @printf("    %-18s dt=%.1e  %6d steps  dE=%.2e  conv=%-3s  %6.1f s\n",
+        label, dt, last, dE, conv ? "yes" : "NO", time() - t0)
+    flush(stdout)
     (psi=Array(psi), E=SpinorBEC.total_energy(ws), conv=conv, dE=dE, steps=last)
 end
 
@@ -133,15 +141,16 @@ println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, c₁/c₀=$(C1_R
 println("verdict = |F−S| / |S−B|, where S−B is the error dt ALREADY costs")
 println("="^78)
 
-S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS)
-B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS)
-F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS)
+println("  arms (streamed as each finishes):"); flush(stdout)
+S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS, label="S separate dt")
+B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS, label="B separate dt/2")
+F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS, label="F fused dt")
 # A THIRD dt, which is what turns "closer to the dt/2 reference" into a statement
 # about accuracy. With only dt and dt/2 there is no way to tell a smaller error
 # from a different one that happens to land nearby, and the first run of this
 # bench was read exactly that far and no further.
-R = relax(half_separate!; dt=DT / 4, max_steps=4 * MAX_STEPS)
-Fh = relax(half_fused!; dt=DT / 2, max_steps=2 * MAX_STEPS)
+R = relax(half_separate!; dt=DT / 4, max_steps=4 * MAX_STEPS, label="R separate dt/4")
+Fh = relax(half_fused!; dt=DT / 2, max_steps=2 * MAX_STEPS, label="F fused dt/2")
 
 @printf("\n  %-28s %14s %6s %10s %8s\n", "arm", "E", "conv", "final dE", "steps")
 for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B),
