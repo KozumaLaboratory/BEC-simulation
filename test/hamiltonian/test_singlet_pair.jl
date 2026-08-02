@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Singlet Pair (S=0) — Amplitude + Step" begin
     @testset "F=1 polar state: |A₀₀|² = n²/3" begin
         config = GridConfig(64, 20.0)

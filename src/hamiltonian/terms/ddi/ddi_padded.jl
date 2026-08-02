@@ -28,7 +28,7 @@ function make_ddi_padded(
     grid::Grid{N, T},
     atom::AtomSpecies;
     c_dd::Float64=compute_c_dd(atom),
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     secular::Bool=false,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,

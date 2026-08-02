@@ -182,9 +182,9 @@ function measure_error_budget(;
     rows = NamedTuple[]
     if sweep !== nothing
         for (knob, f) in sweep
-            t0 = time()
+            t0 = time_ns()
             o = Float64(f())
-            push!(rows, (knob=knob, error=abs(o - o_exact), cost=time() - t0))
+            push!(rows, (knob=knob, error=abs(o - o_exact), cost=elapsed_s(t0)))
         end
     end
 

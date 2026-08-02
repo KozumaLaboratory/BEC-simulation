@@ -41,7 +41,7 @@ function run_twa(;
     last_traj_result = nothing
 
     for i in 1:n_traj
-        t_start = time()
+        t_start = time_ns()
 
         psi_noisy = add_vacuum_noise(psi_gs, grid, F;
             seed=(twa_config.seed_base + i),
@@ -83,7 +83,7 @@ function run_twa(;
             end
         end
 
-        elapsed = time() - t_start
+        elapsed = elapsed_s(t_start)
         if verbose
             avg_time = elapsed
             @printf("  Trajectory %d/%d done (%.1fs)\n", i, n_traj, avg_time)

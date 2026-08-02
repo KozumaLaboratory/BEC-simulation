@@ -204,3 +204,6 @@ figs/**/*.csv
 
 # phase-gap bench cell cache (see bench/phase_gap_report.jl)
 .gap_cache/
+
+# Mutation-harness output (test/mutation/run.jl)
+mutation_out/

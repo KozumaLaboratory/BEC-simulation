@@ -15,6 +15,17 @@
 # no-op without CUDA, which is the same "the gate never ran" failure in a
 # different costume.
 #
+# NB: the `-o` log only ever holds this wrapper's own echo lines. The suite's
+# output goes to $OUT_DIR/tier_<tier>.out, and OUT_DIR follows
+# SPINORBEC_TSUBAME_RUNS_ROOT, which scripts/spinorbec.env sets to
+# /gs/fs/tga-kozuma-kouhi/uk07267/runs — NOT $HOME. Watching the -o log alone
+# looks exactly like a job that has produced nothing for half an hour.
+#
+# NB: the tree must include `runs/`. Config-scanning gates
+# (test_config_zeeman_seed_agreement.jl, test_lhy_config_validity_domain.jl) read
+# it, and an rsync that syncs only src/ and test/ makes them error on ENOENT
+# rather than skip — a red that is about the transfer, not the code.
+#
 # NB: -g and -o go on the qsub CLI, not as directives (UGE rejects `#$ -g` and
 # does not expand $HOME in directives).
 #$ -cwd
@@ -49,6 +60,21 @@ if [ -n "${T4_TMPDIR:-}" ] && [ -w "${T4_TMPDIR}" ]; then
 else
     export JULIA_DEPOT_PATH="$SHARED_DEPOT"
 fi
+# Pin BLAS to one thread. OpenBLAS sizes its level-1 thread team from the core
+# count, and a TSUBAME node reports 384 of them, so every `dot` on a few-MB
+# ComplexF64 array becomes spawn+barrier rather than arithmetic. Left unset, a
+# ci-tier attempt ran `oracles/test_lhy_full_bdg_closed_form_parity.jl` for
+# 18m52s against the 51.8s estimate in _tiers.jl (24s on cpu_4 with this pinned),
+# a worker then hit the 1800s per-file timeout mid-`test_term_properties.jl`, and
+# the suite aborted with 227 files never started — reporting FAIL while having
+# measured almost nothing, which reads like a tier result and is not one. With
+# the pin the same tier finishes 266 files in 11m20s.
+#
+# Not tuning: the workers already are the parallelism, so a BLAS team inside each
+# one is pure contention. `${VAR:-1}` so an explicit caller choice still wins.
+export OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-1}
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+
 JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
 echo "[sbec_tier] host=$(hostname)  tier=${TIER}  workers=${WORKERS}"

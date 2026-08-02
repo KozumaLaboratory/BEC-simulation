@@ -69,7 +69,7 @@ function make_workspace(;
     secular_ddi::Bool=false,
     raman::Union{Nothing, RamanCoupling{N}, TimeDependentRaman{N}}=nothing,
     loss::Union{Nothing, LossParams}=nothing,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     # Deliberately OFF here while the YAML/DSL surface defaults them ON
     # (`DDI_PADDED_DEFAULT` / `DDI_TRUNC_RADIUS_DEFAULT` in
     # schema/parsing_blocks.jl). This is the library primitive — every knob is
@@ -404,7 +404,7 @@ function make_workspace(;
             nothing
         else
             _build_spinor_lhy(Val(spinor_lhy), atom, ws_interactions, psi_init,
-                c_dd, enable_ddi, lhy_opts)
+                c_dd, enable_ddi, lhy_opts, zfield)
         end
 
     # Silent-zero defense (2026-05-26): when the user explicitly requested
@@ -714,7 +714,7 @@ function _warn_lhy_texture(mode::Symbol, psi_init, F::Int)
 end
 
 # Catch-all: unknown / unsupported mode → nothing (caller falls through).
-_build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi, opts) = nothing
+_build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield) = nothing
 
 # Spatially-varying: `e₁(p)` tabulated from the ACTUAL local spinors of
 # `psi_init`, one BdG solve per occupied `|⟨F⟩|/F` bin. Alone among the modes it
@@ -736,18 +736,49 @@ _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi, opts) = nothing
 # that is not a solution of the UNIFORM mean-field problem at its own density.
 # Instability is then a statement about that fictitious uniform system, not
 # about the state. It is `maxlog`-bounded, so it fires once per session.
-function _build_spinor_lhy(::Val{:spatial}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+# The BdG-solving LHY modes (`:full_bdg`, `:spatial`) take a `zeeman` and use it
+# in the excitation spectrum; the closed forms do not, being ansatz-based. Until
+# 2026-07-30 `_build_spinor_lhy` passed none, so `compute_spinor_lhy_table` fell
+# back to its `ZeemanParams()` default and **every full_bdg table was built at
+# zero field**, whatever the run's B was. Two consequences:
+#
+#   * a B-scan comparing LHY closures got a functional identical at every Bz —
+#     measured on runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml,
+#     where `max Im ω` was bit-identical across 50/60/70/80 µG;
+#   * the instability warning's own advice, "pick a mean-field-stable
+#     (F, c₀, c₁, q) point", was unreachable through `q`, because q never
+#     arrived.
+#
+# A `ZeemanParams` carries only (p, q), so a transverse or spatially-varying or
+# time-dependent field cannot be represented. Rather than silently pick a
+# representative value — the failure mode this whole class of bug is made of —
+# pass the uniform axial part when that IS the field, and say out loud what was
+# dropped otherwise.
+function _lhy_zeeman_params(zfield)
+    bx, by, bz, q = zfield.scalars
+    transverse = sqrt(bx^2 + by^2)
+    uniform = is_uniform(zfield)
+    steady = all(isnothing, zfield.waveforms)
+    if !uniform || !steady || transverse > 1e-12 * max(abs(bz), 1.0)
+        @warn """LHY (full_bdg / spatial): the BdG spectrum is being built at the UNIFORM AXIAL field only — p=$(round(bz; sigdigits=4)), q=$(round(q; sigdigits=4)). Dropped: $(uniform ? "" : "spatial profile; ")$(steady ? "" : "time envelope; ")$(transverse > 0 ? "transverse |b_xy|=$(round(transverse; sigdigits=3))" : ""). A ZeemanParams carries only (p, q), so these cannot enter the uniform BdG problem; ε_LHY is therefore evaluated for a different field than the state feels.""" maxlog=1
+    end
+    ZeemanParams(bz, q)
+end
+
+function _build_spinor_lhy(::Val{:spatial}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield)
     _full_bdg() = _build_spinor_lhy(Val(:full_bdg), atom, ws, psi_init, c_dd,
-        enable_ddi, opts)
+        enable_ddi, opts, zfield)
     psi_init === nothing && return _full_bdg()
     tbl = compute_spatial_lhy(;
-        psi_init, F=atom.F, interactions=ws,
+        psi_init, F=atom.F, interactions=ws, zeeman=_lhy_zeeman_params(zfield),
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
         n_bins=opts.n_bins, n_atoms=opts.n_atoms)
     tbl === nothing ? _full_bdg() : tbl
 end
 
-function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(
+    ::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield
+)
     _warn_lhy_texture(:polar_two_channel, psi_init, atom.F)
     compute_spinor_lhy_polar_two_channel(;
         F=atom.F, c0=ws[0], c1=ws[1],
@@ -755,11 +786,12 @@ function _build_spinor_lhy(::Val{:polar_two_channel}, atom, ws, psi_init, c_dd, 
         n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
 
-function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(::Val{:full_bdg}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield)
     _warn_lhy_texture(:full_bdg, psi_init, atom.F)
     spinor_init = psi_init !== nothing ? _extract_spinor(psi_init) : _default_spinor(atom.F)
     compute_spinor_lhy_table(;
         spinor=spinor_init, F=atom.F, interactions=ws,
+        zeeman=_lhy_zeeman_params(zfield),
         c_dd=enable_ddi && !isnan(c_dd) ? c_dd : 0.0,
         n_max=_lhy_n_max(psi_init, opts), n_points=opts.n_points, n_atoms=opts.n_atoms)
 end
@@ -767,7 +799,9 @@ end
 # F-generic polar contact LHY (paper #1, contact-only). ~1000× faster than
 # :full_bdg. Restricted to polar spinors (ζ_α = δ_{α,0}); for post-quench /
 # mixed states fall back to :full_bdg.
-function _build_spinor_lhy(::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(
+    ::Val{:polar_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield
+)
     _warn_lhy_texture(:polar_contact, psi_init, atom.F)
     compute_spinor_lhy_polar_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
@@ -777,7 +811,7 @@ end
 # FM-phase contact LHY (paper #2 contact-only piece). Single-mode collapse at
 # m=+F: ε = (8/15π²)(g_{2F}n)^(5/2). For uniform g_S this matches scalar
 # Lima-Pelster; for realistic per-S a_S it differs.
-function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(::Val{:fm_contact}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield)
     _warn_lhy_texture(:fm_contact, psi_init, atom.F)
     compute_spinor_lhy_fm_contact(;
         F=atom.F, g_dict=_lhy_g_dict(atom, ws), n_max=_lhy_n_max(psi_init, opts),
@@ -791,7 +825,7 @@ end
 # 1 + eps_dd*(3cos^2(theta)-1), convert with eps_dd = c_dd*F^2/(3*g_2F).
 # Direct callers that already have scalar eps_dd should use
 # `compute_spinor_lhy_fm_dipolar(; eps_dd)`.
-function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(::Val{:fm_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield)
     _warn_lhy_texture(:fm_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
@@ -828,7 +862,9 @@ end
     return CPUBackend()
 end
 
-function _build_spinor_lhy(::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(
+    ::Val{:polar_dipolar}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield
+)
     _warn_lhy_texture(:polar_dipolar, psi_init, atom.F)
     g_dict = _lhy_g_dict(atom, ws)
     c_dd_eff = enable_ddi && !isnan(c_dd) ? c_dd : 0.0
@@ -851,7 +887,7 @@ end
 #   states share the point group but have different closed forms — dispatch
 #   them through their own builder, not this branch.
 # See: src/hamiltonian/terms/lhy/icosahedral.jl
-function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi, opts)
+function _build_spinor_lhy(::Val{:icosahedral}, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield)
     _warn_lhy_texture(:icosahedral, psi_init, atom.F)
     atom.F == 6 || throw(ArgumentError(
         ":icosahedral spinor_lhy is F=6 only (got F=$(atom.F))"))

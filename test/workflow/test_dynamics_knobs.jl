@@ -89,4 +89,42 @@ pipeline:
             @test data["step"] == 5
         end
     end
+
+    # `integrator:` was accepted by the schema and then never read for a while,
+    # so `integrator: yoshida` on a standard dynamics step was a silent no-op.
+    # That is the failure this gates: an accuracy knob that parses, does nothing,
+    # and reports success. Every supported name must map to a DISTINCT stepper,
+    # and every unsupported one must raise.
+    @testset "integrator: resolves to a stepper, or raises" begin
+        r = SpinorBEC._resolve_dynamics_stepper
+
+        # Absent / empty / the default names keep the historical leapfrog loop,
+        # which `run_simulation!` selects by being handed `nothing`.
+        @test r(nothing) === nothing
+        @test r("") === nothing
+        for name in ("strang", "leapfrog", "default", "  Strang  ", "STRANG")
+            @test r(name) === nothing
+        end
+
+        @test r("midpoint") === split_step_midpoint!
+        @test r("rk4ip") === rk4ip_step!
+        @test r("RK4IP") === rk4ip_step!            # case-insensitive like the rest
+        @test r(Dict("name" => "rk4ip")) === rk4ip_step!
+
+        # Distinct names must not collapse onto one stepper — that is how a knob
+        # becomes decorative without anything going red.
+        @test r("midpoint") !== r("rk4ip")
+
+        # Unsupported names raise rather than silently falling back, and the
+        # message has to name the alternatives or nobody can act on it.
+        @test_throws ArgumentError r("yoshida")
+        msg = try
+            r("yoshida")
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("midpoint", msg)
+        @test occursin("rk4ip", msg)
+    end
 end

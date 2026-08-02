@@ -22,7 +22,7 @@
 |---|---|---|---|
 | `thesis_FIG-5.4` | **σ/μ × √N scaling failure** — 17.7 → 41.5 → 259 across N (pinned Sinatra-clean) | matplotlib from `runs/twa_N_scan_pinned_16g/` | data ready |
 | `thesis_FIG-5.5` | **Species ε_dd scan** — Cr/Eu/Er/Dy z-elongation + σ/μ chaos peak at marginal | matplotlib from `runs/twa_eps_dd_scan/` | data ready |
-| `thesis_FIG-5.6` | **Resolution-matched GS profile comparison** — 16³×box=20 vs 16³×box=10 ground state density profiles, showing GS-resolution artifact | matplotlib from runs/twa_sinatra/ | data ready |
+| `thesis_FIG-5.6` | **Resolution-matched GS profile comparison** — 16³×box=20 vs 16³×box=10 ground state density profiles, showing GS-resolution artifact | matplotlib from `runs/twa_sinatra/` (gone) | data ready |
 
 ### Appendix E (verify-first audit details)
 

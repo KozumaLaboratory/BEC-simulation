@@ -15,6 +15,13 @@ module SpinorBECCUDAExt
 
 using SpinorBEC
 import CUDA
+# `CuGraph` / `CuGraphExec` look unused and are NOT: `CUDA.@captured` expands to
+# code that names `CuGraphExec` UNQUALIFIED (CUDA.jl lib/cudadrv/graph.jl:190),
+# so the name has to be in scope at the expansion site. Deleting them makes the
+# whole extension fail to load with `UndefVarError: CuGraphExec`.
+# `check_no_stale_explicit_imports` reports all three as stale because it reads
+# the source before macro expansion; the exception is declared in
+# test/test_quality.jl with this reason rather than "fixed" here.
 using CUDA: CuArray, CuGraph, CuGraphExec, @captured
 using LinearAlgebra: dot
 # Shared with the CPU kernels — see src/foundation/voxel_index.jl. Declared once
@@ -56,7 +63,16 @@ function __init__()
     # memory back to the device. Without this, ~96 64³ ComplexF64
     # workspaces accumulate on a 16 GB GPU (~150 MB pinned per point
     # across psi/fft_buf/k²/ddi_kernel) and a long scan will OOM mid-run.
-    SpinorBEC._cuda_reclaim_callback[] = () -> (CUDA.reclaim(); nothing)
+    #
+    # The `functional()` guard is load-bearing, not defensive: this extension
+    # loads whenever CUDA.jl is imported, driver or no driver, so a CPU-only
+    # machine that merely has CUDA.jl installed reached `CUDA.reclaim()`
+    # between scan points and got `ERROR: CUDA driver not functional`. Its two
+    # sibling callbacks below were guarded from the start; this one drifted.
+    SpinorBEC._cuda_reclaim_callback[] = function ()
+        CUDA.functional() && CUDA.reclaim()
+        nothing
+    end
     SpinorBEC._cuda_functional_callback[] = () -> CUDA.functional()
     SpinorBEC._cuda_state_lines_callback[] = function ()
         if !CUDA.functional()
