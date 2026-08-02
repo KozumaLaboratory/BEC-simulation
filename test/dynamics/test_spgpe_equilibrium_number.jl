@@ -57,30 +57,64 @@ using SpinorBEC
     # either the run or the trapped local-density step.
     @test isapprox(N_modesum, N_closed; rtol=0.3)
 
-    sp = SimParams(; dt=0.002, n_steps=1, imaginary_time=false, save_every=1,
-        normalize_every=0)
-    ws = make_workspace(; grid, atom=Rb87,
-        interactions=InteractionParams(Dict{Int, Float64}(0 => c0)),
-        potential=HarmonicTrap{3}((0.0, 0.0, 0.0)),   # homogeneous
-        sim_params=sp, fft_flags=FFTW.ESTIMATE)
-    res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut, gamma=0.05, M=0.0,
-        allow_unphysical_rates=true)
-    fill!(ws.state.psi, 0)
-    dV = cell_volume(grid)
-    N_hist = Float64[]
-    for s in 1:8000                                 # 16 units, 1/(2 gamma mu) = 0.67
-        split_step!(ws)
-        apply_spgpe_step!(ws, res, 0.002; t=0.0, seed=4200 + s)
-        s % 1000 == 0 && push!(N_hist, real(sum(abs2, ws.state.psi)) * dV)
+    # The verdict, as a function of interaction strength. The SPGPE's exact
+    # stationary distribution is P ∝ exp(−(H−μN)/T), the FULL interacting
+    # classical-field measure; T/(ϵ_k−μ) is only its Hartree–Fock approximation
+    # and becomes exact as c₀ → 0. So run the same box at three couplings: if the
+    # ratio goes to 1 with c₀ the code is right and the closed form is merely
+    # approximate, and if it does not the code is wrong.
+    #
+    # At the KZ parameters (c₀ = 0.19, c₀n = 28.6 against T = 80) the run sits
+    # 2.29× above the mode sum, which is either a real 2.3× error or Hartree–Fock
+    # failing at an interaction it has no right to describe.
+    function run_equilibrium(c0_run; steps=8000, seed0=4200)
+        sp = SimParams(; dt=0.002, n_steps=1, imaginary_time=false, save_every=1,
+            normalize_every=0)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict{Int, Float64}(0 => c0_run)),
+            potential=HarmonicTrap{3}((0.0, 0.0, 0.0)),   # homogeneous
+            sim_params=sp, fft_flags=FFTW.ESTIMATE)
+        res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut, gamma=0.05, M=0.0,
+            allow_unphysical_rates=true)
+        fill!(ws.state.psi, 0)
+        dV = cell_volume(grid)
+        N_hist = Float64[]
+        for s in 1:steps
+            split_step!(ws)
+            apply_spgpe_step!(ws, res, 0.002; t=0.0, seed=seed0 + s)
+            s % 1000 == 0 && push!(N_hist, real(sum(abs2, ws.state.psi)) * dV)
+        end
+        (; N=N_hist[end], settled=isapprox(N_hist[end], N_hist[end - 1]; rtol=0.1))
     end
 
-    # Equilibrated: the last two samples agree.
-    @test isapprox(N_hist[end], N_hist[end - 1]; rtol=0.1)
-    N_run = N_hist[end]
+    # Hartree–Fock prediction at the same coupling, in the code's convention.
+    function rj_at(c0_run)
+        nn = 50.0
+        for _ in 1:400
+            s = 0.0
+            for I in CartesianIndices(grid.config.n_points)
+                k2 = grid.k_squared[I]
+                k2 <= k_cut^2 || continue
+                d = 0.5 * k2 + 2c0_run * nn - mu
+                d > 0 && (s += T / d)
+            end
+            nn = 0.5 * nn + 0.5 * (s / V)
+        end
+        nn * V
+    end
 
-    # The verdict. Whichever prediction the run matches is the right convention,
-    # and the other one is what has been sizing the KZ campaign.
-    @info "SPGPE equilibrium" N_run N_modesum N_closed ratio_modesum=N_run / N_modesum ratio_closed=N_run /
-                                                                                                    N_closed
-    @test isapprox(N_run, N_modesum; rtol=0.25)
+    ratios = Float64[]
+    for c0_run in (0.19, 0.02, 0.002)
+        r = run_equilibrium(c0_run)
+        pred = rj_at(c0_run)
+        @test r.settled
+        push!(ratios, r.N / pred)
+        @info "equilibrium vs Hartree-Fock" c0_run N_run=r.N N_HF=pred ratio=r.N / pred
+    end
+
+    # Weak coupling is where Hartree–Fock is exact, so that is where agreement is
+    # REQUIRED. Disagreement there would be a code error; disagreement only at
+    # strong coupling is the closed form running out of validity.
+    @test ratios[end]≈1.0 rtol=0.25
+    @test abs(ratios[end] - 1) < abs(ratios[1] - 1)      # and it must improve
 end
