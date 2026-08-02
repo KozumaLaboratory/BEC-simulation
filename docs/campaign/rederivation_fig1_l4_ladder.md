@@ -77,8 +77,52 @@ loss does.
 either dataset — but every number under it moved by 16.5 %, and the figure should
 be redrawn rather than re-captioned.
 
+## The inset survives where the main panel does not
+
+The inset's two lossy arms were re-run on TSUBAME. Its quantity is the surviving
+fraction N(T)/N(0), which the stored summaries record as
+`N_trajectory.N_final_ratio` and the v3 extractor as `1 − norm_rel_drift` — the
+same number by construction, unlike ΔF_z below.
+
+| config | stored | re-derived | change |
+|---|---:|---:|---:|
+| `matsui_40ms_lossy_medium` | 0.516038 | 0.516901 | **+0.17 %** |
+| `matsui_40ms_lossy_strong` | 0.244302 | 0.243647 | **−0.27 %** |
+
+**Two to three tenths of a percent, against −16.5 % on the same figure's main
+panel.** The inset does not need redrawing.
+
+That is a discrimination rather than a reassurance: both panels went through the
+same pipeline on the same day and only one moved. Peak density is a local maximum
+of the field and rides on the corrected LHY and dealias paths; the surviving
+fraction is a volume integral of a K3 decay and does not. A campaign that had
+re-derived only the inset would have concluded the figure was fine.
+
+The re-derived runs also classify — `stable_arrest` (medium),
+`sacrificial_arrest` (strong) — where the stored summaries classify nothing. New
+information, not a comparison.
+
+### What could not be compared, and why
+
+The extractor schema changed between the two epochs. The stored summaries carry
+a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
+`_extractor_version: 3` emits `Fz_drift`, `Mz` and `norm_rel_drift` instead.
+
+- **ΔF_z is NOT reported here.** Stored `DeltaFz` is 3.478276 (medium) and
+  re-derived `Fz_drift` is 3.328342, which looks like a −4.3 % shift — but
+  `DeltaFz` is a per-atom difference over the `Fz_per_N` series while `Fz_drift`
+  comes from a different extractor, and I did not confirm the two definitions
+  agree. Quoting the ratio would repeat the Fig 3 error of comparing a
+  time-maximum against a final-state value because both were called "peak".
+- **`peak_max` has no stored counterpart** for these two configs. Their stored
+  summaries contain `N_trajectory` and nothing else, so there is no like-for-like
+  density number to put beside the main panel's table.
+
 ## Not covered
 
-- Fig 1 (d)'s `matsui_5ms_n64_density_slice.json` and the inset's two lossy
-  configs.
+- Fig 1 (d)'s density slice is an analysis of `matsui_5ms_morphology_n64`, which
+  is re-derived in the table above (−26.0 %), not a separate run — so the slice
+  moves with it and does not need its own cell.
 - The n96/n128 rungs, deliberately, for the reason above.
+- ΔF_z on the lossy arms, pending a check that the two extractors define it the
+  same way.

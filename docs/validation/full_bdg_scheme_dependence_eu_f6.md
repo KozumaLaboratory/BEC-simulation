@@ -201,3 +201,57 @@ The honest routes are physics changes, not knob changes:
   different ansatz;
 - accepting the scheme dependence and quoting a **bound** rather than an
   ordering, with the spread across schemes as the uncertainty.
+
+## A4 (2026-07-31): the contact-regime agreement is a convergence, not a coincidence
+
+The six-significant-figure agreement quoted above was measured at **one** point.
+Lane A item A4 turned it into a convergence statement, because "agrees at one
+density and one cutoff" and "the closed form is the exact limit" are different
+claims and only the second one licenses the five papers that rest on it.
+
+`bench/a4_lhy_closed_form_residual.jl` (job 8309441, cpu_4, 57 s) sweeps 13
+cases — `polar_contact` at F = 1, 2, 6; `fm_contact` at F = 1, 2, 6;
+`icosahedral` at F = 6 — over three densities and four BdG quadratures, contact
+only. 156 rows.
+
+| $k_{\max}$ | polar_contact | fm_contact | icosahedral |
+|---|---:|---:|---:|
+| 40 | 1.945e-3 | 1.917e-3 | 1.938e-3 |
+| 60 | 5.861e-4 | 5.775e-4 | 5.839e-4 |
+| 90 | 1.750e-4 | 1.724e-4 | 1.743e-4 |
+| 140 | 4.666e-5 | 4.597e-5 | 4.649e-5 |
+
+Fitted order $p = 2.96, 2.98, 2.99$ — **the same for all three families**, with
+no plateau anywhere. At fixed $k_{\max} = 140$ the residual grows as
+$1.5\times10^{-6} \to 9.0\times10^{-6} \to 4.67\times10^{-5}$ for
+$n_0 = 0.3, 1, 3$, i.e. as $n^{3/2}$. So
+
+$$\text{rel. residual} \;\simeq\; C\, n^{3/2} k_{\max}^{-3}.$$
+
+That is the UV tail of the zero-point sum and nothing else. A fixed $k_{\max}$
+is a *shallower* effective cutoff at higher density because the scale that
+matters is $\sqrt{g n}$ — which is why `_lhy_quadrature` derives its cutoff from
+`rtol` rather than taking one absolutely, and why the bench had to override that
+derivation to measure the law at all.
+
+**Three independent closed forms converging to `full_bdg` at the same order with
+the same coefficient is a shared truncation error, not three coincidences.** The
+closed forms are the exact limit here; there is no measurable method gap.
+
+Consequences:
+
+- A4's stated 1e-4 criterion is **met** — $9.0\times10^{-6}$ at $n_0 \le 1$,
+  $k_{\max} = 140$. It is missed only at $n_0 = 3$ with $k_{\max} \le 90$, which
+  is a quadrature setting, not physics.
+- `_RTOL = 2e-3` in `test/oracles/test_lhy_full_bdg_closed_form_parity.jl` is
+  ~40× looser than achievable. Its inline comment already blamed quadrature
+  rather than method error and was right. The fix is **not** a hard-coded larger
+  `k_max` but to let the `rtol`-derived cutoff do its job — which
+  `derived cutoff scales with the stiffness, not absolutely` in that same file
+  already covers.
+- Scope, unchanged from the rest of this document: contact only. `full_bdg` has
+  no mean-field-stable point in the Eu dipolar regime, and $\varepsilon_{LHY}$
+  is scheme-dependent wherever $\mathrm{Im}\,\omega \neq 0$, so a parity number
+  taken there would not mean anything. `icosahedral` is measured only at
+  $\lambda_{\rm spin} > 0$; the closed form returns NaN on the $c_1 < 0$ branch
+  by construction, and **that is the sign Eu production uses**.

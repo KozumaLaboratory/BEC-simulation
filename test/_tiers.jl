@@ -36,6 +36,7 @@ const FAST_TESTS = [
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_dynamics_lhy_normalisation.jl",
+    "workflow/test_gs_cache_hit_physics.jl",
     "solvers/test_lbfgs_forward_coverage.jl",
     "oracles/test_lhy_table_path_coverage.jl",
     "workflow/test_lhy_texture_warning.jl",
@@ -172,6 +173,10 @@ const FAST_TESTS = [
     "analysis/test_fisher.jl",
     "hamiltonian/test_interactions_constraint.jl",
     "workflow/test_io.jl",
+    # summary.json is what every document and figure cites, and until 2026-08-02
+    # it recorded nothing about what produced it — measured across 226 stored
+    # results. Pure dict + file I/O.
+    "workflow/test_summary_provenance.jl",
     # The run dir is keyed on the config BYTES, not the commit, so the same YAML
     # under different code reuses cached points silently. This pins the gate that
     # stops it, and the widened 16-hex directory suffix.
