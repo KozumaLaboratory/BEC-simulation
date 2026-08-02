@@ -26,15 +26,15 @@ else
 
     # exp(z·v·F) via each realization, same input.
     function _rotate(taylor::Bool, sm, psi0, vx, vy, vz, dt, it)
-        old = Ext._SPIN_TAYLOR_ENABLED[]
-        Ext._SPIN_TAYLOR_ENABLED[] = taylor
+        old = SpinorBEC.SPIN_TAYLOR_ENABLED[]
+        SpinorBEC.SPIN_TAYLOR_ENABLED[] = taylor
         try
             p = copy(psi0)
             SpinorBEC._apply_ddi_rotation!(p, vx, vy, vz, sm, dt, 3; imaginary_time=it)
             CUDA.synchronize()
             return p
         finally
-            Ext._SPIN_TAYLOR_ENABLED[] = old
+            SpinorBEC.SPIN_TAYLOR_ENABLED[] = old
         end
     end
 
@@ -72,15 +72,15 @@ else
         psi0 = CUDA.CuArray(randn(ComplexF64, n, n, n, D) ./ 10)
         for it in (false, true), c1 in (0.5, -0.5)
             outs = map((false, true)) do taylor
-                old = Ext._SPIN_TAYLOR_ENABLED[]
-                Ext._SPIN_TAYLOR_ENABLED[] = taylor
+                old = SpinorBEC.SPIN_TAYLOR_ENABLED[]
+                SpinorBEC.SPIN_TAYLOR_ENABLED[] = taylor
                 try
                     p = copy(psi0)
                     apply_spin_mixing_step!(p, sm, c1, 0.01, 3; imaginary_time=it)
                     CUDA.synchronize()
                     Array(p)
                 finally
-                    Ext._SPIN_TAYLOR_ENABLED[] = old
+                    SpinorBEC.SPIN_TAYLOR_ENABLED[] = old
                 end
             end
             @test norm(outs[2] .- outs[1]) / norm(outs[1]) < 1e-10
@@ -114,7 +114,7 @@ else
         end
     end
 
-    # Above `_SPIN_TAYLOR_RSAFE[]` a voxel halves its angle and applies the
+    # Above `SPIN_TAYLOR_RSAFE[]` a voxel halves its angle and applies the
     # rotation 2^s times. Production R is 0.01-0.2 so that branch never fires
     # there; it is what makes the Taylor path valid at ANY R, which is in turn
     # what lets the degree be chosen on the device with no max|v| read-back.
@@ -138,7 +138,7 @@ else
     # A rotation is unitary; the Taylor truncation must not leak norm at the
     # production angle. (The imaginary-time arm is deliberately not unitary.)
     #
-    # This is also the gate on `_SPIN_TAYLOR_TOL[]`. Since the degree is chosen
+    # This is also the gate on `SPIN_TAYLOR_TOL[]`. Since the degree is chosen
     # PER VOXEL, that tolerance is binding rather than slack — at 1e-9 the drift
     # here is 9.6e-13, at 1e-13 it is 2.2e-16 — so the bound below is set at
     # machine precision on purpose: loosening the tolerance turns it red instead

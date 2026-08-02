@@ -11,6 +11,7 @@
 
 using Test
 using LinearAlgebra
+using SpinorBEC
 using SpinorBEC: spin_matrices
 
 @testset "Spin operator algebra (su(2))" begin

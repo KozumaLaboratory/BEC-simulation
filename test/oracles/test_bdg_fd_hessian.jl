@@ -28,6 +28,7 @@
 
 using Test
 using LinearAlgebra
+using Random
 using SpinorBEC
 using SpinorBEC:
     energy_gradient!, precompute_cg_table, c_to_g,
@@ -107,5 +108,59 @@ end
             @test norm(hmf) > 1e-3
             @test norm(Manom) > 1e-3
         end
+    end
+end
+
+# The FD Hessian action must be HOMOGENEOUS: H·(cδ) = c·(H·δ). This needs no
+# reference solution and no tolerance to fit — it is a property of any linear
+# operator, and a finite-difference realisation only has it if the step is taken
+# along the NORMALISED direction.
+#
+# It did not hold until 2026-07-29. `hessian_vector_product` differenced at
+# `ψ ± ε·δ` with ε absolute, so shrinking δ shrank the perturbation instead of
+# the answer, and the quotient drowned in round-off. Measured deviation of
+# H·(cδ)/c from H·δ, before → after:
+#
+#   c=1e-2   5.9e-9  → 1.3e-16
+#   c=1e-4   5.6e-7  → 1.3e-16
+#   c=1e-6   6.8e-5  → 2.6e-16
+#   c=1e-8   4.6e-3  → 1.2e-16
+#
+# The consumer that suffered is Newton-CG, which passes CG iterates whose norm
+# spans decades (‖δ‖ ~ 1e-6 after an L-BFGS stage); the Lanczos consumer passes
+# unit vectors and never saw it. The visible symptom was a non-deterministic
+# `newton_polish`.
+@testset "FD Hessian action is homogeneous in δ" begin
+    grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 20.0, 1 => -0.4)),
+        zeeman=ZeemanParams(0.3, 0.1), potential=HarmonicTrap((1.0, 1.0, 1.0)),
+        sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true))
+    Random.seed!(11)
+    psi = randn(ComplexF64, 8, 8, 8, 3)
+    psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
+    d = randn(ComplexF64, 8, 8, 8, 3)
+    d ./= sqrt(sum(abs2, d))
+
+    H1 = hessian_vector_product(ws, psi, d)
+    @test norm(H1) > 1e-6                     # the operator is live
+    for c in (1e-2, 1e-4, 1e-6, 1e-8)
+        Hc = hessian_vector_product(ws, psi, c .* d) ./ c
+        # The bound is DERIVED from the finite-difference amplification, not from
+        # a measurement: the gradient carries ~1e-16 relative round-off and the
+        # quotient divides by 2ε = 2e-5, so ~5e-12 is the floor this construction
+        # can have. Measured, constant in c:
+        #
+        #   1.3e-16   plain build
+        #   4.7e-11   `--check-bounds=yes`, which is what `Pkg.test()` uses —
+        #             disabling @inbounds changes the summation order inside
+        #             energy_gradient!, and 1/2ε amplifies the last-bit difference
+        #
+        # 1e-9 sits two decades above the worse of those and six decades below the
+        # pre-fix deviation (4.6e-3 at c=1e-8), so it separates "homogeneous" from
+        # "the step does not scale" without pinning either number. A tighter bound
+        # here would be a test that passes standalone and fails under Pkg.test —
+        # which is exactly what 1e-12 did.
+        @test maximum(abs, Hc .- H1) / maximum(abs, H1) < 1e-9
     end
 end

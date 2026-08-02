@@ -31,7 +31,7 @@ pipeline:
       ddi:
         enabled: false
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -44,7 +44,7 @@ pipeline:
       dt: 0.005
       rotating_frame_omega: 0.0          # ← Barnett rotation
       B:
-        Bz: {from: -0.01, to: -2.6e-5, duration: 0.0}
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
         theta: 0.0
         phi: 0.0
       ddi:

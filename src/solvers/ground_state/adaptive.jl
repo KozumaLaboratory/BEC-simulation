@@ -24,12 +24,18 @@ function _find_ground_state_adaptive(;
     ddi_padding::Bool=false,
     ddi_pad_factor::Union{Real, NTuple}=2,
     dt_max,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     rotating_frame_omega::Float64=0.0,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
     quasi_2d::Bool=false,
     l_z::Float64=0.0,
+    # Spinor (tabulated) LHY. `find_ground_state` / `find_ground_state_lbfgs`
+    # accept these and forward them to their own `make_workspace`, so a branch
+    # that does not thread them silently drops the TABLE while `scalar` (which
+    # rides in `interactions.c_lhy`) keeps working — the shape of #174 and #179.
+    spinor_lhy::Union{Nothing, Symbol, AbstractLHY}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     backend::AbstractBackend=CPUBackend(),
     light_shift=nothing,
     verbose::Bool=true,
@@ -60,6 +66,8 @@ function _find_ground_state_adaptive(;
         ddi_trunc_radius,
         ddi_padding,
         ddi_pad_factor,
+        spinor_lhy,
+        lhy_opts,
         fft_flags,
         quasi_2d_ddi,
         l_z_ddi,
@@ -75,7 +83,7 @@ function _find_ground_state_adaptive(;
 
     final_dE = NaN
     final_dpsi = NaN
-    t_start = time()
+    t_start = time_ns()
 
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
@@ -112,7 +120,7 @@ function _find_ground_state_adaptive(;
             final_dpsi = dpsi
 
             if verbose
-                elapsed = time() - t_start
+                elapsed = elapsed_s(t_start)
                 frac = total_steps / n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(

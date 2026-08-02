@@ -90,7 +90,7 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
   - Coriolis orbital ✓ (per-cell FD audit)
   - Barnett spin ✓ (per-cell FD audit)
   - c0 / c1 / DDI / LHY ✓ (per-cell FD audit, post-fix)
-  - Tensor (c2, c4): **not covered** by `energy_gradient!` by design — LBFGS warns and falls back. Marker `[KNOWN-LIMIT]`.
+  - Tensor (c2, c4) ✓ since 2026-06-09 — the anomalous gradient face is implemented and `energy_gradient!` is registry-only, so tensor-active configurations are optimised, not bounced to ITP. FD-gated in `test_term_consistency.jl`. (Was `[KNOWN-LIMIT]`.)
 - **Directional test missing**: 11 / 16 terms (trap, q, c0, c1 directly, DDI, LHY, tensor, raman, light_shift, mag-grad, loss).
   Each is a future-bug opportunity if the term gets refactored.
 

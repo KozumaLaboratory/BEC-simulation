@@ -2,8 +2,8 @@
 #
 # Engine `apply_raman_step!` is the production propagator (called by
 # integrator/split_step.jl and the GPU ext); `RamanTerm` is the registry
-# face (energy + KNOWN-LIMIT nil gradient). One file = engine + face
-# cohesion.
+# face (energy + gradient, both from the same H_R). One file = engine +
+# face cohesion.
 
 # ============================================================================
 # Engine — Raman propagator + time-dependent resolution
@@ -70,7 +70,8 @@ raman_at(::Nothing, ::Float64) = nothing
 
 # ============================================================================
 # RamanTerm — registry face. Sign convention is encoded in
-# apply_raman_step! + _raman_energy above. Gradient not implemented.
+# apply_raman_step! + _raman_energy above; the gradient derives from the
+# same H_R and is FD-gated against the energy.
 # ============================================================================
 
 """Raman two-photon coupling."""
@@ -129,13 +130,64 @@ function energy_contribution(::RamanTerm, psi::AbstractArray{<:Complex}, ws)
     )
 end
 
-# Operator-trinity KNOWN-LIMIT: Raman gradient not implemented in legacy
-# (LBFGS skip). apply_operator! nil to match; ITP path (apply_step!)
-# remains active.
-apply_operator!(out, ::RamanTerm, ws, psi) = out
+"""
+    _accumulate_raman_operator!(out, psi, sm, raman, grid, ndim, n_pts)
 
-# Directional oracle anchored on the PROPAGATOR (apply_raman_step!), since the
-# gradient face is a declared no-op. With δ·F_z the dominant term, ITP minimises
+`out .+= H_R·ψ` for the SAME `H_R` whose expectation `_raman_energy` sums.
+Writing that Hermitian matrix out,
+
+    H_R = δ·F_z + (Ω_R/2)·(e^{i k·r}·F₊ + e^{−i k·r}·F₋),
+
+since `E = δ·⟨F_z⟩ + Ω_R·Re(e^{i k·r}⟨F₊⟩)` and `⟨F₊⟩ = Σ_c a_c ψ̄_{c−1} ψ_c`
+means the off-diagonal entries are `H[c−1, c] = (Ω_R/2)·e^{i k·r}·a_c` and its
+adjoint. Hence, per voxel and component,
+
+    g_j = δ·m_j·ψ_j + (Ω_R/2)·(e^{i k·r}·a_{j+1}·ψ_{j+1} + e^{−i k·r}·a_j·ψ_{j−1})
+
+with `a_c = fp_ladder_coeffs(F)[c]` and `a_1 = a_{D+1} = 0` at the ends.
+"""
+function _accumulate_raman_operator!(psi_out, psi, sm::SpinMatrices{D},
+    raman::RamanCoupling{N}, grid::Grid{N}, ndim, n_pts) where {D, N}
+    F = sm.system.F
+    m_vals = ntuple(c -> Float64(F - (c - 1)), Val(D))
+    fp_coeffs = fp_ladder_coeffs(F, Val(D))
+    half_omega = raman.Omega_R / 2
+
+    @inbounds for I in CartesianIndices(n_pts)
+        kr = sum(ntuple(d -> raman.k_eff[d] * grid.x[d][I[d]], Val(N)))
+        phase = exp(1im * kr)
+        for c in 1:D
+            g = raman.delta * m_vals[c] * psi[I, c]
+            # c is the ψ̄ index: the ⟨F₊⟩ sum contributes ψ_{c+1} through the
+            # e^{+ikr} branch and ψ_{c−1} through its adjoint.
+            c < D && (g += half_omega * phase * fp_coeffs[c + 1] * psi[I, c + 1])
+            c > 1 && (g += half_omega * conj(phase) * fp_coeffs[c] * psi[I, c - 1])
+            psi_out[I, c] += g
+        end
+    end
+    psi_out
+end
+
+# Gradient face = δE/δψ̄. Was a declared no-op until 2026-07-31 ("KNOWN-LIMIT:
+# Raman gradient not implemented in legacy (LBFGS skip)"), which meant that with
+# a Raman coupling active `energy_gradient!` — registry-only since 2026-06-09,
+# so L-BFGS and Newton-CG both ride it — descended a functional EXCLUDING the
+# Raman term while `total_energy` reported one INCLUDING it, with no warning.
+# The converged state was not a stationary point of the energy printed beside
+# it. Gated by the FD identity in `oracles/test_term_fd_registry_coverage.jl`.
+function apply_operator!(out, ::RamanTerm, ws, psi)
+    ws.raman === nothing && return out
+    raman_now = raman_at(ws.raman, ws.state.t)
+    N = ndims(psi) - 1
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    return _accumulate_raman_operator!(
+        out, psi, ws.spin_matrices, raman_now, ws.grid, N, n_pts
+    )
+end
+
+# Directional oracle anchored on the PROPAGATOR (apply_raman_step!) — it predates
+# the gradient face and stays there because it is the face ITP uses. With δ·F_z
+# the dominant term, ITP minimises
 # the energy δ·⟨F_z⟩, so the converged ⟨F_z⟩ takes the sign opposite to δ. A
 # flipped δ sign in the propagator inverts ⟨F_z⟩ and trips this. (δ = 0 — pure
 # transverse drive — has no F_z anchor and short-circuits to true.)

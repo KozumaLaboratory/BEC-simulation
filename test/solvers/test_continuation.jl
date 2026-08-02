@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Parameter Continuation" begin
     F = 1
     grid = make_grid(GridConfig((16,), (10.0,)))

@@ -1,6 +1,7 @@
 using Test
 using SpinorBEC
 using LinearAlgebra: Hermitian, tr
+using Random
 
 @testset "Tensor interaction" begin
     @testset "make_tensor_interaction_cache returns nothing for c2-only" begin

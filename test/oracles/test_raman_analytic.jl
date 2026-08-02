@@ -6,11 +6,10 @@
 # and the registry energy face is
 #   E_Raman = ∫ d³r [ δ·⟨F_z⟩ + Ω_R·Re(e^{ik·r}·⟨F_+⟩) ].
 #
-# KNOWN-LIMIT: RamanTerm.apply_operator! is a NO-OP (gradient not
-# implemented — LBFGS skips Raman; src/hamiltonian/terms/raman.jl:136).
-# So we cannot pin the gradient face. Instead we pin energy_contribution
-# against its explicit closed form, voxel-wise, at machine precision,
-# AND assert the documented no-op contract for apply_operator!.
+# Both faces are pinned against explicit spin matrices, voxel-wise, at machine
+# precision. The gradient face used to be a declared NO-OP and this file
+# asserted that contract; it was implemented 2026-07-31 because a term with an
+# energy and no gradient made L-BFGS descend a functional it did not report.
 #
 # The energy test is NON-TRIVIAL: a wrong sign on δ or Ω_R, a flipped
 # k·r phase, or F_+ ↔ F_- would all break it (the e^{ik·r}·⟨F_+⟩ term is
@@ -24,7 +23,7 @@ using SpinorBEC:
     RamanTerm, RamanCoupling, apply_operator!, energy_contribution,
     spin_matrices, cell_volume
 
-@testset "RamanTerm energy = ∫[δ⟨Fz⟩ + Ω_R Re(e^{ik·r}⟨F₊⟩)], grad = nil" begin
+@testset "RamanTerm energy and gradient vs explicit spin matrices" begin
     for (atom, F) in ((Rb87, 1), (Eu151, 6))
         grid = make_grid(GridConfig((6, 6, 6), (4.0, 4.0, 4.0)))
         D = 2F + 1
@@ -71,12 +70,36 @@ using SpinorBEC:
             @test abs(expected_E) > 1e-6
         end
 
-        @testset "F=$F apply_operator! is KNOWN-LIMIT no-op" begin
+        @testset "F=$F gradient = H_R·ψ from the explicit matrices" begin
+            # Same construction as the energy above, one derivative up:
+            # H_R = δ·F_z + (Ω_R/2)(e^{ik·r}F₊ + e^{−ik·r}F₋). Built here from
+            # `Fz`/`Fp` rather than from the production ladder coefficients, so
+            # the two statements share nothing but the physics.
+            Fm = Fp'
+            expected_g = zeros(ComplexF64, 6, 6, 6, D)
+            @inbounds for I in CartesianIndices((6, 6, 6))
+                kr =
+                    k_eff[1] * grid.x[1][I[1]] +
+                    k_eff[2] * grid.x[2][I[2]] +
+                    k_eff[3] * grid.x[3][I[3]]
+                H = delta * Fz + (Omega_R / 2) * (exp(im * kr) * Fp + exp(-im * kr) * Fm)
+                expected_g[I, :] = H * psi[I, :]
+            end
+
+            # ACCUMULATE contract: a pre-filled `out` must gain H_R·ψ, not be
+            # overwritten — the defect class `test_apply_operator_accumulates.jl`
+            # gates generally, checked here on the term this file owns.
             out = randn(ComplexF64, 6, 6, 6, D)
             before = copy(out)
             ret = apply_operator!(out, RamanTerm(), ws, psi)
-            @test out == before          # leaves accumulator untouched
             @test ret === out
+            @test isapprox(out, before .+ expected_g; rtol=1e-12, atol=1e-13)
+
+            # And the two faces are the same operator: E = Re⟨ψ, H_R ψ⟩·dV.
+            @test isapprox(
+                real(sum(conj.(psi) .* expected_g)) * dV, expected_E;
+                rtol=1e-10, atol=1e-12,
+            )
         end
     end
 end

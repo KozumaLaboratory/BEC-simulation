@@ -1,6 +1,19 @@
 # Long-time LHY stability ladder — auto-generated.
 # Source: scripts/validation/eu_lhy_longtime_gen.jl
 # LHY = polar_contact, K3 = 0, duration = 125.66 ω_ref⁻¹ ≈ 200ms
+#
+# ANSATZ MISMATCH, left in place deliberately (noted 2026-07-30). This arm's
+# state is `m_minus_F`, i.e. FM, while `polar_contact` is the closed form for
+# the polar state (zeta = delta_{m,0}). runs/eu_k3_lhy/*.yaml label this
+# "applied outside nominal regime", so the mismatch is the study design across
+# this family, not an accident — but the number it produces is NOT a validated
+# closure for this state and must not be read as one. The matching closed
+# form is `fm_contact` (any F since 2026-07-27, gated against full_bdg at
+# F=1..8); the general path is `full_bdg`. The sibling `icosahedral` arm had
+# the same defect and could no longer run at all once the I_h form began
+# refusing lambda_spin < 0, so it moved to full_bdg. This arm fails QUIETLY
+# instead, which is the more dangerous half. Neither the "scope note" nor any
+# generator named in these headers exists in the tree.
 
 metadata:
   suite: eu_lhy_longtime
@@ -38,7 +51,7 @@ pipeline:
         enabled: true
         secular: false
       lhy: {kind: polar_contact}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

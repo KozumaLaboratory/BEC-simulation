@@ -35,20 +35,14 @@ function combined_precondition!(
     sqrt_pv::AbstractArray{<:Real}, k2::AbstractArray{<:Real}, α_K::Float64,
 ) where {N}
     n_pts = ntuple(d -> size(v, d), Val(N))
-    n_comp = ws.spin_matrices.system.n_components
     spv = reshape(sqrt_pv, n_pts..., 1)               # broadcast over components
-    fft_buf = ws.state.fft_buf
     αK = real(eltype(k2))(α_K)
+    filt = cached_kspace_filter(
+        k2, :combined_precond_k, α_K, k2v -> inv(oftype(αK, 0.5) * k2v + αK)
+    )
 
     v .*= spv                                         # P_V^½
-    @inbounds for c in 1:n_comp                       # P_K (per component)
-        idx = _component_slice(N, n_pts, c)
-        fft_buf .= view(v, idx...)
-        ws.fft_plans.forward * fft_buf
-        fft_buf ./= (0.5 .* k2 .+ αK)
-        ws.fft_plans.inverse * fft_buf
-        view(v, idx...) .= fft_buf
-    end
+    batched_kspace_filter!(v, ws, filt)               # P_K (all components)
     v .*= spv                                         # P_V^½
     v
 end

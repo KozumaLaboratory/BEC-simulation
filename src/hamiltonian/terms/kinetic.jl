@@ -107,8 +107,14 @@ function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArr
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
-    fft_buf = similar(psi, ComplexF64, n_pts...)
-    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    # `similar(psi, …)` WITHOUT an eltype: the buffer must match psi's element
+    # type as well as its device, because `ws.fft_plans` were planned for psi's
+    # eltype and FFTW's in-place plans reinterpret the memory they are handed.
+    # Hardcoding ComplexF64 here made every Float32 workspace feed a ComplexF64
+    # buffer to a ComplexF32 in-place plan: no error, garbage out — the F32
+    # kinetic energy came back 0.0035 against 0.48 (2026-07-29).
+    fft_buf = similar(psi, n_pts...)
+    k_squared_dev = _to_device_cached(ws.backend, ws.grid.k_squared)
     _grad_kinetic!(out, psi, ws, fft_buf, k_squared_dev, n_pts, D, Val(N))
     return out
 end
@@ -120,9 +126,8 @@ function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
     n_pts = ntuple(d -> size(psi, d), Val(N))
     n_comp = size(psi, N + 1)
     dV = cell_volume(ws.grid)
-    # Device-aware buffer: matches psi's device so the FFT plan (also
-    # ws.fft_plans, matching ws.state.psi's device) operates correctly.
-    fft_buf = similar(psi, ComplexF64, ws.grid.config.n_points)
+    # Device- AND eltype-aware: see `apply_operator!` above.
+    fft_buf = similar(psi, ws.grid.config.n_points)
     return _kinetic_energy(
         psi, ws.grid, ws.fft_plans, fft_buf, n_comp, N, n_pts, dV
     )
@@ -145,7 +150,7 @@ end
 function apply_operator!(out, ::KineticTerm, ws, psi, ctx::GradientContext)
     N = ndims(psi) - 1
     D = ws.spin_matrices.system.n_components
-    k_squared_dev = _to_device(ws.backend, ws.grid.k_squared)
+    k_squared_dev = _to_device_cached(ws.backend, ws.grid.k_squared)
     _grad_kinetic!(out, psi, ws, ctx.fft_buf, k_squared_dev, ctx.n_pts, D, Val(N))
     return out
 end

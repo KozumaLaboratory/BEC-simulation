@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Quasi-2D direct API" begin
     @testset "make_workspace scales interactions" begin
         grid = make_grid(GridConfig((16, 16), (10.0, 10.0)))

@@ -17,6 +17,10 @@
 #
 # Env:
 #   BS_GRID=64  BS_BOX=24.0  BS_NB=101  BS_BMIN=0.0  BS_BMAX=100.0  (µG)
+#   BS_TRAP_Z=1.1818          trap aspect ω_z/ω_⊥ — this is κ
+#   BS_DIR=down|up            continuation direction; `up` + BS_ANCHOR_STATE=flower
+#                             is the branch a hysteresis loop needs at κ ≥ 1.0
+#   BS_ANCHOR_STATE=m_plus_F  seed for the first (anchor) cell
 #   BS_PIN_EPS=1e-3           fixed transverse pin b_x (dimensionless p-units)
 #   BS_ITP=2000  BS_LBFGS_ANCHOR=400  BS_LBFGS_CELL=120
 #   BS_NEWTON_ANCHOR=1  (Newton-polish the stiff anchor; OFF for soft cells)
@@ -78,18 +82,50 @@ const PRESET  = eu151_preset(; n_pts=(NX, NX, NX), box=(BOX, BOX, BOX),
 const ATOM = PRESET.atom
 const SYS  = SpinSystem(ATOM.F)
 
-# Descending B (anchor = high field, then continue down into the soft manifold).
-const B_UG = collect(range(BMAX, BMIN; length=NB))
+# Scan direction. The anchor is always the FIRST cell, so the direction picks
+# which spinodal the continuation walks toward — and therefore which branch this
+# run produces.
+#
+#   down (default)  anchor at HIGH field, continue into the soft low-B manifold.
+#                   Pairs with BS_ANCHOR_STATE=m_plus_F → the "dn" branch, which
+#                   loses stability at the LOWER spinodal.
+#   up              anchor at LOW field, continue upward. Pairs with
+#                   BS_ANCHOR_STATE=flower → the "up" branch, which is stable at
+#                   weak field and loses stability at the UPPER spinodal.
+#
+# Both branches at one κ are what a hysteresis loop is made of, so a first-order
+# claim needs BOTH — the direction was hard-coded to `down` until 2026-07-29,
+# which is why the library had no "up" branch at any κ ≥ 1.0.
+const DIR = let d = lowercase(get(ENV, "BS_DIR", "down"))
+    d in ("down", "up") || error("BS_DIR must be `down` or `up`, got `$d`")
+    d
+end
+const B_UG = DIR == "down" ? collect(range(BMAX, BMIN; length=NB)) :
+             collect(range(BMIN, BMAX; length=NB))
 
-@printf("B-scan pinned continuation: grid=%d^3 box=%.1f  B=%.1f→%.1f µG × %d pts  pin b_x=%.1e  tol=%.0e  %s%s%s\n",
-    NX, BOX, BMAX, BMIN, NB, EPS, TOL, HAS_GPU ? "CUDA" : "CPU", SMOKE ? " [SMOKE]" : "",
+@printf("B-scan pinned continuation: grid=%d^3 box=%.1f κ=%.4f  B=%.1f→%.1f µG × %d pts (%s, anchor=%s)  pin b_x=%.1e  tol=%.0e  %s%s%s\n",
+    NX, BOX, TRAPZ, first(B_UG), last(B_UG), NB, DIR,
+    get(ENV, "BS_ANCHOR_STATE", "m_plus_F"),
+    EPS, TOL, HAS_GPU ? "CUDA" : "CPU", SMOKE ? " [SMOKE]" : "",
     REPOLISH ? @sprintf(" [REPOLISH >%.0e cap=%d ramp=%s]", RP_THRESH, RP_LBFGS,
         isempty(RP_RAMP) ? "none" : join(RP_RAMP, ",")) : "")
 flush(stdout)
 
+# `make_workspace` deliberately defaults both image knobs OFF — it is the
+# library primitive, and flipping it there would move every direct-call fixture
+# (see its own comment). The YAML/DSL surface defaults them ON, and this script
+# is production physics reached by direct call, so it opts in explicitly.
+#
+# It matters more here than almost anywhere else. The bare periodic kernel
+# carries a 2-5 % dipolar field error that is FLAT in resolution, and its origin
+# is the square lattice of periodic images breaking rotational symmetry — an
+# ANISOTROPIC error. This scan's whole subject is how the trap aspect ratio κ
+# controls the order of the transition, so an anisotropy-dependent DDI error is
+# a direct confound on the axis being measured, not a uniform offset.
 base_kw(p) = (; grid=PRESET.grid, atom=ATOM, interactions=PRESET.interactions,
     potential=PRESET.potential, zeeman=static_zeeman(; Bz=p, Bx=EPS, q=0.0),
-    enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND)
+    enable_ddi=true, c_dd=PRESET.c_dd, secular_ddi=false, backend=BACKEND,
+    ddi_padding=true, ddi_trunc_radius=-1.0)
 
 # density-weighted axial + transverse magnetisation (manifest scalars).
 function frame_scalars(psi)

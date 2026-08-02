@@ -27,8 +27,12 @@ const SMOKE = get(ENV, "SMOKE", "0") == "1"
 # somewhere off the group volume. That is not a nicety: the group Lustre area is
 # shared with two other users holding ~900 GB between them, and when it filled,
 # a production cell died with a Bus error -- JLD2 mmaps its output, so a full
-# filesystem is SIGBUS rather than a clean write error. $HOME is a separate
-# 25 GB quota on the same Lustre, so BR_OUT=$HOME/... survives a full /gs/fs.
+# filesystem is SIGBUS rather than a clean write error.
+#
+# Preferred destination: /gs/bs/work/<n>/<user>, which is a per-user area on a
+# DIFFERENT filesystem (40 PB, no per-user block quota). $HOME also works and is
+# a separate quota too, but it is only 25 GB -- fine for the ledger CSVs, not for
+# a depot plus snapshots.
 const OUT   = get(ENV, "BR_OUT", joinpath(@__DIR__, "data"))
 mkpath(OUT)
 
@@ -113,7 +117,16 @@ const OMEGA_TRAP = (1.0, 1.0, 2.0)
 const N_ATOMS = 30000
 const OMEGA_REF = 628.3                  # rad/s
 const B_GAUSS = 9.216e-4                 # |p| = 15 (magnetostriction regime)
-const OMEGA   = CELL == "zero" ? 0.0 : 0.74
+# Stir rate. `zero` pins it to 0 regardless — that cell IS the no-rotation
+# control and must not be reachable by a typo in BR_OMEGA.
+#
+# The efficiency dF_z/|dL_z| = 0.99 was measured at Omega = 0.74 only. Whether it
+# is universal or an accident of that rate is the obvious next question, and it
+# has a prediction attached: the efficiency follows from J_z conservation plus
+# the DDI being the only spin-orbit channel, neither of which references Omega,
+# so it should be FLAT. The injected L_z, by contrast, is a driven response and
+# should depend on Omega strongly.
+const OMEGA   = CELL == "zero" ? 0.0 : parse(Float64, get(ENV, "BR_OMEGA", "0.74"))
 const DDI_ON  = CELL != "plus_nodd"
 # Overridable so a short job can measure s/step on the PRODUCTION grid and set
 # the batch walltime from a number instead of an estimate. A 20-minute probe
@@ -155,6 +168,21 @@ end
 let dxs = ntuple(d -> BOX[d] / NPTS[d], 3)
     @printf("  geometry OK: n=%s box=%s dx=(%.4f, %.4f, %.4f)\n", NPTS, BOX, dxs...)
     get(ENV, "BR_CHECK", "0") == "1" && exit(0)
+end
+
+# Orszag 2/3 dealiasing. The per-term J_z torque budget on a real post-quench
+# state (torque_budget.jl) put the violation in the KINETIC term, ~5x the DDI:
+# L_z does not map the discrete k-grid onto itself, so whatever the state carries
+# near the Nyquist edge leaks angular momentum. The 2/3 filter removes exactly
+# that band, which is why it is the direct treatment rather than yet more dx.
+#
+# Deliberately NO explicit k_cut: `DEALIAS_K_CUT` hard-codes a box of 12 on every
+# axis, so on this 28x28x18 box it would cut the occupied band roughly in half.
+# The default (n_d / 3 per axis, index space) is box-independent and is what we
+# want.
+if get(ENV, "BR_DEALIAS", "0") == "1"
+    SpinorBEC.DEALIAS_2_3_ENABLED[] = true
+    println("  dealias: Orszag 2/3 ON (index-space n/3 per axis, no k_cut override)")
 end
 
 const GRID = make_grid(GridConfig(NPTS, BOX))
@@ -344,6 +372,20 @@ frames = Tuple{Float64, Array{ComplexF32, 4}}[]
 
 tag = (SMOKE ? "smoke_$CELL" : CELL) * TAG_SUFFIX
 ledger = joinpath(OUT, "ledger_$tag.csv")
+# Refuse to share an output file with a concurrent job. Four Omega-scan runs once
+# resolved to the same ledger name (the geometry selector overwrote BR_TAG) and
+# raced on write_csv's tmp+rename until two died with ENOENT -- and the two that
+# survived had silently overwritten each other's data. A lock file makes that a
+# startup error instead of a corrupted result.
+let lock = ledger * ".lock"
+    if isfile(lock) && time() - mtime(lock) < 86400
+        error("$ledger is already claimed by a running job (see $lock). " *
+              "Two jobs resolving to one output name will race and corrupt it — " *
+              "give this run its own BR_TAG.")
+    end
+    write(lock, string(get(ENV, "JOB_ID", "?"), " ", gethostname()))
+    atexit(() -> (rm(lock; force=true); nothing))
+end
 
 psi_gs = run_gs()
 psi_stir = run_dynamics(psi_gs, :stir, 0.0, rows, frames; ledger_path=ledger)

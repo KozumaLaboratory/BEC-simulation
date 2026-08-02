@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Potentials" begin
     @testset "GravityPotential evaluate_potential" begin
         grid_cfg = GridConfig((32,), (10.0,))

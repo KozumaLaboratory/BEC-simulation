@@ -29,6 +29,51 @@ function _zero_odd_offdiag_at_nyquist!(Q_xy, Q_xz, Q_yz, full_n::NTuple{N, Int})
 end
 
 """
+    auto_ddi_trunc_radius(box, pad_factor=nothing) → Float64
+
+Largest wrap-around-free spherical cutoff radius for `box`, which is what
+`trunc_radius: auto` resolves to.
+
+Unpadded, the truncated kernel is exact only while `R` stays inside half the
+smallest box extent — beyond that the real-space sphere overlaps its own
+periodic image. Zero-padding to `pad_factor_d · L_d` buys the extra room, so `R`
+may grow to `(pad_factor_d − 1)·L_d` on every axis, capped by the box diagonal
+(no separation in the box exceeds it, so a larger `R` truncates nothing).
+
+The single declaration of this rule: `make_workspace` and
+`analysis/dipole_field.jl` both call it rather than restating it.
+"""
+function auto_ddi_trunc_radius(box::NTuple{N, <:Real}, pad_factor=nothing) where {N}
+    pad_factor === nothing && return Float64(minimum(box)) / 2
+    pf = if pad_factor isa Real
+        ntuple(_ -> Float64(pad_factor), N)
+    else
+        ntuple(d -> Float64(pad_factor[d]), N)
+    end
+    diag = sqrt(sum(b -> Float64(b)^2, box))
+    min(diag, minimum(ntuple(d -> (pf[d] - 1) * Float64(box[d]), N)))
+end
+
+"""
+    auto_ddi_pad_factor(box) → NTuple{N, Float64}
+
+Per-axis zero-pad factors that let the spherical cutoff reach `max(box)`, which
+is what `pad_factor: auto` resolves to.
+
+A single sphere has one radius, so on an anisotropic box the binding axis is the
+SHORT one: `auto_ddi_trunc_radius` caps `R` at `min_d (f_d − 1)·L_d`, while
+covering every separation in the box needs `R ≥ max(box)`. Solving
+`(f_d − 1)·L_d ≥ max(box)` per axis gives `f_d = 1 + max(box)/L_d`.
+
+Isotropic boxes come out at exactly 2 on every axis — unchanged from the plain
+default, which is already exact there. An aspect-2 cigar comes out at (3, 3, 2),
+2.25x the padded volume of a flat 2x: that memory is the price of removing the
+last ~2e-3 of field error, and is why this is opt-in rather than the default.
+"""
+auto_ddi_pad_factor(box::NTuple{N, <:Real}) where {N} =
+    ntuple(d -> 1 + Float64(maximum(box)) / Float64(box[d]), N)
+
+"""
     ddi_trunc_factor(x) → T
 
 Radial modifier `h(x)` of the spherically-truncated DDI kernel

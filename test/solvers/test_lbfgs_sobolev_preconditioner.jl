@@ -62,7 +62,15 @@ using Test
         # heavily on problem stiffness — pinned in benchmarks, not unit
         # tests. Here we only check that α > 0 doesn't kill convergence.
         r = build_problem(sobolev_alpha=0.1)
-        @test r.converged || r.last_step >= 100
+        # `last_step >= 100` used to stand in for "it did not give up early".
+        # That stopped meaning anything when the solver learned to stop at its
+        # gradient floor instead of grinding to `n_steps`: a healthy solve now
+        # ends in tens of steps with `stop_reason = :line_search_stalled`. State
+        # the intent directly — it either reached `tol`, or it stopped because
+        # steepest descent proved no further step exists. Running out of steps
+        # is the outcome this test is against.
+        @test r.converged || r.stop_reason === :line_search_stalled
+        @test r.stop_reason !== :max_steps
         @test r.energy < Inf
     end
 end

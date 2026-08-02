@@ -368,8 +368,19 @@ function _run_step(
         return (psi_out, grid, atom, ws_cached, step_result)
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
+    # from_jld2: load ψ from a prior result (mirrors the rotating_basis
+    # path). Its init_state_params carry a path/snap, not Float64s, so
+    # resolve it before the numeric-params loop below.
+    psi_from_jld2 = nothing
+    if initial_state === :from_jld2
+        isp = get(p, "init_state_params", Dict())
+        jpath = get(isp, "path", nothing)
+        jpath === nothing && throw(ArgumentError(
+            "initial_state: from_jld2 requires init_state_params.path"))
+        psi_from_jld2 = _load_psi_from_jld2(String(jpath), get(isp, "snap", "last"))
+    end
     init_state_params = Dict{Symbol, Float64}()
-    if haskey(p, "init_state_params")
+    if initial_state !== :from_jld2 && haskey(p, "init_state_params")
         for (k, v) in p["init_state_params"]
             init_state_params[Symbol(k)] = Float64(v)
         end
@@ -381,7 +392,9 @@ function _run_step(
     end
     temp_ratio = _get_optional_float(p, "temperature_ratio")
 
-    psi_init = psi_prev
+    # Both warm-start routes, in precedence order: an explicit from_jld2 state
+    # wins, then a carried-over psi, then a `seed_from` reference.
+    psi_init = psi_from_jld2 !== nothing ? psi_from_jld2 : psi_prev
     if psi_init === nothing && haskey(p, "seed_from")
         psi_init = _resolve_seed_from(p["seed_from"], p, grid, atom)
         verbose && println("  seed_from: loaded + upsampled warm seed (skips fresh init)")
@@ -480,10 +493,12 @@ function _run_step(
     gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
 
     gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
+    tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;
             grid, atom, interactions, zeeman, potential,
-            dt, n_steps, tol, initial_state, init_state_params, psi_init,
+            dt, n_steps, tol, tol_drho=tol_drho_val,
+            initial_state, init_state_params, psi_init,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
@@ -524,6 +539,8 @@ function _run_step(
                 target_magnetization=target_mz, backend,
                 verbose,
                 light_shift=gs_light_shift,
+                spinor_lhy=spinor_lhy_mode,
+                lhy_opts=gs_lhy_opts,
                 pin=pin_closure, epsilon_ramp=pin_eps,
                 residual_polish,
             )
@@ -563,6 +580,11 @@ function _run_step(
     step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
+        # `converged=false` alone cannot tell a run that failed from one that
+        # reached the method's floor with an unattainable `tol` asked of it.
+        # ITP has no line search and reports neither key.
+        :ground_state_stop_reason => String(get(gs, :stop_reason, :unknown)),
+        :ground_state_floor_limited => Bool(get(gs, :floor_limited, false)),
         :ground_state_grad_norm => Float64(get(gs, :grad_norm, NaN)),
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,

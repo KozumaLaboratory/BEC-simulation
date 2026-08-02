@@ -22,7 +22,7 @@ scan:
       override: {...}
 ```
 
-`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired into `run_yaml`. Used in `runs/eu151_mz_scan/`, `runs/eu151_phase_pq/` etc — those each have ONE `config.yaml` with a `scan:` block.
+`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired into `run_yaml`. Used in `runs/eu151_mz_scan/` (gone), `runs/eu151_phase_pq/` (gone) etc — those each have ONE `config.yaml` with a `scan:` block.
 
 Today's new scans (phi_omega, Berry crossover, thesis_batch) bypassed this and instead generated N separate dirs via Julia generator scripts. Cause: launching N parallel runs across 3-GPU chunks is easier when each run is its own shell call. But the result is duplicated YAML and orphan analyzers.
 

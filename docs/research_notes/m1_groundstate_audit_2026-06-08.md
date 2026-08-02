@@ -1,7 +1,23 @@
 # M1 sweep — gate (1) ground-state-ness audit (2026-06-08)
 
+> **訂正 (2026-08-02): sweep は在る。** 2026-07-31 の版はここに「どの commit にも
+> 存在せず、下記の数値は再チェックできない」「入力の 30 セルが無い」と書いていた。
+> **誤り。** `runs/sprint5_M1_multistart_groundstate/` (untracked) は 30 セル
+> (`cell_B*_Om*.jld2`) と `groundstate_audit.jld2`、計 31 ファイル 83 MB が
+> main checkout に揃っている。
+>
+> 正しい制約は **untracked であること** — git に無いので clone からは再現できず、
+> CI にも worktree にも見えない。しかし手元では**数値を辿り直せる**。
+> 「追跡外」を「消失」と読み替えたのが元の誤りで、これは廃棄 manifest が
+> 474 件で犯したのと同じ取り違えである
+> ([`stored_run_disposal.md`](../campaign/stored_run_disposal.md))。
+>
+> 監査自体の限界は変わらない: 自ら **gate (1) のみ**（saddle 除去と vortex 解像度は
+> pending）と述べている。
+> 全体像: [`doc_run_citation_inventory.md`](../campaign/doc_run_citation_inventory.md)。
+
 First physics-gated extraction from the on-disk 30-cell rotating-frame
-sweep (`runs/sprint5_M1_multistart_groundstate/`, B × Ω, Eu F=6, 24³,
+sweep (`runs/sprint5_M1_multistart_groundstate/` (untracked), B × Ω, Eu F=6, 24³,
 50k atoms). Produced by `scripts/m1_groundstate_audit.jl`.
 
 Gate (1) of the phase verdict: the gradients are gated (master oracle)
