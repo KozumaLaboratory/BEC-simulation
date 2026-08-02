@@ -161,7 +161,13 @@ else
         kw = (; ddi_padding=true, spinor_lhy=:polar_contact)
         a = _run(true, 5; kw...)
         b = _run(false, 5; kw...)
-        @test a == b
+        # `_agree`, not `==`, for the reason the arms above already carry: bit
+        # identity is what the fusion delivers on a fixed device state and it does
+        # hold when this file runs alone, but GPU reduction order is not stable
+        # inside a `full`-tier worker that has already run thirty other files.
+        # This arm shipped with `==` and would have been the one that flaked —
+        # under exactly the condition the other arms were relaxed for.
+        @test _agree(a, b) < 1e-12
 
         wst = _ws(; kw...)
         @test wst.lhy isa SpinorBEC.TabulatedLHY
@@ -175,7 +181,7 @@ else
         # dropped it too, which it does not. Requiring the LHY to MOVE ψ is what
         # separates "the table is applied" from "the table is zero".
         c = _run(true, 5; ddi_padding=true)          # same config, no LHY
-        @test a != c
+        @test _agree(a, c) > 1e-6
     end
 
     @testset "no frozen mean field ⇒ the fusion declines" begin
