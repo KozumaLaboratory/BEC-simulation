@@ -88,6 +88,9 @@ using SpinorBEC
     end
 
     # Hartree–Fock prediction at the same coupling, in the code's convention.
+    # Rayleigh-Jeans is the THERMAL prediction and only applies while there is
+    # no condensate. Returns NaN + condensed=true otherwise rather than a number
+    # that silently omits the largest term.
     function rj_at(c0_run)
         nn = 50.0
         for _ in 1:400
@@ -96,25 +99,33 @@ using SpinorBEC
                 k2 = grid.k_squared[I]
                 k2 <= k_cut^2 || continue
                 d = 0.5 * k2 + 2c0_run * nn - mu
-                d > 0 && (s += T / d)
+                # `d <= 0` is NOT an absent mode to skip. It means mu sits above
+                # the Hartree-Fock floor, which is a CONDENSATE — and skipping it
+                # made this predictor report 2.2e5 where the run held 7.2e6, then
+                # the run was blamed for the difference. Signal it.
+                d > 0 || return (; N=NaN, condensed=true)
+                s += T / d
             end
             nn = 0.5 * nn + 0.5 * (s / V)
         end
-        nn * V
+        (; N=nn * V, condensed=false)
     end
 
-    ratios = Float64[]
+    # Weak coupling at mu = 15 is deeply CONDENSED, so the Thomas-Fermi number
+    # mu*V/c0 is the prediction there and Rayleigh-Jeans does not apply at all.
+    # That is the whole lesson: at c0 = 0.002 the run holds 7.2e6 against a
+    # Thomas-Fermi 7.5e6, 4% low, while the thermal-only predictor said 2.2e5 —
+    # and the 33x was charged to the code.
     for c0_run in (0.19, 0.02, 0.002)
         r = run_equilibrium(c0_run)
-        pred = rj_at(c0_run)
         @test r.settled
-        push!(ratios, r.N / pred)
-        @info "equilibrium vs Hartree-Fock" c0_run N_run=r.N N_HF=pred ratio=r.N / pred
+        rj = rj_at(c0_run)
+        N_TF = mu * V / c0_run
+        @info "equilibrium" c0_run N_run=r.N N_TF ratio_TF=r.N / N_TF rj_applies=!rj.condensed
+        @test rj.condensed                              # all three are condensed
+        @test r.N≈N_TF rtol=1.0                         # and near the TF number
     end
-
-    # Weak coupling is where Hartree–Fock is exact, so that is where agreement is
-    # REQUIRED. Disagreement there would be a code error; disagreement only at
-    # strong coupling is the closed form running out of validity.
-    @test ratios[end]≈1.0 rtol=0.25
-    @test abs(ratios[end] - 1) < abs(ratios[1] - 1)      # and it must improve
+    # The deeply condensed end is where the thermal fraction is negligible and
+    # Thomas-Fermi is sharp, so that is where agreement is required.
+    @test run_equilibrium(0.002).N≈mu * V / 0.002 rtol=0.15
 end
