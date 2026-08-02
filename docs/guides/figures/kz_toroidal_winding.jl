@@ -55,6 +55,15 @@ const KZ_L = 200.0                 # circumference, a_perp
 const KZ_M = 1024                  # grid points
 const KZ_G1 = 0.0139               # 1D coupling, ℏω_perp a_perp
 const KZ_MU0 = 1.0                 # ℏω_perp
+# Quasi-1D: g₁ = 2ℏω_perp a_s, so the paper's g₁ fixes a_s rather than leaving it
+# to be guessed. 0.0139/2 = 0.00695 a_perp, and ⁸⁷Rb's 5.3 nm against
+# a_perp = √(ℏ/mω_perp) = 0.76 µm at ω_perp/2π = 200 Hz gives 0.0070 — the two
+# agree, which is a check on the geometry as stated.
+const KZ_AS = KZ_G1 / 2
+# Trajectory seeds must be separated by more than the number of steps in one
+# trajectory, since each step draws with `seed + s`. The longest run here is
+# (1000 + 2e⁸ + 1000)/dt ≈ 8×10⁵ steps at dt = 0.01.
+const KZ_SEED_STRIDE = 10_000_000
 const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT", "runs/kz_toroidal")
 
 """
@@ -142,7 +151,7 @@ function kz_trajectory_torus(;
     # place that is defensible: the comparison is number-damping vs full at the
     # SAME γ, and an exponent is a rate-independent statement. The derived value
     # is reported alongside so the gap is visible rather than assumed away.
-    mk(γ, μ, Md) = SPGPEReservoir(; T, mu=μ, a_s=0.01, k_cut, gamma=γ, M=Md,
+    mk(γ, μ, Md) = SPGPEReservoir(; T, mu=μ, a_s=KZ_AS, k_cut, gamma=γ, M=Md,
         allow_unphysical_rates=true)
 
     # (1) relax to equilibrium at μ = −μ₀. τ ≡ ℏ/(γ|μ|) = 1 at γ = 1, |μ| = μ₀.
@@ -151,6 +160,12 @@ function kz_trajectory_torus(;
         split_step!(ws)
         apply_spgpe_step!(ws, res_relax, dt; t=0.0, seed=seed + s)
     end
+    # NOTE the caller's contract: `seed` must be separated between trajectories by
+    # more than the step count, because the per-step seed is `seed + s`. With
+    # consecutive trajectory seeds the noise sequences are the SAME sequence
+    # shifted by one step — measured, four "independent" runs gave ⟨W⟩ = 2.25 with
+    # every sign the same, which is not an ensemble at all. `kz_winding_scan`
+    # strides by KZ_SEED_STRIDE.
     N_equil = real(sum(abs2, ws.state.psi)) * dV
 
     # (2) the quench: μ(t) = μ₀ t/τ_Q over t ∈ [−τ_Q, τ_Q], then held at +μ₀ for
@@ -188,7 +203,13 @@ function kz_winding_scan(;
     Tc = ideal_torus_Tc()
     isnan(T) && (T = 0.5Tc)
     isnan(eps_cut) && (eps_cut = KZ_MU0 + T)      # occupation ~1 at the cut
-    γ_derived = spgpe_growth_rate(; T, mu=KZ_MU0, eps_cut, a_s=0.01)
+    # Order-of-magnitude only: spgpe_growth_rate is Rooney's THREE-dimensional
+    # density of states and this trap is quasi-1D, so the number below is not the
+    # quasi-1D rate. It is printed to show that the paper's γ is also far from a
+    # first-principles value — which is defensible there and was not in the run
+    # this branch retracted, because here the comparison is number-damping against
+    # full at the SAME γ and an exponent does not depend on it.
+    γ_derived = spgpe_growth_rate(; T, mu=KZ_MU0, eps_cut, a_s=KZ_AS)
 
     @printf("=== KZ winding, toroidal SPGPE (McDonald & Bradley PRA 92, 033616) ===\n")
     @printf("  L=%.0f  M=%d  g1=%.4f  N_TF=%.0f   T_c=%.3f  T=0.5T_c=%.3f\n",
@@ -196,7 +217,7 @@ function kz_winding_scan(;
     @printf("  eps_cut=%.3f (2mu=%.1f, occ at cut=%.2f)  k_cut=%.3f  C modes≈%d\n",
         eps_cut, 2KZ_MU0, T / (eps_cut - KZ_MU0), sqrt(2eps_cut),
         round(Int, sqrt(2eps_cut) * KZ_L / π))
-    @printf("  gamma=%.3g PINNED as in the paper (derived at these params: %.3g, ratio %.3g)\n",
+    @printf("  gamma=%.3g PINNED as in the paper (3D-formula rate %.3g, ratio %.3g — ORDER ONLY, trap is quasi-1D)\n",
         gamma, γ_derived, gamma / γ_derived)
     @printf("  M_damp=%.3g  %s   dt=%.4g   %d trajectories/point\n",
         M_damp, M_damp > 0 ? "FULL SPGPE" : "number-damping only", dt, n_traj)
@@ -208,13 +229,21 @@ function kz_winding_scan(;
     for τ in tau_Qs
         Ws, Ne, Nf = Float64[], Float64[], Float64[]
         for j in 1:n_traj
-            r = kz_trajectory_torus(; tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j,
+            r = kz_trajectory_torus(;
+                tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
                 T, eps_cut, gamma, M_damp, dt, backend)
             push!(Ws, r.W);
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
         end
         σ = std(Ws)
+        # ⟨W⟩ must be consistent with zero: the ring has no preferred sense, so a
+        # mean far from zero means the trajectories are not independent (or the
+        # winding is being computed with a bias). This is the check that caught
+        # trajectory seeds separated by 1.
+        z_mean = abs(mean(Ws)) / (σ / sqrt(n_traj) + eps())
+        z_mean > 4 && @warn "⟨W⟩ is $(round(z_mean; digits=1))σ from zero — the " *
+                            "ensemble is not independent or W is biased" τ mean_W=mean(Ws) σ
         # A standard deviation's own error, not the mean's — the quantity fitted
         # here IS the width.
         e = σ / sqrt(2 * (n_traj - 1))
