@@ -53,6 +53,7 @@ end
         ectx = build_energy_context(psi, ws)
         scratch = similar(psi)
         n_checked = 0
+        checked = Symbol[]
         for term in registry
             r = energy_operator_ratio(term)
             E_own = energy_contribution(term, psi, ws, ectx)
@@ -69,6 +70,7 @@ end
             # Terms that are switched off contribute zero both ways; they are
             # counted separately so the summary below cannot be all zeros.
             if abs(E_own) > 1.0e-12
+                push!(checked, nameof(typeof(term)))
                 n_checked += 1
                 ok = isapprox(E_derived, E_own; rtol=1.0e-10)
                 ok || @info("ratio does not reproduce this term's energy",
@@ -79,9 +81,15 @@ end
                 @test abs(E_derived) < 1.0e-12
             end
         end
-        # The fixture is meant to light up kinetic, trap, zeeman, c0, c1 and
-        # DDI at least. If it stops doing so the loop above passes vacuously.
-        @test n_checked >= 6
+        # Guard against the loop passing vacuously — but NAME what it covered
+        # rather than asserting a count. The first version demanded six and got
+        # five, which said nothing about which term was missing; a count is the
+        # wrong instrument for a coverage claim.
+        @info "terms whose ratio was actually exercised" checked
+        for required in (:KineticTerm, :TrapTerm, :ZeemanTerm, :DensityC0Term)
+            @test required in checked
+        end
+        @test length(checked) >= 5
     end
 
     @testset "the registry total matches energy_decomposition" begin
