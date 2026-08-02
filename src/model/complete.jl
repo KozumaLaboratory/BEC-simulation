@@ -109,12 +109,55 @@
 # and nothing can drift: `converged`, `stop_reason`, `floor_limited`, `grad_norm`.
 
 export CompletionMarker, PayloadEntry, Admission, MarkerVerdict
-export COMPLETE_MARKER_FORMAT, marker_path, incomplete_marker_path
+export COMPLETE_MARKER_FORMAT, MARKER_CUTOVER_UNIX, marker_path, incomplete_marker_path
 export write_complete_marker, write_incomplete_marker, read_complete_marker, admit_payload
 export gs_verdict
 
 "On-disk marker format version. Readers refuse anything else rather than guess."
 const COMPLETE_MARKER_FORMAT = 1
+
+"""
+The instant marker writing began: commit `ce9721cb`, "cutover step 2 — a cache
+hit requires a completion marker", 2026-08-01T19:33:52+09:00.
+
+A payload with NO marker whose mtime is AFTER this is `:rejected`, not
+`:unmarked`. Before it, no writer in the tree could produce a marker, so an
+unmarked payload is history. After it, every writer produces one — a marker on
+success, a tombstone on a failure it knows about — so an unmarked payload is a
+run that was killed hard enough that it wrote neither.
+
+**Why a dated constant and not a backfill.** The obvious alternative is to walk
+`runs/` once and stamp every existing payload with a marker, after which "no
+marker" could mean "not complete" unconditionally. That is worse on three counts,
+and the third is the one that decides it:
+
+ 1. **A backfilled marker would be a lie.** Its whole content is a certificate
+    that some run completed. Nothing on disk today says which of the 522 `.jld2`
+    in the main checkout came from a run that finished — that is precisely the
+    information this cutover exists to start recording, and inventing it
+    retroactively would put a certificate on the killed runs too.
+ 2. **It cannot be re-run.** A backfill is a one-shot mutation of a directory
+    that is not in git (43 of 70 cited `runs/` directories are absent from the
+    tree entirely), so a second checkout, a TSUBAME `SPINORBEC_RUNS_ROOT`, or a
+    collaborator's copy would each need their own, and a missed one silently
+    goes back to grandfathering.
+ 3. **A date is checkable; a stamp is not.** This constant is one integer that a
+    test pins and a reader can verify against `git log -1 --format=%ct ce9721cb`.
+    A backfill leaves no artifact stating what it did.
+
+The failure direction is the safe one. An mtime that has been reset — `rsync`
+without `-t`, a `cp` that does not preserve times, a fresh `git checkout` — makes
+an old payload look new, and a payload that looks new is REJECTED, i.e.
+recomputed. Never the reverse. (The collect path is `rsync -av`, which does
+preserve mtimes: `autopilot/ssh_transport.jl:54`.)
+
+Documented failure this closes: Snakemake issue 3808 — outputs of FAILED jobs
+stopped being marked incomplete, the metadata read `"incomplete": false`, and
+reruns never triggered. Its `incomplete()` is literally "exists and marked ⇒
+incomplete, else complete", which is arm (b). Nix and Bazel do not grandfather at
+all: a `/nix/store` path absent from `ValidPaths` is garbage.
+"""
+const MARKER_CUTOVER_UNIX = 1_785_580_432
 
 """
     PayloadEntry(path, bytes)
@@ -403,6 +446,11 @@ end
 # wrote the artifact they are holding.
 _marker_timestamp() = string(now())
 
+# For the rejection message only. A raw epoch second is not something a person
+# can compare against a commit date without a second tool.
+_unix_to_iso(t::Real) = string(Dates.format(
+        Dates.unix2datetime(floor(Int, t)), "yyyy-mm-ddTHH:MM:SS"), "Z")
+
 # ---------------------------------------------------------------------------
 # read
 # ---------------------------------------------------------------------------
@@ -549,13 +597,10 @@ Three outcomes, and the middle one is a dated migration allowance:
 
 Arm (b) exists for one measured reason: at cutover there were 671 `.jld2` under
 `runs/` and ZERO markers, and rejecting all of them would have meant recomputing
-the tree. It has a sharp edge that a comment must not leave implicit — a run
-hard-killed AFTER its payload lands but BEFORE its marker is written looks
-byte-for-byte like a pre-cutover artifact, so for as long as arm (b) lives it
-admits future killed runs too. **Deleting arm (b) is a later step's business**;
-it needs a cutoff (a store-level sentinel written by the first marked run, or a
-date) so that a post-cutover run cannot fall into it. Until then the guarantee
-is: everything this cutover writes is marked, and anything marked is verified.
+the tree. It has a sharp edge — a run hard-killed AFTER its payload lands but
+BEFORE its marker is written looks byte-for-byte like a pre-cutover artifact —
+which the tombstone covers for writers that KNOW they failed and
+`MARKER_CUTOVER_UNIX` covers for the ones that never got the chance.
 
 `require_converged = true` additionally demands that the marker carry a
 `[verdict]` saying `converged = true`. It is OFF by default and the default path
@@ -592,6 +637,20 @@ function admit_payload(path::AbstractString; require_converged::Bool=false)
         require_converged && return _reject(path,
             "it has NO completion marker, so it carries no verdict, and this " *
             "caller requires `converged = true`")
+        # The cutoff that bounds arm (b). A payload written AFTER marker writing
+        # existed and carrying no marker is not history — it is a run that died
+        # between the payload and the marker, or one that threw. See
+        # `MARKER_CUTOVER_UNIX` for why this is a dated constant and not a
+        # backfill.
+        mt = mtime(path)
+        mt > MARKER_CUTOVER_UNIX && return _reject(path,
+            "it has NO completion marker but was written at " *
+            "$(_unix_to_iso(mt)), AFTER marker writing began " *
+            "($(_unix_to_iso(MARKER_CUTOVER_UNIX)), commit ce9721cb). Every writer " *
+            "since then leaves a marker on success or a tombstone on a failure it " *
+            "knows about, so neither means the run was killed hard (OOM, walltime, " *
+            "lost node) — or that its mtime was reset by a copy that does not " *
+            "preserve times, which is the same answer: recompute")
         _warn_unmarked_once(path)
         return Admission(true, :unmarked, "no completion marker beside $(basename(path))", nothing)
     end

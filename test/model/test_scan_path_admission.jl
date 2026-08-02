@@ -167,6 +167,12 @@ energy_of(p) = JLD2.load(p)["energy"]
             @testset "arm (b): an UNMARKED legacy point is still served" begin
                 _reset_unmarked_warnings!()
                 plant_point_sentinel!(p1; remark=false)
+                # Arm (b) is bounded by a date since W3, so a payload standing
+                # for a PRE-cutover artifact has to be older than the cutover.
+                # Written just now it is a post-cutover kill, which is rejected —
+                # that arm is `test_marker_cutoff.jl`'s. 2023-11-14 as a literal
+                # so this file does not depend on the constant's value.
+                run(pipeline(`touch -d @1700000000 $p1`; stdout=devnull))
                 @test !isfile(marker_path(p1))
                 run_scan()
                 @test energy_of(p1) == SCAN_SENTINEL_E
@@ -192,6 +198,11 @@ end
 
         @testset "arm (b): an unmarked payload is still admitted" begin
             _reset_unmarked_warnings!()
+            # Dated like the pre-cutover artifact it stands for: since W3 an
+            # unmarked payload written AFTER the cutover is rejected, which is a
+            # different arm (`test_marker_cutoff.jl`). 2023-11-14 as a literal so
+            # this file does not depend on the constant's value.
+            run(pipeline(`touch -d @1700000000 $res`; stdout=devnull))
             @test _has_result(dir)
             @test _result_path_or_nothing(exp) == res
         end

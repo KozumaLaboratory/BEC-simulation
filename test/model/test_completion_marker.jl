@@ -37,6 +37,14 @@ end
 
 shorten!(p, n) = open(io -> truncate(io, filesize(p) - n), p, "r+")
 
+# Arm (b) is bounded by a date (`MARKER_CUTOVER_UNIX`, W3), so a payload that is
+# meant to stand for a PRE-cutover artifact has to actually be older than the
+# cutover. A fixture written just now is a run killed after this cutover, which
+# is the case the cutoff exists to reject. `touch(p)` can only set "now".
+# 2023-11-14 as a literal rather than `MARKER_CUTOVER_UNIX - 1`, so this file
+# keeps testing what it tested if the cutoff is reverted on its own.
+predate!(p) = (run(pipeline(`touch -d @1700000000 $p`; stdout=devnull)); p)
+
 @testset "the completion marker (cutover step 2, invariant 4)" begin
     @testset "read returns a typed value, not a Dict" begin
         mktempdir() do dir
@@ -118,8 +126,8 @@ shorten!(p, n) = open(io -> truncate(io, filesize(p) - n), p, "r+")
     @testset "2. an unmarked legacy payload is ADMITTED as :unmarked" begin
         mktempdir() do dir
             _reset_unmarked_warnings!()
-            p1 = fixture(dir, "point_001.jld2", 128)
-            p2 = fixture(dir, "point_002.jld2", 128)
+            p1 = predate!(fixture(dir, "point_001.jld2", 128))
+            p2 = predate!(fixture(dir, "point_002.jld2", 128))
             a = admit_payload(p1)
             @test a.hit
             @test a.provenance === :unmarked
@@ -135,17 +143,20 @@ shorten!(p, n) = open(io -> truncate(io, filesize(p) - n), p, "r+")
             # Canary: a DIFFERENT store warns again, so the silence above is
             # per-store memory and not a warning that stopped working.
             mktempdir() do other
-                @test_logs (:warn,) admit_payload(fixture(other, "point_001.jld2", 8))
+                @test_logs (:warn,) admit_payload(predate!(fixture(other, "point_001.jld2", 8)))
             end
         end
     end
 
     @testset "2b. the tombstone is what keeps arm (b) from grandfathering NEW kills" begin
         mktempdir() do dir
-            p = fixture(dir, "point_001.jld2", 256)
+            p = predate!(fixture(dir, "point_001.jld2", 256))
             # Arm (b) alone cannot tell a pre-cutover artifact from a run killed
-            # after its payload landed — they are the same bytes. The writer's
-            # own statement is the only discriminator.
+            # after its payload landed — they are the same bytes. Two things
+            # discriminate them: the writer's own statement (the tombstone, here)
+            # and the payload's date (`MARKER_CUTOVER_UNIX`, W3 — hence
+            # `predate!`, which is what makes this fixture a legacy artifact
+            # rather than a post-cutover kill).
             @test admit_payload(p).provenance === :unmarked
             tp = write_incomplete_marker(
                 p, [p]; kind="point", reason="the run was INTERRUPTED mid-solve"

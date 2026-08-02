@@ -84,7 +84,16 @@ function plant_sentinel!(path, stage_ref; remark::Bool=true)
         f["code_rev"] = code_tree_hash()
     end
     rm(marker_path(path); force=true)
-    remark && write_complete_marker(path, [path]; kind="ground_state", artifact_id=stage_ref)
+    if remark
+        write_complete_marker(path, [path]; kind="ground_state", artifact_id=stage_ref)
+    else
+        # Arm (b) is bounded by a date since W3: an unmarked payload written
+        # AFTER the cutover is a run killed between its bytes and its marker, and
+        # is rejected. A fixture standing for a PRE-cutover artifact therefore has
+        # to be dated like one. 2023-11-14 as a literal so this file does not
+        # depend on the constant's value.
+        run(pipeline(`touch -d @1700000000 $path`; stdout=devnull))
+    end
     path
 end
 
