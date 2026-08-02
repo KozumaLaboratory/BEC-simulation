@@ -32,12 +32,18 @@ include(joinpath(@__DIR__, "_run_files.jl"))
 include(joinpath(@__DIR__, "_tiers.jl"))
 
 """
-    claim(dir, i) -> Bool
+    claim_work_item(dir, i) -> Bool
 
 Try to take work item `i`. Exactly one caller can win: `O_CREAT | O_EXCL` fails
 for everyone but the process that creates the file.
+
+Named `claim_work_item` and not `claim` because this file does `using SpinorBEC`
+and then defines the name at top level, so a bare `claim` becomes `Main.claim`
+and SHADOWS `SpinorBEC.claim` for every test file this process includes. That is
+not hypothetical: it turned `validation/test_matsui2025_ref.jl` red under
+`SPINORBEC_TEST_WORKERS=auto` while the same file was green run directly.
 """
-function claim(dir::AbstractString, i::Integer)
+function claim_work_item(dir::AbstractString, i::Integer)
     flags = Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL |
             Base.Filesystem.JL_O_WRONLY
     try
@@ -59,7 +65,7 @@ function serve_queue(qdir::AbstractString)
     failed = false
     timings = Tuple{String, Float64}[]
     for (i, f) in enumerate(readlines(joinpath(qdir, "queue.txt")))
-        claim(qdir, i) || continue
+        claim_work_item(qdir, i) || continue
         f_failed, f_timings = run_test_files([f])
         failed |= f_failed
         append!(timings, f_timings)

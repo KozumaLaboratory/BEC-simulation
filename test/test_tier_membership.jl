@@ -106,7 +106,15 @@ end
 # `struct CheckResult` (now `L5TermCheck`) had run first.
 @testset "No test file shadows a SpinorBEC export" begin
     exported = Set(String.(names(SpinorBEC)))
-    pattern = r"^(?:struct|mutable struct|abstract type|const)\s+([A-Za-z_][A-Za-z0-9_!]*)"
+    # `function` is in the list because leaving it out is what let
+    # `run_chunk.jl:40`'s `claim` sit here undetected: that file does
+    # `using SpinorBEC` and then defines `claim` at top level, so `Main.claim`
+    # shadowed `SpinorBEC.claim` for every test file the chunk process included.
+    # `validation/test_matsui2025_ref.jl` was green run directly and red under
+    # `SPINORBEC_TEST_WORKERS=auto`, which is the worst shape a collision can
+    # take. Scanning `test/` for the extended pattern returns exactly one hit
+    # today (that one), so this costs nothing beyond closing the class.
+    pattern = r"^(?:struct|mutable struct|abstract type|const|function)\s+([A-Za-z_][A-Za-z0-9_!]*)"
     collisions = Tuple{String, String, Int}[]
     test_root = @__DIR__
     for (root, _, files) in walkdir(test_root), f in files

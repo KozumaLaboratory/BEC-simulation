@@ -267,6 +267,13 @@ const CI_EXTRA = [
     # so the type-C target cannot drift when the fixture or the metric changes.
     # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
     "validation/test_matsui_fig4_dip.jl",
+    # `refs/matsui2025.toml` + `ref` + `Claim`. Same fixture, one level up: that
+    # file gates the METRIC against the fixture, this one gates the REFERENCE
+    # FILE against both — every measured row is re-measured rather than read,
+    # and the three constructor refusals that are the whole enforceable content
+    # of the A/B/C taxonomy each get one assertion. Resolves one production
+    # config, hence ci.
+    "validation/test_matsui2025_ref.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -684,6 +691,11 @@ const _COST = Dict{String, Float64}(
     # two `run_registry.jl` writer sites cannot be reached any other way.
     "model/test_record_provenance.jl" => 46.0,
     "model/test_model_toml_roundtrip.jl" => 9.0,
+    # 380 assertions. ~3 s of TOML + fixture measurement (the whole reference
+    # file is re-measured several times over, including four break-and-restore
+    # canaries), ~10 s for the one `yaml_to_model` on the production Fig. 4B
+    # config that makes the type-A claim's evidence a real Stage.
+    "validation/test_matsui2025_ref.jl" => 16.0,
     # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
     "model/test_yaml_to_model.jl" => 12.0,
     # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to

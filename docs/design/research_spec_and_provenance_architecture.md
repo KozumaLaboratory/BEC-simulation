@@ -783,9 +783,117 @@ no coverage at all. And `test_cpu_spin_rotation_taylor_parity.jl` did not gate
 8.17, where an unhalved degree-40 Horner is still 3.8e-12.
 
 **Step 5 — `refs/<paper>.toml` + `claim`.** One file, `refs/matsui2025.toml`,
-populated from the numbers already pinned in
-`test/validation/test_matsui_fig4_dip.jl`. `Claim`'s inner constructor is 8
+~~populated from the numbers already pinned in
+`test/validation/test_matsui_fig4_dip.jl`~~. `Claim`'s inner constructor is 8
 lines.
+
+**That instruction, and the example row in §2.5, were both wrong, and the way
+they were wrong is the reason the step exists.** §2.5 shows
+`[dip_width_nT] value = 12.84`. That number appears nowhere in
+`test_matsui_fig4_dip.jl`, which pins `14.5414`. Both are correct measurements
+by the same metric of the same published curve: `14.5414` is the experimental
+width over the full published range, `12.8383` is the same width restricted to
+**our own scan's** `[-13, +9]` nT window, which is what §0.7 of the parameter
+contract actually arbitrated on. `resonance_dip`'s `center` is a parabolic
+vertex and is window-invariant (measured: identical to 12 digits across five
+windows); its `width` is a half-depth crossing against a per-side **endpoint**
+baseline and is therefore *defined by* the window — the simulated curve gives
+15.0224 / 13.0734 / 12.7524 nT over `[-20,20]` / `[-13,9]` / `[-12.5,9]`. A row
+storing a bare `dip_width_nT` is under-determined by 2.3 nT, **18 %, twice the
++8.8 % excess it is used to arbitrate**. So `window` and `window_from` are
+required fields on every measured row, and `quotable_digits` carries §0.7's
+"quote it to two significant figures, not four" as a column rather than a
+parenthesis. Six configs under `runs/matsui_fig4b/` quote the full-window
+`15.0224` in their headers as "the target" while the comparison used the
+scan-window number — a live instance of exactly the drift this file removes.
+
+The shipped shape is therefore not "the numbers, copied". A `measured` row names
+the fixture (by path **and sha256**), the metric, the metric field, the baseline
+convention and the window; `ref` **re-runs that measurement on every call** and
+refuses the row if the stored value disagrees by more than `1e-9 / 1e-12`. The
+stored number is a cross-check, never the authority. Two further provenances
+carry what cannot be re-measured: `read_off` names `file:line` in the authors'
+published Fortran (pinned by content hash, since only the CSV extracts are
+committed), and `reconstructed` — a value that source does **not** contain —
+additionally owes the alternative it was chosen over and what choosing wrong
+costs, in units and by a stated method (`analytic` / `measured` / `unpriced`).
+27 quantities: 8 measured, 17 read-off, 2 reconstructed.
+
+`ref` returns a `RefRow`, an explicitly-typed `NamedTuple` — that is the
+`Union{Nothing, NamedTuple}` §2.5 types `Claim.target` as, pinned so the shape
+does not vary per row. It has to be the **whole row**: `target.value` is what a
+comparison compares, but `target.window`, `target.metric` and
+`target.endpoint_baseline` are what the comparison must consume to measure our
+run the same way. `scripts/validation/matsui_fig4b_report.jl:86` already does
+this by hand.
+
+**Two numbers this document and its neighbours carried were re-derived and are
+wrong.** (a) "`Ntot = 3.5e4` vs `5.0e4` is a factor 2 in `c_0`, worth 34 % in
+peak density" — measured, it is **10/7** (`c_0 + 36c_1` = 4687.266 against
+3281.086), and 34 % is `2^(-3/5)`, the figure for a factor 2. The factor 2 is
+the *separate* `cc0_eff` item, which §0.3.5 of the parameter contract **proves
+is degenerate** for a polarised `m = -F` state — so
+`runs/matsui_fig4b/fig4b_gsvariant_n32.yaml` prices a knob the observable cannot
+see, and `matsui_reproduction_status.md:22-25` still asserts the retracted
+version. (b) `ZeemanQ = 1 Hz ⇒ 0.68 nT` **checks out** (11q against
+p/h = 16.275 Hz/nT ⇒ 0.6759 nT) and is now a gated arithmetic identity rather
+than a sentence.
+
+**A gate that reads the TOML and checks the TOML proves nothing**, so
+`test/validation/test_matsui2025_ref.jl` (391 assertions, tier `ci`) has three
+independent arms: `ref_measure` against the fixture, literals pinned in the test
+file, and the raw stored value parsed straight out of the TOML. That third arm
+is not decoration — the first version of arm 1 compared `ref_measure(q)` with
+`ref(q).value`, and since `ref` *returns the fresh measurement*, that was a
+measurement compared with itself. It was caught by canary, not by review:
+neutering `ref`'s own cross-check and perturbing a stored value by 0.1 left arms
+1 and 2 fully green, and only the in-test canary went red.
+
+Eight canaries were run by breaking source, reading the log from disk, and
+restoring byte-identically — the fixture shifted 1 nT *with its declared hash
+updated to match* (so only the measurement can catch it), each of `Claim`'s
+three refusals deleted in turn, `ref`'s value cross-check / hash check /
+reconstruction required-key clause neutered, and a positive control for the
+"only reader of `refs/`" tripwire. **Two gates were found green and are reported,
+not quietly strengthened**: arm 1's circularity above, and a canary aimed at the
+reconstruction-specific required-key clause, which is redundant whenever a row
+retains *any* other cost key — stripping one key still trips the general
+all-or-nothing rule, so the canary had to strip the whole group.
+
+**What is NOT shipped, and why.** No type-C Matsui claim is constructed. It
+needs 45 `:evolve` cells plus a `c_dd = 0` control, and **zero of those 46
+stages are constructible**: `gs_stage` (`run_step_ground_state.jl:310`) is the
+only `Stage` producer in `src/`, and `run_step_dynamics.jl` declares none — the
+same blocker two committed tests in `test/model/` already name. Offering the
+ground-state stage as evidence for a dip-width claim would restate a different
+observable, which is the failure the `control` field exists to name. What ships
+instead is the type-**A** claim the tree does support — that
+`fig4b_scan_n32.yaml` resolves to the parameters registered for the paper,
+checked against `ref` rather than against the config's own header prose — plus a
+tripwire that fires the day an `:evolve` producer appears. `Claim`'s constructor
+is the specified 8 lines and no more; the one hole they leave (`evidence =
+Stage[]` constructs) is pinned as an executable statement instead of closed
+unilaterally.
+
+**Answers §7 question 4:** `refs/` at the repo root. `docs/refs/` holds PDFs for
+people; this is machine-read and gated. The CSV fixtures stay in
+`test/fixtures/matsui2025/` — already committed, already gated, already rsynced
+to TSUBAME, and outside `code_tree_hash`, so neither location touches identity.
+
+**`claim` collided with the test runner, and only in parallel.** `run_chunk.jl`
+does `using SpinorBEC` and then defined its own `claim(dir, i)` — the O_EXCL
+queue helper — at top level, so `Main.claim` shadowed `SpinorBEC.claim` for
+every file that process included. `test_matsui2025_ref.jl` was **green run
+directly and red under `SPINORBEC_TEST_WORKERS=auto`**, which is the worst shape
+a name collision can take. The runner's helper is renamed `claim_work_item`
+(root fix: a private queue helper should not squat on a package export), and the
+existing "no test file shadows a SpinorBEC export" gate — whose regex covered
+`struct` / `const` / `abstract type` but **not `function`**, which is precisely
+why it had been green over this collision since the day `claim` was exported —
+now covers `function` too. Scanning `test/` with the extended pattern returns
+exactly one hit, that one, so closing the class cost nothing. This is a live
+argument for §7's unasked question: `ref` and `claim` are extremely generic
+names to export from a package, and the first one has already bitten.
 
 **Step 6 — delete `metadata:`.** `schema.jl:402`, plus the 45 keys in configs,
 after grepping that nothing reads them (it does not, by §1).
