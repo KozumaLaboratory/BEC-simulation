@@ -73,24 +73,60 @@ than just the number: `GS stage-cache key` 45 times, `Loading cached GS` **44**
 — point 1 populates, the other 44 reuse. No physics change; it is the same
 ground state, loaded instead of re-relaxed.
 
-## What is left, in measured order
+## The sysimage does not help — measured, and retired
 
-1. **A sysimage — up to ~364 s (65 % of the job), and this figure is an
-   ESTIMATE.** `scripts/build_sysimage.jl` and `build_sysimage_full.jl` exist and
-   the Matsui submit uses neither, but a sysimage only removes JIT for the
-   methods its precompile workload actually exercises, and **neither script
-   targets this code path** — the first builds the rotating-basis F=1 API, the
-   second the M0/M1/M2 F=6 24³ LBFGS cascade (with a 28-30 GB RSS warning).
-   `build_sysimage.jl` also activated `@__DIR__/../..`, the parent of the repo,
-   which has no `Project.toml` — fixed here, untested. Treat the 364 s as an
-   upper bound until a Matsui-representative sysimage is built and timed.
-2. **Drop the DDI zero-padding for this observable.** 21 % of the step at 32³,
+This was the largest estimated lever (~364 s, 65 % of the job). It is dead.
+
+**Three build attempts, two of which could not build at all.** `create_sysimage`
+dies on CUDA device code:
+
+```
+LLVM ERROR: Cannot select: intrinsic %llvm.nvvm.read.ptx.sreg.envreg2   (GPU workload)
+LLVM ERROR: Cannot select: intrinsic %llvm.nvvm.membar.sys              (CPU workload)
+```
+
+PackageCompiler compiles traced code for the host target and CUDA.jl's device
+code is NVVM/PTX. It gets compiled in because **`Project.toml` declares CUDA in
+`[deps]` while also naming it as the trigger for `SpinorBECCUDAExt` in
+`[extensions]`** — an extension trigger belongs in `[weakdeps]`, so that pair is
+inconsistent. `include_transitive_dependencies=false` keeps CUDA out and the
+build then succeeds (560 MB), at the cost that nothing CuArray-parameterised is
+in the image.
+
+**And the image that does build makes the job slower:**
+
+| | `ru_wallclock` |
+|---|---|
+| stage cache only (8318964.15) | 528.5 s |
+| **+ sysimage (8319472.15)** | **574.4 s** |
+| | **+45.9 s (+8.7 %)** |
+
+Same 45 points, same config, `[sysimage]` confirmed in the log and the stage
+cache still hitting 44 times. Single run each, so ±5 % of node variation is
+possible, but the predicted −364 s is not within any plausible error bar.
+
+The reason is the same as the build failure: the CuArray-parameterised
+`make_workspace` / `find_ground_state` / `split_step!` specialisations — where
+the 277 s of first-point JIT plausibly lives — cannot be in the image, so
+nothing that matters was cached, and 560 MB now has to be read off Lustre at
+startup.
+
+**Getting this lever would mean restructuring the CUDA dependency**, not tuning a
+build flag. Out of scope for a performance pass, and recorded here so the next
+person does not re-derive the 364 s estimate.
+
+## What is left
+
+1. **Drop the DDI zero-padding for this observable.** 21 % of the step at 32³,
    19 s over the campaign, and the campaign's own kernel factorial already
    measured its effect on the answer: **0.0016 nT**, against a dip centre of
    −2.51 and a residual of 0.040. Not applied here, because it does change the
    physics — small is not zero, and that is the user's call, not a silent edit.
-3. **The integrator.** Caps out at the 92 s of stepping — 15 % of the job — and
+2. **The integrator.** Caps out at the 92 s of stepping — 15 % of the job — and
    RK4IP specifically is a *loss* at this tolerance (`rk4ip_cost_on_gpu.md`).
+
+Net result of this pass: **600.3 → 528.5 s, −12 %**, from one environment
+variable that was already in the repo.
 
 ## Method note
 
