@@ -89,6 +89,11 @@ const FAST_TESTS = [
     # scan over `src/` + `ext/` against a PINNED set, so a new one is red until
     # someone writes down why it may be ambient.
     "model/test_no_ambient_module_refs.jl",
+    # Step 4's one KEPT ambient Ref: the Horner degree clamp is the positive
+    # control test_taylor_tolerance_criterion.jl needs, so it cannot be frozen —
+    # but it moves psi by 5.9e-2 at cap 0 and is in no Stage, so `run_pipeline`
+    # refuses to run while it is clamped.
+    "model/test_taylor_degree_cap_guard.jl",
     # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
     # assert the next run recomputes instead of serving the partial output.
     # Nothing else in the suite exercises the swallowed `InterruptException`.
@@ -690,6 +695,9 @@ const _COST = Dict{String, Float64}(
     "model/test_corpus_resolves.jl" => 22.0,
     # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
     "model/test_no_ambient_module_refs.jl" => 1.0,
+    # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
+    # a throw-before-solve arm; measured 25.5 s, dominated by first-call JIT.
+    "model/test_taylor_degree_cap_guard.jl" => 26.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,

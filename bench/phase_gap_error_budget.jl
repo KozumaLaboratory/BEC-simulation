@@ -94,7 +94,7 @@
 using Printf
 import CUDA
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP, spin_density_vector,
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE, spin_density_vector,
     _winding_vector, _extract_spinor, lhy_mean_field_max_growth
 using LinearAlgebra: norm
 
@@ -142,9 +142,9 @@ state — and `growth`, the `max Im ω` of the mean field the table was built fr
 `growth > 0` means ε_LHY is scheme-dependent for this row and the row is not a
 measurement of anything, whatever its ΔE says."""
 function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
-    old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP[]
+    old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
     SPIN_TAYLOR_ENABLED[] = taylor
-    SPIN_TAYLOR_DEGREE_CAP[] = cap
+    SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = cap
     try
         grid = grid_of()
         seed_psi = init_psi(grid, SpinSystem(6); state=seed)
@@ -185,7 +185,7 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
             wind=w)
     finally
         SPIN_TAYLOR_ENABLED[] = old_t
-        SPIN_TAYLOR_DEGREE_CAP[] = old_c
+        SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = old_c
     end
 end
 

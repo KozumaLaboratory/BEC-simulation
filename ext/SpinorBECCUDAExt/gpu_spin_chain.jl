@@ -230,7 +230,7 @@ end
     CUDA.@cuda threads = 256 blocks = cld(N, 16) _spin_chain_warp_kernel!(
         P, fx, fy, fz, px, py, pz, vph, zf, zb, coef.mz, coef.sxu, coef.syu,
         rk_sm, rk_dd, Int32(SPIN_TAYLOR_RK_MAX), T(SPIN_TAYLOR_TOL)^2, F * F,
-        T(SPIN_TAYLOR_RSAFE)^2, Int32(SPIN_TAYLOR_DEGREE_CAP[]), Val(D),
+        T(SPIN_TAYLOR_RSAFE)^2, Int32(SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]), Val(D),
         Val(!it), src, Pin)
     nothing
 end

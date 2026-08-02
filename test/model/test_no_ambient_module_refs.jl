@@ -103,7 +103,7 @@ CPU-only CI nothing exercises it",
 5-stage, on BOTH devices and on the ITP path (measured 3.6e-13 over 20 ITP steps). Wants \
 a declared per-run field; the parity gates on both devices flip it, so it needs an \
 argument path first",
-    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP") =>
+    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE") =>
         "[STEP-4] NOT a numerics choice: the positive control for \
 test_taylor_tolerance_criterion.jl, whose NegligibleErrorSpec returns :indeterminate \
 when the control cannot breach. Freezing it deletes the only control that works. Keep \

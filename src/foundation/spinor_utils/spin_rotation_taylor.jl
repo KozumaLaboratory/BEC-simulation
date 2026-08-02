@@ -113,8 +113,49 @@ leaving ψ untouched.
 
 That is the honest control for "this approximation is negligible": show that the
 observable moves when the operator is absent. If it does not, the claim was
-vacuous. See `test/hamiltonian/test_taylor_tolerance_criterion.jl`."""
-const SPIN_TAYLOR_DEGREE_CAP = Ref(SPIN_TAYLOR_RK_MAX)
+vacuous. See `test/hamiltonian/test_taylor_tolerance_criterion.jl`.
+
+KEPT AMBIENT AND RENAMED (cutover step 4). Every other `Ref` on this path either
+became a declared input or a frozen const; this one cannot. Freezing it deletes
+the only positive control that works — `NegligibleErrorSpec` returns
+`:indeterminate`, not `:pass`, when the control cannot breach, and the criterion
+file's header records that two weaker controls were tried and could NOT breach.
+So the value stays assignable and the NAME says what it is for.
+
+But it is also the one member of the group that genuinely moves an answer:
+`cap = 0` measured rel|Δψ| = 5.9e-2 over 4 real-time steps and 2.8e-1 over 20
+ITP steps. Leaving it silently writable is therefore a hole in itself — a run
+with it clamped would file an artifact under an id that describes an unclamped
+run. `_assert_taylor_degree_cap_unclamped` is called once per `run_pipeline` so
+that run ERRORS instead. Direct-Julia callers (`find_ground_state`,
+`run_simulation!`) are deliberately not guarded: that is the entry point the
+control uses, and it writes no artifact."""
+const SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE = Ref(SPIN_TAYLOR_RK_MAX)
+
+"""
+    _assert_taylor_degree_cap_unclamped()
+
+Refuse to run a pipeline while the Horner degree is clamped.
+
+The cap is a test instrument (see `SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE`). It is
+not part of any `Stage`, because no run sets it and a field nobody sets is a
+field that rots — so the only way it can be wrong is a leaked assignment, and
+the only safe answer to a leaked assignment is to stop. An id that cannot
+express the question must not address the answer.
+"""
+@noinline function _assert_taylor_degree_cap_unclamped()
+    cap = SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
+    cap == SPIN_TAYLOR_RK_MAX || throw(
+        ArgumentError(
+            "SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] is $cap, not $SPIN_TAYLOR_RK_MAX. " *
+            "That clamp is a positive control for test_taylor_tolerance_criterion.jl, " *
+            "not a run setting: it changes ψ (measured 5.9e-2 over 4 real-time steps " *
+            "at cap 0) and it is in no Stage, so the artifact this run would write " *
+            "would be addressed by an id describing an UNCLAMPED run. Reset it to " *
+            "SPIN_TAYLOR_RK_MAX before running a pipeline."),
+    )
+    nothing
+end
 
 """
     spin_tridiag_bands(sm, ::Type{T}) -> (mz, sxu, syu)
@@ -170,11 +211,11 @@ end
 This voxel's angle halving `h = 2^-sh` and Horner degree `kv`, from
 `g = |v|²F²`. Both tests run on SQUARES so no `sqrt` is needed:
 `(R/2^sh/k)² = (rk[k]·h)²·g`. `cap` clamps the result from above — see
-[`SPIN_TAYLOR_DEGREE_CAP`](@ref); it exists for the accuracy gate's positive
+[`SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE`](@ref); it exists for the accuracy gate's positive
 control and is unclamped in production.
 """
 @inline function _taylor_rot_schedule(
-    g::T, rk, K::Int, tol2::T, rsafe2::T, cap::Int=SPIN_TAYLOR_DEGREE_CAP[]
+    g::T, rk, K::Int, tol2::T, rsafe2::T, cap::Int=SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
 ) where {T}
     scale1 = @inbounds rk[1]          # rk[1] = scale ⇒ r2 starts as R²
     r2 = scale1 * scale1 * g

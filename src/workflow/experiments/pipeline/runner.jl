@@ -151,6 +151,11 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     psi_init=nothing,
     checkpoint_dir::Union{Nothing, String}=nothing,
     live_status_path::Union{Nothing, String}=nothing)
+    # Cutover step 4. The one ambient `Ref` left on a kernel path that can move
+    # a number, and it is not in any `Stage` because no run sets it — so a
+    # leaked assignment would file an artifact under an id describing a
+    # different computation. One integer comparison per pipeline.
+    _assert_taylor_degree_cap_unclamped()
     psi = psi_init
     grid = nothing
     atom = nothing

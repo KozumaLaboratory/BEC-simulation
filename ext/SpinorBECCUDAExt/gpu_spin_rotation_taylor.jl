@@ -314,7 +314,7 @@ function _apply_spin_rotation_taylor!(
     rsafe2 = T(SPIN_TAYLOR_RSAFE)^2
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
         P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(SPIN_TAYLOR_RK_MAX),
-        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_DEGREE_CAP[]),
+        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]),
         Val(D), Val(!imaginary_time), src_idx)
     nothing
 end
