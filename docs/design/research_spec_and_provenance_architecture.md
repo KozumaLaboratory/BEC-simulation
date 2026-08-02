@@ -948,3 +948,37 @@ face on all 14 `HamTerm`s.
    3 makes that *visible* — the id changes — but only if the hash is computed on
    the compute node from the actual checkout, not baked at submit time. Confirm
    that is the intended reading before step 1 ships.
+
+---
+
+## Appendix: requirements discovered after the unified-design inventory began
+
+Recorded here so the unified redesign cannot silently drop them. Each was found
+by a canary that came back GREEN, i.e. by a gate proving itself not to work.
+
+**R-VERDICT-TRUTH (2026-08-02, W2-d).** The completion marker carries the solve's
+verdict — `converged`, `stop_reason`, `floor_limited`, `grad_norm` — and admission
+can require it. But every gate over it checks the verdict's PRESENCE and INTERNAL
+CONSISTENCY, never its TRUTH. Forcing `Bool(gs.converged)` to `true` at the writer
+(`run_step_ground_state.jl:709`) leaves all 168 assertions across
+`test_marker_verdict.jl`, `test_admission_requires_marker.jl` and
+`test_completion_marker.jl` **green**.
+
+So a marker can lie, and the design has no answer for that. It is the same shape
+as an id that lies — the difference being that identity is DERIVED from the
+declaration and therefore cannot disagree with it, whereas the verdict is
+REPORTED by the thing being judged. Anything a run says about itself is in this
+class; anything derived from what a run *is* is not.
+
+The candidate fix is an independent re-derivation — recompute `grad_norm` from
+the stored psi and compare — which is cheap relative to the solve it certifies.
+That is not implemented. A unified design must either derive the verdict rather
+than accept it, or state plainly that self-reported fields are trusted and mark
+them as such wherever they are read.
+
+**R-ARM-INDEPENDENCE (2026-08-02, R8).** The literature-target gate has three
+arms and only their COMPOSITION is sound: making `ref_measure` return the stored
+value leaves arms 1 and 2 green while the three canary arms fire. That is by
+design and it is verified, but it means no single arm may be dropped or
+simplified without re-establishing the composition. A design that keeps one arm
+and calls it "the gate" reopens the hole.
