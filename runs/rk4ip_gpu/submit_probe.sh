@@ -20,6 +20,11 @@ source scripts/tsubame_setup.sh
 set -euo pipefail                       # re-arm: tsubame_setup runs `set +e`
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.julia:${HOME}/.julia"
 
+# /gs/bs/work, not the group /gs/fs — and NOT the default `runs/`, which is
+# inside the git worktree. Omitting this put a probe's scan output in the repo.
+export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/runs}"
+mkdir -p "$SPINORBEC_STORE"
+
 echo "[src]   $(git rev-parse HEAD)  $(git status --porcelain -- src | wc -l) dirty src files"
 nvidia-smi -L || true
 echo "[t] startup done: $(date -Ins)"
@@ -31,7 +36,7 @@ case "${SGE_TASK_ID:-1}" in
     4) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 128 ;;
     5) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 64 ;;
     6) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 32 ;;
-    7) "$JULIA" --project=. scripts/validation/scan_job_cost_breakdown.jl \
+    7) stdbuf -oL -eL "$JULIA" --project=. scripts/validation/scan_job_cost_breakdown.jl \
            runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml 3 ;;
     *) echo "no task ${SGE_TASK_ID}"; exit 1 ;;
 esac
