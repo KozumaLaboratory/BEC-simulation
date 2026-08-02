@@ -142,6 +142,7 @@ function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
+    t_hold::Float64=NaN,
 )
     grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
@@ -182,7 +183,13 @@ function kz_trajectory_torus(;
 
     # (2) the quench: μ(t) = μ₀ t/τ_Q over t ∈ [−τ_Q, τ_Q], then held at +μ₀ for
     #     ten relaxation times, τ = 1/(γ μ₀) = 100 at γ = 10⁻².
-    t_hold = 10.0 / (gamma * KZ_MU0)
+    # "a further 10 units of relaxation time" with τ ≡ ℏ/(γ|μ|) is ambiguous in
+    # the source: at the quench's γ = 10⁻² that is 1000 time units, at the
+    # relaxation stage's γ = 1 it is 10. A hundredfold difference, and for
+    # τ_Q = 7.4 the longer reading holds the system for 68x the quench itself —
+    # long enough to relax away whatever the quench imprinted, which is what a
+    # σ(W) flat in τ_Q looks like.
+    isnan(t_hold) && (t_hold = 10.0 / (gamma * KZ_MU0))
     μ_wave = PiecewiseLinearWaveform([0.0, 2tau_Q, 2tau_Q + t_hold],
         [-KZ_MU0, KZ_MU0, KZ_MU0])
     res = mk(gamma, μ_wave, M_damp)
@@ -210,7 +217,7 @@ whether 0.124 and 0.097 are distinguishable at all.
 function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
-    shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false,
+    shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -248,7 +255,7 @@ function kz_winding_scan(;
         for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend)
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold)
             push!(Ws, r.W);
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
@@ -361,6 +368,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "hold")
+        # Does the post-quench hold erase the imprint? beta came out 0.012 against
+        # a published 0.124 with a hold of 1000 time units — 68x the quench itself
+        # at the fast end. Vary only that.
+        for th in (10.0, 100.0, 1000.0)
+            kz_winding_scan(; n_traj=200, M_damp=0.0, dt=0.05, M_grid=256, backend,
+                t_hold=th, tag="kz_torus_hold$(round(Int, th))")
+        end
     elseif startswith(mode, "merge")
         # "merge:nd" / "merge:full" — read every shard's RAW windings, then do the
         # statistics once, on the pooled sample.
@@ -381,16 +396,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
             "tau_Q", "n", "sigma(W)", "err", "<W>", "z(<W>)", "int(W)")
         σs, es = Float64[], Float64[]
         for τ in τs
-            W = byτ[τ];
-            n = length(W);
+            W = byτ[τ]
+            nW = length(W)
             σ = std(W)
-            e = σ / sqrt(2 * (n - 1))
-            z = abs(mean(W)) / (σ / sqrt(n))
-            fi = count(w -> abs(w - round(w)) < 0.1, W) / n
+            e = σ / sqrt(2 * (nW - 1))
+            z = abs(mean(W)) / (σ / sqrt(nW))
+            fi = count(w -> abs(w - round(w)) < 0.1, W) / nW
             push!(σs, σ);
             push!(es, e)
             @printf("%-10.1f %-6d %-9.4f %-9.4f %-9.4f %-8.2f %-8.2f\n",
-                τ, n, σ, e, mean(W), z, fi)
+                τ, nW, σ, e, mean(W), z, fi)
             z > 4 && @warn "⟨W⟩ is $(round(z; digits=1))σ from zero" τ
             fi < 0.8 && @warn "only $(round(100fi))% integer windings" τ
         end
