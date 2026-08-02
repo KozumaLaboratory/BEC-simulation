@@ -94,6 +94,9 @@ but they assert no result.
 >
 > Both are **untracked**, so they are invisible from a clone, from CI and from a
 > worktree — but the numbers they back can be re-checked in the main checkout.
+> Both also have a **producer committed** — `scripts/m1_b1_multistart_newton.jl`
+> and `scripts/validation/run_validation_matrix.jl` — so they are regenerable
+> too, not merely re-readable. Neither retraction was warranted on any reading.
 > The two documents that had struck their claims through on the strength of this
 > list have been corrected (`m1_groundstate_audit_2026-06-08.md`,
 > `self_contained_validation_report.md` Layer F). Reading "untracked" as "gone" is

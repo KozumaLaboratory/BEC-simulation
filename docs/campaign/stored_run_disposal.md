@@ -181,6 +181,40 @@ classifier.** `L4_K3_n{64,96,128}` is a grid-convergence ladder whose name
 contains none of the words the rule looks for; it survived only because defect 2
 was found first.
 
+## Third correction: 249 of 251 are regenerable, not 32
+
+The campaign's alarm was that stored results are unattributable. Measured
+directly — for each run directory holding data, is there **any** committed
+artifact that names it?
+
+| | dirs |
+|---|---:|
+| a recipe is reachable in git (tracked YAML, or a script/test that names it) | **249** |
+| nothing in git names it | **2** — `dipole_field_demo`, `yan_li_saito_f1_torus_gs_disc`, 0.1 GiB total, cited by no document |
+
+**That measurement moved 219 → 166 → 62 → 2**, and every step was a defect in the
+question, not a change in the tree:
+
+1. **"Recipe" was assumed to mean a YAML in the run directory.** Most of this work
+   was driven by committed *scripts* — `scripts/m1_b1_multistart_newton.jl`,
+   `scripts/validation/run_validation_matrix.jl` — which are recipes.
+2. **Directory names were matched whole**, so every CAS name lost to its
+   `_<hash>` suffix. Matching the stem too recovered 104.
+3. **Only file *contents* were searched**, not tracked *filenames*. The factorial
+   arms live at `runs/eu_robust_factorial/K0_gdr0_LHY1.yaml` — the config is
+   committed, under a name no content grep would surface. That recovered 60.
+
+This is the same failure as the citation matcher two sections up, a fourth time
+in one session: **a single assumed form for the thing being looked for, and
+everything outside that form reported as absent.** Each fix moved the count one
+way. When that happens, stop and measure what the question is excluding.
+
+**What this does not soften.** A committed script that names a directory is not
+the same as a reproducible run: it does not pin the commit, the parameters, or
+the Julia version, which is precisely the gap #290 closes for `summary.json` going
+forward. The claim here is narrow and worth having anyway — the stored tree is not
+an orphanage. It is 2 directories and 0.1 GiB of orphans.
+
 ## Procedure — move, do not delete
 
 ```bash
