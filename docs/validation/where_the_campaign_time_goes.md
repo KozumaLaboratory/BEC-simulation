@@ -51,23 +51,46 @@ Three results:
   20.19; 0.604 → 0.403). Turning it off drops the DDI path to 1st order, so this
   is what the accuracy costs, not a free saving.
 
-## What is worth doing, in measured order
+## Applied and re-measured: the stage cache
 
-1. **A sysimage.** ~355 s of 600 (59 %) is startup and first-point JIT.
-   `scripts/build_sysimage.jl` and `build_sysimage_full.jl` already exist and the
-   Matsui submit script does not use one.
-2. **`SPINORBEC_STAGE_CACHE=1`.** The ground state is identical across all 45
-   points — the scan axis is `pipeline.1.B.Bz.to`, inside the *dynamics* block —
-   and the stage cache is opt-in and off by default. Other submit scripts in this
-   repo (`runs/eu_gs_phase_c1_B_kappa/*.sh`) set it; the Matsui one does not.
-   Bounded above by the 143 s of per-point setup.
-3. **Drop the DDI zero-padding for this observable.** Worth 21 % of the step at
-   32³ (19 s over the campaign), and the campaign's own kernel factorial already
+The scan axis is `pipeline.1.B.Bz.to`, inside the *dynamics* block, so all 45
+points share one ground state and each was re-relaxing it. `SPINORBEC_STAGE_CACHE`
+has existed all along, opt-in and off by default; other submit scripts in this
+repo (`runs/eu_gs_phase_c1_B_kappa/*.sh`) set it, the Matsui one did not.
+
+A/B on this exact config (UGE 8318863, 3 points): **5.44 → 3.93 s/point, −27.8 %.**
+
+Whole job, same 45 points:
+
+| | `ru_wallclock` |
+|---|---|
+| before (8310846.15) | 600.3 s |
+| **with the stage cache (8318964.15)** | **528.5 s** |
+| | **−71.8 s (−12 %)** |
+
+Predicted 44 × 1.51 = 66 s, measured 72 s. The log confirms the mechanism rather
+than just the number: `GS stage-cache key` 45 times, `Loading cached GS` **44**
+— point 1 populates, the other 44 reuse. No physics change; it is the same
+ground state, loaded instead of re-relaxed.
+
+## What is left, in measured order
+
+1. **A sysimage — up to ~364 s (65 % of the job), and this figure is an
+   ESTIMATE.** `scripts/build_sysimage.jl` and `build_sysimage_full.jl` exist and
+   the Matsui submit uses neither, but a sysimage only removes JIT for the
+   methods its precompile workload actually exercises, and **neither script
+   targets this code path** — the first builds the rotating-basis F=1 API, the
+   second the M0/M1/M2 F=6 24³ LBFGS cascade (with a 28-30 GB RSS warning).
+   `build_sysimage.jl` also activated `@__DIR__/../..`, the parent of the repo,
+   which has no `Project.toml` — fixed here, untested. Treat the 364 s as an
+   upper bound until a Matsui-representative sysimage is built and timed.
+2. **Drop the DDI zero-padding for this observable.** 21 % of the step at 32³,
+   19 s over the campaign, and the campaign's own kernel factorial already
    measured its effect on the answer: **0.0016 nT**, against a dip centre of
-   −2.51 and a residual of 0.040. Cheap in a way the other kernel knobs are not.
-4. **The integrator.** Caps out at the 15 % of the job that is stepping, and
-   RK4IP specifically is a *loss* at this tolerance
-   (`rk4ip_cost_on_gpu.md`).
+   −2.51 and a residual of 0.040. Not applied here, because it does change the
+   physics — small is not zero, and that is the user's call, not a silent edit.
+3. **The integrator.** Caps out at the 92 s of stepping — 15 % of the job — and
+   RK4IP specifically is a *loss* at this tolerance (`rk4ip_cost_on_gpu.md`).
 
 ## Method note
 
