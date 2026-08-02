@@ -679,6 +679,19 @@ function _run_step(
     # `find_ground_state_lbfgs` reports no such field, hence the `get` default.
     gs_interrupted = Bool(get(gs, :interrupted, false))
 
+    # ONE reading of what the solver thought of its own answer, feeding both the
+    # completion marker and `step_result` below. Extracted once rather than twice
+    # because two independent `get(gs, :floor_limited, …)` sites are two places
+    # for the spelling to drift, and the marker's copy is the one admission
+    # believes. `find_ground_state_lbfgs` reports all four; the ITP reports
+    # `converged` only, hence the defaults.
+    gs_v = MarkerVerdict(
+        Bool(gs.converged),
+        String(get(gs, :stop_reason, :unknown)),
+        Bool(get(gs, :floor_limited, false)),
+        Float64(get(gs, :grad_norm, NaN)),
+    )
+
     # Save to cache if specified
     if cache_path !== nothing && !gs_interrupted
         mkpath(dirname(cache_path))
@@ -704,8 +717,16 @@ function _run_step(
             # LAST, and after the `mv`: the marker must certify bytes that are
             # already at their final path. Same directory, so this rename is a
             # real `rename(2)` and a reader never sees a partial marker.
+            #
+            # The verdict travels WITH the marker, not only inside the payload.
+            # `f["converged"]` above has been written since step 1 and admission
+            # could never see it — reading it would mean opening the JLD2, which
+            # is the multi-GB load the marker exists to decide about. This is the
+            # highest-stakes marker in the tree: the key is content-addressed, so
+            # one non-converged ψ here is served to every OTHER config that
+            # resolves to the same physics.
             write_complete_marker(cache_path, [cache_path];
-                kind="ground_state", artifact_id=stage_ref)
+                kind="ground_state", artifact_id=stage_ref, verdict=gs_v)
             verbose && println("  Cached GS to $cache_path")
         catch err
             isfile(tmp) && rm(tmp; force=true)
@@ -722,14 +743,16 @@ function _run_step(
 
     step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs_energy,
-        :ground_state_converged => gs.converged,
+        # All four off `gs_v`, so the four keys downstream reads and the four
+        # fields the marker certifies cannot disagree. `converged=false` alone
+        # cannot tell a run that failed from one that reached the method's floor
+        # with an unattainable `tol` asked of it; ITP reports neither of the
+        # other two.
+        :ground_state_converged => gs_v.converged,
         :interrupted => gs_interrupted,
-        # `converged=false` alone cannot tell a run that failed from one that
-        # reached the method's floor with an unattainable `tol` asked of it.
-        # ITP has no line search and reports neither key.
-        :ground_state_stop_reason => String(get(gs, :stop_reason, :unknown)),
-        :ground_state_floor_limited => Bool(get(gs, :floor_limited, false)),
-        :ground_state_grad_norm => Float64(get(gs, :grad_norm, NaN)),
+        :ground_state_stop_reason => gs_v.stop_reason,
+        :ground_state_floor_limited => gs_v.floor_limited,
+        :ground_state_grad_norm => gs_v.grad_norm,
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,
     )

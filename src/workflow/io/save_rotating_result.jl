@@ -490,7 +490,12 @@ function save_rotating_basis_result!(
         end
     else
         try
-            write_complete_marker(out_path, [out_path]; kind="dynamics")
+            # Same verdict as the point marker: a `result.jld2` produced by a
+            # pipeline whose first step was a ground state inherits that solve's
+            # opinion, and `Experiment` admits this name. A dynamics-only
+            # pipeline gets `nothing`.
+            write_complete_marker(out_path, [out_path]; kind="dynamics",
+                verdict=gs_verdict(result))
         catch err
             @warn "completion marker write failed (non-fatal); result.jld2 will be " *
                 "admitted as :unmarked" out_path exception = err

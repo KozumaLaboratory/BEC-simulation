@@ -79,6 +79,8 @@ const FAST_TESTS = [
     "model/test_admission_requires_marker.jl",
     "model/test_record_provenance.jl",
     "model/test_completion_marker.jl",
+    # W2: the marker carries the solve's verdict and admission can require it.
+    "model/test_marker_verdict.jl",
     # Step 3. The GS stage cache admits on `artifact_id`; `_gs_cache_key` and
     # `_hashable` are deleted. 31 knobs, ONE assertion each — a single bundled
     # assertion is how a 19-key list rots into a 17-key list — plus the
@@ -682,6 +684,8 @@ const _COST = Dict{String, Float64}(
     # so what has to be right is the ranking, not the absolute number.
     "model/test_interrupted_run_recomputes.jl" => 50.0,
     "model/test_completion_marker.jl" => 3.0,
+    # Filesystem-only, like `test_completion_marker.jl`: no solve runs in either.
+    "model/test_marker_verdict.jl" => 3.0,
     # Two RTP loops driven directly (5.9 s) + one `run_yaml` interrupted
     # mid-dynamics and recomputed in full, 1e6 steps (48.8 s).
     "model/test_interrupted_dynamics_recomputes.jl" => 55.0,

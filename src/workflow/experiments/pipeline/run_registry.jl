@@ -884,7 +884,12 @@ function _finish_point!(psi_file::AbstractString, result, psi_host,
         push!(payloads, joinpath(_gs_stage_dir(), stage_ref * ".jld2"))
     end
     try
-        write_complete_marker(psi_file, payloads; kind="point", artifact_id=stage_ref)
+        # The ground-state verdict rides along when the pipeline had a GS step;
+        # a dynamics-only point legitimately has none and `gs_verdict` returns
+        # `nothing` rather than inventing one. `admit_payload(…;
+        # require_converged=true)` is what reads it back.
+        write_complete_marker(psi_file, payloads; kind="point", artifact_id=stage_ref,
+            verdict=gs_verdict(result))
         verbose && println("    ✓ complete.toml ($(length(payloads)) file(s))")
     catch err
         # A completed multi-hour run must not acquire a new way to fail. The

@@ -76,9 +76,42 @@
 # forensic record of what the killed run had reached, and `write_complete_marker`
 # clears the tombstone when the recomputation succeeds.
 
-export CompletionMarker, PayloadEntry, Admission
+# ## The verdict, and why the marker is where it goes
+#
+# A marker as written by cutover step 2 certifies BYTES: these files, these
+# sizes, written last. It says nothing about whether the answer inside them is
+# any good, and `admit_payload` had no way to ask — `grep converged` over this
+# file found one occurrence and it was in a comment. Meanwhile the GS writer puts
+# `converged` INTO the payload (`run_step_ground_state.jl:691`) and `_finish_point!`
+# checks `:interrupted` and `isfinite`, so the verdict existed on both sides of
+# admission and was readable by neither.
+#
+# That is Bazel issue 16179 in this tree: the action succeeded, the blobs
+# uploaded, the action-cache entry was written, and the quality check failed
+# afterwards — poisoning the cache for every later build. Nix registers a path in
+# `ValidPaths` only after the output is hashed and reference-scanned; the Remote
+# Execution API writes `UpdateActionResult` LAST, after and referencing
+# already-validated content.
+#
+# The fix is NOT "refuse to mark a non-converged solve". This repo measured the
+# opposite: the default `tol = 1e-8` sits below the ~5e-7 gradient floor an
+# energy-gated line search can resolve, so `converged = false, floor_limited =
+# true` is the BEST ACHIEVABLE answer for the problem and the method, not a
+# failure (`solvers/lbfgs/driver.jl:436-456`). Refusing to mark it would throw
+# away good ground states and would push every Eu production run into arm (b).
+#
+# So the marker CARRIES the verdict and admission can be asked to REQUIRE it.
+# `admit_payload(path; require_converged = false)` keeps today's behaviour
+# byte-for-byte; `require_converged = true` is for a caller whose claim depends
+# on the solve having actually met its own `tol` — a BdG or stability gate, where
+# a floor-limited state is a different object from a converged one. The four
+# fields are the ones the solver already publishes, so nothing new is computed
+# and nothing can drift: `converged`, `stop_reason`, `floor_limited`, `grad_norm`.
+
+export CompletionMarker, PayloadEntry, Admission, MarkerVerdict
 export COMPLETE_MARKER_FORMAT, marker_path, incomplete_marker_path
 export write_complete_marker, write_incomplete_marker, read_complete_marker, admit_payload
+export gs_verdict
 
 "On-disk marker format version. Readers refuse anything else rather than guess."
 const COMPLETE_MARKER_FORMAT = 1
@@ -99,6 +132,61 @@ struct PayloadEntry
 end
 
 """
+    MarkerVerdict(converged, stop_reason, floor_limited, grad_norm)
+
+What the solve behind a payload thought of its own answer. Written into the
+marker's `[verdict]` table; read back by `admit_payload(...; require_converged)`.
+
+Not a quality score and not a threshold — the four fields are copied verbatim
+from what `find_ground_state_lbfgs` / the ITP already return, so this struct
+cannot disagree with the solver. `converged` keeps its one meaning
+(`grad_norm < tol`); the other three exist because that Bool alone cannot tell a
+solve that FAILED from one that succeeded as far as the method allows:
+
+  * `stop_reason` — `:tol` / `:line_search_stalled` / `:max_steps` / `:unknown`.
+    Stored as a `String` because TOML has no symbol and a round-trip through
+    `Symbol` would invent one.
+  * `floor_limited` — `true` when the line search stalled ABOVE the requested
+    `tol`, i.e. the requested tolerance is below what an energy-gated step can
+    resolve. This is the legitimate `converged = false`.
+  * `grad_norm` — the residual actually reached. `NaN` when the method reports
+    none (ITP), which TOML writes and parses as `nan`.
+"""
+struct MarkerVerdict
+    converged::Bool
+    stop_reason::String
+    floor_limited::Bool
+    grad_norm::Float64
+end
+
+"""
+    gs_verdict(result) -> Union{Nothing, MarkerVerdict}
+
+Read a ground-state verdict out of a pipeline result dict, or `nothing` when the
+pipeline had no ground-state step.
+
+The four `:ground_state_*` keys are published by
+`_run_step(::GroundStateStep, …)` (`pipeline/run_step_ground_state.jl`). This
+function is the ONE place that names them, so the three marker writers do not
+each grow their own copy of the spelling — the failure mode CLAUDE.md's naming
+convention exists to stop.
+
+`:ground_state_converged` is the discriminator: a dynamics-only pipeline never
+sets it, and a verdict invented for such a run would be a claim about a solve
+that did not happen.
+"""
+function gs_verdict(result)
+    conv = get(result, :ground_state_converged, nothing)
+    conv === nothing && return nothing
+    MarkerVerdict(
+        Bool(conv),
+        String(get(result, :ground_state_stop_reason, "unknown")),
+        Bool(get(result, :ground_state_floor_limited, false)),
+        Float64(get(result, :ground_state_grad_norm, NaN)),
+    )
+end
+
+"""
     CompletionMarker
 
 The typed reading of a `<payload>.complete.toml`. `read_complete_marker` returns
@@ -113,6 +201,11 @@ written by a run that HAS no id — since cutover step 3 the GS stage cache is
 keyed on `artifact_id`, and a config whose `Model` does not resolve gets none, so
 it recomputes and its point files carry `nothing` here. Absent means absent;
 neither is a hit criterion.
+
+`verdict` is `Union{Nothing, MarkerVerdict}` for the same reason and one more: a
+`kind = "dynamics"` payload is an evolution, which has no convergence to report,
+and every marker written before the verdict landed has none either. Absent is
+absent — `require_converged = true` refuses it rather than assuming.
 """
 struct CompletionMarker
     format::Int
@@ -121,6 +214,7 @@ struct CompletionMarker
     code_rev::Union{Nothing, String}
     written_at::String
     payload::Vector{PayloadEntry}
+    verdict::Union{Nothing, MarkerVerdict}
 end
 
 """
@@ -198,6 +292,7 @@ function write_complete_marker(anchor::AbstractString, payloads::AbstractVector{
     kind::AbstractString,
     artifact_id::Union{Nothing, AbstractString}=nothing,
     code_rev::Union{Nothing, AbstractString}=_code_rev_or_nothing(),
+    verdict::Union{Nothing, MarkerVerdict}=nothing,
 )
     isempty(payloads) &&
         throw(
@@ -223,6 +318,7 @@ function write_complete_marker(anchor::AbstractString, payloads::AbstractVector{
     )
     artifact_id === nothing || (d["artifact_id"] = String(artifact_id))
     code_rev === nothing || (d["code_rev"] = String(code_rev))
+    verdict === nothing || (d["verdict"] = _verdict_to_dict(verdict))
 
     _write_marker_atomically(mp, d)
     # A recomputation that succeeded must clear the tombstone its predecessor
@@ -246,6 +342,14 @@ from a pre-cutover artifact and arm (b) of `admit_payload` would serve it.
 far it got); admission does not check those sizes, because the tombstone rejects
 regardless. Sizes are recorded best-effort so a payload that is itself missing
 cannot make the tombstone fail to write.
+
+No `[verdict]` here, deliberately. A tombstone is written when the run was
+interrupted or diverged, and `gs_verdict` would report the GROUND-STATE step's
+opinion — which can perfectly well be `converged = true` while the DYNAMICS that
+followed it went non-finite. `converged = true` printed beside
+`reason = "psi is not finite (the run diverged)"` is a contradiction on its face,
+and the tombstone rejects regardless, so the field would be a misleading number
+that nothing reads.
 """
 function write_incomplete_marker(anchor::AbstractString, payloads::AbstractVector{<:AbstractString};
     kind::AbstractString, reason::AbstractString,
@@ -304,8 +408,42 @@ _marker_timestamp() = string(now())
 # ---------------------------------------------------------------------------
 
 const _MARKER_KEYS = ("format", "kind", "written_at", "payload", "artifact_id", "code_rev",
-    "reason")
+    "reason", "verdict")
 const _ENTRY_KEYS = ("path", "bytes")
+const _VERDICT_KEYS = ("converged", "stop_reason", "floor_limited", "grad_norm")
+
+# All four, always. A verdict missing a field is not a partial verdict — it is a
+# verdict whose reader has to guess a default, and the whole point of the table
+# is that `converged = false` alone is ambiguous.
+function _verdict_to_dict(v::MarkerVerdict)
+    Dict{String, Any}(
+        "converged" => v.converged,
+        "stop_reason" => v.stop_reason,
+        "floor_limited" => v.floor_limited,
+        "grad_norm" => v.grad_norm,
+    )
+end
+
+function _verdict_from_dict(d)
+    d isa AbstractDict ||
+        throw(ArgumentError("completion marker: `verdict` must be a table"))
+    _marker_closed(d, _VERDICT_KEYS, "completion marker verdict")
+    for k in _VERDICT_KEYS
+        haskey(d, k) || throw(
+            ArgumentError(
+                "completion marker verdict is missing \"$k\"; all of " *
+                join(_VERDICT_KEYS, ", ") * " are required, because " *
+                "`converged` on its own cannot tell a failed solve from one that " *
+                "reached its method's floor"),
+        )
+    end
+    MarkerVerdict(
+        Bool(d["converged"]),
+        String(d["stop_reason"]),
+        Bool(d["floor_limited"]),
+        Float64(d["grad_norm"]),
+    )
+end
 
 """
     read_complete_marker(path) -> CompletionMarker
@@ -353,6 +491,7 @@ function _marker_from_dict(d::AbstractDict)
         _str_or_nothing("code_rev"),
         String(get(d, "written_at", "")),
         entries,
+        haskey(d, "verdict") ? _verdict_from_dict(d["verdict"]) : nothing,
     )
 end
 
@@ -397,7 +536,7 @@ end
 _reset_unmarked_warnings!() = (lock(() -> empty!(_UNMARKED_WARNED), _UNMARKED_WARNED_LOCK); nothing)
 
 """
-    admit_payload(path) -> Admission
+    admit_payload(path; require_converged=false) -> Admission
 
 The one admission decision. Every cache-hit site calls this instead of `isfile`.
 
@@ -417,8 +556,23 @@ admits future killed runs too. **Deleting arm (b) is a later step's business**;
 it needs a cutoff (a store-level sentinel written by the first marked run, or a
 date) so that a post-cutover run cannot fall into it. Until then the guarantee
 is: everything this cutover writes is marked, and anything marked is verified.
+
+`require_converged = true` additionally demands that the marker carry a
+`[verdict]` saying `converged = true`. It is OFF by default and the default path
+is byte-for-byte what it was: this knob changes what a CALLER asks for, never
+what the store contains. Two things it deliberately refuses:
+
+  * an `:unmarked` payload — arm (b) carries no verdict, so admitting it under
+    `require_converged` would make the knob bypassable by the entire legacy
+    population, which is most of the tree;
+  * a marked payload whose verdict says `floor_limited = true`. That state is
+    the best the method can produce (`solvers/lbfgs/driver.jl:436`) and is a
+    perfectly good ground state — it is refused here only because
+    `require_converged` means what it says. A caller who wants "converged OR
+    floor-limited" reads it off the returned marker: `adm.marker.verdict` is
+    published for exactly that, so the richer decision needs no second knob.
 """
-function admit_payload(path::AbstractString)
+function admit_payload(path::AbstractString; require_converged::Bool=false)
     isfile(path) ||
         return Admission(false, :absent, "no payload at $path", nothing)
     # The tombstone is checked FIRST and out-votes everything: it is a statement
@@ -435,6 +589,9 @@ function admit_payload(path::AbstractString)
     end
     mp = marker_path(path)
     isfile(mp) || begin
+        require_converged && return _reject(path,
+            "it has NO completion marker, so it carries no verdict, and this " *
+            "caller requires `converged = true`")
         _warn_unmarked_once(path)
         return Admission(true, :unmarked, "no completion marker beside $(basename(path))", nothing)
     end
@@ -452,6 +609,17 @@ function admit_payload(path::AbstractString)
         actual == e.bytes || return _reject(path,
             "its completion marker records $(e.bytes) bytes for $(e.path) " *
             "but the file is $(actual)")
+    end
+    if require_converged
+        v = marker.verdict
+        v === nothing && return _reject(path,
+            "its completion marker carries no [verdict] (a dynamics payload, or one " *
+            "written before the verdict landed) and this caller requires " *
+            "`converged = true`")
+        v.converged || return _reject(path,
+            "its verdict says converged = false (stop_reason = $(v.stop_reason), " *
+            "floor_limited = $(v.floor_limited), grad_norm = $(v.grad_norm)) and " *
+            "this caller requires `converged = true`")
     end
     Admission(true, :marked, "marker verified $(length(marker.payload)) file(s)", marker)
 end
