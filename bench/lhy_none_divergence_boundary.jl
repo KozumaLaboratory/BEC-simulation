@@ -25,7 +25,11 @@ using SpinorBEC
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
-const STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3000
+# 800, not 3000. Divergence is a fast event — the c₁ = −0.05 cell NaNs long
+# before then — and the measured cost of a row was dominated by 7 fresh
+# `make_workspace` calls (padded DDI buffers + FFT plans), not by the stepping.
+# Stepping less keeps every cell rather than thinning the sweep.
+const STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 800
 const DT = 0.002
 
 "Run a short ITP and report what happened to the state, not whether it converged."
