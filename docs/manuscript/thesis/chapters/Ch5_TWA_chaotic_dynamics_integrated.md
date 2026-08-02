@@ -102,10 +102,43 @@ SpinorBEC.jl supports 5 LHY treatment modes (via `spinor_lhy:` YAML key):
 
 ### 5.2.2 Eu collapse test config
 
-Config: `runs/lhy_mode_ablation/`. Eu F=6, $a_s = 110\,a_B$, $N = 10^4$, 32³ box=10,
+Config: `runs/lhy_mode_ablation/` (gone). Eu F=6, $a_s = 110\,a_B$, $N = 10^4$, 32³ box=10,
 ITP to convergence. Variable: `spinor_lhy` setting only.
 
+> **その config は git に一度も入っていない (2026-07-31)。** `runs/lhy_mode_ablation/` (gone)
+> は履歴上どの commit にも存在しない — 誰かの作業ツリーにあり、本文が引用し、
+> 引用だけが残った。**したがって下表の 5 行は再チェック不能**であり、古いのではなく
+> **辿れない**。stale な run なら特定して日付を付けて失格にできるが、これはできない。
+> 監査 (`stored_results_vintage_audit.md`) が扱う 481 件とは別の失敗形態で、
+> 全体像は [`doc_run_citation_inventory.md`](../../../campaign/doc_run_citation_inventory.md)
+> にある（cited 66 / absent 26 のうち、結果を伴う主張はこれを含め 4 件のみ）。
+>
+> 直下の 2026-07-29 注記が参照する再導出は **姉妹 config**
+> (`eu151_edh_postfix_local`) に対するものであって、この ablation そのものではない。
+> 上に書かれたパラメータは 4 個だけで、collapse の主張には trap・c₁・B・DDI 扱いも要る。
+> それらは姉妹レポートから借りた**仮定**として明示のうえ再構成し、走らせた（§5.2.3 の
+> 2 つ目の注記）。したがってこれは reproduction ではなく reconstruction である。
+
 ### 5.2.3 結果: 5 modes all collapse to identical filament
+
+> **この表を campaign evidence として引用しないこと。** 下の 5 行は §5.2.2 の
+> 消えた config が出したもので、(a) 再チェックできず、(b) 2026-06 の積分器修正、
+> 2026-07-08 の q 修正、および LHY 欠陥群（表引き LHY が経路単位で落ちる 6 経路、
+> 閉形式の $N_{atoms}$ 倍、GPU broadcast の silent zero、FM の
+> `kappa < 1e-12 && return 0.0` が負の $g_{2F}$ を飲む件）すべてより前に測られている。
+> 結論そのものの現状は直下の注記を読むこと。
+>
+> **再構成して測り直した (2026-07-31、TSUBAME job 8308113、5 アーム全て converged)。**
+> 消えた config を仮定付きで組み直した結果は
+> [`runs/lhy_mode_ablation_reconstructed/RESULTS.md`](../../../../runs/lhy_mode_ablation_reconstructed/RESULTS.md)。
+> **定性的結論は生き残り、それを支えた数字は生き残らなかった。** 上表の peak density ratio は
+> `off` に対し 0.998 / 1.005 / 0.999 / 1.001 — LHY を 1% 未満の効果としている。現行コードでは
+> **0.956 / 0.951 / 0.951 / 0.953、すなわち約 4.9%** で、5 倍大きく符号も一貫している。
+> 4 つの閉形式どうしは 0.58% で一致するので「closure の選択はほとんど効かない」は成立し、
+> 4.9% は droplet を作る balance でもないので「LHY は sub-leading」も成立する。
+> **vacuous だったのは `off` との一致であり、それこそが本節の引用していた部分だった。**
+> なお上表の filament length (μm) は未検証のまま — 再構成は ITP 基底状態で filament を作らない。
+> また §5.2.2 の `box=10` は姉妹レポートの `box=[20,20,20]` と矛盾しており、再構成は 20 を使った。
 
 | spinor_lhy mode | filament length (μm) | peak density ratio | converged? |
 |---|---|---|---|
@@ -194,10 +227,10 @@ Visualization: Round-3 Task 5 dashboard panel (3D variance overlay).
 
 | Sweep | configs path | 主結果 |
 |---|---|---|
-| LHY-mode ablation | `runs/lhy_mode_ablation/` | LHY-insufficient (§5.2) |
+| LHY-mode ablation | `runs/lhy_mode_ablation/` (gone) | LHY-insufficient (§5.2) |
 | Coupling N scan (32³) | `runs/twa_N_scan/` | Findings A/B (§5.4) |
 | Species ε_dd scan | `runs/twa_eps_dd_scan/` | trend confirmed (§5.6) |
-| Sinatra check (32³ + 2×16³) | `runs/twa_sinatra/` | GS-resolution artifact (§5.7) |
+| Sinatra check (32³ + 2×16³) | `runs/twa_sinatra/` (gone) | GS-resolution artifact (§5.7) |
 | Pinned 1/N at 16³×box=10 | `runs/twa_N_scan_pinned_16g/` | 1/√N fails (§5.5) |
 
 すべて `runs/*.config.yaml` + `result.jld2` で repository-tracked。
@@ -363,7 +396,24 @@ chaos, not species-specific quantum fluctuation.
 
 ### 5.7.1 May-7 Sinatra check の anomaly
 
-`runs/twa_sinatra/` で実施した systematic Sinatra criterion test:
+`runs/twa_sinatra/` (gone) で実施した systematic Sinatra criterion test:
+
+> **引用先が違ううえ、下表の数値が出典と合わない (2026-07-31)。**
+>
+> 1. `runs/twa_sinatra/` (gone) は git に一度も存在しない。実際の出力は CAS ディレクトリ
+>    `runs/{baseline_32g, coarse_16g, cutoff_16g}_<hash>/result.jld2` で、これは
+>    [`twa_sinatra_validation.md`](../../../research_notes/twa_sinatra_validation.md)
+>    に書かれている。ディレクトリ名そのものが誤り。
+> 2. その出典 note は冒頭で **"superseded / VERDICT REVISED 2026-05-08"** と宣言し、
+>    正しい読みは [`twa_pinned_16g_result.md`](../../../research_notes/twa_pinned_16g_result.md)
+>    だとしている。**§5.7 の結論（GS-resolution artifact）はその後続に支えられており、
+>    後続の config は `runs/twa_N_scan_pinned_16g/` として実際にコミットされている。**
+>    結論は無事で、根拠の指し先が古い。
+> 3. **下表の中段が出典のどちらとも一致しない。** 出典 note は 16³×box=20 を
+>    σ/μ = **0.042**、Sinatra ratio 5.3 と記録している。下表は同じ行を
+>    σ/μ = **0.31**、r = 0.66 としている。r 列も出典の 42.6 / 5.3 / 5.3 と桁が違う。
+>    第 3 行 (16³ box=10, 0.82) は May-7 の check ではなく後続の N=10⁵ 値である。
+>    どれが正しいか本セッションでは判定できないため、修正せず記録する。
 
 | Grid | box | $r = N_{\rm modes} D / N$ | σ/μ at peak |
 |---|---|---|---|

@@ -10,11 +10,12 @@
 # Gap discipline (arch doc §4 KNOWN-LIMIT row):
 # - DUMB_DEFERRED_SLOTS — dumb statement deferred to its own unit;
 #   explicitly skipped, never silently. Empty since the DDI unit landed.
-# - PRODUCTION_RHS_GAPS (:raman) — production apply_operator! is
-#   declared-nil; the oracle asserts BOTH sides of the gap
-#   (production ≡ 0 AND dumb ≠ 0 when active), so the gap closing or
-#   widening is a test event either way. :tensor left the list when its
-#   gradient face was implemented 2026-06-09.
+# - PRODUCTION_RHS_GAPS — production apply_operator! declared-nil; the
+#   oracle asserts BOTH sides of the gap (production ≡ 0 AND dumb ≠ 0
+#   when active), so the gap closing or widening is a test event either
+#   way. EMPTY since 2026-07-31: :tensor left when its gradient face was
+#   implemented (2026-06-09) and :raman when its was (2026-07-31), so
+#   every slot's RHS is now compared against the dumb statement.
 # - Slot coverage is not KIND coverage. The `lhy` slot's dumb statement
 #   implements the scalar form only; see the declaration testset below.
 #
@@ -48,7 +49,7 @@ const SLOT_TERM = (;
     loss=LossTerm,
 )
 
-const PRODUCTION_RHS_GAPS = (:raman,)  # :tensor gradient implemented 2026-06-09
+const PRODUCTION_RHS_GAPS = ()  # :tensor 2026-06-09, :raman 2026-07-31
 
 """Source-faithful sign mutant: a copy of `term` with every numeric
 field negated. The registry term carries its coefficients in struct

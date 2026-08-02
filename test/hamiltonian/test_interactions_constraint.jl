@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Constraint-based interactions" begin
     @testset "interaction_params_from_constraint basic" begin
         ip = interaction_params_from_constraint(; c_total=4689.0, c1_ratio=0.0, F=6)

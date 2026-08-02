@@ -13,24 +13,26 @@ using Printf
 # For ‖W·dt‖ < 0.5, Taylor with N=14 reaches F32 precision (1e-7) — adequate
 # for the typical TDHFB regime where g·n·dt ~ 1e-3 → ‖W·dt‖ ~ 1e-2 → 1e-3.
 
-try
+# `return` at the top level of an included file does not stop the include —
+# Julia evaluates each top-level expression on its own, so the old
+# `try … return nothing … end` guard logged "skipping" and then fell straight
+# through to the CUDA calls below. On every CPU-only runner this file died with
+# `LoadError: CUDA driver not functional` instead of skipping. The guard has to
+# sit inside each `@testset`, whose body IS a function.
+const HAS_CUDA = try
     @eval using CUDA
-    if !CUDA.functional()
-        @info "CUDA not functional — skipping TDHFB GPU phase5c tests"
-        return nothing
-    end
-catch e
-    @info "CUDA not available — skipping TDHFB GPU phase5c tests"
-    return nothing
+    CUDA.functional()
+catch
+    false
 end
 
-ext = Base.get_extension(SpinorBEC, :SpinorBECCUDAExt)
-batched_expm = ext.batched_expm_neg_i_dt!
+ext = HAS_CUDA ? Base.get_extension(SpinorBEC, :SpinorBECCUDAExt) : nothing
+batched_expm = HAS_CUDA ? ext.batched_expm_neg_i_dt! : nothing
 
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())
 
 @testset "TDHFB GPU phase5c: F=1 batched expm vs CPU Base.exp" begin
+    HAS_CUDA || (@test true; return nothing)
     D = 6  # twoD for F=1
     N_vox = 50
     dt = 0.01
@@ -58,6 +60,7 @@ CUDA.reclaim()
 end
 
 @testset "TDHFB GPU phase5c: F=6 batched expm sample voxel F32" begin
+    HAS_CUDA || (@test true; return nothing)
     D = 26  # twoD for F=6
     N_vox = 32 * 32 * 32  # production scale
     dt = 0.001
@@ -82,6 +85,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c: identity preserved when W = 0" begin
+    HAS_CUDA || (@test true; return nothing)
     D = 8
     N_vox = 10
     W = CUDA.zeros(ComplexF64, D, D, N_vox)
@@ -100,6 +104,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c: dt=0 returns identity" begin
+    HAS_CUDA || (@test true; return nothing)
     D = 6
     N_vox = 5
     W = CuArray(randn(ComplexF64, D, D, N_vox))
@@ -117,6 +122,7 @@ end
 end
 
 @testset "TDHFB GPU phase5c: unitary preservation for Hermitian W" begin
+    HAS_CUDA || (@test true; return nothing)
     # If W is Hermitian, exp(-i W dt) is unitary: M M† = I
     D = 8
     N_vox = 20
@@ -144,5 +150,4 @@ end
     end
 end
 
-GC.gc()
-CUDA.reclaim()
+HAS_CUDA && (GC.gc(); CUDA.reclaim())

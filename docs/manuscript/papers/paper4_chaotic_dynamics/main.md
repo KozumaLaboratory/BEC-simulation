@@ -326,4 +326,4 @@ Key citations expected:
 **Companion materials**:
 - `docs/manuscript/figures_data/`: σ/μ scan plots, 50-trajectory ensemble traces.
 - `scripts/dynamics/sinatra_*.jl`: TWA validity diagnostics.
-- `runs/sigma_mu_scan_*`: numerical run cache (gitignored).
+- `runs/sigma_mu_scan_*` (planned): numerical run cache (gitignored).

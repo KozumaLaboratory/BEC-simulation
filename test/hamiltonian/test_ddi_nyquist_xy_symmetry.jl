@@ -10,6 +10,9 @@
 # `_build_q_tensor!` zeros the off-diagonals on every odd-axis Nyquist
 # plane. See scripts/ddi_nyquist_xy_asymmetry_probe.jl.
 
+using Test
+using SpinorBEC
+
 @testset "DDI Nyquist x↔y symmetry" begin
     swap_xy(A) = permutedims(A, (2, 1, 3))
 

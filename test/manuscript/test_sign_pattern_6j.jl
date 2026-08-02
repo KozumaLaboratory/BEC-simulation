@@ -11,6 +11,7 @@
 # Sign pattern in S emerges from the competition. Tabulate explicitly for paper3 cases
 # F = 3, 4, 6, 8, 10 and compare to paper3 stated β_S^{λ_spin} signs.
 
+using Test
 using SpinorBEC
 using LinearAlgebra
 using Printf

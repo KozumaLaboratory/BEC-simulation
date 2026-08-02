@@ -125,7 +125,7 @@ function find_ground_state(;
     ddi_pad_factor::Union{Real, NTuple}=2,
     adaptive_dt::Bool=false,
     dt_max::Float64=10.0 * dt,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     target_magnetization::Union{Nothing, Float64}=nothing,
     rotating_frame_omega::Float64=0.0,
     target_Jz::Union{Nothing, Float64}=nothing,

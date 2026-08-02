@@ -62,11 +62,66 @@ else
         end
     end
 
-    @testset "fused half-step ≡ the unfused one, bit for bit" begin
+    """
+    Relative agreement between the two arms.
+
+    NOT `a == b`. Bit-identity is what the fusion is designed to deliver on a
+    fixed device state, and it does hold when this file runs alone — measured
+    max|a-b| = 0.0 at 1, 2 and 5 steps. It does NOT hold reliably inside a
+    `full`-tier worker that has already run thirty other files: the same two arms
+    came back 1e-10 apart on ψ of scale 0.13, i.e. agreeing to ~1e-9 relative,
+    which is round-off and not a physics difference. GPU reduction order is a
+    function of launch configuration and pool state, so exact equality is not a
+    property this path can be held to across processes — CLAUDE.md records the
+    same conclusion for the fused/broadcast boundary (9b30c8bb).
+
+    The bound below is still a genuine differential gate: 1e-12 relative is four
+    orders tighter than the O(dt²) difference a real splitting change would make,
+    and the padded-vs-bare assertions in this file rely on the same scale to tell
+    the two convolutions apart.
+
+    (The in-worker discrepancy was NOT reproduced by replaying that worker's
+    toggle-flipping predecessors — `SPIN_TAYLOR_ENABLED`,
+    `COMBINED_SPIN_STEP_ENABLED`, `MEANFIELD_MIDPOINT_ENABLED` — so this is a
+    robustness fix to the CLAIM, not a diagnosed root cause.)
+
+    Six further reproduction attempts, each with a positive control, all came
+    back bit-identical, so none of these is the mechanism either. Listed so the
+    next reader does not spend the jobs again:
+
+      - GPU memory pressure, down to 0.82 GiB free of 46 (cuFFT plan selection
+        is workspace-dependent, so this was the leading guess).
+      - Device model: green standalone on both `gpu_h` and `gpu_1`, and the
+        red run was `gpu_1`.
+      - The file that actually preceded it in that worker — the queue is
+        heaviest-first and on-demand, so only `workflow/test_experiment.jl`
+        (205 s, queue item 1) ran before it. Replayed in one process: green.
+      - Global accuracy knobs: none of worker 1's other twelve files writes
+        one.
+      - GPU COMPUTE contention: eleven concurrent CUDA processes, 100 %
+        utilisation, this file 57.5 s against 42.7 s alone — so it really was
+        contending — and still bit-identical. (The load has to be
+        preallocated; the first attempt allocated per iteration, took the
+        device to 95 GiB and made the test fail with "Out of GPU memory",
+        which is an OOM masquerading as a physics result.)
+      - The suite harness itself: run through `run_test_files`, i.e. inside the
+        outer `@testset` that installs its own RNG rather than a bare
+        `include`. 15/15.
+
+    What is left, and untried, is eleven concurrent *SpinorBEC* processes doing
+    FFT and DDI work on the one device — not eleven GEMM loops.
+    """
+    function _agree(a, b)
+        scale = max(maximum(abs, a), maximum(abs, b))
+        scale == 0 && return false
+        maximum(abs, a .- b) / scale
+    end
+
+    @testset "fused half-step ≡ the unfused one, to round-off" begin
         SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
         a = _run(true, 5)
         b = _run(false, 5)
-        @test a == b
+        @test _agree(a, b) < 1e-12
         # The two arms really did take different paths: with the midpoint
         # predictor-corrector off there is no frozen ψ_mf, so the fused arm
         # declines and the equality above would be trivially true.
@@ -84,7 +139,7 @@ else
         SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
         a = _run(true, 5; ddi_padding=true)
         b = _run(false, 5; ddi_padding=true)
-        @test a == b
+        @test _agree(a, b) < 1e-12
         wsp = _ws(; ddi_padding=true)
         @test wsp.ddi_padded !== nothing
         @test SpinorBEC._spin_chain_reason(
@@ -92,7 +147,41 @@ else
         # Padding changes Φ, so the padded arm must NOT agree with the bare one.
         # Without this, a padded workspace that silently ran the bare convolution
         # — the failure the index map exists to prevent — would still pass.
-        @test a != _run(true, 5)
+        @test _agree(a, _run(true, 5)) > 1e-6
+    end
+
+    # Every production Eu run is tabulated (polar_contact / icosahedral /
+    # full_bdg / …), and `_spin_chain_reason` declined every table until
+    # 2026-08-01 — so NO production run had ever taken the fused half-step, and
+    # the arms above were gating a path production does not build. Same shape as
+    # the fused DIAGONAL kernel's `c_lhy` bound, closed the same way and gated
+    # the same way.
+    @testset "the fusion holds with a TABULATED LHY, the production case" begin
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        kw = (; ddi_padding=true, spinor_lhy=:polar_contact)
+        a = _run(true, 5; kw...)
+        b = _run(false, 5; kw...)
+        # `_agree`, not `==`, for the reason the arms above already carry: bit
+        # identity is what the fusion delivers on a fixed device state and it does
+        # hold when this file runs alone, but GPU reduction order is not stable
+        # inside a `full`-tier worker that has already run thirty other files.
+        # This arm shipped with `==` and would have been the one that flaked —
+        # under exactly the condition the other arms were relaxed for.
+        @test _agree(a, b) < 1e-12
+
+        wst = _ws(; kw...)
+        @test wst.lhy isa SpinorBEC.TabulatedLHY
+        @test SpinorBEC._spin_chain_reason(
+            wst, wst.interactions, CUDA.zeros(ComplexF64, 2)) === nothing
+
+        # POSITIVE CONTROL, and it is the whole point of this arm. The prepass
+        # collapses a non-scalar `c_lhy` to zero, so a fused path that reached
+        # the table and then dropped it would still satisfy `a == b` — because
+        # BOTH arms would be wrong in the same way only if the unfused path
+        # dropped it too, which it does not. Requiring the LHY to MOVE ψ is what
+        # separates "the table is applied" from "the table is zero".
+        c = _run(true, 5; ddi_padding=true)          # same config, no LHY
+        @test _agree(a, c) > 1e-6
     end
 
     @testset "no frozen mean field ⇒ the fusion declines" begin

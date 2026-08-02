@@ -1,3 +1,5 @@
+using Test
+using SpinorBEC
 using FFTW
 
 @testset "Phase Scan" begin

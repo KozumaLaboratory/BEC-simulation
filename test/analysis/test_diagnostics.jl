@@ -1,3 +1,5 @@
+using Test
+using SpinorBEC
 using SpinorBEC: _elliptic_k
 using FFTW
 
