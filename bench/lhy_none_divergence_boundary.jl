@@ -78,6 +78,7 @@ const SCALES = (0.0, 0.1, 0.25, 0.5, 1.0)
 
 for lhy in (:none, :polar_contact)
     println("\n--- lhy = $lhy   (cells: finite E, DIVERGED, or REFUSED at build)")
+    flush(stdout)
     @printf("  %-10s", "c_dd×")
     for c1 in C1S
         @printf(" %11s", "c₁=$(c1)")
@@ -91,6 +92,11 @@ for lhy in (:none, :polar_contact)
                               st === :diverged ? "DIVERGED" : "refused")
         end
         println()
+        # Flush. Third bench in this session to need it said explicitly: Julia
+        # block-buffers stdout to a pipe, so a row that has finished is invisible
+        # until the buffer fills, and the run looks stalled. `grep
+        # --line-buffered` only fixes the DOWNSTREAM half.
+        flush(stdout)
         GC.gc(true)
         CUDA.reclaim()
     end
