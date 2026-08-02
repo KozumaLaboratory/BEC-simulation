@@ -21,11 +21,14 @@
 #   null read as evidence, a bit-identical A/B read as physics, a knob the
 #   observable is degenerate in. The constructor cannot check that the control
 #   actually fails; only running it can. It can insist one was declared.
-# - a `:C` claim needs a registered literature TARGET. Model fidelity is a
-#   statement about a published number, so it needs the published number, from
-#   `refs/<paper>.toml` via `ref` — where the target is measured off a committed
-#   fixture rather than typed. An `:A` claim needs neither: GPU == CPU has no
-#   literature and needs no control beyond the equality itself.
+# - a `:C` claim needs a registered literature TARGET, and one that ARBITRATES.
+#   Model fidelity is a statement about a published number, so it needs the
+#   published number, from `refs/<paper>.toml` via `ref` — where the target is
+#   measured off a committed fixture rather than typed. "Arbitrating" is not an
+#   extra opinion: it means nothing in `REF_DISQUALIFIERS` applies, i.e. their
+#   axis, the window and the metric all permit this number to decide. An `:A`
+#   claim needs neither: GPU == CPU has no literature and needs no control beyond
+#   the equality itself.
 #
 # Deliberately NOT enforced here, and worth naming rather than leaving to be
 # discovered: `evidence = Stage[]` passes every check above, so a `:C` claim with
@@ -58,7 +61,7 @@ One assertion, with the arms that support it and the arm that must fail.
 | `kind` | `:A` code correctness / `:B` physics agreement / `:C` model fidelity |
 | `evidence` | the stages whose results support it |
 | `control` | the arm that must FAIL — required for `:B` and `:C` |
-| `target` | a row from `refs/<paper>.toml` via `ref` — required for `:C` |
+| `target` | a row from `refs/<paper>.toml` via `ref` — required for `:C`, and it must ARBITRATE |
 
 ```julia
 claim("our Fig. 4B dip width reproduces Matsui et al.";
@@ -85,6 +88,26 @@ struct Claim
             throw(ArgumentError("a :$kind claim needs a control that trips it"))
         kind === :C && target === nothing &&
             throw(ArgumentError("a :C claim needs a registered literature target"))
+        # ...and the target has to be one that can DECIDE. `arbitrates` declared
+        # exactly this ("whether this number decides a comparison, or is merely
+        # quotable") and nothing read it, so a `:C` claim could be built against
+        # `dip_centre_exp_nT` — the row whose own note says it "exists to be
+        # quotable and to be REFUSED as a target", because the Fig. 4 caption
+        # admits a 10 nT axis offset on a 3.2 nT centre. This is the one place in
+        # the tree where a number is offered as deciding a comparison, so it is
+        # the place the flag has to bite; a flag nothing reads should be cut, not
+        # kept as documentation with a Bool type.
+        kind === :C && target !== nothing && !get(target, :arbitrates, false) &&
+            throw(
+                ArgumentError(
+                    "a :C claim needs an ARBITRATING target; " *
+                    "$(get(target, :source, :?)).$(get(target, :quantity, :?)) is " *
+                    "disqualified by " *
+                    join(String.(get(target, :disqualified_by, Symbol[])), ", ") *
+                    ". Those are properties of the reference (its axis, its window, " *
+                    "its metric), not of our result — a number they disqualify is " *
+                    "quotable, and quoting it as agreement claims more than it supports."),
+            )
         new(statement, kind, evidence, control, target)
     end
 end

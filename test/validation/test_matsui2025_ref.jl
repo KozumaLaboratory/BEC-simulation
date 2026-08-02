@@ -158,7 +158,10 @@ end
 
         # And the arbitration is data, not prose: the two window-restricted
         # widths decide the Fig. 4B comparison, the experimental CENTRE does not
-        # (the caption admits a 10 nT axis offset, 3x the centre itself).
+        # (the caption admits a 10 nT axis offset, 3x the centre itself). Since
+        # W5 `arbitrates` is DERIVED from `disqualified_by`; the derivation and
+        # the closed vocabulary behind it are gated by
+        # `test/validation/test_arbitrates_is_derived.jl`.
         @test ref(:matsui2025, :dip_width_exp_scanwindow_nT).arbitrates
         @test ref(:matsui2025, :dip_width_sim_scanwindow_nT).arbitrates
         @test ref(:matsui2025, :dip_centre_sim_nT).arbitrates
@@ -329,7 +332,7 @@ end
         with_broken(
             REFPATH,
             s -> replace(s,
-                "window = [-13.0, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\narbitrates = true\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted" => "window = [-12.5, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\narbitrates = true\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted",
+                "window = [-13.0, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted" => "window = [-12.5, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted",
             ),
         ) do
             # The stored value no longer matches, so `ref` refuses …
@@ -578,5 +581,253 @@ end
         # in that ratio (contract §0.3.5) holds on the resolved model.
         @test m.interactions.c0 + 36 * m.interactions.c1 ≈ 4687.266258 rtol = 1e-6
         @test m.atom.F == 6
+    end
+end
+
+# ---------------------------------------------------------------------------
+# W5: `arbitrates` was hand-set by whoever could also see the result.
+# ---------------------------------------------------------------------------
+#
+# The finding: this file marked some quantities `arbitrates = true`, and whoever
+# set that flag could also see how our number compared. That is the approval-
+# testing failure mode by another name — golden tests are documented to fail by
+# BLESSING a wrong value.
+#
+# What the tree said before, checked rather than assumed:
+#
+#   * NOTHING in `src/` dispatched on it. The only `.arbitrates` outside the
+#     decoder was a docstring example. `Claim`'s inner constructor required a
+#     `target` for a `:C` claim and did NOT require it to arbitrate — so a
+#     model-fidelity claim could be built against `dip_centre_exp_nT`, the row
+#     whose own note says it "exists to be quotable and to be REFUSED as a
+#     target".
+#   * The blessing SHAPE was visible in the file: `dip_minimum_sim_atoms`, the
+#     quantity we disagree with most (~20 % more atoms moved out of m = -6), is
+#     the one flagged non-arbitrating. Its grounds are a real systematic — but
+#     under a free `Bool`, "their counting systematic swamps it" and "we do not
+#     like the number" were the same three characters.
+#
+# The decision: KEEP it, because it is the discriminator between "the target" and
+# "not the target" and six configs under `runs/matsui_fig4b/` got that wrong —
+# but make it two things it was not.
+#
+#   (a) LOAD-BEARING. `Claim` refuses a `:C` claim whose target does not
+#       arbitrate. A flag nothing reads should be cut, not kept as documentation
+#       with a Bool type.
+#   (b) DERIVED, not declared. `arbitrates == isempty(disqualified_by)`, and
+#       `disqualified_by` draws from a CLOSED vocabulary in which every entry is
+#       a property of the reference — their axis, the window, the metric. There
+#       is no longer a field to set while looking at our result.
+#
+# The eight pinned values are the regression that (b) reproduces exactly what the
+# hand-set booleans said, and the positive control for the whole derivation: a
+# rule tuned to produce a different answer fails there.
+#
+# It lives in THIS file and not its own because the arms below break the
+# committed TOML in place, and the tripwire above is right that a second reader
+# in a second worker process would race them.
+
+# What the hand-set booleans said, before the derivation replaced them. Pinned
+# LITERALLY and not read back out of the TOML — a gate that reads its expectation
+# from the file it is checking passes against any value.
+const ARBITRATES_PINS = (
+    :dip_centre_sim_nT => true,
+    :dip_centre_exp_nT => false,
+    :dip_width_sim_nT => false,
+    :dip_width_exp_nT => false,
+    :dip_width_sim_scanwindow_nT => true,
+    :dip_width_exp_scanwindow_nT => true,
+    :dip_minimum_sim_atoms => false,
+    :dip_minimum_exp_atoms => false,
+)
+
+@testset "W5: `arbitrates` is derived from a closed, reference-side vocabulary" begin
+    @testset "A: the derivation reproduces all eight hand-set values" begin
+        for (q, expected) in ARBITRATES_PINS
+            r = ref(:matsui2025, q)
+            @test r.arbitrates === expected
+            # …and it IS the derivation, not a second declaration that happens to
+            # agree. Both directions, so neither is vacuous.
+            @test r.arbitrates === isempty(r.disqualified_by)
+        end
+        # Both classes are populated: 3 arbitrating, 5 not. A derivation that
+        # returned a constant would satisfy half the loop above.
+        arb = [q for (q, _) in ARBITRATES_PINS if ref(:matsui2025, q).arbitrates]
+        @test length(arb) == 3
+        @test length(ARBITRATES_PINS) - length(arb) == 5
+    end
+
+    @testset "B: the disqualifiers are the ones the notes argue for" begin
+        # Each row's reason is pinned by NAME, not merely by count: swapping
+        # `axis_offset` for `window_not_covered` leaves `arbitrates` identical
+        # and would otherwise pass arm A untouched.
+        @test ref(:matsui2025, :dip_centre_exp_nT).disqualified_by == [:axis_offset]
+        @test ref(:matsui2025, :dip_width_sim_nT).disqualified_by == [:window_not_covered]
+        @test ref(:matsui2025, :dip_width_exp_nT).disqualified_by == [:window_not_covered]
+        @test ref(:matsui2025, :dip_minimum_sim_atoms).disqualified_by ==
+            [:absolute_population]
+        @test ref(:matsui2025, :dip_minimum_exp_atoms).disqualified_by ==
+            [:absolute_population]
+        for q in (:dip_centre_sim_nT, :dip_width_sim_scanwindow_nT,
+            :dip_width_exp_scanwindow_nT)
+            @test isempty(ref(:matsui2025, q).disqualified_by)
+        end
+
+        # The centre is disqualified by the AXIS and not by the window, and the
+        # full-window width by the WINDOW and not the axis. That asymmetry is the
+        # physics of the two metrics — a shift moves a position and does not
+        # stretch a width — and it is what makes the vocabulary say something.
+        @test ref(:matsui2025, :dip_centre_exp_nT).window === nothing        # "full"
+        @test :window_not_covered ∉ ref(:matsui2025, :dip_centre_exp_nT).disqualified_by
+        @test :axis_offset ∉ ref(:matsui2025, :dip_width_exp_nT).disqualified_by
+    end
+
+    @testset "C: the vocabulary is CLOSED, and an unknown reason is an error" begin
+        @test REF_DISQUALIFIERS ==
+            (:axis_offset, :window_not_covered, :absolute_population)
+        # A reason invented in the TOML is refused by name. Without this, the key
+        # is the free `Bool` it replaced, wearing a list.
+        with_broken(REFPATH,
+            s -> replace(s,
+                "disqualified_by = [\"axis_offset\"]" => "disqualified_by = [\"we_dont_like_it\"]",
+                count=1)) do
+            e = try
+                ref(:matsui2025, :dip_centre_exp_nT)
+                nothing
+            catch err
+                err
+            end
+            @test e isa ArgumentError
+            @test occursin("not a registered reason", e.msg)
+            @test occursin("axis_offset", e.msg)
+        end
+        # Green again immediately, so the canary tested the gate and not the
+        # restore.
+        @test ref(:matsui2025, :dip_centre_exp_nT).disqualified_by == [:axis_offset]
+
+        # A bare string is not a one-element list: `"axis_offset"` iterated as
+        # characters would produce twelve nonsense reasons.
+        with_broken(REFPATH,
+            s -> replace(s,
+                "disqualified_by = [\"axis_offset\"]" => "disqualified_by = \"axis_offset\"",
+                count=1)) do
+            e = try
+                ref(:matsui2025, :dip_centre_exp_nT)
+                nothing
+            catch err
+                err
+            end
+            @test e isa ArgumentError
+            @test occursin("must be a LIST", e.msg)
+        end
+
+        # And the key is REQUIRED on a measured row: dropping it must not silently
+        # make the row arbitrate.
+        with_broken(REFPATH,
+            s -> replace(s, "disqualified_by = [\"absolute_population\"]\n" => "",
+                count=1)) do
+            e = try
+                ref(:matsui2025, :dip_minimum_sim_atoms)
+                nothing
+            catch err
+                err
+            end
+            @test e isa ArgumentError
+            @test occursin("disqualified_by", e.msg)
+        end
+    end
+
+    @testset "D: `arbitrates` is not a key anyone can set" begin
+        # The whole point: there is no longer a field to bless. `_closed` refuses
+        # an unknown key, so re-adding the old spelling is an ERROR rather than a
+        # second declaration that quietly out-votes the derivation.
+        doc = TOML.parsefile(REFPATH)
+        for (q, t) in doc["quantity"]
+            @test !haskey(t, "arbitrates")
+        end
+        with_broken(REFPATH,
+            s -> replace(s,
+                "disqualified_by = [\"axis_offset\"]" => "disqualified_by = [\"axis_offset\"]\narbitrates = true",
+                count=1)) do
+            e = try
+                ref(:matsui2025, :dip_centre_exp_nT)
+                nothing
+            catch err
+                err
+            end
+            @test e isa ArgumentError
+            @test occursin("arbitrates", e.msg)
+        end
+    end
+
+    @testset "E: the flag BITES — a :C claim needs an arbitrating target" begin
+        # This is what makes the flag load-bearing rather than documentation with
+        # a Bool type. Before it, `Claim` required a target and not an arbitrating
+        # one, so the row that exists "to be REFUSED as a target" was accepted as
+        # one.
+        # A minimal but REAL Stage, same shape as `test_matsui2025_ref.jl`'s:
+        # `Claim` embeds `Stage`, so the constructor gate has to be exercised
+        # against the real type rather than a stand-in.
+        m = Model(; grid=GridSpec(; ndim=1, n_points=(16,), box=(8.0,)),
+            atom=SpinorBEC.ATOM_REGISTRY[:Na23],
+            interactions=InteractionSpec(; n_atoms=1000, omega_ref=100.0, c0=10.0, c1=0.1),
+            ddi=DDISpec(; c_dd=1.0))
+        s = stage(:relax; model=m, method=:itp, dt=0.01, n_steps=10)
+        # The control is the PHYSICS switched off — c_dd = 0 — not a tolerance
+        # loosened.
+        ctrl = stage(:relax; model=with(m; ddi=DDISpec()), method=:itp, dt=0.01, n_steps=10)
+
+        good = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
+        bad = ref(:matsui2025, :dip_centre_exp_nT)
+        # POSITIVE CONTROL: the arbitrating target still constructs, so a refusal
+        # below is about the flag and not about the fixture being malformed.
+        @test good.arbitrates
+        c = claim("our Fig. 4B width reproduces theirs"; kind=:C, evidence=[s],
+            control=ctrl, target=good)
+        @test c.target.quantity === :dip_width_exp_scanwindow_nT
+
+        @test !bad.arbitrates
+        e = try
+            claim("our centre agrees with experiment"; kind=:C, evidence=[s],
+                control=ctrl, target=bad)
+            nothing
+        catch err
+            err
+        end
+        @test e isa ArgumentError
+        @test occursin("ARBITRATING target", e.msg)
+        # The message names WHICH systematic, so the reader is sent to the axis
+        # rather than left to guess.
+        @test occursin("axis_offset", e.msg)
+
+        # …and the refusal is specific to `:C`. An `:A` or `:B` claim is not a
+        # statement about a published number and is unaffected.
+        @test Claim("GPU == CPU", :A, Stage[s], nothing, nothing).kind === :A
+        @test Claim("polar beats FM", :B, Stage[s], ctrl, nothing).kind === :B
+        # A `:C` claim with no target at all is still refused for the old reason.
+        e2 = try
+            Claim("x", :C, Stage[s], ctrl, nothing)
+            nothing
+        catch err
+            err
+        end
+        @test e2 isa ArgumentError
+        @test occursin("registered literature target", e2.msg)
+    end
+
+    @testset "F: `RefRow` still has ONE shape" begin
+        # `disqualified_by::Vector{Symbol}` and not a `Tuple`: a tuple's type
+        # varies with its LENGTH, so a row with one reason and a row with none
+        # would be different types and the shape could not be pinned.
+        ts = unique(typeof(ref(:matsui2025, q)) for q in ref_quantities(:matsui2025))
+        @test only(ts) === RefRow
+        @test fieldtype(RefRow, :disqualified_by) === Vector{Symbol}
+        @test fieldtype(RefRow, :arbitrates) === Bool
+        # A non-measured row carries neither a recipe nor a disqualifier, and an
+        # empty list there must NOT be read as "it arbitrates".
+        r = ref(:matsui2025, :zeeman_q_Hz)
+        @test r.provenance === :read_off
+        @test isempty(r.disqualified_by)
+        @test r.arbitrates === false
     end
 end

@@ -219,13 +219,23 @@ value = 12.84
 kind  = "read_off"        # read_off | inferred
 note  = "Fig. 4B experimental trace, FWHM of the m=6 depletion"
 doi   = "10.1103/..."
-arbitrates = true          # this number, not the centre, decides the comparison
+disqualified_by = []       # nothing stops this number deciding the comparison
 ```
 
-Provenance becomes data. `arbitrates` is the column that matters and the pattern
-already ships: `test/validation/test_matsui_fig4_dip.jl` pins width and centre
-and carries a canary at `:122` — shift the curve and the centre moves by exactly
-the shift while the width does not; stretch it and the width doubles.
+Provenance becomes data. Whether a number DECIDES is the column that matters and
+the pattern already ships: `test/validation/test_matsui_fig4_dip.jl` pins width
+and centre and carries a canary at `:122` — shift the curve and the centre moves
+by exactly the shift while the width does not; stretch it and the width doubles.
+
+**As shipped, that column is `disqualified_by` and `arbitrates` is derived from
+it** (`arbitrates == isempty(disqualified_by)`). A free `arbitrates` Bool is set
+by whoever can also see how our number compares, which is the approval-testing
+failure mode — golden tests fail by BLESSING a wrong value. `REF_DISQUALIFIERS`
+is a closed vocabulary (`:axis_offset`, `:window_not_covered`,
+`:absolute_population`) in which every entry is a property of the REFERENCE, so
+there is no field to set while looking at our result. `Claim` refuses a `:C`
+claim whose target does not arbitrate, which is what makes the flag load-bearing
+rather than documentation with a Bool type.
 
 ### 2.6 `run!` — idempotent, returns records
 

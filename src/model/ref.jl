@@ -35,13 +35,42 @@ using TOML
 using SHA: sha256
 
 export ref, ref_measure, RefRow, ref_quantities, ref_source_path
-export REFS_FORMAT, REF_PROVENANCES
+export REFS_FORMAT, REF_PROVENANCES, REF_DISQUALIFIERS
 
 "Serialised-reference format version. Bump when the on-disk shape changes."
 const REFS_FORMAT = 1
 
 "How a reference value came to be. Closed, and the reason the file is worth having."
 const REF_PROVENANCES = (:measured, :read_off, :reconstructed)
+
+"""
+The reasons a published number CANNOT decide a comparison. Closed, and every
+entry is a property of the REFERENCE — the paper, the window, or the metric —
+decidable without knowing what our code produces.
+
+That restriction is the whole point. `arbitrates` used to be a hand-set `Bool`,
+and whoever set it could also see how our number compared: golden tests are
+documented to fail by BLESSING a wrong value, and the shape is visible in this
+very file — `dip_minimum_sim_atoms`, the quantity on which we disagree MOST
+(~20 % more atoms moved out of `m = -6`), is the one flagged non-arbitrating.
+Its reason is a real systematic, but nothing in the schema distinguished "the
+axis cannot support this" from "we do not like the number", because both were
+spelled `arbitrates = false`.
+
+So `arbitrates` is now DERIVED — `isempty(disqualified_by)` — and the only way
+to make a row non-arbitrating is to name which of these applies. There is no
+longer a field to set while looking at our result.
+
+| entry | what it means |
+|---|---|
+| `:axis_offset` | read against the experimental abscissa, which the Fig. 4 caption admits "may contain an offset error of up to 10 nT" — three times the centre itself. A shift, so it disqualifies a POSITION and not a width. |
+| `:window_not_covered` | the row's window is not one our scans span, so the two numbers are not the same measurement. Applies only where the window DEFINES the value: `resonance_dip`'s width is a half-depth crossing against a per-side endpoint baseline (15.02 / 13.07 / 12.75 nT over three windows), while its centre is a parabolic vertex, measured identical to 12 digits over five. |
+| `:absolute_population` | an absolute atom count, so it inherits the `N_atoms` reconstruction (a 1.43x in `c_0 + 36 c_1`) and the experiment's Stern-Gerlach counting systematic. Ratios and widths do not. |
+
+Adding an entry is a deliberate widening of what may disqualify a number, and it
+belongs in the same commit as the row that needs it.
+"""
+const REF_DISQUALIFIERS = (:axis_offset, :window_not_covered, :absolute_population)
 
 """
 One row of `refs/<source>.toml`, with a shape that does not depend on which row
@@ -65,7 +94,8 @@ that `NamedTuple`, pinned.
 | `locus` | where it came from: `file:line` for `read_off`, the derivation for the others |
 | `note` | the argument for it |
 | `dataset` … `window_from` | the measurement recipe; `nothing` unless `provenance == :measured` |
-| `arbitrates` | whether this number decides a comparison, or is merely quotable |
+| `disqualified_by` | which of `REF_DISQUALIFIERS` stop this number deciding anything; empty means none |
+| `arbitrates` | DERIVED, `isempty(disqualified_by)`: whether this number decides a comparison, or is merely quotable |
 | `quotable_digits` | how many figures survive the measurement's own sensitivity |
 | `alternative` … `cost_kind` | what was chosen against, and what choosing wrong costs |
 """
@@ -83,6 +113,7 @@ const RefRow = @NamedTuple{
     endpoint_baseline::Union{Nothing, Bool},
     window::Union{Nothing, Tuple{Float64, Float64}},
     window_from::String,
+    disqualified_by::Vector{Symbol},
     arbitrates::Bool,
     quotable_digits::Int,
     alternative::Union{Nothing, Float64},
@@ -104,7 +135,7 @@ const _REF_KEYS_ALWAYS = ("provenance", "value", "units", "note")
 # gives 15.02 / 13.07 / 12.75 nT over three of them — so a row without one is
 # under-determined by more than the gap it is used to arbitrate.
 const _REF_KEYS_MEASURED = ("dataset", "metric", "metric_field", "endpoint_baseline",
-    "window", "window_from", "arbitrates", "quotable_digits")
+    "window", "window_from", "disqualified_by", "quotable_digits")
 
 const _REF_KEYS_LOCUS = ("locus",)
 
@@ -435,7 +466,8 @@ target" — a true message about the wrong file.
 r = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
 r.value        # 12.838286496502047, measured just now
 r.window       # (-13.0, 9.0) — without which the value is under-determined by 2.2 nT
-r.arbitrates   # true
+r.disqualified_by  # Symbol[] — nothing on the reference side stops it deciding
+r.arbitrates       # true, DERIVED from the line above
 ```
 """
 function ref(source::Symbol, quantity::Symbol)
@@ -494,6 +526,8 @@ function ref(source::Symbol, quantity::Symbol)
         value = got
     end
 
+    disq = measured ? _disqualifiers(t, what) : Symbol[]
+
     ck = has_cost || prov === :reconstructed ? Symbol(String(t["cost_kind"])) : :none
     (ck === :none || ck in _COST_KINDS) || throw(
         ArgumentError(
@@ -516,7 +550,14 @@ function ref(source::Symbol, quantity::Symbol)
         measured ? Bool(t["endpoint_baseline"]) : nothing,
         measured ? _window(t, source, quantity) : nothing,
         measured ? String(t["window_from"]) : "",
-        measured ? Bool(t["arbitrates"]) : false,
+        disq,
+        # DERIVED, never read off the file. A row arbitrates when it is a
+        # MEASUREMENT and nothing disqualifies it. `measured &&` is load-bearing
+        # and not defensive: a `read_off` row carries no `disqualified_by`, so a
+        # bare `isempty(disq)` would make every literal in their Fortran an
+        # arbitrating target — including `zeeman_q_Hz`, which is one of the two
+        # numbers the §0.7 gap is being blamed on.
+        measured && isempty(disq),
         measured ? Int(t["quotable_digits"]) : 0,
         ck === :none ? nothing : Float64(t["alternative"]),
         ck === :none ? "" : String(t["alternative_locus"]),
@@ -524,6 +565,40 @@ function ref(source::Symbol, quantity::Symbol)
         ck === :none ? "" : String(t["cost_units"]),
         ck,
     ))
+end
+
+# The list must be a list — a bare string would let `disqualified_by =
+# "axis_offset"` read as a 12-element list of characters — and every entry must
+# be in the closed vocabulary. An unrecognised reason is an ERROR and not a
+# shrug, because the one thing this key exists to prevent is a disqualification
+# whose grounds are whatever the author felt: that is the free `Bool` it replaced.
+#
+# Duplicates are refused too. `[:axis_offset, :axis_offset]` is not a stronger
+# statement than one, and letting it through would make the list's length
+# meaningless to anything that later counts it.
+function _disqualifiers(t, what::AbstractString)
+    raw = t["disqualified_by"]
+    raw isa AbstractVector || throw(
+        ArgumentError(
+            "$what has disqualified_by = $(repr(raw)); it must be a LIST of reasons " *
+            "(use [] for a row nothing disqualifies, which is what makes it arbitrate)"),
+    )
+    out = Symbol[]
+    for r in raw
+        s = Symbol(String(r))
+        s in REF_DISQUALIFIERS || throw(
+            ArgumentError(
+                "$what is disqualified_by :$s, which is not a registered reason. " *
+                "The vocabulary is closed so that a disqualification names a property " *
+                "of the REFERENCE, not an opinion about our number; it is " *
+                join(String.(REF_DISQUALIFIERS), ", ") *
+                ". Adding one is a deliberate widening and belongs in this commit."),
+        )
+        s in out && throw(
+            ArgumentError("$what lists disqualified_by :$s twice"))
+        push!(out, s)
+    end
+    out
 end
 
 # A measured row's locus is its recipe, spelled out, so the row prints as

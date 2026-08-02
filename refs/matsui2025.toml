@@ -115,6 +115,17 @@ its cross-consistency with `fig4_theo` is what licenses that reconstruction \
 # which is twice the gap it is used to arbitrate — hence `window` and
 # `window_from` are required, and `quotable_digits` records that the arbitrating
 # widths are good to two significant figures, not four.
+#
+# WHICH ROWS DECIDE, AND WHO GETS TO SAY. `arbitrates` is NOT a key here. It is
+# derived — `isempty(disqualified_by)` — and `disqualified_by` draws from a closed
+# vocabulary (`REF_DISQUALIFIERS` in `src/model/ref.jl`) in which every entry is a
+# property of the REFERENCE: their axis, the window, the metric. A free Bool would
+# be set by whoever can also see how our number compares, which is the approval-
+# testing failure mode — golden tests fail by BLESSING a wrong value — and the
+# shape is visible right here: `dip_minimum_sim_atoms`, the quantity we disagree
+# with MOST, is non-arbitrating. Its grounds are real, but under a free Bool
+# "their counting systematic swamps it" and "we do not like the number" were the
+# same three characters. Naming the systematic separates them.
 
 [quantity.dip_centre_sim_nT]
 provenance = "measured"
@@ -126,15 +137,17 @@ metric_field = "center"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own simulated curve"
-arbitrates = true
+disqualified_by = []
 quotable_digits = 3
 note = """
 The number a second implementation of the same model has to reproduce. The paper \
 contrasts an analytic -1.5 nT with an observed -3.5 nT and attributes the gap to \
 the gas's dipole field; their own simulation, which contains that field, lands at \
 -2.55 nT, so -2.55 is the code-vs-code target and neither -1.5 nor -3.5 is. \
-`arbitrates` is true for the CODE-vs-CODE comparison only: it is window-invariant \
-and immune to the experimental axis systematic because no experiment enters it."""
+Nothing disqualifies it, for the CODE-vs-CODE comparison: the centre is \
+window-invariant (measured identical to 12 digits over five windows, so \
+`window_not_covered` cannot apply) and no experiment enters it, so neither can \
+`axis_offset`."""
 
 [quantity.dip_centre_exp_nT]
 provenance = "measured"
@@ -146,15 +159,17 @@ metric_field = "center"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own measured scan"
-arbitrates = false
+disqualified_by = ["axis_offset"]
 quotable_digits = 3
 note = """
-`arbitrates = false`, and that is the point of this row: it exists to be quotable \
-and to be REFUSED as a target. The Fig. 4 caption states the field axis "may \
-contain an offset error of up to 10 nT" — three times the centre itself — so \
--2.14, -2.55, the measured -3.20 and even the paper's own -1.5 nT analytic \
-estimate are all consistent with this measurement. Any claim that a simulated \
-centre "agrees with experiment" claims more than this axis supports."""
+`axis_offset`, and that is the point of this row: it exists to be quotable and \
+to be REFUSED as a target. The Fig. 4 caption states the field axis "may contain \
+an offset error of up to 10 nT" — three times the centre itself — so -2.14, \
+-2.55, the measured -3.20 and even the paper's own -1.5 nT analytic estimate are \
+all consistent with this measurement. Any claim that a simulated centre "agrees \
+with experiment" claims more than this axis supports. The disqualifier is a \
+property of THEIR axis, stated in THEIR caption; it does not depend on what our \
+code produces."""
 
 [quantity.dip_width_sim_nT]
 provenance = "measured"
@@ -166,11 +181,11 @@ metric_field = "width"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own simulated curve"
-arbitrates = false
+disqualified_by = ["window_not_covered"]
 quotable_digits = 3
 note = """
-`arbitrates = false` because no SpinorBEC scan spans [-20, +20] nT: a width \
-measured over a window our runs do not cover cannot be compared with them. This \
+`window_not_covered`: no SpinorBEC scan spans [-20, +20] nT, and a width \
+measured over a window our runs do not cover is not the same measurement. This \
 is the number six configs under `runs/matsui_fig4b/` quote in their headers as \
 "the target" while the comparison that was actually performed used the \
 scan-window row below — 1.95 nT away, a gap created purely by dropping the \
@@ -187,7 +202,7 @@ metric_field = "width"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own measured scan"
-arbitrates = false
+disqualified_by = ["window_not_covered"]
 quotable_digits = 3
 note = """
 Full-window counterpart of `dip_width_sim_nT`, and not comparable with it either: \
@@ -205,7 +220,7 @@ metric_field = "width"
 endpoint_baseline = true
 window = [-13.0, 9.0]
 window_from = "our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT"
-arbitrates = true
+disqualified_by = []
 quotable_digits = 2
 note = """
 Their simulation restricted to OUR scan's window, which is the only way the two \
@@ -225,7 +240,7 @@ metric_field = "width"
 endpoint_baseline = true
 window = [-13.0, 9.0]
 window_from = "our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT"
-arbitrates = true
+disqualified_by = []
 quotable_digits = 2
 note = """
 THE arbitrating number of Fig. 4B, and the reason the width is it: an axis offset \
@@ -245,15 +260,17 @@ metric_field = "minimum"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own simulated curve"
-arbitrates = false
+disqualified_by = ["absolute_population"]
 quotable_digits = 5
 note = """
 The depth of the dip, out of 49999.9. Registered because it is the third number \
 in §0.5's table and because it is the quantity behind the one gap that survives \
 every cheap explanation: we move ~20 % more atoms out of m = -6 than they do, at \
-every field. `arbitrates = false` — it is an absolute population, so it inherits \
-both the atom-number reconstruction below and the experiment's counting \
-systematic."""
+every field. `absolute_population` — it inherits both the atom-number \
+reconstruction below and the experiment's counting systematic. Note what that \
+does NOT say: the disqualifier is about the two systematics, not about the \
+disagreement being large. A row made non-arbitrating BECAUSE we disagree with it \
+is the blessing failure the closed vocabulary exists to prevent."""
 
 [quantity.dip_minimum_exp_atoms]
 provenance = "measured"
@@ -265,7 +282,7 @@ metric_field = "minimum"
 endpoint_baseline = true
 window = "full"
 window_from = "the published range of their own measured scan"
-arbitrates = false
+disqualified_by = ["absolute_population"]
 quotable_digits = 4
 note = """
 Deeper than the simulated minimum, but the measured sheet's TOTAL over all 13 \

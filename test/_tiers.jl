@@ -708,7 +708,7 @@ const _COST = Dict{String, Float64}(
     # file is re-measured several times over, including four break-and-restore
     # canaries), ~10 s for the one `yaml_to_model` on the production Fig. 4B
     # config that makes the type-A claim's evidence a real Stage.
-    "validation/test_matsui2025_ref.jl" => 16.0,
+    "validation/test_matsui2025_ref.jl" => 24.0,
     # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
     "model/test_yaml_to_model.jl" => 12.0,
     # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to
