@@ -157,9 +157,10 @@ function _line_search_energy_decrease(
     # against `gradient_only!`'s 1.382, because both are the same fused kernel
     # and the energy falls out of it — so the caller can skip its own gradient
     # pass and save a whole `total_energy` (1.306 ms of a 5.83 ms iteration).
-    # On the CPU it is NOT free: `energy_gradient!` runs the term registry
-    # twice, 12.80 ms against 6.57 + 6.11 separately, so the caller does not
-    # pass this there.
+    # On the CPU it became worth it once `operator_and_energy_via_registry!`
+    # stopped the second registry traversal: `energy_gradient!` went 14.2 →
+    # 8.8 ms against `gradient_only!`'s 7.7, so the energy now costs ~1 ms
+    # rather than a whole second pass.
     grad_out=nothing, k_squared_dev=nothing,
 )
     D = 2F + 1
