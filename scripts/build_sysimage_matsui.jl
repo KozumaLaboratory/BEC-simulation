@@ -28,10 +28,21 @@ isfile(WORKLOAD) || error("missing workload: $WORKLOAD")
 @info "Building the Fig. 4B sysimage" output = OUTPUT workload = WORKLOAD
 @info "Expect 30-60 minutes. The workload is a real 2-point run_yaml at 32^3."
 
+# `include_transitive_dependencies=false` is load-bearing, not tuning. CUDA is
+# declared in `[deps]` of Project.toml (while ALSO being the trigger for
+# `SpinorBECCUDAExt` in `[extensions]` — an extension trigger belongs in
+# `[weakdeps]`, so that pair is inconsistent). Being a hard dep, PackageCompiler
+# compiles CUDA.jl into the image by default, and its device code is NVVM/PTX:
+#
+#   LLVM ERROR: Cannot select: intrinsic %llvm.nvvm.membar.sys
+#
+# Excluding transitive deps keeps CUDA out. The consequence is that nothing
+# CuArray-parameterised is in this image and the GPU path still JITs.
 create_sysimage(
     [:SpinorBEC];
     sysimage_path=OUTPUT,
     precompile_execution_file=WORKLOAD,
+    include_transitive_dependencies=false,
 )
 
 println("\nbuilt: $OUTPUT")
