@@ -68,9 +68,19 @@ function kz_trajectory(;
     if physical
         hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
         host = zeros(ComplexF64, size(ws.state.psi))
-        thermal_cfield!(host, grid, hplans; T=T_hot, mu, c0,
+        N_seed = thermal_cfield!(host, grid, hplans; T=T_hot, mu, c0,
             k_cut=sqrt(2 * (mu + cutoff_n_T * T_hot)), seed)
         copyto!(ws.state.psi, host)
+        # Report what the seed put in AND what the workspace holds after the copy.
+        # Three different initial conditions — vacuum, flat-filtered, RJ-weighted —
+        # produced results agreeing to 13-16 digits, which is not a field forgetting
+        # its initial state but a seed that never reached the evolution.
+        @printf("    [seed] N_seed=%.4g  N_in_ws=%.4g  (HF %.4g)\n",
+            N_seed, real(sum(abs2, ws.state.psi)) * cell_volume(grid),
+            let e = classical_field_equilibrium(; T=T_hot, mu, c0, rmax=maximum(grid.config.box_size) / 2)
+                e.N0 + e.Nth
+            end)
+        flush(stdout)
     else
         fill!(ws.state.psi, 0)
     end
