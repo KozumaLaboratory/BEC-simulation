@@ -6,6 +6,10 @@
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #
+# See also submit_test_tier.sh, which takes the tier as a parameter, makes its
+# own checkout, and propagates the suite's return code. This one ends with an
+# `echo`, so `qacct` reports exit_status 0 for a red suite.
+#
 # Full `ci` tier. Main's required checks are fast + oracles + formatter only, so
 # a green PR says nothing about `ci` — run this before merging anything under
 # solvers/ hamiltonian/ analysis/.

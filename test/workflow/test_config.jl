@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Unified Config" begin
     @testset "parsing - ground_state type" begin
         yaml = """

@@ -32,9 +32,14 @@ directory, enabling transparent resume.
 function compute_run_dir(yaml_path::String; base_dir::String=default_run_root())
     isfile(yaml_path) || throw(ArgumentError("YAML file not found: $yaml_path"))
     content = read(yaml_path, String)
-    hash8 = bytes2hex(sha256(content))[1:8]
+    # 16 hex, matching CLAUDE.md commitment #4. It was 8 (32 bits), which reaches
+    # a 1 % collision probability at ~9e3 files sharing a basename — thin for a
+    # sweep generator emitting thousands of configs under one name. Widening
+    # renames every future directory, so runs cached under the old 8-hex name are
+    # recomputed once.
+    hash16 = bytes2hex(sha256(content))[1:16]
     basename_no_ext = splitext(basename(yaml_path))[1]
-    joinpath(base_dir, "$(basename_no_ext)_$(hash8)")
+    joinpath(base_dir, "$(basename_no_ext)_$(hash16)")
 end
 
 function _env_metadata()
@@ -176,6 +181,53 @@ function _scan_preview_lines(data::Dict)
     end
     push!(lines, "#")
     return lines
+end
+
+"""
+    _assert_point_provenance(psi_file, env; verbose)
+
+Refuse to reuse a cached scan point unless it was produced by the code running
+now.
+
+The run directory is keyed on the YAML's bytes and **not** on the producing
+commit, so the same config under a different commit lands in the same directory
+and every point is skipped — silently returning results computed by older code.
+A stale result and a fresh one are indistinguishable from the directory, which
+is the failure mode the campaign charter exists for.
+
+Reuse is allowed only when the point's recorded `env.git_hash` equals the current
+one and neither tree was dirty. Anything else — a different commit, a dirty tree
+on either side, or a point file with no provenance at all — throws. Set
+`SPINORBEC_ALLOW_STALE_POINTS=1` to override, which is the right move for a
+docs-only commit and the wrong one for anything else.
+"""
+function _assert_point_provenance(psi_file::String, env::Dict{String, Any}; verbose::Bool=true)
+    get(ENV, "SPINORBEC_ALLOW_STALE_POINTS", "0") == "1" && return nothing
+    stored = try
+        JLD2.jldopen(psi_file, "r") do d
+            haskey(d, "env") ? d["env"] : nothing
+        end
+    catch
+        nothing
+    end
+    why = if stored === nothing
+        "it records no provenance"
+    elseif get(stored, "git_hash", "unknown") != get(env, "git_hash", "unknown")
+        "it was produced at $(get(stored, "git_hash", "unknown")), not $(get(env, "git_hash", "unknown"))"
+    elseif get(stored, "git_dirty", true) || get(env, "git_dirty", true)
+        "the tree was dirty on one side, so neither commit identifies the code"
+    else
+        nothing
+    end
+    why === nothing && return nothing
+    throw(
+        ErrorException(
+            "refusing to reuse cached $(basename(psi_file)): $why. The run directory " *
+            "is keyed on the config bytes, not the commit, so reusing it here would " *
+            "silently return results from other code. Delete the point file to " *
+            "recompute, or set SPINORBEC_ALLOW_STALE_POINTS=1 if you know the " *
+            "difference cannot matter."),
+    )
 end
 
 function _point_filename(i::Int, run_name::String="")
@@ -485,6 +537,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             psi_file = joinpath(run_dir, _point_filename(i, run_name))
 
             if isfile(psi_file)
+                _assert_point_provenance(psi_file, env; verbose)
                 verbose && println("  ✓ $(basename(psi_file)) (cached)")
                 if scan.continuation
                     d = JLD2.load(psi_file)
@@ -506,7 +559,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             delete!(patched, "scan")
 
             started_at = _now_iso()
-            t_start = time()
+            t_start = time_ns()
 
             # Continuation: inject previous psi as initial condition
             prev = scan.continuation ? get(chain_state, run_name, nothing) : nothing
@@ -526,7 +579,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 checkpoint_dir=ckpt_dir, live_status_path=live_path)
 
             finished_at = _now_iso()
-            duration = time() - t_start
+            duration = elapsed_s(t_start)
 
             psi_host = _to_host(result.psi)
             energy = get(result, :ground_state_energy, NaN)
@@ -698,12 +751,13 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
     if isfile(psi_file)
+        _assert_point_provenance(psi_file, env; verbose)
         verbose && println("  ✓ $(basename(psi_file)) (cached)")
         return nothing
     end
 
     started_at = _now_iso()
-    t_start = time()
+    t_start = time_ns()
 
     _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
     config = parse_pipeline(data)
@@ -714,7 +768,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         live_status_path=live_path)
 
     finished_at = _now_iso()
-    duration = time() - t_start
+    duration = elapsed_s(t_start)
 
     psi_host = _to_host(result.psi)
     energy = get(result, :ground_state_energy, NaN)

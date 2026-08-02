@@ -119,7 +119,7 @@ optimum within ~6%.  See `docs/manuscript/figures/klaus_quench_fig_k14_omega_ref
 ## Klaus-II adiabatic result (2026-05-27): still null
 
 A 7-stage adiabatic Klaus-II prototype
-(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5/`) was
+(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.yaml`) was
 dispatched to test whether the sudden-tilt null result was just
 an adiabaticity artifact.  Result:
 

@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "LHY abstraction and Quasi-2D LHY" begin
     @testset "_lhy_V dispatch" begin
         @test SpinorBEC._lhy_V(1.0, nothing) == 0.0

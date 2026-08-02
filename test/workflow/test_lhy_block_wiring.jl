@@ -235,8 +235,9 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         # `scalar` derives c_lhy FROM (N_atoms, omega_ref), so under {c0, c1}
         # it genuinely cannot be derived. The kind still resolves, and the
         # step must SAY that LHY is off rather than leave it to be noticed in
-        # the energy decomposition.
-        @test_logs (:warn, r"LHY is INACTIVE") match_mode = :any begin
+        # the energy decomposition. The wording is #198's — this branch now
+        # reaches the same `else` that guards the missing-N case generally.
+        @test_logs (:warn, r"LHY term is OFF") match_mode = :any begin
             @test resolved("{c0: 1.0, c1: 0.01}", "scalar") == "scalar"
         end
     end

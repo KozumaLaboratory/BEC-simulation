@@ -14,7 +14,19 @@ using SpinorBEC
 @testset "Klaus 2022 minimal regression" begin
     # Tiny smoke version of runs/klaus2022_full
     # Schema notes: `trap:` migrated to `potential:`,
-    # `level:` removed from B-block, `ferromagnetic_min` → `m_plus_F`.
+    # `level:` removed from B-block, `ferromagnetic_min` → `m_minus_F`.
+    #
+    # `m_minus_F`, not `m_plus_F`: the rename was read the wrong way round and
+    # that is what made this file unrunnable. `H = -p·F_z + q·F_z²` with
+    # `p ≡ -g_F μ_B B` means +Bz on a g_F > 0 atom (Dy164) puts the ground state
+    # at m = -F. ITP applies `exp(-(E-min)·dt)`, so at p ≈ -3.5e4 every
+    # component except m = -F underflows to zero on the first step — and with
+    # all the weight started in m = +F the state went to zero and normalising it
+    # gave `NaN detected in ITP at step 1. Likely DDI or interaction overflow.
+    # Reduce dt.` The message is misleading: it is underflow, not overflow, and
+    # neither dt nor the field needed to change. Measured, same 8³ config:
+    #     m_plus_F  / 1.0 Gauss    → NaN at step 1
+    #     m_minus_F / 1.0 Gauss    → E = -277668.36
     yaml_str = """
     pipeline:
       - ground_state:
@@ -27,7 +39,7 @@ using SpinorBEC
           dt: 0.001
           n_steps: 500
           tol: 1.0e-5
-          initial_state: m_plus_F
+          initial_state: m_minus_F
       - dynamics:
           duration: 0.5
           dt: 0.002
