@@ -148,7 +148,6 @@ const FAST_TESTS = [
     # recovery of an IMPOSED correlation length as it is scaled.
     "analysis/test_coherence_length.jl",
     "dynamics/test_thermal_cfield.jl",
-    "dynamics/test_spgpe_equilibrium_number.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
@@ -531,6 +530,16 @@ const CI_EXTRA = [
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
 const FULL_EXTRA = [
+    # 1266 s on its own — three independent SPGPE equilibrium solves at
+    # n = 48, each run to steady state from both directions. It was in
+    # FAST_TESTS, where the job budget is 15 min: no worker count can help,
+    # because a parallel makespan is bounded below by the slowest single
+    # file. Three per-PR runs died at 15m18s / 15m21s / 15m20s against
+    # `timeout-minutes: 15`, and the identical seconds are what gave it away
+    # as a budget rather than a race. `full` (30 min) is the only tier it
+    # fits, and it eats two thirds of that — worth making cheaper at the
+    # source rather than leaving here.
+    "dynamics/test_spgpe_equilibrium_number.jl",
     "solvers/test_3d.jl",
     "solvers/test_adaptive_dt.jl",
     "analysis/test_analytic_ground_states.jl",
@@ -713,6 +722,13 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
+    # against the 3.0 s default it had been taking. The default made it the
+    # LAST file handed out, which is the worst possible order for the one
+    # file that sets the makespan on its own. The absolute number is
+    # machine-dependent and the ordering it buys is not — nothing else in
+    # any tier is within a factor of four of it.
+    "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
