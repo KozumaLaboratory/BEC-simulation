@@ -7,7 +7,7 @@
 #$ -N matsui_fit
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-18
+#$ -t 1-21
 #$ -j n
 
 set -euo pipefail
@@ -25,6 +25,15 @@ mkdir -p "$SPINORBEC_STORE"
 # Measured -12% on this exact config family (UGE 8318964); the ground state is
 # identical across the 45 scan points, which vary only the dynamics B target.
 export SPINORBEC_STAGE_CACHE=1
+
+# A duplicated case label is silently unreachable — `case` takes the first
+# match — and two sessions appending arms to the same `*)` sentinel produce
+# exactly that. This cost a 25-minute run of the wrong config.
+dup=$(grep -oE '^ *[0-9]+\)' "$0" | tr -d ' )' | sort -n | uniq -d)
+if [ -n "$dup" ]; then echo "duplicate task labels: $dup" >&2; exit 1; fi
+for c in $(grep -oE 'runs/matsui_fit/[A-Za-z0-9_.]+\.yaml' "$0"); do
+    [ -f "$c" ] || { echo "missing config: $c" >&2; exit 1; }
+done
 
 case "${SGE_TASK_ID:-1}" in
     1) CONFIG=runs/matsui_fit/fit_c1ratio_m0139.yaml ;;
@@ -45,9 +54,9 @@ case "${SGE_TASK_ID:-1}" in
     16) CONFIG=runs/matsui_fit/fit_k3real_1em30.yaml ;;
     17) CONFIG=runs/matsui_fit/fit_k3real_1em29.yaml ;;
     18) CONFIG=runs/matsui_fit/fit_k3real_1em28.yaml ;;
-    16) CONFIG=runs/matsui_fit/fit_hold_T52.yaml ;;
-    17) CONFIG=runs/matsui_fit/fit_hold_T54.yaml ;;
-    18) CONFIG=runs/matsui_fit/fit_hold_T52r200.yaml ;;
+    19) CONFIG=runs/matsui_fit/fit_hold_T52.yaml ;;
+    20) CONFIG=runs/matsui_fit/fit_hold_T54.yaml ;;
+    21) CONFIG=runs/matsui_fit/fit_hold_T52r200.yaml ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 
