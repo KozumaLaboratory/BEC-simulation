@@ -210,6 +210,7 @@ whether 0.124 and 0.097 are distinguishable at all.
 function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
+    shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -239,9 +240,12 @@ function kz_winding_scan(;
     flush(stdout)
 
     σs, errs = Float64[], Float64[]
+    all_W = Vector{Vector{Float64}}()
     for τ in tau_Qs
         Ws, Ne, Nf = Float64[], Float64[], Float64[]
-        for j in 1:n_traj
+        # Shards are strided, not blocked, so a shard that dies leaves the survivors
+        # spread over the whole seed range rather than a contiguous hole.
+        for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
                 T, eps_cut, gamma, M_damp, dt, M_grid, backend)
@@ -268,7 +272,8 @@ function kz_winding_scan(;
         # here IS the width.
         e = σ / sqrt(2 * (n_traj - 1))
         push!(σs, σ);
-        push!(errs, e)
+        push!(errs, e);
+        push!(all_W, Ws)
         @printf("  %-10.1f %-9.4f %-9.4f %-10.4f %-10.4g %-10.4g %-8.2f\n",
             τ, σ, e, mean(Ws), mean(Ne), mean(Nf), frac_int)
         flush(stdout)
@@ -289,6 +294,23 @@ function kz_winding_scan(;
         β, β_err, ref[1], ref[2], abs(β - ref[1]) / sqrt(β_err^2 + ref[2]^2))
 
     mkpath(OUTDIR)
+    # Raw W per trajectory, not just the width: sigma(W) is one number distilled
+    # from a distribution whose SHAPE is itself a check (windings must be
+    # integers, the mean must vanish, and the literature's defect counts are
+    # Poissonian). Distilling first throws away the evidence.
+    if raw_only
+        rawf = joinpath(OUTDIR, "$(tag)_raw.csv")
+        open(rawf, "w") do io
+            println(io, "# T=$T eps_cut=$eps_cut gamma=$gamma M_damp=$M_damp dt=$dt " *
+                        "M_grid=$M_grid shard=$(shard[1])of$(shard[2])")
+            println(io, "tau_Q,W")
+            for (i, τ) in enumerate(tau_Qs), w in all_W[i]
+                @printf(io, "%.6f,%.10f\n", τ, w)
+            end
+        end
+        @printf("  wrote %s\n", rawf)
+        return (; tau_Qs=collect(tau_Qs), all_W, T, eps_cut)
+    end
     csv = joinpath(OUTDIR, "$(tag).csv")
     open(csv, "w") do io
         println(io, "# beta=$β beta_err=$β_err published=$(ref[1]) M_damp=$M_damp " *
@@ -335,6 +357,18 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "shard")
+        # "shardIofN:MD:NTRAJ" — one process per shard, strided over trajectories.
+        # Trajectories are independent, and the per-step cost is small enough that
+        # process-level parallelism beats threading, which would race on the
+        # package's global scratch buffers.
+        m = match(r"^shard(\d+)of(\d+):(nd|full):(\d+)$", mode)
+        m === nothing && error("shard mode: shardIofN:nd|full:NTRAJ, got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        md = m[3] == "full" ? 1e-2 : 0.0
+        kz_winding_scan(; n_traj=parse(Int, m[4]), M_damp=md, dt=0.05, M_grid=256,
+            backend, shard=(i, n), raw_only=true,
+            tag="kz_torus_$(m[3])_s$(i)of$(n)")
     elseif startswith(mode, "nd")      # number-damping only
         kz_winding_scan(; n_traj=parse(Int, mode[3:end]), M_damp=0.0, backend,
             tag="kz_torus_nd")
