@@ -8,7 +8,7 @@ End-to-end walkthrough for running a SpinorBEC simulation that mirrors a day-in-
 
 After the morning calibration run, write the constants either to a single YAML or append to a CSV history. Both work; CSV is Excel-friendly.
 
-`runs/lab/calibration_history.csv`:
+`runs/lab/calibration_history.csv` (example):
 
 ```csv
 date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,coil_weak_gauss_per_mv,coil_weak_gauss_offset,fort_x_hz,fort_y_hz,fort_z_hz,microwave_rad_per_s_per_mw
@@ -20,7 +20,7 @@ Append a row each calibration day. SpinorBEC will linearly interpolate between r
 
 ## 2. Write the experiment YAML in lab units
 
-`runs/today/config.yaml`:
+`runs/today/config.yaml` (example):
 
 ```yaml
 calibration_history:
@@ -122,7 +122,7 @@ If you opened the dashboard (`serve_dashboard(8765)`), the run shows up under th
 
 ## 7. Analyze offline
 
-After the run finishes, `runs/today/` contains:
+After the run finishes, `runs/today/` (example) contains:
 
 - `<run_name>.jld2` — full ψ + analyzer outputs per scan point
 - `frames/columns.jld2` — Float32 column densities, key `frame_NNNNN`
@@ -165,7 +165,7 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 
 ## Where to look next
 
-**More patterns:** `docs/guides/pipeline_cookbook.md` (recipes by scenario), `runs/samples/` (6 runnable scenarios — quench, droplet+SGPE, Feshbach, lab-cal, SOC, pulse-Rabi).
+**More patterns:** `docs/guides/pipeline_cookbook.md` (recipes by scenario), `runs/samples/` (example) (6 runnable scenarios — quench, droplet+SGPE, Feshbach, lab-cal, SOC, pulse-Rabi).
 
 **Looking something up:** `docs/reference/yaml_schema_reference.md` for every accepted YAML key.
 

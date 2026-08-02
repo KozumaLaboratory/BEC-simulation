@@ -5,11 +5,7 @@
 #$ -N lhy_stab
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
-set -u
-export JULIA_DEPOT_PATH="$HOME/.julia"
-JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
-cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-ddi-conv}"
-echo "host=$(hostname) commit=$(git rev-parse --short HEAD)"
+source "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-gapbench}/scripts/tsubame/_preamble.sh"
 $JULIA --project=. -e 'using Pkg; Pkg.instantiate()' 2>&1 | tail -3
 echo "### SMOKE"
 $JULIA --project=. bench/lhy_stability_scan.jl 3 2>&1

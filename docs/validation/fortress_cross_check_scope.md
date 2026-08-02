@@ -57,7 +57,7 @@ with apt-installable deps.
    grid / box / N as FORTRESS supports (typically 64-128 in each
    axis, box 12-16 a_ho).
 2. Export the resulting ψ + density profile + (E_kin, E_trap, E_contact)
-   to a JSON file under `runs/fortress_compare/spinorbec_side/`.
+   to a JSON file under `runs/fortress_compare/spinorbec_side/` (planned).
 3. Document the conversion rules (FORTRESS uses different units
    internally — almost certainly different ω_ref normalisation).
 
@@ -83,7 +83,7 @@ Until then, this document is the "next session pickup" pointer.
 
 ## References
 
-- `runs/_loop/research/cross_code_benchmark_alternatives_T1.md` —
+- `runs/_loop/research/cross_code_benchmark_alternatives_T1.md` (archived) —
   full researcher survey
 - arXiv:2002.04365 (FORTRESS spin-1 release paper)
 - CPC 279 (2022) (FORTRESS spin-1+2 extension)

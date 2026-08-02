@@ -414,10 +414,41 @@ propagator. `nothing` keeps the historical leapfrog loop (merged V blocks).
 standard dynamics step was a silent no-op. Silently ignoring an accuracy knob is
 worse than not offering it, so unsupported values now raise.
 
-`midpoint` is the one that matters for dipolar dynamics: plain `split_step!`
-freezes the DDI mean field at each V(dt/2) boundary and is only 1st-order in
-time when `c_dd > 0`, while `split_step_midpoint!` restores 2nd order at ~1.5-2×
-the per-step cost.
+`midpoint` buys less than this docstring used to claim. `split_step!` ALREADY
+dispatches to `_half_potential_step_midpoint!` whenever DDI is active
+(`MEANFIELD_MIDPOINT_ENABLED`), so the default is 2nd order on the dipolar path —
+measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
+1st order when `c_dd > 0`" warning describes the LEGACY path with that toggle
+off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
+~1.3× the step, for 1.49× the per-step cost. Close to a wash.
+
+`rk4ip` is 4th order, and whether that is worth taking is a question about the
+required TOLERANCE, not about the order. Full measurement:
+`docs/validation/rk4ip_cost_on_gpu.md`.
+
+At the same `dt` it is more accurate and dearer — H100 64³, `dt` = 7.81e-4:
+**7090x the accuracy at 3.28x the cost per step**. At the same accuracy, time to
+solution (measured at 64³):
+
+    budget    rk4ip dt    split dt    TIME RATIO
+     1e-3     4.23e-2     2.62e-2       0.49x
+     1e-4     2.34e-2     8.29e-3       0.86x
+     1e-5     1.31e-2     2.62e-3       1.53x
+     1e-6     7.38e-3     8.29e-4       2.71x
+
+**Break-even is between 1e-4 and 1e-5**, and production sits near 1e-4 — so at
+default tolerances this is slower for the same answer. Select it when the
+tolerance is tight, or on CPU, where it is cheaper per step outright (2.61 ms
+against `split_step!`'s 3.00 at 12³; on the H100 it is 2.87x at 128³, 3.28x at
+64³, 7.44x at 32³, because it applies `e^{K dt/2}` four times per step where
+Strang applies `e^{K dt}` once and the GPU is FFT-bound). Memory is the other
+constraint: five full-state scratch buffers, measured 12.9 GiB allocator
+high-water for one 128³ step on the H100 and 4.8 GiB of a 15.9 GiB consumer
+card. Two more things to know. It is not
+norm-conserving — the drift is a free error monitor, and `normalize_every` is not
+honoured. And its failure mode is a wall rather than a slope: measured on an
+Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns
+4e40 at 5e-2, where a unitary split-step merely degrades. Real time only.
 """
 function _resolve_dynamics_stepper(spec)
     spec === nothing && return nothing
@@ -427,12 +458,15 @@ function _resolve_dynamics_stepper(spec)
         return nothing
     elseif name == "midpoint"
         return split_step_midpoint!
+    elseif name == "rk4ip"
+        return rk4ip_step!
     else
         throw(
             ArgumentError(
                 "dynamics integrator \"$name\" is not implemented on the standard " *
-                "path. Supported: \"strang\" (default leapfrog) or \"midpoint\" " *
-                "(2nd-order with DDI). The rotating_basis path has its own set."),
+                "path. Supported: \"strang\" (default leapfrog), \"midpoint\" " *
+                "(2nd-order, explicit) or \"rk4ip\" (4th order, cheaper per step than " *
+                "the default, real time only). The rotating_basis path has its own set."),
         )
     end
 end

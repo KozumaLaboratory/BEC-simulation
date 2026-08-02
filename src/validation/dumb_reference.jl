@@ -41,7 +41,9 @@
 #   conventions: c_dd = μ₀μ², no 4π, no 1/(4π)).
 #   The PADDED (non-periodic) DDI variant is a follow-up sub-unit
 #   (App. A defect 9 verdict lives there).
-# - DECLARED PRODUCTION GAPS made visible here: raman and tensor RHS
+# - DECLARED PRODUCTION GAPS made visible here: none left — the raman
+#   and tensor RHS gaps both closed (2026-07-31 / 2026-06-09) and the
+#   master oracle now compares every slot's RHS against these statements
 #   exist on the dumb side while production apply_operator! is nil
 #   (KNOWN-LIMIT) — the master oracle asserts both sides of that gap.
 
@@ -668,10 +670,11 @@ end
 """
     dumb_rhs_breakdown(ws, ψ; ddi_secular=nothing) -> NamedTuple of arrays
 
-Per-slot canonical gradients. Production KNOWN-LIMIT gaps (raman,
-tensor) are present HERE — the master oracle asserts production is nil
-where these are not. `ddi_secular` is required when ws has active DDI
-(model declaration, see `dumb_ddi_potential`).
+Per-slot canonical gradients. Every slot is now compared against
+production by the master oracle — the raman and tensor KNOWN-LIMIT gaps
+that this file used to be the only statement of are both closed.
+`ddi_secular` is required when ws has active DDI (model declaration, see
+`dumb_ddi_potential`).
 """
 function dumb_rhs_breakdown(
     ws, ψ::AbstractArray{<:Complex}; ddi_secular::Union{Nothing, Bool}=nothing

@@ -6,6 +6,7 @@
 # instead of an early ArgumentError.
 
 using Test
+using SpinorBEC
 using SpinorBEC: load_config_from_string
 
 @testset "Schema validation edge cases" begin

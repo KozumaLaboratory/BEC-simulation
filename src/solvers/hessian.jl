@@ -34,11 +34,30 @@ Since `energy_gradient!` returns `2·δE/δψ̄`, this carries BOTH the normal
 (δ²E/δψ̄δψ) and anomalous (δ²E/δψ̄δψ̄) blocks via the real representation
 (perturb along `δ` and `iδ` to separate them — see the L_op/M_op
 extraction in the anchor test). Central difference ⇒ O(ε²) truncation;
-ε=1e-5 sits at the roundoff/truncation optimum for the gated gradient.
+ε=1e-5 sits the roundoff/truncation optimum for the gated gradient.
 Anchored: `test/oracles/test_bdg_fd_hessian.jl` (≡ the hand-built BdG).
+
+**The step is taken along the NORMALISED direction and rescaled.** `ε` calibrates
+the size of the PERTURBATION, so it is only the optimum when ‖δ‖ ≈ 1. Until
+2026-07-29 the difference was taken at `ψ ± ε·δ` with `ε` absolute, which is fine
+for the Lanczos consumer (`trapped_bdg_lowest_eigenvalue` passes unit Lanczos
+vectors) and wrong for Newton-CG, which passes CG iterates whose norm spans
+decades: after an L-BFGS stage ‖δ‖ ~ 1e-6, so the perturbation was ~1e-11, the
+two gradients differed in their 11th digit, and dividing by 2ε amplified their
+~1e-16 noise by 5e4. The HvP was then noise, the trust-region ratio ρ was noise,
+and `newton_polish` came out non-deterministic across processes — measured ratio
+polish/lbfgs spanning 5.5e-4 … 1.000 (bit-identical no-op) … 1.998 (worse) on
+the same commit and problem.
+
+Normalising restores the property the exact Hessian action has and the fixed-ε
+form did not: homogeneity, `H·(cδ) = c·(H·δ)`. Gated by the homogeneity testset
+in `test/oracles/test_bdg_fd_hessian.jl`.
 """
 function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
-    _g(s) = (out=similar(ψ); fill!(out, 0); energy_gradient!(out, ψ .+ s .* δ, ws); out)
+    nδ = sqrt(sum(abs2, δ))
+    nδ == 0 && return zero(δ)
+    d = δ ./ nδ
+    _g(s) = (out=similar(ψ); fill!(out, 0); energy_gradient!(out, ψ .+ s .* d, ws); out)
     if order == 4
         # 5-point stencil: truncation O(ε⁴), so the finite-difference HvP
         # cancellation floor drops from eps^(2/3)≈2e-11 (3-point) to
@@ -46,9 +65,9 @@ function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
         # roundoff cliff). Only matters once the energy-comparison floor is
         # removed (see residual_newton_refine); under an energy-gated step it
         # is invisible. Costs 4 gradient evals.
-        return (_g(-2ε) .- 8 .* _g(-ε) .+ 8 .* _g(ε) .- _g(2ε)) ./ (12ε)
+        return ((_g(-2ε) .- 8 .* _g(-ε) .+ 8 .* _g(ε) .- _g(2ε)) ./ (12ε)) .* nδ
     end
-    (_g(ε) .- _g(-ε)) ./ (2ε)   # 3-point central, O(ε²)
+    ((_g(ε) .- _g(-ε)) ./ (2ε)) .* nδ   # 3-point central, O(ε²)
 end
 
 # Tangent projection: remove the complex-ψ gauge direction (norm AND phase

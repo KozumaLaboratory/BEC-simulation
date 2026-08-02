@@ -33,7 +33,7 @@ function _run_itp_loop!(
     final_drho = NaN
     final_dpsi = NaN
     last_step = start_step
-    t_start = time()
+    t_start = time_ns()
 
     if checkpoint_dir !== nothing
         mkpath(checkpoint_dir)
@@ -190,7 +190,7 @@ function _run_itp_loop!(
                 final_dpsi = dpsi
 
                 if verbose
-                    elapsed = time() - t_start
+                    elapsed = elapsed_s(t_start)
                     frac = step / n_steps
                     eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                     println(
