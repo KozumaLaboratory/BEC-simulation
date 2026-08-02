@@ -78,6 +78,12 @@ const FAST_TESTS = [
     "model/test_admission_requires_marker.jl",
     "model/test_record_provenance.jl",
     "model/test_completion_marker.jl",
+    # Step 3. The GS stage cache admits on `artifact_id`; `_gs_cache_key` and
+    # `_hashable` are deleted. 31 knobs, ONE assertion each — a single bundled
+    # assertion is how a 19-key list rots into a 17-key list — plus the
+    # partition of `GS_SCHEMA` that makes a new key red until it is classified,
+    # and the fail-safe (a config with no `Model` has no id and never hits).
+    "model/test_gs_admission_axes.jl",
     # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
     # assert the next run recomputes instead of serving the partial output.
     # Nothing else in the suite exercises the swallowed `InterruptException`.
@@ -662,6 +668,11 @@ const _COST = Dict{String, Float64}(
     "model/test_resolve_gs_is_shared.jl" => 20.0,
     # Three 16³ Q-tensor builds plus pure value work.
     "model/test_ddi_trunc_radius_three_states.jl" => 6.0,
+    # ~40 resolve-only id computations (no solve) plus six real tiny solves:
+    # the site-by-value arm, the fail-safe pair, its positive control and the
+    # `seed_from` refusal + its control all have to run `_run_step` for real.
+    # Measured 38.2 s serial, 123 assertions.
+    "model/test_gs_admission_axes.jl" => 40.0,
     # 429 configs resolved, 351 of them also round-tripped through TOML and
     # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
     # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.

@@ -33,8 +33,8 @@
 # The design says "run! writes complete.toml last". It is realised as
 # `<payload>.complete.toml` because every admission site in the tree tests ONE
 # file, not a directory: the scan loop admits `point_017.jld2` individually
-# (`run_registry.jl:487`) and the GS stage store admits one content-addressed
-# artifact shared across configs (`run_step_ground_state.jl:343`). A single
+# (`run_registry.jl`) and the GS stage store admits one content-addressed
+# artifact shared across configs (`run_step_ground_state.jl`). A single
 # `<run_dir>/complete.toml` would also be an N-way concurrent write under
 # `SPINORBEC_SCAN_ONLY_INDEX`, where N separate processes each write one point
 # into the same directory.
@@ -108,9 +108,11 @@ shrug.
 
 `artifact_id` and `code_rev` are `Union{Nothing,String}`: `code_rev` because
 `_code_rev_or_nothing` degrades rather than inventing a revision when `src/` is
-being rsync'd under a running job, and `artifact_id` because the sites that
-write markers today are keyed by the OLD admission ids (cutover step 3 is what
-moves them onto `artifact_id`). Absent means absent; neither is a hit criterion.
+being rsync'd under a running job, and `artifact_id` because a payload can be
+written by a run that HAS no id — since cutover step 3 the GS stage cache is
+keyed on `artifact_id`, and a config whose `Model` does not resolve gets none, so
+it recomputes and its point files carry `nothing` here. Absent means absent;
+neither is a hit criterion.
 """
 struct CompletionMarker
     format::Int

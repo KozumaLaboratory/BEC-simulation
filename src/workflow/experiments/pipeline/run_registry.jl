@@ -573,12 +573,14 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     f["converged"] = converged
                     f["grad_norm"] = grad_norm
                     f["mz_actual"] = mz_actual
-                    # Provenance cutover step 1. `gs_ref` already carries this
-                    # value but only under SPINORBEC_LIGHT_POINTS, and there it
-                    # MEANS "psi lives elsewhere" — `open_result` throws when the
-                    # artifact is missing. A separate key so the id is recorded
-                    # on every point without claiming anything about psi.
-                    gs_ref === nothing || (f["gs_cache_key"] = gs_ref)
+                    # Provenance. `gs_ref` already carries this value but only
+                    # under SPINORBEC_LIGHT_POINTS, and there it MEANS "psi lives
+                    # elsewhere" — `open_result` throws when the artifact is
+                    # missing. A separate key so the id is recorded on every
+                    # point without claiming anything about psi. Spelled
+                    # `gs_cache_key` until cutover step 3, when the function that
+                    # produced the value was deleted.
+                    gs_ref === nothing || (f["artifact_id"] = gs_ref)
                     code_rev = _code_rev_or_nothing()
                     code_rev === nothing || (f["code_rev"] = code_rev)
                     # Embed grid geometry — see single-run path for rationale.
@@ -752,10 +754,10 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             f["duration_seconds"] = duration
             f["energy"] = energy
             f["converged"] = converged
-            # Provenance cutover step 1 — see the scan path for why this is a
-            # separate key from `gs_ref`.
-            gs_cache_key = get(result, :gs_stage_ref, nothing)
-            gs_cache_key === nothing || (f["gs_cache_key"] = gs_cache_key)
+            # Provenance — see the scan path for why this is a separate key from
+            # `gs_ref`, and for the step-3 rename.
+            gs_artifact_id = get(result, :gs_stage_ref, nothing)
+            gs_artifact_id === nothing || (f["artifact_id"] = gs_artifact_id)
             code_rev = _code_rev_or_nothing()
             code_rev === nothing || (f["code_rev"] = code_rev)
             # Embed grid geometry so dashboard endpoints (vector3d_bin,

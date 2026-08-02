@@ -2,17 +2,22 @@
 # NEW id is recorded, the OLD key still decides"; step 2 CHANGES admission, so
 # the old name asserted a property the tree no longer has. Renamed rather than
 # deleted: its four-arm shape — record / hit / null / positive control — is what
-# keeps the claim from passing for the wrong reason, and step 2 needs the same
-# discipline over a different predicate.
+# keeps the claim from passing for the wrong reason, and steps 2 and 3 need the
+# same discipline over a different predicate each time.
 #
-# What still holds from step 1, and is still gated below:
+# What step 3 changes, and is gated below:
 #
-#   * WHICH artifact is looked at is still decided by `_gs_cache_key`, not by
-#     `artifact_id`. Step 3 is what moves that, and until it does, moving
-#     `code_tree_hash` must not invalidate the GS store.
-#   * The artifact still carries both ids.
+#   * WHICH artifact is looked at is now decided by `artifact_id`.
+#     `_gs_cache_key` is deleted, and the arm that used to assert the key was
+#     BLIND to `code_tree_hash` is inverted: it now asserts the id MOVES with
+#     it. That is invariant 3, and it means every `src/` edit invalidates the
+#     GS store. The per-axis enumeration lives in
+#     `test/model/test_gs_admission_axes.jl`; what is gated HERE is that the
+#     admission decision at this site follows the id.
+#   * The artifact records that id under the name `artifact_id`. Step 1 spelled
+#     it `gs_cache_key` because the value was `_gs_cache_key`'s.
 #
-# What step 2 changes, and is gated below:
+# What step 2 changed, and is still gated below:
 #
 #   * WHETHER the artifact at that path is served is no longer `isfile`. It is
 #     `admit_payload`: a valid marker, or (arm b) no marker at all. A marker
@@ -22,15 +27,15 @@
 #     a content-addressed cache is not data with a caveat, it is a wrong answer
 #     waiting for a different config to resolve to the same physics.
 #
-# The key is taken from the step's own `:gs_stage_ref` rather than recomputed
-# here. Restating `_gs_cache_key`'s 18 inputs in a test is a second declaration
-# of the thing under test, and it drifts: the step mutates its params dict
-# (`_resolve_derived_params!`) and derives its DDI tuple before hashing.
+# The id is taken from the step's own `:gs_stage_ref` rather than recomputed
+# here. Restating the mapping in a test is a second declaration of the thing
+# under test, and it drifts: the step mutates its params dict
+# (`_resolve_derived_params!`) before the id is built.
 
 using Test
 using JLD2
 using SpinorBEC
-using SpinorBEC: _gs_cache_key, _gs_stage_dir, _run_step, GroundStateStep,
+using SpinorBEC: _gs_stage_dir, _run_step, GroundStateStep,
     code_tree_hash, _code_rev_or_nothing, _package_root, _CODE_TREE_HASH_MEMO,
     make_grid, GridConfig, InteractionParams, resolve_atom,
     marker_path, incomplete_marker_path, admit_payload, read_complete_marker,
@@ -75,7 +80,7 @@ function plant_sentinel!(path, stage_ref; remark::Bool=true)
         f["psi"] = psi_fake
         f["energy"] = PROBE_SENTINEL_E
         f["converged"] = true
-        f["gs_cache_key"] = stage_ref
+        f["artifact_id"] = stage_ref
         f["code_rev"] = code_tree_hash()
     end
     rm(marker_path(path); force=true)
@@ -83,33 +88,14 @@ function plant_sentinel!(path, stage_ref; remark::Bool=true)
     path
 end
 
-@testset "admission requires a marker; the OLD key still picks the file" begin
-    @testset "the old key does not read the new id" begin
-        # An arbitrary but FIXED argument set — the claim is about the key
-        # function's inputs, not about this particular cell.
-        args = (:itp, resolve_atom(:Rb87), make_grid(GridConfig((16,), (8.0,))),
-            InteractionParams(Dict(0 => 1.0, 1 => 0.0)),
-            (false, NaN, false, false, 0.0, NaN, false, 2.0),
-            1.0e-6, 20, 1.0e-3, probe_gs_params())
-        k0 = _gs_cache_key(args...)
-        k1 = probe_with_code_rev("0"^64) do
-            _gs_cache_key(args...)
-        end
-        # If the code revision had leaked into `_gs_cache_key`, every commit
-        # would invalidate the GS store — step 3's decision, not step 1's, and
-        # exactly what "admit on the old one" forbids.
-        @test k1 == k0
-        # Positive control on the key function itself: it is not a constant.
-        @test _gs_cache_key(args[1:5]..., 1.0e-7, args[7:end]...) != k0
-    end
-
+@testset "admission requires a marker; artifact_id picks the file" begin
     mktempdir() do dir
         probe_run_gs(pp) = withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_STAGE_DIR" => dir) do
             _run_step(GroundStateStep(pp), nothing, nothing, nothing, nothing; verbose=false)
         end
 
         local stage_ref, real_E, path
-        @testset "RECORD: a solved artifact carries BOTH ids AND a marker" begin
+        @testset "RECORD: a solved artifact carries its id AND a marker" begin
             (_, _, _, _, res) = probe_run_gs(probe_gs_params())
             stage_ref = res[:gs_stage_ref]
             real_E = res[:ground_state_energy]
@@ -117,9 +103,15 @@ end
             @test stage_ref isa AbstractString
             @test isfile(path)
             d = JLD2.load(path)
-            @test d["gs_cache_key"] == stage_ref            # the id that admits
-            @test d["code_rev"] == code_tree_hash()          # the new one, recorded only
+            @test d["artifact_id"] == stage_ref             # the id that admits
+            # `artifact_id` DIGESTS the code revision, but a 16-hex id does not
+            # let a reader recover it, so it is recorded beside it.
+            @test d["code_rev"] == code_tree_hash()
             @test length(d["code_rev"]) == 64
+            # The name the value was written under until step 3 deleted the
+            # function it came from. Kept as a negative control so an alias
+            # cannot creep back in beside the real key.
+            @test !haskey(d, "gs_cache_key")
             # ... beside the payload the loader reads, unchanged.
             @test haskey(d, "psi") && haskey(d, "energy") && haskey(d, "converged")
             @test d["energy"] == real_E
@@ -135,22 +127,13 @@ end
             @test !isfile(incomplete_marker_path(path))
         end
 
-        @testset "HIT: the file the old key names is what gets served" begin
+        @testset "HIT: the file artifact_id names is what gets served" begin
             plant_sentinel!(path, stage_ref)
             (_, _, _, _, res) = probe_run_gs(probe_gs_params())
             @test res[:ground_state_energy] == PROBE_SENTINEL_E
             @test res[:gs_stage_ref] == stage_ref
             @test String(res[:ground_state_provenance]) == "marked"
             @test stage_files(dir) == [basename(path)]
-        end
-
-        @testset "NULL: moving the new id does not change admission" begin
-            (_, _, _, _, res) = probe_with_code_rev("0"^64) do
-                probe_run_gs(probe_gs_params())
-            end
-            @test res[:ground_state_energy] == PROBE_SENTINEL_E
-            @test res[:gs_stage_ref] == stage_ref
-            @test stage_files(dir) == [basename(path)]   # no second artifact was written
         end
 
         # --- what cutover step 2 changed, at this exact site ---
@@ -188,16 +171,39 @@ end
             @test String(res[:ground_state_provenance]) == "unmarked"
         end
 
-        @testset "POSITIVE CONTROL: moving an input the old key reads DOES miss" begin
+        @testset "POSITIVE CONTROL: moving an input the id reads DOES miss" begin
             (_, _, _, _, res) = probe_run_gs(probe_gs_params(; tol=1.0e-7))
             @test res[:gs_stage_ref] != stage_ref
             @test res[:ground_state_energy] != PROBE_SENTINEL_E
             @test isfile(joinpath(dir, res[:gs_stage_ref] * ".jld2"))
             @test length(stage_files(dir)) == 2
             d = JLD2.load(joinpath(dir, res[:gs_stage_ref] * ".jld2"))
-            @test d["gs_cache_key"] == res[:gs_stage_ref]
+            @test d["artifact_id"] == res[:gs_stage_ref]
             @test d["code_rev"] == code_tree_hash()
             @test admit_payload(joinpath(dir, res[:gs_stage_ref] * ".jld2")).provenance === :marked
+        end
+
+        @testset "STEP 3: moving the code revision is a MISS" begin
+            # The INVERSION. Step 1 asserted `_gs_cache_key` was blind to
+            # `code_tree_hash`, on the grounds that admitting on it would
+            # invalidate the whole GS store on every commit. Step 3 makes that
+            # trade deliberately — invariant 3, and §7's open question 1 — so the
+            # same probe that used to prove a NULL now has to prove a MOVE.
+            #
+            # Last of the sequential arms, so it cannot disturb the file counts
+            # the arms above assert.
+            before = length(stage_files(dir))
+            (_, _, _, _, res) = probe_with_code_rev("0"^64) do
+                probe_run_gs(probe_gs_params())
+            end
+            @test res[:gs_stage_ref] != stage_ref
+            @test res[:ground_state_energy] != PROBE_SENTINEL_E   # not the planted file
+            @test res[:ground_state_energy] ≈ real_E              # ... the same physics
+            @test length(stage_files(dir)) == before + 1
+            # And the id goes back when the revision does, so the miss is about
+            # the revision and not about anything else having moved.
+            (_, _, _, _, back) = probe_run_gs(probe_gs_params())
+            @test back[:gs_stage_ref] == stage_ref
         end
 
         @testset "the extra datasets do not disturb the loader" begin

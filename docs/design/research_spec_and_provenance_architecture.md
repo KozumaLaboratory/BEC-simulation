@@ -32,12 +32,12 @@ neither contains any code identity:
 Neither hashes `src/`. A cache admission is `isfile(result.jld2)`
 (`src/workflow/experiment.jl:190`) — file presence, nothing else.
 
-**The one stage cache is a hand-written allowlist.** `_gs_cache_key`
-(`run_step_ground_state.jl:249-271`) is 19 entries, and its own docstring
-enumerates what it drops. Two of the omissions are HamTerms that the *same
-function* passes to `make_workspace` twenty lines later: `light_shift`
-(`:479-480`, used at `:508`) and `rotating_frame_omega` (`:495`, used at `:511`).
-Changing either serves a stale ground state at full confidence.
+**The one stage cache is a hand-written allowlist.** `_gs_cache_key` was 19
+entries, and its own docstring enumerated what it drops. Two of the omissions are
+HamTerms that the *same function* passes to `make_workspace` twenty lines later:
+`light_shift` and `rotating_frame_omega`. Changing either serves a stale ground
+state at full confidence. (*Deleted by step 3, together with nine more omissions
+this paragraph did not know about — see §6.*)
 
 **Ambient numeric state is invisible to any spec.** 20 module-level `const … =
 Ref(…)` bindings exist under `src/`+`ext/`. **11 of them select a numeric path**:
@@ -388,10 +388,10 @@ code_rev)`.
 (`src/workflow/experiment.jl:103`) and on non-finite floats (`:86`) — an omitted
 field is a hard error, not a silent skip. Both encoders exist:
 `model_toml_dict` (`src/model/io.jl:89`) and `_enc` (`src/model/io.jl:58`).
-*Gate:* grep — exactly one call site constructs an id. This deletes
-`_gs_cache_key` (`run_step_ground_state.jl:249-271`), 19 hand-listed entries
-whose own docstring enumerates its exclusions and which omits `light_shift`
-(`:479`) and `rotating_frame_omega` (`:495`).
+*Gate:* grep — exactly one call site constructs an id. This deleted
+`_gs_cache_key`, 19 hand-listed entries whose own docstring enumerated its
+exclusions and which omitted `light_shift` and `rotating_frame_omega` (step 3;
+`test/model/test_gs_admission_axes.jl` is the per-axis gate).
 
 **2. The declaration is closed.** No field reachable from `Model` is typed `Any`,
 `Function`, or an abstract non-union type; and no mutable module-level binding
@@ -673,10 +673,86 @@ so the equality cannot pass vacuously.
    store. The 2 `B_direction` configs are the pair that silently run with **B
    along +z instead of −z** today.
 
-**Step 3 — flip admission to `artifact_id`.** One-line change once steps 1, 1b and 2
-are green. `git rm src/workflow/experiments/pipeline/run_step_ground_state.jl`'s
-`_gs_cache_key` (`:249-271`) and its `_hashable` helpers (`:235-241`) in the same
-commit.
+**Step 3 — flip admission to `artifact_id`.** The GS stage cache is keyed on
+`artifact_id(gs_stage(r, p))`. `_gs_cache_key` and `_hashable` are deleted in the
+same commit, and nothing falls back to them.
+
+*As landed*, with the six things the one-line framing above got wrong:
+
+1. **It is not one line, because the id has to be BUILT.** `artifact_id` hashes
+   the whole `Stage`, so nothing is selected out of it — but turning a step dict
+   into a `Stage` is a mapping, and a mapping is where an omission hides. The
+   physics half is not mapped at all (`gs_model(r)`, the pure function of the
+   same `GSResolved` the solver reads); the numerics half is
+   `_gs_stage_params(r, p)`, and `test/model/test_gs_admission_axes.jl`
+   partitions every `GS_SCHEMA` key into {model, stage, refused,
+   not-on-this-path, destination}, asserts the partition is TOTAL, then moves
+   each axis one at a time and asserts the id moves with it.
+
+2. **The old key was blind to eleven inputs, not two.** Measured one knob at a
+   time through `_gs_cache_key`: `m_lbfgs`, `newton_polish`, `residual_polish`,
+   `pin`, `tol_drho`, `seed_from`, `noise_seed`, `light_shift`,
+   `rotating_frame_omega`, `backend`, and the code revision. `config_c1kappa_B0`
+   and `B10` carry a `pin:` block selecting a symmetry-broken BRANCH and
+   `config_c1kappa_B60` does not; the only thing keeping the three apart today is
+   that their `Bz` differ.
+
+3. **FAIL-SAFE: no `Model`, no id, never a hit.** 78 of 429 committed configs do
+   not resolve to a `Model`, and roughly 40 of those are runnable today. Such a
+   config recomputes every time and says so once per distinct reason. Recomputing
+   is only slower; serving an artifact under a key that cannot express the
+   question is wrong. Measured before flipping: of the three submit scripts that
+   `export SPINORBEC_STAGE_CACHE=1`, only `submit_texture_bscan_lhy.sh` launches
+   configs that lose caching, and that config's own first line is
+   `⚠️ DO NOT RUN AS-IS` for a reason reproduced at the time (`full_bdg` reports
+   the mean field dynamically unstable, max Im ω = 1050).
+
+4. **`seed_from` had to be refused.** `_gs_cache_key`'s docstring claimed
+   warm-started solves "are never auto-cached", and the guard it relied on
+   (`psi_prev === nothing`) does not catch `seed_from`, which warm-starts from
+   bytes at a path. 19 committed configs use it. `Stage.from` is the slot a warm
+   start belongs in and `artifact_id` recurses into it, but the predecessor here
+   is a directory of point files rather than a `Stage`, so this is refused rather
+   than mis-declared as from-scratch.
+
+5. **`gs_model` gained one refusal.** `_resolve_lhy_block!` copies `lhy.c_lhy`
+   into `interactions.c_lhy` for any kind but only sets `lhy_kind` when the kind
+   is not `none`, so `lhy: {kind: none, c_lhy: 5.0}` runs with a `ScalarLHY`
+   (`make_workspace.jl:435`) while `_lhy_spec` returns the inactive `LHYSpec()`.
+   That is a model claiming there is no LHY over a run that has one — found by
+   this step's acceptance condition, since `c_lhy` was one of the old key's 19
+   entries. No committed config is that shape.
+
+6. **The `[KNOWN-GAP]` correction 1 left here is CLOSED.** The cache-hit
+   `make_workspace` now receives `light_shift`, `spinor_lhy`, `lhy_opts` and
+   `rotating_frame_omega`. It has to close here because step 3 is what makes it
+   dangerous — those are slots of the model the id is derived from, so a hit is
+   by construction a hit for a config that declared them, and an id that promises
+   LHY over a workspace that has none is the id lying about its own artifact. The
+   flip is also what makes it safe: a tabulated LHY with no explicit `n_max` has
+   no id and can never reach that branch, so the table can no longer be built
+   from a different ψ than the solve used. Residual, named: `:full_bdg` still
+   takes its SPINOR from `psi_init`.
+
+**Two consequences to state plainly.**
+
+*Every `src/` edit now invalidates the whole GS stage store*, because
+`artifact_id` digests `code_tree_hash()`. That is invariant 3 working as
+designed, and it is §7 question 1 — which is still open. It was measurable
+before only as a hypothetical; from this commit it is the behaviour.
+
+*Arm (b) of `admit_payload` is NOT deleted here.* Step 2's deviation 2 assigned
+it to step 3, and it needs a dated cutoff plus its own gate. Its population at
+this site is nevertheless zero twice over: the stage store
+(`SPINORBEC_STAGE_DIR`, default `<store>/_stage/gs`) does not exist, and the
+flip changes every id in the store, so a pre-flip artifact is no longer
+ADDRESSABLE.
+
+`scripts/backfill_gs_stage.jl` is deleted rather than rewritten. It reconstructed
+a live `_gs_cache_key` for each old point and copied ψ into the stage store;
+under an id that digests the code revision, an artifact backfilled from a run of
+an OLD revision would be filed under the CURRENT one, which is a lie about what
+produced it. It also had nothing to do: 0 `.jld2` exist under `runs/`.
 
 **Step 4 — the 11 ambient `Ref`s become `stage.params` fields.** Eleven
 mechanical edits, listed by file:line in §1. `DEALIAS_K_CUTOFF` and
@@ -692,8 +768,8 @@ lines.
 **Step 6 — delete `metadata:`.** `schema.jl:402`, plus the 45 keys in configs,
 after grepping that nothing reads them (it does not, by §1).
 
-**Deleted from `src/` by the end:** `_gs_cache_key` + `_hashable`
-(`run_step_ground_state.jl:235-271`), the `"metadata"` schema key
+**Deleted from `src/` by the end:** `_gs_cache_key` + `_hashable` (done, step 3;
+`scripts/backfill_gs_stage.jl` went with them), the `"metadata"` schema key
 (`schema.jl:402`), and 11 `const Ref` bindings. Nothing else is removed —
 `src/model/` is kept as-is and `content_id` is untouched.
 

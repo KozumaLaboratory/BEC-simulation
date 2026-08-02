@@ -133,10 +133,17 @@ end
 The content id of everything `s` declares: model, kind, method, backend, params,
 predecessor, and the code that would run it.
 
-**Nothing is selected, so nothing can be omitted.** That is the whole difference
-from `_gs_cache_key` (`run_step_ground_state.jl:249`), which hand-lists 19 keys
-and — as its own docstring admits — leaves out `light_shift` and
-`rotating_frame_omega`.
+**Nothing is selected, so nothing can be omitted.** That was the whole difference
+from `_gs_cache_key`, the hand-listed 19-entry dict this replaced at the GS
+stage-cache site in cutover step 3 and which was blind to eleven inputs the same
+function passed to the solver (`m_lbfgs`, `newton_polish`, `residual_polish`,
+`pin`, `tol_drho`, `seed_from`, `noise_seed`, `light_shift`,
+`rotating_frame_omega`, `backend`, and the code revision). That function is
+deleted; there is no second key.
+
+The remaining place an omission can hide is the MAPPING from a config to a
+`Stage`, which is why `test/model/test_gs_admission_axes.jl` partitions every
+`GS_SCHEMA` key and moves each axis one at a time.
 
 `from` recurses into the predecessor's id rather than its value: a serial chain
 is identified by what it was built on, and folding the whole ancestry in

@@ -195,15 +195,12 @@ struct GSResolved
     dropped_physics::Vector{String}
 end
 
-"""
-    gs_ddi_tuple(r::GSResolved) -> NTuple{8, Any}
-
-The eight DDI values in the positional order `_parse_gs_ddi` returns them and
-`_gs_cache_key` hashes them. Rebuilt rather than stored so the named fields stay
-the single declaration.
-"""
-gs_ddi_tuple(r::GSResolved) = (r.enable_ddi, r.c_dd, r.secular, r.quasi_2d_ddi,
-    r.l_z_ddi, r.ddi_trunc, r.ddi_padded, r.ddi_pad_factor)
+# `gs_ddi_tuple(r)` — the eight DDI values as the positional tuple
+# `_parse_gs_ddi` returns — lived here to feed `_gs_cache_key`, which hashed
+# them. Cutover step 3 deleted that key: the DDI half of the id is `DDISpec` now,
+# built from the named fields, and the tuple had no other consumer. Deleted
+# rather than kept "in case", which is how a second declaration of the DDI block
+# would come back.
 
 # `_parse_light_shift` builds a `LightShift`, which holds the MATERIALISED
 # profile and the eigenvectors of the already-diagonalised operator — the two
@@ -378,6 +375,25 @@ function gs_model(r::GSResolved)::Model
             "in the layer (Gauss->p, Hz->dimensionless, SI K3->dimensionless), so the " *
             "rest of the model is not interpretable without it"),
     )
+    # Found by cutover step 3's acceptance condition (`artifact_id` must be at
+    # least as discriminating as the key it replaces, and `c_lhy` was one of that
+    # key's 19 entries). `_resolve_lhy_block!` copies `lhy.c_lhy` into
+    # `interactions.c_lhy` for ANY kind but only sets `lhy_kind` when the kind is
+    # not `none` — so `lhy: {kind: none, c_lhy: 5.0}` reaches `make_workspace`
+    # with `spinor_lhy === nothing` and a nonzero `c_lhy`, which builds a
+    # `ScalarLHY` (`make_workspace.jl:435`). `_lhy_spec` would return the
+    # INACTIVE `LHYSpec()` for it, i.e. a model claiming there is no LHY over a
+    # run that has one. Refused, not repaired: repairing it would mean guessing
+    # which kind the user meant. No committed config is this shape.
+    if r.spinor_lhy === nothing || r.spinor_lhy === :none
+        r.interactions.c_lhy == 0.0 || throw(
+            ArgumentError(
+                "ground_state step resolves to c_lhy = $(r.interactions.c_lhy) with no LHY " *
+                "kind (lhy_kind = $(repr(r.spinor_lhy))). make_workspace builds a ScalarLHY " *
+                "from a nonzero c_lhy regardless, so the run HAS an LHY term and a model " *
+                "over it would say it does not. Declare `lhy: {kind: scalar, c_lhy: ...}`"),
+        )
+    end
 
     pot, grad = _potential_and_gradient_specs(r)
     Model(;

@@ -330,6 +330,37 @@ end
         @test m.lhy.c_lhy > 0
     end
 
+    @testset "c_lhy without a kind is refused, not silently dropped" begin
+        # Found by cutover step 3's acceptance condition: `c_lhy` was one of the
+        # 19 entries the deleted admission key hashed, and the model had no slot
+        # for it in this shape. `_resolve_lhy_block!` copies `lhy.c_lhy` into
+        # `interactions.c_lhy` for ANY kind but only sets `lhy_kind` when the
+        # kind is not `none` — so `kind: none` with a `c_lhy` reaches
+        # `make_workspace` with `spinor_lhy === nothing` and a nonzero `c_lhy`,
+        # which builds a `ScalarLHY` anyway (`make_workspace.jl:435`). A model
+        # saying `LHYSpec()` over that run is a model that is WRONG, not merely
+        # under-specified. No committed config is this shape.
+        p = ytm_write(
+            "lhy_none_but_clhy.yaml",
+            replace(YTM_BASE,
+                "      method: itp" => "      lhy: {kind: none, c_lhy: 5.0}\n      method: itp"),
+        )
+        msg = ytm_why(p)
+        @test msg !== nothing
+        @test occursin("c_lhy", msg)
+        @test occursin("no LHY kind", msg)
+        # The control: the same number WITH a kind resolves and reaches the model,
+        # so the refusal is about the missing kind and not about `c_lhy` itself.
+        p2 = ytm_write(
+            "lhy_scalar_clhy.yaml",
+            replace(YTM_BASE,
+                "      method: itp" => "      lhy: {kind: scalar, c_lhy: 5.0}\n      method: itp"),
+        )
+        m2 = ytm_model(p2)
+        @test m2.lhy.kind === :scalar
+        @test m2.lhy.c_lhy == 5.0
+    end
+
     @testset "physics the ground-state runner drops" begin
         for (key, body) in ("quasi_2d" => "      quasi_2d: true\n      l_z: 0.7\n",
             "raman" => "      raman: {Omega_R: 0.5}\n")

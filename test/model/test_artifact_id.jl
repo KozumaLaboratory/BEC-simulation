@@ -49,8 +49,8 @@ heavier(a::AtomSpecies) = AtomSpecies(a.name, a.mass * 1.01, a.F, a.a0, a.a2,
 # slots on one assertion. Adding `f === :light_shift && continue` to
 # `model_toml_dict` — i.e. removing that slot from the digest ENTIRELY — left
 # this file 57/57 green. `light_shift` is one of exactly two slots the cutover
-# exists to stop losing: `_gs_cache_key` omitted `light_shift` and
-# `rotating_frame_omega` while passing both to the solver.
+# exists to stop losing: `_gs_cache_key` (deleted in step 3) omitted
+# `light_shift` and `rotating_frame_omega` while passing both to the solver.
 #
 # Each entry maps a slot's OLD value to a new one and can see nothing else, so a
 # perturbation cannot reach a sibling and let a dropped slot ride on it.

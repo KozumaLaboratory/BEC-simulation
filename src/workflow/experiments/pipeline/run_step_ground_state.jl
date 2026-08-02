@@ -123,7 +123,19 @@ end
 # (the last is what a GS step inherits from a prior step's workspace).
 _zeeman_pq(z) = (linear_p(z), quadratic_q(z))
 
-@noinline function _resolve_pin_block(pin_block, zeeman)
+# Split from the closure builder by cutover step 3: `pin` selects a BRANCH of the
+# soft manifold, so it is an input to the artifact id, and the id runs above the
+# cache branch while the closure is built inside the LBFGS arm. A closure cannot
+# be hashed at all (`_enc` refuses `Function` — every closure site is its own
+# type), so the id takes the two values this parse produces and the closure is
+# reconstructed from them plus the model's own Zeeman.
+#
+# The parse is unconditional, i.e. it now also runs for `method: itp`, which
+# ignores `pin`. That is deliberate: a method-gated parse would leave the id
+# blind to `pin` on any step whose method later learns to honour it, and blind is
+# the failure this step exists to end. Two committed configs pair `pin:` with
+# `method: itp` (`config_vortex_verify_{48,64}.yaml`) and both parse.
+@noinline function _parse_pin_block(pin_block)
     pin_block === nothing && return (nothing, Float64[])
     pin_block isa AbstractDict ||
         throw(ArgumentError("pin: must be a mapping {kind: transverse, epsilon_ramp: [...]}"))
@@ -143,8 +155,15 @@ _zeeman_pq(z) = (linear_p(z), quadratic_q(z))
                 "pin.kind=$kind unsupported via yaml (only :transverse — conjugate field b_x=ε)"
             ),
         )
+    (kind, eps)
+end
+
+_pin_closure(::Nothing, _) = nothing
+function _pin_closure(kind::Symbol, zeeman)
+    kind === :transverse ||
+        throw(ArgumentError("pin.kind=$kind has no closure builder"))
     p_lin, q_quad = _zeeman_pq(zeeman)
-    (pin_transverse_field(; Bz=p_lin, q=q_quad), eps)
+    pin_transverse_field(; Bz=p_lin, q=q_quad)
 end
 
 # --- Automatic content-addressed GS stage cache -------------------------------
@@ -169,45 +188,164 @@ _light_points_enabled() =
 _gs_stage_dir() = get(ENV, "SPINORBEC_STAGE_DIR",
     joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_stage", "gs"))
 
-# content_id refuses to hash NaN/Inf (the gs_ddi tuple carries NaN for an unset
-# ddi_trunc_radius); replace non-finite floats with a stable sentinel, recursively.
-_hashable(x::AbstractFloat) = isfinite(x) ? x : "nonfinite:$(x)"
-_hashable(x::Union{Integer, Bool, AbstractString, Nothing}) = x
-_hashable(x::Symbol) = string(x)
-_hashable(x::Tuple) = Any[_hashable(v) for v in x]
-_hashable(x::AbstractVector) = Any[_hashable(v) for v in x]
-_hashable(x::AbstractDict) = Dict{String, Any}(string(k) => _hashable(v) for (k, v) in x)
-_hashable(x) = string(x)   # last resort: stringify anything exotic
+# --- The id that admits (cutover step 3) --------------------------------------
+#
+# `docs/design/research_spec_and_provenance_architecture.md` §6, step 3. What was
+# here until this commit — `_gs_cache_key`, a hand-listed dict of 19 entries, and
+# the `_hashable` recursion that laundered its raw YAML sub-blocks — is deleted,
+# not wrapped. Two keys deciding admission is the state this cutover exists to
+# end, so there is no fallback to fall back to.
+#
+# The old key was blind to eleven inputs THE SAME FUNCTION passes to the solver,
+# measured one knob at a time: `m_lbfgs`, `newton_polish`, `residual_polish`,
+# `pin`, `tol_drho`, `seed_from`, `noise_seed`, `light_shift`,
+# `rotating_frame_omega`, `backend`, and the code revision. In a per-config cache
+# that is a stale directory. This store is CONTENT-ADDRESSED AND SHARED — the
+# whole point is that any config reuses any other's artifact — so a blind axis is
+# one config's ground state served to a different config that asked a different
+# question. Live exposure at the flip: `config_c1kappa_B0` / `B10` carry a
+# `pin:` block selecting a symmetry-broken BRANCH and `config_c1kappa_B60` does
+# not, and the only thing keeping them apart today is that their Bz differ.
+#
+# `artifact_id(::Stage)` hashes the whole declaration, so nothing is selected out
+# of it. But turning a step dict INTO a `Stage` is a mapping, and a mapping is
+# exactly where an omission can still hide. Two halves, each closed differently:
+#
+#   * PHYSICS is not mapped here at all. `gs_model(r)` is a pure function of the
+#     same `GSResolved` the solver reads (`resolve_gs.jl`), so a physics slot
+#     cannot be in the solve and out of the id.
+#   * NUMERICS are `_gs_stage_params` below, and
+#     `test/model/test_gs_admission_axes.jl` partitions EVERY `GS_SCHEMA` key
+#     into {model, stage, refused, not-on-this-path, destination}, asserts the
+#     partition is total (a new schema key is red until classified), and then
+#     moves each axis one at a time asserting the id moves with it.
+#
+# FAIL-SAFE. A config `gs_model` cannot resolve (22 tabulated-LHY configs with no
+# `n_max`, 16 with no `N_atoms`, 2 with a dropped B tilt) has NO id, and a stage
+# with no id NEVER HITS: it recomputes, every time, and says so once. Recomputing
+# is only slower; serving an artifact addressed by a key that cannot express the
+# question is wrong. Which configs those are is gated by
+# `test/model/test_corpus_resolves.jl`, so the set can only shrink deliberately.
 
-# Canonical key over the resolved physics of a FROM-SCRATCH GS solve. Uses
-# resolved objects where cheap+robust (atom, grid, c-dict, ddi tuple, scalars)
-# and the raw `potential`/`B`/`lhy`/init sub-blocks (which fully determine their
-# resolved objects given atom+grid). Excludes analyze/scan/metadata/cache. Only
-# valid when psi_prev === nothing — warm-started/continuation solves are
-# seed-dependent and are never auto-cached.
-function _gs_cache_key(method, atom, grid, interactions, gs_ddi, tol, n_steps, dt, p)
-    key = Dict{String, Any}(
-        "v" => 1,                                    # key-schema version
-        "method" => string(method),
-        "atom" => atom.name,
-        "F" => atom.F,
-        "n_points" => collect(Int, grid.config.n_points),
-        "box" => collect(Float64, grid.config.box_size),
-        "c" => _hashable(interactions.c),
-        "c_lhy" => _hashable(interactions.c_lhy),
-        "ddi" => _hashable(gs_ddi),
-        "tol" => tol,
-        "n_steps" => n_steps,
-        "dt" => dt,
-        "potential" => _hashable(get(p, "potential", nothing)),
-        "B" => _hashable(get(p, "B", nothing)),
-        "lhy" => _hashable(get(p, "lhy", nothing)),
-        "initial_state" => string(get(p, "initial_state", "polar")),
-        "init_state_params" => _hashable(get(p, "init_state_params", nothing)),
-        "target_magnetization" => _hashable(get(p, "target_magnetization", nothing)),
-        "temperature_ratio" => _hashable(get(p, "temperature_ratio", nothing)),
+# `init_state_params` is a raw YAML mapping and the one place on this path where
+# the value type is not known from the key: the 22 named seeds take Float64
+# knobs, `from_jld2` takes `{path: <str>, snap: last|<int>}`. A `Dict` has no
+# canonical iteration order, and it must NOT reach `_enc` — the generic arm
+# reflects a struct into its fields, and `Dict`'s fields are its internal slot
+# arrays. Flattened to sorted parallel vectors, the shape `_enc_atom` already
+# uses for `scattering_lengths`.
+function _init_state_param_pairs(v)
+    v isa AbstractDict || return (String[], String[])
+    m = Dict{String, String}(string(k) => string(x) for (k, x) in v)
+    ks = sort!(collect(keys(m)))
+    (ks, String[m[k] for k in ks])
+end
+
+# The inverse of `_resolve_backend`, derived from the schema's own enum rather
+# than restated — a second list of backend names is a second declaration, and
+# `Stage`'s constructor validates the answer by calling `_resolve_backend` on it.
+function _backend_symbol(b::AbstractBackend)
+    for name in GS_SCHEMA["backend"].enum
+        s = Symbol(name)
+        _resolve_backend(s) === b && return s
+    end
+    throw(
+        ArgumentError(
+            "no `backend:` enum value resolves to $(typeof(b)); " *
+            "GS_SCHEMA[\"backend\"].enum is $(GS_SCHEMA["backend"].enum)"),
     )
-    content_id(key)
+end
+
+# The numerics half of the stage. `tol` / `n_steps` / `dt` come off `r` because
+# `resolve_gs` is where their defaults are applied; the rest are read with the
+# SAME expression the solver call below uses, so a default cannot differ between
+# what runs and what is hashed.
+#
+# `noise_seed` is included unconditionally even though it only bites when
+# `temperature_ratio` is set. Over-discrimination costs a recomputation; under-
+# discrimination costs a wrong answer, and this file only gets to be wrong in one
+# direction.
+@noinline function _gs_stage_params(r::GSResolved, p::Dict{String, Any})
+    isp_names, isp_values = _init_state_param_pairs(get(p, "init_state_params", nothing))
+    pin_kind, pin_eps = _parse_pin_block(get(p, "pin", nothing))
+    target_mz = _get_optional_float(p, "target_magnetization")
+    temp_ratio = _get_optional_float(p, "temperature_ratio")
+    (
+        tol=r.tol,
+        n_steps=r.n_steps,
+        dt=r.dt,
+        tol_drho=Float64(get(p, "tol_drho", 0.0)),
+        m_lbfgs=Int(get(p, "m_lbfgs", 10)),
+        newton_polish=get(p, "newton_polish", false) == true,
+        residual_polish=get(p, "residual_polish", false) == true,
+        initial_state=String(get(p, "initial_state", "polar")),
+        init_state_param_names=isp_names,
+        init_state_param_values=isp_values,
+        # TOML has no null and `_enc` refuses `nothing` (a fieldless value would
+        # launder into an empty table). `OPTIONAL_FLOAT_NOTHING` is the codec's
+        # one declared spelling for the `nothing` arm of an optional float; it is
+        # outside the numeric domain, so it cannot collide with a real value.
+        target_magnetization=target_mz === nothing ? OPTIONAL_FLOAT_NOTHING : target_mz,
+        temperature_ratio=temp_ratio === nothing ? OPTIONAL_FLOAT_NOTHING : temp_ratio,
+        noise_seed=Int(get(p, "noise_seed", 42)),
+        pin_kind=pin_kind === nothing ? "none" : String(pin_kind),
+        pin_epsilon_ramp=pin_eps,
+    )
+end
+
+"""
+    gs_stage(r::GSResolved, p) -> Stage
+
+The `Stage` a FROM-SCRATCH spinor ground-state solve declares: `:relax` over
+`gs_model(r)`, by `r.method`, on `r.backend`, from nothing.
+
+`from = nothing` is a claim, not a default — it says this solve starts from its
+own `initial_state` and nothing else. The caller is responsible for only asking
+when that is true; `_run_step` refuses to auto-cache a `seed_from` solve for
+exactly this reason.
+
+Throws whatever `gs_model` throws. The caller turns that into "no id", which
+turns into "never a hit".
+"""
+gs_stage(r::GSResolved, p::Dict{String, Any}) = Stage(
+    :relax, gs_model(r), r.method, nothing, _gs_stage_params(r, p),
+    _backend_symbol(r.backend))
+
+# One line per distinct REASON, not one per scan point: a 45-point scan of one
+# unresolvable config would otherwise print 45 identical warnings and the signal
+# would read as noise. Keyed on the message because the message names the slot
+# that is missing, which is the thing a person acts on.
+const _NO_ARTIFACT_ID_WARNED = Set{String}()
+const _NO_ARTIFACT_ID_LOCK = ReentrantLock()
+
+"For tests, and for a long-lived process that wants the warning again."
+_reset_no_artifact_id_warnings!() =
+    (lock(() -> empty!(_NO_ARTIFACT_ID_WARNED), _NO_ARTIFACT_ID_LOCK); nothing)
+
+@noinline function _warn_no_artifact_id_once(why::AbstractString)
+    fresh = lock(_NO_ARTIFACT_ID_LOCK) do
+        why in _NO_ARTIFACT_ID_WARNED ? false : (push!(_NO_ARTIFACT_ID_WARNED, why); true)
+    end
+    fresh || return nothing
+    @warn "GS stage cache DISABLED for this config: it has no artifact id, so it " *
+        "can never be served a cached ground state and will recompute every " *
+        "time. Recomputing is slower; serving an artifact under a key that " *
+        "cannot express the question is wrong." reason = why
+    nothing
+end
+
+# `::Union{Nothing, String}` and `@noinline`: everything below this call feeds
+# `make_workspace`, and an `Any`-typed local reaching that path is the inference
+# explosion CLAUDE.md §"Type stability boundaries" exists to prevent. The
+# `NamedTuple` inside `_gs_stage_params` has a per-call type by construction, so
+# the narrowing has to happen here.
+@noinline function _gs_artifact_id(r::GSResolved, p::Dict{String, Any})::Union{Nothing, String}
+    try
+        artifact_id(gs_stage(r, p))
+    catch err
+        _warn_no_artifact_id_once(err isa ArgumentError ? err.msg : sprint(showerror, err))
+        nothing
+    end
 end
 
 function _run_step(
@@ -234,7 +372,6 @@ function _run_step(
     atom = r.atom
     grid, ndim = r.grid, r.ndim
     interactions = r.interactions
-    gs_ddi = gs_ddi_tuple(r)
     enable_ddi, c_dd_val, secular, q2d, lz, ddi_trunc, ddi_padded_b, ddi_pf = r.enable_ddi, r.c_dd,
     r.secular, r.quasi_2d_ddi, r.l_z_ddi,
     r.ddi_trunc, r.ddi_padded, r.ddi_pad_factor
@@ -251,33 +388,48 @@ function _run_step(
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
     cache_path = get(p, "cache", nothing)
     # Auto content-addressed stage cache: a from-scratch solve keyed on its
-    # resolved physics is reusable by any other config. Only when opted-in, not
-    # already given an explicit `cache:`, and not warm-started (seed-dependent).
-    # `stage_ref` (the content hash) is threaded into step_result so the scan-loop
-    # save can write a light point that references the shared psi (Stage 1).
+    # RESOLVED DECLARATION is reusable by any other config that declares the
+    # same thing. `stage_ref` (the artifact id) is threaded into step_result so
+    # the scan-loop save can write a light point that references the shared psi
+    # (Stage 1).
+    #
+    # Three guards, and the third is new in cutover step 3:
+    #
+    #   `cache_path === nothing`  an explicit `cache:` names its own file.
+    #   `psi_prev === nothing`    a continuation solve is seeded by the previous
+    #                             step, which no id here describes.
+    #   no `seed_from`            SAME reason, and the old guard MISSED it: a
+    #                             `seed_from` solve has `psi_prev === nothing`
+    #                             and is warm-started from bytes at a path, so it
+    #                             was auto-cached under a key that could not see
+    #                             its seed. `Stage.from` is the slot a warm start
+    #                             belongs in and `artifact_id` recurses into it,
+    #                             but the predecessor here is a directory of
+    #                             point files, not a `Stage` — so this is refused
+    #                             rather than mis-declared as from-scratch. 19
+    #                             committed configs use `seed_from`; none is
+    #                             stage-cached today, and all of them are one
+    #                             `export SPINORBEC_STAGE_CACHE=1` away.
     stage_ref = nothing
-    if cache_path === nothing && psi_prev === nothing && _stage_cache_enabled()
-        stage_ref = try
-            _gs_cache_key(method, atom, grid, interactions, gs_ddi, tol, n_steps, dt, p)
-        catch err
-            verbose &&
-                @warn "GS stage-cache key failed; caching disabled for this cell" exception =
-                    err
-            nothing
-        end
+    if cache_path === nothing && psi_prev === nothing && !haskey(p, "seed_from") &&
+        _stage_cache_enabled()
+        stage_ref = _gs_artifact_id(r, p)
         if stage_ref !== nothing
             cache_path = joinpath(_gs_stage_dir(), stage_ref * ".jld2")
-            verbose && println("  GS stage-cache key → $(stage_ref)")
+            verbose && println("  GS artifact id → $(stage_ref)")
         end
     end
     # Cutover step 2, invariant 4: `isfile(cache_path)` was the admission. It is
     # the highest-blast-radius one in the tree — the key is content-addressed
-    # over resolved physics precisely so that ANY other config reuses the
+    # over the resolved declaration precisely so that ANY other config reuses the
     # artifact, so one truncated or half-relaxed file is served to N unrelated
     # cells. `admit_payload` requires a marker to have been written last, or
     # (arm b) no marker at all. Measured at cutover: `runs/_stage` did not exist
-    # and no config carried an explicit `cache:` key, so arm (b) has no legacy
-    # population HERE — this is the site step 3 can make strict first.
+    # and none of the 12 configs carrying an explicit `cache:` key names a file
+    # that is on disk, so arm (b) has no legacy population HERE. Step 3 changes
+    # every id in this store, which drops that population to zero a second way —
+    # a pre-flip artifact is no longer ADDRESSABLE. Deleting arm (b) outright
+    # still needs its own dated cutoff and its own gate; it is not done here.
     gs_admission = cache_path === nothing ? nothing : admit_payload(cache_path)
     if gs_admission !== nothing && gs_admission.hit
         if verbose
@@ -289,25 +441,43 @@ function _run_step(
         psi_out = d["psi"]
         energy = get(d, "energy", NaN)
         converged = get(d, "converged", true)
-        # [KNOWN-GAP, made VISIBLE by cutover step 1b, deliberately not closed
-        # here] This call passes no `light_shift`, no `spinor_lhy`, no
-        # `lhy_opts` and no `rotating_frame_omega`, so a cache HIT hands
-        # downstream analyzers a workspace whose Hamiltonian is missing LHY, the
-        # light shift and the rotating frame. Before this step those four were
-        # resolved ~170 lines below, past this `return`, so the omission was not
-        # even expressible; `r` now carries all four. Closing it CHANGES what a
-        # cache hit computes, which is step 3's job and needs its own gate — see
-        # `docs/design/research_spec_and_provenance_architecture.md` §6. Current
-        # exposure: every committed `cache:` artifact is absent from disk and no
-        # ground-state step declares `light_shift`.
+        # The [KNOWN-GAP] step 1b marked here and left for step 3, CLOSED. Until
+        # this commit the call passed no `light_shift`, no `spinor_lhy`, no
+        # `lhy_opts` and no `rotating_frame_omega`, so a cache HIT handed
+        # downstream analyzers (energy_decomposition, bogoliubov, …) a workspace
+        # whose Hamiltonian was missing LHY, the light shift and the rotating
+        # frame — three terms the FRESH solve had. Step 1b hoisted the four
+        # resolutions above this branch; before that the omission was not even
+        # expressible.
+        #
+        # It has to close HERE and not later, because step 3 is what makes it
+        # dangerous: `lhy`, `light_shift` and `frame` are now slots of the model
+        # the id is derived from, so a hit is by construction a hit for a config
+        # that DECLARED them. An id that promises LHY and a workspace that has
+        # none is the id lying about its own artifact.
+        #
+        # The flip is also what makes it safe. A tabulated LHY with no explicit
+        # `n_max` resolves to `LHYTableOpts.n_max = NaN` ("3 x max|psi_init|^2"),
+        # which would make the table a function of WHICH ψ built it — the cached
+        # converged one here, the seed in the fresh solve. `LHYSpec` refuses a
+        # non-positive `n_max`, so such a config has no id and can never reach
+        # this branch at all. Residual, named rather than hidden: `:full_bdg`
+        # still takes its SPINOR from `psi_init`, so its table is built from the
+        # converged ψ here and from the seed in the solve that wrote the file.
+        # `rotating_frame_omega` is a `SimParams` field, not a `make_workspace`
+        # kwarg — it is what builds the Coriolis cache (`make_workspace.jl:396`).
         ws_cached = make_workspace(;
             grid, atom, interactions, zeeman, potential,
-            sim_params=SimParams(; dt, n_steps=1, save_every=1),
+            sim_params=SimParams(; dt, n_steps=1, save_every=1,
+                rotating_frame_omega=gs_rf_omega),
             psi_init=psi_out,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
             backend,
+            light_shift=gs_light_shift,
+            spinor_lhy=spinor_lhy_mode,
+            lhy_opts=gs_lhy_opts,
         )
         step_result = Dict{Symbol, Any}(
             :ground_state_energy => energy,
@@ -448,7 +618,12 @@ function _run_step(
         m_lbfgs = Int(get(p, "m_lbfgs", 10))
         newton_polish = get(p, "newton_polish", false) == true
         residual_polish = get(p, "residual_polish", false) == true
-        pin_closure, pin_eps = _resolve_pin_block(get(p, "pin", nothing), zeeman)
+        # `_parse_pin_block` is the ONE parse of the block; `_gs_stage_params`
+        # calls the same function, because `pin` selects a branch of the soft
+        # manifold and is therefore an input to the artifact id. Only the
+        # closure — which no id can digest — is built here.
+        pin_kind, pin_eps = _parse_pin_block(get(p, "pin", nothing))
+        pin_closure = _pin_closure(pin_kind, zeeman)
         # Reuse existing workspace when available to preserve DDI flags (secular/q2d/l_z).
         # Skip reuse when backend is overridden OR a pin is active (the pin
         # ε-continuation builds its own bare workspace and needs grid/atom).
@@ -514,10 +689,14 @@ function _run_step(
                 f["psi"] = psi_host
                 f["energy"] = gs_energy
                 f["converged"] = gs.converged
-                # Provenance cutover step 1: the id that DECIDES admission is
-                # written into the artifact beside the code revision the new
-                # `artifact_id` digests.
-                stage_ref === nothing || (f["gs_cache_key"] = stage_ref)
+                # The id that DECIDES admission, written into the artifact it
+                # names. Step 1 spelled this key `gs_cache_key` because the value
+                # WAS `_gs_cache_key`'s; step 3 deleted that function, so the name
+                # is renamed with it rather than kept as an alias for a thing
+                # that no longer exists (CLAUDE.md §"Naming convention").
+                # `code_rev` stays separate: `artifact_id` digests it, but a
+                # 16-hex id does not let a reader RECOVER it.
+                stage_ref === nothing || (f["artifact_id"] = stage_ref)
                 code_rev = _code_rev_or_nothing()
                 code_rev === nothing || (f["code_rev"] = code_rev)
             end

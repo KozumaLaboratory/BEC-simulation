@@ -1,9 +1,9 @@
 # Cutover step 1's deliverable, at the two writer sites a YAML run actually
 # uses, plus the reader that has to let the ids through.
 #
-# THREE places write `code_rev` / `gs_cache_key`: the stage artifact
-# (`run_step_ground_state.jl:576-578`), the scan point (`run_registry.jl:576-578`)
-# and the single point (`run_registry.jl:746-749`). `test_admission_requires_marker.jl`
+# THREE places write `code_rev` / `artifact_id`: the stage artifact
+# (`run_step_ground_state.jl`), the scan point (`run_registry.jl`) and the single
+# point (`run_registry.jl`). `test_admission_requires_marker.jl`
 # calls `_run_step(GroundStateStep(...))` directly, so it reaches the first and
 # only the first — deleting both `run_registry.jl` blocks left every model suite
 # green. Those two are the ones every `run_yaml` goes through, i.e. the ones a
@@ -11,8 +11,13 @@
 #
 # `open_result`'s metadata whitelist is gated here for the same reason and in the
 # same run: the writers can record perfectly and the reader still drop the keys
-# on the floor. Removing `"code_rev"` and `"gs_cache_key"` from `_extract_metadata`
+# on the floor. Removing `"code_rev"` and the id key from `_extract_metadata`
 # also left everything green.
+#
+# The id key was spelled `gs_cache_key` through cutover steps 1 and 2, because
+# the value was `_gs_cache_key`'s. Step 3 deleted that function and admission
+# moved to `artifact_id`, so the dataset is renamed with it rather than kept as
+# an alias for something that no longer exists.
 #
 # A real round trip, kept as small as one can be: 1-D, 16 points, 20 ITP steps,
 # CPU, Rb87, and the scan's first point is served from the stage artifact the
@@ -40,8 +45,8 @@ pipeline:
       tol: 1.0e-6
 """
 
-# Two points, differing in an input `_gs_cache_key` reads — so the two records
-# must carry two different `gs_cache_key`s and one shared `code_rev`.
+# Two points, differing in an input `artifact_id` reads — so the two records
+# must carry two different `artifact_id`s and one shared `code_rev`.
 const PROBE_SCAN = """
 scan:
   zip:
@@ -70,17 +75,17 @@ scan:
             @test haskey(d, "code_rev")
             @test d["code_rev"] == code_rev
             @test length(d["code_rev"]) == 64
-            @test haskey(d, "gs_cache_key")
-            @test d["gs_cache_key"] isa AbstractString
-            @test length(d["gs_cache_key"]) == 16
+            @test haskey(d, "artifact_id")
+            @test d["artifact_id"] isa AbstractString
+            @test length(d["artifact_id"]) == 16
             # Not merely a string: it is the id that named the stage artifact,
             # so a record whose key pointed at nothing would fail here.
-            @test isfile(joinpath(stage_dir, d["gs_cache_key"] * ".jld2"))
+            @test isfile(joinpath(stage_dir, d["artifact_id"] * ".jld2"))
 
             @testset "the reader lets both ids through (`_extract_metadata`)" begin
                 r = open_result(p)
                 @test r.metadata["code_rev"] == code_rev
-                @test r.metadata["gs_cache_key"] == d["gs_cache_key"]
+                @test r.metadata["artifact_id"] == d["artifact_id"]
                 # Negative control on the whitelist: it selects, it does not
                 # copy. `grid_box_size` is written by the same block, three
                 # lines away, and must NOT arrive — without this the two
@@ -102,16 +107,16 @@ scan:
             for d in (d1, d2)
                 @test haskey(d, "code_rev")
                 @test d["code_rev"] == code_rev
-                @test haskey(d, "gs_cache_key")
-                @test length(d["gs_cache_key"]) == 16
-                @test isfile(joinpath(stage_dir, d["gs_cache_key"] * ".jld2"))
+                @test haskey(d, "artifact_id")
+                @test length(d["artifact_id"]) == 16
+                @test isfile(joinpath(stage_dir, d["artifact_id"] * ".jld2"))
             end
             # Per-point, not a constant: the two points differ in `tol`, which
-            # is an input the old admission key reads. A `gs_cache_key` written
+            # is an input the admission id reads. An `artifact_id` written
             # once and copied would pass every assertion above.
-            @test d1["gs_cache_key"] != d2["gs_cache_key"]
-            @test open_result(p1).metadata["gs_cache_key"] == d1["gs_cache_key"]
-            @test open_result(p2).metadata["gs_cache_key"] == d2["gs_cache_key"]
+            @test d1["artifact_id"] != d2["artifact_id"]
+            @test open_result(p1).metadata["artifact_id"] == d1["artifact_id"]
+            @test open_result(p2).metadata["artifact_id"] == d2["artifact_id"]
         end
     end
 end
