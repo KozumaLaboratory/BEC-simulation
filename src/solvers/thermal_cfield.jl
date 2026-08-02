@@ -104,10 +104,24 @@ function thermal_cfield!(
     for I in eachindex(buf)
         buf[I] = randn(rng) + im * randn(rng)
     end
+    # Weight by the Rayleigh-Jeans occupation, not a flat low-pass. A hard cut
+    # gives every mode equal weight, which — since the mode count grows as k² —
+    # puts almost all of the atoms at HIGH k, exactly where ϵ−μ is large and the
+    # reservoir relaxes them away within a few time units. Measured: seeding that
+    # way was indistinguishable from starting at vacuum, `N` after 150 units of
+    # equilibration coming out at 1.85e4 either way against an equilibrium 1.52e5.
+    #
+    # The offset Δ₀ is the mean-field shift at the cloud centre, so the spectrum
+    # is the homogeneous one there. Multiplying by the envelope afterwards
+    # convolves the spectrum with the envelope's own transform, whose width is
+    # ~1/R_cloud ≈ 0.1 against a Rayleigh-Jeans scale √(2T) ≈ 12.6 — a 1% smearing,
+    # which is why the trap can be applied in real space without spoiling this.
+    Δ0 = max(2c0 * (eq.nth[1] + eq.n0[1]) - mu, 1e-3)
     plans.forward * buf
     kc2 = k_cut^2
     for I in CartesianIndices(n_pts)
-        grid.k_squared[I] > kc2 && (buf[I] = 0)
+        k2 = grid.k_squared[I]
+        buf[I] = k2 > kc2 ? 0 : buf[I] * sqrt(T / (0.5 * k2 + Δ0))
     end
     plans.inverse * buf
     # A filtered Gaussian field has uniform variance; normalise it globally so the

@@ -216,8 +216,23 @@ function kz_scan(;
         "scalar limit: c₁=0, no DDI")
     @printf("  grid %d³ box %.1f   k_cut %.2f (k_max %.2f)   μ=%.1f  T %.1f→%.1f\n",
         grid_n, box, k_cut, k_max, mu, T_hot, T_cold)
-    @printf("  γ=%.3g (FIXED) ℳ̄=%.3g   τ_Q %s   %d seeds\n",
-        gamma, M, string(tau_Qs), n_seed)
+    # The header must state what is RUNNING. It said "γ=0.002 (FIXED)" through
+    # every physical-rate run, which is the same failure as printing a caveat and
+    # proceeding: a log that disagrees with the run is how a wrong setting
+    # survives review, and this one had already done it once for the spinor flag.
+    if physical
+        gh = spgpe_growth_rate(; T=T_hot, mu, eps_cut=mu + T_hot, a_s=0.01)
+        gc = spgpe_growth_rate(; T=T_cold, mu, eps_cut=mu + T_cold, a_s=0.01)
+        @printf("  γ DERIVED %.3g (T_hot) → %.3g (T_cold), 1/(2γμ) %.0f → %.0f   τ_Q %s   %d seeds\n",
+            gh, gc, 1 / (2gh * mu), 1 / (2gc * mu), string(tau_Qs), n_seed)
+        eqh = classical_field_equilibrium(; T=T_hot, mu, c0, rmax=box / 2)
+        eqc = classical_field_equilibrium(; T=T_cold, mu, c0, rmax=box / 2)
+        @printf("  HF equilibrium: N(T_hot)=%.3g  N(T_cold)=%.3g (N_0=%.3g, f=%.2f)\n",
+            eqh.N0 + eqh.Nth, eqc.N0 + eqc.Nth, eqc.N0, eqc.N0 / (eqc.N0 + eqc.Nth))
+    else
+        @printf("  γ=%.3g (PINNED, unphysical) ℳ̄=%.3g   τ_Q %s   %d seeds\n",
+            gamma, M, string(tau_Qs), n_seed)
+    end
     flush(stdout)
 
     means = Float64[]

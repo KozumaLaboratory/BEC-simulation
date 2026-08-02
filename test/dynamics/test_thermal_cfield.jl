@@ -67,6 +67,24 @@ using SpinorBEC
         r, g1 = first_order_correlation(psi, grid, plans)
         @test abs(coherence_length(r, g1).f_inf) < 0.1
 
+        # The SPECTRUM has to be Rayleigh-Jeans, not flat. A hard low-pass gives
+        # equal weight per mode and the mode count grows as k², so the atoms end
+        # up at high k where the reservoir strips them in a few time units — a
+        # seed built that way was indistinguishable from vacuum in a real run.
+        # Compare the low-k half of the C region against the high-k half: RJ
+        # weighting T/(k²/2 + Δ) must put the atoms in the former.
+        kbuf = zeros(ComplexF64, n, n, n)
+        kbuf .= view(psi,:,:,:,size(psi, 4))
+        plans.forward * kbuf
+        kc = sqrt(2 * (mu + T))
+        lo = hi = 0.0
+        for I in CartesianIndices((n, n, n))
+            k2 = grid.k_squared[I]
+            k2 > kc^2 && continue
+            k2 < (kc / 2)^2 ? (lo += abs2(kbuf[I])) : (hi += abs2(kbuf[I]))
+        end
+        @test lo > hi
+
         # Only the stretched component is seeded — reservoir noise filling the
         # other spin channels is a separate decision, not a side effect of this.
         @test sum(abs2, view(psi,:,:,:,1)) == 0
