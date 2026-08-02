@@ -150,6 +150,40 @@ else
         @test _agree(a, _run(true, 5)) > 1e-6
     end
 
+    # Every production Eu run is tabulated (polar_contact / icosahedral /
+    # full_bdg / …), and `_spin_chain_reason` declined every table until
+    # 2026-08-01 — so NO production run had ever taken the fused half-step, and
+    # the arms above were gating a path production does not build. Same shape as
+    # the fused DIAGONAL kernel's `c_lhy` bound, closed the same way and gated
+    # the same way.
+    @testset "the fusion holds with a TABULATED LHY, the production case" begin
+        SpinorBEC.MEANFIELD_MIDPOINT_ENABLED[] = true
+        kw = (; ddi_padding=true, spinor_lhy=:polar_contact)
+        a = _run(true, 5; kw...)
+        b = _run(false, 5; kw...)
+        # `_agree`, not `==`, for the reason the arms above already carry: bit
+        # identity is what the fusion delivers on a fixed device state and it does
+        # hold when this file runs alone, but GPU reduction order is not stable
+        # inside a `full`-tier worker that has already run thirty other files.
+        # This arm shipped with `==` and would have been the one that flaked —
+        # under exactly the condition the other arms were relaxed for.
+        @test _agree(a, b) < 1e-12
+
+        wst = _ws(; kw...)
+        @test wst.lhy isa SpinorBEC.TabulatedLHY
+        @test SpinorBEC._spin_chain_reason(
+            wst, wst.interactions, CUDA.zeros(ComplexF64, 2)) === nothing
+
+        # POSITIVE CONTROL, and it is the whole point of this arm. The prepass
+        # collapses a non-scalar `c_lhy` to zero, so a fused path that reached
+        # the table and then dropped it would still satisfy `a == b` — because
+        # BOTH arms would be wrong in the same way only if the unfused path
+        # dropped it too, which it does not. Requiring the LHY to MOVE ψ is what
+        # separates "the table is applied" from "the table is zero".
+        c = _run(true, 5; ddi_padding=true)          # same config, no LHY
+        @test _agree(a, c) > 1e-6
+    end
+
     @testset "no frozen mean field ⇒ the fusion declines" begin
         ws = _ws()
         # `psi_mf === nothing` is the plain (non-midpoint) half-step: the two
