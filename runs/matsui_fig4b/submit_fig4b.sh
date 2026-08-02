@@ -70,6 +70,16 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.jul
 export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/runs}"
 mkdir -p "$SPINORBEC_STORE"
 
+# The scan axis is `pipeline.1.B.Bz.to` — inside the DYNAMICS block — so all 45
+# points share one ground state, and without this each recomputes it. Measured
+# 5.44 -> 3.93 s/point, -27.8 % (UGE 8318863, 3-point A/B on this exact config).
+# Off by default; other submit scripts in this repo already set it.
+#
+# SPINORBEC_LIGHT_POINTS is deliberately NOT set: it replaces each point's inline
+# psi with a `gs_ref` pointer, which `open_result` resolves but the ad-hoc
+# readers under scripts/validation/ do not.
+export SPINORBEC_STAGE_CACHE=1
+
 if [ "${1:-}" = "SMOKE" ]; then
     CONFIG=runs/matsui_fig4b/fig4b_smoke_n32.yaml
 else
