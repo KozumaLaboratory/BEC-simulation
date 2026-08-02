@@ -317,6 +317,30 @@ function _run_step(
         _parse_zeeman(Dict(), duration)
     end
 
+    # Resolved BEFORE the cache branch: the workspace rebuilt on a cache hit is
+    # returned as `ws_prev` for every downstream step, so it must carry the same
+    # physics as the one the solver would have built. These four used to be
+    # resolved below the early return, which silently dropped the tabulated LHY
+    # table, the light shift and the rotating frame from every cache hit.
+    V_trap_for_ls = evaluate_potential(potential, grid)
+    ls_raw = get(p, "light_shift", nothing)
+    gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
+    # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
+    # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
+    # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old
+    # YAML key — which was never written by the new resolver, silently
+    # disabling non-scalar LHY modes (polar_contact / icosahedral / ...)
+    # for every YAML pipeline run.
+    spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
+        v === nothing ? nothing : Symbol(String(v))
+    end
+    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
+    # "type stability boundaries": an Any-typed local reaching make_workspace
+    # is what turns into a multi-minute JIT hang with no stack trace.
+    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
+
+    gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
+
     # --- Cache: skip ITP/LBFGS if file exists, but build a workspace so
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
     cache_path = get(p, "cache", nothing)
@@ -352,11 +376,15 @@ function _run_step(
         converged = get(d, "converged", true)
         ws_cached = make_workspace(;
             grid, atom, interactions, zeeman, potential,
-            sim_params=SimParams(; dt, n_steps=1, save_every=1),
+            sim_params=SimParams(; dt, n_steps=1, save_every=1,
+                rotating_frame_omega=gs_rf_omega),
             psi_init=psi_out,
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
+            light_shift=gs_light_shift,
+            spinor_lhy=spinor_lhy_mode,
+            lhy_opts=gs_lhy_opts,
             backend,
         )
         step_result = Dict{Symbol, Any}(
@@ -475,24 +503,6 @@ function _run_step(
         cb(ws, step, ns);
     end
 
-    V_trap_for_ls = evaluate_potential(potential, grid)
-    ls_raw = get(p, "light_shift", nothing)
-    gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
-    # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
-    # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
-    # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old
-    # YAML key — which was never written by the new resolver, silently
-    # disabling non-scalar LHY modes (polar_contact / icosahedral / ...)
-    # for every YAML pipeline run.
-    spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
-        v === nothing ? nothing : Symbol(String(v))
-    end
-    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
-    # "type stability boundaries": an Any-typed local reaching make_workspace
-    # is what turns into a multi-minute JIT hang with no stack trace.
-    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
-
-    gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
     tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;
