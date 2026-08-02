@@ -45,6 +45,9 @@ case "${SGE_TASK_ID:-1}" in
     16) CONFIG=runs/matsui_fit/fit_k3real_1em30.yaml ;;
     17) CONFIG=runs/matsui_fit/fit_k3real_1em29.yaml ;;
     18) CONFIG=runs/matsui_fit/fit_k3real_1em28.yaml ;;
+    16) CONFIG=runs/matsui_fit/fit_hold_T52.yaml ;;
+    17) CONFIG=runs/matsui_fit/fit_hold_T54.yaml ;;
+    18) CONFIG=runs/matsui_fit/fit_hold_T52r200.yaml ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 
