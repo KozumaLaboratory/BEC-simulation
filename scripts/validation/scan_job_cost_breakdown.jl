@@ -26,17 +26,54 @@ using YAML
 const CFG = length(ARGS) >= 1 ? ARGS[1] : error("usage: scan_job_cost_breakdown.jl <config.yaml>")
 const NPTS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
 
-"Write a copy of the config whose scan has exactly `n` points."
+"""
+Write a copy of the config whose scan has exactly `n` points, and VERIFY it.
+
+A scan axis is either an explicit vector or a `{from, to, step}` range under
+`zip:` / `grid:`. The first version of this handled only the vector case, so on
+a range-spec config it silently returned the config unchanged and the probe ran
+four full 45-point scans while reporting them as 1- and 3-point timings. Hence
+`_count_points` and the assertion: a trim that does not trim must be loud.
+"""
 function trimmed(cfg::String, n::Int, tag::String)
     d = YAML.load_file(cfg)
     sc = get(d, "scan", nothing)
     sc === nothing && error("config has no scan block")
-    for (k, v) in sc
-        v isa AbstractVector && length(v) > n && (sc[k] = v[1:n])
+    for axes in values(sc)
+        axes isa AbstractDict || continue
+        for (k, v) in axes
+            if v isa AbstractVector
+                length(v) > n && (axes[k] = v[1:n])
+            elseif v isa AbstractDict && haskey(v, "from") && haskey(v, "step")
+                v["to"] = Float64(v["from"]) + (n - 1) * Float64(v["step"])
+            end
+        end
     end
+    got = _count_points(sc)
+    got == n || error("trim asked for $n points, config yields $got — see the docstring")
     out = joinpath(mktempdir(), "trim_$(tag).yaml")
     YAML.write_file(out, d)
     out
+end
+
+"Points a scan block will expand to (zip axes are parallel, grid axes multiply)."
+function _count_points(sc::AbstractDict)
+    total = 1
+    for (mode, axes) in sc
+        axes isa AbstractDict || continue
+        lens = Int[]
+        for v in values(axes)
+            if v isa AbstractVector
+                push!(lens, length(v))
+            elseif v isa AbstractDict && haskey(v, "from")
+                f, t, st = Float64(v["from"]), Float64(v["to"]), Float64(v["step"])
+                push!(lens, floor(Int, (t - f) / st + 1e-9) + 1)
+            end
+        end
+        isempty(lens) && continue
+        total *= (mode == "zip" ? maximum(lens) : prod(lens))
+    end
+    total
 end
 
 function dyn_steps_and_dt(cfg::String)
