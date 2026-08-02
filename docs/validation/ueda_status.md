@@ -55,7 +55,7 @@ code is **not** part of the current validation evidence.
   starting point of the joint sign-off as originally intended.
 - The export tool `scripts/validation/export_operator_rhs.jl` and the
   `operator_rhs.jld2` artefacts under
-  `runs/verification_suite/L4_eu_matsui_hamiltonian_only_*` remain
+  `runs/L4_eu_matsui_hamiltonian_only_*` (untracked) remain
   intact. They are usable for the day Ueda-side comparison resumes.
 - The L4 cross-grid convergence result (ΔF_z = 0.00886 at
   k_cut = 16, agreeing to 5 digits across N = {64, 96, 128}) is
