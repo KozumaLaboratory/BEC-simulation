@@ -51,7 +51,12 @@ function trimmed(cfg::String, n::Int, tag::String)
     end
     got = _count_points(sc)
     got == n || error("trim asked for $n points, config yields $got — see the docstring")
-    out = joinpath(mktempdir(), "trim_$(tag).yaml")
+    # Under the store, not mktempdir(): run_yaml derives its output directory
+    # from the config's path, and a config in a compute node's /tmp puts the run
+    # somewhere no other machine can watch.
+    dir = joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_probe")
+    mkpath(dir)
+    out = joinpath(dir, "trim_$(tag).yaml")
     YAML.write_file(out, d)
     out
 end
@@ -89,30 +94,38 @@ end
 function main()
     nsteps, dt = dyn_steps_and_dt(CFG)
     @printf("config %s\n  dynamics: %d steps at dt = %.1e\n\n", basename(CFG), nsteps, dt)
+    flush(stdout)
 
+    # Announce BEFORE each phase and flush: with verbose=false a run_yaml prints
+    # nothing, so a probe that only reports afterwards is indistinguishable from
+    # a hung one. The first pass at this sat 19 minutes with no way to tell.
+    function timed(label, path; verbose=false)
+        @printf("  ... %s\n", label)
+        flush(stdout)
+        t = @elapsed run_yaml(path; verbose=verbose)
+        @printf("  %-38s %8.2f s\n", label, t)
+        flush(stdout)
+        t
+    end
+
+    b_per_point = NaN
     withenv("SPINORBEC_STAGE_CACHE" => "0") do
-        a = @elapsed run_yaml(trimmed(CFG, 1, "a"); verbose=false)
-        @printf("A  1 point,  cold (JIT rides here)   : %8.2f s\n", a)
-        b = @elapsed run_yaml(trimmed(CFG, NPTS, "b"); verbose=false)
-        @printf("B  %d points, warm                    : %8.2f s  -> %.2f s/point\n",
-            NPTS, b, b / NPTS)
-        global _B_PER_POINT = b / NPTS
+        timed("A  1 point, cold (JIT rides here)", trimmed(CFG, 1, "a"); verbose=true)
+        b = timed("B  $NPTS points, warm", trimmed(CFG, NPTS, "b"))
+        b_per_point = b / NPTS
+        @printf("     -> %.2f s/point\n", b_per_point)
     end
 
     withenv("SPINORBEC_STAGE_CACHE" => "1") do
-        c = @elapsed run_yaml(trimmed(CFG, NPTS, "c1"); verbose=false)   # populates
-        d = @elapsed run_yaml(trimmed(CFG, NPTS, "c2"); verbose=false)   # reuses
-        @printf("C  %d points, stage cache populating  : %8.2f s  -> %.2f s/point\n",
-            NPTS, c, c / NPTS)
-        @printf("C' %d points, stage cache reusing     : %8.2f s  -> %.2f s/point  (%+.1f %%)\n",
-            NPTS, d, d / NPTS, 100 * (d / NPTS - _B_PER_POINT) / _B_PER_POINT)
+        timed("C  $NPTS points, stage cache filling", trimmed(CFG, NPTS, "c1"))
+        d = timed("C' $NPTS points, stage cache reusing", trimmed(CFG, NPTS, "c2"))
+        @printf("     -> %.2f s/point  (%+.1f %% vs B)\n",
+            d / NPTS, 100 * (d / NPTS - b_per_point) / b_per_point)
     end
 
-    println("\nSteady-state point, where the time goes:")
-    println("  Run scripts/validation/step_cost_ablation_gpu.jl for ms/step at this n,")
-    println("  multiply by the step count above, and the remainder is per-point setup")
-    println("  (two make_workspace calls, the ground state, analyzers, the JLD2 save).")
-    println("  The integrator can only ever address the stepping fraction.")
+    @printf("\nStepping is %d steps x (ms/step from step_cost_ablation_gpu.jl).\n", nsteps)
+    println("At 32^3 that is 3456 x 0.604 ms = 2.09 s, so anything above that in the")
+    println("per-point figure is setup the integrator cannot touch.")
 end
 
 main()
