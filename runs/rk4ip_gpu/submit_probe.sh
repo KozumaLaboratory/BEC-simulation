@@ -7,7 +7,7 @@
 #$ -N rk4ip_gpu
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-3
+#$ -t 1-6
 #$ -j n
 
 set -euo pipefail
@@ -27,6 +27,9 @@ case "${SGE_TASK_ID:-1}" in
     1) "$JULIA" --project=. scripts/validation/rk4ip_gpu_cost_probe.jl ;;
     2) "$JULIA" --project=. scripts/validation/rk4ip_time_to_solution_gpu.jl 64 ;;
     3) "$JULIA" --project=. scripts/validation/rk4ip_time_to_solution_gpu.jl 128 ;;
+    4) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 128 ;;
+    5) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 64 ;;
+    6) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 32 ;;
     *) echo "no task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 
