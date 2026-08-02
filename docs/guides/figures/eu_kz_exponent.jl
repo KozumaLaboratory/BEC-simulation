@@ -61,7 +61,19 @@ function kz_trajectory(;
         interactions=InteractionParams(Dict{Int, Float64}(0 => c0, 1 => c1)),
         potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp, backend)
     seed_device_rng!(backend, seed)
-    fill!(ws.state.psi, 0)
+    # Seed the C region with the T_hot equilibrium instead of asking the reservoir
+    # to grow it from vacuum. It cannot: a mode relaxes at 2γ(ϵ−μ), which vanishes
+    # exactly where the Rayleigh-Jeans occupation puts the atoms, so ten response
+    # times of equilibration reached 1.85e4 against an equilibrium of 1.52e5.
+    if physical
+        hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
+        host = zeros(ComplexF64, size(ws.state.psi))
+        thermal_cfield!(host, grid, hplans; T=T_hot, mu, c0,
+            k_cut=sqrt(2 * (mu + cutoff_n_T * T_hot)), seed)
+        copyto!(ws.state.psi, host)
+    else
+        fill!(ws.state.psi, 0)
+    end
 
     # T(t): hold hot, linear ramp over tau_Q, hold cold. mu fixed throughout, so
     # the transition is crossed by cooling rather than by pumping atoms in.

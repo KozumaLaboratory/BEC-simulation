@@ -102,6 +102,7 @@ const FAST_TESTS = [
     # Gated on a coherent field (no decay), white noise (decay within a cell), and
     # recovery of an IMPOSED correlation length as it is scaled.
     "analysis/test_coherence_length.jl",
+    "dynamics/test_thermal_cfield.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
