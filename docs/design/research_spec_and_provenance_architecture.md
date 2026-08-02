@@ -757,8 +757,30 @@ produced it. It also had nothing to do: 0 `.jld2` exist under `runs/`.
 **Step 4 — the 11 ambient `Ref`s become `stage.params` fields.** Eleven
 mechanical edits, listed by file:line in §1. `DEALIAS_K_CUTOFF` and
 `DEALIAS_2_3_ENABLED` first: they are the pair that 75 committed configs set and
-that no spec-derived key could see. Gate is a grep for `const … = Ref(` under
-`src/hamiltonian/` and `src/foundation/spinor_utils/`.
+that no spec-derived key could see. ~~Gate is a grep for `const … = Ref(` under `src/hamiltonian/` and
+`src/foundation/spinor_utils/`.~~ **That gate, as I specified it, was defective
+and was replaced when step 4 ran it verbatim.** It matches `Ref(` but not
+`Ref{Union{…}}(`, so it cannot see `DEALIAS_K_CUTOFF` — one of the two the same
+sentence calls out as the pair to do first — and it scans two directories, so
+both euler warps in `ext/SpinorBECCUDAExt/` are outside it. Three of eleven
+invisible; measured, the grep returns 6 lines against 15 module-level `Ref`s
+under `src/` + `ext/`.
+
+The gate is now a scanner over `CODE_TREE_DIRS` (asserted equal to
+`("src", "ext")` rather than restated, so it cannot drift from what
+`code_tree_hash` covers) matching `Ref(` / `Ref{` / `Base.RefValue`, compared
+against a **pinned literal set with a reason per entry**, checked in both
+directions so neither an addition nor a rename can pass. `test_no_ambient_module_refs.jl`.
+
+Two further gates were found broken while doing this, both reported rather than
+quietly strengthened. `bench/verify_euler_warp.jl` flipped `_DDI_EULER_WARP[]`
+and then called a function that takes the Taylor path first at `D <= 16`, so it
+compared the Taylor kernel with itself, measured relerr `0.0`, and printed OK
+under a tolerance implying its author expected a difference; `_SM_EULER_WARP` had
+no coverage at all. And `test_cpu_spin_rotation_taylor_parity.jl` did not gate
+`SPIN_TAYLOR_RSAFE` — its own comment claims the sweep runs "far past
+`SPIN_TAYLOR_RSAFE`, where every voxel halves", but the largest R it reaches is
+8.17, where an unhalved degree-40 Horner is still 3.8e-12.
 
 **Step 5 — `refs/<paper>.toml` + `claim`.** One file, `refs/matsui2025.toml`,
 populated from the numbers already pinned in
