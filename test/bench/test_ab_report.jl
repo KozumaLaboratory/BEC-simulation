@@ -81,13 +81,20 @@ using .ABReport: Arm, compare, summarize, read_rows
 some other output the body printed
 {"metric":"wall","value":13.5,"sha":"bbb","round":1}
 {"metric":"iters","value":600,"sha":"aaa","round":1}
+{"metric":"grad_norm","value":9.97568048e-07,"sha":"aaa","round":1}
+{"metric":"neg","value":-1.5e+03,"sha":"bbb","round":1}
 {"not_a_row":1}
 """,
         )
         rows = read_rows(path)
-        @test length(rows) == 3
+        @test length(rows) == 5
         @test rows[1].metric == "wall" && rows[1].value == 12.5 && rows[1].sha == "aaa"
         @test rows[3].metric == "iters"
+        # A NEGATIVE exponent, which the shipped regex truncated at the `e`
+        # because `-` was only allowed as a leading sign. Real `grad_norm` rows
+        # are all of this shape, so the very first data set hit it.
+        @test rows[4].value ≈ 9.97568048e-7
+        @test rows[5].value ≈ -1.5e3
         rm(path)
     end
 end

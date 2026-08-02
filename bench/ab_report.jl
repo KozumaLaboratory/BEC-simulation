@@ -109,7 +109,11 @@ function read_rows(path::AbstractString)
     for line in eachline(path)
         startswith(line, "{\"metric\"") || continue
         m = match(r"\"metric\"\s*:\s*\"([^\"]*)\"", line)
-        v = match(r"\"value\"\s*:\s*(-?[\d.eE+]+)", line)
+        # `-` inside the class, not only as a leading sign: real rows carry
+        # `9.97568048e-07`, and without it the parse truncated at the `e`. The
+        # first version of this file shipped that bug and the first real data
+        # set found it, because the test fixture had no negative exponent.
+        v = match(r"\"value\"\s*:\s*(-?[\d.eE+-]+)", line)
         s = match(r"\"sha\"\s*:\s*\"([^\"]*)\"", line)
         (m === nothing || v === nothing || s === nothing) && continue
         push!(rows, (metric=m.captures[1], value=parse(Float64, v.captures[1]),
