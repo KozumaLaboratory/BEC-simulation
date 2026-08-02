@@ -265,12 +265,16 @@ function kz_winding_scan(;
         frac_int = count(w -> abs(w - round(w)) < 0.1, Ws) / length(Ws)
         frac_int < 0.8 && @warn "only $(round(100frac_int))% of windings are " *
                                 "near-integer — the phase is not a clean condensate" τ
-        z_mean = abs(mean(Ws)) / (σ / sqrt(n_traj) + eps())
+        z_mean = abs(mean(Ws)) / (σ / sqrt(length(Ws)) + eps())
         z_mean > 4 && @warn "⟨W⟩ is $(round(z_mean; digits=1))σ from zero — the " *
                             "ensemble is not independent or W is biased" τ mean_W=mean(Ws) σ
         # A standard deviation's own error, not the mean's — the quantity fitted
         # here IS the width.
-        e = σ / sqrt(2 * (n_traj - 1))
+        # length(Ws), NOT n_traj: a shard runs a strided SUBSET, and using the
+        # full count understated this by sqrt(1000/63) = 4x — which would have
+        # made agreement with the published beta look four times more significant
+        # than the data supports.
+        e = σ / sqrt(2 * (length(Ws) - 1))
         push!(σs, σ);
         push!(errs, e);
         push!(all_W, Ws)
@@ -356,6 +360,67 @@ if abspath(PROGRAM_FILE) == @__FILE__
         for dt in (0.02, 0.01, 0.005)
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
+        end
+    elseif startswith(mode, "merge")
+        # "merge:nd" / "merge:full" — read every shard's RAW windings, then do the
+        # statistics once, on the pooled sample.
+        md = split(mode, ":")[2]
+        files = filter(f -> startswith(f, "kz_torus_$(md)_s") && endswith(f, "_raw.csv"),
+            readdir(OUTDIR))
+        isempty(files) && error("no raw shards for $md in $OUTDIR")
+        byτ = Dict{Float64, Vector{Float64}}()
+        for f in files, ln in eachline(joinpath(OUTDIR, f))
+            (isempty(ln) || startswith(ln, "#") || startswith(ln, "tau_Q")) && continue
+            a_, b_ = split(ln, ",")
+            push!(get!(byτ, parse(Float64, a_), Float64[]), parse(Float64, b_))
+        end
+        τs = sort(collect(keys(byτ)))
+        @printf("=== %s, %d shards ===\n", md == "full" ? "FULL SPGPE" : "number-damping",
+            length(files))
+        @printf("%-10s %-6s %-9s %-9s %-9s %-8s %-8s\n",
+            "tau_Q", "n", "sigma(W)", "err", "<W>", "z(<W>)", "int(W)")
+        σs, es = Float64[], Float64[]
+        for τ in τs
+            W = byτ[τ];
+            n = length(W);
+            σ = std(W)
+            e = σ / sqrt(2 * (n - 1))
+            z = abs(mean(W)) / (σ / sqrt(n))
+            fi = count(w -> abs(w - round(w)) < 0.1, W) / n
+            push!(σs, σ);
+            push!(es, e)
+            @printf("%-10.1f %-6d %-9.4f %-9.4f %-9.4f %-8.2f %-8.2f\n",
+                τ, n, σ, e, mean(W), z, fi)
+            z > 4 && @warn "⟨W⟩ is $(round(z; digits=1))σ from zero" τ
+            fi < 0.8 && @warn "only $(round(100fi))% integer windings" τ
+        end
+
+        # Every point has the same n, so log σ carries the same error at each and
+        # an unweighted fit is the right one. The error on β then comes from that
+        # error propagated, which is a statement about the data; the residual-based
+        # error is a statement about the fit. Report both and take the larger.
+        x = log.(τs);
+        y = log.(σs)
+        x̄, ȳ = mean(x), mean(y)
+        Sxx = sum((x .- x̄) .^ 2)
+        slope = sum((x .- x̄) .* (y .- ȳ)) / Sxx
+        β = -slope
+        δlogσ = mean(es ./ σs)
+        β_prop = δlogσ / sqrt(Sxx)
+        resid = y .- (ȳ .+ slope .* (x .- x̄))
+        β_resid = sqrt(sum(resid .^ 2) / (length(x) - 2) / Sxx)
+        β_err = max(β_prop, β_resid)
+        ref = md == "full" ? (0.0966, 0.0128) : (0.1236, 0.0098)
+        @printf("\nbeta = %.4f ± %.4f  (propagated %.4f, residual %.4f)\n",
+            β, β_err, β_prop, β_resid)
+        @printf("published %.4f ± %.4f   ->  %.1f sigma\n",
+            ref[1], ref[2], abs(β - ref[1]) / sqrt(β_err^2 + ref[2]^2))
+        open(joinpath(OUTDIR, "kz_torus_$(md)_merged.csv"), "w") do io
+            println(io, "# beta=$β beta_err=$β_err published=$(ref[1]) shards=$(length(files))")
+            println(io, "tau_Q,n,sigma_W,sigma_W_err")
+            for (i, τ) in enumerate(τs)
+                @printf(io, "%.6f,%d,%.8f,%.8f\n", τ, length(byτ[τ]), σs[i], es[i])
+            end
         end
     elseif startswith(mode, "shard")
         # "shardIofN:MD:NTRAJ" — one process per shard, strided over trajectories.
