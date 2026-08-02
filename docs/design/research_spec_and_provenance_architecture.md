@@ -1,5 +1,12 @@
 # Research spec and provenance architecture
 
+> **This file is now the RECORD, not the front.** The researcher-facing design is
+> [`unified_spec_architecture.md`](unified_spec_architecture.md) — one law, one
+> lookup, one register. Nothing here is retracted; what follows is the
+> measurements, the cutover log, the four step-2 deviations, the six step-3
+> corrections and the canary passes that the front is derived from. Read that
+> file first; come here for why a number is what it is.
+
 **Status:** design, revision 3 (2026-07-31). Supersedes revisions 1 and 2 entirely.
 
 **Audit trail.** Revision 1 was red-teamed across seven attack surfaces: 47
