@@ -115,7 +115,16 @@ echo "[store] $SPINORBEC_STORE"
 nvidia-smi -L || true
 
 # Guard silent CPU fallback (a broken-CUDA node otherwise burns hours on CPU).
-"$JULIA" --project=. -e '
+# Optional sysimage (scripts/build_sysimage_matsui.jl). Measured baseline
+# without one: 528.5 s for 45 points, of which ~277 s is first-point JIT and
+# ~115 s startup. Set SPINORBEC_SYSIMAGE to a built .so to skip most of that.
+SYSIMG_ARG=""
+if [ -n "${SPINORBEC_SYSIMAGE:-}" ] && [ -f "${SPINORBEC_SYSIMAGE}" ]; then
+    SYSIMG_ARG="--sysimage=${SPINORBEC_SYSIMAGE}"
+    echo "[sysimage] $SPINORBEC_SYSIMAGE"
+fi
+
+"$JULIA" --project=. $SYSIMG_ARG -e '
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
