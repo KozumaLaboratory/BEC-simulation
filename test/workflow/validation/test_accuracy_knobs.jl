@@ -15,7 +15,8 @@
 using Test
 using SpinorBEC
 using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
-    SPIN_TAYLOR_ENABLED, DEALIAS_2_3_ENABLED
+    SPIN_TAYLOR_ENABLED, DEALIAS_2_3_ENABLED,
+    yaml_to_model, model_toml_dict, content_id
 
 @testset "accuracy knob registry" begin
     @test !isempty(ACCURACY_KNOBS)
@@ -65,6 +66,56 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
             error("boom")
         end
         @test (SPIN_TAYLOR_ENABLED[], DEALIAS_2_3_ENABLED[]) == before
+    end
+
+    # [KNOWN-GAP], pinned so that fixing it is a visible diff rather than a
+    # silent improvement. `with_reference_accuracy` is the instrument for "re-run
+    # this with every approximation at its most accurate setting", and around
+    # `run_yaml` it can produce exactly the degeneracy it exists to detect: the
+    # reference run resolves to the SAME `artifact_id` as production and can be
+    # served the production artifact.
+    #
+    # Two independent causes, both measured. `:spin_taylor` is in no `Stage`
+    # (see test/model/test_ambient_refs_vs_artifact_id.jl). `:dealias_2_3` IS in
+    # the id via `GridSpec`, but `_run_yaml_prepare` applies the config's own
+    # top-level `dealias:` block AFTER the reference flip, overwriting it — and
+    # 75 committed configs carry that block.
+    #
+    # The POSITIVE CONTROL is the whole assertion: the same config without the
+    # block DOES move the id, so the null below is about the clobber and not
+    # about a harness that never moves anything.
+    @testset "[KNOWN-GAP] a config's dealias block clobbers the reference flip" begin
+        base = """
+        defaults: {kind: spinor, backend: cpu}
+        pipeline:
+          - ground_state:
+              atom: Rb87
+              grid: {n: [16], box: [8.0]}
+              potential: {type: harmonic, omega: [1.0]}
+              interactions: {N_atoms: 100, omega_ref: 100.0, c0: 1.0, c1: 0.0}
+              ddi: {enabled: false}
+              lhy: {kind: none}
+              initial_state: polar
+              method: itp
+              n_steps: 5
+              dt: 1.0e-3
+              tol: 1.0e-6
+        """
+        mid(p) = content_id(model_toml_dict(yaml_to_model(p)); n=16)
+        mktempdir() do d
+            plain = joinpath(d, "plain.yaml")
+            blocked = joinpath(d, "blocked.yaml")
+            write(plain, base)
+            write(blocked, "dealias: {enabled: false}\n" * base)
+
+            # Control: with nothing clobbering it, the reference flip MOVES the id.
+            @test mid(plain) != with_reference_accuracy(() -> mid(plain))
+            # The gap: one extra line, and it stops moving.
+            @test mid(blocked) == with_reference_accuracy(() -> mid(blocked))
+            # ... and the two configs describe the same physics otherwise, so the
+            # difference above is the clobber and nothing else.
+            @test mid(plain) == mid(blocked)
+        end
     end
 
     @testset "report names the per-run knobs it does not set" begin
