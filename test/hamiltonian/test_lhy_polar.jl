@@ -472,3 +472,35 @@ end
     @test table_contact.densities ≈ table_dipolar.densities
     @test maximum(abs.(table_contact.potential_values .- table_dipolar.potential_values)) < 1e-8
 end
+
+@testset "polar_contact REFUSES at σ₀ < 0 instead of dying in `^`" begin
+    # c₁ < 0 drives the density Goldstone stiffness negative, and the closed form
+    # then evaluated `(n·σ₀)^2.5` and threw a bare DomainError twelve frames deep
+    # — "Exponentiation yielding a complex result requires a complex argument",
+    # which names no coupling and suggests no fix. It is the same situation as
+    # `λ_spin < 0` in the I_h form, which had been given a NaN refusal in July;
+    # this one had not. Found running the ITP-fusion bench at c₁/c₀ = −0.05, the
+    # sign Eu F=6 PRODUCTION uses.
+    F = 6
+    g_neg = SpinorBEC._c0c1_to_gS(F, 10.0, -0.5)
+    err = try
+        SpinorBEC.compute_spinor_lhy_polar_contact(;
+            F, g_dict=g_neg, n_max=2.0, n_points=8)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    # The message has to name the cause and the way out, or the refusal is just a
+    # different crash.
+    @test occursin("σ₀ < 0", err.msg) || occursin("not applicable", err.msg)
+    @test occursin("full_bdg", err.msg)
+
+    # POSITIVE CONTROL: the same call at c₁ > 0 must still build, or this test
+    # would pass on a form that refuses everything.
+    g_pos = SpinorBEC._c0c1_to_gS(F, 10.0, 0.5)
+    tbl = SpinorBEC.compute_spinor_lhy_polar_contact(;
+        F, g_dict=g_pos, n_max=2.0, n_points=8)
+    @test tbl isa SpinorBEC.PolarContactLHY
+    @test all(isfinite, tbl.potential_values)
+end

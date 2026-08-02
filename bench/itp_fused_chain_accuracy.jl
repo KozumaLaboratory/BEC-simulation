@@ -44,6 +44,12 @@ const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 40000
 # result is meant to license had never been run. A conclusion drawn at one sign of
 # the spin coupling is not a conclusion about the other.
 const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 0.05
+# The LHY kind is an argument because `polar_contact` CANNOT be built at c₁ < 0 —
+# σ₀ goes negative and the closed form refuses (it used to die in `^`). That is
+# not a limitation of the fusion question: the fused diagonal absorbs a tabulated
+# LHY completely (measured under 2 % in every substep), so `none` exercises the
+# same diag + spin-mixing + DDI chain the fusion changes.
+const LHY = length(ARGS) >= 4 ? Symbol(ARGS[4]) : :polar_contact
 const DT = 0.002
 const TOL = 1.0e-10
 
@@ -59,7 +65,7 @@ function build(dt)
             save_every=10^9),
         psi_init=psi0, enable_ddi=true, c_dd=EU_c_dd,
         ddi_padding=true, ddi_trunc_radius=-1.0,
-        spinor_lhy=:polar_contact, backend=CUDABackend())
+        spinor_lhy=(LHY === :none ? nothing : LHY), backend=CUDABackend())
     ws
 end
 
@@ -123,7 +129,7 @@ function ddist(a, b)
 end
 
 println("="^78)
-println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, c₁/c₀=$(C1_RATIO), tol=$(TOL), $(CUDA.name(CUDA.device()))")
+println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, c₁/c₀=$(C1_RATIO), lhy=$(LHY), tol=$(TOL), $(CUDA.name(CUDA.device()))")
 println("verdict = |F−S| / |S−B|, where S−B is the error dt ALREADY costs")
 println("="^78)
 

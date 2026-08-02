@@ -95,6 +95,16 @@ function lhy_energy_polar(n::Float64, coefs::PolarLHYCoefs;
 
     # m = 0: ν=1, κ_0 = |δ_0| = σ_0 (Goldstone), t_0 = 0
     sigma_0 = coefs.sigma[1]
+    # REFUSE rather than throw a DomainError from `^`. σ₀ < 0 is the density
+    # Goldstone branch going unstable, which is the same situation as
+    # `λ_spin < 0` in `epsilon_LHY_F6_Ih`: the closed form assumes a branch
+    # structure that no longer holds, and ε_LHY is scheme-dependent there. That
+    # path returns NaN and lets `_tabulate_lhy` raise a message naming the fix;
+    # this one used to evaluate `(n·σ₀)^2.5` and die with
+    # "Exponentiation yielding a complex result requires a complex argument",
+    # 12 frames deep, saying nothing about couplings. Found 2026-08-02 running
+    # this at c₁/c₀ = −0.05 — the sign Eu F=6 PRODUCTION uses.
+    sigma_0 < 0 && return NaN
     total = (n * sigma_0)^2.5
 
     # m = ±1..F: ν=2 each
