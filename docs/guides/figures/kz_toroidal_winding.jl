@@ -133,9 +133,9 @@ relaxes at `2γ(ϵ−μ)`, which vanishes where the occupation is largest.
 function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
-    dt::Float64=0.01, backend=CPUBackend(),
+    dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
 )
-    grid = make_grid(GridConfig((KZ_M,), (KZ_L,)))
+    grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
     ws = make_workspace(; grid, atom=Rb87,
@@ -197,7 +197,7 @@ whether 0.124 and 0.097 are distinguishable at all.
 """
 function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
-    dt::Float64=0.01, backend=CPUBackend(), tag::String="kz_torus",
+    dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -219,8 +219,9 @@ function kz_winding_scan(;
         round(Int, sqrt(2eps_cut) * KZ_L / π))
     @printf("  gamma=%.3g PINNED as in the paper (3D-formula rate %.3g, ratio %.3g — ORDER ONLY, trap is quasi-1D)\n",
         gamma, γ_derived, gamma / γ_derived)
-    @printf("  M_damp=%.3g  %s   dt=%.4g   %d trajectories/point\n",
-        M_damp, M_damp > 0 ? "FULL SPGPE" : "number-damping only", dt, n_traj)
+    @printf("  M_damp=%.3g  %s   dt=%.4g  M_grid=%d (k_max=%.2f, %.1fx k_cut)   %d traj/point\n",
+        M_damp, M_damp > 0 ? "FULL SPGPE" : "number-damping only", dt, M_grid,
+        π * M_grid / KZ_L, π * M_grid / KZ_L / sqrt(2eps_cut), n_traj)
     @printf("\n  %-10s %-9s %-9s %-10s %-10s %-10s\n",
         "tau_Q", "sigma(W)", "err", "<W>", "<N_equil>", "<N_final>")
     flush(stdout)
@@ -231,7 +232,7 @@ function kz_winding_scan(;
         for j in 1:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, backend)
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend)
             push!(Ws, r.W);
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
@@ -261,7 +262,9 @@ function kz_winding_scan(;
     slope = sum((x .- x̄) .* (y .- ȳ)) / Sxx
     resid = y .- (ȳ .+ slope .* (x .- x̄))
     β = -slope
-    β_err = sqrt(sum(resid .^ 2) / max(length(x) - 2, 1) / Sxx)
+    # With two points the line passes through both and the residual-based error is
+    # identically zero — a structural zero, not a tight measurement. Refuse it.
+    β_err = length(x) >= 3 ? sqrt(sum(resid .^ 2) / (length(x) - 2) / Sxx) : NaN
     ref = M_damp > 0 ? (0.0966, 0.0128) : (0.1236, 0.0098)
     @printf("\n  beta = %.4f ± %.4f   published %.4f ± %.4f   (%.1f sigma)\n",
         β, β_err, ref[1], ref[2], abs(β - ref[1]) / sqrt(β_err^2 + ref[2]^2))
@@ -287,6 +290,22 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # Every code path, smallest ensemble, two shortest quenches. NOT physics.
         kz_winding_scan(; tau_Qs=(exp(2.0), exp(3.0)), n_traj=4, backend,
             tag="kz_torus_smoke")
+    elseif mode == "conv"
+        # dt AND grid convergence, before any production run. For the SPGPE the
+        # time step matters more than the k-space quadrature (Rooney, Blakie &
+        # Bradley, PRE 89, 013302), and the grid is worth testing because
+        # k_cut = 2.01 puts only 128 of the paper's 1024 modes inside the C
+        # region — the rest are projected away every step. M = 256 still leaves
+        # k_max = 4.0, i.e. 2x k_cut, which clears the 3/2 dealiasing margin.
+        #
+        # A cheaper setting is only allowed if sigma(W) does not move. That is
+        # the same discipline the literature applies to the cutoff itself
+        # (results must be stable under a 10-15% variation).
+        for (dt, Mg) in ((0.01, 1024), (0.005, 1024), (0.02, 1024),
+            (0.01, 512), (0.01, 256), (0.05, 256))
+            kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=64, dt, M_grid=Mg, backend,
+                tag="kz_torus_conv_dt$(replace(string(dt), "." => "p"))_M$(Mg)")
+        end
     elseif mode == "dtconv"
         # dt convergence FIRST: for the SPGPE the time step matters more than the
         # k-space quadrature (Rooney, Blakie & Bradley, PRE 89, 013302).
