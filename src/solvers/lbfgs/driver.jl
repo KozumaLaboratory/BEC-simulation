@@ -114,6 +114,24 @@ function find_ground_state_lbfgs(;
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     precond_alpha_v::Float64=-1.0,        # ≥0 ⇒ combined P_C = P_V^½ P_K P_V^½
     precond_alpha_k::Float64=1.0,         # kinetic shift for the P_C kinetic factor
+    # OFF by default because it was MEASURED, not because nobody tried it: on
+    # the weak-field Eu+DDI soft manifold at 24³ it made convergence ~40×
+    # WORSE (d496dd71, 2026-06-23). The reason is structural, so do not expect
+    # a better α to rescue it — that ground state spontaneously breaks the
+    # exact axial U(1) `e^{-iθ(L_z+F_z)}`, so the minimum is a degenerate
+    # ORBIT with a Goldstone flat direction, and a DIAGONAL preconditioner
+    # cannot precondition a collective zero mode.
+    #
+    # This is worth stating here rather than only in a commit message: the
+    # bench that was kept expressly "so the next session does not re-derive
+    # it" was itself deleted two days later by a sweep that dropped one-off
+    # drivers (40c329a5), and the finding survived only in `git log`.
+    #
+    # It also says what the iteration count on that problem IS limited by.
+    # `P_C` is the Antoine-Levitt-Tang preconditioner (J. Comput. Phys. 343
+    # (2017), arXiv:1611.02045), where it is the dominant lever — for TRAPPED,
+    # GAPPED problems. This one is neither, so per-iteration cost is the lever
+    # here and the flat direction is what would have to be quotiented out.
     rotating_frame_omega::Float64=0.0,
     newton_polish::Bool=false,
     newton_max_outer::Int=20,
