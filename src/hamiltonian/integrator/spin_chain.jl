@@ -84,12 +84,22 @@ function _spin_chain_reason(ws::Workspace, ip::InteractionParams, psi_mf)
         return "the Orszag F-filter reshapes ⟨F⟩ for DDI but not for spin-mixing"
     ws.magnetic_gradient === nothing ||
         return "a magnetic gradient mutates V around the diagonal step"
-    # The fused kernel carries the diagonal phase as `V + c₀n + c·n^{3/2}`, the
-    # same closed form the GPU diagonal kernel's `c_lhy` bound admits. A
-    # tabulated LHY is a lookup, not that form.
+    # The fused kernel carries the diagonal phase as `V + c₀n + c·n^{3/2}` for the
+    # closed forms, and as `V + c₀n + lookup(n)` for a tabulated one — the same
+    # two arms the fused GPU DIAGONAL kernel carries, sharing
+    # `_lhy_interp_uniform` so the three entry points cannot disagree about a
+    # table. Tabulated was declined outright until 2026-08-01, and since every
+    # production Eu run is tabulated (polar_contact / icosahedral / full_bdg / …)
+    # that meant NO production run ever took the fused half-step.
+    #
+    # Anything else still returns a reason, and must: the GPU prepass collapses a
+    # non-scalar, non-tabulated `c_lhy` to zero, so admitting one here would run
+    # it with no LHY and say nothing — the defect that hit the GPU diagonal in
+    # July. `SpatialLHY` is not a `TabulatedLHY` and is declined above by
+    # `_lhy_needs_spin` in any case.
     let l = ws.lhy !== nothing ? ws.lhy : ip.c_lhy
-        l isa Union{Nothing, NoLHY, Float64, ScalarLHY} ||
-            return "a tabulated LHY is not the closed-form diagonal phase"
+        l isa Union{Nothing, NoLHY, Float64, ScalarLHY, TabulatedLHY} ||
+            return "this LHY is neither the closed-form diagonal phase nor a table"
     end
     nothing
 end

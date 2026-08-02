@@ -647,10 +647,10 @@ $\rho_{\rm inv}$ Hermitian deviation = 0; $\mathrm{Tr}\,\rho_{\rm inv} = 1$ exac
 
 ### V.8 Source anchors
 
-- **Theorist J-involution derivation**: `runs/_loop/theorist/turn_115.md §2.A`
+- **Theorist J-involution derivation**: `runs/_loop/theorist/turn_115.md §2.A` (archived)
   (equations A1–A6; theorist re-derivation closed-form
   $\sum_{i,j}|\langle 0,0|\zeta_i \otimes \zeta_j\rangle|^2 = m_{\rm rep}/(2F+1)$ at line ~147).
-- **Numerical verification at F=9 T:A**: `runs/_loop/sim/turn_115.md §5`
+- **Numerical verification at F=9 T:A**: `runs/_loop/sim/turn_115.md §5` (archived)
   (metrics block: `bar_beta_0_canonical_F9_TA = 0.0526315789473683`, table
   for $S = 0,\ldots,2F$, sum-rule dev $6.66 \times 10^{-15}$);
   script `test/manuscript/test_f9_f11_polyhedral.jl`
@@ -669,8 +669,8 @@ $\rho_{\rm inv}$ Hermitian deviation = 0; $\mathrm{Tr}\,\rho_{\rm inv} = 1$ exac
 - `sign_pattern_anomalous_identity.md` — empirical observation pattern
 - `Ch6_polyhedral_phases_integrated.md` §6.5 — F=6 icosa closed forms
 - `paper3_universal_theorem/main.md` §V — 5 polyhedral cases verified
-- `runs/_loop/theorist/turn_115.md` — multiplicity-aware J-involution derivation (2026-05-19)
-- `runs/_loop/sim/turn_115.md` — multiplicity-aware F=9 T:A 4-falsifier corroboration (2026-05-19)
+- `runs/_loop/theorist/turn_115.md` (archived) — multiplicity-aware J-involution derivation (2026-05-19)
+- `runs/_loop/sim/turn_115.md` (archived) — multiplicity-aware F=9 T:A 4-falsifier corroboration (2026-05-19)
 
 ---
 

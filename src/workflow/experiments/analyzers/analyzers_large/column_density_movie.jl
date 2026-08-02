@@ -52,7 +52,11 @@ function _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
     open(manifest_path, "w") do io
         JSON.print(io, manifest)
     end
+    # `n_phases`, not a second computation of it: `sources` was a local of the
+    # traversal that moved into `_each_dynamics_snapshot`, and the reference
+    # left behind here threw `UndefVarError` — only under `multi_step=true`,
+    # because the ternary never evaluated it otherwise.
     (output_dir=output_dir, n_frames=global_idx,
         archive_path=archive_path, manifest_path=manifest_path,
-        axis=axis, n_phases=multi_step ? length(sources) : 1)
+        axis=axis, n_phases=n_phases)
 end

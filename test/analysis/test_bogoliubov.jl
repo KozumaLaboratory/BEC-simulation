@@ -1,3 +1,5 @@
+using Test
+using SpinorBEC
 using LinearAlgebra: normalize
 
 @testset "Bogoliubov-de Gennes" begin

@@ -1,3 +1,5 @@
+using Test
+using SpinorBEC
 using JLD2
 using JSON
 using Dates: Date

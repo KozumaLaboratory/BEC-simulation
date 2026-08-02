@@ -16,7 +16,7 @@ function _run_simulation_standard!(
     stream_snapshots::Bool=false,
     stepper::S=(split_step!),
 ) where {N, S}
-    t_start = time()
+    t_start = time_ns()
     try
         for step in 1:(sp.n_steps)
             stepper(ws)
@@ -31,7 +31,7 @@ function _run_simulation_standard!(
                     keep_psi=(!stream_snapshots),
                 )
 
-                elapsed = time() - t_start
+                elapsed = elapsed_s(t_start)
                 frac = step / sp.n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(

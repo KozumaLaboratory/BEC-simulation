@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "BdG enhancements" begin
     @testset "detect_roton: stable system" begin
         spinor = ComplexF64[1.0, 0.0, 0.0]

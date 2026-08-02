@@ -42,6 +42,8 @@ using SpinorBEC: _LBFGS_FORWARD_KWARGS, find_ground_state_lbfgs
         # floor detection for the Armijo backtracking loop — ITP has no line
         # search, so there is nothing to forward it to
         :stop_at_floor,
+        # element type of the L-BFGS s/y curvature history; ITP keeps no history
+        :history_precision,
     ])
 
     not_forwarded = setdiff(lbfgs_kwargs, forwarded, lbfgs_exclusive)

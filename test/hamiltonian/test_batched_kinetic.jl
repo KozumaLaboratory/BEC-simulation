@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Batched Kinetic Step" begin
     @testset "Batched matches per-component 1D" begin
         config = GridConfig(64, 20.0)

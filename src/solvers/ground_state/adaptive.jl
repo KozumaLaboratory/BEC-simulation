@@ -24,7 +24,7 @@ function _find_ground_state_adaptive(;
     ddi_padding::Bool=false,
     ddi_pad_factor::Union{Real, NTuple}=2,
     dt_max,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     rotating_frame_omega::Float64=0.0,
     quasi_2d_ddi::Bool=false,
     l_z_ddi::Float64=0.0,
@@ -83,7 +83,7 @@ function _find_ground_state_adaptive(;
 
     final_dE = NaN
     final_dpsi = NaN
-    t_start = time()
+    t_start = time_ns()
 
     while total_steps < n_steps
         copyto!(psi_backup, ws.state.psi)
@@ -120,7 +120,7 @@ function _find_ground_state_adaptive(;
             final_dpsi = dpsi
 
             if verbose
-                elapsed = time() - t_start
+                elapsed = elapsed_s(t_start)
                 frac = total_steps / n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(
