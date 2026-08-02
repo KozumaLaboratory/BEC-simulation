@@ -11,6 +11,13 @@ echo "### SMOKE"
 $JULIA --project=. bench/itp_fused_chain_accuracy.jl 16 400 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
 rc=${PIPESTATUS[0]}; echo "### smoke rc=$rc"
 [ "$rc" -ne 0 ] && { echo "SMOKE FAILED"; echo "ALL DONE $(date)"; exit 1; }
-echo; echo "### PRODUCTION 64^3"
-$JULIA --project=. bench/itp_fused_chain_accuracy.jl 64 40000 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
+# A MATRIX, not one point. The 2.9x-at-equal-accuracy claim rests on 64^3 with
+# c1_ratio = +0.05, and CLAUDE.md records that c1 < 0 is the sign Eu F=6
+# production uses — so the configuration the claim is FOR had never been run. The
+# grid is varied for the same reason: one point cannot tell a property of the
+# scheme from a coincidence of the state.
+for cfg in "64 40000 0.05" "64 40000 -0.05" "96 40000 0.05"; do
+    echo; echo "### PRODUCTION n/steps/c1 = $cfg"
+    $JULIA --project=. bench/itp_fused_chain_accuracy.jl $cfg 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
+done
 echo "ALL DONE $(date)"

@@ -38,6 +38,12 @@ include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 64
 const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 40000
+# THE SIGN OF c₁ IS A PARAMETER, and it was not one until now. Every number this
+# bench has produced came from `c1_ratio = +0.05`, while CLAUDE.md records that
+# `c₁ < 0` is the sign Eu F=6 PRODUCTION uses — so the one configuration the
+# result is meant to license had never been run. A conclusion drawn at one sign of
+# the spin coupling is not a conclusion about the other.
+const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 0.05
 const DT = 0.002
 const TOL = 1.0e-10
 
@@ -46,7 +52,7 @@ function build(dt)
     psi0 = init_psi(grid, SpinSystem(6); state=:spin_coherent,
         init_theta=π / 4, init_phi=0.3)
     ws = make_workspace(;
-        grid, atom=Eu151, interactions=eu_interaction_params(0.05),
+        grid, atom=Eu151, interactions=eu_interaction_params(C1_RATIO),
         zeeman=ZeemanParams(EU_p_weak, 0.0),
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
         sim_params=SimParams(; dt=dt, n_steps=1, imaginary_time=true,
@@ -117,7 +123,7 @@ function ddist(a, b)
 end
 
 println("="^78)
-println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, tol=$(TOL), $(CUDA.name(CUDA.device()))")
+println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, c₁/c₀=$(C1_RATIO), tol=$(TOL), $(CUDA.name(CUDA.device()))")
 println("verdict = |F−S| / |S−B|, where S−B is the error dt ALREADY costs")
 println("="^78)
 
