@@ -4,6 +4,9 @@
 # abstract dispatch over `PipelineStep`. The fix is the deferred
 # concrete-step refactor described in pipeline_runner.jl. Until that
 # lands, skip the affected blocks unless the user explicitly opts in.
+using Test
+using SpinorBEC
+
 const _SKIP_HEAVY_YAML_INFRA =
     get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
@@ -561,9 +564,15 @@ pipeline:
         @test sum(abs2, psi) * cell_volume(grid2d) ≈ 1.0 atol=1e-10
     end
 
-    @testset "P1.1: Schema accepts all 22 init states" begin
+    @testset "P1.1: Schema accepts every init state it advertises" begin
+        # `ferromagnetic` / `ferromagnetic_min` became `m_plus_F` / `m_minus_F`
+        # in c2b0bece. The rename deleted the old names from the schema, as the
+        # naming convention requires, and this list kept them — for 2½ months,
+        # because no tier ran this file and the nightly that did was already
+        # red. The set-equality below is what makes the next rename fail HERE,
+        # with both sides named, instead of inside `validate_config!`.
         all_states = [
-            "polar", "ferromagnetic", "ferromagnetic_min",
+            "polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
             "spin_coherent", "radial_spin_vortex", "flower", "spin_helix",
             "cyclic", "biaxial_nematic", "polar_core_vortex",
@@ -572,6 +581,11 @@ pipeline:
             "chiral_spin_vortex", "magnetic_domain",
             "vortex_lattice", "skyrmion_lattice",
         ]
+        # `from_jld2` is a loader, not a named state — the one enum entry this
+        # list deliberately omits.
+        @test Set(all_states) ==
+            setdiff(Set(SpinorBEC.GS_SCHEMA["initial_state"].enum), Set(["from_jld2"]))
+
         for s in all_states
             d = Dict{String, Any}(
                 "atom" => "Rb87", "grid" => Dict("n" => 32, "box" => 10.0),
@@ -653,9 +667,12 @@ pipeline:
 
     @testset "P1.4: Pulse sequence parse + compile" begin
         raw = [
-            Dict{String, Any}("t" => 0.0, "apply" => "zeeman", "duration" => 0.5,
+            # `apply: B`, not `zeeman`: the unified B block renamed the target,
+            # and `zeeman` is now rejected rather than silently compiled to
+            # nothing (which is what this test was actually asserting).
+            Dict{String, Any}("t" => 0.0, "apply" => "B", "duration" => 0.5,
                 "p" => Dict{String, Any}("from" => 0.0, "to" => 100.0)),
-            Dict{String, Any}("t" => 0.5, "apply" => "zeeman", "duration" => 0.5,
+            Dict{String, Any}("t" => 0.5, "apply" => "B", "duration" => 0.5,
                 "p" => 100.0),
         ]
         events = SpinorBEC.parse_pulse_sequence(raw, 1.0)
@@ -686,8 +703,12 @@ pipeline:
       duration: 0.02
       dt: 0.001
       pulse_sequence:
-        - {t: 0.0, apply: zeeman, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
-        - {t: 0.01, apply: zeeman, duration: 0.01, p: 10.0, q: 0.5}
+        # `apply: B`, not `zeeman`: the unified B block renamed the target and
+        # `parse_pulse_sequence` now rejects the old name outright. #198 fixed
+        # the dict-form occurrence a few testsets up; this YAML one is the same
+        # rename, and it was the last red left in the `full` tier.
+        - {t: 0.0, apply: B, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
+        - {t: 0.01, apply: B, duration: 0.01, p: 10.0, q: 0.5}
 """)
         result = SpinorBEC.run_config(cfg)
         @test result.dynamics_result !== nothing
@@ -696,7 +717,7 @@ pipeline:
     @testset "P1: Schema validates dynamics pulse_sequence" begin
         d = Dict{String, Any}(
             "duration" => 1.0, "dt" => 0.001,
-            "pulse_sequence" => [Dict("t" => 0.0, "apply" => "zeeman")],
+            "pulse_sequence" => [Dict("t" => 0.0, "apply" => "B")],
         )
         SpinorBEC.validate_config!(d, SpinorBEC.DYNAMICS_SCHEMA, "test")
     end

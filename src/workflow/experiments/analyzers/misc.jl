@@ -204,6 +204,23 @@ function _analyze_summary_json(psi, grid, atom, params, ws_prev, pipeline_result
     for (k, v) in extras
         summary[String(k)] = v
     end
+    # What produced this number. `point_NNN.jld2` has carried an `env/` block
+    # since the CAS reuse check needed one (`_assert_point_provenance` refuses a
+    # cached point from a different commit), but `summary.json` — the file every
+    # document and figure actually cites — carried none. Measured 2026-08-02 on
+    # 226 stored results: not one summary recorded the commit, the config hash,
+    # or the Julia version, and only 20 of the 226 had ANY file under version
+    # control, so a cited number could not be re-derived or even attributed.
+    #
+    # `_env_metadata()` already exists and is what the jld2 stores; called here
+    # rather than threaded through `pipeline_results` so this adds no key to a
+    # dict that reaches `make_workspace` (CLAUDE.md, "Type stability
+    # boundaries"). Two `git` subprocesses per summary write, against a pipeline
+    # step measured in minutes.
+    for (k, v) in _env_metadata()
+        summary["_env_$k"] = v
+    end
+    summary["_written_at"] = _now_iso()
     mkpath(dirname(output_path) == "" ? "." : dirname(output_path))
     open(output_path, "w") do io
         JSON.print(io, summary, 2)

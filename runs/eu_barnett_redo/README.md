@@ -131,3 +131,102 @@ Grid note: FFT sizes are chosen with small prime factors. The previous round
 found `n=112` to be ~66× slower per step than `n=80` and abandoned fine grids as
 infeasible — `112 = 2⁴·7`, and that factor-7 transform is a large part of it.
 `96 = 2⁵·3` sits between the two in size and is FFT-friendly.
+
+## Results
+
+### The claim
+
+**Of the orbital angular momentum lost after the quench, ~99% becomes spin.**
+
+| quantity | value | why it is trustworthy |
+|---|---|---|
+| conversion efficiency `ΔF_z/|ΔL_z|` | **0.991** | identical at box 42 and 46.7 (0.9916 / 0.9912) and flat across the whole quench |
+| `J_z` ledger leak | **0.9%** of the signal | edge fraction 2.4e-10, four orders under target |
+| rotation is the cause | `Ω=0` gives `J_z ≡ 0` | leak 7.5e-07 — a static field exerts no torque |
+| the DDI is the mechanism | DDI off gives `L_z ≡ 0` | leak 2.1e-12; without it the rotating field nucleates nothing |
+| the sign follows the rotation | `±Ω` mirror to four digits | every column, including the leak |
+
+### Why the efficiency and not ΔF_z
+
+`ΔF_z` is a **transient**. It rises through the entire quench (0.27 → 1.06 over
+t = 40 → 80, still rising at the end) and it rises with the box:
+
+| box | ΔF_z | ΔL_z | efficiency | leak/conv | edge_xy |
+|---|---|---|---|---|---|
+| 35 | 0.9240 | −0.9422 | 0.9806 | 2.0% | 1.95e-05 |
+| 42 | 1.0133 | −1.0218 | 0.9916 | 0.8% | 8.90e-07 |
+| 46.7 | 1.0609 | −1.0704 | 0.9912 | 0.9% | 2.41e-10 |
+
+Same cause for both: once the field is off the cloud expands freely, so a wider
+box or a longer window each let the relaxation run further. Quoting `ΔF_z` means
+quoting the window. The **ratio** removes the window — a 15% spread collapses to
+1.1%, and to 0.04% between the two boxes that meet the edge target.
+
+The stir output is converged (`J_z` at quench start: 8.6904 / 8.7026 / 8.7052,
+last step +0.03%), so the state entering the quench is settled; only the quench
+transient moves.
+
+### The stir rate sets how much, not how efficiently
+
+A scan over the stir rate, at box 42:
+
+| Ω | `L_z` injected | efficiency `ΔF_z/|ΔL_z|` |
+|---|---|---|
+| 0.55 | 1.49 | 0.994 |
+| 0.74 | 8.89 | 0.992 |
+| 1.20 | 0.86 | 0.994 |
+
+**Injection varies 10×; the efficiency moves 0.2%.** The prediction was recorded
+before the runs reported: the efficiency follows from `J_z` conservation with the
+DDI as the only spin–orbit channel once `B = 0`, and neither references the
+drive, so it should be flat — while the injected `L_z` is a driven response and
+should not be. Both held.
+
+That separation is what makes the 99% a statement about the **mechanism** rather
+than about one operating point.
+
+Two caveats, deliberately not dressed up:
+
+- These three numbers are read from the job logs. The CSVs of that scan were
+  destroyed by an output-name collision (four concurrent jobs resolved to one
+  ledger; fixed in `variants.sh` + a lock file). Per-job logs are separate, so
+  the Ω attribution is sound, but there is no time series behind them.
+- The injection is clearly **resonant**, peaking somewhere in 0.74–0.95. Four
+  points spanning 0.4–1.2 do not resolve where, and no resonance curve is
+  claimed here. That would need a dedicated scan across 0.6–1.1.
+
+A re-run for clean CSVs was submitted and then cancelled: it would have bought a
+figure, not a conclusion, at ~24 GPU-hours on a congested cluster.
+
+### Figures
+
+| | |
+|---|---|
+| `fig1_ledger.png` | `L_z`, `F_z`, `J_z` through stir + quench, with per-axis edge fraction |
+| `fig2_chirality.png` | `F_z(t)` for −Ω / 0 / +Ω |
+| `fig3_mechanism.png` | DDI on vs off |
+| `fig4_efficiency.png` | the transient vs the ratio — the argument in one panel |
+
+Figures 1–3 use the box-35 set, the only geometry with all four cells. Generate
+with `--tag=` so cells are never mixed across geometries:
+
+```bash
+python3 runs/eu_barnett_redo/fig_core.py --tag=_prod_box35
+python3 runs/eu_barnett_redo/fig4_efficiency.py
+```
+
+### What it took to get here, and what to reuse
+
+The `J_z` leak was misdiagnosed four times — as the integrator, the z box, the
+kinetic-term discretisation (predicted dealiasing would fix it; it changed
+nothing), and box 35 being an outlier. Two predictions recorded in PR #177 were
+wrong in opposite directions. Each time, progress came from measuring instead of
+reasoning:
+
+- `torque_budget.jl` measures each term's violation of `[H, J_z] = 0` on a real
+  saved state — exactly zero in the continuum, so anything nonzero is the
+  discretisation, resolved per term. Seconds, against hour-long dynamic A/B runs.
+- One variable at a time, with `dx` held to the last digit (`42/288 = 35/240 =
+  28/192`), separated the box from everything else.
+- The final answer needed **no new run at all** — reading the existing ledgers
+  along the time axis showed the efficiency was already flat.

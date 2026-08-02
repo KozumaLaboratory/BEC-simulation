@@ -5,12 +5,28 @@
 # a GPU→CPU sync point.
 
 """
-GPU-native normalize: compute total norm in one GPU reduction.
+GPU-native normalize: one GPU reduction, and the norm never leaves the device.
+
+`sum(abs2, psi)` returns a HOST scalar, so it ends in a device-to-host copy —
+i.e. a full stream drain. ITP normalises on EVERY step (`normalize_every = 1`
+whenever the magnetisation is unconstrained), so that was one host round-trip
+per step: measured 61 µs at 32³ and 152 µs at 64³ on an H100, which is 12 % of
+a 32³ ITP step and, at 8× the data for 2.5× the time, plainly latency and not
+bandwidth. Reducing with `dims` leaves the result in a `(1,1,…,1)` device array
+that broadcasts against ψ, so nothing is transferred and nothing waits.
+
+Same failure mode the Taylor rotation's per-voxel degree was introduced to
+avoid (gpu_spin_rotation_taylor.jl, "Accuracy contract"): a scalar read back to
+the host is a stream drain wearing a reduction's clothes.
+
+Not bit-identical to the scalar form — a `dims` reduction need not sum in the
+same order — but it is the same quantity to within reduction round-off, and it
+is a normalisation constant.
 """
 function SpinorBEC._normalize_psi!(psi::CuArray{<:Complex}, grid, n_components, ndim)
     dV = SpinorBEC.cell_volume(grid)
-    norm_sq = sum(abs2, psi) * dV  # single GPU reduction + scalar transfer
-    psi ./= sqrt(norm_sq)
+    norm_sq = sum(abs2, psi; dims=ntuple(identity, ndims(psi)))  # stays on device
+    psi ./= sqrt.(norm_sq .* dV)
     nothing
 end
 

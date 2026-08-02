@@ -62,10 +62,34 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
 
     @testset "INSENSITIVE to non-physics (analyze / metadata / cache in p)" begin
         # The key reads only physics sub-blocks from p; extra keys must not move it.
+        #
+        # `analyze` is the one that matters and this testset did not have it until
+        # 2026-07-30 — the name said "analyze / metadata / cache" while the body
+        # added only `cache` and a note, so folding `analyze` into the key escaped
+        # the mutation harness. Cross-analyze reuse IS covered further down, but
+        # only inside the `SPINORBEC_RUN_HEAVY_YAML` block, which the default suite
+        # does not run. Reusing one ground state across several analyze blocks is
+        # the cache's whole purpose, so it belongs in the cheap row too.
         let p5 = copy(p)
             p5["cache"] = "/some/explicit/path.jld2"
             p5["irrelevant_note"] = "hello"
             @test k(pp=p5) == k()
+        end
+        let p6 = copy(p)
+            p6["analyze"] = Any[Dict("column_density_movie" => Dict("axis" => 3))]
+            @test k(pp=p6) == k()
+        end
+        let p7 = copy(p)
+            p7["analyze"] = Any[Dict("vortex_extraction" => Dict())]
+            p7["metadata"] = Dict("operator" => "anko", "note" => "rerun for figure 3")
+            @test k(pp=p7) == k()
+        end
+        # Positive control: the two analyze blocks above really do differ, so a
+        # key that folded them in would give three different values.
+        let pa = copy(p), pb = copy(p)
+            pa["analyze"] = Any[Dict("column_density_movie" => Dict("axis" => 3))]
+            pb["analyze"] = Any[Dict("vortex_extraction" => Dict())]
+            @test pa["analyze"] != pb["analyze"]
         end
     end
 

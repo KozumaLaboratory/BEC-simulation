@@ -36,6 +36,7 @@ React app consumes.
 """
 function serve_dashboard(port::Int=8080; base_dir::String="runs",
     bind::AbstractString=get(ENV, "SPINORBEC_DASHBOARD_BIND", "0.0.0.0"),
+    server_ref::Union{Nothing, Ref}=nothing,
 )
     if !isfile(_WEB_DIST_INDEX)
         throw(
@@ -77,6 +78,13 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs",
         )
     end
     server = Sockets.listen(Sockets.InetAddr(bind_addr, port))
+    # A caller that spawned this on a task has no other way to stop it: the
+    # loop below only exits on an InterruptException, and `Base.throwto` on a
+    # task parked in `accept` switches to that task and does not reliably come
+    # back — which is why `test_live_monitor.jl` hung forever and sat in
+    # MANUAL_TESTS_ALLOWLIST rather than in a tier. Hand the listen socket out
+    # and `close(ref[])` makes `accept` throw, the `finally` runs, the task ends.
+    server_ref === nothing || (server_ref[] = server)
     println("Dashboard server running at http://$(bind_addr):$port")
     println("  Serving runs from: $(abspath(base_dir))")
     println("  React app:         $(_WEB_DIST_INDEX)")
@@ -92,7 +100,9 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs",
             )
         end
     catch e
-        e isa InterruptException || rethrow(e)
+        # A closed listen socket surfaces as IOError/EOFError from `accept`;
+        # that is the programmatic stop, not a fault.
+        e isa InterruptException || e isa Base.IOError || e isa EOFError || rethrow(e)
         println("\nDashboard server stopped.")
     finally
         close(server)

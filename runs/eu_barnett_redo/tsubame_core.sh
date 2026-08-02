@@ -40,11 +40,27 @@ echo "REPO=$REPO  branch=$(git branch --show-current 2>/dev/null)  HEAD=$(git re
 # The shared depot lives on the group volume. When that volume is full, Julia
 # cannot write precompile output and dies with an LLVM "IO failure on output
 # stream: Disk quota exceeded" -- so the depot has to be overridable too, not
-# just the results. `JULIA_DEPOT_PATH=$HOME/.julia` runs entirely off the
-# separate 25 GB home quota.
+# just the results.
+#
+# Escape routes, both on filesystems separate from /gs/fs:
+#   /gs/bs/work/<n>/<user>   per-user, 40 PB, no per-user block quota  <- preferred
+#   $HOME                    separate quota but only 25 GB
+# A depot needs ~5 GB and must be instantiated ONCE before the first job
+# (`Pkg.instantiate(); Pkg.precompile()`), or the run dies with
+# "Package CUDA ... is required but does not seem to be installed".
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.julia}"
 export JULIAUP_DEPOT_PATH="${JULIAUP_DEPOT_PATH:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup}"
 export BR_CELL="${BR_CELL:-plus}"
+
+# Optional named geometry. `qsub -v` splits values on commas, so BR_N / BR_BOX
+# tuples CANNOT be passed through -v -- they silently expand into several bogus
+# variables and the job runs the default geometry. Use BR_VARIANT=<name> from
+# variants.sh instead.
+if [ -n "${BR_VARIANT:-}" ]; then
+  source runs/eu_barnett_redo/variants.sh
+  br_select_prod "$BR_VARIANT"
+  echo "variant=$BR_VARIANT n=$BR_N box=$BR_BOX dt=$BR_DT"
+fi
 
 source scripts/tsubame_setup.sh    # node-local NVMe SPINORBEC_SCRATCH_DIR — KEEP IT.
 

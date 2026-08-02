@@ -162,19 +162,50 @@ Semantic details + interactions live in `docs/reference/dynamics.md`.
 | `secular` | Bool | false |
 | `quasi_2d` | Bool | false |
 | `l_z` | Real [0, 100] | — |
-| `trunc_radius` | Number or `"auto"`/`"box_half"` | off |
-| `padded` | Bool | false |
-| `pad_factor` | Number or per-axis Vector | 2 |
+| `trunc_radius` | Number or `"auto"`/`"box_half"`/`"none"`/`"off"` | `"auto"` |
+| `padded` | Bool | true |
+| `pad_factor` | Number, per-axis Vector, or `"auto"` | 2 |
+
+Both image-handling knobs default **on** as of 2026-07-29 (they were both off
+before). The bare periodic kernel they replace carries a $2 \times 10^{-2}$ to
+$5 \times 10^{-2}$ dipolar field error against free space, and that error is
+*flat in resolution* — $1.91 \times 10^{-2}$ at $32^3$, $48^3$ and $64^3$ alike —
+so refining the grid does not touch it. Set `padded: false` and
+`trunc_radius: none` to reproduce a pre-flip run. Measured by
+`scripts/ddi_cutoff_geometry_jz_probe.jl`.
+
+The two are **not independent knobs**. The cutoff alone fixes rotation
+covariance by ~1000× (the $J_z = L_z + \langle F_z\rangle$ violation rate drops
+$1.9\times10^{-2} \to 1.7\times10^{-5}$) while leaving the field *magnitude*
+essentially untouched ($2.1\times10^{-2} \to 2.0\times10^{-2}$), because the
+periodic images are still there. It is the padding that removes them.
+
+Because a dynamics step rebuilds the DDI kernel rather than inheriting it (the
+truncation and padding are baked into the kernel, not carried on `DDIParams`),
+an explicit opt-out written only in `ground_state` does **not** propagate — repeat
+it in the `dynamics` step too.
 
 **`padded`** (Tier B) enables the zero-padded, image-free convolution
 (Vico–Greengard): combined with `trunc_radius: auto` it removes the periodic
 images *exactly* (not just suppresses them), giving near-machine accuracy at
-fixed resolution. Cost: ~`prod(pad_factor)`× the grid FFT work + memory (≈8× at
-the default 2× pad in 3D). **`pad_factor`** sets the zero-pad multiple — a scalar
-or a per-axis vector. Use a smaller factor on thin axes for **anisotropic
-padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to cut memory; the
-auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis to stay
-wrap-around-free. Only meaningful with `padded: true`.
+fixed resolution. Cost is far below the naive `prod(pad_factor)`: at $D = 13$ the
+DDI step is dominated by the spin density and the Euler rotation on the unpadded
+grid rather than by the 6 FFTs, measuring **1.2–1.4×** per step. Memory is the
+real constraint — the padded context is ~290 MB at $64^3$ and ~975 MB at $96^3$.
+**`pad_factor`** sets the zero-pad multiple — a scalar,
+a per-axis vector, or `"auto"`. Use a smaller factor on thin axes for
+**anisotropic padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to
+cut memory; the auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis
+to stay wrap-around-free. Only meaningful with `padded: true`.
+
+`pad_factor: auto` matters only on an **anisotropic** box. A single sphere has
+one radius, so at a flat $2\times$ pad the cutoff is capped at $\min(L_d)$ while
+covering every separation in the box needs $\max(L_d)$ — the SHORT axis binds.
+Auto solves $(f_d - 1)L_d \ge \max(L_d)$ per axis, giving
+$f_d = 1 + \max(L_d)/L_d$. On the aspect-2 cigar that is $(3, 3, 2)$ and takes
+the field error from $1.8\times10^{-3}$ to $0$, for $2.25\times$ the padded
+volume. Isotropic boxes resolve to exactly 2 on every axis, so nothing changes
+for them — which is why the default stays `2` rather than `auto`.
 
 **`trunc_radius`** applies the spherically-truncated DDI kernel
 (Ronen–Bortolotti–Bohn cutoff; Vico–Greengard–Ferrando spectral form). Every
@@ -186,11 +217,14 @@ un-padded convolution — with spectral accuracy at *fixed* resolution, rather t
 trying to converge it away by refining the grid. `h(0)=0` keeps the `Q(k=0)=0`
 spherical-cavity convention (no contact / −δ term is introduced); `h(x)→1` for
 `|k|R ≫ 1` leaves the bulk physics intact. A number sets `R` (in `a_ho` units);
-`"auto"`/`"box_half"` uses half the smallest box extent (the largest cutoff that
-avoids wrap-around in the periodic convolution). The quasi-2D kernel is the
-analytically z-integrated form and is already smooth, so `trunc_radius` does not
-apply there. Off by default (backward-compatible). Diagnostic:
-`scripts/ddi_truncation_isotropy_probe.jl`.
+`"auto"`/`"box_half"` picks the largest wrap-around-free cutoff: half the
+smallest box extent when unpadded, or `min(box diagonal, min_d (pad_factor_d −
+1)·L_d)` when padded. `"none"`/`"off"` restores the bare periodic kernel. The
+quasi-2D kernel is the analytically z-integrated form and is already smooth, so
+`trunc_radius` does not apply there. Diagnostics:
+`scripts/ddi_truncation_isotropy_probe.jl` (field isotropy),
+`scripts/ddi_cutoff_geometry_jz_probe.jl` (field error + $J_z$ violation vs a
+free-space reference, with a corrupted-kernel positive control).
 
 ### `B` — unified Zeeman block
 
@@ -424,7 +458,7 @@ snapshot every `every` steps to the run dir.
 | key | type | required |
 |---|---|---|
 | `t` | Number [0, 1e6] | yes |
-| `apply` | "B" / "raman" / "interactions" / "trap" | yes |
+| `apply` | "B" / "raman" / "interactions" | yes |
 | `duration` | Number [0, 1e6] | — |
 
 Per-target params (left permissive; `_apply_pulse_sequence` validates):
@@ -434,7 +468,10 @@ Per-target params (left permissive; `_apply_pulse_sequence` validates):
 | `B` | `p`, `q`, `bx`, `by` |
 | `raman` | `Omega`, `delta`, `k_eff` |
 | `interactions` | `c0`, `c1` |
-| `trap` | `omega`, `center` |
+
+`trap` was listed here until 2026-07-29 and has never been compiled:
+`compile_pulse_sequence` has no branch for it, so the event was silently
+dropped. `parse_pulse_sequence` now rejects any target it cannot compile.
 
 ### `potential`
 

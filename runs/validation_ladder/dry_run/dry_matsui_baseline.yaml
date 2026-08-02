@@ -34,7 +34,7 @@ pipeline:
           - 1.0
         type: "harmonic"
       B:
-        Bz: "-0.01 Gauss"
+        Bz: "0.01 Gauss"
       gauge_fix: false
       initial_state: "m_minus_F"
       tol: 1.0e-9

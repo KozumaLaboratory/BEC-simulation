@@ -236,12 +236,15 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "secular" => FieldSpec(; type=Bool, default=false),
     "quasi_2d" => FieldSpec(; type=Bool, default=false),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
-    # Ronen spherical-truncation radius (Tier A): a number (physical R), or
-    # "auto"/"box_half" for half the smallest box extent.
+    # Ronen spherical-truncation radius (Tier A): a number (physical R),
+    # "auto"/"box_half" for the largest radius the padding admits, or
+    # "none"/"off" for the bare periodic kernel. Defaults to auto.
     "trunc_radius" => FieldSpec(; type=Union{Number, String}),
     # Tier B: zero-padded, image-free convolution + optional anisotropic pad.
-    "padded" => FieldSpec(; type=Bool, default=false),
-    "pad_factor" => FieldSpec(; type=Union{Number, Vector}),
+    "padded" => FieldSpec(; type=Bool, default=true),   # was false, flipped 2026-07-29
+    # A number, a per-axis vector, or "auto" (size the padding so the cutoff can
+    # reach max(box) instead of being capped by the short axis).
+    "pad_factor" => FieldSpec(; type=Union{Number, Vector, String}),
 )
 
 # `kind` selects the solver path:
@@ -274,6 +277,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
+    "tol_drho" => FieldSpec(; type=Number, default=0.0, range=(0.0, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     # Append a 2nd-order Newton-CG trust-region pass after LBFGS to drive the
     # stationarity residual below the first-order √eps gradient floor. Needed

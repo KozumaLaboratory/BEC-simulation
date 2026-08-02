@@ -65,13 +65,15 @@ function _finalize_lbfgs_atomic!(
     # Sync ws.state.psi to the snapshot before any energy/grad work.
     copyto!(ws.state.psi, psi_snapshot)
 
-    # Total energy at the snapshot.
-    E_final = Float64(total_energy(ws))
-
-    # Gradient + projected-norm at the snapshot.
+    # Energy + gradient + projected-norm at the snapshot, from ONE evaluation.
+    # `energy_gradient!` already returns the total energy at the ψ it is handed
+    # (`energy_decomposition(ws).total` on CPU, the fused total on GPU) — the
+    # separate `total_energy(ws)` that used to precede it was a second full
+    # evaluation of the identical quantity at the identical ψ. Taking it from
+    # the same pass also makes the {ψ, E, ∇E} spine atomic by construction
+    # rather than by re-synchronisation.
     grad = similar(psi_snapshot)
-    fill!(grad, zero(eltype(grad)))
-    energy_gradient!(grad, psi_snapshot, ws; k_squared_dev)
+    E_final = Float64(energy_gradient!(grad, psi_snapshot, ws; k_squared_dev))
     _project_constraints!(grad, psi_snapshot, ws.grid, target_magnetization, F)
     grad_norm_final = Float64(sqrt(real(sum(abs2, grad)) * dV))
 

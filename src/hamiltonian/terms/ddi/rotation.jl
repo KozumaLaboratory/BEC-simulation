@@ -30,33 +30,35 @@ function _apply_ddi_rotation!(
     nothing
 end
 
-# Crop a (possibly zero-padded) dipolar field to psi's physical
-# [1:n_pts...] corner. The padded-DDI convolution returns Φ on the
-# 2×-per-dim grid (ddi_padded.jl); the rotation must read the corner,
-# NOT the first N_spatial LINEAR elements (those walk full padded
-# columns into the pad region for ndim ≥ 2 — App. A defect 9, the
-# 2026-05-10 batched-gemm rewrite dropped the CartesianIndices crop).
-# Unpadded fields (size == n_pts, every production DDI run) return
-# unchanged — zero copy, the hot @simd path below is untouched.
-@inline function _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
-    size(phi_x) == n_pts && return (phi_x, phi_y, phi_z)
-    crop = CartesianIndices(n_pts)
-    return (phi_x[crop], phi_y[crop], phi_z[crop])
+# Voxel → index in the dipolar field. The padded-DDI convolution returns Φ on
+# the 2×-per-dim grid (ddi_padded.jl); the rotation must read the physical
+# [1:n_pts...] CORNER, NOT the first N_spatial LINEAR elements (those walk full
+# padded columns into the pad region for ndim ≥ 2 — App. A defect 9, which the
+# 2026-05-10 batched-gemm rewrite introduced by dropping the crop).
+#
+# This used to be served by materialising `phi[CartesianIndices(n_pts)]` —
+# three fresh n_pts arrays per DDI call, twice per ITP step, and taken by every
+# run since `DDI_PADDED_DEFAULT` flipped to `true` (9c117c05). The map is read
+# inside the angle pre-pass instead, so nothing is copied on either layout.
+@inline function _ddi_phi_index_map(phi_x, n_pts)
+    size(phi_x) == n_pts && return nothing
+    CartesianIndices(n_pts)
 end
 
 @inline function _ddi_compute_angles!(
     alpha::Vector{T}, beta::Vector{T}, theta::Vector{T},
     phi_x::Array{<:AbstractFloat}, phi_y::Array{<:AbstractFloat}, phi_z::Array{<:AbstractFloat},
-    dt_frac::Float64, N_spatial::Int,
+    dt_frac::Float64, N_spatial::Int, src,
 ) where {T <: AbstractFloat}
     z = zero(T)
     one_t = one(T)
     dt_t = T(dt_frac)
     _voxel_loop!(N_spatial) do i
         @inbounds begin
-            px = T(phi_x[i])
-            py = T(phi_y[i])
-            pz = T(phi_z[i])
+            j = _voxel_index(src, i)
+            px = T(phi_x[j])
+            py = T(phi_y[j])
+            pz = T(phi_z[j])
             pm = sqrt(px * px + py * py + pz * pz)
             if pm < T(1e-100)
                 alpha[i] = z
@@ -83,12 +85,21 @@ function _apply_ddi_rotation_batched_real!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
-
-    phi_x, phi_y, phi_z = _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
-    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
-        phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
+    src = _ddi_phi_index_map(phi_x, n_pts)
+
+    # Taylor needs the raw field, so the whole atan/acos/sqrt angle pre-pass
+    # disappears with the 5-stage core rather than feeding it.
+    if SPIN_TAYLOR_ENABLED[]
+        apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, spin_tridiag_bands_cached(sm, T),
+            T(dt_frac), Val(D); imaginary_time=false, F, src)
+        return nothing
+    end
+
+    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial, src)
     _apply_euler_5stage_batched_real!(P, rc.W, rc.conj_V, rc.V_T,
         rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing
@@ -102,12 +113,19 @@ function _apply_ddi_rotation_batched_imag!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N_spatial = prod(n_pts)
     F = T(sm.system.F)
-    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
-
-    phi_x, phi_y, phi_z = _ddi_crop_phi(phi_x, phi_y, phi_z, n_pts)
-    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
-        phi_x, phi_y, phi_z, dt_frac, N_spatial)
     P = reshape(psi, N_spatial, D)
+    src = _ddi_phi_index_map(phi_x, n_pts)
+
+    if SPIN_TAYLOR_ENABLED[]
+        apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, spin_tridiag_bands_cached(sm, T),
+            T(dt_frac), Val(D); imaginary_time=true, F, src)
+        return nothing
+    end
+
+    rc = _get_ddi_rotation_cache_cpu(psi, sm, ndim)
+    _ddi_compute_angles!(rc.alpha, rc.beta, rc.theta,
+        phi_x, phi_y, phi_z, dt_frac, N_spatial, src)
     _apply_euler_5stage_batched_imag!(P, rc.W, rc.conj_V, rc.V_T,
         rc.alpha, rc.beta, rc.theta, F, Val(D))
     nothing

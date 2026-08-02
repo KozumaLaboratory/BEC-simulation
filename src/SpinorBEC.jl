@@ -175,9 +175,11 @@ reset_tracing!() = TimerOutputs.reset_timer!(TIMER)
 function plot_density end
 function plot_spinor end
 function plot_spin_texture end
+function plot_dipole_field end
 function animate_dynamics end
 function plot_sweep end
-export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, plot_sweep
+export plot_density, plot_spinor, plot_spin_texture, plot_dipole_field
+export animate_dynamics, plot_sweep
 
 include("precompile.jl")
 

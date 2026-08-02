@@ -298,6 +298,21 @@ function _tabulate_lhy(energy_fn, ::Type{ResultT};
         # V = dε/dn, so dividing ε here divides the tabulated V too.
         energy[i] = energy_fn(n) / n_atoms
     end
+    # A closed form that refuses to answer returns NaN (see epsilon_LHY_F6_Ih:
+    # c_0 < 0, λ_spin < 0). Without this check the NaN propagates through
+    # _numerical_derivative into every table entry and then into ψ, so the run
+    # reports NaN dynamics far from the parameter choice that caused it. Fail
+    # where the cause is visible instead.
+    bad = findfirst(!isfinite, energy)
+    bad === nothing || throw(
+        ArgumentError(
+            "$(nameof(ResultT)): the closed form is not applicable at these couplings " *
+            "— ε is $(energy[bad]) at n = $(densities[bad]). This is the closed form " *
+            "refusing to extrapolate (I_h: c_0 < 0 means the state is not the ground " *
+            "state; λ_spin < 0 means its spin-Goldstone branch is dynamically " *
+            "unstable, where ε_LHY is scheme-dependent). Use `kind: full_bdg`, which " *
+            "diagonalises instead of assuming the branch structure."),
+    )
     ResultT(densities, _numerical_derivative(densities, energy))
 end
 

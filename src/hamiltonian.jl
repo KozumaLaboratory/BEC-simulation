@@ -94,6 +94,7 @@ include("hamiltonian/integrator/dealias.jl")
 include("hamiltonian/integrator/spin_chain.jl")
 include("hamiltonian/integrator/split_step.jl")
 include("hamiltonian/integrator/split_step_composers.jl")
+include("hamiltonian/integrator/rk4ip.jl")  # 4th-order RK in the interaction picture
 include("hamiltonian/integrator/combined_spin_step.jl")
 include("hamiltonian/integrator/adaptive.jl")
 

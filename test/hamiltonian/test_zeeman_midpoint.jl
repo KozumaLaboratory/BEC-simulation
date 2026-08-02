@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Zeeman midpoint evaluation" begin
     @testset "Time-dependent Zeeman: O(dt^2) convergence" begin
         grid = make_grid(GridConfig((16,), (10.0,)))

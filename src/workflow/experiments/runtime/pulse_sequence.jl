@@ -12,10 +12,21 @@ struct PulseEvent
 end
 
 """
+The targets `compile_pulse_sequence` actually compiles. An `apply:` outside this
+set used to parse fine, group fine, and then compile to nothing — so
+`apply: zeeman` (the pre-`B`-block spelling) and `apply: trap` (documented in
+`yaml_schema_reference.md` but never implemented) were both silent no-ops.
+"""
+const PULSE_TARGETS = (:B, :raman, :interactions)
+
+"""
     parse_pulse_sequence(raw::Vector, duration::Float64) -> Vector{PulseEvent}
 
 Parse a YAML pulse_sequence list into PulseEvent objects.
 Each entry: {t: Float64, apply: String, duration: Float64, ...params}
+
+An unrecognised `apply:` throws rather than being dropped: the compiler simply
+has no branch for it, so the event would have no effect at all.
 """
 function parse_pulse_sequence(raw::Vector, duration::Float64)
     events = PulseEvent[]
@@ -25,6 +36,12 @@ function parse_pulse_sequence(raw::Vector, duration::Float64)
         dur = Float64(get(entry, "duration", duration - t_start))
         t_end = min(t_start + dur, duration)
         target = Symbol(entry["apply"])
+        target in PULSE_TARGETS || throw(
+            ArgumentError(
+                "pulse_sequence apply: $(entry["apply"]) is not compiled. \
+                 Use one of $(PULSE_TARGETS). (`zeeman` became `B` with the unified \
+                 B block; `trap` has never been implemented.)"),
+        )
         params = Dict{String, Any}(
             string(k) => v for (k, v) in entry
                                if !(string(k) in ("t", "apply", "duration"))
@@ -39,7 +56,10 @@ end
     compile_pulse_sequence(events::Vector{PulseEvent}, duration::Float64, defaults::Dict)
         -> Dict{Symbol,Any}
 
-Compile events into a Dict of :B, :raman, :interactions, :trap overrides.
+Compile events into a Dict keyed by what the CONSUMER reads —
+`:zeeman`, `:raman`, `:time_dep_interactions` — not by the `apply:` target the
+events were grouped under. `_apply_pulse_sequence` read `:B` here for a while and
+threw the Zeeman overlay away.
 Each value is the appropriate TimeDep* struct ready for make_workspace.
 """
 function compile_pulse_sequence(
@@ -131,7 +151,14 @@ function _apply_pulse_sequence(ps_raw, duration::Float64, interactions,
     )
     events = parse_pulse_sequence(ps_raw, duration)
     compiled = compile_pulse_sequence(events, duration, defaults)
-    zee_out = haskey(compiled, :B) ?
+    # `haskey(compiled, :zeeman)`, not `:B`. `compile_pulse_sequence` groups
+    # events by their `apply:` target (`:B`) but writes the compiled object under
+    # `:zeeman`, so this read `haskey(compiled, :B)` — always false — and the
+    # TimeDependentZeeman it had just built was thrown away on every run. The
+    # `:raman` and `:time_dep_interactions` arms below use the key the compiler
+    # writes and were unaffected. Gated by the `pulse_sequence` row of
+    # test/workflow/test_yaml_physics_reaches_workspace.jl.
+    zee_out = haskey(compiled, :zeeman) ?
               compiled[:zeeman]::TimeDependentZeeman : zeeman
     ram_out = haskey(compiled, :raman) ? compiled[:raman] : raman
     tdi_out = if haskey(compiled, :time_dep_interactions)

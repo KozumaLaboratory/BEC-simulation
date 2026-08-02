@@ -1,11 +1,58 @@
 # Eu F=6 EdH post-quench collapse: LHY-insufficiency negative result
 
-> **Vintage note.** The `runs/` results this document cites predate every
-> physics correction merged after 2026-06-02 — including a quadratic Zeeman
-> that was 11× too large for Eu until 2026-07-08. See
-> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md) before quoting a number from here.
-
-**Status**: ablation complete, conclusion confirmed across 5 LHY treatments **Date**: 2026-05-07 **Code path**: `runs/eu151_edh_postfix_local/`, post-Bug-4-fix Julia `main`
+> ## Re-derived 2026-07-29: the conclusion holds, the evidence below did not
+>
+> **The conclusion stands.** Re-running this config in current code confirms that
+> no LHY treatment available here arrests this collapse. But the comparison the
+> conclusion rested on was **vacuous**, and it took three separate coefficient
+> fixes before it became a real test.
+>
+> This config is `backend: gpu`. Until 2026-07-28 (#125) every *tabulated* LHY was
+> silently collapsed to `c_lhy = 0` on the GPU broadcast path, so three of the
+> five rows below (`polar_contact`, `polar_dipolar`, `full_bdg`) ran with **no LHY
+> at all**. A fourth, `scalar`, ran with a coefficient short by
+> $\pi(a_s/a_{ho})\sqrt N$ — 2.34× at this $N = 10^4$ (#108). The fifth was
+> LHY-off by construction. "All five identical" was four flavours of *off* plus
+> one weak one: the observation was guaranteed regardless of the physics.
+>
+> Re-run on current `main` — which also carries #158, the closed-form tables being
+> $N_{atoms}$ too large:
+>
+> | mode | $E$ | peak $n$ | FWHM$_z$ (voxels) | $M_z$ |
+> |---|---:|---:|---:|---:|
+> | off | −881.086 | 0.01014 | 10 | −5.4104 |
+> | scalar | −880.993 | 0.00968 | 10 | −5.4567 |
+> | polar_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+> | fm_contact | −881.022 | 0.00982 | 10 | −5.4431 |
+> | *full_bdg* | *−847.324* | *0.00054* | *22* | *−5.9955* |
+>
+> The four usable modes agree to **4.7 %** in peak density. The closed forms are
+> *active* — all three differ from each other and from `off` — they are simply
+> small in this regime. So the conclusion is now supported by a comparison that
+> could have come out otherwise.
+>
+> `full_bdg` is the lone outlier and is **not usable here**. It self-reports the
+> reason:
+>
+> ```
+> Warning: FullBdG LHY: mean field is dynamically unstable (max Im ω = 213.0).
+>   The zero-point sum drops the complex branches while the counterterms still
+>   subtract all 13 of them, so ε_LHY is scheme-dependent here. This is a
+>   property of the state — the closed forms are no better.
+>     E=-847.3236 conv=false
+> ```
+>
+> Its ITP also returned `conv=false`. A 19× density difference from an
+> unconverged, self-flagged scheme-dependent mode is not evidence of anything.
+>
+> Figure: `figs/lhy_ablation/eu_edh_lhy_ablation.png`. Run output:
+> `/gs/bs/work/7/uk07267/spinorbec-runs/lhy_ablation_v2` (862 MB, off-repo).
+>
+> Everything below is the original record. Its **absolute** numbers are still not
+> comparable to the table above — the run also predates the Eu quadratic-Zeeman
+> fix (11× too large until 2026-07-08), the DDI integrator-order fixes and the ITP
+> density-bias fix. See
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
 
 ## TL;DR
 
