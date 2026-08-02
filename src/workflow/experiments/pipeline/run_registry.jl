@@ -446,8 +446,34 @@ end
         end
     end
 
+    # W4. `_exit_summary.json` is written by `run_pipeline`, and a run whose
+    # every point is a cache HIT never enters it — so the run that exercised the
+    # cache HARDEST was the one that reported nothing about it. Stamped here, at
+    # the end of `run_yaml`, so the counts exist whether zero points ran or all
+    # of them did. Merged rather than overwritten: the last point's `completed` /
+    # `runtime_seconds` / `exception_type` are `run_pipeline`'s to state.
+    _stamp_cache_stats(joinpath(run_dir, "_exit_summary.json"))
+
     verbose && println("Done: $run_dir")
     run_dir
+end
+
+# Rewrites only the `cache` key. Creates the file when a fully-cached run means
+# `run_pipeline` never wrote one — in that case `completed` is absent rather than
+# invented, because nothing here knows whether the ORIGINAL run completed and a
+# `true` would be a claim this function cannot make.
+function _stamp_cache_stats(path::AbstractString)
+    try
+        d = isfile(path) ? JSON.parsefile(path) : Dict{String, Any}()
+        d = Dict{String, Any}(String(k) => v for (k, v) in d)
+        d["cache"] = _cache_stats_payload()
+        d["cache_written_at"] = string(now())
+        open(io -> JSON.print(io, d, 2), path, "w")
+    catch e
+        # A finished run must not acquire a new way to fail over a statistic.
+        @warn "failed to stamp cache stats into _exit_summary.json" path exception = e
+    end
+    nothing
 end
 
 function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=true)

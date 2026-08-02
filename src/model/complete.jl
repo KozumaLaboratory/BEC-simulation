@@ -111,7 +111,7 @@
 export CompletionMarker, PayloadEntry, Admission, MarkerVerdict
 export COMPLETE_MARKER_FORMAT, MARKER_CUTOVER_UNIX, marker_path, incomplete_marker_path
 export write_complete_marker, write_incomplete_marker, read_complete_marker, admit_payload
-export gs_verdict
+export gs_verdict, admission_counts
 
 "On-disk marker format version. Readers refuse anything else rather than guess."
 const COMPLETE_MARKER_FORMAT = 1
@@ -583,6 +583,58 @@ end
 "For tests, and for a long-lived process that wants the warning again."
 _reset_unmarked_warnings!() = (lock(() -> empty!(_UNMARKED_WARNED), _UNMARKED_WARNED_LOCK); nothing)
 
+# ---------------------------------------------------------------------------
+# counters (W4)
+# ---------------------------------------------------------------------------
+#
+# The warnings above are `@warn` and nothing else: they reach no `Record`, no
+# `_exit_summary.json`, no `run_summary`. A person who did not capture stderr —
+# i.e. anyone reading a finished run — cannot find out how many artifacts were
+# served unverified, or how many were thrown away.
+#
+# ccache's posture is a PERSISTED PER-REASON COUNTER: 28 named uncacheable
+# counters (`Unsupported compiler option`, `Preprocessing failed`, `Could not use
+# precompiled header`, `Multiple source files`, `Input file modified during
+# compilation`, …) surfaced by `--show-stats -v`. sccache's documented real-world
+# failure is the silent one — workspaces that stopped caching entirely because
+# `CARGO_INCREMENTAL` was set, discoverable only via `--show-stats`.
+#
+# Process-cumulative, not per-run: `admit_payload` is called from the scan loop,
+# from `Experiment`, and from the GS stage cache, all outside any one
+# `run_pipeline`. A counter reset per pipeline would miss exactly the scan-loop
+# admissions that dominate. `_write_exit_summary` stamps the running total and
+# labels its scope.
+const _ADMISSION_COUNTS = Dict{Symbol, Int}(
+    :marked => 0, :unmarked => 0, :rejected => 0, :absent => 0)
+const _ADMISSION_COUNTS_LOCK = ReentrantLock()
+
+function _count_admission!(p::Symbol)
+    lock(_ADMISSION_COUNTS_LOCK) do
+        _ADMISSION_COUNTS[p] = get(_ADMISSION_COUNTS, p, 0) + 1
+    end
+    nothing
+end
+
+"""
+    admission_counts() -> Dict{Symbol,Int}
+
+How many payloads this PROCESS has admitted, by provenance. A copy, so a caller
+cannot mutate the counters it is reading.
+
+`:unmarked` is the one to watch: it counts artifacts served WITHOUT a verified
+marker. A run whose summary shows a nonzero `unmarked` reused pre-cutover bytes,
+which is legal and is also the thing to check before quoting the result.
+"""
+admission_counts() = lock(() -> copy(_ADMISSION_COUNTS), _ADMISSION_COUNTS_LOCK)
+
+"For tests, and for a long-lived process that wants a fresh window."
+_reset_admission_counts!() = lock(_ADMISSION_COUNTS_LOCK) do
+    for k in keys(_ADMISSION_COUNTS)
+        _ADMISSION_COUNTS[k] = 0
+    end
+    nothing
+end
+
 """
     admit_payload(path; require_converged=false) -> Admission
 
@@ -618,6 +670,16 @@ what the store contains. Two things it deliberately refuses:
     published for exactly that, so the richer decision needs no second knob.
 """
 function admit_payload(path::AbstractString; require_converged::Bool=false)
+    # Counted HERE, on the way out, rather than at each of the nine `return`s
+    # inside. A per-branch increment is one edit away from a branch that does not
+    # count, and an admission that does not count is exactly the silence W4
+    # exists to end.
+    adm = _admit_payload(path; require_converged)
+    _count_admission!(adm.provenance)
+    adm
+end
+
+function _admit_payload(path::AbstractString; require_converged::Bool=false)
     isfile(path) ||
         return Admission(false, :absent, "no payload at $path", nothing)
     # The tombstone is checked FIRST and out-votes everything: it is a statement

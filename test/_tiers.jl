@@ -83,6 +83,8 @@ const FAST_TESTS = [
     # W3: the grandfather arm is bounded by a dated cutoff.
     "model/test_marker_verdict.jl",
     "model/test_marker_cutoff.jl",
+    # W4: the cache's fail-safes reach a file, not only a log line.
+    "model/test_cache_stats_reported.jl",
     # Step 3. The GS stage cache admits on `artifact_id`; `_gs_cache_key` and
     # `_hashable` are deleted. 31 knobs, ONE assertion each — a single bundled
     # assertion is how a 19-key list rots into a 17-key list — plus the
@@ -689,6 +691,9 @@ const _COST = Dict{String, Float64}(
     # Filesystem-only, like `test_completion_marker.jl`: no solve runs in either.
     "model/test_marker_verdict.jl" => 3.0,
     "model/test_marker_cutoff.jl" => 3.0,
+    # Filesystem-only arms are ~2 s; the end-to-end arm runs the same two-point
+    # scan twice (once cold, once fully cached) and is the other 33 s.
+    "model/test_cache_stats_reported.jl" => 35.0,
     # Two RTP loops driven directly (5.9 s) + one `run_yaml` interrupted
     # mid-dynamics and recomputed in full, 1e6 steps (48.8 s).
     "model/test_interrupted_dynamics_recomputes.jl" => 55.0,

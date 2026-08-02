@@ -322,6 +322,26 @@ const _NO_ARTIFACT_ID_LOCK = ReentrantLock()
 _reset_no_artifact_id_warnings!() =
     (lock(() -> empty!(_NO_ARTIFACT_ID_WARNED), _NO_ARTIFACT_ID_LOCK); nothing)
 
+"""
+    no_artifact_id_reasons() -> Vector{String}
+
+Every distinct reason a config was denied a GS artifact id in THIS process,
+sorted.
+
+The set behind it was already keyed per reason — better than the design's "warns
+once" — but it was `@warn` only, so it reached no `Record`, no
+`_exit_summary.json`, no `run_summary`. About 40 runnable configs currently
+resolve to no id and nothing on disk said so. `_write_exit_summary` now stamps
+this list; it is the repo's own "check the run's own report before claiming"
+applied to the cache.
+
+A non-empty list means those configs CANNOT be served a cached ground state and
+recompute every time — slower, and never wrong, which is why it is a counter and
+not an error.
+"""
+no_artifact_id_reasons() =
+    lock(() -> sort!(collect(_NO_ARTIFACT_ID_WARNED)), _NO_ARTIFACT_ID_LOCK)
+
 @noinline function _warn_no_artifact_id_once(why::AbstractString)
     fresh = lock(_NO_ARTIFACT_ID_LOCK) do
         why in _NO_ARTIFACT_ID_WARNED ? false : (push!(_NO_ARTIFACT_ID_WARNED, why); true)

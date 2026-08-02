@@ -122,6 +122,34 @@ _is_oom_error(err) =
     err isa OutOfMemoryError ||
     (err isa ErrorException && occursin(r"out of memory|OOM"i, err.msg))
 
+# W4. The cache's fail-safes were `@warn` and nothing else: no `Record`, no
+# `_exit_summary.json`, no `run_summary`. That is sccache's documented real-world
+# failure — workspaces that stopped caching entirely because `CARGO_INCREMENTAL`
+# was set, discoverable only through `--show-stats`. ccache's answer is a
+# persisted per-reason counter (28 named uncacheable reasons behind
+# `--show-stats -v`), and this is that, in the file the autopilot already reads.
+#
+# Two things a person reading a finished run needs and could not get:
+#
+#   `no_id_reasons`  which configs could never be served a cached ground state,
+#                    by REASON — the string names the slot that did not resolve.
+#   `admission`      how many payloads were served with a verified marker
+#                    (`marked`), served WITHOUT one (`unmarked`, i.e. arm (b)),
+#                    thrown away (`rejected`), or simply not there (`absent`).
+#
+# `scope` is stated in the file because both are PROCESS-cumulative: a scan calls
+# `run_pipeline` once per point into the same run directory, so the last write
+# wins and it carries the totals for the whole process — which is the useful
+# reading, and a wrong one if a reader assumes per-point.
+function _cache_stats_payload()
+    Dict{String, Any}(
+        "scope" => "process-cumulative",
+        "no_id_reasons" => no_artifact_id_reasons(),
+        "admission" => Dict{String, Any}(
+            String(k) => v for (k, v) in admission_counts()),
+    )
+end
+
 function _write_exit_summary(path::Union{Nothing, String};
     completed::Bool, exception_type::Union{Nothing, AbstractString},
     last_step::Int, runtime_seconds::Real,
@@ -136,6 +164,9 @@ function _write_exit_summary(path::Union{Nothing, String};
         "nan_encountered" => nan_encountered,
         "oom_killed" => oom_killed,
         "written_at" => string(now()),
+        # Stamped on BOTH the success and the failure path: a run that threw is
+        # exactly the one whose cache behaviour someone will want to reconstruct.
+        "cache" => _cache_stats_payload(),
     )
     try
         open(path, "w") do io
