@@ -246,7 +246,19 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     inter isa Dict || return nothing
     N_raw = get(inter, "N_atoms", nothing)
     ω_raw = get(inter, "omega_ref", nothing)
-    (N_raw === nothing || ω_raw === nothing) && return nothing
+    if N_raw === nothing || ω_raw === nothing
+        # Everything below derives from (N_atoms, omega_ref) and cannot run —
+        # but the `lhy:` block does NOT. A tabulated kind needs only `kind`,
+        # and this function is the ONLY caller of `_resolve_lhy_block!`, which
+        # writes the internal `lhy_kind` slot the ground-state and dynamics
+        # steps read. Returning here without it meant a config written with the
+        # direct `interactions: {c0, c1}` form silently ran with no LHY at all.
+        # No committed config is currently affected (0 of 360 lhy-bearing
+        # configs omit N_atoms/omega_ref), so this closes a latent footgun
+        # rather than fixing live data.
+        _resolve_lhy_block!(p, inter, atom, NaN, 0.0, 0, NaN)
+        return nothing
+    end
 
     N_atoms = Int(N_raw)
     omega_ref = Float64(ω_raw)
