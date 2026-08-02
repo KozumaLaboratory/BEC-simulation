@@ -19,6 +19,11 @@
 # and reports the stepping fraction of B, so the ceiling on any integrator-side
 # optimisation is explicit.
 
+# `import CUDA` BEFORE `using SpinorBEC`, or the CUDA extension is not loaded and
+# a `backend: gpu` config dies with `no method matching _to_device(::CUDABackend,
+# ::Array)` — 6.7 s in, swallowed into `_exit_summary.json` as a bare
+# "MethodError". The campaign's own submit line does this; this script did not.
+import CUDA
 using SpinorBEC
 using Printf
 using YAML
@@ -92,6 +97,8 @@ function dyn_steps_and_dt(cfg::String)
 end
 
 function main()
+    CUDA.functional() ||
+        error("CUDA not functional — this config is backend: gpu and would fall back silently")
     nsteps, dt = dyn_steps_and_dt(CFG)
     @printf("config %s\n  dynamics: %d steps at dt = %.1e\n\n", basename(CFG), nsteps, dt)
     flush(stdout)
