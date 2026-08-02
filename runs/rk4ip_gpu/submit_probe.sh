@@ -7,7 +7,7 @@
 #$ -N rk4ip_gpu
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-6
+#$ -t 1-7
 #$ -j n
 
 set -euo pipefail
@@ -22,6 +22,7 @@ export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH}:/gs/fs/tga-kozuma-kouhi/shared/.jul
 
 echo "[src]   $(git rev-parse HEAD)  $(git status --porcelain -- src | wc -l) dirty src files"
 nvidia-smi -L || true
+echo "[t] startup done: $(date -Ins)"
 
 case "${SGE_TASK_ID:-1}" in
     1) "$JULIA" --project=. scripts/validation/rk4ip_gpu_cost_probe.jl ;;
@@ -30,7 +31,10 @@ case "${SGE_TASK_ID:-1}" in
     4) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 128 ;;
     5) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 64 ;;
     6) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 32 ;;
+    7) "$JULIA" --project=. scripts/validation/scan_job_cost_breakdown.jl \
+           runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml 3 ;;
     *) echo "no task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 
+echo "[t] work done: $(date -Ins)"
 echo "[done]"
