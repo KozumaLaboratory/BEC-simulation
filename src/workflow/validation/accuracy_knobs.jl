@@ -187,6 +187,50 @@ used for the whole cloud: ~5 % on converged weak-field Eu textures with a SIGN \
 that flips along a B-scan. SpatialLHY cuts that to 0.8 % and removes the flip, \
 at 1.8× in the diagonal step; its own residual is measurable via \
 spatial_lhy_residual and should be quoted with any result using it."),
+    # THE ONE THAT DOMINATES, and it was missing from this list entirely while ten
+    # knobs at the 1e-3..1e-13 level sat in it.
+    #
+    # ITP is a gradient flow with DISCRETE NORMALIZATION (GFDN, Bao & Du 2004),
+    # and that is a FIRST-order time splitting of the continuous flow: the descent
+    # substep and the normalization substep do not commute, so decoupling them
+    # costs O(Δt) — in the CONVERGED state, not merely per step. Strang's second
+    # order does not apply; it comes from time-symmetry, which imaginary time plus
+    # a projection every step does not have.
+    #
+    # Measured, Eu F=6 64³ and 96³, converged to dE ≈ 1e-10, against separate-at-
+    # dt/4 (`bench/itp_fused_chain_accuracy.jl`), density / energy:
+    #
+    #     dt   = 2e-3   2.4e-2 / 4.0e-4      ← the shipped value
+    #     dt/2 = 1e-3   8.4e-3 / 8.3e-5
+    #
+    # The halving ratio is 2.90. Against a dt/4 reference a p-th order scheme
+    # gives `2^p + 1`, so that is p ≈ 0.93 — first order, as the theory says, and
+    # NOT the 4 an earlier version of the bench compared it to.
+    #
+    # So the converged ground state carries ~2 % density error at the shipped dt,
+    # which is 5× the ddi_pad_factor residual, 10¹⁰ × the spin_taylor one, and the
+    # reason those were the wrong things to have been optimising. And because it
+    # is FIRST order, 10× the accuracy costs 10× the steps — there is no cheap
+    # refinement here.
+    #
+    # NOT FIXABLE BY A SMALLER dt ALONE, if the aim is accuracy per unit cost: the
+    # scheme's order is the ceiling. Liu & Cai 2021 (SIAM J. Sci. Comput.,
+    # 10.1137/20M1328002) restore the Lagrange multiplier to the flow (GFLM) and
+    # show that GFDN is additionally *inaccurate* — converging to a dt-dependent
+    # solution — for multicomponent BECs with TWO OR MORE constraints, with spin-1
+    # as their worked example. This code has that shape whenever
+    # `target_magnetization` is set. No `runs/` YAML sets it today, so production
+    # is in the single-constraint case, but the DSL and LBFGS paths reach it.
+    AccuracyKnob(:dt, :per_run, 5.0e-4, 2.0e-3,
+        "ITP time step. THE DOMINANT accuracy term and first order, because ITP is \
+a gradient flow with discrete normalization whose descent and normalization \
+substeps do not commute (Bao & Du 2004). Measured on the CONVERGED state at Eu \
+F=6, 64³ and 96³: 2.4e-2 density error at the shipped 2e-3, 8.4e-3 at 1e-3, \
+ratio 2.90 ⇒ p ≈ 0.93. Ten times the accuracy costs ten times the steps. Every \
+other knob in this list is between 5× and 1e10× smaller.";
+        accepted_error=2.4e-2,
+        ladder=[(value=2.0e-3, rel_error=2.4e-2, rel_cost=1.0),
+            (value=1.0e-3, rel_error=8.4e-3, rel_cost=2.0)]),
     AccuracyKnob(:dtype, :per_run, Float64, Float64,
         "Mixed precision. `f32` (rotating_basis only) halves ψ traffic; scalar \
 locks stay F64. Not used by default."),
