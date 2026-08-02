@@ -115,18 +115,45 @@ startup.
 build flag. Out of scope for a performance pass, and recorded here so the next
 person does not re-derive the 364 s estimate.
 
+## Dropping the DDI padding costs half the residual — not taken
+
+Zero-padding is 21 % of the step at 32³. The campaign's own kernel factorial had
+put its effect on the dip centre at **0.0016 nT** — but that was measured at
+`N = 5×10⁴` and production runs `N = 3.5×10⁴`, so it was re-measured rather than
+inherited (UGE 8319532, 45 points, same config with `padded: false`).
+
+Prediction recorded in the config before the run: centre within 0.005 nT, and
+not worth taking beyond 0.01 nT.
+
+| | centre [nT] | width [nT] |
+|---|---|---|
+| padded (production) | −2.5099 | 12.7400 |
+| unpadded | −2.4913 | 12.7284 |
+| **difference** | **+0.0187** | −0.0116 |
+| Matsui | −2.5495 | 12.7524 |
+
+**The centre moves 0.0187 nT — 12× the figure that would have been inherited**,
+47 % of the whole unexplained 0.040 nT residual, and in the direction *away* from
+Matsui (0.0396 → 0.0582). Per-field `N_{m=−6}` shifts by up to 5.3×10⁻³.
+
+The saving was 528.5 → 510.2 s (−18.3 s, −3.5 %). Trading half the residual for
+3.5 % of wall-clock is not a trade worth making, so production keeps `padded:
+true`. The unpadded config is kept as the A/B.
+
+The transferable part: a kernel-treatment difference measured at one atom number
+did **not** carry to another 30 % away. Two earlier retractions in this campaign
+came from exactly that kind of inheritance.
+
 ## What is left
 
-1. **Drop the DDI zero-padding for this observable.** 21 % of the step at 32³,
-   19 s over the campaign, and the campaign's own kernel factorial already
-   measured its effect on the answer: **0.0016 nT**, against a dip centre of
-   −2.51 and a residual of 0.040. Not applied here, because it does change the
-   physics — small is not zero, and that is the user's call, not a silent edit.
-2. **The integrator.** Caps out at the 92 s of stepping — 15 % of the job — and
-   RK4IP specifically is a *loss* at this tolerance (`rk4ip_cost_on_gpu.md`).
+**The integrator**, which caps out at the 92 s of stepping — 15 % of the job —
+and where RK4IP specifically is a *loss* at this tolerance
+(`rk4ip_cost_on_gpu.md`).
 
 Net result of this pass: **600.3 → 528.5 s, −12 %**, from one environment
-variable that was already in the repo.
+variable that was already in the repo. The two larger-looking levers — a
+sysimage and the DDI padding — were both measured and both rejected, one because
+it made the job slower and one because it moved the physics.
 
 ## Method note
 
