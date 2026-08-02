@@ -154,6 +154,13 @@ Each of the 207 satisfies all of:
    construction;
 5. it is not a scan, sweep, ladder or phase map.
 
+**Criterion 3 describes an epoch that is now closed.** `summary.json` recorded
+nothing about what produced it until #290 (2026-08-02), which adds the `_env_*`
+block that `point_NNN.jld2` had carried all along. Every summary written from
+here on names its commit, so this campaign's central complaint — 474 stored
+results, not one of them attributable — cannot recur. What criterion 3 selects is
+the pre-#290 backlog, not stored results in general, and it stops growing today.
+
 **Reclaim by bytes, not by count.** The distribution is concentrated: the largest
 5 directories are 38 % of the 60.6 GiB, and the largest 15 are most of it.
 
