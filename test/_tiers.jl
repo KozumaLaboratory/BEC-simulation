@@ -94,6 +94,13 @@ const FAST_TESTS = [
     # but it moves psi by 5.9e-2 at cap 0 and is in no Stage, so `run_pipeline`
     # refuses to run while it is clamped.
     "model/test_taylor_degree_cap_guard.jl",
+    # Step 4's measurement, one assertion per ambient Ref: does flipping it move
+    # `artifact_id`? `:moves` for the dealias pair (pinning them INTO the id),
+    # `:blind` for the rest, each with the reason it is still open — so closing
+    # one is a visible diff here. Also covers the `dealias_k_cut` half, which
+    # `test_gs_admission_axes.jl` arm C29 does not: unhooking only that half from
+    # `GridSpec` leaves C29 green at 124/124 (measured).
+    "model/test_ambient_refs_vs_artifact_id.jl",
     # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
     # assert the next run recomputes instead of serving the partial output.
     # Nothing else in the suite exercises the swallowed `InterruptException`.
@@ -698,6 +705,8 @@ const _COST = Dict{String, Float64}(
     # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
     # a throw-before-solve arm; measured 25.5 s, dominated by first-call JIT.
     "model/test_taylor_degree_cap_guard.jl" => 26.0,
+    # Seven resolve-only id computations, two per Ref. No solve; measured 5.8 s.
+    "model/test_ambient_refs_vs_artifact_id.jl" => 6.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
