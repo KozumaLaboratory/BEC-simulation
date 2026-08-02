@@ -84,6 +84,11 @@ const FAST_TESTS = [
     # partition of `GS_SCHEMA` that makes a new key red until it is classified,
     # and the fail-safe (a config with no `Model` has no id and never hits).
     "model/test_gs_admission_axes.jl",
+    # Step 4. Ambient module-level `Ref`s are the one input class `artifact_id`
+    # cannot see: not in the declaration, not in `code_tree_hash`. A pure file
+    # scan over `src/` + `ext/` against a PINNED set, so a new one is red until
+    # someone writes down why it may be ambient.
+    "model/test_no_ambient_module_refs.jl",
     # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
     # assert the next run recomputes instead of serving the partial output.
     # Nothing else in the suite exercises the swallowed `InterruptException`.
@@ -677,6 +682,8 @@ const _COST = Dict{String, Float64}(
     # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
     # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
     "model/test_corpus_resolves.jl" => 22.0,
+    # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
+    "model/test_no_ambient_module_refs.jl" => 1.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
