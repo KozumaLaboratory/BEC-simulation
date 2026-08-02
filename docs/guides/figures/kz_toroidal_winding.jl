@@ -64,6 +64,14 @@ const KZ_AS = KZ_G1 / 2
 # trajectory, since each step draws with `seed + s`. The longest run here is
 # (1000 + 2e⁸ + 1000)/dt ≈ 8×10⁵ steps at dt = 0.01.
 const KZ_SEED_STRIDE = 10_000_000
+# The paper's system is a SCALAR field. Running it on an F=1 species gives three
+# components, and the reservoir noise is added to every one of them — so the two
+# empty spin channels fill thermally and feed the density term c₀n = c₀Σ_c|ψ_c|²,
+# shifting the effective chemical potential. A spinless (F=0) species makes the
+# field genuinely one-component. The species identity is otherwise irrelevant
+# here: in internal units ℏ = m = ω_perp = 1 the mass scales out, and c₀ is
+# supplied directly as g₁ rather than taken from the atom's a_s.
+const KZ_ATOM = Sr88
 const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT", "runs/kz_toroidal")
 
 """
@@ -134,14 +142,19 @@ function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
+    t_hold::Float64=NaN,
 )
     grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
-    ws = make_workspace(; grid, atom=Rb87,
+    ws = make_workspace(; grid, atom=KZ_ATOM,
         interactions=InteractionParams(Dict{Int, Float64}(0 => KZ_G1)),
         potential=HarmonicTrap{1}((0.0,)),      # ring: no confinement along it
         sim_params=sp, backend, fft_flags=FFTW.ESTIMATE)
+    size(ws.state.psi, 2) == 1 || error(
+        "kz_toroidal_winding is a SCALAR reproduction and the field has " *
+        "$(size(ws.state.psi, 2)) components; reservoir noise would populate the " *
+        "spin channels and shift mu through c0*n.")
     seed_device_rng!(backend, seed)
     fill!(ws.state.psi, 0)
     dV = cell_volume(grid)
@@ -170,7 +183,13 @@ function kz_trajectory_torus(;
 
     # (2) the quench: μ(t) = μ₀ t/τ_Q over t ∈ [−τ_Q, τ_Q], then held at +μ₀ for
     #     ten relaxation times, τ = 1/(γ μ₀) = 100 at γ = 10⁻².
-    t_hold = 10.0 / (gamma * KZ_MU0)
+    # "a further 10 units of relaxation time" with τ ≡ ℏ/(γ|μ|) is ambiguous in
+    # the source: at the quench's γ = 10⁻² that is 1000 time units, at the
+    # relaxation stage's γ = 1 it is 10. A hundredfold difference, and for
+    # τ_Q = 7.4 the longer reading holds the system for 68x the quench itself —
+    # long enough to relax away whatever the quench imprinted, which is what a
+    # σ(W) flat in τ_Q looks like.
+    isnan(t_hold) && (t_hold = 10.0 / (gamma * KZ_MU0))
     μ_wave = PiecewiseLinearWaveform([0.0, 2tau_Q, 2tau_Q + t_hold],
         [-KZ_MU0, KZ_MU0, KZ_MU0])
     res = mk(gamma, μ_wave, M_damp)
@@ -198,6 +217,7 @@ whether 0.124 and 0.097 are distinguishable at all.
 function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
+    shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -222,17 +242,20 @@ function kz_winding_scan(;
     @printf("  M_damp=%.3g  %s   dt=%.4g  M_grid=%d (k_max=%.2f, %.1fx k_cut)   %d traj/point\n",
         M_damp, M_damp > 0 ? "FULL SPGPE" : "number-damping only", dt, M_grid,
         π * M_grid / KZ_L, π * M_grid / KZ_L / sqrt(2eps_cut), n_traj)
-    @printf("\n  %-10s %-9s %-9s %-10s %-10s %-10s\n",
-        "tau_Q", "sigma(W)", "err", "<W>", "<N_equil>", "<N_final>")
+    @printf("\n  %-10s %-9s %-9s %-10s %-10s %-10s %-8s\n",
+        "tau_Q", "sigma(W)", "err", "<W>", "<N_equil>", "<N_final>", "int(W)")
     flush(stdout)
 
     σs, errs = Float64[], Float64[]
+    all_W = Vector{Vector{Float64}}()
     for τ in tau_Qs
         Ws, Ne, Nf = Float64[], Float64[], Float64[]
-        for j in 1:n_traj
+        # Shards are strided, not blocked, so a shard that dies leaves the survivors
+        # spread over the whole seed range rather than a contiguous hole.
+        for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend)
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold)
             push!(Ws, r.W);
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
@@ -242,16 +265,28 @@ function kz_winding_scan(;
         # mean far from zero means the trajectories are not independent (or the
         # winding is being computed with a bias). This is the check that caught
         # trajectory seeds separated by 1.
-        z_mean = abs(mean(Ws)) / (σ / sqrt(n_traj) + eps())
+        # W must come out near-integer. A c-field's phase is not perfectly smooth,
+        # but a well-formed condensate winds by whole turns — and the run that was
+        # accidentally three-component returned 2.25. This is a free check that
+        # the field being measured is a condensate at all.
+        frac_int = count(w -> abs(w - round(w)) < 0.1, Ws) / length(Ws)
+        frac_int < 0.8 && @warn "only $(round(100frac_int))% of windings are " *
+                                "near-integer — the phase is not a clean condensate" τ
+        z_mean = abs(mean(Ws)) / (σ / sqrt(length(Ws)) + eps())
         z_mean > 4 && @warn "⟨W⟩ is $(round(z_mean; digits=1))σ from zero — the " *
                             "ensemble is not independent or W is biased" τ mean_W=mean(Ws) σ
         # A standard deviation's own error, not the mean's — the quantity fitted
         # here IS the width.
-        e = σ / sqrt(2 * (n_traj - 1))
+        # length(Ws), NOT n_traj: a shard runs a strided SUBSET, and using the
+        # full count understated this by sqrt(1000/63) = 4x — which would have
+        # made agreement with the published beta look four times more significant
+        # than the data supports.
+        e = σ / sqrt(2 * (length(Ws) - 1))
         push!(σs, σ);
-        push!(errs, e)
-        @printf("  %-10.1f %-9.4f %-9.4f %-10.4f %-10.4g %-10.4g\n",
-            τ, σ, e, mean(Ws), mean(Ne), mean(Nf))
+        push!(errs, e);
+        push!(all_W, Ws)
+        @printf("  %-10.1f %-9.4f %-9.4f %-10.4f %-10.4g %-10.4g %-8.2f\n",
+            τ, σ, e, mean(Ws), mean(Ne), mean(Nf), frac_int)
         flush(stdout)
     end
 
@@ -270,6 +305,23 @@ function kz_winding_scan(;
         β, β_err, ref[1], ref[2], abs(β - ref[1]) / sqrt(β_err^2 + ref[2]^2))
 
     mkpath(OUTDIR)
+    # Raw W per trajectory, not just the width: sigma(W) is one number distilled
+    # from a distribution whose SHAPE is itself a check (windings must be
+    # integers, the mean must vanish, and the literature's defect counts are
+    # Poissonian). Distilling first throws away the evidence.
+    if raw_only
+        rawf = joinpath(OUTDIR, "$(tag)_raw.csv")
+        open(rawf, "w") do io
+            println(io, "# T=$T eps_cut=$eps_cut gamma=$gamma M_damp=$M_damp dt=$dt " *
+                        "M_grid=$M_grid shard=$(shard[1])of$(shard[2])")
+            println(io, "tau_Q,W")
+            for (i, τ) in enumerate(tau_Qs), w in all_W[i]
+                @printf(io, "%.6f,%.10f\n", τ, w)
+            end
+        end
+        @printf("  wrote %s\n", rawf)
+        return (; tau_Qs=collect(tau_Qs), all_W, T, eps_cut)
+    end
     csv = joinpath(OUTDIR, "$(tag).csv")
     open(csv, "w") do io
         println(io, "# beta=$β beta_err=$β_err published=$(ref[1]) M_damp=$M_damp " *
@@ -301,8 +353,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # A cheaper setting is only allowed if sigma(W) does not move. That is
         # the same discipline the literature applies to the cutoff itself
         # (results must be stable under a 10-15% variation).
-        for (dt, Mg) in ((0.01, 1024), (0.005, 1024), (0.02, 1024),
-            (0.01, 512), (0.01, 256), (0.05, 256))
+        # Ordered by what decides the question, not by cost: the paper's setting
+        # and the cheap candidate first, so a job that runs out of wall time still
+        # answers it.
+        for (dt, Mg) in ((0.01, 1024), (0.05, 256), (0.01, 256),
+            (0.02, 1024), (0.01, 512), (0.005, 1024))
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=64, dt, M_grid=Mg, backend,
                 tag="kz_torus_conv_dt$(replace(string(dt), "." => "p"))_M$(Mg)")
         end
@@ -313,6 +368,87 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "hold")
+        # Does the post-quench hold erase the imprint? beta came out 0.012 against
+        # a published 0.124 with a hold of 1000 time units — 68x the quench itself
+        # at the fast end. Vary only that.
+        for th in (10.0, 100.0, 1000.0)
+            kz_winding_scan(; n_traj=200, M_damp=0.0, dt=0.05, M_grid=256, backend,
+                t_hold=th, tag="kz_torus_hold$(round(Int, th))")
+        end
+    elseif startswith(mode, "merge")
+        # "merge:nd" / "merge:full" — read every shard's RAW windings, then do the
+        # statistics once, on the pooled sample.
+        md = split(mode, ":")[2]
+        files = filter(f -> startswith(f, "kz_torus_$(md)_s") && endswith(f, "_raw.csv"),
+            readdir(OUTDIR))
+        isempty(files) && error("no raw shards for $md in $OUTDIR")
+        byτ = Dict{Float64, Vector{Float64}}()
+        for f in files, ln in eachline(joinpath(OUTDIR, f))
+            (isempty(ln) || startswith(ln, "#") || startswith(ln, "tau_Q")) && continue
+            a_, b_ = split(ln, ",")
+            push!(get!(byτ, parse(Float64, a_), Float64[]), parse(Float64, b_))
+        end
+        τs = sort(collect(keys(byτ)))
+        @printf("=== %s, %d shards ===\n", md == "full" ? "FULL SPGPE" : "number-damping",
+            length(files))
+        @printf("%-10s %-6s %-9s %-9s %-9s %-8s %-8s\n",
+            "tau_Q", "n", "sigma(W)", "err", "<W>", "z(<W>)", "int(W)")
+        σs, es = Float64[], Float64[]
+        for τ in τs
+            W = byτ[τ]
+            nW = length(W)
+            σ = std(W)
+            e = σ / sqrt(2 * (nW - 1))
+            z = abs(mean(W)) / (σ / sqrt(nW))
+            fi = count(w -> abs(w - round(w)) < 0.1, W) / nW
+            push!(σs, σ);
+            push!(es, e)
+            @printf("%-10.1f %-6d %-9.4f %-9.4f %-9.4f %-8.2f %-8.2f\n",
+                τ, nW, σ, e, mean(W), z, fi)
+            z > 4 && @warn "⟨W⟩ is $(round(z; digits=1))σ from zero" τ
+            fi < 0.8 && @warn "only $(round(100fi))% integer windings" τ
+        end
+
+        # Every point has the same n, so log σ carries the same error at each and
+        # an unweighted fit is the right one. The error on β then comes from that
+        # error propagated, which is a statement about the data; the residual-based
+        # error is a statement about the fit. Report both and take the larger.
+        x = log.(τs);
+        y = log.(σs)
+        x̄, ȳ = mean(x), mean(y)
+        Sxx = sum((x .- x̄) .^ 2)
+        slope = sum((x .- x̄) .* (y .- ȳ)) / Sxx
+        β = -slope
+        δlogσ = mean(es ./ σs)
+        β_prop = δlogσ / sqrt(Sxx)
+        resid = y .- (ȳ .+ slope .* (x .- x̄))
+        β_resid = sqrt(sum(resid .^ 2) / (length(x) - 2) / Sxx)
+        β_err = max(β_prop, β_resid)
+        ref = md == "full" ? (0.0966, 0.0128) : (0.1236, 0.0098)
+        @printf("\nbeta = %.4f ± %.4f  (propagated %.4f, residual %.4f)\n",
+            β, β_err, β_prop, β_resid)
+        @printf("published %.4f ± %.4f   ->  %.1f sigma\n",
+            ref[1], ref[2], abs(β - ref[1]) / sqrt(β_err^2 + ref[2]^2))
+        open(joinpath(OUTDIR, "kz_torus_$(md)_merged.csv"), "w") do io
+            println(io, "# beta=$β beta_err=$β_err published=$(ref[1]) shards=$(length(files))")
+            println(io, "tau_Q,n,sigma_W,sigma_W_err")
+            for (i, τ) in enumerate(τs)
+                @printf(io, "%.6f,%d,%.8f,%.8f\n", τ, length(byτ[τ]), σs[i], es[i])
+            end
+        end
+    elseif startswith(mode, "shard")
+        # "shardIofN:MD:NTRAJ" — one process per shard, strided over trajectories.
+        # Trajectories are independent, and the per-step cost is small enough that
+        # process-level parallelism beats threading, which would race on the
+        # package's global scratch buffers.
+        m = match(r"^shard(\d+)of(\d+):(nd|full):(\d+)$", mode)
+        m === nothing && error("shard mode: shardIofN:nd|full:NTRAJ, got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        md = m[3] == "full" ? 1e-2 : 0.0
+        kz_winding_scan(; n_traj=parse(Int, m[4]), M_damp=md, dt=0.05, M_grid=256,
+            backend, shard=(i, n), raw_only=true,
+            tag="kz_torus_$(m[3])_s$(i)of$(n)")
     elseif startswith(mode, "nd")      # number-damping only
         kz_winding_scan(; n_traj=parse(Int, mode[3:end]), M_damp=0.0, backend,
             tag="kz_torus_nd")
