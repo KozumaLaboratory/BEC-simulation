@@ -26,6 +26,19 @@
     @inbounds ys[i] + t * (ys[i + 1] - ys[i])
 end
 
+# Uniformity is what makes the device lookup O(1); the tabulators all build
+# `range(0, n_max; length=n_points)`, and a non-uniform table would be silently
+# mis-indexed. Checked rather than assumed, and shared with the fused diagonal
+# kernel (gpu_diagonal.jl) so both entry points reject the same tables.
+function _assert_uniform_lhy_grid(xs, m::Int)
+    all(k -> abs((xs[k + 1] - xs[k]) - (xs[2] - xs[1])) <=
+             1e-9 * max(abs(xs[2] - xs[1]), 1.0), 1:(m - 1)) ||
+        throw(ArgumentError(
+            "GPU LHY lookup needs a uniform density grid; got a non-uniform one " *
+            "with $m nodes. Build the table with `range(0, n_max; length=n)`."))
+    nothing
+end
+
 const _LHY_TABLE_CACHE = Dict{Tuple{UInt64, DataType}, Any}()
 
 function _device_lhy_table(l::SpinorBEC.TabulatedLHY, ::Type{RT},
@@ -43,14 +56,7 @@ function SpinorBEC._lhy_potential_field(l::SpinorBEC.TabulatedLHY,
     m >= 2 || return fill!(similar(density_buf), zero(RT))
     dx = RT(xs[2] - xs[1])
     x0 = RT(xs[1])
-    # Uniformity is what makes the device lookup O(1); the tabulators all build
-    # `range(0, n_max; length=n_points)`, and a non-uniform table would be
-    # silently mis-indexed, so it is checked rather than assumed.
-    all(k -> abs((xs[k + 1] - xs[k]) - (xs[2] - xs[1])) <=
-             1e-9 * max(abs(xs[2] - xs[1]), 1.0), 1:(m - 1)) ||
-        throw(ArgumentError(
-            "GPU LHY lookup needs a uniform density grid; got a non-uniform one " *
-            "with $m nodes. Build the table with `range(0, n_max; length=n)`."))
+    _assert_uniform_lhy_grid(xs, m)
     ys = _device_lhy_table(l, RT, density_buf)
     out = similar(density_buf)
     out .= _lhy_interp_uniform.(density_buf, x0, dx, Ref(ys), m)

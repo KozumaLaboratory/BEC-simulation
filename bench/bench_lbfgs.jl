@@ -62,15 +62,65 @@ end
 # End-to-end: per-iteration slope
 # ----------------------------------------------------------------------------
 
-function iteration_slope(cell; n_lo::Int=4, n_hi::Int=20, samples::Int=3)
+# Wall-clock budget for the long arm of the slope. The original 4-vs-20-step
+# form put ~1 s on each arm and differenced two run minima: at that scale the
+# estimator is measuring startup and its own noise, and the baseline cells moved
+# up to 20 % between jobs. `n_lo` also has to clear `m_lbfgs` — below it the
+# two-loop is still filling its history, so the differenced steps cost less than
+# a steady-state iteration and the component breakdown cannot close.
+const TARGET_SECONDS = parse(Float64, get(ENV, "SBEC_BENCH_SECONDS", "300"))
+
+function iteration_slope(cell; n_lo::Int=25, n_probe::Int=60)
     run(n) = begin
         r = find_ground_state_lbfgs(; cell..., n_steps=n, tol=0.0)
         SYNC()
         r
     end
-    t_lo = timed(() -> run(n_lo); warmup=1, samples).t
-    t_hi = timed(() -> run(n_hi); warmup=0, samples).t
-    (t_hi - t_lo) / (n_hi - n_lo)
+    run(n_lo)                                   # compile
+    # Size the long arm from a SLOPE, not from a single short run. A single
+    # `n_lo`-step run averages in the steps before the history reaches
+    # `m_lbfgs`, which are cheaper: probing that way underestimated the
+    # steady-state iteration by 2x (116 ms vs 245 ms measured), so a "5 minute"
+    # point ran for 11.
+    t_probe_lo = @elapsed run(n_lo)
+    t_probe_hi = @elapsed run(n_probe)
+    per_probe = max((t_probe_hi - t_probe_lo) / (n_probe - n_lo), 1.0e-6)
+    n_hi = clamp(round(Int, TARGET_SECONDS / per_probe) + n_lo, 4 * n_lo, 500_000)
+    t_lo = @elapsed run(n_lo)
+    r_hi = nothing
+    t_hi = @elapsed (r_hi = run(n_hi))
+    # `n_line_search_evals` only exists on revisions that report it; keep the
+    # bench file identical across A/B arms by degrading to NaN rather than
+    # erroring on the older one.
+    ls = hasproperty(r_hi, :n_line_search_evals) ?
+         r_hi.n_line_search_evals / max(r_hi.last_step, 1) : NaN
+    fails = hasproperty(r_hi, :n_line_search_failures) ?
+            r_hi.n_line_search_failures / max(r_hi.last_step, 1) : NaN
+    (per_iter=(t_hi - t_lo) / (n_hi - n_lo), n_hi=n_hi, t_hi=t_hi, t_lo=t_lo,
+        ls_evals=ls, ls_fail_frac=fails, energy=r_hi.energy,
+        grad_norm=r_hi.grad_norm, converged=r_hi.converged)
+end
+
+# A solve with a REALISTIC tolerance, to get the line-search evaluation count in
+# the regime that matters.
+#
+# `iteration_slope` above passes `tol = 0.0` so that `n_steps` is consumed
+# exactly and the slope is well defined. The consequence, missed for four rounds
+# of A/B: this cell reaches its gradient floor (|grad| ~ 5e-7) within a few dozen
+# steps, and every iteration after that burns the line search's full 30-deep
+# backtrack and finds nothing — 94 % of steps, 29.4 energy evaluations each. So
+# that measurement is the cost of running AT the floor, in which a change to one
+# evaluation per iteration is diluted 30x.
+#
+# The component costs are measured warm and are trustworthy; what the cost of a
+# descending iteration needs from a real solve is only the evaluation count.
+function descending_solve(cell; tol::Float64=1.0e-8, n_steps::Int=2000)
+    r = find_ground_state_lbfgs(; cell..., n_steps=n_steps, tol=tol)
+    SYNC()
+    steps = max(r.last_step, 1)
+    (; steps, converged=r.converged, grad_norm=r.grad_norm, energy=r.energy,
+        ls_evals=r.n_line_search_evals / steps,
+        ls_fail_frac=r.n_line_search_failures / steps)
 end
 
 # ----------------------------------------------------------------------------
@@ -138,14 +188,23 @@ end
 ms(x) = @sprintf("%8.3f ms", x * 1e3)
 
 grids = GRID_ARG > 0 ? (GRID_ARG,) : (16, 24)
+# `SBEC_BENCH_CELLS` trims the sweep. A question about a CPU reduction does not
+# need the DDI cell, and each cell is a full measurement budget.
+const CELLS = get(ENV, "SBEC_BENCH_CELLS", "both")
+ddi_cases = CELLS == "contact" ? (false,) : CELLS == "ddi" ? (true,) : (false, true)
 
-for n in grids, ddi in (false, true)
+for n in grids, ddi in ddi_cases
     label = "Eu151 F=6 $(n)³ " * (ddi ? "+DDI" : "contact")
     println("=== $label ===")
     cell = build_cell(; n, enable_ddi=ddi)
 
     c = components(cell)
-    per_iter = iteration_slope(cell)
+    s = iteration_slope(cell)
+    per_iter = s.per_iter
+    # Print what the estimator actually did, so a point that silently ran for a
+    # second instead of the budget cannot be read as a 5-minute measurement.
+    @printf("  measured over %d steps in %.1f s (short arm %d steps, %.1f s)\n",
+        s.n_hi, s.t_hi, 25, s.t_lo)
 
     # One gradient (grad + 2 projections + sobolev) + direction + >=1 line-search
     # energy evaluation (retraction + total_energy) per iteration.
@@ -160,9 +219,29 @@ for n in grids, ddi in (false, true)
     for (k, v) in parts
         @printf("    %-22s %s  (%4.1f%%)\n", k, ms(v), 100v / per_iter)
     end
-    resid = per_iter - sum(last, parts)
-    n_ls = 1 + resid / (c.t_energy + c.t_retract)
-    @printf("    %-22s %s  (%4.1f%%)  -> implied line-search evals/iter = %.2f\n",
-        "residual", ms(resid), 100resid / per_iter, n_ls)
+    # Reconcile against the MEASURED number of line-search energy evaluations,
+    # not an inferred one. The earlier form solved the residual for the count,
+    # which makes the breakdown close by construction and can therefore never
+    # report that it does not.
+    ls_cost = s.ls_evals * (c.t_energy + c.t_retract)
+    @printf("    %-22s %s  (%4.1f%%)  [measured %.2f evals/iter, %.1f%% of steps found no step]\n",
+        "line search TOTAL", ms(ls_cost), 100ls_cost / per_iter,
+        s.ls_evals, 100 * s.ls_fail_frac)
+    # Whether the solve is going anywhere at all. A cost measured on a solve
+    # that is not descending is a cost measured on the wrong problem.
+    @printf("  end state: E=%.10g  |grad|=%.3e  converged=%s\n",
+        s.energy, s.grad_norm, s.converged)
+    resid = per_iter - sum(last, parts) - (ls_cost - (c.t_energy + c.t_retract))
+    @printf("    %-22s %s  (%4.1f%%)\n", "residual", ms(resid), 100resid / per_iter)
+
+    # The same cost model, evaluated at the evaluation count of a solve that is
+    # actually descending rather than sitting at its floor.
+    d = descending_solve(cell)
+    base_cost = c.t_grad + 2 * c.t_proj + c.t_sob + c.t_dir
+    model = base_cost + d.ls_evals * (c.t_energy + c.t_retract)
+    @printf("  descending solve: %d steps, converged=%s, |grad|=%.3e, %.2f evals/iter, %.1f%% found no step\n",
+        d.steps, d.converged, d.grad_norm, d.ls_evals, 100 * d.ls_fail_frac)
+    @printf("  cost model at that count: %s   (fixed %s + %.2f x %s)\n",
+        ms(model), ms(base_cost), d.ls_evals, ms(c.t_energy + c.t_retract))
     println()
 end

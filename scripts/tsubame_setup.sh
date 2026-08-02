@@ -5,7 +5,11 @@
 #   source scripts/tsubame_setup.sh
 #
 # Sets up:
-#   - module load cuda + julia (best-effort, defaults to TSUBAME 4 names)
+#   - module load cuda (best-effort). The julia load is attempted and always
+#     fails: TSUBAME 4 ships no julia modulefile. This script does NOT put
+#     julia on PATH — name the binary yourself in UGE jobs, via
+#     $SPINORBEC_TSUBAME_JULIA (see scripts/spinorbec.env). A bare `julia`
+#     works in a login shell only, from the lab profile, which qsub drops.
 #   - JULIA_DEPOT_PATH on node-local NVMe so first-time precompile
 #     doesn't thrash Lustre's metadata server
 #   - SPINORBEC_SCRATCH_DIR for per-frame snapshot streaming

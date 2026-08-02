@@ -44,7 +44,7 @@
 #     norm |u|² − |v|² > 0 instead, which is what makes the FM-at-c₁>0
 #     case agree (89% error → 2.6e-4).
 
-export compute_spinor_lhy_table
+export compute_spinor_lhy_table, lhy_mean_field_max_growth
 
 """
     compute_spinor_lhy_table(; spinor, F, interactions, zeeman, c_dd,
@@ -384,13 +384,23 @@ function _lhy_k_panel(C, B, D::Int, a::Float64, b::Float64, n::Int,
 end
 
 """
-    _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
-                            k_max, n_k, n_dir) → Float64
+    _lhy_bdg_energy_and_growth(spinor, n0, F, interactions, zeeman, c_dd,
+                               k_max, n_k, n_dir) → (ε_LHY, max_growth)
 
-`ε_LHY(n₀)` for the given spinor: UV-subtracted BdG zero-point energy
-density, spherically averaged over `k̂` when the DDI is active.
+`ε_LHY(n₀)` for the given spinor — UV-subtracted BdG zero-point energy density,
+spherically averaged over `k̂` when the DDI is active — together with
+`max Im ω`, the dynamical-instability diagnostic.
+
+The diagnostic is RETURNED and not only warned about. `ε_LHY` is
+scheme-dependent wherever `max Im ω ≠ 0`, so a caller choosing a parameter point
+needs to ask BEFORE committing to it, and a `maxlog`-limited `@warn` cannot be
+asked. On 2026-07-30 that cost two full measurement rounds: a phase-gap budget
+tabulated `full_bdg` from an unrelaxed seed at max Im ω = 1040, reported
+"unconverged" and then "blocked on issue #172", and both readings were wrong —
+the warning that said so had been eaten by a log filter. See
+[`lhy_mean_field_max_growth`].
 """
-function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
+function _lhy_bdg_energy_and_growth(spinor, n0, F, interactions, zeeman, c_dd,
     k_max, n_k, n_dir; rtol::Float64=1e-4, max_refine::Int=5)
     D = 2F + 1
     nd = _lhy_n_dir(rtol, c_dd, n_dir)
@@ -508,5 +518,42 @@ function _lhy_bdg_energy_density(spinor, n0, F, interactions, zeeman, c_dd,
             "mean-field-stable (F, c₀, c₁, q) point." maxlog=1
     end
 
-    E / length(dirs)
+    E / length(dirs), max_growth
+end
+
+"""
+    _lhy_bdg_energy_density(args...; kwargs...) → Float64
+
+`ε_LHY` alone. The body computes it together with `max Im ω`, so the pair-returning
+[`_lhy_bdg_energy_and_growth`] is the real function and this is its projection —
+which is why this is one line rather than a second declaration of the same physics.
+Every caller that only wants the energy keeps this name and this signature.
+"""
+_lhy_bdg_energy_density(args...; kwargs...) =
+    first(_lhy_bdg_energy_and_growth(args...; kwargs...))
+
+"""
+    lhy_mean_field_max_growth(; F, spinor, n0, interactions, zeeman, c_dd, rtol) → Float64
+
+`max Im ω` of the Bogoliubov spectrum for this mean field: zero when it is
+dynamically stable, positive when it is not.
+
+Ask this BEFORE committing to a parameter point. Wherever it is nonzero, ε_LHY is
+scheme-dependent — the zero-point sum drops the complex branches while the
+counterterms still subtract all `D` of them — so `full_bdg` cannot serve as an
+accuracy reference there and neither can any closed form. The ITP has nothing to
+converge to, and no tolerance fixes that.
+
+The same number drives the `@warn` in `_lhy_bdg_energy_and_growth`, but a
+`maxlog`-limited warning is not something a caller can ASK, and it is something a
+log filter can eat — which is exactly how a phase-gap budget spent two rounds
+reporting "unconverged" and then "blocked on #172" while running at
+max Im ω = 1040 (2026-07-30).
+"""
+function lhy_mean_field_max_growth(; F::Int, spinor, n0::Real=1.0,
+    interactions::InteractionParams, zeeman=ZeemanParams(), c_dd::Real=0.0,
+    rtol::Float64=1.0e-4)
+    _, g = _lhy_bdg_energy_and_growth(spinor, Float64(n0), F, interactions, zeeman,
+        Float64(c_dd), nothing, nothing, nothing; rtol)
+    g
 end

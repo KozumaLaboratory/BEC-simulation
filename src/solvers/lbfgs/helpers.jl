@@ -29,63 +29,41 @@ function _sobolev_precondition!(
 end
 
 """
-    _axpy_threaded!(a, c, b) → a
+    _axpy!(a, c, b) → a
 
-`a .+= c .* b`, split across Julia threads for host arrays.
+`a .+= c .* b` as an explicit `@simd` loop, for host arrays.
 
-Elementwise, so the result does not depend on the split: this is bit-identical
-to the broadcast it replaces at any thread count, and identical again when
-`Threads.nthreads() == 1` (the fallback IS the sequential loop).
+Bit-identical to the broadcast it replaces — same operations, same order.
 
-Why it exists: the two-loop recursion touches `2m` ψ-sized arrays twice each
-and was measured at ~18 GB/s — one core's streaming bandwidth — making it 60-64
-% of the CPU cost of an L-BFGS iteration (`docs/design/lbfgs_iteration_cost.md`).
-The axpys are the half that parallelises without changing a single rounding;
-the dots are handled separately by `_realdot_blocked`, which does change the
-summation order and carries its own accuracy gate.
+It is NOT threaded, and that is a measurement, not an oversight: splitting
+these across threads made the two-loop recursion 9.8 ms → 22.6 ms (4 threads)
+→ 32.4 ms (48 threads) at 24³ × D=13. Each axpy is ~0.5 ms of real work and
+there are `2m` of them per direction, so a `@threads` region per axpy is mostly
+launch cost, and that cost grows with the thread count. See
+`docs/design/lbfgs_iteration_cost.md`.
 """
-function _axpy_threaded!(a::Array, c::Number, b::Array)
-    n = length(a)
-    nt = Threads.nthreads()
-    # Below ~0.5 MB the `@threads` region costs more than the traffic it saves.
-    if nt == 1 || n < (1 << 15)
-        @inbounds @simd for i in eachindex(a, b)
-            a[i] += c * b[i]
-        end
-        return a
-    end
-    chunk = cld(n, nt)
-    Threads.@threads for t in 1:nt
-        lo = (t - 1) * chunk + 1
-        hi = min(t * chunk, n)
-        @inbounds @simd for i in lo:hi
-            a[i] += c * b[i]
-        end
+function _axpy!(a::Array, c::Number, b::Array)
+    @inbounds @simd for i in eachindex(a, b)
+        a[i] += c * b[i]
     end
     return a
 end
 
-# Device arrays: the broadcast is already parallel.
-_axpy_threaded!(a, c, b) = (a .+= c .* b)
+# Device arrays: the broadcast is already the parallel form.
+_axpy!(a, c, b) = (a .+= c .* b)
 
-# Number of blocks the real-dot reduction is cut into. A CONSTANT, not
-# `nthreads()`: the summation order — and therefore the last bits of the answer
-# — must not depend on how many threads the machine happens to have, or the
-# same input would give different results on different nodes.
+# Number of blocks the real-dot reduction is cut into. Blocking is here for
+# ACCURACY (one level of pairwise summation), not for parallelism — nothing in
+# this file is threaded, see `_axpy!`.
 const _REALDOT_BLOCKS = 64
 
 # Real part of ⟨a,b⟩ over `lo:hi`. `@simd` on purpose: a hand-unrolled scalar
-# form (four independent accumulators, no `@simd`) was measured at 8.2 ms
-# against BLAS `zdotc`'s 7.7 ms for the whole two-loop at 24³ × D=13 even with
-# the blocks threaded — i.e. the scalar loads alone were enough to cancel four
-# cores. Letting the compiler vectorise makes each block memory-bound, which is
-# the regime the threading can actually help.
-#
-# The cost is that the reassociation `@simd` performs depends on the machine's
-# vector width, so this is reproducible for a given binary + CPU but not across
-# CPUs — the same is already true of `zdotc`, whose kernel is selected per CPU.
-# What IS machine-independent is the block structure: `_REALDOT_BLOCKS` is a
-# constant, so the answer does not depend on the thread count.
+# form (four independent accumulators, no `@simd`) measured 8.2 ms against BLAS
+# `zdotc`'s 7.7 ms for the whole two-loop at 24³ × D=13 — the scalar loads alone
+# gave the whole advantage back. The cost is that `@simd`'s reassociation
+# depends on the machine's vector width, so the result is reproducible for a
+# given binary + CPU but not across CPUs; `zdotc`, whose kernel is selected per
+# CPU, was never machine-independent either.
 @inline function _realdot_range(a, b, lo::Int, hi::Int)
     s = 0.0
     @inbounds @simd for i in lo:hi
@@ -95,54 +73,45 @@ const _REALDOT_BLOCKS = 64
 end
 
 """
-    _realdot_blocked(a, b) → Float64
+    _realdot(a, b) → Float64
 
-`real(dot(a, b))` as a fixed 64-block reduction: each block is summed
-sequentially, then the 64 partials are added in index order, and the blocks run
-on separate threads when there are threads to run them on.
+`real(dot(a, b))` as a sequential 64-block reduction: each block is summed with
+`@simd`, then the 64 partials are added in index order.
 
-The two-loop recursion spends `2m` of these per direction on ψ-sized arrays,
-and after the axpys were threaded they are what is left of a step that runs at
-one core's streaming bandwidth.
+**Why not `dot`.** `dot` on a `ComplexF64` array dispatches to OpenBLAS
+`zdotc`, and OpenBLAS sizes its thread team from the machine's core count. On a
+few-MB array that call is team wakeup and barrier with almost no arithmetic, so
+its cost grows with the size of the node: the same L-BFGS iteration measured
+156.6 ms with BLAS at 192 threads and 50.2 ms with `OPENBLAS_NUM_THREADS=1`.
+The two-loop calls this `2m` times per direction, and `_project_constraints!`
+twice per gradient. Not calling BLAS at all is the fix that needs no global
+setting — pinning BLAS threads process-wide would also throttle the genuine
+level-3 work elsewhere (dense `eigen` in the Bogoliubov solver).
 
-This is **not** a precision trade for speed. Blocking a sum is one level of
-pairwise summation, so the error bound improves from `O(n·eps)` to
-`O((n/64 + 64)·eps)`; the gate in `test_lbfgs_fast_path_equivalence.jl`
-measures it against a `BigFloat` reference on a deliberately ill-conditioned
-input and requires it to be no worse than a sequential sum.
+**Accuracy.** Blocking a sum is one level of pairwise summation, so the error
+bound improves from `O(n·eps)` to `O((n/64 + 64)·eps)`. The gate in
+`test_lbfgs_fast_path_equivalence.jl` measures it against a `BigFloat`
+reference on a deliberately ill-conditioned input and requires it to be no
+worse than a sequential sum.
 
-What it does change is the last bits relative to the BLAS `zdotc` it replaces,
-so it is **not** bit-identical to what was there before — worth stating,
-because this solver sits close enough to the `sqrt(eps)` energy-gated floor
-that a change in summation order moves the endpoint. It is independent of the
-THREAD COUNT (the block count is a constant), which a `@threads`-over-
-`nthreads()` reduction would not be; it is not independent of the CPU, and
-neither is `zdotc`.
+It is **not** bit-identical to the `zdotc` it replaces. Worth stating: this
+solver sits close enough to the `sqrt(eps)` energy-gated floor that a change in
+summation order moves the endpoint.
 """
-function _realdot_blocked(a::Array, b::Array)
+function _realdot(a::Array, b::Array)
     n = length(a)
     n == 0 && return 0.0
     nb = min(_REALDOT_BLOCKS, n)
     chunk = cld(n, nb)
-    partials = Vector{Float64}(undef, nb)
-    if Threads.nthreads() == 1 || n < (1 << 15)
-        @inbounds for t in 1:nb
-            partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
-        end
-    else
-        Threads.@threads for t in 1:nb
-            @inbounds partials[t] = _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
-        end
-    end
     s = 0.0
     @inbounds for t in 1:nb
-        s += partials[t]
+        s += _realdot_range(a, b, (t - 1) * chunk + 1, min(t * chunk, n))
     end
     return s
 end
 
-# Device arrays keep the existing reduction.
-_realdot_blocked(a, b) = real(dot(a, b))
+# Device arrays: the existing reduction is already the parallel form.
+_realdot(a, b) = real(dot(a, b))
 
 """
 Two-loop L-BFGS direction, evaluated under the manifold inner product
@@ -174,10 +143,10 @@ function _lbfgs_direction(
     # array — for a 16³ × D=13 spinor that's ~640 KB per call, repeated
     # 2m+1 times per L-BFGS direction).
     for i in m:-1:1
-        alphas[i] = rho_hist[i] * _realdot_blocked(s_hist[i], q) * dV
+        alphas[i] = rho_hist[i] * _realdot(s_hist[i], q) * dV
         # `q - a*y` and `q + (-a)*y` agree bit for bit: negating a float is
         # exact, so the sum rounds to the same value.
-        _axpy_threaded!(q, -alphas[i], y_hist[i])
+        _axpy!(q, -alphas[i], y_hist[i])
     end
 
     if m > 0
@@ -186,14 +155,14 @@ function _lbfgs_direction(
         # recomputing the dot product was a full extra pass over two
         # ψ-sized arrays for a number we had.
         ys = 1.0 / (rho_hist[end] * dV)
-        yy = _realdot_blocked(y_hist[end], y_hist[end])   # ≡ sum(abs2, y)
+        yy = _realdot(y_hist[end], y_hist[end])   # ≡ sum(abs2, y)
         γ = ys / max(yy, 1e-30)
         q .*= γ
     end
 
     for i in 1:m
-        β = rho_hist[i] * _realdot_blocked(y_hist[i], q) * dV
-        _axpy_threaded!(q, alphas[i] - β, s_hist[i])
+        β = rho_hist[i] * _realdot(y_hist[i], q) * dV
+        _axpy!(q, alphas[i] - β, s_hist[i])
     end
 
     q .*= -1
@@ -220,10 +189,17 @@ decrease test `E(α) < E0`, preserving the old manifold-safe behaviour.
 permits a bounded doubling phase when `α = 1` already decreases, so the first
 unscaled step auto-finds its scale instead of being stuck at the Newton length.
 
-Returns `(α, E, psi_accepted)`. `psi_accepted` is the retracted iterate at the
-accepted `α` (scratch-backed, valid until the next line search) so the driver
-does not have to redo the step + retraction it already computed here. On
+Returns `(α, E, psi_accepted, n_eval)`. `psi_accepted` is the retracted iterate
+at the accepted `α` (scratch-backed, valid until the next line search) so the
+driver does not have to redo the step + retraction it already computed here. On
 failure (`α = 0`) it is the untouched `psi`.
+
+`n_eval` is how many TOTAL-ENERGY evaluations this call made. It is reported
+because it, not any single kernel, is what sets the cost of an iteration: a
+5-minute measurement of Eu-151 F=6 at 24³ put the iteration at ~245 ms against
+a component sum of ~57 ms, and the only candidate for the missing ~190 ms is
+this count being much larger than one. Retractions without an energy (the
+expansion phase's final re-placement) are not counted — they are not evaluations.
 """
 function _line_search_energy_decrease(
     psi, direction, E0, ws, grid, dV, target_Mz, F;
@@ -231,6 +207,17 @@ function _line_search_energy_decrease(
     α_init::Float64=1.0, shrink::Float64=0.5, grow::Float64=2.0,
     c1::Float64=1.0e-4, max_iter::Int=30, max_expand::Int=6,
     expand::Bool=false,
+    # When given, the FIRST trial evaluates `energy_gradient!` into this buffer
+    # instead of `total_energy`, and the returned `grad_valid` says whether the
+    # step that was accepted is the one it was evaluated at. On the GPU that
+    # gradient is free — measured at 24³ D=13, `energy_gradient!` costs 1.383 ms
+    # against `gradient_only!`'s 1.382, because both are the same fused kernel
+    # and the energy falls out of it — so the caller can skip its own gradient
+    # pass and save a whole `total_energy` (1.306 ms of a 5.83 ms iteration).
+    # On the CPU it is NOT free: `energy_gradient!` runs the term registry
+    # twice, 12.80 ms against 6.57 + 6.11 separately, so the caller does not
+    # pass this there.
+    grad_out=nothing, k_squared_dev=nothing,
 )
     D = 2F + 1
     N_dim = length(grid.config.n_points)
@@ -249,8 +236,19 @@ function _line_search_energy_decrease(
         copyto!(ws.state.psi, psi_trial)
         nothing
     end
+    n_eval = 0
+    fused_done = false
     eval_energy = function (α)
         retract!(α)
+        n_eval += 1
+        if grad_out !== nothing && !fused_done
+            fused_done = true
+            # `retract!` has already placed `psi_trial` in `ws.state.psi`; the
+            # copy inside `energy_gradient!` repeats it. Kept rather than
+            # special-cased because it is one device copy against the 1.3 ms
+            # this saves.
+            return energy_gradient!(grad_out, psi_trial, ws; k_squared_dev)
+        end
         total_energy(ws)
     end
 
@@ -281,9 +279,11 @@ function _line_search_energy_decrease(
             # (`best_E` is already known), which is why this is `retract!` and
             # not the `eval_energy` the fix on main used.
             last_α == best_α || retract!(best_α)
-            return best_α, best_E, psi_trial
+            # The expansion phase moved on from the point `grad_out` was taken
+            # at, so the caller must not reuse it.
+            return best_α, best_E, psi_trial, n_eval, false
         end
-        return α, E_trial, psi_trial
+        return α, E_trial, psi_trial, n_eval, grad_out !== nothing
     end
 
     # Backtracking from α_init.
@@ -291,9 +291,53 @@ function _line_search_energy_decrease(
         α *= shrink
         E_trial = eval_energy(α)
         if accept(α, E_trial)
-            return α, E_trial, psi_trial
+            # Backtracked: `grad_out` was evaluated at α_init, not here.
+            return α, E_trial, psi_trial, n_eval, false
         end
     end
     # No sufficient decrease found — return zero step.
-    (0.0, E0, psi)
+    (0.0, E0, psi, n_eval, false)
 end
+
+"""
+    _history_array_type(psi, history_precision) → Type
+
+Array type for the L-BFGS `s`/`y` history.
+
+The two-loop recursion reads `s_i` and `y_i` once in each of its two loops —
+`4m` streaming reads of a ψ-sized array per direction, 230 MB at `m = 20`,
+24³, D = 13. Measured at 10.3 ms on one core, i.e. ~23 GB/s, so it is bandwidth
+and nothing else, and halving the element size is the only lever left: threading
+it is negative (see `_axpy!`) and lowering `m` is paid back in iterations.
+
+Never UPCASTS: a Float32 workspace (`dtype = :f32`) keeps a Float32 history
+whatever is asked for, because a Float64 history of a Float32 iterate stores
+precision that is not there.
+
+Float32 on the GPU is refused rather than silently allowed: `_realdot` there is
+`real(dot(a, b))`, and cuBLAS has no mixed-precision `dot`, so the mixed call
+would fall out to a generic reduction — a correctness-neutral but
+unmeasured path. The saving this exists for is a CPU-bandwidth one.
+"""
+function _history_array_type(psi::AbstractArray, history_precision::DataType)
+    history_precision === Float64 && return typeof(psi)
+    history_precision === Float32 || throw(ArgumentError(
+        "history_precision must be Float32 or Float64, got $history_precision"))
+    psi isa Array || throw(
+        ArgumentError(
+            "history_precision=Float32 is CPU-only: the device `_realdot` is " *
+            "cuBLAS `dot`, which has no mixed-precision form. Leave it at Float64 " *
+            "on a GPU workspace."),
+    )
+    R = real(eltype(psi))
+    sizeof(R) <= sizeof(Float32) && return typeof(psi)
+    return Array{Complex{Float32}, ndims(psi)}
+end
+
+"""
+    _history_copy(HT, x) → HT
+
+`copy(x)` into the history's element type. `HT === typeof(x)` is the ordinary
+case and just copies.
+"""
+_history_copy(::Type{HT}, x) where {HT} = HT === typeof(x) ? copy(x) : convert(HT, x)

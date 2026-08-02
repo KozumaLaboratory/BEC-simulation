@@ -51,6 +51,30 @@ declare -A BR_PROD_VARIANTS=(
   #             is where a time-stepping error would also live.
   [prod_box35]="240,240,120|35.0,35.0,18.0|0|1.0e-3|NaN"   # xy box 28 -> 35 at IDENTICAL dx
   [prod_dt5e4]="192,192,120|28.0,28.0,18.0|0|5.0e-4|NaN"   # dt halved, geometry identical
+  # --- BOX convergence, the series that was never taken. dx was refined three
+  # times with the xy box pinned at 28, and the box turned out to be what
+  # mattered: at identical dx = 0.1458333, xy box 28 -> 35 cut the leak 13x
+  # (0.243 -> 0.018, gate OK at 2.0%) while dealias and dt/2 changed it by less
+  # than 0.5%. It also moved the CONVERSION by -13% (1.066 -> 0.924), so the
+  # dx-converged value was converged inside a contaminated box.
+  #
+  # Why xy and not z: J_z is angular momentum about z, so density wrapping in x
+  # or y corrupts it directly while density leaving through the z faces does
+  # not. Fixing the z box earlier changed nothing, which is what sent the
+  # diagnosis down the wrong path.
+  #
+  # 42/288 = 35/240 = 28/192 exactly, so dx is held to the last digit and only
+  # the box moves. 288 = 2^5*3^2.
+  [prod_box42]="288,288,120|42.0,42.0,18.0|0|1.0e-3|NaN"   # xy box 35 -> 42, dx identical
+  # Fourth box point. The leak converges monotonically (0.243 -> 0.018 -> 0.0086)
+  # and box 42 is the FIRST to meet the 1e-6 edge target on both in-plane axes
+  # (8.9e-07 vs 1.95e-05 at box 35), so box 35 was probably still contaminated.
+  # The conversion does NOT yet converge: 1.066 -> 0.924 -> 1.013. The stir
+  # output does (8.784 -> 8.887 -> 8.889, last step +0.02%), so whatever moves
+  # is in the QUENCH, not in the state entering it.
+  # n = 320 = 2^6*5 rather than 336 = 2^4*3*7: the factor 7 is what made n = 112
+  # ~66x slower per step than n = 80. box = 320 * 7/48 keeps dx at 7/48 exactly.
+  [prod_box47]="320,320,120|46.6666666667,46.6666666667,18.0|0|1.0e-3|NaN"
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
@@ -60,7 +84,12 @@ br_select_prod() {
   local tag=$1
   [[ -n "${BR_PROD_VARIANTS[$tag]:-}" ]] || { echo "unknown prod variant: $tag" >&2; return 1; }
   IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_PROD_VARIANTS[$tag]}"
-  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_$tag"
+  # BR_TAG names the OUTPUT file, so it must not be clobbered by the geometry.
+  # A caller sweeping another axis (BR_OMEGA) passes its own tag; overwriting it
+  # here pointed four concurrent jobs at one ledger, and they raced on the
+  # tmp+rename and killed each other with ENOENT. Append instead of assign.
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC
+  export BR_TAG="${BR_TAG:-}_$tag"
 }
 
 # Export BR_N / BR_BOX / BR_PAD / BR_DT / BR_TRUNC for one variant name.
@@ -68,5 +97,6 @@ br_select_variant() {
   local tag=$1
   [[ -n "${BR_VARIANTS[$tag]:-}" ]] || { echo "unknown variant: $tag" >&2; return 1; }
   IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_VARIANTS[$tag]}"
-  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC BR_TAG="_probe_$tag"
+  export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC
+  export BR_TAG="${BR_TAG:-}_probe_$tag"
 }

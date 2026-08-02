@@ -107,11 +107,11 @@ did NOT re-run. Regenerator: `scripts/eu_k3_lhy_factorial_regen.jl`.
 | 0 | **off** | `stable_arrest` | **−5.74131** | 1.000 |
 | 0 | scalar | `stable_arrest` | −5.74958 | 1.000 |
 | 0 | polar_contact | `stable_arrest` | −5.74687 | 1.000 |
-| 0 | icosa | `stable_arrest` | −5.74686 | 1.000 |
+| 0 | **full_bdg** | `stable_arrest` | **−5.75017** | 1.000 |
 | 200 | **off** | `sacrificial_arrest` | **−2.19516** | 0.377 |
 | 200 | scalar | `sacrificial_arrest` | −2.33119 | 0.400 |
 | 200 | polar_contact | `sacrificial_arrest` | −2.29143 | 0.393 |
-| 200 | icosa | `sacrificial_arrest` | −2.29143 | 0.393 |
+| 200 | **full_bdg** | `sacrificial_arrest` | **−2.34171** | 0.402 |
 
 **Claim 3 survives.** At one revision `off` and `scalar` land in the same class
 with Fz_per_N −5.74131 vs −5.74958 — 0.14% apart — and the same holds at
@@ -123,8 +123,21 @@ of the energy.
 There is no stabilisation specific to the spinor closure. In the old json the
 closed forms alone read `stable_arrest` at K3=200 while `off`/`scalar` read
 `sacrificial_arrest`; that separation was the 30000× overstrength of #158.
-`polar_contact` and `icosa` now agree to six figures, as a mostly-polarised
-state should.
+**`icosa` is gone from the factorial, replaced by `full_bdg`.**
+`IcosahedralLHY`'s closed form is `c₀^(5/2) + 3|λ_spin|^(5/2)`; the absolute
+value made it symmetric under `c₁ → −c₁` and returned a real energy where the
+spin-Goldstone branch is dynamically unstable. These configs use
+`c1_ratio = −0.005`, i.e. `c₁ < 0`, so the `icosa` rows were measured in a regime
+current main now refuses with an `ArgumentError`. `full_bdg` diagonalises the
+coupled problem with no ansatz and is valid there — checked before substituting
+(finite V, no instability warning at c₀ = 3270, c₁ = −16.35, m = −F).
+
+That substitution does not touch either verdict: all four settings still collapse
+onto one class per K3 row. It is worth noting how INSENSITIVE the classification
+is — `full_bdg` gives `E_LHY = 0.1462` against `polar_contact`'s `0.0957`, a
+factor 1.53, and the class does not move. So "the closure decides the arrest" is
+refuted twice: by the models agreeing, and by a 1.5× change in LHY strength
+changing nothing.
 
 **A retraction.** An earlier pass reported claim 3 as refuted, comparing
 re-measured `scalar` against the OLD `off` row. The `off` row moves too: it was
@@ -264,7 +277,10 @@ transfer physics, NOT numerical drift.
 ```
 
 YAMLs already in place:
-- `runs/eu_lhy_longtime/LHY_icosahedral_200ms.yaml` (queued)
+- `runs/eu_lhy_longtime/LHY_full_bdg_200ms.yaml` (queued; was
+  `LHY_icosahedral_200ms.yaml` and `kind: icosahedral` until 2026-07-30 — the I_h
+  closed form refuses this config's `c1_ratio < 0`, so both the mode and the file
+  name changed)
 - Matsui loss-on YAMLs (Task #C, not yet generated)
 - Barnett 64³ at Ω=−0.3 (Task #20-followup, not yet generated)
 

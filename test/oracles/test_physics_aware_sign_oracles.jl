@@ -242,7 +242,7 @@ end
 # (5) RamanTerm:  +δ → ⟨F_z⟩ < 0  (energy δ·⟨F_z⟩ minimised by ITP)
 # ============================================================================
 #
-# RamanTerm's gradient face is a declared no-op, so the previous in-term
+# RamanTerm's gradient face was a declared no-op until 2026-07-31, so the previous in-term
 # sign_oracle was the placeholder `predicate=true` — it could not detect a
 # δ-sign flip in the PROPAGATOR (apply_raman_step!), the face production
 # actually runs. Here we anchor on the propagator: ITP under H = δ·F_z (Ω=0,

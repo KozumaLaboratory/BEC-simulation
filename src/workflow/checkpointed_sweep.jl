@@ -114,12 +114,12 @@ function run_sweep!(
             continue
         end
         verbose && @printf("[%d/%d] %s  running …\n", i, n_total, key)
-        t0 = time()
+        t0 = time_ns()
         results[i] = get_or_compute!(
             sweep.checkpoint, key, () -> sweep.runner(params); force=force
         )
         verbose && @printf("[%d/%d] %s  done in %.1fs\n",
-            i, n_total, key, time() - t0)
+            i, n_total, key, elapsed_s(t0))
     end
     return results
 end
@@ -156,7 +156,7 @@ function extend_unconverged!(
         end
         verbose && @printf("[%d/%d] %s  extending (n=%d) …\n",
             i, n_total, key, n_extend)
-        t0 = time()
+        t0 = time_ns()
         # In-place fork! (same source/target key) = advance the
         # checkpoint. The predicate short-circuits already-converged
         # cells (no transform call); we've already filtered above so
@@ -167,7 +167,7 @@ function extend_unconverged!(
             predicate=sweep.gate,
         )
         verbose && @printf("[%d/%d] %s  extended in %.1fs (gate=%s)\n",
-            i, n_total, key, time() - t0, string(sweep.gate(results[i])))
+            i, n_total, key, elapsed_s(t0), string(sweep.gate(results[i])))
     end
     return results
 end

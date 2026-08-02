@@ -22,11 +22,14 @@ using Printf
 function _energy_gradient_scratch(psi, n_pts)
     scratch_get!(:energy_gradient, (typeof(psi), n_pts)) do
         (
-            similar(psi, ComplexF64, n_pts),  # fft_buf
-            similar(psi, Float64, n_pts),     # fx scratch
-            similar(psi, Float64, n_pts),     # fy scratch
-            similar(psi, Float64, n_pts),     # fz scratch
-            similar(psi, ComplexF64, n_pts),  # Coriolis derivative scratch
+            # eltype(psi), not ComplexF64 — `ws.fft_plans` follows ψ's
+            # precision and an in-place plan on a mismatched buffer degrades
+            # to out-of-place, so the k-space work silently reads real-space ψ.
+            similar(psi, eltype(psi), n_pts),  # fft_buf
+            similar(psi, Float64, n_pts),      # fx scratch
+            similar(psi, Float64, n_pts),      # fy scratch
+            similar(psi, Float64, n_pts),      # fz scratch
+            similar(psi, eltype(psi), n_pts),  # Coriolis derivative scratch
         )
     end
 end
@@ -141,9 +144,11 @@ function _project_constraints!(
     D = 2F + 1
 
     # 1. Remove ψ-direction: grad -= Re⟨ψ|grad⟩ × ψ
-    #    (chemical potential projection). `dot(a, b) = sum(conj(a)*b)`,
-    #    no `conj.(psi)` and no broadcast-product temporary.
-    μ_real = real(dot(psi, grad)) * dV
+    #    (chemical potential projection). `_realdot` rather than `real(dot(...))`:
+    #    `dot` on ComplexF64 goes to OpenBLAS `zdotc`, whose thread team is sized
+    #    from the machine, and on a few-MB array that call is nearly all team
+    #    overhead. This one runs twice per gradient. See `_realdot`.
+    μ_real = _realdot(psi, grad) * dV
     grad .-= μ_real .* psi
 
     # 2. Magnetization conservation

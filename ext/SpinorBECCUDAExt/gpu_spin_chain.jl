@@ -134,6 +134,82 @@ end
     nothing
 end
 
+# Tabulated LHY in the fused chain.
+#
+# `_spin_chain_reason` used to decline every `TabulatedLHY` — "a tabulated LHY is
+# not the closed-form diagonal phase" — and since EVERY production Eu run is
+# tabulated (polar_contact / icosahedral / full_bdg / …), no production run has
+# ever taken the fused half-step. That is the same bound the fused DIAGONAL
+# kernel carried until 2026-07-28, and it is closed the same way: the table is a
+# lookup, not a different phase.
+#
+# `_lhy_interp_uniform` is the SAME device lookup the generic path and the fused
+# diagonal both call, so the three cannot disagree about the table.
+#
+# Note what the old bound was protecting: `clhy` above collapses a non-scalar
+# `c_lhy` to `zero(T)`, so a table reaching that kernel would have run with NO
+# LHY and said nothing — the exact defect that hit the GPU diagonal. The refusal
+# was load-bearing, which is why this adds a path rather than widening `clhy`.
+@inline function _chain_prepass_kernel_tab!(
+    Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0::T, dt::T,
+    x0::T, dxi::T, ys, m::Int32, ::Val{D}, ::Val{IT}, dst,
+) where {T, D, IT}
+    i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+    i > size(Pmf, 1) && return nothing
+    n = zero(T)
+    fz = zero(T)
+    fxr = zero(T)
+    fyi = zero(T)
+    prev = @inbounds Pmf[i, 1]
+    n += abs2(prev)
+    fz += m_vals[1] * abs2(prev)
+    @inbounds for c in 2:D
+        cur = Pmf[i, c]
+        n += abs2(cur)
+        fz += m_vals[c] * abs2(cur)
+        pr = conj(prev) * cur
+        fxr += fp[c] * real(pr)
+        fyi += fp[c] * imag(pr)
+        prev = cur
+    end
+    lhy = _lhy_interp_uniform(n, x0, dxi, ys, Int(m))
+    varg = (@inbounds(Vt[i]) + c0 * n + lhy) * dt
+    @inbounds begin
+        j = _voxel_index(dst, i)
+        Fx[j] = fxr
+        Fy[j] = fyi
+        Fz[j] = fz
+        db[i] = n
+        vph[i] = IT ? Complex{T}(exp(-varg), zero(T)) : cis(-varg)
+    end
+    nothing
+end
+
+@inline function _launch_chain_prepass_tab!(
+    Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0::T, dt::T,
+    x0::T, dxi::T, ys, m::Int32, ::Val{D}, it::Bool, dst, N,
+) where {T, D}
+    threads = min(N, 256)
+    CUDA.@cuda threads = threads blocks = cld(N, threads) _chain_prepass_kernel_tab!(
+        Fx, Fy, Fz, vph, db, Pmf, Vt, m_vals, fp, c0, dt,
+        x0, dxi, ys, m, Val(D), Val(it), dst)
+    nothing
+end
+
+"""Device table for the fused chain, or `nothing` when the LHY is not tabulated.
+
+Returns the same `(x0, dx, ys, m)` quadruple the fused diagonal uses, from the
+same cache — one upload per table `objectid`, not one per step.
+"""
+function _chain_lhy_table(c_lhy, ::Type{T}, proto::CUDA.CuArray) where {T}
+    c_lhy isa SpinorBEC.TabulatedLHY || return nothing
+    xs = c_lhy.densities
+    m = length(xs)
+    m >= 2 || return nothing
+    _assert_uniform_lhy_grid(xs, m)
+    (T(xs[1]), T(xs[2] - xs[1]), _device_lhy_table(c_lhy, T, proto), Int32(m))
+end
+
 SpinorBEC._spin_chain_available(psi::CuArray, ws::SpinorBEC.Workspace) =
     _spin_taylor_plan(psi, ws.spin_matrices) !== nothing
 
@@ -184,17 +260,32 @@ function SpinorBEC._apply_spin_chain!(
     # the convolution on the ⟨F⟩ just written. Two call sites rather than one
     # with a Union-typed buffer/map tuple, so each launches a concretely-typed
     # kernel.
+    tab = _chain_lhy_table(c_lhy, T, psi)
     if pad === nothing
-        _launch_chain_prepass!(
-            reshape(bufs.Fx_r, N), reshape(bufs.Fy_r, N), reshape(bufs.Fz_r, N),
-            vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
-            Val(D), it, nothing, N)
+        if tab === nothing
+            _launch_chain_prepass!(
+                reshape(bufs.Fx_r, N), reshape(bufs.Fy_r, N), reshape(bufs.Fz_r, N),
+                vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
+                Val(D), it, nothing, N)
+        else
+            _launch_chain_prepass_tab!(
+                reshape(bufs.Fx_r, N), reshape(bufs.Fy_r, N), reshape(bufs.Fz_r, N),
+                vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), dt_outer,
+                tab..., Val(D), it, nothing, N)
+        end
         SpinorBEC._convolve_ddi!(ws.ddi, bufs, n_pts)
     else
-        _launch_chain_prepass!(
-            pad.Fx_pad, pad.Fy_pad, pad.Fz_pad,
-            vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
-            Val(D), it, CartesianIndices(n_pts), N)
+        if tab === nothing
+            _launch_chain_prepass!(
+                pad.Fx_pad, pad.Fy_pad, pad.Fz_pad,
+                vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), clhy, dt_outer,
+                Val(D), it, CartesianIndices(n_pts), N)
+        else
+            _launch_chain_prepass_tab!(
+                pad.Fx_pad, pad.Fy_pad, pad.Fz_pad,
+                vph, db, Pmf, Vt, m_vals, fp, T(ip[0]), dt_outer,
+                tab..., Val(D), it, CartesianIndices(n_pts), N)
+        end
         SpinorBEC._convolve_ddi_padded!(ws.ddi, pad)
     end
 

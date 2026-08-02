@@ -59,19 +59,21 @@ minutes after** the run.
 
 ---
 
-## 3. Stale documentation — these overrides win
+## 3. Stale documentation — four of the five overrides are now discharged
 
-Found 2026-07-30 by reading code against docs. Until the source doc is fixed, **this
-table is authoritative**. Treating a stale `KNOWN-LIMIT` as real is more expensive than a
-missing feature, because it silently reroutes work.
+Measured 2026-07-30 by reading code against docs; **re-measured 2026-08-02 before
+this charter landed**. Four of the five rows had been fixed at the source in the
+meantime. They are kept as a record, struck, rather than deleted — a table that
+claims to override `CLAUDE.md` is exactly the thing that must not be allowed to
+go stale unnoticed.
 
-| Doc says | Reality | Evidence |
+| Doc says | Reality | Status 2026-08-02 |
 |---|---|---|
-| `CLAUDE.md:256` — tensor c2/c4 not in `energy_gradient!`, LBFGS falls back to ITP `[KNOWN-LIMIT]` | **Retired 2026-06-09.** LBFGS/Newton-CG optimise the full Hamiltonian including `TensorTerm`, FD-gated in `test_term_consistency` | `src/solvers/lbfgs/driver.jl:183-187` |
-| `docs/validation/ueda_status.md:32,80` — independent reference-RHS "(planned)" | **Exists** | `src/validation/reference_rhs/{contact,ddi,loss,scalar,zeeman,total}.jl` |
-| `matsui_reproduction_status.md` Level 5 — "not started; needs imaging pipeline" | **Imaging chain is complete**: PSF, saturation, shot noise, pixel binning, SG+TOF (fixed grid *and* Castin–Dum scaling), `simulate_bragg_tof`, tomography, Faraday, phase contrast | `src/analysis/{imaging,tof,tof_multiframe,tomography,faraday}.jl` + 7 analyzers |
-| `README.md` CI badge | points at `anko9801/BEC-simulation`, not this org repo | — |
-| `dthesis_year1_roadmap.md` | "上妻研（東大）" is wrong (Science Tokyo); Q2 dated 2027-07 is marked closed 2026-05 — the doc is internally inconsistent as a plan | — |
+| ~~`CLAUDE.md:256` — tensor c2/c4 not in `energy_gradient!`, LBFGS falls back to ITP `[KNOWN-LIMIT]`~~ | Retired 2026-06-09; LBFGS/Newton-CG optimise the full Hamiltonian including `TensorTerm` | **DISCHARGED** — `CLAUDE.md:261` now states this; no `KNOWN-LIMIT` remains in the file |
+| ~~`ueda_status.md:32,80` — independent reference-RHS "(planned)"~~ | Exists, `src/validation/reference_rhs/` | **DISCHARGED** — both sites read "(implemented)" |
+| ~~`matsui_reproduction_status.md` Level 5 — "not started; needs imaging pipeline"~~ | The imaging chain is complete | **DISCHARGED** — the row now reads "the pipeline EXISTS … Blocker is the Fig-2C source data, not the code" |
+| ~~`README.md` CI badge points at `anko9801/BEC-simulation`~~ | — | **DISCHARGED** — no such URL in `README.md` |
+| `dthesis_year1_roadmap.md:41` — Q2 dated 2027-07 marked "CLOSED AHEAD OF SCHEDULE (2026-05-11)" | The document is internally inconsistent as a plan | **OPEN**, narrowed. The affiliation half of the original row was wrong: the doc says 上妻研, never 上妻研（東大）, so there is nothing to correct there |
 
 **Consequence for planning:** the tensor gradient is on the critical path for Lane C.
 It works. Use LBFGS, not ITP, for tensor-active ground states.
@@ -79,7 +81,8 @@ It works. Use LBFGS, not ITP, for tensor-active ground states.
 **Structural fix (session S-DOC):** every `KNOWN-LIMIT` / `not implemented` / `planned`
 claim must carry a machine-checkable predicate (a test name or a grep assertion) that
 **fails when the limit no longer holds**. Same discipline as the existing
-set-equivalence meta-test.
+set-equivalence meta-test. Four rows discharging themselves within three days,
+silently, is the argument for it: nothing told anyone.
 
 ---
 

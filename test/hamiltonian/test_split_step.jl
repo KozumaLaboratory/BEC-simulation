@@ -288,7 +288,7 @@ using SpinorBEC
     @testset "Parametric 4th-order convergence ($method)" for (method, test_dts) in [
         (:yoshida, [0.02, 0.01]),
         (:suzuki, [0.02, 0.01]),
-        (:blanes_moan_s6, [0.05, 0.025]),
+        (:blanes_moan_srkn6b, [0.05, 0.025]),
         (:omelyan_pefrl, [0.02, 0.01]),
     ]
         config = GridConfig(128, 20.0)
@@ -318,22 +318,24 @@ using SpinorBEC
     end
 
     @testset "Coefficient sums ($method)" for method in
-                                              (:yoshida, :suzuki, :blanes_moan_s6, :omelyan_pefrl)
+                                              (
+        :yoshida, :suzuki, :blanes_moan_srkn6b, :omelyan_pefrl
+    )
         comp = SpinorBEC._resolve_composition(method)
         @test sum(comp.a) ≈ 1.0 atol=1e-15
         @test sum(comp.b) ≈ 1.0 atol=1e-15
         @test length(comp.a) == length(comp.b) + 1
     end
 
-    @testset "Blanes-Moan S6 palindromic symmetry" begin
-        comp = SpinorBEC._COMP_BLANES_MOAN_S6
+    @testset "Blanes-Moan SRKN₆ᵇ palindromic symmetry" begin
+        comp = SpinorBEC._COMP_BLANES_MOAN_SRKN6B
         for i in 1:3
             @test comp.a[i] ≈ comp.a[8 - i] atol=1e-15
             @test comp.b[i] ≈ comp.b[7 - i] atol=1e-15
         end
     end
 
-    @testset "Adaptive simulation with $method" for method in (:blanes_moan_s6, :omelyan_pefrl)
+    @testset "Adaptive simulation with $method" for method in (:blanes_moan_srkn6b, :omelyan_pefrl)
         config = GridConfig(64, 20.0)
         grid = make_grid(config)
         sys = SpinSystem(1)

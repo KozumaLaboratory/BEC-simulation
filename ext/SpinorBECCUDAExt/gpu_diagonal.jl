@@ -20,17 +20,31 @@ using StaticArrays: SVector
 # The voxel-dependent half of the diagonal phase, declared ONCE: this kernel
 # and the fused V half-step (gpu_spin_chain.jl, which multiplies the
 # same phase in and out around its rotations) both call it.
-@inline function _diag_voxel_phase(
-    Pmf, i, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
-) where {T, D, IT}
+@inline function _diag_voxel_density(Pmf, i, ::Type{T}, ::Val{D}) where {T, D}
     n = zero(T)
     @inbounds for c in 1:D
         n += abs2(Pmf[i, c])
     end
-    lhy = clhy == zero(T) ? zero(T) : clhy * n * sqrt(n)
-    varg = (@inbounds(Vt[i]) + c0 * n + lhy) * dt
+    n
+end
+
+# The voxel-dependent phase, given an ALREADY-EVALUATED V_LHY. Split out so the
+# scalar and tabulated kernels differ only in how they get that one number and
+# cannot drift on the rest of the diagonal.
+@inline function _diag_phase_from(
+    n::T, Vt_i::T, c0::T, lhy::T, dt::T, ::Val{IT},
+) where {T, IT}
+    varg = (Vt_i + c0 * n + lhy) * dt
     # one transcendental per voxel instead of D
-    (n, IT ? Complex{T}(exp(-varg), zero(T)) : cis(-varg))
+    IT ? Complex{T}(exp(-varg), zero(T)) : cis(-varg)
+end
+
+@inline function _diag_voxel_phase(
+    Pmf, i, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
+) where {T, D, IT}
+    n = _diag_voxel_density(Pmf, i, T, Val(D))
+    lhy = clhy == zero(T) ? zero(T) : clhy * n * sqrt(n)
+    (n, _diag_phase_from(n, (@inbounds Vt[i]), c0, lhy, dt, Val(IT)))
 end
 
 @inline function _diag_step_kernel!(
@@ -44,6 +58,70 @@ end
         P[i, c] *= vph * zph[c]
     end
     return nothing
+end
+
+# Tabulated LHY in the SAME fused kernel. Until now every `TabulatedLHY` missed
+# this kernel's `c_lhy` bound and fell to the generic broadcast propagator — 2D
+# ≈ 26 launches per call plus a materialised V_LHY array, four calls per ITP
+# step. Measured on an H100 at 24³ Eu F=6: 0.336 ms/step with no LHY against
+# 1.021 with a table, i.e. 0.685 ms of the step was the fallback and not the
+# physics. Every production Eu run is tabulated (polar_contact / icosahedral /
+# full_bdg / …), so that is the common case.
+#
+# `_lhy_interp_uniform` is the SAME device lookup the generic path calls
+# (gpu_lhy_field.jl), so the two cannot disagree on the table — only on how the
+# Zeeman factor associates, which is why the gate is machine precision and not
+# bit-identity, exactly as for the scalar arm.
+@inline function _diag_step_kernel_tab!(
+    P, Pmf, Vt, db, zph, c0::T, x0::T, dxi::T, ys, m::Int32, dt::T,
+    ::Val{D}, ::Val{IT},
+) where {T, D, IT}
+    i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+    i > size(P, 1) && return nothing
+    n = _diag_voxel_density(Pmf, i, T, Val(D))
+    lhy = _lhy_interp_uniform(n, x0, dxi, ys, Int(m))
+    vph = _diag_phase_from(n, (@inbounds Vt[i]), c0, lhy, dt, Val(IT))
+    @inbounds db[i] = n
+    @inbounds for c in 1:D
+        P[i, c] *= vph * zph[c]
+    end
+    return nothing
+end
+
+function SpinorBEC._diagonal_step_svec!(
+    ::Val{N},
+    psi::CuArray{Complex{T}},
+    V_trap,
+    zeeman_diag::SVector{D, Float64},
+    c0,
+    c_lhy::SpinorBEC.TabulatedLHY,
+    dt_frac,
+    density_buf,
+    imaginary_time;
+    psi_mf::Union{Nothing, AbstractArray}=nothing,
+) where {N, T <: AbstractFloat, D}
+    xs = c_lhy.densities
+    m = length(xs)
+    m >= 2 || throw(ArgumentError("a tabulated LHY needs ≥ 2 density nodes, got $m"))
+    _assert_uniform_lhy_grid(xs, m)
+    n_pts = ntuple(d -> size(psi, d), Val(N))
+    Ns = prod(n_pts)
+    dtf = T(dt_frac)
+    it = imaginary_time === true
+    zph = _get_diag_zph(psi, zeeman_diag, dtf, it)
+    ys = _device_lhy_table(c_lhy, T, psi)
+
+    P = reshape(psi, Ns, D)
+    Pmf = reshape(psi_mf === nothing ? psi : psi_mf::CuArray{Complex{T}}, Ns, D)
+    Vt = reshape(V_trap, Ns)
+    db = reshape(density_buf, Ns)
+    threads = min(Ns, 256)
+    blocks = cld(Ns, threads)
+    CUDA.@cuda threads = threads blocks = blocks _diag_step_kernel_tab!(
+        P, Pmf, Vt, db, zph, T(c0), T(xs[1]), T(xs[2] - xs[1]), ys, Int32(m), dtf,
+        Val(D), Val(it),
+    )
+    nothing
 end
 
 # Same phase, written out for a later kernel to consume rather than applied

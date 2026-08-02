@@ -77,7 +77,17 @@ end
     # No `using X: name` where `name` is never referenced. This is the
     # actively-tracked rot signal: when a function is renamed or deleted,
     # the stale `using X: old_name` survives this test.
-    @test check_no_stale_explicit_imports(SpinorBEC) === nothing
+    #
+    # `ignore` is for names the checker cannot see because they appear only
+    # AFTER macro expansion. `CUDA.@captured` expands to code that names
+    # `CuGraphExec` unqualified (CUDA.jl lib/cudadrv/graph.jl:190), so the
+    # import in SpinorBECCUDAExt is load-bearing: removing it makes the whole
+    # extension fail with `UndefVarError: CuGraphExec`. Verified 2026-07-29 by
+    # deleting it and watching the extension stop loading — do not "clean" these
+    # on the checker's word alone.
+    @test check_no_stale_explicit_imports(
+        SpinorBEC; ignore=(:CuGraph, :CuGraphExec, Symbol("@captured"))
+    ) === nothing
 end
 
 @testset "JET typo smoke" begin

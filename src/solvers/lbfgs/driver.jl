@@ -7,6 +7,27 @@ export find_ground_state_lbfgs
 # preconditioning — the physical convergence certificate). Single source so the
 # initial and per-step gradient (reused across steps, not recomputed) precondition
 # identically. Mirrors the former inline block exactly ⇒ bit-identical trajectory.
+# Everything after the raw gradient: constraint projection, the projected-raw
+# residual, preconditioning. Split out so the fused line-search path — which
+# already holds `H·ψ` at the accepted iterate — can finish it without repeating
+# the pass that produced it.
+@inline function _lbfgs_grad_finish!(
+    g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+    precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64,
+)
+    _project_constraints!(g, psi, grid, target_magnetization, F)
+    grad_norm = sqrt(sum(abs2, g) * dV)
+    if precond_alpha_v >= 0
+        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
+        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    elseif sobolev_alpha > 0
+        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
+        _project_constraints!(g, psi, grid, target_magnetization, F)
+    end
+    grad_norm
+end
+
 @inline function _lbfgs_grad!(
     g, psi, ws, k_squared_dev, grid, target_magnetization, F,
     precond_alpha_v::Float64, precond_alpha_k::Float64, sobolev_alpha::Float64, dV::Float64;
@@ -23,16 +44,9 @@ export find_ground_state_lbfgs
         gradient_only!(g, psi, ws)
         E_known
     end
-    _project_constraints!(g, psi, grid, target_magnetization, F)
-    grad_norm = sqrt(sum(abs2, g) * dV)
-    if precond_alpha_v >= 0
-        sqrt_pv = build_precond_sqrt_pv(ws, psi, precond_alpha_v)
-        combined_precondition!(g, ws, sqrt_pv, k_squared_dev, precond_alpha_k)
-        _project_constraints!(g, psi, grid, target_magnetization, F)
-    elseif sobolev_alpha > 0
-        _sobolev_precondition!(g, ws, k_squared_dev, sobolev_alpha)
-        _project_constraints!(g, psi, grid, target_magnetization, F)
-    end
+    grad_norm = _lbfgs_grad_finish!(
+        g, psi, ws, k_squared_dev, grid, target_magnetization, F,
+        precond_alpha_v, precond_alpha_k, sobolev_alpha, dV)
     (E, grad_norm)
 end
 
@@ -64,7 +78,28 @@ function find_ground_state_lbfgs(;
     m_lbfgs::Int=20,   # history depth. 20 measured ~9× lower grad_norm floor +
     # ~30% fewer line-search backtracks vs 10 on Eu F=6+DDI
     # 16³ (m=30 was worse). Memory ~ 2·m·|ψ|: reduce to 10 if
-    # VRAM-constrained at large grids.
+    # VRAM-constrained at large grids. Lowering it to buy a cheaper
+    # two-loop does NOT pay: measured across three c1_ratio values at
+    # 24³, the per-iteration cost is linear in m (0.2-0.4 ms per unit)
+    # but the +DDI iteration COUNT rises as m falls, and total wall is
+    # flat over m = 5..40. `history_precision` is the lever instead.
+    history_precision::DataType=Float64,   # element type of the s/y history.
+    # `Float32` narrows the two-loop's traffic, which is what that step
+    # costs: 4m reads of a ψ-sized array per direction (230 MB at m=20,
+    # 24³, D=13) at one core's ~23 GB/s. The history only steers the
+    # SEARCH DIRECTION — the line search still accepts on a
+    # full-precision energy and `rho_hist`/`grad` stay Float64 — so it
+    # trades curvature resolution, not correctness.
+    #
+    # WHEN IT PAYS, measured at 24³ over three c1_ratio values:
+    #   contact  31.2→27.6 ms/iteration and the SAME iteration count
+    #            (36 either way) ⇒ −9 % wall.
+    #   +DDI     the same −3.6 ms/iteration, but 16-36 % MORE iterations
+    #            ⇒ +3 to +21 % wall. A NET LOSS.
+    # So this is opt-in for contact-dominated problems and must not be
+    # switched on for the dipolar production case. The per-iteration
+    # saving is consistent to 0.1 ms across all six runs; it is the
+    # convergence side that decides.
     verbose::Bool=_default_solver_verbose(),
     light_shift::Union{Nothing, LightShift}=nothing,
     # Spinor (tabulated) LHY. Until 2026-07-29 these kwargs did not exist, so
@@ -91,6 +126,16 @@ function find_ground_state_lbfgs(;
     # HvP cost. newton_polish (HvP) cannot break it.
     pin::Union{Nothing, Function}=nothing,        # ε -> (; zeeman=…) | (; potential=…)
     epsilon_ramp::AbstractVector{<:Real}=Float64[],  # non-empty ⇒ pin ε→0 continuation
+    stop_at_floor::Bool=true,   # end the solve when a STEEPEST-DESCENT line
+    # search finds no acceptable step. That is not a heuristic: such a failure
+    # leaves ψ, `grad` and `E` untouched and the curvature history empty, so the
+    # next iteration forms the same direction from the same gradient with the
+    # same `E0` and repeats the same evaluations to the same answer, forever.
+    # The iterate is a fixed point of the loop and nothing further can be found.
+    # Without this the solver ran to `n_steps` regardless: measured 97.8 % of
+    # 2000 steps on Eu-151 F=6 24³ at the default `tol=1e-8`, ~30 futile energy
+    # evaluations each, because that problem's gradient floor is 5e-7. Set
+    # `false` to restore the old behaviour.
     lbfgs_history=nothing,   # optional (s_hist, y_hist, rho_hist) to warm-start the
     # two-loop (ε-continuation threads it across rungs so
     # each rung reuses curvature instead of restarting SD).
@@ -105,7 +150,8 @@ function find_ground_state_lbfgs(;
             pin, epsilon_ramp, grid, atom, interactions, zeeman, potential,
             n_steps, tol, initial_state, init_state_params, psi_init, ws_init,
             enable_ddi, c_dd, secular_ddi, ddi_trunc_radius, ddi_padding, ddi_pad_factor,
-            quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs, verbose,
+            quasi_2d_ddi, l_z_ddi, target_magnetization, backend, m_lbfgs,
+            history_precision, verbose,
             light_shift, dtype, sobolev_alpha, precond_alpha_v, precond_alpha_k,
             rotating_frame_omega, newton_polish, newton_max_outer, newton_max_cg, newton_eps,
             spinor_lhy, lhy_opts,
@@ -199,18 +245,30 @@ function find_ground_state_lbfgs(;
 
     # L-BFGS history — warm-start from a supplied history when threading across
     # ε-continuation rungs (copied so the caller's vectors are not mutated).
+    HT = _history_array_type(psi, history_precision)
     s_hist, y_hist, rho_hist = if lbfgs_history === nothing
-        (typeof(psi)[], typeof(psi)[], Float64[])
+        (HT[], HT[], Float64[])
     else
-        (typeof(psi)[copy(s) for s in lbfgs_history[1]],
-            typeof(psi)[copy(y) for y in lbfgs_history[2]],
+        (HT[_history_copy(HT, s) for s in lbfgs_history[1]],
+            HT[_history_copy(HT, y) for y in lbfgs_history[2]],
             Float64[ρ for ρ in lbfgs_history[3]])
     end
 
     E_prev = Inf
     converged = false
     last_step = 0
-    t_start = time()
+    # Total-energy evaluations spent inside the line search, summed over the
+    # solve. Returned because it, not any single kernel, is what sets the cost
+    # per iteration — see `_line_search_energy_decrease`.
+    n_line_search_evals = 0
+    # Line searches that found no acceptable step (α = 0) and therefore threw
+    # the curvature history away. A solve where this is most iterations is not
+    # running L-BFGS at all — it is running steepest descent with a 30-deep
+    # backtrack in front of it, which is what a ~30 evals/iteration average
+    # means.
+    n_line_search_failures = 0
+    stalled = false
+    t_start = time_ns()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
     # accepted ψ becomes the next step's gradient) rather than recomputed at the
@@ -226,7 +284,7 @@ function find_ground_state_lbfgs(;
 
         # Log
         if verbose && (step == 1 || step % max(1, n_steps ÷ 20) == 0 || step == n_steps)
-            elapsed = time() - t_start
+            elapsed = elapsed_s(t_start)
             eta = elapsed / step * (n_steps - step)
             @printf("  LBFGS %d/%d | E=%.8g dE=%.3g |∇|=%.3g | %.1fs, ETA %.0fs\n",
                 step, n_steps, E, dE, grad_norm, elapsed, eta)
@@ -249,9 +307,9 @@ function find_ground_state_lbfgs(;
             _lbfgs_direction(grad, s_hist, y_hist, rho_hist, dV)
         end
 
-        # Ensure descent direction (`real(dot(a, b))` skips two
-        # broadcast temporaries vs `real(sum(conj.(a) .* b))`)
-        slope = real(dot(grad, direction)) * dV
+        # Ensure descent direction. `_realdot`, not `real(dot(...))` — see the
+        # note there on OpenBLAS level-1 team overhead.
+        slope = _realdot(grad, direction) * dV
         if slope >= 0
             direction .= .-grad  # fall back to steepest descent
             slope = -sum(abs2, grad) * dV
@@ -260,18 +318,46 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        α, E_trial, psi_accepted = _line_search_energy_decrease(
+        # Fuse the first trial with the gradient where that is free. On the
+        # GPU `energy_gradient!` and `gradient_only!` are the SAME fused kernel
+        # (1.383 vs 1.382 ms at 24³ D=13) because the energy falls out of the
+        # pass that forms H·ψ, so evaluating the α=1 trial that way and reusing
+        # its gradient removes a whole `total_energy` — 1.306 ms of a measured
+        # 5.83 ms iteration, on the ~85 % of iterations where α=1 is accepted.
+        #
+        # NOT done on the CPU, and that is a measurement: there
+        # `energy_gradient!` traverses the term registry twice, 12.80 ms
+        # against 6.57 + 6.11 for the two passes separately, so fusing would
+        # cost 0.1 ms rather than save.
+        fused_grad = _is_gpu(psi) ? grad_new : nothing
+        α, E_trial, psi_accepted, n_ls, grad_ready = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
-            slope=slope, expand=is_sd,
+            slope=slope, expand=is_sd, grad_out=fused_grad, k_squared_dev,
         )
+        n_line_search_evals += n_ls
 
         # Line search failed — reset L-BFGS and try steepest descent next
         if α == 0.0
+            n_line_search_failures += 1
             empty!(s_hist);
             empty!(y_hist);
             empty!(rho_hist)
             E_prev = E
             last_step = step
+            # A failure along the STEEPEST-DESCENT direction is conclusive: ψ,
+            # `grad` and `E` are untouched and the history is now empty, so the
+            # next iteration rebuilds this exact direction from this exact
+            # gradient and repeats these exact evaluations. Continuing cannot
+            # produce a different answer. (A failure along an L-BFGS direction
+            # is NOT conclusive — the reset to steepest descent is a genuinely
+            # different attempt, and it often succeeds.)
+            if stop_at_floor && is_sd
+                stalled = true
+                verbose && @printf(
+                    "  Stopped at the energy-comparison floor: steepest descent finds no decrease, so no later step can. |∇E|=%.3g\n",
+                    grad_norm)
+                break
+            end
             continue
         end
 
@@ -285,18 +371,31 @@ function find_ground_state_lbfgs(;
         # Gradient at the new ψ — same preconditioning as the initial gradient so
         # it can be carried to the next iteration. grad_norm_new is the projected-
         # raw residual used by the next convergence test.
-        E_new, grad_norm_new = _lbfgs_grad!(
-            grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
-            precond_alpha_v, precond_alpha_k, sobolev_alpha, dV;
-            E_known=Float64(E_trial),
-        )
+        E_new, grad_norm_new = if grad_ready
+            # `grad_new` already holds 2·δE/δψ̄ at exactly this iterate — the
+            # line search accepted the trial it was evaluated at, and the
+            # driver adopted that trial's ψ. Only the projection and
+            # preconditioning are left.
+            (
+                Float64(E_trial),
+                _lbfgs_grad_finish!(
+                    grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+                    precond_alpha_v, precond_alpha_k, sobolev_alpha, dV),
+            )
+        else
+            _lbfgs_grad!(
+                grad_new, psi, ws, k_squared_dev, grid, target_magnetization, F,
+                precond_alpha_v, precond_alpha_k, sobolev_alpha, dV;
+                E_known=Float64(E_trial),
+            )
+        end
 
         # L-BFGS history update — `real(dot(s_k, y_k))` is the same
         # quantity as `real(sum(conj.(s_k) .* y_k))` without the two
         # `size(grad)` temporaries.
         y_k = scratch.y_k
         y_k .= grad_new .- grad
-        ys = real(dot(s_k, y_k)) * dV
+        ys = _realdot(s_k, y_k) * dV
         if is_active(ys)
             # At capacity, evict the oldest pair and write the new one into
             # the buffers it was holding: steady-state history maintenance
@@ -312,8 +411,8 @@ function find_ground_state_lbfgs(;
                 push!(s_hist, s_slot)
                 push!(y_hist, y_slot)
             else
-                push!(s_hist, copy(s_k))
-                push!(y_hist, copy(y_k))
+                push!(s_hist, _history_copy(HT, s_k))
+                push!(y_hist, _history_copy(HT, y_k))
             end
             push!(rho_hist, 1.0 / ys)
         else
@@ -389,7 +488,42 @@ function find_ground_state_lbfgs(;
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
-    merge(result, (; lbfgs_history=(s_hist, y_hist, rho_hist)))
+    # `converged` keeps its meaning (grad_norm < tol). `stop_reason` says WHY the
+    # loop ended, which `converged=false` alone cannot distinguish: a solve that
+    # ran out of steps while still descending and one that hit its gradient floor
+    # at step 25 and then spent 1975 steps proving it both report `false`.
+    stop_reason = converged ? :tol : (stalled ? :line_search_stalled : :max_steps)
+
+    # `converged` keeps meaning `grad_norm < tol` — a lot of code reads it and it
+    # is persisted — but on its own it cannot distinguish a solve that failed
+    # from one that succeeded as far as the method allows. A stall says exactly
+    # that: steepest descent found no step, so no later iteration can either,
+    # and `grad_norm` IS the attainable floor for this problem and method.
+    #
+    # Measured on Eu-151 F=6 24³: floor 5.0e-7 against the DEFAULT `tol = 1e-8`,
+    # i.e. the default asks for something fifty times below what an energy-gated
+    # line search can resolve. Reporting that as `converged = false` and nothing
+    # else is how a perfectly good ground state gets read as a failed run.
+    floor_limited = stalled && result.grad_norm > tol
+    if floor_limited
+        @warn "L-BFGS stopped at its energy-comparison floor. The requested " *
+            "`tol` is below what this problem and method can reach, so " *
+            "`converged` is false for a state that is as converged as " *
+            "L-BFGS can make it: steepest descent found no acceptable step, " *
+            "which means no later iteration can find one either. Both the " *
+            "L-BFGS line search and Newton-CG accept steps by an ENERGY " *
+            "comparison, and a step whose energy reduction falls below the " *
+            "evaluation roundoff cannot be resolved. To go below this floor " *
+            "use `residual_polish=true`, which drives (H-mu)psi to zero " *
+            "directly and is not energy-gated." tol grad_norm=result.grad_norm energy=result.energy last_step maxlog=1
+    end
+
+    merge(
+        result,
+        (; lbfgs_history=(s_hist, y_hist, rho_hist),
+            n_line_search_evals, n_line_search_failures, stop_reason,
+            floor_limited),
+    )
 end
 
 """

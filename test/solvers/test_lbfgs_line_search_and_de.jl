@@ -70,4 +70,111 @@ using Test
         @test gap > 0            # still descending, so the gate has teeth
         @test r6.dE ≈ gap rtol = 1.0e-8
     end
+
+    @testset "stops at the floor instead of burning n_steps" begin
+        # With `tol` below the problem's attainable gradient floor the solver
+        # reaches the floor and then cannot decrease the energy at all. Before
+        # the stall check it ran to `n_steps` regardless, at ~30 futile energy
+        # evaluations each — measured 97.8 % of 2000 steps on Eu-151 F=6 24³ at
+        # the DEFAULT tol=1e-8, whose floor is 5e-7.
+        #
+        # Once two consecutive line searches fail the state is a fixed point: ψ
+        # is unchanged, the history has been emptied, so the next iteration
+        # forms the same steepest-descent direction from the same gradient and
+        # fails identically. Stopping there cannot cost anything, and the two
+        # runs below must therefore agree on the iterate exactly.
+        r_stop = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
+        r_grind = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16,
+            stop_at_floor=false)
+
+        @test r_stop.stop_reason === :line_search_stalled
+        @test r_stop.last_step < 400
+        # Conclusive at the FIRST steepest-descent failure — no tunable count.
+        @test r_stop.n_line_search_failures <= 2
+        @test r_grind.stop_reason === :max_steps
+        @test r_grind.last_step == 400
+        # Same fixed point, so the early stop gives up nothing.
+        @test r_stop.energy == r_grind.energy
+        @test r_stop.grad_norm == r_grind.grad_norm
+        # ...and it is a large saving, not a marginal one.
+        @test r_grind.n_line_search_evals > 5 * r_stop.n_line_search_evals
+    end
+
+    @testset "the floor is a fixed point under a magnetization constraint too" begin
+        # The stop rule rests on a failed steepest-descent line search leaving
+        # the iterate untouched, which needs the whole evaluation — including
+        # the constrained retraction `_normalize_psi_constrained!`, which
+        # ITERATES — to be deterministic. Checked separately from the
+        # unconstrained case because it is a different code path.
+        cons = (; base..., target_magnetization=0.0)
+        r_stop = find_ground_state_lbfgs(; cons..., n_steps=300, tol=1.0e-16)
+        r_grind = find_ground_state_lbfgs(; cons..., n_steps=300, tol=1.0e-16,
+            stop_at_floor=false)
+        @test r_stop.stop_reason === :line_search_stalled
+        @test r_grind.stop_reason === :max_steps
+        @test r_stop.energy == r_grind.energy
+        @test r_stop.grad_norm == r_grind.grad_norm
+    end
+
+    @testset "an unattainable tol is reported as such, not as a failure" begin
+        # `converged = false` on its own cannot separate "the solve failed" from
+        # "the solve reached the floor and you asked for less than the floor".
+        # Measured on Eu-151 F=6 24³: floor 5.0e-7 against the DEFAULT tol=1e-8.
+        r_floor = find_ground_state_lbfgs(; base..., n_steps=400, tol=1.0e-16)
+        @test r_floor.stop_reason === :line_search_stalled
+        @test r_floor.converged == false        # honest: it did not reach 1e-16
+        @test r_floor.floor_limited == true     # ...because 1e-16 is below the floor
+
+        # The floor it reports is a real number, not a label: ask for something
+        # above it and the same solve converges. Derived from the measurement
+        # rather than picked, so this cannot be tuned green.
+        attainable = 10 * r_floor.grad_norm
+        r_ok = find_ground_state_lbfgs(; base..., n_steps=400, tol=attainable)
+        @test r_ok.converged == true
+        @test r_ok.stop_reason === :tol
+        @test r_ok.floor_limited == false
+    end
+
+    @testset "line-search evaluation count is reported" begin
+        # This count, not any single kernel, is what sets the cost of an
+        # iteration: a 5-minute measurement of Eu-151 F=6 at 24³ put the
+        # iteration at ~245 ms against a component sum of ~57 ms. It has to be
+        # a real count — at least one trial per step that took a step.
+        r = find_ground_state_lbfgs(; base..., n_steps=6, tol=0.0)
+        @test r.n_line_search_evals >= r.last_step
+        @test r.n_line_search_evals == round(Int, r.n_line_search_evals)
+    end
+end
+
+# ── the acceptance rule itself ────────────────────────────────────────
+# The two gates above are BOOKKEEPING: which iterate the line search leaves
+# behind, and what `dE` reports. Neither says the search only accepts a step that
+# decreases the energy — and the mutation harness found that the Armijo condition
+# was defended by exactly one file, `test_polished_ground_state.jl`, and there
+# only incidentally ("the polish must not raise the energy").
+#
+# That is thin for the property that makes L-BFGS a descent method at all. With
+# `accept(α, E) = true` substituted for the Armijo test, this problem climbs from
+# E = 4.663 to E = 26.59 in 25 steps — a factor of 5.7 the wrong way. So the
+# variational statement is a sharp, cheap gate, and it needs no reference energy:
+# whatever the minimum is, the run may not end above where it started.
+@testset "L-BFGS is a descent method (variational)" begin
+    grid = make_grid(GridConfig(64, 12.0))
+    ws = make_workspace(;
+        grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 30.0, 1 => 0.0)),
+        zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap(1.0),
+        sim_params=SimParams(; dt=0.005, n_steps=1, imaginary_time=true))
+    psi0 = init_psi(grid, SpinSystem(1); state=:polar)
+    psi0 ./= sqrt(sum(abs2, psi0) * cell_volume(grid))
+    copyto!(ws.state.psi, psi0)
+    E_init = total_energy(ws)
+
+    r = find_ground_state_lbfgs(; ws_init=ws, n_steps=25, tol=1e-10, verbose=false)
+
+    # The start is genuinely above the minimum — otherwise "did not increase"
+    # would be satisfiable by doing nothing at all.
+    @test r.energy < E_init - 1e-6
+    # And the run may never end above its own starting point.
+    @test r.energy <= E_init
 end

@@ -449,6 +449,26 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             # The dispatch path passes it on the qsub command line instead.
             @test !occursin("#\$ -g", script)
 
+            # Thread count must be set BY THE SCRIPT. Until 2026-07-29 it was
+            # not, and since qsub is given neither -V nor -v (asserted below,
+            # as the reason this matters), every autopilot-dispatched run ran
+            # Julia at its default of ONE thread on a profile that had asked
+            # for 48 cores — with every threaded CPU hot path silently on its
+            # sequential branch.
+            @test occursin(
+                raw"export JULIA_NUM_THREADS=\"${JULIA_NUM_THREADS:-${NSLOTS:-4}}\"",
+                script,
+            )
+            # ...and it is exported before julia is invoked, not after.
+            @test findfirst("JULIA_NUM_THREADS", script).start <
+                findfirst("run_yaml", script).start
+            # The premise: nothing reaches the job except through this script.
+            let b_env = UGEBackend(ssh_host="tsubame")
+                argv = _uge_qsub_cmd(b_env, "/x").exec
+                @test !("-V" in argv)
+                @test !("-v" in argv)
+            end
+
             # Without cuda_module the load line is omitted.
             bare = render_uge_script("gpu_1", "/cfg.yaml";
                 project_root="/proj", log_dir="/runs/j", jobname="j")

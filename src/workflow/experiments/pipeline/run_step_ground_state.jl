@@ -580,6 +580,11 @@ function _run_step(
     step_result = Dict{Symbol, Any}(
         :ground_state_energy => gs_energy,
         :ground_state_converged => gs.converged,
+        # `converged=false` alone cannot tell a run that failed from one that
+        # reached the method's floor with an unattainable `tol` asked of it.
+        # ITP has no line search and reports neither key.
+        :ground_state_stop_reason => String(get(gs, :stop_reason, :unknown)),
+        :ground_state_floor_limited => Bool(get(gs, :floor_limited, false)),
         :ground_state_grad_norm => Float64(get(gs, :grad_norm, NaN)),
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,

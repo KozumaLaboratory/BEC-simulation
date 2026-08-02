@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Spectral Analysis" begin
     @testset "Single frequency detection" begin
         f0 = 5.0

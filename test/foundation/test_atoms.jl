@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Atom Species Library" begin
     all_atoms = [
         Li7, Na23, K39, K41, Rb85, Rb87, Cs133,

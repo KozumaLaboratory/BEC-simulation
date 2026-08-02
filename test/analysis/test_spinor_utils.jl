@@ -1,7 +1,7 @@
 using Test
 using SpinorBEC
 using StaticArrays
-using LinearAlgebra: norm, normalize
+using LinearAlgebra: I, norm, normalize
 
 @testset "Spinor Utils" begin
     @testset "_get_spinor and _set_spinor! round-trip" begin

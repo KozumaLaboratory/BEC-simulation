@@ -186,7 +186,7 @@ share nothing.
 | order slopes | split-step vs dumb RK4 / dense expm (§2), limit-class dt-valley |
 | parity | resume == straight; CPU == GPU per term (tolerance, not bit); F32 == F64 (~1e-5); alloc == 0 in hot loops; basis round-trips |
 | conservation, commute-gated | norm / energy / M_z / J_z checked **iff every active term commutes** (boolean per term): full DDI → J_z only; secular DDI → + F_z (the secular approximation's content, machine-checked); Loss → norm gate off |
-| KNOWN-LIMIT gaps, loud | AD-on-dumb produces gradients production lacks (Tensor, Raman) — the dumb-vs-fast gradient gate *legitimately* fails there, so the gap is declared per term and `energy ≠ 0 ∧ gradient ≡ 0` is a loud error at LBFGS entry, never a silent wrong landscape. AD makes the gap visible; the policy makes it loud |
+| KNOWN-LIMIT gaps, loud | AD-on-dumb produced gradients production lacked (Tensor, Raman), so the gap was declared per term and `energy ≠ 0 ∧ gradient ≡ 0` had to be loud at LBFGS entry rather than a silent wrong landscape. **Both gaps are now closed** (Tensor 2026-06-09, Raman 2026-07-31) and `PRODUCTION_RHS_GAPS` is empty, so the dumb-vs-fast gradient gate covers every slot. The policy stands for the next term that lands energy-first |
 | Euler factor | `energy_factor = 2/d` derived from homogeneity degree; guarded by the scaling oracle `ε(λψ) = λ^d ε(ψ)` (free, F-independent; mixed-degree terms fail by construction) |
 | convergence gating | quoted numbers require `‖∇E‖`-gated states (never disk-cached gate status — fresh re-eval; M1 lesson) |
 
