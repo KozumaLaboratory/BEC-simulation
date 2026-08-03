@@ -6,6 +6,10 @@
 
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
+    # Pins that SPIN_TAYLOR_TOL is a control at the angles production runs
+    # at. Three src comments said it was inert there, from an R three orders
+    # too small; nothing checked them.
+    "hamiltonian/test_taylor_tolerance_binds.jl",
     "test_quality.jl",
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).

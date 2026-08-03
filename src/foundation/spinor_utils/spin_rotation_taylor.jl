@@ -61,14 +61,35 @@ the same conclusion measured on that device.
 The relationship, not this number, is what is gated:
 `test_cpu_spin_rotation_taylor_parity.jl` fails if the truncation error stops
 being negligible against the splitting error."""
-# 1e-15, not 1e-13. The tighter value is FREE — the degree is floored at 2 and at
-# production `R ≈ 1e-5` the schedule returns 2 for every tolerance over ten
-# decades — so shipping the loose one offered a choice that could only ever be
-# equal or worse. A setting that gives accuracy away without buying speed is not a
-# trade, and the way to remove one is to stop shipping it.
+# 1e-15, not 1e-13. The tighter value costs ONE Horner degree and buys two
+# decades of backward error, which is why it is now the default rather than a
+# "reference" sitting beside a looser shipped value.
 #
-# The knob stays registered because it CAN bind at large rotation angles, where it
-# is a real control; it is simply not one at any angle this code runs at.
+# The knob stays registered because it BINDS AT PRODUCTION ANGLES. That is a
+# correction: this comment used to say "the degree is floored at 2 and at
+# production `R ≈ 1e-5` the schedule returns 2 for every tolerance over ten
+# decades", and `RSAFE` below said production R is 0.01–0.2. The two disagreed by
+# three orders and the second one is right. Measured (Eu F=6, 16³,
+# spin-coherent, `theta_max = |c₁·dt|·fmax·F` — the quantity spin_mixing.jl:90
+# already computes):
+#
+#     c₁      dt      R_max      degree@1e-13   degree@1e-15
+#     -0.05   0.005   0.00134    5              5
+#     -0.05   0.01    0.00268    5              6
+#     -0.2    0.005   0.00536    5              6
+#     -0.2    0.01    0.0107     6              7
+#     1.0     0.005   0.0268     7              8
+#     1.0     0.01    0.0536     8              9
+#
+# It binds across the band except at its very bottom, where both give 5 — and 5
+# is the point: the degree is nowhere near the floor of 2 at any production
+# angle. Sweeping R over eleven decades the two tolerances differ at 16 of 23
+# sampled angles, and the degree returns 2 only for R ≲ 3e-8, four to five
+# orders below the weakest cell here.
+#
+# So the tolerance is a real control here, not a formality, and it must not be
+# frozen into a `const` on the grounds that production cannot feel it.
+# `test/hamiltonian/test_taylor_tolerance_binds.jl` pins that.
 const SPIN_TAYLOR_TOL = Ref(1.0e-15)
 
 """Angle above which a voxel halves its rotation and applies it twice (repeated
@@ -83,11 +104,10 @@ const SPIN_TAYLOR_RK_MAX = 40
 """Upper clamp on the Horner degree. Defaults to no clamp.
 
 Exists because the accuracy criterion needs a positive control and nothing else
-could provide one. `SPIN_TAYLOR_TOL` cannot degrade the rotation — the degree is
-floored at 2 and at production `R = |scale|·|v|·F ≈ 1e-5` the schedule returns 2
-for every tolerance over ten decades. Neither can the floor: measured, an
-order-1 rotation is still ~1e-8 relative, four orders inside the splitting
-error. The rotation is simply nowhere near binding, and the only way to make the
+could provide one. `SPIN_TAYLOR_TOL` changes the DEGREE at production angles
+(`R = |scale|·|v|·F ≈ 1e-3…5e-2`, measured — see the note on `SPIN_TAYLOR_TOL`)
+but not the observable: an order-1 rotation is still ~1e-8 relative, four orders
+inside the splitting error. The rotation is simply nowhere near binding, and the only way to make the
 observable notice it is to REMOVE it — `cap = 0` skips the Horner loop entirely,
 leaving ψ untouched.
 
