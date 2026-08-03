@@ -51,7 +51,7 @@
 
 using SpinorBEC, FFTW, Printf, Statistics, Random
 
-const KZ_L = 200.0                 # circumference, a_perp
+const KZ_L = 200.0                 # circumference, a_perp (the paper's)
 const KZ_M = 1024                  # grid points
 const KZ_G1 = 0.0139               # 1D coupling, ℏω_perp a_perp
 const KZ_MU0 = 1.0                 # ℏω_perp
@@ -142,9 +142,9 @@ function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
-    t_hold::Float64=NaN, n_probe::Int=0,
+    t_hold::Float64=NaN, n_probe::Int=0, L::Float64=KZ_L,
 )
-    grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
+    grid = make_grid(GridConfig((M_grid,), (L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
     ws = make_workspace(; grid, atom=KZ_ATOM,
@@ -207,7 +207,7 @@ function kz_trajectory_torus(;
         if s % every == 0
             ψ = ws.state.psi
             push!(probe_t, t - tau_Q)              # measured FROM the transition
-            push!(probe_N0, abs2(sum(ψ)) * cell_volume(grid)^2 / KZ_L)
+            push!(probe_N0, abs2(sum(ψ)) * cell_volume(grid)^2 / L)
         end
     end
 
@@ -385,6 +385,35 @@ if abspath(PROGRAM_FILE) == @__FILE__
         for dt in (0.02, 0.01, 0.005)
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
+        end
+    elseif startswith(mode, "size")
+        # Is xi_hat physical or is it the ring? It came out 20-37 at every quench
+        # rate on a ring of 200 — L/6, six to eight domains, which is no dynamic
+        # range for sigma(W) to have. Quadruple the circumference at fixed
+        # everything else: a physical xi_hat stays put and sigma(W)^2 doubles
+        # (more domains on a longer ring); a finite-size-limited one grows with L
+        # and sigma(W) does not move.
+        #
+        # dx is held fixed at L/M so the resolution is identical — only the box
+        # changes.
+        for L in (200.0, 400.0, 800.0)
+            Mg = round(Int, 256 * L / KZ_L)
+            Ws, ξs = Float64[], Float64[]
+            for j in 1:24
+                r = kz_trajectory_torus(; tau_Q=1000.0,
+                    seed=7_000_000 + j * KZ_SEED_STRIDE,
+                    T=0.5 * ideal_torus_Tc(), eps_cut=KZ_MU0 + 0.5 * ideal_torus_Tc(),
+                    M_damp=0.0, dt=0.05, M_grid=Mg, L, backend)
+                push!(Ws, r.W);
+                push!(ξs, r.xi_hat)
+            end
+            σW = std(Ws)
+            fin = filter(isfinite, ξs)
+            @printf("L=%6.0f M=%5d dx=%.3f  sigma(W)=%.3f ± %.3f  xi(from W)=%5.1f  xi(g1)=%5.1f ± %4.1f  L/xi=%.1f\n",
+                L, Mg, L / Mg, σW, σW / sqrt(2 * 23),
+                L / (4σW^2), mean(fin), std(fin) / sqrt(max(length(fin), 1)),
+                L / mean(fin))
+            flush(stdout)
         end
     elseif startswith(mode, "freeze")
         # The three quantities that have to agree, and never have been compared:
