@@ -1,3 +1,17 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# 幅が保持時間の Fourier 限界かを検証（3 本）
+#
+# 理由:
+# #   論文は「The width of the dip can be regarded as the spread in the spatially
+#   distributed dipole field strength」と述べている。実測でも幅は 1/T の 0.28 倍しか
+#   応答せず（5.0 -> 5.4 ms で 12.740 -> 12.459）、Fourier 解釈は成り立たない。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
 # 総発展 5.2 ms + ランプ 200 us（実験のクエンチ時間）
 #
 # WHY. The dip width has resisted every parameter tried — dt, ramp shape, ramp

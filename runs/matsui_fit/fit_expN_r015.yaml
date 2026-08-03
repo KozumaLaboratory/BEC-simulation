@@ -1,3 +1,16 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# 実験のショット平均 N = 38161 でフィット（3 本）
+#
+# 理由:
+# #   論文は「approximately 5e4 atoms, with a negligible thermal component」と明記。
+#   38161 はショットごとの計数値で、しかも撮像経路の損失を含む。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
 # N = 38161 (the EXPERIMENT's own per-shot mean), c1_ratio = 0.15 — arm 2 of 3.
 #
 # Every fit so far ran N = 3.5e4, which is THEIR SIMULATION's shipped Ntot. For

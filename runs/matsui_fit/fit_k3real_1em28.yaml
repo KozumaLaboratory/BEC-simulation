@@ -1,3 +1,15 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# 同上、妥当域の K3（3 本）
+#
+# 理由:
+# #   同上。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
 # K3 = 1e-28 cm^6/s  ( = 1e-40 m^6/s ) — arm 3 of 3, at N = 3.5e4.
 #
 # The physically credible range for 151Eu, per the experimentalist: 1e-42 to

@@ -1,3 +1,17 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# スピン非依存の三体損失を 4 桁走査（3 本）
+#
+# 理由:
+# #   論文 Appendix D は損失を「three-body collisions involving atoms NOT in the m = -6
+#   component」と特定している。全 13 成分に同じ K3 を入れるのは物理的に誤りで、
+#   実際に場依存の向きが実験と逆になった。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
 # K3 = 3.6e-27 cm^6/s — UNCONSTRAINED three-body loss, arm 2 of 3, at N = 3.5e4.
 #
 # K3 for 151Eu is NOT measured to better than a factor of a few: Miyazawa 2021

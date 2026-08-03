@@ -1,3 +1,18 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# c1_ratio を dip に対して走査（9 本）
+#
+# 理由:
+# #   c1_ratio が唯一の自由パラメータだと考えていた。論文 Appendix E は c0 = 2*pi*hbar^2*a12/M,
+#   c1 = (1/18)*pi*hbar^2*a12/M すなわち 1/36 を空間プロファイルから決めたと述べている。
+#   さらに測定の結果、c1 は dip をほとんど動かさない（0 -> 0.30 で中心 0.18 nT）。
+#   判別に使えるのはリング本数であり、dip ではない。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
 # c1_ratio = 0.15 — BRACKET arm 1 of 4, fit to the experiment.
 #
 # The first five-arm scan (UGE 8320064) measured, on the matched window:
