@@ -1,7 +1,7 @@
 # --- Integrator compositions: Yoshida / Suzuki / Blanes-Moan / Omelyan ---
 #
 # Symplectic-composition coefficients (Yoshida 4th & 6th, Suzuki 4th,
-# Blanes-Moan S6, Omelyan PEFRL) and the three core composers used by
+# Blanes-Moan SRKN₆ᵇ, Omelyan PEFRL) and the three core composers used by
 # split_step!: _strang_core!, _yoshida_core!, _aba_step!. Extracted from
 # split_step.jl 2026-05-01.
 
@@ -30,7 +30,15 @@ const _COMP_SUZUKI = let p = 1.0 / (4.0 - 4.0^(1 / 3)), q = 1.0 - 4.0 * p
     (a=(p / 2, p, (p + q) / 2, (q + p) / 2, p, p / 2), b=(p, p, q, p, p))
 end
 
-const _COMP_BLANES_MOAN_S6 = let
+# Blanes & Moan (2002) SRKN₆ᵇ. The 6 counts STAGES, not order: this is a
+# 6-stage FOURTH-order method, with a smaller error constant than Yoshida-4 at
+# the same order. It was named `_COMP_BLANES_MOAN_S6` and documented as "the
+# default 6th" until 2026-07-29, when the composer-order gate measured it at
+# 4.00 — on a generic non-commuting pair, on the (kinetic, potential) split the
+# propagator performs, and on a pair satisfying the RKN condition
+# [B,[B,[B,A]]] = 0 exactly. `_COMP_YOSHIDA_S6` is the sixth-order one.
+# Gated by test/hamiltonian/test_composer_order_conditions.jl.
+const _COMP_BLANES_MOAN_SRKN6B = let
     a1 = 0.0792036964311957
     a2 = 0.353172906049774
     a3 = -0.0420650803577195
@@ -52,10 +60,11 @@ end
 
 # Yoshida 6th-order (Yoshida 1990, "solution A"). 7-stage symplectic
 # with 8 V-steps and 7 K-steps after merging adjacent same-operator
-# substeps. Lower error constant than Blanes-Moan S6 for some problems
-# (notably when the perturbation spectrum has wide bandwidth) but more
-# stages → ~15% slower per dt. Pick this when you need sub-1e-10 norm
-# drift over very long evolution; Blanes-Moan S6 is the default 6th.
+# substeps. THE sixth-order option — `_COMP_BLANES_MOAN_SRKN6B` is fourth
+# order despite the 6 in its published name, so there is no cheaper 6th-order
+# alternative here. Pick this when you need sub-1e-10 norm drift over very
+# long evolution; at fourth order Blanes-Moan SRKN₆ᵇ has the smaller error
+# constant and is cheaper per dt.
 const _COMP_YOSHIDA_S6 = let
     # Yoshida (1990) Phys. Lett. A 150, 262. Solution A:
     w1 = -1.17767998417887
@@ -73,12 +82,12 @@ function _resolve_composition(sym::Symbol)
     sym === :yoshida && return _COMP_YOSHIDA
     sym === :yoshida_s6 && return _COMP_YOSHIDA_S6
     sym === :suzuki && return _COMP_SUZUKI
-    sym === :blanes_moan_s6 && return _COMP_BLANES_MOAN_S6
+    sym === :blanes_moan_srkn6b && return _COMP_BLANES_MOAN_SRKN6B
     sym === :omelyan_pefrl && return _COMP_OMELYAN_PEFRL
     throw(
         ArgumentError(
             "Unknown composition: $sym. Use :yoshida, :yoshida_s6, :suzuki, " *
-            ":blanes_moan_s6, or :omelyan_pefrl",
+            ":blanes_moan_srkn6b, or :omelyan_pefrl",
         ),
     )
 end

@@ -25,6 +25,26 @@ the same setting on every curve being compared — the width is only comparable
 between curves measured the same way, and the endpoint convention is the one
 that does not depend on where a noisy curve happens to peak.
 
+!!! warning "`width` is a property of the curve **and its window**"
+    With `endpoint_baseline=true` the half-depth level is set by the endpoints,
+    so trimming the scan changes `width` even though the physics did not. This
+    is not a small effect on a dip with long wings. Measured on the Matsui
+    Fig. 4B theory curve, one and the same dataset:
+
+    | window [nT] | `width` [nT] |
+    |---|---|
+    | [−20, +20] | 15.02 |
+    | [−13, +9] | 13.07 |
+    | [−10, +9] | 11.79 |
+
+    Two curves are therefore comparable in `width` only over an **identical**
+    `x` window — matching the nominal range is not enough if the two scans put
+    their outermost sample at different `x`. Restricting both to a nominal
+    [−12.5, +9] left one curve's leftmost sample at −12.5 and the other's, which
+    had no node there, at −12; that half step alone inflated the apparent
+    disagreement from 0.10 % to 1.04 %. Trim both to common abscissae before
+    comparing. `center` is local to the minimum and carries none of this.
+
 Throws if the minimum sits on either endpoint (no dip is bracketed) or if `y`
 never returns to half depth on one side (the scan is too narrow to size it).
 """

@@ -249,7 +249,14 @@ the record of that.)
 
 `test/fixtures/matsui2025/dataset_fig4_theo.csv` is a 1 nT grid descending from
 +20 nT (0.5 nT between −10 and +10), 61 points, totalling 49999.9 atoms at every
-field. The Fig. 4B observable is `N_{m=−6}` after a 5 ms hold. Applying
+field. The Fig. 4B observable is `N_{m=−6}` after a 5 ms hold — confirmed from
+the paper on 2026-08-02 ("subjected to varying magnetic fields for a period of
+5 ms"), having previously been asserted here without a source. **The published
+theory curve is the in-situ population; the experimental points are taken after
+a 0.1 mT ramp, 2.7 ms expansion, Stern-Gerlach and 16 ms of free fall, so the two
+are not the same quantity. The field axis carries an offset error of up to 10 nT
+and ~1 nT of random fluctuation.** All three are stated in the Fig. 4 caption and
+Appendix E; see `matsui_experiment_parameters.md`. Applying
 `resonance_dip` (parabolic vertex; half-depth crossings against a per-side endpoint
 baseline) to both published curves:
 
@@ -317,7 +324,20 @@ Read alongside the numbers, whenever they land:
 
 ### 0.7 Results — UGE 8304651, commit `f7433171`, clean tree
 
-Ancestor gate green on all 14 `fix_list.toml` refs. All four tasks exit 0.
+> **Superseded 2026-08-01 — read `docs/validation/matsui_residual_root_cause.md`
+> first.** Everything in §0.7 was run at `N = 5×10⁴`. Their published curves were
+> produced at `N = 3.5×10⁴` and normalised to 5×10⁴, and with the right `N` the
+> centre gap closes from 0.411 to 0.040 nT and the width gap from 1.061 to
+> 0.012 nT. Two further corrections apply to the numbers below:
+>
+> - **Every width labelled "same window, same metric" is not.** Our scan steps
+>   0.5 nT throughout; theirs steps 0.5 nT only inside ±10 nT and 1 nT outside,
+>   so a nominal [−12.5, +9] restriction put our leftmost sample at −12.5 and
+>   theirs at −12. On genuinely common abscissae the width excess at `N = 5×10⁴`
+>   is +8.3 %, not the +9.6 % below.
+> - **The "+15 % width" and "20 % uniform excess" readings are `N`, not physics.**
+>
+> §0.7 is kept as the record of how the wrong `N` presented itself.
 
 #### Fig. 4B — the dip
 
@@ -327,6 +347,8 @@ Ancestor gate green on all 14 `fix_list.toml` refs. All four tasks exit 0.
 | Matsui simulation, **same window, same metric** | −2.5495 | 12.75 |
 | difference | **+0.41** | **+1.22 (+9.6 %)** |
 | Matsui experiment (full window) | −3.2048 | 14.5414 |
+
+(The width row is the mismatched-endpoint comparison; see the banner above.)
 
 **Type C**, producing commit `f7433171`, gate `ci`
 (`test/validation/test_matsui_fig4_dip.jl` pins the reference side).
@@ -587,6 +609,50 @@ not accounted for by any convention difference found in §0.3.
 
 **Type C**, producing commit `f7433171`, no tier (single run, not gated).
 
+### 0.8 Closed — the residual was `N`, and what is left
+
+Full account and error budget: `docs/validation/matsui_residual_root_cause.md`.
+
+Their published run used `Ntot = 3.5×10⁴` — the value shipped in their
+`setup_parameters` — with the curves normalised to 5×10⁴, which is what §0.6 had
+assumed. The degeneracy was broken by `dataset_fig1/F.txt`, their own Fortran's
+5 ms state, because transfer + rms radius + aspect ratio respond to `N`
+differently and requiring all three at once fixes it uniquely.
+
+At `N = 3.5×10⁴`, on the matched window [−12, +9], reading the final `psi`:
+
+| | centre [nT] | width [nT] |
+|---|---|---|
+| **SpinorBEC 32³** | **−2.5099** | **12.740** |
+| Matsui simulation | −2.5495 | 12.752 |
+| difference | **+0.0396 (1.6 %)** | **−0.012 (0.10 %)** |
+
+Per-field `N_{m=−6}`: rms 1.10 %, worst 2.57 %. **Type C**, producing commit
+`ec310fe2`+, gate `ci` for the reference side only
+(`test/validation/test_matsui_fig4_dip.jl`); the SpinorBEC side is a TSUBAME run,
+not gated.
+
+Still open, and both small:
+
+- **0.0396 nT of centre.** Not the time step (refining `dt` 4× moves it by
+  0.0001 nT), not the grid (0.007), not the DDI kernel (0.002). Their exponential
+  ramp moves it −0.077, roughly 2× too far, so the ramp is implicated without
+  being a clean substitution.
+- The residual sits well inside the ~1 nT field fluctuation the paper quotes, so
+  it does not threaten the reproduction — it is simply unaccounted for.
+
+This is **convention independence and reference generation on the same
+Ref-(19) model lineage**, not physics independence. It does not replace S-A1 or
+S-A2.
+
+**And it is a comparison against their SIMULATION, not their experiment.** The
+paper states the trap held ~5×10⁴ atoms with a negligible thermal component, so
+their published theory curve was computed at 70 % of the experimental atom
+number. Attempts made on 2026-08-02 to fit the experiment by scanning
+`c1_ratio`, `N`, `K3` and the hold time are retracted in full — every premise
+was wrong and every one is stated in the paper. The primary-source parameters
+are collected in `matsui_experiment_parameters.md`; read that before comparing
+anything to the experiment.
 
 ---
 

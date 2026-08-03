@@ -1,7 +1,7 @@
 # test/oracles/test_term_consistency.jl
 #
-# Per-HamTerm consistency check (the structural anti-recurrence gate
-# for sign-bug class). For every HamTerm, we verify:
+# Zeeman (diagonal / transverse / full), Tensor and SpatialZeeman — the three
+# slots whose faces are checked HERE. Two checks each:
 #
 #   1. `energy_contribution` and `apply_operator!` are FD-consistent:
 #         (E(ψ + ε·δψ) - E(ψ)) / ε ≈ Re⟨grad, δψ⟩
@@ -12,8 +12,16 @@
 #      with the term active. This catches sign-inversion bugs of the
 #      kind found in 2026-06-03 Coriolis + 2026-06-04 transverse Zeeman.
 #
-# Running this for every term in the HamTerm registry is the CI gate
-# that makes the bug class structurally impossible.
+# SCOPE. This header used to say "For every HamTerm" and "Running this for every
+# term in the HamTerm registry is the CI gate that makes the bug class
+# structurally impossible". It never ran more than three of the fourteen slots,
+# and a reader had no way to tell — which is the same failure the tests here
+# exist to prevent, one level up. Registry-wide coverage of check (1), with the
+# coverage itself asserted so a fixture that stops activating a term cannot take
+# its gate with it, lives in `test_term_fd_registry_coverage.jl` (2026-07-31);
+# check (2) is registry-wide in `test_hamiltonian_sign_oracles.jl`. What is left
+# here is the per-slot detail those two do not carry: the F-swept Tensor cases
+# (F=2/3/6, several channel sets) and the arbitrary-B(r) SpatialZeeman field.
 
 using Test
 using FFTW
@@ -146,6 +154,78 @@ end
         fd, inner, _ = _fd_vs_inner(SpinorBEC.SpatialZeemanTerm(), wsz, psi, δ)
         @test isapprox(fd, inner; rtol=1e-3)
     end
+end
+
+# ============================================================================
+# The registry sweep — the gate this file's header always claimed to be
+# ============================================================================
+#
+# Until 2026-07-29 the testsets above were the whole file: Zeeman ×3, Tensor,
+# SpatialZeeman. Five of a fourteen-term registry, while the header said "for
+# every term in the HamTerm registry". Measured consequence: doubling the
+# kinetic energy (`0.5 * E` → `1.0 * E` in `_kinetic_energy`, which
+# `energy_contribution(::KineticTerm, …)` calls) left this file GREEN.
+#
+# So the sweep is written as a sweep. Terms this fixture cannot switch on are
+# listed explicitly and asserted, so a term can be uncovered but not
+# uncovered-and-invisible: adding a HamTerm forces it into one bucket or the
+# other, and dropping one out of the registry changes the other bucket.
+
+const _FD_UNCOVERED = Dict(
+    # Non-Hermitian by design; `energy_contribution` is not the generator of
+    # `apply_operator!` for it. Gated by oracles/test_loss_nonunitarity.jl.
+    :LossTerm => "non-unitary by design",
+    # Covered above with its own spatially-varying field fixture.
+    :SpatialZeemanTerm => "own fixture in this file",
+    # Each needs an optics / rotating-frame config this fixture does not build.
+    # These are the open cells, named so they can be closed.
+    :RamanTerm => "needs a Raman beam config",
+    :LightShiftTerm => "needs a light-shift beam config",
+    :CoriolisTerm => "needs a rotating-frame Ω",
+)
+
+@testset "FD consistency across the WHOLE registry" begin
+    gr = make_grid(GridConfig((4, 4, 4), (4.0, 4.0, 4.0)))
+    # F = 2 so TensorTerm has a channel; c_lhy so LHYTerm is live; DDI and a
+    # magnetic gradient switched on. Every coefficient non-zero on purpose — an
+    # inactive term makes its row vacuous.
+    ws = make_workspace(; grid=gr, atom=Rb85,
+        interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.2, 2 => 0.5); c_lhy=0.3),
+        zeeman=ZeemanParams(0.7, 0.2), potential=HarmonicTrap((1.0, 1.1, 0.9)),
+        sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=false),
+        enable_ddi=true, c_dd=1.0,
+        magnetic_gradient=MagneticGradient{3}(0.3, 1, 0.5),
+        fft_flags=FFTW.ESTIMATE)
+
+    Random.seed!(20260729)
+    dV = cell_volume(gr)
+    psi = randn(ComplexF64, 4, 4, 4, 5)
+    psi ./= sqrt(sum(abs2, psi) * dV)
+    δψ = randn(ComplexF64, 4, 4, 4, 5)
+    δψ ./= sqrt(sum(abs2, δψ) * dV)
+
+    seen_inactive = Symbol[]
+    n_checked = 0
+    for term in SpinorBEC.build_h_terms_registry(ws)
+        name = nameof(typeof(term))
+        haskey(_FD_UNCOVERED, name) && (push!(seen_inactive, name); continue)
+        grad = zero(psi)
+        apply_operator!(grad, term, ws, psi)
+        if sqrt(sum(abs2, grad)) < 1e-12
+            push!(seen_inactive, name)
+            continue
+        end
+        n_checked += 1
+        @testset "$name" begin
+            fd, inner, _ = _fd_vs_inner(term, ws, psi, δψ)
+            @test isapprox(fd, inner; rtol=1e-3)
+        end
+    end
+
+    # The sweep must actually sweep: a fixture change that silently deactivates
+    # terms has to fail here rather than quietly shrink the gate.
+    @test n_checked >= 8
+    @test Set(seen_inactive) == Set(keys(_FD_UNCOVERED))
 end
 
 @testset "HamTerm directional sign oracles" begin

@@ -33,7 +33,8 @@
 # value actually differs from its default — a knob whose "reference" equals its
 # default is either mis-recorded or not a knob.
 
-export AccuracyKnob, ACCURACY_KNOBS, with_reference_accuracy, accuracy_report
+export AccuracyKnob, ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
+    dominated_knobs
 
 """
     AccuracyKnob
@@ -73,19 +74,48 @@ struct AccuracyKnob
     ladder::Vector{NamedTuple{(:value, :rel_error, :rel_cost), Tuple{Any, Float64, Float64}}}
     getter::Union{Nothing, Function}
     setter::Union{Nothing, Function}
+    # Measured cost of the APPROXIMATE direction relative to `reference`, or NaN
+    # when nobody has measured it. `< 1` means the approximation is faster and the
+    # knob is a real trade; `>= 1` means it gives accuracy away and buys nothing,
+    # which is not a trade at all — see `dominated_knobs`.
+    approx_rel_cost::Float64
 end
 
 function AccuracyKnob(name::Symbol, scope::Symbol, reference, default, note::String;
     accepted_error=NaN,
     ladder=NamedTuple{(:value, :rel_error, :rel_cost),
-        Tuple{Any, Float64, Float64}}[], getter=nothing, setter=nothing)
+        Tuple{Any, Float64, Float64}}[], getter=nothing, setter=nothing,
+    approx_rel_cost=NaN)
     scope in (:global, :per_run) ||
         throw(ArgumentError("scope must be :global or :per_run, got :$scope"))
     scope === :global && (getter === nothing || setter === nothing) &&
         throw(ArgumentError("a :global knob needs both `getter` and `setter`"))
     AccuracyKnob(name, scope, reference, default, note, Float64(accepted_error),
-        ladder, getter, setter)
+        ladder, getter, setter, Float64(approx_rel_cost))
 end
+
+"""
+    dominated_knobs() -> Vector{AccuracyKnob}
+
+Knobs whose APPROXIMATE setting gives accuracy away and is not measurably faster.
+
+Such a setting is not a trade — it is strictly worse on both axes, and there is no
+budget under which anyone should pick it. The rule is the user's, and it is sharp:
+*if a setting is less accurate and not faster, it should not be on offer.*
+
+Deleting them is not always possible (`secular_ddi` is required by the
+rotating-frame path, so it stays as a PHYSICS choice), so this is the next best
+thing: naming them, mechanically, so no report or profile can present one as a
+performance option. `accuracy_profile_for_budget` already cannot select one — the
+budget picks the cheapest ADMISSIBLE rung, and a dominated setting is never
+cheaper — but that only holds where a ladder exists, and most knobs have none.
+
+`approx_rel_cost` is NaN until someone measures it, and an unmeasured knob is not
+reported here: "nobody has measured it" is a different statement from "it buys
+nothing", and conflating them would let this list grow by neglect.
+"""
+dominated_knobs() = filter(k -> isfinite(k.approx_rel_cost) &&
+            k.approx_rel_cost >= 0.98, ACCURACY_KNOBS)
 
 """
     ACCURACY_KNOBS
@@ -101,16 +131,18 @@ against a splitting error of 7.6e-3, i.e. 3e-11 of it — but measured on ENERGY
 only. Gated by test_taylor_tolerance_criterion.jl, which therefore licenses an \
 energy claim and not a phase-classification one.";
         getter=() -> SPIN_TAYLOR_ENABLED[], setter=v -> (SPIN_TAYLOR_ENABLED[] = v)),
-    # DELETED in cutover step 4: `:spin_taylor_tol`, reference 1e-15 / default
-    # 1e-13. Its own note already said "measured irrelevant across ten decades …
-    # the reference value is tighter for form's sake and costs nothing", and the
-    # gap was then measured on the state rather than on the degree: rel|Δψ| =
-    # 6.46e-16 (Eu F=6 16³, 4 real-time steps). That is 100× BELOW what flipping
-    # the realization itself costs (`:spin_taylor`, 6.15e-14) and eleven orders
-    # under the splitting error — i.e. it is this file's own criterion
-    # ("a knob whose reference equals its default is either mis-recorded or not a
-    # knob") one decimal further along. `SPIN_TAYLOR_TOL` is now a frozen const,
-    # so `code_tree_hash` covers it and there is no setter to register.
+    AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-15,
+        "Backward-error target for the Taylor degree. It BINDS at production \
+angles: measured R_max = 1.3e-3…5.4e-2 for Eu F=6 (theta_max = |c1*dt|*fmax*F), \
+where 1e-13 and 1e-15 give degrees 4 vs 5 through 8 vs 9. This entry used to say \
+'INERT at production angles: the degree is floored at 2 and at R ~ 1e-5 the \
+schedule returns 2' — the 1e-5 was three orders low, and the degree returns 2 \
+only for R below ~3e-8. It shipped at 1e-13 with 1e-15 as the 'reference'; the \
+tighter value is now the default, which costs one Horner degree and buys two \
+decades of backward error. Changing the degree is not the same as changing the \
+observable: the rotation stays ~1e-8 relative, four orders inside the splitting \
+error, so this is a real control on the COST and a negligible one on the ANSWER.";
+        getter=() -> SPIN_TAYLOR_TOL[], setter=v -> (SPIN_TAYLOR_TOL[] = v)),
     AccuracyKnob(:dealias_2_3, :global, true, false,
         "Orszag 2/3 filter on ψ and on the bilinear DDI field. NOTE the \
 direction: ON is the accurate setting. OFF does not remove the above-cut \
@@ -140,12 +172,18 @@ approximation valid when ω_L ≫ c_dd⟨n⟩; make_workspace advises when that 
 Required (ArgumentError) when spin_rotating_frame_omega ≠ 0, so this knob cannot \
 be removed without removing the rotating-basis path. Buys NO speed — measured \
 0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
-3-component convolution with all 6 FFTs. Choose it for the physics or not at all."),
+3-component convolution with all 6 FFTs. Choose it for the physics or not at all.";
+        approx_rel_cost=0.986),
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \
 general-spinor path, gated to ~1e-4 against the closed forms in their own \
-regimes, and ~100× dearer."),
+regimes. The '~100× dearer' this note used to carry is FALSE per step: measured \
+0.997× against 0.987× for polar_contact at 32³, i.e. both are free, and the \
+difference is a ONE-TIME table build (0.41-0.71 s vs 0.05 s). So the closed forms \
+buy no per-step speed and the reason to prefer one is its ansatz matching the \
+state — or, at Eu, that full_bdg has no dynamically stable mean field to \
+linearise around at all (see check_accuracy_preconditions)."),
     AccuracyKnob(:spatial_lhy, :per_run, true, false,
         "Whether ε_LHY tracks the local polarisation. Without it one spinor is \
 used for the whole cloud: ~5 % on converged weak-field Eu textures with a SIGN \
@@ -238,6 +276,17 @@ function accuracy_report(; io::IO=stdout)
     println(io, "\n`with_reference_accuracy` does NOT set these — put them in the config:")
     for k in per_run
         println(io, "    $(k.name) = $(repr(k.reference))")
+    end
+    dom = dominated_knobs()
+    if !isempty(dom)
+        println(io, "\nNOT A TRADE — less accurate and not measurably faster:")
+        for k in dom
+            @printf(io, "    %-18s approximate setting costs %.3f× (≥ 1 means it buys nothing)\n",
+                k.name, k.approx_rel_cost)
+        end
+        println(io, "  Never select one of these for performance. Where a knob is kept for")
+        println(io, "  another reason — secular_ddi is required by the rotating-frame path —")
+        println(io, "  it is a PHYSICS choice and the speed argument for it does not exist.")
     end
     nothing
 end

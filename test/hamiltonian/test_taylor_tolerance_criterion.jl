@@ -24,7 +24,7 @@
 #
 # What actually holds it is that `R` is tiny — the rotation is nowhere near the
 # binding error at any order ≥ 1. The only control left is to REMOVE the
-# operator: `SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = 0` skips the Horner loop, leaving ψ
+# operator: `SPIN_TAYLOR_DEGREE_CAP[] = 0` skips the Horner loop, leaving ψ
 # untouched. That is also the honest general form of the question — show the
 # observable moves when the operator is absent, or "negligible" meant nothing.
 #
@@ -43,7 +43,7 @@
 using Test
 
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE,
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP,
     NegligibleErrorSpec, measure_error_budget, check, passed,
     _taylor_rot_schedule, _cpu_spin_rk
 
@@ -60,12 +60,12 @@ end
 # Run `f` with the Horner degree clamped from above. `k = 0` removes the
 # rotation entirely.
 function _with_degree_cap(f, k::Int)
-    old = SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
-    SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = k
+    old = SPIN_TAYLOR_DEGREE_CAP[]
+    SPIN_TAYLOR_DEGREE_CAP[] = k
     try
         f()
     finally
-        SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = old
+        SPIN_TAYLOR_DEGREE_CAP[] = old
     end
 end
 

@@ -204,7 +204,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     else
         joinpath(dirname(live_status_path), "_exit_summary.json")
     end
-    t_start = time()
+    t_start = time_ns()
     last_step = 0
     exit_exception = nothing
 
@@ -233,7 +233,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
         exit_exception = err
         _write_exit_summary(exit_summary_path; completed=false,
             exception_type=string(typeof(err).name.name),
-            last_step=last_step, runtime_seconds=time() - t_start,
+            last_step=last_step, runtime_seconds=elapsed_s(t_start),
             nan_encountered=_is_nan_error(err),
             oom_killed=_is_oom_error(err))
         rethrow(err)
@@ -241,7 +241,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
 
     _write_exit_summary(exit_summary_path; completed=true,
         exception_type=nothing, last_step=last_step,
-        runtime_seconds=time() - t_start,
+        runtime_seconds=elapsed_s(t_start),
         nan_encountered=false, oom_killed=false)
 
     # Auto-save dynamics pipelines into the dashboard-canonical layout

@@ -105,3 +105,19 @@ function SpinorBEC.apply_raman_step!(
 
     nothing
 end
+
+# RamanTerm gradient face on GPU — CPU fallback, the same shape as the tensor
+# one in `gpu_tensor.jl`. The per-voxel ladder loop is scalar-indexed, and the
+# energy face already pays a host round-trip for this term, so correctness comes
+# first and a device kernel is a perf follow-on. Gate-first: an inactive Raman
+# term is the common L-BFGS case and must not pay a copy. ACCUMULATES, matching
+# the CPU contract.
+function SpinorBEC.apply_operator!(
+    out::CuArray, term::SpinorBEC.RamanTerm, ws, psi::CuArray
+)
+    ws.raman === nothing && return out
+    out_h = Array(out)
+    SpinorBEC.apply_operator!(out_h, term, ws, Array(psi))
+    copyto!(out, out_h)
+    out
+end

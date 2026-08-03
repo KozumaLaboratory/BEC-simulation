@@ -109,12 +109,57 @@ end
         @test d.center < 0
     end
 
-    # Measured vs simulated agree on the width to 3 %, and the centres differ by
-    # 0.66 nT — under the paper's own stated ~1 nT field fluctuation. This is
-    # the size of the gap a SpinorBEC reproduction has to beat to say anything.
-    @testset "reference measured/simulated consistency" begin
-        @test abs(THEO_WIDTH_NT - EXP_WIDTH_NT) / EXP_WIDTH_NT < 0.05
-        @test abs(THEO_CENTER_NT - EXP_CENTER_NT) < 1.0
+    # `width` belongs to the curve AND its window: the half-depth level is set
+    # by the endpoints, so trimming the scan moves it even though nothing about
+    # the physics changed. Pinned here because a cross-window comparison already
+    # produced one wrong conclusion in this campaign (the Fig. 4B width was
+    # reported 1.04 % off when the true matched-window figure is 0.10 %).
+    @testset "width is window-dependent — trim before comparing" begin
+        B, N6, _ = _load("dataset_fig4_theo")
+        p = sortperm(B)
+        Bs, Ns = B[p], N6[p]
+        w(lo, hi) = (m=(Bs .>= lo) .& (Bs .<= hi); resonance_dip(Bs[m], Ns[m]))
+
+        wide = w(-20.0, 20.0)
+        mid = w(-13.0, 9.0)
+        narrow = w(-10.0, 9.0)
+
+        # One dataset, three windows, three widths — a 21 % spread.
+        @test wide.width ≈ 15.0224 atol = 1e-3
+        @test mid.width ≈ 13.0734 atol = 1e-3
+        @test narrow.width ≈ 11.7913 atol = 1e-3
+        @test (wide.width - narrow.width) / narrow.width > 0.2
+
+        # The centre is local to the minimum and must NOT move with the window.
+        # This is why the centre is the number the campaign quotes.
+        @test wide.center ≈ mid.center atol = 1e-6
+        @test wide.center ≈ narrow.center atol = 1e-6
+    end
+
+    # Measured vs simulated, trimmed to the range both scans actually cover.
+    # Their abscissae do not line up — the simulated scan steps 0.5 nT inside
+    # ±10 and 1 nT outside, the measured one 0.583 nT throughout — so even here
+    # the two outermost samples sit a fraction of a step apart and the width
+    # carries a systematic of roughly that size: hence 5 %, not tighter.
+    @testset "reference measured/simulated consistency, common window" begin
+        Bt, Nt, _ = _load("dataset_fig4_theo")
+        pt = sortperm(Bt)
+        Bt, Nt = Bt[pt], Nt[pt]
+        Be, Ne, _ = _load("dataset_fig4_exp")
+        Bm, Nm = _mean_over_repeats(Be, Ne)
+
+        lo = max(minimum(Bt), minimum(Bm))
+        hi = min(maximum(Bt), maximum(Bm))
+        @test lo > -20.0 && hi < 20.0            # the trim is doing something
+        mt = (Bt .>= lo) .& (Bt .<= hi)
+        mm = (Bm .>= lo) .& (Bm .<= hi)
+        dt = resonance_dip(Bt[mt], Nt[mt])
+        dm = resonance_dip(Bm[mm], Nm[mm])
+
+        @test abs(dt.width - dm.width) / dm.width < 0.05
+        # Centres differ by ~0.66 nT — under the paper's own stated ~1 nT field
+        # fluctuation. This is the gap a SpinorBEC reproduction has to beat.
+        @test abs(dt.center - dm.center) < 1.0
     end
 
     # Canary: the metric must MOVE when the curve does, otherwise the pins above

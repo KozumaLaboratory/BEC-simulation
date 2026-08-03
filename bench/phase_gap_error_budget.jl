@@ -89,12 +89,59 @@
 # positive control fired: with the spin rotation removed, final dE ran 1e-1
 # instead of 1e-6, so the instrument is not blind.
 #
+# v5 (2026-07-31). At 120000 steps every arm CONVERGES (dE ≈ 9.5e-10 against a
+# 1e-9 target) and every arm reports the two seeds landing in the SAME winding
+# class, with `state sep` at 1e-3 (reference) to 1e-7 (production) against 1.09
+# for the broken control. So the bistability v3 appeared to show was
+# under-convergence: the seeds had simply not merged yet at 30000 steps.
+#
+# BUT THAT MAY BE MY OWN DESIGN AND NOT THE PHYSICS. Two-stage relaxation runs
+# both seeds through a COMMON LHY-free stage 1 first. If stage 1 already collapses
+# them onto one state, stage 2 only refines it and "0 distinct" says nothing about
+# whether two minima exist — the comparison would have been destroyed by the fix
+# that made the reference well-posed. So v5 records `state sep` at the END OF
+# STAGE 1 as well. The FIRST version of that check compared sep@1 to the final
+# sep and flagged "merged" when they were close — which is wrong, and the smoke
+# said so: at 40 steps both are ≈ 0.43, i.e. nothing merged and stage 2 simply had
+# no time to act, yet the rule fired on all 16 points. Closeness of the two says
+# stage 2 did nothing; it does not say stage 1 did everything.
+#
+# So the separation is recorded at all THREE points — seed, end of stage 1, end of
+# stage 2 — and the question becomes which leg of that trajectory did the
+# collapsing. That is readable directly from the printed numbers, so the rule is a
+# convenience rather than the evidence.
+#
+# Also worth an explanation, and NOT yet explained: the reference arm reports
+# ΔE = 43.4 between two states that agree to 1.6e-3, where the production arm
+# reports 6.1e-3. Each seed builds its OWN full_bdg table from its own stage-1
+# state, and those tables are individually scheme-dependent, so the suspicion is
+# that ΔE there is a difference of TABLES rather than of states. `sep_1` plus the
+# per-seed ε_LHY now printed makes that checkable instead of suspected.
+#
 #   julia --project=. bench/phase_gap_error_budget.jl [n] [max_steps]
 
+# ITERATION COST. Four runs of this bench, 40 min of H100 each, and TWO of them
+# changed no physics at all — one added a recorded column, one fixed a line of
+# verdict logic. That is the wrong shape for a loop meant to answer questions.
+# Three changes fix it:
+#
+#   * MEASURE AND JUDGE ARE SEPARATE. Every cell is appended to a JSONL as soon as
+#     it finishes; `bench/phase_gap_report.jl` reads that file and prints every
+#     verdict. Changing how a result is READ now costs a second and no GPU.
+#   * CELLS ARE CACHED, keyed on the tree hash of `src/` plus the cell's own
+#     parameters. A run that changes only reporting reuses everything; a run that
+#     changes `src/` reuses nothing. The cache REFUSES to load when `src/` is
+#     dirty and says so — a cache silently serving results from other code is the
+#     exact bug class this file exists to catch.
+#   * ROWS STREAM. Each row prints and flushes when done, so the first cell is
+#     readable at ~2 min instead of the whole grid at ~40, and a run that has
+#     already answered the question can be killed.
+#
 using Printf
+using Serialization: serialize, deserialize
 import CUDA
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE, spin_density_vector,
+using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_DEGREE_CAP, spin_density_vector,
     _winding_vector, _extract_spinor, lhy_mean_field_max_growth
 using LinearAlgebra: norm
 
@@ -116,8 +163,59 @@ const DT = 0.002
 
 grid_of() = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
 
+# --- cell cache -------------------------------------------------------------
+# Keyed on the tree hash of `src/`, so reporting-only edits reuse every cell and a
+# physics edit reuses none. Disabled outright when `src/` is dirty: a cache that
+# serves results computed by code you have since changed is worse than no cache,
+# and this file exists to catch exactly that kind of silent mismatch.
+const CACHE_DIR = get(ENV, "SPINORBEC_GAP_CACHE",
+    joinpath(@__DIR__, "..", ".gap_cache"))
+# Keyed on `src/` AND on this file: the measurement half lives HERE, so a cache
+# that watched only `src/` would happily serve cells produced by a different
+# `relax`. It nearly did — the winding-at-stage-1 field below is a bench-only
+# change that src/'s tree hash cannot see.
+const SRC_REV = try
+    isempty(strip(read(`git status --porcelain -- src`, String))) ?
+    string(strip(read(`git rev-parse HEAD:src`, String)), "-",
+        string(hash(read(@__FILE__, String)); base=16)) : nothing
+catch
+    nothing
+end
+# One JSONL PER src key, not one shared file. It is appended to, so a shared name
+# would silently interleave rows from different revisions of the code and the
+# report would average over them — the same corruption the smoke/production split
+# already guards against, one level up.
+const RESULTS_JSONL = get(ENV, "SPINORBEC_GAP_JSONL",
+    joinpath(CACHE_DIR, "rows_$(SRC_REV === nothing ? "dirty" : SRC_REV[1:12]).jsonl"))
+
+if SRC_REV === nothing
+    println("[cache] DISABLED — src/ is dirty or not a git tree. Every cell recomputes.")
+else
+    mkpath(CACHE_DIR)
+    println("[cache] $(CACHE_DIR)  src=$(SRC_REV[1:12])")
+end
+
+_cell_key(nt) = string(hash((SRC_REV, N_GRID, MAX_STEPS, ITP_TOL, ITP_TOL_DRHO,
+        SEEDS, nt)); base=16)
+
+"Run `f()` unless this cell is already on disk for this exact `src/` tree."
+function cached(f, nt)
+    SRC_REV === nothing && return f()
+    path = joinpath(CACHE_DIR, "cell_$(_cell_key(nt)).jls")
+    if isfile(path)
+        try
+            return deserialize(path)
+        catch e
+            @warn "cache entry unreadable, recomputing" path exception = e
+        end
+    end
+    v = f()
+    serialize(path, v)
+    v
+end
+
 "One ITP run at fixed knobs. `psi0` is a state, so a caller can chain stages."
-function itp(; psi0, B::Float64, kind, dt, steps::Int)
+function itp(; psi0, B::Float64, kind, dt, steps::Int, pad::Float64)
     grid = grid_of()
     find_ground_state(;
         grid, atom=Eu151, interactions=eu_interaction_params(0.05),
@@ -125,7 +223,7 @@ function itp(; psi0, B::Float64, kind, dt, steps::Int)
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=psi0,
         dt, n_steps=steps, tol=ITP_TOL, tol_drho=ITP_TOL_DRHO, save_every=200,
         enable_ddi=true, c_dd=EU_c_dd, ddi_padding=true, ddi_trunc_radius=-1.0,
-        spinor_lhy=kind, backend=CUDABackend(), verbose=false,
+        ddi_pad_factor=pad, spinor_lhy=kind, backend=CUDABackend(), verbose=false,
     )
 end
 
@@ -141,10 +239,11 @@ Returns the energy, the convergence state, the winding vector that classifies th
 state — and `growth`, the `max Im ω` of the mean field the table was built from.
 `growth > 0` means ε_LHY is scheme-dependent for this row and the row is not a
 measurement of anything, whatever its ΔE says."""
-function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
-    old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
+function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int,
+    pad::Float64)
+    old_t, old_c = SPIN_TAYLOR_ENABLED[], SPIN_TAYLOR_DEGREE_CAP[]
     SPIN_TAYLOR_ENABLED[] = taylor
-    SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = cap
+    SPIN_TAYLOR_DEGREE_CAP[] = cap
     try
         grid = grid_of()
         seed_psi = init_psi(grid, SpinSystem(6); state=seed)
@@ -155,7 +254,7 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         nsteps = round(Int, MAX_STEPS * (DT / dt))
         # Stage 1: mean field only. Half the step budget — it starts from a seed
         # and only has to reach a physical texture, not the final fixed point.
-        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2)
+        pre = itp(; psi0=seed_psi, B, kind=nothing, dt, steps=nsteps ÷ 2, pad)
         psi_pre = Array(pre.workspace.state.psi)
 
         # Ask, before spending the second stage, whether a reference is even
@@ -171,11 +270,23 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
         end
 
         # Stage 2: the arm's own LHY, tabulated from the relaxed ψ.
-        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps)
+        gs = itp(; psi0=psi_pre, B, kind, dt, steps=nsteps, pad)
         psi_h = Array(gs.workspace.state.psi)
-        _, _, fz = spin_density_vector(psi_h, gs.workspace.spin_matrices, 3)
+        sm = gs.workspace.spin_matrices
+        _, _, fz = spin_density_vector(psi_h, sm, 3)
+        _, _, fz1 = spin_density_vector(psi_pre, sm, 3)
+        _, _, fz0 = spin_density_vector(Array(seed_psi), sm, 3)
         w = _winding_vector(psi_h, gs.workspace.grid, 13)
-        (E=gs.energy, fz=fz, converged=gs.converged, growth=growth,
+        # The winding class at the END OF STAGE 1 — the same observable the
+        # verdict classifies by. A separation RATIO cannot answer "did the
+        # scaffolding produce this answer", because absolute and relative give
+        # opposite verdicts on the same data: stage 1 closes ~0.94 of the gap
+        # (so it "did most of it") while stage 2 closes 5 further orders (so it
+        # "did most of it"). Both readings are true and neither is the question.
+        # The question is whether the arm still had two classes to choose
+        # between when it took over, and that is this.
+        w1 = _winding_vector(psi_pre, gs.workspace.grid, 13)
+        (E=gs.energy, fz=fz, fz1=fz1, fz0=fz0, wind1=w1, converged=gs.converged, growth=growth,
             # The final dE VALUE, not just the boolean. Without it "not
             # converged" cannot be told apart from "converged, but this
             # criterion never fires" — which is the whole question when a gauge
@@ -185,23 +296,37 @@ function relax(; seed::Symbol, B::Float64, kind, dt, taylor::Bool, cap::Int)
             wind=w)
     finally
         SPIN_TAYLOR_ENABLED[] = old_t
-        SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = old_c
+        SPIN_TAYLOR_DEGREE_CAP[] = old_c
     end
 end
 
 """ΔE between the two seeds at one B — plus everything needed to know whether
 that number is a gap between PHASES at all."""
-function gap(; B, kind, dt, taylor, cap)
-    a = relax(; seed=SEEDS[1], B, kind, dt, taylor, cap)
-    b = relax(; seed=SEEDS[2], B, kind, dt, taylor, cap)
+function gap(; B, kind, dt, taylor, cap, pad)
+    a = cached((; seed=SEEDS[1], B, kind, dt, taylor, cap, pad)) do
+        relax(; seed=SEEDS[1], B, kind, dt, taylor, cap, pad)
+    end
+    b = cached((; seed=SEEDS[2], B, kind, dt, taylor, cap, pad)) do
+        relax(; seed=SEEDS[2], B, kind, dt, taylor, cap, pad)
+    end
     sep = norm(vec(a.fz) .- vec(b.fz)) / max(norm(vec(a.fz)), eps())
+    # The same measure at the two earlier points of the trajectory: the raw seeds,
+    # and the end of the common LHY-free stage 1. `sep0 → sep1 → sep` says WHERE
+    # the two seeds stopped being different — and if that is the first leg, the
+    # two-stage scaffolding merged them and the arm's `distinct` verdict is about
+    # my design rather than about whether two minima exist.
+    sep1 = norm(vec(a.fz1) .- vec(b.fz1)) / max(norm(vec(a.fz1)), eps())
+    sep0 = norm(vec(a.fz0) .- vec(b.fz0)) / max(norm(vec(a.fz0)), eps())
     # `isequal`, not `!=`: `_winding_vector` returns `missing` for a depopulated
     # component, and `!=` on vectors carrying missing yields `missing` rather than
     # a Bool — which is a TypeError the moment it reaches an `if`. `isequal`
     # treats missing as equal to missing and always returns Bool, so "the same
     # component is empty in both" reads as the same class, which is what it is.
     distinct = !isequal(a.wind, b.wind)   # the classification the claims rest on
-    (dE=b.E - a.E, sep=sep, distinct=distinct,
+    # Were they ALREADY in one class when the arm took over? If so the arm never
+    # had a choice and its `distinct` says nothing about whether two minima exist.
+    distinct1 = !isequal(a.wind1, b.wind1)
+    (dE=b.E - a.E, sep=sep, sep1=sep1, sep0=sep0, distinct=distinct, distinct1=distinct1,
         conv=a.converged && b.converged,
         # The WORSE of the two, because a reference is only defined where BOTH
         # states have one.
@@ -257,14 +382,24 @@ end
 # --- gap: a small B scan, so the boundary can be located rather than assumed ---
 const BS = (2.6e-9, 3.5e-9, 4.4e-9, 5.2e-9)
 
+# THE ARM THIS WHOLE EXERCISE WAS FOR was missing from six runs of this bench.
+# `ddi_pad_factor = 1.5` is the ONLY measured speedup among the accuracy knobs
+# (0.906x at 32^3; every other knob is free or costs), and the question that
+# decides it is "does it change the winding classification". That question needs
+# the `[classification]` section only — arms agreeing or disagreeing with each
+# other — and NOT the reference arm, which `bench/lhy_stability_scan.jl` has since
+# shown can never be dynamically stable for a dipolar gas. So it is answerable
+# here even though the boundary verdict is not.
+const RK = SpinorBEC.SPIN_TAYLOR_RK_MAX
 arms = [
-    ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
+    ("reference (Euler, full_bdg)", (kind=:full_bdg, dt=DT, taylor=false, cap=RK, pad=2.0)),
     ("production (Taylor, polar_contact)", (kind=:polar_contact, dt=DT, taylor=true,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
+        cap=RK, pad=2.0)),
+    ("candidate: ddi_pad_factor 1.5", (kind=:polar_contact, dt=DT, taylor=true,
+        cap=RK, pad=1.5)),
     ("baseline probe: dt/2, reference", (kind=:full_bdg, dt=DT / 2, taylor=false,
-        cap=SpinorBEC.SPIN_TAYLOR_RK_MAX)),
-    ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0)),
+        cap=RK, pad=2.0)),
+    ("control: rotation removed", (kind=:full_bdg, dt=DT, taylor=true, cap=0, pad=2.0)),
 ]
 
 println("\n[gap] ΔE = E($(SEEDS[2])) − E($(SEEDS[1])), tol=$(ITP_TOL), " *
@@ -277,91 +412,39 @@ println("  those rows are gaps between phases; the rest say there is no second")
 println("  minimum there, which is information rather than a failed measurement.")
 println("  `max Imω` is the mean field the LHY table was built from. Nonzero ⇒")
 println("  ε_LHY is scheme-dependent for that row and its ΔE is not a gap.")
-@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s\n",
-    "arm", "B", "ΔE", "conv", "final dE", "dist", "state sep", "max Imω")
+println("  `sep@0 → sep@1 → sep` is the separation at the raw seeds, at the end of")
+println("  the common LHY-free stage 1, and at the end of the arm. If the collapse")
+println("  happens on the FIRST leg the scaffolding merged the seeds, not the arm —")
+println("  read that before reading `dist`.")
+@printf("\n  %-36s %8s %13s %6s %9s %6s %9s %9s %9s %9s\n",
+    "arm", "B", "ΔE", "conv", "final dE", "dist", "sep@0", "sep@1", "sep", "max Imω")
 results = Dict{Tuple{String, Float64}, Any}()
 for (label, a) in arms, B in BS
-    g = gap(; B, a.kind, a.dt, a.taylor, a.cap)
+    g = gap(; B, a.kind, a.dt, a.taylor, a.cap, a.pad)
     results[(label, B)] = g
-    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3g\n",
+    @printf("  %-36s %8.2e %13.6e %6s %9.2e %6s %9.3e %9.3e %9.3e %9.3g\n",
         label, B, g.dE, g.conv ? "yes" : "NO", g.dEf,
-        g.distinct ? "yes" : "no", g.sep, g.growth)
+        g.distinct ? "yes" : "no", g.sep0, g.sep1, g.sep, g.growth)
+    # Stream: the row is readable NOW, not when the grid finishes. Piped through
+    # a filter stdout block-buffers otherwise, which is why four runs showed
+    # nothing for 40 minutes and could not be killed early.
+    flush(stdout)
+    open(RESULTS_JSONL, "a") do io
+        println(io, "{\"arm\":\"$(label)\",\"B\":$(B),\"dE\":$(g.dE)," *
+                    "\"conv\":$(g.conv),\"dEf\":$(g.dEf),\"distinct\":$(g.distinct)," *
+                    "\"sep0\":$(g.sep0),\"sep1\":$(g.sep1),\"sep\":$(g.sep)," *
+                    "\"distinct1\":$(g.distinct1)," *
+                    "\"growth\":$(g.growth),\"n\":$(N_GRID),\"steps\":$(MAX_STEPS)," *
+                    "\"src\":\"$(SRC_REV === nothing ? "dirty" : SRC_REV)\"}")
+    end
     GC.gc(true);
     CUDA.reclaim()
 end
 
 # --- verdict --------------------------------------------------------------
-#
-# The classification, not ΔE, is what the claims rest on — so the first thing to
-# report is whether the ARMS AGREE about it. If two accuracy settings put the
-# same (B, seeds) in different winding classes, that disagreement IS the accuracy
-# requirement, stated in the units the claim is made in, and it does not need a
-# converged ΔE or a slope to be meaningful.
-println("\n[classification] does the accuracy setting change the ANSWER?")
-@printf("  %-36s %s\n", "arm", join((@sprintf("%9.2e", B) for B in BS), " "))
-for (label, _) in arms
-    @printf("  %-36s %s\n", label,
-        join((results[(label, B)].distinct ? "  distinct" : "      same" for B in BS), " "))
-end
-let base = [results[(arms[1][1], B)].distinct for B in BS]
-    dis = [(label, B) for (label, _) in arms[2:end], B in BS
-           if results[(label, B)].distinct != base[findfirst(==(B), BS)]]
-    if isempty(dis)
-        println("  All arms agree on every point — so no setting tested here changes")
-        println("  the classification, and the requirement is looser than the coarsest.")
-    else
-        println("  DISAGREEMENT at $(length(dis)) point(s): " *
-                join(("$(l) @ B=$(b)" for (l, b) in dis), "; "))
-        println("  Each is a setting that changes the answer, i.e. an accuracy floor —")
-        println("  but read it against `state sep` in the table: a pair that is already")
-        println("  4 orders closer at that B is a near-degenerate crossover, where any")
-        println("  setting can flip the label and none of them is wrong.")
-    end
-end
-
-println()
-ref = [results[("reference (Euler, full_bdg)", B)] for B in BS]
-usable = [i for i in eachindex(BS)
-          if ref[i].conv && ref[i].distinct && (ref[i].growth == 0)]
-if length(usable) < 2
-    nconv = count(r -> r.conv, ref)
-    ndist = count(r -> r.distinct, ref)
-    nstab = count(r -> r.growth == 0, ref)
-    println("""[verdict] The reference arm has $(length(usable)) usable B point(s) — a point is
-usable only if BOTH seeds converged, ended in DIFFERENT winding classes, AND the
-mean field the LHY table came from is dynamically stable. Of $(length(BS)) points:
-$(nconv) converged, $(ndist) distinct, $(nstab) stable. Fewer than two usable means
-the boundary cannot be located here and no δB can be quoted — and the breakdown
-says WHICH of the three is missing, so the next run changes that one rather than
-the tolerances.""")
-else
-    dEs = [ref[i].dE for i in usable]
-    Bs = [BS[i] for i in usable]
-    signs = sign.(dEs)
-    bracketed = any(signs[1:(end - 1)] .!= signs[2:end])
-    slope = (dEs[end] - dEs[1]) / (Bs[end] - Bs[1])
-    @printf("[verdict] usable B points: %d   ∂(ΔE)/∂B = %.4e   boundary %s\n",
-        length(usable), slope, bracketed ? "BRACKETED" : "NOT bracketed")
-    if !bracketed
-        println("""  Not bracketed ⇒ this is a local rate on one side, and any δB from it is an
-  extrapolation. Widen the scan before quoting a boundary shift.""")
-    end
-    if slope != 0
-        println("  δB = δ(ΔE)/|∂(ΔE)/∂B|, each arm against the reference at the same B:")
-        i0 = usable[1]
-        for (label, _) in arms
-            label == "reference (Euler, full_bdg)" && continue
-            g = results[(label, BS[i0])]
-            d = abs(g.dE - ref[i0].dE)
-            @printf("    %-36s δ(ΔE) %10.3e → δB %10.3e  (conv %s)\n",
-                label, d, d / abs(slope), g.conv ? "yes" : "NO")
-        end
-        println("""
-  The dt/2 row is the BASELINE: the boundary shift already accepted by choosing
-  dt. An approximation whose δB sits well under it is not what limits the
-  boundary. And note the direction that helps — a SMALL |∂(ΔE)/∂B| is the bad
-  case: it means the phases stay near-degenerate over a wide range of B, so any
-  energy error moves the apparent boundary a long way, and far enough that way
-  there is a crossover there and not a boundary at all.""")
-    end
-end
+# The judgement lives in `phase_gap_report.jl` and is CALLED from here, not
+# duplicated. That file also runs standalone over the JSONL, so re-reading a
+# finished measurement costs a second and no GPU — which is the point: two of the
+# first four runs of this bench changed nothing but the judgement.
+include(joinpath(@__DIR__, "phase_gap_report.jl"))
+report([merge((arm=label, B=B), results[(label, B)]) for (label, _) in arms, B in BS])

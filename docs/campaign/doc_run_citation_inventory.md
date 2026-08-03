@@ -62,7 +62,7 @@ plan, and reading its status column would have said so.)*
 
 ### Recoverable, wrong path — 1
 
-`runs/_loop/{theorist,sim}/turn_115.md`, the derivation provenance for Lemma 1 in
+`runs/_loop/{theorist,sim}/turn_115.md` (archived), the derivation provenance for Lemma 1 in
 `paper3_universal_theorem`. The loop was retired 2026-06-08 and moved
 **deliberately** to `BEC-simulation-archive/loop_record_2026_06_08/`, where
 `sim/turn_115.md` and `judge/turn_115.json` are present — verified. Nothing is
@@ -78,7 +78,32 @@ lost; the citation points at the pre-move path. Repointing it is a doc fix.
 `12174e883326ecac`). These describe a tree the reader does not have. They mislead,
 but they assert no result.
 
-### Live claims with a stated result — 4
+### Live claims with a stated result — 4, of which 2 were false alarms
+
+> **Correction (2026-08-02): two of these four are on disk.** This list was built
+> with the matcher whose three defects are documented in
+> [`stored_run_disposal.md`](stored_run_disposal.md). Re-adjudicated with the
+> fixed resolver against the main checkout:
+>
+> | run | verdict | what is actually there |
+> |---|---|---|
+> | `lhy_mode_ablation` | absent | — |
+> | `twa_sinatra` | absent | — |
+> | `sprint5_M1_multistart_groundstate` | **on disk** | 30 `cell_B*_Om*.jld2` + `groundstate_audit.jld2`, 83 MB |
+> | `ddi_convention_factorial` | **on disk** | `results.jld2`, 10 885 bytes, 2026-05-26 |
+>
+> Both are **untracked**, so they are invisible from a clone, from CI and from a
+> worktree — but the numbers they back can be re-checked in the main checkout.
+> Both also have a **producer committed** — `scripts/m1_b1_multistart_newton.jl`
+> and `scripts/validation/run_validation_matrix.jl` — so they are regenerable
+> too, not merely re-readable. Neither retraction was warranted on any reading.
+> The two documents that had struck their claims through on the strength of this
+> list have been corrected (`m1_groundstate_audit_2026-06-08.md`,
+> `self_contained_validation_report.md` Layer F). Reading "untracked" as "gone" is
+> the same conflation that put the canonical Eu Hamiltonian-only runs on a
+> disposal list.
+>
+> **The regenerate-or-retract list is therefore 2, not 4.**
 
 **This is the regenerate-or-retract list.**
 
@@ -87,7 +112,7 @@ but they assert no result.
 | `lhy_mode_ablation` | LHY-insufficiency | `Ch5_TWA_chaotic_dynamics_integrated.md` §5.2 gives the config inline (Eu F=6, a_s=110a_B, N=10⁴, 32³ box=10) and the summary table records the verdict "LHY-insufficient"; indexed from `Ch2_framework.md` |
 | `twa_sinatra` | GS-resolution artifact | `Ch5` §5.7 table row, and `figures_update_2026-05-11.md` sources `thesis_FIG-5.6` from it (32³ vs 2×16³) |
 | `sprint5_M1_multistart_groundstate` | multistart ground-state audit (B × Ω, Eu F=6, 24³) | `research_notes/m1_groundstate_audit_2026-06-08.md` |
-| `ddi_convention_factorial` | the DDI convention factorial | `self_contained_validation_report.md`: "Output: `runs/ddi_convention_factorial/results.jld2`" |
+| `ddi_convention_factorial` | the DDI convention factorial | `self_contained_validation_report.md`: "Output: `runs/ddi_convention_factorial/results.jld2` (gone)" |
 
 `fortress_compare` is a fifth citation but the document is a **scope** doc naming
 an output path for work not yet done, so it is a plan like the figure rows.
@@ -104,17 +129,40 @@ The audit states that each document citing stored runs "now carries a one-line
 pointer here". Of the seven it lists, five do; `manuscript/shared/figures.md` and
 `manuscript/klaus_quench_protocol_spec_2026_05_26.md` never got it.
 
-## The gate, and what is wrong with its shape
+## The gate
 
 `test/oracles/test_doc_run_citations_resolve.jl` fails when a document cites a
-`runs/` path that does not resolve, as a ratchet: existing breakage is pinned in
-`KNOWN_UNRESOLVED`, and what is asserted is that the set does not grow. It is
-checked in both directions so the list cannot rot.
+`runs/` path that does not resolve **and does not say why on the line**.
 
-**A name list is the wrong shape and should be replaced.** Every session that adds
-a document naming a run it has not produced yet must edit a central list in a test
-file — churn, and an invitation to append rather than think. The right shape is a
-marker at the citation site (`(planned)`, `(off-repo)`, `(archived)`), so the
-knowledge lives where the author is and the list shrinks to the genuinely
-unexplained. Not done here: it means editing ~30 citation sites in documents
-several sessions are actively rewriting, and it would collide.
+The two earlier versions kept a central `KNOWN_UNRESOLVED` name list. It needed
+**three resyncs in a single day** — twice by me, once by #232 — because every
+session that adds a document naming an unproduced run had to edit a list in a test
+file, and several sessions rewrite these documents in parallel. A central list
+also cannot record *why* a citation is unresolved, which is the part a reader
+needs.
+
+So the declaration moved to the citation site. Four markers:
+
+| marker | meaning |
+|---|---|
+| `(example)` | invented for a tutorial (`runs/foo`, `runs/today`). Not evidence. |
+| `(planned)` | intended, not yet produced — the `placeholder` figure rows |
+| `(archived)` | outside this repo (`runs/_loop/**` → `BEC-simulation-archive/`) |
+| `(gone)` | never committed or removed; the claim needs regenerating or retracting |
+
+45 citations were migrated. Both central lists are deleted.
+
+**Fenced code blocks are out of scope** — a path in a shell example is a command
+to type, not a claim that evidence exists. Measured before making it scope: 27
+unresolved citations sat inside fences and **8 names appeared only there**, which
+is exactly the population the old `PLACEHOLDERS` list existed to excuse.
+`docs/archive/` stays out of scope for the reason #235 gave.
+
+The gate checks staleness in the other direction too: a marked line whose
+citations all resolve fails, so `(gone)` cannot accumulate on paths that came
+back. That check is **per line, not per citation** — two lines legitimately name
+one path that resolves and one that does not.
+
+**What it cannot do:** tell a truthful marker from a lazy one. `(gone)` is cheap
+to type. It makes the state visible and local; this document is what tracks
+whether the underlying claim was dealt with.

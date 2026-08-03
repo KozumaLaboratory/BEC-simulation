@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Nematic Tensor Eigenvalues" begin
     using LinearAlgebra
 

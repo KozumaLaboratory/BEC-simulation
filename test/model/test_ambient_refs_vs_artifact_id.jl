@@ -40,7 +40,7 @@ using SpinorBEC: resolve_gs, _gs_artifact_id,
     DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF,
     MEANFIELD_MIDPOINT_ENABLED, COMBINED_SPIN_STEP_ENABLED,
     SPIN_CHAIN_FUSION_ENABLED, SPIN_TAYLOR_ENABLED,
-    SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE, SPIN_TAYLOR_RK_MAX
+    SPIN_TAYLOR_DEGREE_CAP, SPIN_TAYLOR_RK_MAX
 
 # A ground-state step that resolves on its own. Eu F=6 with DDI, because that is
 # the configuration every one of these Refs is actually read in.
@@ -108,8 +108,8 @@ path first",
         "BLIND BY DESIGN and guarded instead: it is the positive control for \
 test_taylor_tolerance_criterion.jl, no run sets it, and `run_pipeline` throws while \
 it is clamped (test_taylor_degree_cap_guard.jl)",
-        () -> SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[],
-        v -> (SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = v == 2 ? SPIN_TAYLOR_RK_MAX : 2)),
+        () -> SPIN_TAYLOR_DEGREE_CAP[],
+        v -> (SPIN_TAYLOR_DEGREE_CAP[] = v == 2 ? SPIN_TAYLOR_RK_MAX : 2)),
 ]
 
 @testset "every ambient Ref, measured against artifact_id" begin

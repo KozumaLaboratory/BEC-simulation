@@ -332,6 +332,30 @@ end
     # ---------------------------------------------------------------
     base_id = ax_id(ax_base())
 
+    # Carried forward from `test/workflow/test_gs_stage_cache.jl`, whose
+    # `_gs_cache_key` fixtures died with the function in cutover step 3. The
+    # PROPERTY they were protecting did not: reusing ONE ground state across
+    # several `analyze` blocks is the entire purpose of this cache, so an
+    # `analyze` block must not move the id. That row was added on main
+    # (2026-07-30) with the note that the testset's NAME had promised `analyze`
+    # since before its body checked it — "analyze / metadata / cache" while the
+    # body added only `cache` — so folding `analyze` into the key escaped the
+    # mutation harness. Losing it in a merge would reopen exactly that gap.
+    @testset "C0b. an analyze block does not move the id" begin
+        p1 = ax_base()
+        p1["analyze"] = Any[Dict("column_density_movie" => Dict("axis" => 3))]
+        @test ax_id(p1) == base_id
+
+        p2 = ax_base()
+        p2["analyze"] = Any[Dict("vortex_extraction" => Dict())]
+        @test ax_id(p2) == base_id
+
+        # POSITIVE CONTROL. The two blocks must actually differ, or both
+        # equalities above hold for the trivial reason and gate nothing. This is
+        # main's control, kept verbatim in spirit.
+        @test p1["analyze"] != p2["analyze"]
+    end
+
     @testset "C0. the base resolves, and the id is a deterministic 16-hex string" begin
         why = ax_why(ax_base())
         why === nothing || println("  base fixture does not resolve: ", why)

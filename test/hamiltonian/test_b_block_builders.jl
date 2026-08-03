@@ -1,6 +1,9 @@
 # YAML run_config blocks below trip the same JIT inference cascade
 # documented in CLAUDE.md ("Type stability boundaries") on Julia 1.11+.
 # Skip them by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in.
+using Test
+using SpinorBEC
+
 const _SKIP_HEAVY_YAML_ZEEMAN =
     get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "false") != "true"
 
@@ -191,7 +194,11 @@ pipeline:
       interactions: {omega_ref: 314.159}
       B:
         B_mag: 1.0e-4
-        theta_deg: {from: 0.0, to: 35.0}
+        # `theta`, in RADIANS — 0.611 rad = 35°. `theta_deg` is the internal
+        # magnitude-dict spelling `_detect_b_coord` reads AFTER
+        # `_split_B_block!` has run; as a user-facing `B:` key it is rejected,
+        # which is what this testset asserted for as long as no tier ran it.
+        theta: {from: 0.0, to: 0.611}
 """)
         result = SpinorBEC.run_config(cfg)
         @test result.dynamics_result !== nothing

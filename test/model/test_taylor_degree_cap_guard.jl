@@ -1,6 +1,6 @@
 # Gate: a clamped Horner degree cannot file an artifact under a production id.
 #
-# `SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE` is the one ambient `Ref` on a kernel
+# `SPIN_TAYLOR_DEGREE_CAP` is the one ambient `Ref` on a kernel
 # path that cutover step 4 deliberately KEEPS. Freezing it would delete the only
 # positive control `test/hamiltonian/test_taylor_tolerance_criterion.jl` has —
 # `NegligibleErrorSpec` returns `:indeterminate` rather than `:pass` when the
@@ -19,7 +19,7 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE, SPIN_TAYLOR_RK_MAX,
+using SpinorBEC: SPIN_TAYLOR_DEGREE_CAP, SPIN_TAYLOR_RK_MAX,
     _assert_taylor_degree_cap_unclamped, load_config, run_pipeline
 
 const _CAP_PROBE = """
@@ -40,12 +40,12 @@ pipeline:
 """
 
 function _with_cap(f, k::Int)
-    old = SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]
-    SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = k
+    old = SPIN_TAYLOR_DEGREE_CAP[]
+    SPIN_TAYLOR_DEGREE_CAP[] = k
     try
         f()
     finally
-        SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] = old
+        SPIN_TAYLOR_DEGREE_CAP[] = old
     end
 end
 
@@ -54,7 +54,7 @@ end
     # because that is the declared ceiling, and if either number drifts this
     # gate must say so rather than agree.
     @test SPIN_TAYLOR_RK_MAX == 40
-    @test SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] == 40
+    @test SPIN_TAYLOR_DEGREE_CAP[] == 40
 
     @testset "the assertion itself" begin
         @test _assert_taylor_degree_cap_unclamped() === nothing
@@ -69,13 +69,13 @@ end
                 @test err isa ArgumentError
                 # The message has to name the slot and the reason, or nobody can
                 # act on it.
-                @test occursin("SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE", err.msg)
+                @test occursin("SPIN_TAYLOR_DEGREE_CAP", err.msg)
                 @test occursin(string(k), err.msg)
                 @test occursin("artifact", err.msg)
             end
         end
         # Restored, including after the throws above.
-        @test SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[] == SPIN_TAYLOR_RK_MAX
+        @test SPIN_TAYLOR_DEGREE_CAP[] == SPIN_TAYLOR_RK_MAX
     end
 
     @testset "and it is wired into run_pipeline" begin

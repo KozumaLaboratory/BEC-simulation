@@ -1,5 +1,6 @@
 using Test
 using LinearAlgebra
+using SpinorBEC
 using SpinorBEC: OpticalPumpingParams, build_sigma_eff_table, polarization_q
 
 @testset "Optical pumping rate equation" begin

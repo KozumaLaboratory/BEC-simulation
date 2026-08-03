@@ -1,0 +1,131 @@
+# Campaign ancestor gate — the ref list read by guard 1 of docs/campaign/CAMPAIGN.md §4.
+#
+# A run is campaign evidence only if its producing commit descends from EVERY ref below:
+#
+#     git merge-base --is-ancestor <ref> <producing_commit>
+#
+# The check is mechanical. "The run looks recent" is not the check — one re-derivation
+# was nearly published against a fix that merged 22 minutes after the run.
+#
+# This file is the only place the SHAs are declared. The table in CAMPAIGN.md §2 carries
+# the human-readable context and deliberately carries no SHAs, so the two cannot drift.
+#
+# Adding a row disqualifies past runs by construction. That is the intended behaviour.
+#
+# Every ref was verified an ancestor of main at 2a0075e6 (2026-07-30).
+
+schema_version = 1
+
+[[fix]]
+id = "itp-spin-rotation-stage3-density-bias"
+ref = "9925f41a"
+pr = 18
+merged = 2026-06-15
+summary = "imaginary-time spin-rotation Stage-3 density bias (c1 + DDI)"
+effect = "changes ground states"
+
+[[fix]]
+id = "strang-2nd-order-under-ddi"
+ref = "c75b9e6f"
+pr = 45
+merged = 2026-06-22
+summary = "restore 2nd-order Strang for DDI via midpoint mean-field"
+effect = "the integrator was 1st order with DDI"
+
+[[fix]]
+id = "yoshida-4th-order-under-ddi"
+ref = "7993d1f6"
+pr = 46
+merged = 2026-06-22
+summary = "restore true 4th order for the Yoshida composition under DDI"
+effect = "same defect, 4th-order composition path"
+
+[[fix]]
+id = "adaptive-4th-order"
+ref = "4c5b7814"
+pr = 47
+merged = 2026-06-22
+summary = "make adaptive_run! a genuine 4th-order integrator"
+effect = "same defect, adaptive path"
+note = "extends CAMPAIGN.md §2 row 2 to the sibling propagator paths; see also #49"
+
+[[fix]]
+id = "combined-step-midpoint-mean-field"
+ref = "d3e86f35"
+pr = 49
+merged = 2026-06-22
+summary = "midpoint mean-field for split_step_combined! (M_z conservation)"
+effect = "same defect, fused combined-step path"
+note = "extends CAMPAIGN.md §2 row 2 to the sibling propagator paths; see also #47"
+
+[[fix]]
+id = "lbfgs-true-gradient-floor"
+ref = "b94aa40c"
+pr = 48
+merged = 2026-06-22
+summary = "drive the LBFGS ground state to its true gradient floor"
+effect = "changes the converged ground state"
+
+[[fix]]
+id = "eu-quadratic-zeeman-geometry"
+ref = "69ef67fd"
+pr = 63
+merged = 2026-07-08
+summary = "Eu quadratic Zeeman was 11x too large (geometry factor)"
+effect = "disqualifies every Eu run with a field"
+
+[[fix]]
+id = "full-bdg-uv-subtraction"
+ref = "9b556db2"
+pr = 103
+merged = 2026-07-27
+summary = "full_bdg LHY UV counterterm subtracted eps_k twice"
+effect = "divergent at every F and phase"
+
+[[fix]]
+id = "scalar-c-lhy-autoderive"
+ref = "e43043da"
+pr = 108
+merged = 2026-07-27
+summary = "auto-derived scalar c_lhy was short by pi*(a_s/a_ho)*sqrt(N)"
+effect = "6.8x for 151Eu"
+
+[[fix]]
+id = "tabulated-lhy-dropped-on-broadcast-path"
+ref = "035275b6"
+pr = 125
+merged = 2026-07-28
+summary = "tabulated LHY was silently dropped on the broadcast (GPU) propagator path"
+effect = "LHY silently off"
+
+[[fix]]
+id = "tabulated-lhy-energy-2p5x"
+ref = "69ee9a67"
+merged = 2026-07-28
+summary = "tabulated LHY energy was 2.5x too large — E = integral of eps, not n*V"
+effect = "energy magnitude"
+note = "landed on main outside a PR merge commit"
+
+[[fix]]
+id = "closed-form-lhy-n-atoms"
+ref = "0ca7049e"
+pr = 158
+merged = 2026-07-29
+summary = "the closed-form spinor tables were exactly N_atoms too large"
+effect = "caused a spurious 15x arrest"
+
+[[fix]]
+id = "dynamics-phase-lhy-block"
+ref = "5ca6b508"
+pr = 174
+merged = 2026-07-29
+summary = "the dynamics phase never resolved its own lhy: block"
+effect = "closed-form LHY drift 135% -> ~1e-9; LHY 97% -> 5-7% of total"
+
+[[fix]]
+id = "summary-provenance-stamping"
+ref = "caf34a24"
+pr = 139
+merged = 2026-07-29
+summary = "stamp the producing commit, and make staleness queryable"
+effect = "pre-#139 runs cannot be retro-dated, only re-run"

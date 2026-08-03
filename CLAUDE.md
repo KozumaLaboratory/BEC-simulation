@@ -9,6 +9,8 @@ Anchors:
 - `README.md` / `docs/index.md` — project description + documentation map.
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
 - `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit,adding_new_hamiltonian_term}.md` — physics convention authority + 14-term sign × path audit.
+- `docs/conventions/testing_strategy.md` — what a test may claim when there is no experiment: the five grounding methods (exact / order / invariant / metamorphic / differential) vs the two that are not grounding (pin / api), the claim × path coverage model, and the two instruments (`test/_inventory.jl`, `test/mutation/`).
+- `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 lists doc claims measured against the code; a row still marked OPEN overrides this file until the source doc is fixed. Four of the original five discharged within three days and none announced itself — check the row before trusting it.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
 `AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.
@@ -68,7 +70,7 @@ Umbrella files `Foo.jl` `include` sub-files in dependency order; public exports 
 1. **Arbitrary-F spinor first, F=1 last.** Every closed form, observable, analyzer built for general F. ¹⁵¹Eu (F=6) is production; F=1 is a debugging convenience.
 2. **Composable physics modules.** Each Hamiltonian term, loss channel, noise source is an independent unit composing via split-step sandwich or callback. No god-functions.
 3. **Zero silent sign drift — guarantee preserved, mechanism updated (2026-06-06).** The invariant: no sign / factor / term-omission can drift silently. Mechanism: **day-0 gated redundancy** — independent statements of the same physics (production fast kernels vs the dumb reference, pinned to physics by directional anchors) compared per-term by CI gates registered from their first commit; a meta-test asserts every statement pair is gated and every oracle file is in a tier (and is itself canaried: deleting a term from one side must turn the meta-test red). Deliberate duplication across dumb/fast statements is the oracle, not a bug; **ungated duplication remains forbidden** — that was the actual pre-2026 disease. Single-declaration derivation is kept where it is free but is not the load-bearing mechanism: runtime-speed targets exclude interpreter evaluation, and a physics-codegen layer would be a thesis-scale detour with a new whole-system bug surface. Design SSoT: `docs/design/hamiltonian_layered_architecture.md`.
-4. **Content-addressed computation.** `Experiment(spec)` → `<store.root>/<sha256(canonical_bytes(spec))[1:16]>/`. Users never name outdirs. Collection ops (`sweep`, `twin`, `tabulate`, `spec_diff`) fall out of `Vector{Experiment}` + the spec primitive.
+4. **Content-addressed computation — two mechanisms, do not conflate.** `Experiment(spec)` → `<store.root>/<sha256(canonical_bytes(spec))[1:16]>/`, keyed on the *canonical spec*. `run_yaml` is different: `compute_run_dir` keys on **the raw bytes of the YAML file**, `<basename>_<sha256(bytes)[1:16]>`. Byte-keying is over-sensitive (a comment costs a recompute) but never falsely shares a directory. What it does **not** carry is the producing commit, and `run_yaml` skips existing `point_*.jld2` — so the same YAML under different code would silently return old results. `_assert_point_provenance` refuses that: reuse requires the point's recorded `env.git_hash` to match the current one with neither tree dirty, override `SPINORBEC_ALLOW_STALE_POINTS=1`. Gated by `test/workflow/test_run_dir_provenance_gate.jl`. Users never name outdirs. Collection ops (`sweep`, `twin`, `tabulate`, `spec_diff`) fall out of `Vector{Experiment}` + the spec primitive.
 5. **YAML-disk + DSL-memory duality.** Every spec is YAML-serialisable (resumable via `run_yaml`) and Julia-constructible (`config([ground_state(...), dynamics(...), analyze(...)])`). Sweeps/tests use DSL; production uses YAML.
 6. **Layered validation.** Code correctness (A: oracle + GPU=CPU + Hψ self-consistency) ⊥ physics agreement (B: closed-form limits + F=1 polar/FM + polyhedral) ⊥ model fidelity (C: published experimental data). Never conflate. Self-contained chain (A + B + reference-RHS oracle) holds correctness without external code.
 7. **Tier-gated tests with explicit lists.** `fast` (pure units, quick) / `ci` (+ integration + all oracle gates) / `full` (+ heavy ITP/RTP/BO/GPU) / `physics` (analytic-only). Heavy YAML tests behind env-var guards.
@@ -159,7 +161,8 @@ The historical pattern: same physics in N hand-duplicated locations; one drift, 
 5. Register in `src/hamiltonian.jl` include list AND `build_h_terms_registry` AND `H_TERMS_CANONICAL_ORDER`.
 6. Add a directional test to `test/oracles/test_hamiltonian_sign_oracles.jl`. If term has `sign(E) = sign(c)·X²` shape (tautology), additionally add a physics-anchored oracle to `test/oracles/test_physics_aware_sign_oracles.jl`.
 7. Run the oracle suite — every gate must pass:
-   - `test_term_consistency.jl` (FD oracle: `apply_operator!` ↔ FD of `energy_contribution`).
+   - `test_term_fd_registry_coverage.jl` (FD oracle over EVERY registry slot: `apply_operator!` ↔ FD of `energy_contribution`, with the coverage asserted — a new term with no active fixture fails here, it does not silently skip).
+   - `test_term_consistency.jl` (the same identity, per-slot detail for Zeeman / Tensor / SpatialZeeman only).
    - `test_gpu_cpu_per_term_parity.jl` (per-term GPU↔CPU; closes blind spot where term contributes zero in aggregate test).
    - `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` (registry vs hand-written bit-identity).
    - `test_magnetic_gradient_gap.jl` style: per-term audit gate when term has a non-obvious path (transverse, off-diagonal, propagator that mutates V).
@@ -176,7 +179,8 @@ Tier membership is **explicit in `test/runtests.jl`** — no auto-discovery.
 |---|---|
 | `test_hamiltonian_sign_oracles.jl` | Directional physics per HamTerm: `+p ⇒ ⟨F_z⟩ > 0`, `+Ω ⇒ ⟨L_z⟩ > 0`, `+g_F·grad ⇒ ⟨x⟩ < 0`, etc. |
 | `test_physics_aware_sign_oracles.jl` | Physics-anchored oracles for terms with tautology-shape directional tests (SpinC1, DDI, LHY, Tensor). |
-| `test_term_consistency.jl` | FD oracle: `apply_operator!` vs finite-difference of `energy_contribution`. Catches energy ↔ gradient drift. |
+| `test_term_fd_registry_coverage.jl` | FD oracle over EVERY registry slot: `apply_operator!` vs finite-difference of `energy_contribution`, plus the meta-assertion that the set of slots actually differenced equals the canonical order minus the declared exclusions. Catches energy ↔ gradient drift, and catches a fixture quietly dropping a term. |
+| `test_term_consistency.jl` | The same identity with per-slot detail, for **three** slots (Zeeman diagonal/transverse/full, F-swept Tensor, arbitrary-B(r) SpatialZeeman). Its header claimed all fourteen until 2026-07-31. |
 | `test_gpu_cpu_per_term_parity.jl` | One-term-active GPU vs CPU `energy_decomposition` and `Hψ`. Forbids "term contributes zero in test config, missing GPU path invisible". |
 | `test_registry_{energy_decomposition,gradient}_parity.jl` | Registry path identities (legacy shape; ctx vs plain faces). The strang-step variant was deleted 2026-06-06 (post-B3 near-self-comparison); the propagator gate is the dt-valley + RK4-slope suite vs the dumb reference. |
 | `test_term_legacy_equivalence.jl` | Per-term: new HamTerm `apply_step!` vs legacy routine. |
@@ -249,6 +253,7 @@ NOT bugs — don't "fix".
 - **`PolarTwoChannelLHY` is polar-only**, exact at F=1, ~1 % off at F=2, **30–70 % off at F=6** (pinned by `test_spinor_lhy.jl`). Two-channel reduction sums (S=0, S=2) only — exhaustive only up to F=2. For F ≥ 2 polar use `PolarContactLHY` / `PolarDipolarLHY`; FM → `FMContactLHY` / `FMDipolarLHY` (**any F** since 2026-07-27 — the FM closed form needs only `g_{2F}`, and the former F=6-only lookup table was gating an unused field); F=6 I_h → `IcosahedralLHY` (genuinely F=6, the I_h channel structure is specific).
 - **`IcosahedralLHY` refuses at `λ_spin < 0`, i.e. at `c₁ < 0`** (2026-07-30). The closed form is `c_0^(5/2) + 3|λ_spin|^(5/2)`; the `|·|` made it symmetric under `c₁ → −c₁` and returned a real energy where the spin-Goldstone branch is dynamically unstable (`full_bdg` reports max Im ω = 2.8 at c₀=10, c₁=−0.2, and the closed form ran 0.4 / 2.1 / 11.0 % high at c₁ = −0.05 / −0.1 / −0.2). `epsilon_LHY_F6_Ih` now returns NaN there and `_tabulate_lhy` turns any non-finite table into an `ArgumentError` at build time — which also closes the pre-existing `c_0 < 0` NaN, previously propagated silently into ψ. **`c₁ < 0` is the sign Eu F=6 production uses, so those configs now error and must move to `kind: full_bdg`.** Gated by `test_lhy_full_bdg_closed_form_parity.jl` + `test_lhy_magnitude_si_anchor.jl`.
 - **`FullBdGLHY` is the general-spinor path** — correct for any `F` and any spinor, gated against `polar_contact` / `fm_contact` / the scalar limit to ~1e-4 by `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`. It warns only when the mean field is **dynamically** unstable (`Im ω ≠ 0`), where ε_LHY is scheme-dependent for closed forms too. (The former "~3000× spurious offset at F=6 polar" was a UV counterterm subtracting ε_k twice — divergent at every F and phase, fixed 2026-07-27.) Prefer the closed forms when the state matches their ansatz: ~100× cheaper.
+- **The combined preconditioner `P_C` (`precond_alpha_v ≥ 0`) is OFF by default because it LOSES** — ~40× worse on the weak-field Eu+DDI soft manifold at 24³ (measured 2026-06-23, `d496dd71`). Structural, not a tuning miss: that ground state breaks the exact axial U(1) `e^{-iθ(L_z+F_z)}`, so the minimum is a degenerate ORBIT and a diagonal preconditioner cannot precondition a collective Goldstone. `P_C` is Antoine-Levitt-Tang (arXiv:1611.02045), where preconditioning IS the dominant lever — for trapped, gapped problems. Consequence: on that problem the iteration count is set by a flat direction, so **per-iteration cost is the lever** and quotienting the symmetry is the only thing that would attack the count. The bench kept to stop re-derivation was deleted two days later as a one-off driver (`40c329a5`); this line is the replacement.
 - **`secular_ddi=true` is user-chosen**, not auto. `make_workspace` `@info` advisory in secular regime.
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components Larmor-average to zero only in secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is canonical** — hand-written `[c2, c4, c6]` silently misindexes for F ≥ 3.
@@ -325,6 +330,52 @@ Semantic mismatch is not type-visible — static analysis cannot catch file/func
 - `Cthulhu.descend(run_pipeline, (typeof(config),))` for deep inspection.
 
 **User-supplied callbacks** (live_monitor `extract_observables`, simulation `SimulationCallbacks.on_step`) accept `::Function` — OK in cold paths; hot-loop callbacks must parameterize: `struct Cb{F1,F2} ...`.
+
+## Before computing — five gates
+
+Measured 2026-08-02: a request to fit an experiment produced **24 × 45-point GPU
+scans (~3 h) in which every premise was wrong**, and every one was stated in the
+paper's Results and appendices. The atom number, the thermal fraction, the value
+and provenance of `c1_ratio`, the loss mechanism, the origin of the dip width,
+and a **10 nT systematic on the field axis** — 250× the residual being chased —
+were all published. The same shape recurred four times that day: act on a
+plausible model of the situation instead of verifying the model, when
+verification was cheaper than the action.
+
+These are gates, not advice. Each one is cheap and each one would have stopped a
+day of work.
+
+1. **Read the primary source before spending compute.** A campaign document
+   summarising a paper is not the paper. Before any comparison to an experiment,
+   write down — with quotes — the atom number, temperature/condensate fraction,
+   every already-fitted parameter and what it was fitted to, the loss mechanism,
+   the systematic error on each axis, and whether the published theory curve is
+   the same observable as the published data. `WebFetch` on an arXiv PDF saves
+   it locally even when it cannot parse it; grep the text.
+2. **Sensitivity table before any scan.** Two points per (parameter, observable)
+   cell, and normalise by that observable's uncertainty. Most cells are zero, and
+   knowing which is the result: "`c1_ratio` does not move the dip" means the dip
+   is *robust* to not knowing `c1_ratio`. It also means twelve arms scanning
+   `c1_ratio` against the dip could not have worked.
+3. **Systematic errors before residuals.** State the systematic on every axis
+   first. A statistical bootstrap that omits a quoted systematic reports a σ that
+   is a fiction. No parameter can be constrained below the systematic.
+4. **Rejection criterion written into the config before launch.** "Centre within
+   0.005 nT; not worth taking beyond 0.01" made the DDI-padding verdict
+   automatic. Without it, a run finishes and the interpretation is chosen
+   afterwards, which is not a measurement.
+5. **One arm, then report.** Batches of four to six hide a wrong premise until
+   all of them have run.
+
+**Prefer discrete observables.** A ring count, a winding number, a vortex count,
+a symmetry present-or-absent carries no error bar and no calibration. The 5 ms
+`m = −4` ring count rejected a candidate `c1_ratio` in one run and was
+resolution-independent across 32³/64³/128³; twenty-four continuous-observable
+arms decided nothing.
+
+**Check the reference implementation against the data before chasing a
+residual.** If the published simulation misses the published experiment by the
+same amount you do, the gap is model deficiency and no parameter closes it.
 
 ## Cost model + execution discipline
 

@@ -15,6 +15,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
+    dominated_knobs,
     SPIN_TAYLOR_ENABLED, DEALIAS_2_3_ENABLED,
     yaml_to_model, model_toml_dict, content_id
 
@@ -26,8 +27,12 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
             @test k.scope in (:global, :per_run)
             # A reference equal to the default means the entry claims a choice
             # that does not exist.
+            # `reference == default` is allowed only where the knob is not a
+            # trade: either it has no less-accurate setting worth shipping, or —
+            # `spin_taylor_tol` — the accurate value was measured FREE and is now
+            # the only one shipped, which is what removing a non-trade looks like.
             @test k.reference != k.default || k.name in (:ddi_padding, :secular_ddi,
-                :dtype, :temperature_ratio)
+                :dtype, :temperature_ratio, :spin_taylor_tol)
             @test length(k.note) > 40          # a cost, not a label
             if k.scope === :global
                 @test k.getter !== nothing && k.setter !== nothing
@@ -128,5 +133,35 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
         # The report must say what it does NOT cover, or it invites being read as
         # a complete switch.
         @test occursin("does NOT set these", s)
+    end
+
+    @testset "a setting that is less accurate and not faster is NOT a trade" begin
+        # The rule: if an approximate setting gives accuracy away without being
+        # measurably faster, there is no budget under which anyone should pick it,
+        # and it must never be presented as a performance option.
+        dom = dominated_knobs()
+        @test !isempty(dom)                       # else the mechanism is untested
+        for k in dom
+            @test isfinite(k.approx_rel_cost) && k.approx_rel_cost >= 0.98
+        end
+        # `secular_ddi` is the measured case: 0.986× at 32³, i.e. noise, because
+        # Q_xx = Q_yy = −Q_zz/2 keeps the kernel a 3-component convolution with
+        # all 6 FFTs.
+        @test :secular_ddi in (k.name for k in dom)
+
+        # UNMEASURED IS NOT DOMINATED. "Nobody has measured it" and "it buys
+        # nothing" are different statements, and conflating them would let this
+        # list grow by neglect rather than by measurement.
+        for k in ACCURACY_KNOBS
+            isfinite(k.approx_rel_cost) && continue
+            @test !(k.name in (d.name for d in dom))
+        end
+
+        # And the report has to SAY so — a rule nobody is shown is not a rule.
+        buf = IOBuffer()
+        accuracy_report(; io=buf)
+        s2 = String(take!(buf))
+        @test occursin("NOT A TRADE", s2)
+        @test occursin("secular_ddi", s2)
     end
 end

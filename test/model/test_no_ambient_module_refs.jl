@@ -79,71 +79,58 @@ end
 # depend on its value.
 const ALLOWED = Dict{Tuple{String, String}, String}(
     # --- [STEP-4] numerics, still ambient ---------------------------------
-    ("src/hamiltonian/integrator/dealias.jl", "DEALIAS_2_3_ENABLED") =>
-        "[STEP-4] the Orszag projector; already IN the id via GridSpec.dealias_two_thirds \
-(resolve_gs.jl:311), so what remains is deleting the global",
-    ("src/hamiltonian/integrator/dealias.jl", "DEALIAS_K_CUTOFF") =>
-        "[STEP-4] physical-k form of the same projector; already IN the id via \
-GridSpec.dealias_k_cut (resolve_gs.jl:337)",
-    ("src/hamiltonian/integrator/split_step.jl", "MEANFIELD_MIDPOINT_ENABLED") =>
-        "[STEP-4] real-time only (measured exactly 0.0 under ITP: `!imaginary_time` \
-guards both half-potential sites). Belongs in the params of an `:evolve` Stage, and \
-no `:evolve` Stage exists yet — `run_step_dynamics.jl` declares none",
-    ("src/hamiltonian/integrator/combined_spin_step.jl", "COMBINED_SPIN_STEP_ENABLED") =>
-        "[STEP-4] a different splitting of the same H, agreeing at O(dt^3). Same \
-destination and same blocker as MEANFIELD_MIDPOINT_ENABLED; combined_spin_step.jl:42-46 \
-already says so",
-    ("src/hamiltonian/integrator/spin_chain.jl", "SPIN_CHAIN_FUSION_ENABLED") =>
-        "[STEP-4] measured bit-identical on both devices; it exists so \
-test/oracles/test_spin_chain_fusion_parity.jl can run BOTH statements on one input. \
-Freezing it would delete the gate — but the parity gate is CUDA-only, so on a \
-CPU-only CI nothing exercises it",
-    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_ENABLED") =>
-        "[STEP-4] routes every spin rotation between Taylor-Horner and the exact Euler \
-5-stage, on BOTH devices and on the ITP path (measured 3.6e-13 over 20 ITP steps). Wants \
-a declared per-run field; the parity gates on both devices flip it, so it needs an \
-argument path first",
-    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE") =>
-        "[STEP-4] NOT a numerics choice: the positive control for \
-test_taylor_tolerance_criterion.jl, whose NegligibleErrorSpec returns :indeterminate \
-when the control cannot breach. Freezing it deletes the only control that works. Keep \
-ambient, rename to say so, and guard at the pipeline boundary so a clamped cap cannot \
-file an artifact under a production id",
+    ("src/hamiltonian/integrator/dealias.jl", "DEALIAS_2_3_ENABLED") => "[STEP-4] the Orszag projector; already IN the id via GridSpec.dealias_two_thirds \
+                                                                (resolve_gs.jl:311), so what remains is deleting the global",
+    ("src/hamiltonian/integrator/dealias.jl", "DEALIAS_K_CUTOFF") => "[STEP-4] physical-k form of the same projector; already IN the id via \
+                                                             GridSpec.dealias_k_cut (resolve_gs.jl:337)",
+    ("src/hamiltonian/integrator/split_step.jl", "MEANFIELD_MIDPOINT_ENABLED") => "[STEP-4] real-time only (measured exactly 0.0 under ITP: `!imaginary_time` \
+                                                                          guards both half-potential sites). Belongs in the params of an `:evolve` Stage, and \
+                                                                          no `:evolve` Stage exists yet — `run_step_dynamics.jl` declares none",
+    ("src/hamiltonian/integrator/combined_spin_step.jl", "COMBINED_SPIN_STEP_ENABLED") => "[STEP-4] a different splitting of the same H, agreeing at O(dt^3). Same \
+                                                                                  destination and same blocker as MEANFIELD_MIDPOINT_ENABLED; combined_spin_step.jl:42-46 \
+                                                                                  already says so",
+    ("src/hamiltonian/integrator/spin_chain.jl", "SPIN_CHAIN_FUSION_ENABLED") => "[STEP-4] measured bit-identical on both devices; it exists so \
+                                                                         test/oracles/test_spin_chain_fusion_parity.jl can run BOTH statements on one input. \
+                                                                         Freezing it would delete the gate — but the parity gate is CUDA-only, so on a \
+                                                                         CPU-only CI nothing exercises it",
+    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_ENABLED") => "[STEP-4] routes every spin rotation between Taylor-Horner and the exact Euler \
+                                                                              5-stage, on BOTH devices and on the ITP path (measured 3.6e-13 over 20 ITP steps). Wants \
+                                                                              a declared per-run field; the parity gates on both devices flip it, so it needs an \
+                                                                              argument path first",
+    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP") => "[STEP-4] NOT a numerics choice: the positive control for \
+                                                                                 test_taylor_tolerance_criterion.jl, whose NegligibleErrorSpec returns :indeterminate \
+                                                                                 when the control cannot breach. Freezing it deletes the only control that works. Keep \
+                                                                                 ambient, rename to say so, and guard at the pipeline boundary so a clamped cap cannot \
+                                                                                 file an artifact under a production id",
 
     # --- session state: caches, registries, callback slots, snapshots -----
-    ("src/workflow/experiments/inspect.jl", "CHECK_REGISTRY") =>
-        "the pre-flight check registry; populated at load, read by the inspector, never \
-by a kernel",
-    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_reclaim_callback") =>
-        "weak-extension callback slot: the CUDA ext installs it at load",
-    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_functional_callback") =>
-        "weak-extension callback slot: answers whether CUDA is usable, for logging",
-    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_state_lines_callback") =>
-        "weak-extension callback slot: device state lines for the run banner",
-    ("src/workflow/experiments/runtime/dealias_block.jl", "_DEALIAS_PENDING_SNAPSHOT") =>
-        "restore snapshot for the two dealias globals; goes away with them",
-    ("src/workflow/autopilot/queue.jl", "_DEFAULT_QUEUE_ROOT") =>
-        "process-wide default queue location; scheduler state, no physics",
-    ("src/workflow/autopilot/breakers.jl", "_DEFAULT_BREAKER_THRESHOLDS") =>
-        "circuit-breaker thresholds; scheduler policy, no physics",
-    ("src/workflow/autopilot/monitor.jl", "_DIVERGENCE_THRESHOLDS") =>
-        "divergence-reap thresholds; decides whether a run is KILLED, not what it computes",
-    ("src/workflow/monitoring/notifications.jl", "_SLACK_HTTP_HINT_SHOWN") =>
-        "print-once latch for a Slack hint",
+    ("src/workflow/experiments/inspect.jl", "CHECK_REGISTRY") => "the pre-flight check registry; populated at load, read by the inspector, never \
+                                                         by a kernel",
+    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_reclaim_callback") => "weak-extension callback slot: the CUDA ext installs it at load",
+    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_functional_callback") => "weak-extension callback slot: answers whether CUDA is usable, for logging",
+    ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_state_lines_callback") => "weak-extension callback slot: device state lines for the run banner",
+    ("src/workflow/experiments/runtime/dealias_block.jl", "_DEALIAS_PENDING_SNAPSHOT") => "restore snapshot for the two dealias globals; goes away with them",
+    ("src/workflow/autopilot/queue.jl", "_DEFAULT_QUEUE_ROOT") => "process-wide default queue location; scheduler state, no physics",
+    ("src/workflow/autopilot/breakers.jl", "_DEFAULT_BREAKER_THRESHOLDS") => "circuit-breaker thresholds; scheduler policy, no physics",
+    ("src/workflow/autopilot/monitor.jl", "_DIVERGENCE_THRESHOLDS") => "divergence-reap thresholds; decides whether a run is KILLED, not what it computes",
+    ("src/workflow/monitoring/notifications.jl", "_SLACK_HTTP_HINT_SHOWN") => "print-once latch for a Slack hint",
 )
 
 @testset "no unpinned module-level Ref under src/ and ext/" begin
     @testset "the scanner finds a known binding (positive control)" begin
         mktempdir() do tmp
             mkpath(joinpath(tmp, "src", "deep"))
-            write(joinpath(tmp, "src", "deep", "probe.jl"), """
-                # a comment mentioning Ref( that must not match
-                const PLAIN = Ref(true)
-                const PARAMETRIC = Ref{Union{Nothing, Float64}}(nothing)
-                const REFVALUE = Base.RefValue{Int}(3)
-                const NOT_A_REF = Dict{Int, Int}()
-                f() = Ref(0)
-                """)
+            write(
+                joinpath(tmp, "src", "deep", "probe.jl"),
+                """
+# a comment mentioning Ref( that must not match
+const PLAIN = Ref(true)
+const PARAMETRIC = Ref{Union{Nothing, Float64}}(nothing)
+const REFVALUE = Base.RefValue{Int}(3)
+const NOT_A_REF = Dict{Int, Int}()
+f() = Ref(0)
+""",
+            )
             got = _scan_refs(tmp, ("src",))
             @test got == [("src/deep/probe.jl", "PARAMETRIC"),
                 ("src/deep/probe.jl", "PLAIN"),

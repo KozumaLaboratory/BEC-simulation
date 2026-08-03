@@ -8,6 +8,7 @@ For build/install/test commands and conventions, see the repo root `README.md` a
 
 ```
 docs/
+├── campaign/       active campaign charter (read first in a campaign session)
 ├── guides/         step-by-step how-tos
 ├── reference/      API + YAML schema + architecture
 ├── design/         active design notes (implemented or in-progress)
@@ -65,6 +66,7 @@ docs/
 | Evaporative cooling to BEC (0-D truncated-Boltzmann model) | `research_notes/evaporation_bec_prep_model_2026-06-15.md` |
 | Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
 | Whether a stored `runs/` result can still be quoted | `validation/stored_results_vintage_audit.md` |
+| Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
 | Closed-form theory derivations | `theory/*.md` |
 
