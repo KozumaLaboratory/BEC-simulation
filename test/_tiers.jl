@@ -85,6 +85,10 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
+    # Does what a run WRITES reach what the reaper READS? The autopilot suite
+    # drives `is_divergent_status` with dicts it builds itself, so it passed
+    # while the writer and the reader shared no keys at all.
+    "workflow/test_live_status_reaches_the_detector.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
