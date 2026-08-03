@@ -118,14 +118,22 @@ function find_ground_state_lbfgs(;
     # the weak-field Eu+DDI soft manifold at 24³ it made convergence ~40×
     # WORSE (d496dd71, 2026-06-23).
     #
-    # The MECHANISM is open. It was recorded as "a diagonal preconditioner
-    # cannot precondition a collective Goldstone", and that does not survive
-    # measurement: `bench/probe_lbfgs_orbit_fraction.jl` finds the L-BFGS step
-    # orthogonal to the orbit tangent to machine precision (median 2.4e-17
-    # against a positive control of 1.000000), so the Goldstone is not in the
-    # iterate path and cannot be the thing P_C fails to fix. The ground state
-    # does break the exact axial U(1) `e^{-iθ(L_z+F_z)}`; it is the causal step
-    # that does not follow. Do not read the 40 % as explained.
+    # The recorded mechanism was wrong. It said "a diagonal preconditioner
+    # cannot precondition a collective Goldstone"; the L-BFGS step is
+    # orthogonal to that orbit to machine precision (2.4e-17 against a positive
+    # control of 1.000000, `bench/probe_lbfgs_orbit_fraction.jl`), so the exact
+    # Goldstone is never in the iterate path.
+    #
+    # The ~600 iterations are CONDITIONING. `probe_lbfgs_lambda_min_bound.jl`
+    # bounds λ_min ≤ 3.0e-2 — still falling, and overlap 0.0000 with the exact
+    # generator, so a genuine soft mode rather than the null space — against
+    # μ_max ≈ 1.4e2, giving κ ≥ 4.7e3. The measured decay rate implies
+    # κ_eff ≈ 9e3, within 2×, and that κ predicts 472 iterations against ~600
+    # observed. The method is achieving what its conditioning permits.
+    #
+    # So preconditioning IS the lever and P_C is the wrong preconditioner: it
+    # is diagonal in real space and in Fourier space, and the soft mode is
+    # neither.
     #
     # This is worth stating here rather than only in a commit message: the
     # bench that was kept expressly "so the next session does not re-derive
