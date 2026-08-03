@@ -54,17 +54,37 @@ function ground_state_preflight(; interactions::InteractionParams,
     fails = String[]
     warns = String[]
 
-    # 1. c₀ ≤ 0 — an ATTRACTIVE condensate. Measured: every ITP arm returned NaN.
-    #    Reached by `c1_ratio < −1/F²`, where `c₀ = c_total/(1 + F²·r)` changes
-    #    sign; at r = −0.05, F = 6 that is c₀ = −5859 with c₁ = +293. The pole was
-    #    documented in the config header I was reading at the time.
-    if c0 <= 0
+    # 1. c₀ ≤ 0 is an ATTRACTIVE condensate. That is legitimate physics — bright
+    #    solitons, quantum droplets — and a droplet stabilised by an LHY term has
+    #    a real ground state, so this REFUSES only the combination that was
+    #    actually measured to blow up: attractive with NO stabilising term. With
+    #    an LHY present it warns instead.
+    #
+    #    A first version refused c₀ ≤ 0 outright, on one measurement at
+    #    `lhy = none`. Generalising "attractive + no LHY diverges" to "attractive
+    #    diverges" would have blocked droplet work on evidence that says nothing
+    #    about it.
+    #
+    #    How it is reached by accident: `c₀ = c_total/(1 + F²·r)` changes sign at
+    #    `r = −1/F²`, and PAST the pole c₁ flips POSITIVE — so "c₀ < 0 with
+    #    c₁ < 0" is unreachable through `c1_ratio`, and a negative c₁ (the whole
+    #    range `r ∈ (−1/F², 0)`, which is what production scans) never trips this.
+    if c0 <= 0 && lhy === nothing
         push!(
             fails,
-            "c₀ = $(round(c0; sigdigits=5)) ≤ 0 — the condensate is " *
-            "ATTRACTIVE and ITP diverges (measured: NaN in every arm). If this came " *
-            "from a c1_ratio, note c₀ = c_total/(1 + F²·r) changes sign at r = −1/F² " *
-            "(−1/36 ≈ −0.0278 for F=6); production scans stay above it.",
+            "c₀ = $(round(c0; sigdigits=5)) ≤ 0 with no LHY — an ATTRACTIVE " *
+            "condensate and nothing to arrest the collapse; measured NaN in every ITP " *
+            "arm. An attractive point with an LHY term is a droplet and is allowed. If " *
+            "this came from a c1_ratio, c₀ = c_total/(1 + F²·r) changes sign at " *
+            "r = −1/F² (−1/36 ≈ −0.0278 for F=6) and c₁ turns POSITIVE past it, so this " *
+            "is very likely not the point you meant.",
+        )
+    elseif c0 <= 0
+        push!(
+            warns,
+            "c₀ = $(round(c0; sigdigits=5)) ≤ 0 — attractive. Legitimate with an " *
+            "LHY term (this is the droplet regime), but the ITP stability limit and the " *
+            "dt error were both measured at c₀ > 0 and neither transfers.",
         )
     end
 

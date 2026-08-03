@@ -22,11 +22,38 @@ using SpinorBEC: ground_state_preflight, print_preflight, passed
         @test occursin("clear", r.summary)
     end
 
-    @testset "c₀ ≤ 0 is refused, and the pole is named" begin
-        r = ground_state_preflight(; interactions=bad_ip, spinor_lhy=:polar_contact)
+    @testset "c₀ ≤ 0: refused only with NO LHY, warned about with one" begin
+        # Attractive + nothing to arrest it is what was measured to blow up.
+        r = ground_state_preflight(; interactions=bad_ip, spinor_lhy=:none)
         @test !passed(r)
         @test occursin("ATTRACTIVE", r.summary)
         @test occursin("−1/F²", r.summary) || occursin("1/36", r.summary)
+
+        # Attractive WITH an LHY term is a droplet — legitimate physics, and a
+        # first version of this check refused it on evidence that said nothing
+        # about it. `fm_contact` is used here because `polar_contact` has its own
+        # (correct) refusal at σ₀ < 0.
+        d = ground_state_preflight(; interactions=bad_ip, spinor_lhy=:fm_contact,
+            method=:lbfgs)
+        @test passed(d)
+        @test occursin("droplet", d.summary)
+    end
+
+    @testset "a negative c₁ is NOT what this refuses" begin
+        # The whole point of the pole: for r ∈ (−1/F², 0) the couplings are
+        # c₀ > 0 with c₁ < 0, which is what production scans, and past the pole c₁
+        # flips POSITIVE. So "c₀ < 0 with c₁ < 0" is unreachable through c1_ratio
+        # and no negative-c₁ point is blocked.
+        c_total, F2 = 4687.3, 36
+        for r in (-0.024, -0.010, -0.001)
+            c0 = c_total / (1 + F2 * r)
+            c1 = r * c0
+            @test c0 > 0 && c1 < 0          # the premise, asserted not assumed
+            res = ground_state_preflight(;
+                interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
+                c_dd=211.0, spinor_lhy=:polar_contact, method=:lbfgs)
+            @test passed(res)
+        end
     end
 
     @testset "full_bdg with an active dipole is refused" begin
