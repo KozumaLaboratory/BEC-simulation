@@ -77,8 +77,18 @@ println("`lhy = none` divergence boundary — Eu F=6 D=13, $(N_GRID)³, $(STEPS)
 println("c_dd scale 1.0 = the production $(round(EU_c_dd; sigdigits=4))")
 println("="^78)
 
-const C1S = (-0.10, -0.05, -0.02, 0.0, 0.02, 0.05, 0.10)
-const SCALES = (0.0, 0.1, 0.25, 0.5, 1.0)
+# THE SWEEP IS OVER-SCOPED FOR WHAT IS LEFT TO ASK. Three c_dd scales are already
+# measured to diverge at c₁ = −0.05 — 0.0 and 0.1 here, and 1.0 from
+# `bench/itp_fused_chain_accuracy.jl` — so "does the dipole move the boundary" is
+# answered: it does not. What is NOT known is where between −0.05 and −0.02 the
+# boundary sits, and that needs c₁ refinement at ONE c_dd, not a grid.
+#
+# Two full-grid attempts were killed at the wall clock with 2 of 5 rows, and
+# cutting the step count 3000 → 800 changed nothing — which confirms the cost is
+# per-CELL workspace construction and not the stepping, and means the fix has to
+# remove cells rather than steps. 35 cells → 8.
+const C1S = (-0.05, -0.045, -0.04, -0.035, -0.03, -0.025, -0.02, 0.0)
+const SCALES = (1.0,)
 
 for lhy in (:none, :polar_contact)
     println("\n--- lhy = $lhy   (cells: finite E, DIVERGED, or REFUSED at build)")
@@ -91,7 +101,18 @@ for lhy in (:none, :polar_contact)
     for sc in SCALES
         @printf("  %-10.2f", sc)
         for c1 in C1S
+            t0 = time()
             st, E = probe(; c1_ratio=c1, cdd_scale=sc, lhy)
+            # PER-CELL timing, printed to stderr so it does not disturb the table.
+            # Two runs died at the wall with the cost unattributed and a fix aimed
+            # at the wrong half; the way to stop guessing is to measure the cell.
+            @printf(stderr, "    cell c1=%+.3f cdd=%.2f lhy=%-14s %6.1f s  %s\n",
+                c1, sc, lhy, time() - t0, st)
+            flush(stderr)
+            # Reclaim per CELL, not per row: seven 32³ padded-DDI workspaces
+            # accumulating inside one row is what took maxvmem to 205 G.
+            GC.gc(true)
+            CUDA.reclaim()
             @printf(" %11s", st === :finite ? @sprintf("%.4g", E) :
                               st === :diverged ? "DIVERGED" : "refused")
         end
