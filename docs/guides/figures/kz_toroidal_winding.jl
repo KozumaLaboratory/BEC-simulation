@@ -368,6 +368,36 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "slow")
+        # "slowIofN:nd|full:NTRAJ" — the tau_Q range the FREEZE-OUT requires.
+        #
+        # During the ramp |mu(t)| = mu_0 |t|/tau_Q, so the relaxation time is
+        # tau_Q/(gamma mu_0 |t|). Setting that equal to the time still to run, |t|,
+        # gives the freeze-out
+        #
+        #     t_hat = sqrt(tau_Q/(gamma mu_0)) = sqrt(100 tau_Q)
+        #
+        # — and t_hat ∝ tau_Q^(1/2) is the published alpha = 0.5119. Scaling can
+        # only appear where t_hat < tau_Q, i.e.
+        #
+        #     tau_Q > 1/(gamma mu_0) = 100.
+        #
+        # The first scan ran 7.4 … 2981 with FOUR of seven points below that,
+        # frozen through the entire ramp. The measured sigma(W) says the same: it
+        # is flat until the last three points, and fitting only those gives
+        # beta = 0.082 for the full SPGPE against a published 0.0966 ± 0.0128.
+        #
+        # So the paper's e² … e⁸ is in units of the relaxation time tau =
+        # hbar/(gamma mu_0) = 100/omega_perp, not of 1/omega_perp. Read that way
+        # every point sits at least 7x above the crossover.
+        m = match(r"^slow(\d+)of(\d+):(nd|full):(\d+)$", mode)
+        m === nothing && error("slow mode: slowIofN:nd|full:NTRAJ, got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        τ_relax = 1 / (1e-2 * KZ_MU0)
+        kz_winding_scan(; tau_Qs=τ_relax .* exp.(0.0:1.0:6.0),
+            n_traj=parse(Int, m[4]), M_damp=(m[3] == "full" ? 1e-2 : 0.0),
+            dt=0.05, M_grid=256, backend, shard=(i, n), raw_only=true,
+            tag="kz_torus_slow$(m[3])_s$(i)of$(n)")
     elseif startswith(mode, "hold")
         # Does the post-quench hold erase the imprint? beta came out 0.012 against
         # a published 0.124 with a hold of 1000 time units — 68x the quench itself
