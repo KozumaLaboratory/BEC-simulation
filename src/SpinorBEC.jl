@@ -45,9 +45,11 @@ include("workflow/experiments/euv3_coils.jl")  # euv3 lab coil/field calibration
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
 include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
 include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
+include("analysis/coherence_length.jl")  # g1(r) + coherence length (KZ observable)
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
+include("solvers/thermal_cfield.jl")  # classical-field HF equilibrium + thermal seed
 include("solvers/spgpe.jl")   # full SPGPE: growth + energy-damping reservoirs (Rooney PRA 86 053634)
 # Klaus-regime rotating-basis + scalar-eGPE used to live as a vertical
 # slice at src/rotating_basis/; 2026-06-02 dispersed into proper layers
