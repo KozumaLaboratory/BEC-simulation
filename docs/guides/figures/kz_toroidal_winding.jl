@@ -386,6 +386,40 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "gam")
+        # "gamIofN:GAMMA:MD:NTRAJ" — the test the range choice was missing.
+        #
+        # beta was reported as 0.0991 +- 0.0067 against a published 0.0966 and
+        # that claim is withdrawn: the LOCAL slope drifts across the window
+        # (0.066, 0.099, 0.045, 0.131, 0.133, 0.120), so the global fit averages a
+        # changing slope rather than measuring an exponent. Choosing the window
+        # and reading off a number that lands on the target is a fit with extra
+        # steps.
+        #
+        # The window has to come from somewhere independent, and it does: the
+        # MEASURED freeze-out t_hat = 3.4 sqrt(tau_Q/(gamma mu_0)) must be small
+        # against the ramp. At gamma = 1e-2 the ratio t_hat/tau_Q runs
+        # 3.40 2.06 1.25 0.76 0.46 0.28 0.17 over the scan — the first four points
+        # are outside the regime by construction, and even the best is 0.17.
+        # Reaching 0.05 needs tau_Q > 4.6e5, an hour per trajectory.
+        #
+        # gamma buys it back: t_hat/tau_Q = 3.4/sqrt(gamma mu_0 tau_Q), so ten
+        # times the rate reaches the same ratio at a tenth of tau_Q. And the
+        # exponent MUST NOT depend on gamma — gamma sets tau_0, not the scaling.
+        # So the same window in t_hat/tau_Q at three rates is simultaneously the
+        # affordable measurement and the check that the number is an exponent at
+        # all rather than a local slope.
+        m = match(r"^gam(\d+)of(\d+):([0-9.]+):(nd|full):(\d+)$", mode)
+        m === nothing && error("gam mode: gamIofN:GAMMA:nd|full:NTRAJ, got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        γ = parse(Float64, m[3])
+        # Fixed window in t_hat/tau_Q = 3.4/sqrt(gamma tau_Q): span the same
+        # ratios 0.34 … 0.034 at every gamma, i.e. tau_Q = 100/gamma … 1e4/gamma.
+        τs = (1 / γ) .* [1e2, 3e2, 1e3, 3e3, 1e4]
+        kz_winding_scan(; tau_Qs=τs, n_traj=parse(Int, m[5]),
+            M_damp=(m[4] == "full" ? γ : 0.0), gamma=γ, dt=0.05, M_grid=256,
+            backend, shard=(i, n), raw_only=true,
+            tag="kz_torus_gam$(replace(string(γ), "." => "p"))$(m[4])_s$(i)of$(n)")
     elseif startswith(mode, "size")
         # Is xi_hat physical or is it the ring? It came out 20-37 at every quench
         # rate on a ring of 200 — L/6, six to eight domains, which is no dynamic
