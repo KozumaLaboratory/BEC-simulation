@@ -614,23 +614,81 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Three measurements the design demands and this document does not perform.**
-These are the sharpest, because `isnan(cost)` is red at build — so the design as
-written cannot land these three rows as `:open`; they are `:dropped` rows naming
-the measurement that would promote them.
+**Status, 2026-08-03.** Three of the fourteen are closed with measurements —
+A2:R-OPEN-03 / A5:R-NIX-03B (item 1, which this document called its largest
+single unknown) and A2:R-OPEN-01 (item 2). Eleven remain. Both closures cost
+almost nothing to obtain, which is itself the lesson worth recording: item 2 was
+never a compute measurement at all — it is resolution and hashing, and it sat
+open because it was filed alongside a genuinely expensive one.
+
+**Three measurements the design demands and this document did not perform —
+TWO OF THEM HAVE SINCE BEEN MADE (2026-08-03).** They are kept in place, with
+the numbers, because the reason they were listed is the useful part: `isnan(cost)`
+is red at build, so a `:dropped` row names the measurement that promotes it, and
+this is what promotion looks like.
 
 1. **A2:R-OPEN-03 / A5:R-NIX-03B — the FFTW planner and the OpenBLAS team size.**
    `fft_flags = FFTW.MEASURE` is the default at `make_workspace.jl:72`, and the
    planner picks its codelet sequence by timing trials, so summation order is
    load-dependent; the OpenBLAS level-1 team is sized from core count. The
    measured evidence that this moves numbers is a 25x spread in `grad_norm`
-   across three runs at one commit on one cluster. Neither has been measured *on
-   psi*, so neither can be classified refuse-class or caveat-class. **This is the
-   largest single unknown in the design.**
+   across three runs at one commit on one cluster. Neither had been measured *on
+   psi*, so neither could be classified refuse-class or caveat-class. This was
+   named the largest single unknown in the design.
+
+   **MEASURED 2026-08-03** (TSUBAME jobs 8339392 and 8339525, 24^3 Eu151, 400
+   ITP steps, cpu_16). Five conditions — planner default vs `MEASURE`, and
+   `OPENBLAS_NUM_THREADS` 1 / 4 / 16:
+
+   | quantity | result |
+   |---|---|
+   | energy | `1.8857610302635` under **all five**, identical to 15 printed digits |
+   | psi hash | **differs under all five** |
+   | psi, same process, twice | bit-identical, `max\|dpsi\| = 0` |
+   | psi, three separate processes, identical env | three hashes, `max\|dpsi\| ~ 1e-16`, `dE/E ~ 3e-16` |
+
+   So the classification is **caveat-class, not refuse-class**: neither knob
+   moves an energy at this size, and what they move in psi is last-ulp. The
+   sharper consequence is about the instrument rather than the knobs — **a psi
+   hash is an oracle only WITHIN a process.** Two byte-identical invocations
+   (`smoke` and `blas1` in job 8339392) produced different hashes. Any gate,
+   parity job or bisect that compares psi hashes across processes is measuring
+   the process, not the code.
+
+   One mechanism was hypothesised and then **refuted**: memory alignment. A 64^3
+   in-place complex FFT gives a bit-identical result from a 64-byte-aligned and a
+   16-mod-64 buffer, under both `ESTIMATE` and `MEASURE`. The cause of the
+   cross-process variation is still unidentified; it is bounded at 1e-16, which
+   is what the row needed.
 2. **A2:R-OPEN-01 — how much a derived key collapses the corpus.** Distinct
-   derived ids against distinct whole-file hashes over all 429 configs. It
-   decides whether the concurrent-write path is hot or theoretical, and it has
-   not been run.
+   derived ids against distinct whole-file hashes over every config under
+   `runs/`. It decides whether the concurrent-write path is hot or theoretical.
+
+   **MEASURED 2026-08-03**, by resolution and hashing only — no physics, so this
+   was always a reading-cost measurement rather than a compute one:
+
+   | | |
+   |---|---|
+   | configs under `runs/` | 446 |
+   | resolve to a `Model` | 367 (79 listed with their reason) |
+   | distinct whole-file hashes | 444 |
+   | **distinct derived ids** | **116** |
+   | collapse | **3.16x** |
+   | names claimed by more than one config | 44 |
+   | largest group | **59 configs on one name** |
+
+   **The path is HOT.** Fifty-nine configs under `runs/klaus_quench/` resolve to
+   `4607507a826b1363`; sixteen verification-suite configs share another.
+
+   The number inverts if the collapse is a BLIND SPOT rather than genuine
+   sharing, so that was checked rather than assumed. Two members of the
+   59-config group (`klaus_quench_om0p0.yaml` and
+   `klaus_quench_omm0p2_holdonly_delay2ms_refine.yaml`) have `ground_state`
+   blocks with no key unique to either and no shared key holding a different
+   value — byte-identical GS physics — while their `dynamics` blocks differ. The
+   sharing is real: those 59 runs genuinely want one ground state, which is the
+   stage cache's entire purpose. So the concurrent-write path is hot *because
+   the design is working*, not because the id is blind to something.
 3. **A2:R-OPEN-05 — write amplification of per-attempt records.** This design
    commits to an append-only `attempts/` shape without the
    executions-per-artifact measurement the requirement says must come first. If
