@@ -499,14 +499,48 @@ function _run_step(
             spinor_lhy=spinor_lhy_mode,
             lhy_opts=gs_lhy_opts,
         )
-        step_result = Dict{Symbol, Any}(
-            :ground_state_energy => energy,
-            :ground_state_converged => converged,
-            :ground_state_provenance => String(gs_admission.provenance),
-            :workspace => ws_cached,
-            :gs_stage_ref => stage_ref,
-        )
-        return (psi_out, grid, atom, ws_cached, step_result)
+        # Is the verdict TRUE of what was just loaded? Everything above this
+        # line trusts the marker; `admit_payload` checked that it exists, was
+        # written last, and names bytes that are present. None of that reads ψ.
+        #
+        # This is the one place the workspace and the stored state are both in
+        # hand, so it is the one place the {ψ, E, ∇E} spine can be re-derived
+        # without building anything for the purpose. A hit that fails is not
+        # served: it falls through to the fresh solve below, loudly. Wrong-and-
+        # fast is the outcome the content-addressed store multiplies — the key
+        # is shared, so one bad payload reaches every config with the same
+        # physics.
+        gs_audit = verify_verdict(
+            gs_admission.marker === nothing ? nothing : gs_admission.marker.verdict,
+            psi_out, ws_cached; energy_recorded=energy, F=atom.F)
+        if gs_audit.checked && !gs_audit.agrees
+            @error "cached ground state REJECTED: its verdict is not true of it" path =
+                cache_path reason = gs_audit.reason energy_recorded = gs_audit.energy_recorded energy_rederived =
+                gs_audit.energy_rederived grad_norm_recorded = gs_audit.grad_norm_recorded grad_norm_rederived =
+                gs_audit.grad_norm_rederived
+        else
+            v = gs_admission.marker === nothing ? nothing : gs_admission.marker.verdict
+            step_result = Dict{Symbol, Any}(
+                :ground_state_energy => energy,
+                :ground_state_converged => converged,
+                :ground_state_provenance => String(gs_admission.provenance),
+                :workspace => ws_cached,
+                :gs_stage_ref => stage_ref,
+            )
+            # The other three quarters of the verdict. The marker carries
+            # `stop_reason`, `floor_limited` and `grad_norm`; until this commit a
+            # hit published only `converged`, so `gs_verdict` on a cache-hit
+            # result reconstructed `("unknown", false, NaN)` from its defaults —
+            # a re-marked payload would lose the distinction between a converged
+            # solve and a floor-limited one that the verdict exists to keep.
+            if v !== nothing
+                step_result[:ground_state_stop_reason] = v.stop_reason
+                step_result[:ground_state_floor_limited] = v.floor_limited
+                step_result[:ground_state_grad_norm] = v.grad_norm
+            end
+            step_result[:ground_state_verdict_verified] = gs_audit.checked
+            return (psi_out, grid, atom, ws_cached, step_result)
+        end
     end
     initial_state = Symbol(get(p, "initial_state", "polar"))
     # from_jld2: load ψ from a prior result (mirrors the rotating_basis
@@ -677,13 +711,46 @@ function _run_step(
         throw(ArgumentError("Unknown ground_state method: $method. Supported: itp, lbfgs"))
     end
 
-    # Strip any Nyquist-mode junk the LBFGS/Newton path can accumulate (ITP is
-    # already dealiased) — kills the checkerboard artifact at the source in the
-    # saved/analysed ψ. Host copy: the null uses a CPU FFT.
+    # Strip any Nyquist-mode junk the LBFGS/Newton path can accumulate — kills
+    # the checkerboard artifact at the source in the saved/analysed ψ. Host
+    # copy: the null uses a CPU FFT.
+    #
+    # The docstring's "the split-step dealias already strips it during ITP, so
+    # this is a no-op there" is TRUE only without a rotating frame. Measured
+    # 2026-08-03 at 8^3, dt = 0.002, `method: itp`: with `rotating_frame_omega`
+    # = 0 the projection moves ψ by 1.1e-16 (machine epsilon, a genuine no-op);
+    # at Ω = 0.3 it moves it by 1.1e-5 — five orders larger, and present in
+    # every combination containing Ω and in none without. The Coriolis 3-shear
+    # runs AFTER the dealias inside the sandwich, and an FFT-based shear rings
+    # at the Nyquist frequency, so it repopulates exactly what the dealias had
+    # just removed.
     psi_out = _null_nyquist_modes!(_to_host(copy(gs.workspace.state.psi)), grid)
-    # With a pin ε-continuation the certified energy is the ε→0 extrapolation,
-    # not the last pinned-rung value.
-    gs_energy = hasproperty(gs, :E0_extrap) ? gs.E0_extrap : gs.energy
+
+    # …which makes the projection a state change, and a state change here used
+    # to split the step's outputs in two: `psi_out` was saved and analysed,
+    # while `gs.workspace` — returned to every downstream analyzer — and
+    # `gs.energy` still described the UNPROJECTED state. Measured on the same
+    # config: the recorded energy was that of a ψ differing from the stored one
+    # by 2.6e-5 relative, an energy offset of 3.0e-8 (second order, as it must
+    # be at a stationary point). A cache hit rebuilds its workspace FROM the
+    # stored ψ, so fresh and cached analysis of the same artifact disagreed by
+    # exactly that much, and the recorded energy belonged to neither file.
+    #
+    # `_finalize_lbfgs_atomic!` (`solvers/lbfgs/atomic.jl`) makes {ψ, E, ∇E}
+    # atomic at the SOLVER's return. This is the same discipline one level up,
+    # at the STEP's return: sync the workspace to the state that is actually
+    # saved, then take the energy from it. One ψ, one E, one workspace.
+    # `copyto!` and not a new helper: it already crosses host→device and
+    # ComplexF64→ComplexF32 (the `dtype: f32` path), which is the whole job.
+    copyto!(gs.workspace.state.psi, psi_out)
+    # With a pin ε-continuation the certified energy is the ε→0 extrapolation
+    # of a sequence of solves, not a functional of this ψ — recomputing it here
+    # would silently replace the certificate with the last rung's value.
+    gs_energy = if hasproperty(gs, :E0_extrap)
+        gs.E0_extrap
+    else
+        Float64(total_energy(gs.workspace))
+    end
     verbose && _print_gs_summary(psi_out, grid, atom, gs)
 
     # THE defect this cutover exists to close. `_run_itp_loop!` swallows

@@ -85,6 +85,13 @@ const FAST_TESTS = [
     # W2: the marker carries the solve's verdict and admission can require it.
     # W3: the grandfather arm is bounded by a dated cutoff.
     "model/test_marker_verdict.jl",
+    # …and the arm none of the three marker files has: does the verdict
+    # describe the payload it is attached to?
+    "model/test_verdict_truth.jl",
+    # …and what that gate FOUND: the step returned three descriptions of its
+    # answer — saved psi, analysed workspace, reported energy — and with a
+    # rotating frame they were three different states.
+    "model/test_gs_step_returns_one_state.jl",
     "model/test_marker_cutoff.jl",
     # W4: the cache's fail-safes reach a file, not only a log line.
     "model/test_cache_stats_reported.jl",
