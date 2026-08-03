@@ -65,8 +65,9 @@ else
             end
             a, b = run(true), run(false)
             @test a == b
-            a == b || @info "DDI warp mismatch" T N it relerr = norm(vec(a) .- vec(b)) /
-                                                                max(norm(vec(b)), eps(T))
+            a == b || @info "DDI warp mismatch" T N it relerr =
+                norm(vec(a) .- vec(b)) /
+                max(norm(vec(b)), eps(T))
         end
 
         @testset "spin-mixing rotation (T=$T, N=$N, IT=$it)" for T in (Float64, Float32),
@@ -104,8 +105,9 @@ else
             end
             a, b = run(true), run(false)
             @test a == b
-            a == b || @info "SM warp mismatch" T N it relerr = norm(vec(a) .- vec(b)) /
-                                                               max(norm(vec(b)), eps(T))
+            a == b || @info "SM warp mismatch" T N it relerr =
+                norm(vec(a) .- vec(b)) /
+                max(norm(vec(b)), eps(T))
         end
 
         # Both arms must actually have moved ψ, or `a == b` is two copies of the
