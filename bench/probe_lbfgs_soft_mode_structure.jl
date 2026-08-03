@@ -40,6 +40,7 @@ using SpinorBEC: _realdot, _tangent_project, energy_gradient!, CoriolisTerm,
     apply_operator!
 using Printf
 using FFTW: fft
+using LinearAlgebra: eigen, Hermitian
 using Random: MersenneTwister
 
 include(joinpath(@__DIR__, "eu151_params.jl"))
@@ -139,6 +140,33 @@ function axial_generator(psi, ws)
     t
 end
 
+"""
+    spin_rank(v) → (fractions, u)
+
+Eigenvalue fractions of `M = Σ_x v(x)v(x)†`, the D×D spin-space correlation of
+the mode, and its leading spinor.
+
+This is the sizing question for the replacement preconditioner. If the mode is
+`f(x)·u` for one fixed `u ∈ C^D`, `M` is rank 1 and a SINGLE global D×D
+operator preconditions it — 13×13 applied per voxel, negligible against a 25 ms
+iteration. If the weight is spread over several eigenvalues the spin structure
+varies in space and the operator has to be built per voxel, which is 169
+complex multiplies per grid point and no longer free.
+"""
+function spin_rank(v)
+    n = size(v)
+    D = n[end]
+    sv = reshape(v, :, D)
+    M = zeros(ComplexF64, D, D)
+    @inbounds for i in axes(sv, 1), a in 1:D, b in 1:D
+        M[a, b] += sv[i, a] * conj(sv[i, b])
+    end
+    F = eigen(Hermitian(M))
+    ev = sort(real.(F.values); rev=true)
+    u = F.vectors[:, argmax(real.(F.values))]
+    (ev ./ sum(ev), u)
+end
+
 function report(name, v, psi, grid)
     par, per = spin_vs_density(v, psi)
     tot = par + per
@@ -150,6 +178,12 @@ function report(name, v, psi, grid)
         100 * low_k_weight(v, grid, 0.1), 100 * low_k_weight(v, grid, 0.3))
     @printf("  %-22s top components m = %s  (%.0f %%, %.0f %%, %.0f %%)\n", "",
         join(["$(7 - c)" for c in top], ", "), 100w[top[1]], 100w[top[2]], 100w[top[3]])
+    fr, u = spin_rank(v)
+    uw = abs2.(u)
+    ut = sortperm(uw; rev=true)[1:3]
+    @printf("  %-22s spin rank: λ₁ %.1f %%  λ₁₂ %.1f %%  λ₁₂₃ %.1f %%   leading spinor m = %s\n",
+        "", 100fr[1], 100 * sum(fr[1:2]), 100 * sum(fr[1:3]),
+        join(["$(7 - c)" for c in ut], ", "))
 end
 
 function main()
@@ -196,6 +230,12 @@ function main()
     println("  diagonal does see it; weight spread like the control means it does")
     println("  not. Together those say which factor of P_C = P_V^1/2 P_K P_V^1/2")
     println("  is failing, and whether the replacement has to act in spin space.")
+    println()
+    println("  And `spin rank` sizes the replacement. λ₁ near 100 % means the mode is")
+    println("  f(x)·u for ONE fixed spinor, so a single global 13×13 preconditions it")
+    println("  and costs nothing. Weight spread across eigenvalues means the spin")
+    println("  structure varies in space and the operator must be built per voxel —")
+    println("  169 complex multiplies per grid point, which is no longer free.")
 end
 
 main()
