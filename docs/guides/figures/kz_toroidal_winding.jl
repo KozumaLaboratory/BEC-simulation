@@ -142,7 +142,7 @@ function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
-    t_hold::Float64=NaN,
+    t_hold::Float64=NaN, n_probe::Int=0,
 )
     grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
@@ -193,15 +193,33 @@ function kz_trajectory_torus(;
     μ_wave = PiecewiseLinearWaveform([0.0, 2tau_Q, 2tau_Q + t_hold],
         [-KZ_MU0, KZ_MU0, KZ_MU0])
     res = mk(gamma, μ_wave, M_damp)
+    n_steps_q = round(Int, (2tau_Q + t_hold) / dt)
+    # N₀ = |∫ψ dx|²/L is the k=0 population on a ring: for a uniform ψ = √n it
+    # returns nL = N exactly, so it needs no normalisation convention argued over.
+    probe_t = Float64[];
+    probe_N0 = Float64[]
+    every = n_probe > 0 ? max(1, n_steps_q ÷ n_probe) : typemax(Int)
     t = 0.0
-    for s in 1:round(Int, (2tau_Q + t_hold) / dt)
+    for s in 1:n_steps_q
         split_step!(ws)
         apply_spgpe_step!(ws, res, dt; t=t, seed=seed + 1_000_003 + s)
         t += dt
+        if s % every == 0
+            ψ = ws.state.psi
+            push!(probe_t, t - tau_Q)              # measured FROM the transition
+            push!(probe_N0, abs2(sum(ψ)) * cell_volume(grid)^2 / KZ_L)
+        end
     end
 
     psi = Array(ws.state.psi)
+    # ξ̂ measured directly from g₁(r) on the ring, not inferred from σ(W). The
+    # two must agree — σ(W)² ≈ L/(4ξ̂) for a phase random-walking over L/ξ̂
+    # domains — and if they do not, the disagreement localises the error.
+    hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
+    rr, g1 = first_order_correlation(psi, grid, hplans)
+    cl = coherence_length(rr, g1)
     (; W=winding_number(psi, grid), N_final=real(sum(abs2, psi)) * dV, N_equil,
+        xi_hat=cl.xi, f_inf=cl.f_inf, probe_t, probe_N0,
         t_total=1000.0 + 2tau_Q + t_hold)
 end
 
@@ -367,6 +385,52 @@ if abspath(PROGRAM_FILE) == @__FILE__
         for dt in (0.02, 0.01, 0.005)
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
+        end
+    elseif startswith(mode, "freeze")
+        # The three quantities that have to agree, and never have been compared:
+        #
+        #  (1) t_hat, the delay in condensate growth after the transition. The ramp
+        #      argument gives t_hat = sqrt(tau_Q/(gamma mu_0)); the published
+        #      alpha = 0.5119 says t_hat ∝ tau_Q^(1/2). If there is no delay, there
+        #      is no freeze-out and nothing downstream can be Kibble-Zurek.
+        #  (2) xi_hat measured directly from g1(r) on the ring.
+        #  (3) sigma(W)² ≈ L/(4 xi_hat), the random walk of phase over L/xi_hat
+        #      domains.
+        #
+        # sigma(W) = 1.4 implies xi_hat ≈ 25 a_perp where KZ predicts ≈ 1.65 — a
+        # factor of 15 that no choice of tau_Q range can absorb, since the exponent
+        # is 1/4. Measuring all three separates "the scan is in the wrong regime"
+        # from "the observable is wrong" from "the dynamics has no freeze-out".
+        #
+        # The threshold defining t_hat is SWEPT, because a threshold that sets the
+        # answer is how a condensate fraction once passed for a coherence length.
+        τs = [1e2, 1e3, 1e4]
+        for τ in τs
+            Ws, ξs, Ts, N0s = Float64[], Float64[], Vector{Float64}[], Vector{Float64}[]
+            for j in 1:24
+                r = kz_trajectory_torus(; tau_Q=τ, seed=5_000_000 + j * KZ_SEED_STRIDE,
+                    T=0.5 * ideal_torus_Tc(), eps_cut=KZ_MU0 + 0.5 * ideal_torus_Tc(),
+                    M_damp=0.0, dt=0.05, M_grid=256, backend, n_probe=400)
+                push!(Ws, r.W);
+                push!(ξs, r.xi_hat)
+                push!(Ts, r.probe_t);
+                push!(N0s, r.probe_N0)
+            end
+            N_TF = KZ_MU0 * KZ_L / KZ_G1
+            tgrid = Ts[1]
+            N0bar = [mean(N0s[j][i] for j in eachindex(N0s)) for i in eachindex(tgrid)]
+            @printf("\ntau_Q = %.0f   t_hat_predicted = %.1f\n", τ, sqrt(τ / 1e-2))
+            for thr in (0.02, 0.05, 0.10, 0.20)
+                ic = findfirst(>(thr * N_TF), N0bar)
+                @printf("   threshold %4.0f%% of N_TF -> t_hat = %s\n", 100thr,
+                    ic === nothing ? "never" : @sprintf("%.1f", tgrid[ic]))
+            end
+            σW = std(Ws)
+            ξ_from_W = KZ_L / (4 * σW^2)
+            @printf("   sigma(W) = %.3f -> xi_hat(from W) = %.1f ;  xi_hat(from g1) = %.2f ± %.2f\n",
+                σW, ξ_from_W, mean(filter(isfinite, ξs)),
+                std(filter(isfinite, ξs)) / sqrt(max(count(isfinite, ξs), 1)))
+            flush(stdout)
         end
     elseif startswith(mode, "slow")
         # "slowIofN:nd|full:NTRAJ" — the tau_Q range the FREEZE-OUT requires.
