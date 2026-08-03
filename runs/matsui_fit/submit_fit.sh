@@ -7,7 +7,7 @@
 #$ -N matsui_fit
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-32
+#$ -t 1-36
 #$ -j n
 
 set -euo pipefail
@@ -68,6 +68,10 @@ case "${SGE_TASK_ID:-1}" in
     30) CONFIG=runs/matsui_fit/fit_code_q_n50k.yaml ;;
     31) CONFIG=runs/matsui_fit/fit_code_c1e2_n50k.yaml ;;
     32) CONFIG=runs/matsui_fit/fit_code_qc1e2_n50k.yaml ;;
+    33) CONFIG=runs/matsui_fit/rings_c0.yaml ;;
+    34) CONFIG=runs/matsui_fit/rings_c1e2.yaml ;;
+    35) CONFIG=runs/matsui_fit/rings_c036.yaml ;;
+    36) CONFIG=runs/matsui_fit/rings_c030.yaml ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 

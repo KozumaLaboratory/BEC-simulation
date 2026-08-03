@@ -1,0 +1,92 @@
+# リング本数の時間変化 — c1/c0 = 0.0、単一磁場 B = +2.5 nT
+#
+# 論文は m=-5 と m=-4 が「2 本と 3 本のリング」からなると述べ、c1~0 と c1<0 では
+# 2 本しか出ないことを c1 決定の根拠にしている（Appendix E）。我々の 32^3 でも
+# 5 ms の断面で再現できた: 1/36 -> m=-4 が 3 本、c1=0 -> 1 本、0.30 -> 3 本。
+#
+# だが 1/36 と 0.30 が両方 3 本になる。実験側からは、リング本数が時間とともに
+# 1 -> 3 -> 2 と変化するとの指摘がある。もしそうなら 5 ms の一断面で c1 を
+# 決めるのは脆く、論文の決定も「その時刻でたまたま 3 本だった」に過ぎない
+# 可能性がある。
+#
+# この run は単一磁場で 40 ms（論文 Fig.2 と同じ範囲）まで走らせ、psi を 50 点
+# 保存してリング本数の時間変化を測る。B スキャンではないので 1 点。
+#
+# 注意: 論文の 3 本は「横から見た像」(Fig.1E) の話で、z 方向に積分すると構造が
+# 消える。Psi_-5 は z*rho*exp(-i phi) の形なので z=0 に節を持つ。
+#
+# duration = 27.646016 t.u. = 40 ms x 691.1504 ; 27646 steps, save every 553 -> 50 snapshots
+
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: rings_c0
+  grid_n: 32
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: 2.5e-5, to: 2.5e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.0
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 27.646016        # 40 ms x 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 50000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.0
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 553
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: true
+        precision: f32
+
+  - analyze:
+      - energy_decomposition: {}
