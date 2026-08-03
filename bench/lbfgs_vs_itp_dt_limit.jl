@@ -172,6 +172,15 @@ energy comparison here means anything.
 If `monotone: NO`, the ITP sequence is not in its asymptotic regime and the
 Richardson value is a number with no claim behind it — stop there.
 
+THE WALL TIMES ARE NOT COMPARABLE ACROSS NODES and no speed ratio should be read
+from them. Two runs of this file, identical iteration counts and energies to eight
+digits, gave L-BFGS 1000 iterations in 47.4 s on r18n8 and 167.9 s on r4n3 — 3.5×
+— while the ITP arms moved ~15 %. L-BFGS line-searches through host BLAS level-1
+and is machine-dependent (156.6 → 50.2 ms/it measured on the same problem); ITP is
+GPU-FFT bound. Putting both arms on ONE node is not enough, because they respond
+to different parts of the machine. A speed claim needs a repeated, same-node,
+both-arms measurement, which this is not.
+
 And note what this does NOT settle: it is one grid, one c₁, one seed, and at
 c₁/c₀ = −0.024 the shipped dt diverges outright, so the comparison cannot even be
 posed there without first choosing a stable dt.""")
