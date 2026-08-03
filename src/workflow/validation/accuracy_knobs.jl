@@ -171,16 +171,21 @@ be removed without removing the rotating-basis path. Buys NO speed — measured 
 0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
 3-component convolution with all 6 FFTs. Choose it for the physics or not at all.";
         approx_rel_cost=0.986),
-    # `:none` IS REACHABLE AND DIVERGES at the production shape. Measured
-    # 2026-08-02, Eu F=6 64³ with c_dd = 211: every arm of
-    # `bench/itp_fused_chain_accuracy.jl` returned NaN at c₁/c₀ = −0.05, and at
-    # +0.05 it ran the full 40000-step cap to dE = 2.3e-6 (target 1e-10) landing
-    # at E = 7.86 against 776.7 with a table — a different state, not a
-    # less-converged one. LHY is the term that arrests dipolar collapse, so
-    # turning it off is not "the same physics without a correction".
+    # A WITHDRAWN CLAIM, kept as a note because the mistake is instructive.
     #
-    # This is the shipped DEFAULT, which is the uncomfortable part: `:none` is
-    # what a config gets by omitting the block.
+    # I recorded here that `:none` "diverges at the production shape", from runs at
+    # `c1_ratio = −0.05` that returned NaN. That ratio is not a production point:
+    # the constraint `c₀ + F²c₁ = c_total` with `c₁ = r·c₀` gives
+    # `c₀ = c_total/(1 + 36r)`, which flips c₀ NEGATIVE for `r < −1/36 ≈ −0.0278`.
+    # At r = −0.05 the couplings are c₀ = −5859 and c₁ = +293 — an ATTRACTIVE
+    # density interaction, so the collapse is trivial and has nothing to do with
+    # the LHY or the spin channel. `runs/eu_gs_phase_c1_B_kappa` scans
+    # r ∈ [−0.024, +0.048] and says in its own header that it stays above the
+    # singularity; I picked a value outside it without reading that.
+    #
+    # So `:none` is NOT known to fail at any production point, and the real
+    # production side — c₀ > 0 with c₁ < 0, i.e. r ∈ (−1/36, 0) — remains
+    # unmeasured.
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \

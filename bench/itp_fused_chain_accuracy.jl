@@ -38,12 +38,21 @@ include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 64
 const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 40000
-# THE SIGN OF c₁ IS A PARAMETER, and it was not one until now. Every number this
-# bench has produced came from `c1_ratio = +0.05`, while CLAUDE.md records that
-# `c₁ < 0` is the sign Eu F=6 PRODUCTION uses — so the one configuration the
-# result is meant to license had never been run. A conclusion drawn at one sign of
-# the spin coupling is not a conclusion about the other.
-const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 0.05
+# `c1_ratio` IS NOT c₁/c₀ IN THE OBVIOUS DIRECTION, and reading it as such cost a
+# day. The constraint is `c₀ + F²c₁ = c_total` with `c₁ = r·c₀`, so
+# `c₀ = c_total/(1 + 36r)` — which flips c₀ NEGATIVE for `r < −1/36 ≈ −0.0278`.
+#
+#   r = −0.05   c₀ = −5859, c₁ = +293   ← c₀ ATTRACTIVE. Not a production point.
+#   r = −0.024  c₀ = +34465, c₁ = −827  ← c₀ > 0 with c₁ < 0. This IS one.
+#
+# Runs at r = −0.05 returned NaN in every arm and I read that as "the production
+# sign diverges". It is a negative c₀, i.e. an attractive condensate, and the
+# collapse says nothing about the LHY or the spin channel.
+# `runs/eu_gs_phase_c1_B_kappa` scans r ∈ [−0.024, +0.048] and states in its own
+# header that it "stays > singularity −1/36"; I picked outside it without reading.
+#
+# So the production side — c₀ > 0 with c₁ < 0 — is what the default now names.
+const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : -0.024
 # The LHY kind is an argument because `polar_contact` CANNOT be built at c₁ < 0 —
 # σ₀ goes negative and the closed form refuses (it used to die in `^`). That is
 # not a limitation of the fusion question: the fused diagonal absorbs a tabulated
