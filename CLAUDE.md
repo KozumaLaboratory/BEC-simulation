@@ -331,6 +331,52 @@ Semantic mismatch is not type-visible — static analysis cannot catch file/func
 
 **User-supplied callbacks** (live_monitor `extract_observables`, simulation `SimulationCallbacks.on_step`) accept `::Function` — OK in cold paths; hot-loop callbacks must parameterize: `struct Cb{F1,F2} ...`.
 
+## Before computing — five gates
+
+Measured 2026-08-02: a request to fit an experiment produced **24 × 45-point GPU
+scans (~3 h) in which every premise was wrong**, and every one was stated in the
+paper's Results and appendices. The atom number, the thermal fraction, the value
+and provenance of `c1_ratio`, the loss mechanism, the origin of the dip width,
+and a **10 nT systematic on the field axis** — 250× the residual being chased —
+were all published. The same shape recurred four times that day: act on a
+plausible model of the situation instead of verifying the model, when
+verification was cheaper than the action.
+
+These are gates, not advice. Each one is cheap and each one would have stopped a
+day of work.
+
+1. **Read the primary source before spending compute.** A campaign document
+   summarising a paper is not the paper. Before any comparison to an experiment,
+   write down — with quotes — the atom number, temperature/condensate fraction,
+   every already-fitted parameter and what it was fitted to, the loss mechanism,
+   the systematic error on each axis, and whether the published theory curve is
+   the same observable as the published data. `WebFetch` on an arXiv PDF saves
+   it locally even when it cannot parse it; grep the text.
+2. **Sensitivity table before any scan.** Two points per (parameter, observable)
+   cell, and normalise by that observable's uncertainty. Most cells are zero, and
+   knowing which is the result: "`c1_ratio` does not move the dip" means the dip
+   is *robust* to not knowing `c1_ratio`. It also means twelve arms scanning
+   `c1_ratio` against the dip could not have worked.
+3. **Systematic errors before residuals.** State the systematic on every axis
+   first. A statistical bootstrap that omits a quoted systematic reports a σ that
+   is a fiction. No parameter can be constrained below the systematic.
+4. **Rejection criterion written into the config before launch.** "Centre within
+   0.005 nT; not worth taking beyond 0.01" made the DDI-padding verdict
+   automatic. Without it, a run finishes and the interpretation is chosen
+   afterwards, which is not a measurement.
+5. **One arm, then report.** Batches of four to six hide a wrong premise until
+   all of them have run.
+
+**Prefer discrete observables.** A ring count, a winding number, a vortex count,
+a symmetry present-or-absent carries no error bar and no calibration. The 5 ms
+`m = −4` ring count rejected a candidate `c1_ratio` in one run and was
+resolution-independent across 32³/64³/128³; twenty-four continuous-observable
+arms decided nothing.
+
+**Check the reference implementation against the data before chasing a
+residual.** If the published simulation misses the published experiment by the
+same amount you do, the gap is model deficiency and no parameter closes it.
+
 ## Cost model + execution discipline
 
 Cost regime is permanent: this codebase pays a JIT cascade because Workspace is heavily-specialized and `make_workspace` is the hot path for every pipeline step.
