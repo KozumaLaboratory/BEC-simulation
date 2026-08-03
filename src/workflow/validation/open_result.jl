@@ -255,7 +255,13 @@ function _extract_metadata(data::Dict)
         if startswith(k, "env/") || startswith(k, "units/")
             meta[k] = v
         elseif k in ("converged", "energy", "duration_seconds",
-            "started_at", "finished_at", "run_name", "scan_index")
+            "started_at", "finished_at", "run_name", "scan_index",
+            # Provenance. Whitelisted, or the ids the writers record would be
+            # silently dropped here and never reach `summary.json` — "every new
+            # run records a complete id" has to survive the reader, not just the
+            # writer. `artifact_id` was spelled `gs_cache_key` until cutover
+            # step 3 deleted the function that produced it.
+            "code_rev", "artifact_id")
             meta[k] = v
         elseif k == "conventions"
             meta["conventions"] = v

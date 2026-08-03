@@ -117,6 +117,36 @@ vacuous. See `test/hamiltonian/test_taylor_tolerance_criterion.jl`."""
 const SPIN_TAYLOR_DEGREE_CAP = Ref(SPIN_TAYLOR_RK_MAX)
 
 """
+    _assert_taylor_degree_cap_unclamped()
+
+Refuse to run a pipeline while the Horner degree is clamped.
+
+The cap is a test instrument — main's docstring above says it "exists for the
+accuracy gate's positive control", and `cap = 0` skips the Horner loop entirely.
+It is in no `Stage`, because no run sets it and a field nobody sets is a field
+that rots. So the only way it can be wrong is a leaked assignment, and the only
+safe answer to a leaked assignment is to stop: an id that cannot express the
+question must not address the answer.
+
+Called once per `run_pipeline` (`pipeline/runner.jl:189`). Direct-Julia callers
+(`find_ground_state`, `run_simulation!`) are deliberately NOT guarded — that is
+the entry point the positive control itself uses, and it writes no artifact.
+"""
+@noinline function _assert_taylor_degree_cap_unclamped()
+    cap = SPIN_TAYLOR_DEGREE_CAP[]
+    cap == SPIN_TAYLOR_RK_MAX || throw(
+        ArgumentError(
+            "SPIN_TAYLOR_DEGREE_CAP[] is $cap, not $SPIN_TAYLOR_RK_MAX. That clamp " *
+            "is a positive control for test_taylor_tolerance_criterion.jl, not a run " *
+            "setting: it changes ψ (measured 5.9e-2 over 4 real-time steps at cap 0) " *
+            "and it is in no Stage, so the artifact this run would write would be " *
+            "addressed by an id describing an UNCLAMPED run. Reset it to " *
+            "SPIN_TAYLOR_RK_MAX before running a pipeline."),
+    )
+    nothing
+end
+
+"""
     spin_tridiag_bands(sm, ::Type{T}) -> (mz, sxu, syu)
 
 The three bands of `A = v·F`, which is Hermitian TRIDIAGONAL in the `F_z`

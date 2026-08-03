@@ -5,8 +5,6 @@
 # compete; min-E = GS. Gate the ordering on the saved grad_norm, NOT conv (which
 # false-negatives at |∇E|~2e-7).
 #   5 (Bz) × 4 (κ) = 20 points × 3 seeds = 60 solves @ 64³.
-metadata: {owner: anko, project: Eu151 GS — mid-field GS via Newton-CG recipe}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}

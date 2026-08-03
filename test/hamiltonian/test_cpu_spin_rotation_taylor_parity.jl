@@ -12,7 +12,7 @@
 # wrong tolerance.
 #
 # `test/gpu/test_gpu_spin_rotation_taylor_parity.jl` is the same gate for the
-# CUDA realization. Both read the SAME `SPIN_TAYLOR_TOL[]`, so relaxing the
+# CUDA realization. Both read the SAME `SPIN_TAYLOR_TOL`, so relaxing the
 # contract turns both red.
 
 using Test
@@ -20,6 +20,7 @@ using Random
 using LinearAlgebra: norm
 using SpinorBEC
 using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_TOL, SPIN_TAYLOR_RSAFE,
+    SPIN_TAYLOR_RK_MAX, _taylor_rot_schedule, _cpu_spin_rk,
     _apply_ddi_rotation!, apply_spin_mixing_step!, spin_matrices
 
 # Run `f` with the Taylor path forced on/off, restoring the flag afterwards.
@@ -39,6 +40,8 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
     n = (6, 6, 6)
     Ns = prod(n)
 
+    # The angle halving has its OWN assertion below (`SPIN_TAYLOR_RSAFE is what
+    # halves`), because this sweep does not gate it — see the note there.
     @testset "DDI rotation (F=$F, IT=$it, amp=$amp)" for F in (1, 2, 6),
         it in (false, true), amp in (0.01, 1.0, 30.0)
 
@@ -47,7 +50,7 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
         rng = MersenneTwister(11 + F + (it ? 3 : 0) + round(Int, 100amp))
         psi0 = randn(rng, ComplexF64, n..., D)
         # `amp` sweeps R = dt·|Φ|·F from deep inside the production range
-        # (0.01–0.2) to far past `SPIN_TAYLOR_RSAFE[]`, where every voxel halves
+        # (0.01–0.2) to far past `SPIN_TAYLOR_RSAFE`, where every voxel halves
         # its angle and applies it repeatedly.
         px = amp .* randn(rng, Float64, n...)
         py = amp .* randn(rng, Float64, n...)
@@ -128,5 +131,53 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
             # the threading itself costs a small fixed amount.
             @test bytes < 20_000
         end
+    end
+
+    # `SPIN_TAYLOR_RSAFE` is a `Ref`, not a const. Cutover step 4 on this branch
+    # froze it and pinned the bare values here; #307 then measured that the
+    # premise for freezing the sibling tolerance was three orders wrong, so
+    # origin/main's `Ref` form is what survived the merge and these reads are
+    # dereferenced again. The canary for the freeze — set it to 1e30 so no voxel ever halves —
+    # left this whole file GREEN. The `amp` sweep above says in its own comment
+    # that it goes "far past SPIN_TAYLOR_RSAFE, where every voxel halves"; the
+    # voxels do halve, but nothing here DEPENDS on it. Measured: the largest
+    # angle the sweep reaches is R = 8.17 (F=6, IT=false, amp=30), where an
+    # unhalved degree-40 Horner still has backward error R^40/40! = 3.8e-12,
+    # inside the 1e-10 threshold. Pushing to amp = 45 does not fix it either —
+    # R only reaches 9.98 and the aggregate rel-norm stays at 1.1e-14, because
+    # one bad voxel in 216 is diluted by the norm.
+    #
+    # So the halving is asserted where it is decided, on the schedule itself.
+    # Values are PINNED, not read back from the thing under test: at R = 8.17
+    # with rsafe = 1.0 the schedule must halve 4 times and land at R·h = 0.511.
+    @testset "SPIN_TAYLOR_RSAFE is what halves" begin
+        # Pinned, so this cannot agree with a value that drifted. 1e-15 and not
+        # 1e-13: #307 made the tighter value the default after measuring that
+        # the tolerance BINDS at production angles (R_max = 1.3e-3…5.4e-2,
+        # degrees 5 through 9), which is the same finding that reverted this
+        # branch's freeze.
+        @test SPIN_TAYLOR_RSAFE[] == 1.0
+        @test SPIN_TAYLOR_TOL[] == 1.0e-15
+        @test SPIN_TAYLOR_RK_MAX == 40
+
+        dt, F, R = 0.01, 6.0, 8.17
+        rk = _cpu_spin_rk(Float64, dt)
+        g = (R / (dt * F))^2 * F^2          # g = |v|²F² with |scale|·|v|·F = R
+        h, sh, kv = _taylor_rot_schedule(
+            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL[]^2, SPIN_TAYLOR_RSAFE[]^2)
+        @test sh == 4                        # it halved, four times
+        @test R * h ≈ 0.510625 rtol = 1e-12  # below rsafe, as the branch promises
+        # 14, not 13. #307 made 1e-15 the default and its commit message says the
+        # tighter tolerance "costs ONE Horner degree" — this is that degree, at
+        # the one angle where the schedule is pinned rather than swept.
+        @test kv == 14                       # and the degree search terminated
+        @test kv < SPIN_TAYLOR_RK_MAX
+
+        # Without halving the same angle needs the whole ceiling and still
+        # misses: this is the number the `amp` sweep could not see.
+        _, sh0, kv0 = _taylor_rot_schedule(
+            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL[]^2, 1.0e60)
+        @test sh0 == 0
+        @test kv0 == SPIN_TAYLOR_RK_MAX
     end
 end

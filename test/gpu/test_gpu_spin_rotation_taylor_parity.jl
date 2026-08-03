@@ -114,7 +114,7 @@ else
         end
     end
 
-    # Above `SPIN_TAYLOR_RSAFE[]` a voxel halves its angle and applies the
+    # Above `SPIN_TAYLOR_RSAFE` a voxel halves its angle and applies the
     # rotation 2^s times. Production R is 0.01-0.2 so that branch never fires
     # there; it is what makes the Taylor path valid at ANY R, which is in turn
     # what lets the degree be chosen on the device with no max|v| read-back.
@@ -138,7 +138,7 @@ else
     # A rotation is unitary; the Taylor truncation must not leak norm at the
     # production angle. (The imaginary-time arm is deliberately not unitary.)
     #
-    # This is also the gate on `SPIN_TAYLOR_TOL[]`. Since the degree is chosen
+    # This is also the gate on `SPIN_TAYLOR_TOL`. Since the degree is chosen
     # PER VOXEL, that tolerance is binding rather than slack — at 1e-9 the drift
     # here is 9.6e-13, at 1e-13 it is 2.2e-16 — so the bound below is set at
     # machine precision on purpose: loosening the tolerance turns it red instead

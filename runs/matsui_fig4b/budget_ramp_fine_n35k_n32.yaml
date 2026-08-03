@@ -27,14 +27,6 @@
 #
 # Everything else is bit-identical to budget_ramp_n35k_n32.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: budget_ramp_fine_n35k
-  grid_n: 32
-
 defaults:
   kind: spinor
   backend: gpu

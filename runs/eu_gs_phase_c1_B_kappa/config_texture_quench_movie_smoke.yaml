@@ -2,7 +2,6 @@
 # takes (full_bdg LHY, DDI, the quench dynamics, the movie analyzer, the JLD2
 # archive the renderer reads) on a coarse grid in a couple of minutes. Useless
 # as physics; the point is that the chain runs to an mp4.
-metadata: {owner: anko, project: Eu151 texture quench movie — smoke}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0}

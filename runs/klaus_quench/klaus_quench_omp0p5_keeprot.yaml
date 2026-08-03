@@ -9,15 +9,6 @@
 #   B quench applied      : true
 #   rotation kept in hold : true
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omp0p5_keeprot
-  rotation_omega: 0.5
-  ddi_on_dynamics: true
-  do_B_quench: true
-  rotation_kept_in_hold: true
-  generator: scripts/validation/klaus_quench_batch2_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu
