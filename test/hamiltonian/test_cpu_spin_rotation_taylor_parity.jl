@@ -167,7 +167,10 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
             g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL[]^2, SPIN_TAYLOR_RSAFE[]^2)
         @test sh == 4                        # it halved, four times
         @test R * h ≈ 0.510625 rtol = 1e-12  # below rsafe, as the branch promises
-        @test kv == 13                       # and the degree search terminated
+        # 14, not 13. #307 made 1e-15 the default and its commit message says the
+        # tighter tolerance "costs ONE Horner degree" — this is that degree, at
+        # the one angle where the schedule is pinned rather than swept.
+        @test kv == 14                       # and the degree search terminated
         @test kv < SPIN_TAYLOR_RK_MAX
 
         # Without halving the same angle needs the whole ceiling and still

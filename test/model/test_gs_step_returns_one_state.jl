@@ -1,4 +1,5 @@
-using Test, SpinorBEC
+using Test
+using SpinorBEC
 using SpinorBEC: _run_step, GroundStateStep, energy_decomposition, total_energy
 
 # The ground-state step must return ONE state.

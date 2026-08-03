@@ -404,14 +404,14 @@ function _run_step(
     gs_lhy_opts = r.lhy_opts
     gs_rf_omega = r.rf_omega
 
-    # Resolved BEFORE the cache branch: the workspace rebuilt on a cache hit is
-    # returned as `ws_prev` for every downstream step, so it must carry the same
-    # physics as the one the solver would have built. These four used to be
-    # resolved below the early return, which silently dropped the tabulated LHY
-    # table, the light shift and the rotating frame from every cache hit.
-    V_trap_for_ls = evaluate_potential(potential, grid)
-    ls_raw = get(p, "light_shift", nothing)
-    gs_light_shift = _parse_light_shift(ls_raw, atom.F, V_trap_for_ls, backend)
+    # The four hoists that used to live here — the light shift, the tabulated
+    # LHY mode and options, and the rotating frame — are the same fix, made
+    # twice. origin/main hoisted them above the cache branch in place; cutover
+    # step 1b moved the whole resolution into `resolve_gs` so `_run_step` and
+    # `yaml_to_model` cannot become two parsers of one physics. `r` above
+    # already carries all four. Re-parsing here would be a second declaration of
+    # the same thing, which is precisely what `test_resolve_gs_is_shared.jl` arm
+    # B forbids, and it reddened on this merge.
     # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
     # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
     # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old

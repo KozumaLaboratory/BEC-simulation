@@ -1,4 +1,6 @@
-using Test, SpinorBEC, YAML, TOML
+using Test
+using SpinorBEC
+using YAML, TOML
 using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpec,
     PotentialSpec, HarmonicSpec, resolve_atom
 

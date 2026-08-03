@@ -33,6 +33,7 @@
 # the declaration that it was deliberate.
 
 using Test
+using SpinorBEC
 using TOML
 
 const _REPO = normpath(joinpath(@__DIR__, "..", ".."))

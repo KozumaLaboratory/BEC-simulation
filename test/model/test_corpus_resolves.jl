@@ -95,14 +95,25 @@ const CD_MU_0 = 1.25663706212e-6
 # purpose — deriving them from the source that produces them would make this
 # gate agree with itself.
 const CORPUS_UNRESOLVED = [
-    # --- :lhy_n_max (22) ---
+    # --- :lhy_n_max (23) ---
+    # Three arrived with origin/main (`#--`, the LHY-mode ablation). Refused for
+    # exactly the documented reason and not by this branch: a tabulated kind with
+    # no `n_max` resolves to `LHYTableOpts.n_max = NaN` ("3 x max|psi_init|^2"),
+    # which would make the table a function of WHICH psi built it, and `LHYSpec`
+    # refuses that. `LHY_none` and `LHY_scalar` in the same directory resolve,
+    # which is the control: the refusal tracks the LHY kind, not the directory.
     (
-        "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.yaml",
+        "runs/lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml",
         :lhy_n_max,
         "needs a resolved n_max",
     ),
     (
-        "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.yaml",
+        "runs/lhy_mode_ablation_reconstructed/LHY_polar_contact.yaml",
+        :lhy_n_max,
+        "needs a resolved n_max",
+    ),
+    (
+        "runs/lhy_mode_ablation_reconstructed/LHY_polar_dipolar.yaml",
         :lhy_n_max,
         "needs a resolved n_max",
     ),

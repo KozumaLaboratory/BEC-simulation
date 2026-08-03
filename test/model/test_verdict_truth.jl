@@ -1,4 +1,6 @@
-using Test, SpinorBEC, JLD2
+using Test
+using SpinorBEC
+using JLD2
 using SpinorBEC:
     MarkerVerdict, VerdictAudit, verify_verdict,
     _VERDICT_ENERGY_RTOL, _VERDICT_GRAD_RATIO

@@ -35,6 +35,7 @@
 # and adding one is a decision someone has to write down here.
 
 using Test
+using SpinorBEC
 using SpinorBEC: CODE_TREE_DIRS
 
 const _REPO = normpath(joinpath(@__DIR__, "..", ".."))
