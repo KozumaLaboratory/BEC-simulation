@@ -32,7 +32,7 @@ using SpinorBEC: _voxel_index
 # Horner, so the two devices cannot drift to different tolerances or a different
 # spin algebra.
 using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_TOL, SPIN_TAYLOR_RSAFE,
-    SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE
+    SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP
 
 include("backend.jl")
 include("gpu_rng.jl")

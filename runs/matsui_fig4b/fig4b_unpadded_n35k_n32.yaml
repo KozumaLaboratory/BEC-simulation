@@ -18,14 +18,6 @@
 #
 # Everything else is bit-identical to fig4b_scan_n35k_n32.yaml.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fig4b_dip_n35k_unpadded
-  grid_n: 32
-
 defaults:
   kind: spinor
   backend: gpu

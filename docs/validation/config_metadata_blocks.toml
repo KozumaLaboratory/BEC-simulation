@@ -61,9 +61,9 @@
 format = 1
 
 [dump]
-configs_with_metadata = 302
-physical_lines = 2107
-distinct_keys = 59
+configs_with_metadata = 321
+physical_lines = 2225
+distinct_keys = 60
 
 # key -> number of configs carrying it
 [dump.key_counts]
@@ -74,12 +74,12 @@ distinct_keys = 59
 "K3_factor" = 36
 "K3_on" = 28
 "K3_per_m_si_value" = 19
-"LHY_kind" = 17
+"LHY_kind" = 22
 "LHY_on" = 28
 "N_atoms" = 15
 "caveat" = 18
 "cell_name" = 73
-"claim_type" = 9
+"claim_type" = 23
 "ddi_on" = 16
 "ddi_on_dynamics" = 33
 "delay_ms" = 3
@@ -90,10 +90,10 @@ distinct_keys = 59
 "expected_phase" = 6
 "gdr_on" = 28
 "generator" = 156
-"grid_n" = 33
+"grid_n" = 47
 "hypothesis" = 1
 "initial_m_sign" = 10
-"ladder_level" = 165
+"ladder_level" = 179
 "lit_anchor" = 3
 "noise_convention" = 45
 "note" = 3
@@ -107,7 +107,8 @@ distinct_keys = 59
 "protocol_kind" = 33
 "protocol_summary" = 16
 "purpose" = 1
-"reference" = 103
+"reconstructs" = 5
+"reference" = 117
 "rot_hold" = 10
 "rot_prep" = 10
 "rot_quench" = 10
@@ -117,9 +118,9 @@ distinct_keys = 59
 "scenario" = 12
 "seed_kind" = 11
 "static_B" = 6
-"suite" = 263
+"suite" = 282
 "t_hold_dim" = 9
-"target" = 19
+"target" = 33
 "target_ms" = 9
 "theta_tilt" = 6
 "variant" = 13
@@ -4045,3 +4046,254 @@ metadata:
   ladder_level: 7
   reference: analytic_K3_uniform_3body_loss_clean_IC
   expected: norm_t_matches_analytic_within_dt_squared'''
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: full_bdg
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_none.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: none
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_polar_contact.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: polar_contact
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_polar_dipolar.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: polar_dipolar
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_scalar.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: scalar
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_dt_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_dt_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_ramp_fine_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_ramp_fine_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_ramp_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_ramp_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/dt_where_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: dt_where_ramp_refined
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_boxscan_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_box_scan_fixed_dx
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_ddikernel_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_ddi_kernel_factorial
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_dtconv_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dt_convergence
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_gsddi_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_gs_ddi_bracket
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_gs_ddi_off
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_natoms_fixed_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_n_atoms_scan_corrected
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_natoms_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_n_atoms_scan
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_theirgrid_n128.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_their_grid_n128
+  grid_n: 128
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_unpadded_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n35k_unpadded
+  grid_n: 32
+
+"""

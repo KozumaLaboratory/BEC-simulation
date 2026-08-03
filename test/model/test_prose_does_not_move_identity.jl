@@ -1,4 +1,4 @@
-using Test, SpinorBEC, YAML
+using Test, SpinorBEC, YAML, TOML
 using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpec,
     PotentialSpec, HarmonicSpec, resolve_atom
 
@@ -100,44 +100,57 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
     end
 
     # ---- arm 4: the harvested configs really are prose-only -----------------
-    # The deletion is only safe because `metadata:` reaches no physics. Assert
-    # that on the real files rather than trusting the harvest script: load a
-    # sample of the configs as they stood BEFORE the harvest and confirm the
-    # only key that left is `metadata`.
-    @testset "harvest removed prose and nothing else" begin
+    # The deletion is only safe because `metadata:` reaches no physics.
+    #
+    # The FIRST version of this arm compared the working tree to `HEAD` with
+    # `git diff --name-only HEAD -- runs/`. That is empty the moment the harvest
+    # is committed, so in CI `sample` came back empty and two assertions failed
+    # — a gate whose subject only exists while the change is uncommitted is a
+    # gate that cannot run where it matters. Rewritten against the artifact
+    # instead of against the diff, so it holds at any git state.
+    @testset "the harvest covers every config, and none still carries prose" begin
         root = normpath(joinpath(@__DIR__, "..", ".."))
         blocks = joinpath(root, "docs", "validation", "config_metadata_blocks.toml")
-        if !isfile(blocks)
-            @test_skip "config_metadata_blocks.toml not present"
+        runs = joinpath(root, "runs")
+        if !isfile(blocks) || !isdir(runs)
+            @test_skip "harvest dump or runs/ not present"
         else
-            gitdir = joinpath(root, ".git")
-            if !ispath(gitdir)
-                @test_skip "not a git checkout"
-            else
-                sample = filter(p -> endswith(p, ".yaml"),
-                    readlines(`git -C $root diff --name-only HEAD -- runs/`))
-                @test !isempty(sample)
-                checked = 0
-                for rel in first(sample, 12)
-                    old_txt = try
-                        read(`git -C $root show HEAD:$rel`, String)
-                    catch
-                        continue
-                    end
-                    new_path = joinpath(root, rel)
-                    isfile(new_path) || continue
-                    old = YAML.load(old_txt)
-                    new = YAML.load_file(new_path)
-                    old isa AbstractDict && new isa AbstractDict || continue
-                    @test setdiff(keys(old), keys(new)) ⊆ Set(["metadata"])
-                    @test isempty(setdiff(keys(new), keys(old)))
-                    # every surviving key is byte-identical
-                    for k in keys(new)
-                        @test new[k] == old[k]
-                    end
-                    checked += 1
-                end
-                @test checked > 0
+            recorded = Set(String(b["path"]) for b in TOML.parsefile(blocks)["block"])
+            @test !isempty(recorded)
+
+            # No config anywhere still carries the key the schema no longer
+            # accepts. This is the property the deletion asserts, stated
+            # directly rather than through a diff.
+            still = String[]
+            for (dir, _, files) in walkdir(runs), f in files
+                (endswith(f, ".yaml") || endswith(f, ".yml")) || continue
+                path = joinpath(dir, f)
+                any(startswith(l, "metadata:") for l in eachline(path)) &&
+                    push!(still, relpath(path, root))
+            end
+            @test isempty(still)
+
+            # The dump is an ARCHIVE, so a recorded path whose config has since
+            # been deleted is correct behaviour, not drift — the block is
+            # exactly what you would want kept. But a WHOLESALE mismatch would
+            # mean the dump describes some other tree, so the exceptions are
+            # named rather than the assertion dropped.
+            #
+            # These two were deleted on origin/main while this branch was only
+            # stripping their `metadata:`; the deletion won the merge.
+            const_deleted = Set([
+                "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.yaml",
+                "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.yaml",
+            ])
+            missing_paths = [p for p in recorded if !isfile(joinpath(root, p))]
+            @test Set(missing_paths) ⊆ const_deleted
+
+            # POSITIVE CONTROL: the scan can actually see a `metadata:` block,
+            # or `isempty(still)` above is satisfied by a broken reader.
+            mktempdir() do d
+                probe = joinpath(d, "probe.yaml")
+                write(probe, "metadata:\n  note: x\npipeline: []\n")
+                @test any(startswith(l, "metadata:") for l in eachline(probe))
             end
         end
     end

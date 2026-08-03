@@ -58,7 +58,7 @@ end
 
 # --- Accuracy contract ---
 #
-# The degree and, above `SPIN_TAYLOR_RSAFE`, the angle halving are decided
+# The degree and, above `SPIN_TAYLOR_RSAFE[]`, the angle halving are decided
 # PER VOXEL inside the kernel from that voxel's own `R = |scale|·|v(r)|·F`.
 # Nothing about the field is needed on the host.
 #
@@ -310,11 +310,11 @@ function _apply_spin_rotation_taylor!(
     threads = 256
     blocks = cld(N, voxels_per_block)
     rk = _get_spin_rk(P, scale)
-    tol2 = T(SPIN_TAYLOR_TOL)^2
-    rsafe2 = T(SPIN_TAYLOR_RSAFE)^2
+    tol2 = T(SPIN_TAYLOR_TOL[])^2
+    rsafe2 = T(SPIN_TAYLOR_RSAFE[])^2
     CUDA.@cuda threads = threads blocks = blocks _spin_taylor_warp_kernel!(
         P, vx, vy, vz, coef.mz, coef.sxu, coef.syu, rk, Int32(SPIN_TAYLOR_RK_MAX),
-        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_DEGREE_CAP_TEST_OVERRIDE[]),
+        tol2, F * F, rsafe2, Int32(SPIN_TAYLOR_DEGREE_CAP[]),
         Val(D), Val(!imaginary_time), src_idx)
     nothing
 end

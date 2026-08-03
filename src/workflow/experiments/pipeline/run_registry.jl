@@ -203,9 +203,26 @@ docs-only commit and the wrong one for anything else.
 """
 function _assert_point_provenance(psi_file::String, env::Dict{String, Any}; verbose::Bool=true)
     get(ENV, "SPINORBEC_ALLOW_STALE_POINTS", "0") == "1" && return nothing
+    # Materialise the two values INSIDE the `do` block. `d["env"]` is a
+    # `JLD2.Group` — a lazy handle into the open file — and `jldopen(…) do`
+    # closes the file when the block returns, so reading a key off it afterwards
+    # throws `ArgumentError: file is closed`. Since `env` is written as a group
+    # (`f["env/$k"] = v`, :684 and :870), that was every call: this function
+    # threw the moment it was actually reached, and the `catch` above is on the
+    # OPEN, not on the reads, so it did not absorb it either.
+    #
+    # It went unnoticed because the only caller was behind `isfile(psi_file)` on
+    # a path no test exercised with a real env group. Composing it with
+    # `admit_payload` (this branch) put it on the live cache-hit path and six
+    # suites went red with `ArgumentError: file is closed`.
     stored = try
         JLD2.jldopen(psi_file, "r") do d
-            haskey(d, "env") ? d["env"] : nothing
+            haskey(d, "env") || return nothing
+            g = d["env"]
+            Dict{String, Any}(
+                "git_hash" => get(g, "git_hash", "unknown"),
+                "git_dirty" => get(g, "git_dirty", true),
+            )
         end
     catch
         nothing

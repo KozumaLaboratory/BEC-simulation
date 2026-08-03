@@ -97,6 +97,18 @@ const ALLOWED = Dict{Tuple{String, String}, String}(
                                                                               5-stage, on BOTH devices and on the ITP path (measured 3.6e-13 over 20 ITP steps). Wants \
                                                                               a declared per-run field; the parity gates on both devices flip it, so it needs an \
                                                                               argument path first",
+    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_TOL") => "[STEP-4, UNFROZEN BY #307] this branch froze it to a const on the stated grounds \
+                                                                          that production R ~ 1e-5 floors the degree at 2 so the tolerance cannot be felt. \
+                                                                          Measured on main: R_max = 1.3e-3…5.4e-2 for Eu F=6, degrees 5 through 9, and the \
+                                                                          degree returns 2 only below R ~ 3e-8 — four orders under the weakest production \
+                                                                          cell. The premise was three orders wrong, so it stays a Ref and stays a \
+                                                                          registered accuracy knob. Gated by test_taylor_tolerance_binds.jl",
+    ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_RSAFE") => "[STEP-4, UNFROZEN BY #307] frozen here alongside SPIN_TAYLOR_TOL and restored \
+                                                                            with it — the two are read by the same schedule and splitting them would leave \
+                                                                            half the schedule declared and half ambient. The halving threshold is asserted \
+                                                                            where it is DECIDED (the schedule) in \
+                                                                            test_cpu_spin_rotation_taylor_parity.jl, because the amp sweep that claims to \
+                                                                            cross it does not actually depend on it",
     ("src/foundation/spinor_utils/spin_rotation_taylor.jl", "SPIN_TAYLOR_DEGREE_CAP") => "[STEP-4] NOT a numerics choice: the positive control for \
                                                                                  test_taylor_tolerance_criterion.jl, whose NegligibleErrorSpec returns :indeterminate \
                                                                                  when the control cannot breach. Freezing it deletes the only control that works. Keep \

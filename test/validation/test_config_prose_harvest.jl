@@ -79,9 +79,19 @@ const PIN_SUITE_ITEMS = Dict(
 )
 
 # The `metadata:` block being deleted, measured on the tree.
-const PIN_MD_BLOCKS = 302
-const PIN_MD_LINES = 2107
-const PIN_MD_KEYS = 59
+# 321, not 302. Nineteen more arrived WITH origin/main while this cutover was
+# deleting the key from the schema — `runs/matsui_fig4b/*` (14) and
+# `runs/lhy_mode_ablation_reconstructed/*` (5). Arm 4 caught them: it asserts
+# that whatever still carries a block on disk is in the dump, "the net may be
+# wider than the cut, never narrower", and the merge made the cut narrower.
+# Left alone they would have been configs whose `metadata:` the schema no longer
+# accepts.
+const PIN_MD_BLOCKS = 321
+const PIN_MD_LINES = 2225
+# 60: the new blocks contributed `reconstructs`. The others (`suite`,
+# `claim_type`, `grid_n`, `ladder_level`, `reference`, `target`, `LHY_kind`)
+# were already in the 59.
+const PIN_MD_KEYS = 60
 
 # Every id, spelled out. This is the set-equality arm and it is deliberately
 # long: an inventory whose membership is summarised rather than listed is an
@@ -167,7 +177,7 @@ const PIN_IDS = Set{String}(
         @test md["dump"]["distinct_keys"] == PIN_MD_KEYS
         @test length(md["dump"]["key_counts"]) == PIN_MD_KEYS
         # Not 45. The cutover plan's estimate was low and the file says so.
-        @test PIN_MD_KEYS != 45
+        @test PIN_MD_KEYS != 45   # the cutover plan estimated 45; it was low then and lower now
         dumped = Set(String(b["path"]) for b in blocks)
         @test length(dumped) == PIN_MD_BLOCKS       # one row per config, no dupes
         for b in blocks

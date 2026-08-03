@@ -133,8 +133,11 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
         end
     end
 
-    # `SPIN_TAYLOR_RSAFE` was frozen from a `Ref` to a const in cutover step 4,
-    # and the canary for that freeze — set it to 1e30 so no voxel ever halves —
+    # `SPIN_TAYLOR_RSAFE` is a `Ref`, not a const. Cutover step 4 on this branch
+    # froze it and pinned the bare values here; #307 then measured that the
+    # premise for freezing the sibling tolerance was three orders wrong, so
+    # origin/main's `Ref` form is what survived the merge and these reads are
+    # dereferenced again. The canary for the freeze — set it to 1e30 so no voxel ever halves —
     # left this whole file GREEN. The `amp` sweep above says in its own comment
     # that it goes "far past SPIN_TAYLOR_RSAFE, where every voxel halves"; the
     # voxels do halve, but nothing here DEPENDS on it. Measured: the largest
@@ -148,16 +151,20 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
     # Values are PINNED, not read back from the thing under test: at R = 8.17
     # with rsafe = 1.0 the schedule must halve 4 times and land at R·h = 0.511.
     @testset "SPIN_TAYLOR_RSAFE is what halves" begin
-        # Pinned, so this cannot agree with a const that drifted.
-        @test SPIN_TAYLOR_RSAFE == 1.0
-        @test SPIN_TAYLOR_TOL == 1.0e-13
+        # Pinned, so this cannot agree with a value that drifted. 1e-15 and not
+        # 1e-13: #307 made the tighter value the default after measuring that
+        # the tolerance BINDS at production angles (R_max = 1.3e-3…5.4e-2,
+        # degrees 5 through 9), which is the same finding that reverted this
+        # branch's freeze.
+        @test SPIN_TAYLOR_RSAFE[] == 1.0
+        @test SPIN_TAYLOR_TOL[] == 1.0e-15
         @test SPIN_TAYLOR_RK_MAX == 40
 
         dt, F, R = 0.01, 6.0, 8.17
         rk = _cpu_spin_rk(Float64, dt)
         g = (R / (dt * F))^2 * F^2          # g = |v|²F² with |scale|·|v|·F = R
         h, sh, kv = _taylor_rot_schedule(
-            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL^2, SPIN_TAYLOR_RSAFE^2)
+            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL[]^2, SPIN_TAYLOR_RSAFE[]^2)
         @test sh == 4                        # it halved, four times
         @test R * h ≈ 0.510625 rtol = 1e-12  # below rsafe, as the branch promises
         @test kv == 13                       # and the degree search terminated
@@ -166,7 +173,7 @@ _relerr(a, b) = norm(vec(a) .- vec(b)) / max(norm(vec(b)), eps())
         # Without halving the same angle needs the whole ceiling and still
         # misses: this is the number the `amp` sweep could not see.
         _, sh0, kv0 = _taylor_rot_schedule(
-            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL^2, 1.0e60)
+            g, rk, SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_TOL[]^2, 1.0e60)
         @test sh0 == 0
         @test kv0 == SPIN_TAYLOR_RK_MAX
     end
