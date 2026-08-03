@@ -32,7 +32,6 @@
 #
 # `dealias` OFF: measured, see config_texture_quench_movie.yaml. With it on this
 # cell loses 94% of its norm in 20 steps.
-metadata: {owner: anko, project: Eu151 texture rotating-field stir movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: false}

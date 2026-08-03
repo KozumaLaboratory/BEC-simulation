@@ -1,5 +1,4 @@
 # single-cell stability probe: FM stretched seed, the failing corner.
-metadata: {owner: anko, project: stability probe}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

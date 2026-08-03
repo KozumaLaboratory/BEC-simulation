@@ -65,6 +65,9 @@ const FAST_TESTS = [
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
     "model/test_artifact_id.jl",
+    # Why `artifact_id` had to stop being `content_id(spec)`: prose participates
+    # in the latter, so harvesting 302 `metadata:` blocks moved 302 names.
+    "model/test_prose_does_not_move_identity.jl",
     # Step 1b. `yaml_to_model` is the resolver from raw YAML to a `Model`;
     # `test_resolve_gs_is_shared.jl` is what keeps it and `_run_step` from
     # becoming two parsers of the same physics; `test_ddi_trunc_radius…` gates
@@ -281,6 +284,14 @@ const CI_EXTRA = [
     # of the A/B/C taxonomy each get one assertion. Resolves one production
     # config, hence ci.
     "validation/test_matsui2025_ref.jl",
+    # Cutover step 6: the harvest of what lived in run-config prose. Set
+    # equality over 300 item ids with every count pinned as a literal, so the
+    # inventory of migrated knowledge cannot silently shrink — plus the arm
+    # asserting the verbatim `metadata:` dump covers every config that still
+    # carries a block, which is what makes the deletion safe by construction
+    # rather than by how carefully the sampling was done. Pure TOML + a
+    # `walkdir` over `runs/`, no solve.
+    "validation/test_config_prose_harvest.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -709,6 +720,9 @@ const _COST = Dict{String, Float64}(
     # canaries), ~10 s for the one `yaml_to_model` on the production Fig. 4B
     # config that makes the type-A claim's evidence a real Stage.
     "validation/test_matsui2025_ref.jl" => 24.0,
+    # Two TOML parses (~5 MB total) plus one `walkdir` over the 429 configs
+    # under `runs/` reading each first line-block. No SpinorBEC call at all.
+    "validation/test_config_prose_harvest.jl" => 5.0,
     # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
     "model/test_yaml_to_model.jl" => 12.0,
     # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to

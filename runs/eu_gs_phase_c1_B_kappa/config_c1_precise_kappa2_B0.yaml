@@ -7,7 +7,6 @@
 # pre-jump softening. 0.0005 step, two bare seeds, newton_polish + tol 1e-9. Grid/box
 # match the other precise runs (box_z=24 >> the compressed z-cloud; if E/mF come out
 # jagged the tighter trap is under-resolved and this needs a finer grid). 17 c1 × 2 κ.
-metadata: {owner: anko, project: Eu151 GS — c1*(κ) tricritical probe (B0, κ=2.0/2.5)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

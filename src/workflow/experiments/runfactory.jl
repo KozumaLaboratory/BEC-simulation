@@ -220,21 +220,24 @@ analyze(steps::Symbol...) = Dict{Any, Any}(
 # === Top-level config assembly ===
 
 """
-    config(pipeline; defaults=nothing, metadata=nothing, dealias=nothing) -> Dict
+    config(pipeline; defaults=nothing, dealias=nothing) -> Dict
 
 Wrap a vector of pipeline-step Dicts (from `ground_state`, `dynamics`,
 `analyze`) into a full YAML-shaped config Dict. `defaults` accepts a
-NamedTuple or Dict mapping to the top-level `defaults:` block; `metadata`
-likewise.
+NamedTuple or Dict mapping to the top-level `defaults:` block.
+
+The `metadata` kwarg was removed in the step-6 cutover along with the schema
+key it wrote: nothing ever read one back, so the DSL could emit provenance
+into a slot that no consumer would ever contradict. Provenance goes where it
+is read — `refs/<source>.toml` through `ref`, the A/B/C taxonomy through
+`Claim`.
 """
 function config(
     pipeline::AbstractVector;
     defaults=nothing,
-    metadata=nothing,
     dealias=nothing,
 )
     out = Dict{Any, Any}()
-    metadata === nothing || (out["metadata"] = _dictify(metadata))
     defaults === nothing || (out["defaults"] = _dictify(defaults))
     dealias === nothing || (out["dealias"] = _dictify(dealias))
     out["pipeline"] = collect(pipeline)

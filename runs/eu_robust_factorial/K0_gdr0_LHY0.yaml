@@ -7,14 +7,6 @@
 #   gdr_on = false
 #   LHY_on = false
 
-metadata:
-  suite: spinorbec_eu_robust_factorial
-  ladder_level: 12
-  K3_on: false
-  gdr_on: false
-  LHY_on: false
-  generator: scripts/validation/eu_robust_factorial_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu                       # CPU at 32³ avoids the per-environment

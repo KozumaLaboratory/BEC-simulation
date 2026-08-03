@@ -5,8 +5,6 @@
 # order parameter is resolution-robust, so the contour SHAPE is faithful while
 # the map stays cheap (~4 GB). Post-process with eu_phase_fingerprint →
 # eu_phase_contour.py for smooth flux-closure / |⟨F⟩| curves.
-metadata: {owner: anko, project: Eu151 GS — dense flux-closure map for smooth contours}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

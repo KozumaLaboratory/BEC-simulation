@@ -97,7 +97,15 @@ Their simulated time series at the Fig. 2C field, 2766 points to t = 40.0014 ms,
 row 1 summing to exactly 50000. Registered so its bytes are pinned: it carries no \
 `measured` quantity here, but it is the locus of the `hold_ms` reconstruction and \
 its cross-consistency with `fig4_theo` is what licenses that reconstruction \
-(gated at < 1 % by test/validation/test_matsui_fig4_dip.jl)."""
+(gated at < 1 % by test/validation/test_matsui_fig4_dip.jl).
+
+Sample spacing, measured off these bytes: 40.0014 ms / 2765 intervals = \
+0.014467 ms. That is what a comparable save cadence on our side has to match, \
+and it is the derivation behind `save.every: 10` in \
+`runs/matsui_fig4b/fig2c_populations_n32.yaml` (10 x dt 0.001 / omega_ref \
+691.1504 = 14.47 us). Recorded here rather than as a hand-typed cadence in the \
+config, so the cadence follows from the sheet instead of being asserted beside \
+it (`docs/validation/config_prose_harvest.toml`, item matsui_ueda-026)."""
 
 # ---------------------------------------------------------------------------
 # MEASURED — Fig. 4B targets. `ref` re-runs `resonance_dip` and refuses a
@@ -308,7 +316,17 @@ A LITERAL Hz input, not derived from |B|^2. Their code has two branches: \
 runs set it to 1.0, so the |B|^2 branch is never taken and the `Ehf = 1.772e9` \
 sitting on their Eu branch — 23-Na's hyperfine splitting, reused — is dead code \
 for these figures. Ours always derives q from |B|^2 and gets 9.6e-7 Hz at 2.6 nT: \
-six orders down, and the gap is worth more than that, hence the cost below."""
+six orders down, and the gap is worth more than that, hence the cost below.
+
+The cost below is `cost_kind = "analytic"`, so here is the arithmetic rather \
+than the assertion: q F_z^2 shifts the m = -6 -> -5 spacing by \
+q[(-5)^2 - (-6)^2] = -11 q, i.e. 11 Hz at q/h = 1 Hz, against the linear scale \
+p/h = 42.315 Hz at the 2.6 nT hold field (`b_field_final_nT`). 11/42.315 = 26 % \
+of the level spacing, and rescaling the resonance position by that fraction is \
+the 0.676 nT. The 11 Hz intermediate is written down because a cost recorded \
+only as its endpoint is a number nobody can re-derive or find wrong; it was \
+carried in nine `runs/matsui_fig4b/*.yaml` headers and nowhere else \
+(`docs/validation/config_prose_harvest.toml`, item matsui_ueda-011)."""
 alternative = 0.0
 alternative_locus = "time.f90:253 — the derived |B|^2 branch, which is what SpinorBEC always does"
 cost = 0.675880
@@ -329,7 +347,24 @@ their spin-dependent energy is half the polarised contact energy BY \
 CONSTRUCTION, and 1/36 is a consequence of that choice at F = 6, not an \
 independent parameter. Their F = 6 model is c0 + c1 only: a2 = a4 = a6 = 0 and \
 cc2 = cc3 = 0 on the Eu branch (time.f90:219-228), so this dataset cannot \
-constrain the six unmeasured Eu scattering channels."""
+constrain the six unmeasured Eu scattering channels.
+
+The cross-check the nine `runs/matsui_fig4b/*.yaml` headers were run against, \
+recorded here because it is the number that closes the mapping and it lived \
+only in prose: with `cc0_eff = 0.5` and `cc1 = cc0/36`, c0 + 36 c1 = 2 c0, so \
+c0 = 4687.266258 / 2 = 2343.633129 — half the constraint value in \
+`N_atoms`'s note. Both sides of the mapping (their two `_eff` knobs, our one \
+`c1_ratio` under the c0 + 36 c1 constraint) land on the same c0, which is what \
+makes `c1_ratio = 1/36` the faithful translation rather than a coincidence \
+(`docs/validation/config_prose_harvest.toml`, item matsui_ueda-009).
+
+Two labels in the tree are wrong about this row and are retracted by it: \
+`runs/barnett_eu_window/*.yaml:30` calls 1/36 a "Matsui best-fit" (79 configs) \
+and `runs/eu151_edh_vs_flower/edh_checkerboard_summary.tex:56` calls it "the \
+experimentally established ratio (Buchachenko et al. antiferromagnetic \
+estimate)". It is neither: it is a modelling construction, read off their \
+source. Whether a Buchachenko estimate exists and what it says is a separate \
+open question — unverified here, not disproved."""
 
 [quantity.a_contact_bohr]
 provenance = "read_off"

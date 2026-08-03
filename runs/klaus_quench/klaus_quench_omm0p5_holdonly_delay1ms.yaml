@@ -4,14 +4,6 @@
 #   weak-field hold starts with NO rotation for first 1.0 ms,
 #   then Ω = -0.5 for remaining 9.0 ms.
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omm0p5_holdonly_delay1ms
-  rotation_omega: -0.5
-  delay_ms: 1.0
-  variant_kind: delay_test
-  generator: scripts/validation/klaus_quench_batch4_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

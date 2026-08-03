@@ -2,11 +2,6 @@
 # Physics: with c0=c1=0, no trap and no DDI, diagonal Zeeman terms only rotate phases.
 # Expected: populations and total magnetization are exactly constant; no spin transfer.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: diagonal_Zeeman_phase_evolution
-  expected: population_invariant
-
 defaults:
   kind: spinor
   backend: cpu

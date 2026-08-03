@@ -16,12 +16,6 @@
 #   - rotating B axis 90° rotates the elongation 90°
 #   - phase remains FM (m=+F or m=-F)
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 2
-  reference: DDI_kernel_axis_flip_test
-  expected: density_elongation_aligns_with_B_axis
-
 defaults:
   kind: spinor
   backend: gpu

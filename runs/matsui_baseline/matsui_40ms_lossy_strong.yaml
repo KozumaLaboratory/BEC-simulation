@@ -3,20 +3,6 @@
 # Goal: upper bracket on the medium K3 probe (factor 100 vs 30).
 # K3 = 100 × Dy proxy = 1.0e-39 m^6/s.
 
-metadata:
-  suite: matsui_baseline
-  variant: loss_on_strong
-  ladder_level: 12
-  reference: Matsui_2026_Science_arxiv_2504_17357
-  target: 40ms_dynamics_lossy_strong
-  grid_n: 64
-  K3_factor: 100.0
-  K3_per_m_si_value: 1.0e-39
-  caveat: |
-    Phenomenological K3 only — no γ_dr, no LHY. Pair with _medium.
-    Together the two strengths bracket the expected experimental
-    loss rate at the Matsui parameter set.
-
 defaults:
   kind: spinor
   backend: gpu

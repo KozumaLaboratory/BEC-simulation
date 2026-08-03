@@ -3,12 +3,6 @@
 # implementation reproduces the analytic n(t) = n0 / sqrt(1 + 2 K3 n0² t)
 # in a uniform box (no trap, no DDI, no contact, no LHY).
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 7
-  reference: analytic_K3_uniform_3body_loss
-  expected: n_t_equals_n0_over_sqrt_one_plus_2K3_n0sq_t
-
 defaults:
   kind: spinor
   backend: gpu

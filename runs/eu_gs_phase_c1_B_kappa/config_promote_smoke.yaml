@@ -2,8 +2,6 @@
 # local GPU (CPU success ⇏ GPU works). 48³ (even, > 32 so upsample fires),
 # tiny polish budget, physical-Eu c1 at two Bz (checks override bites → E varies)
 # × 2 seeds (checks seed matching + min-E). NOT a physics result.
-metadata: {owner: anko, project: Eu151 GS phase diagram — seed_from smoke}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}

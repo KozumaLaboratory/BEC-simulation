@@ -22,16 +22,6 @@
 # Per-task output: point_<TASK_ID>.jld2  (1..47, NaN-padded to 003 prefix)
 # ============================
 
-metadata:
-  owner: Mitsuki Gotou
-  project: Project A — full DDI symmetric ±120 μG sweep v3 (64³, 47 pts)
-  note: |
-    Full DDI (secular=false) symmetric scan -120..+120 μG, 47 points,
-    dense ±50–70 μG band, 64³ grid. Designed for UGE array submission:
-    each task picks scan.points[SGE_TASK_ID] via SPINORBEC_SCAN_ONLY_INDEX.
-    c1=1/36 (Matsui), thermal=0.40, initial_state=m_minus_F, tol=1e-7 (relative).
-    Uses Nyquist DDI symmetry fix (kx/ky/kz, main @ 091367fd).
-
 defaults:
   kind: spinor
   backend: gpu
