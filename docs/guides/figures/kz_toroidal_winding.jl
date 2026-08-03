@@ -487,7 +487,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
         m === nothing && error("slow mode: slowIofN:nd|full:NTRAJ, got $mode")
         i, n = parse(Int, m[1]), parse(Int, m[2])
         τ_relax = 1 / (1e-2 * KZ_MU0)
-        kz_winding_scan(; tau_Qs=τ_relax .* exp.(0.0:1.0:6.0),
+        # The number-damping case leaves the saturated regime later than the full
+        # one: over 100 … 40343 its residual is 2.3x the propagated error, the
+        # first four points are flat, and only the last three fall. Shifting the
+        # window up by two e-folds rather than trimming points off the bottom —
+        # trimming would be choosing the range from the answer.
+        span = get(ENV, "SBEC_SPAN", "0") == "2" ? (2.0:1.0:8.0) : (0.0:1.0:6.0)
+        kz_winding_scan(; tau_Qs=τ_relax .* exp.(span),
             n_traj=parse(Int, m[4]), M_damp=(m[3] == "full" ? 1e-2 : 0.0),
             dt=0.05, M_grid=256, backend, shard=(i, n), raw_only=true,
             tag="kz_torus_slow$(m[3])_s$(i)of$(n)")
@@ -503,6 +509,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # "merge:nd" / "merge:full" — read every shard's RAW windings, then do the
         # statistics once, on the pooled sample.
         md = split(mode, ":")[2]
+        # `occursin`, not `==`: the tag is "slowfull" for the extended scan, and
+        # comparing exactly printed the full-SPGPE data against the
+        # number-damping reference — a mislabel that flatters or damns the result
+        # by whichever number it happens to grab.
+        is_full = occursin("full", md)
         files = filter(f -> startswith(f, "kz_torus_$(md)_s") && endswith(f, "_raw.csv"),
             readdir(OUTDIR))
         isempty(files) && error("no raw shards for $md in $OUTDIR")
@@ -513,8 +524,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
             push!(get!(byτ, parse(Float64, a_), Float64[]), parse(Float64, b_))
         end
         τs = sort(collect(keys(byτ)))
-        @printf("=== %s, %d shards ===\n", md == "full" ? "FULL SPGPE" : "number-damping",
-            length(files))
+        @printf("=== %s [%s], %d shards ===\n",
+            is_full ? "FULL SPGPE" : "number-damping", md, length(files))
         @printf("%-10s %-6s %-9s %-9s %-9s %-8s %-8s\n",
             "tau_Q", "n", "sigma(W)", "err", "<W>", "z(<W>)", "int(W)")
         σs, es = Float64[], Float64[]
@@ -548,7 +559,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         resid = y .- (ȳ .+ slope .* (x .- x̄))
         β_resid = sqrt(sum(resid .^ 2) / (length(x) - 2) / Sxx)
         β_err = max(β_prop, β_resid)
-        ref = md == "full" ? (0.0966, 0.0128) : (0.1236, 0.0098)
+        ref = is_full ? (0.0966, 0.0128) : (0.1236, 0.0098)
         @printf("\nbeta = %.4f ± %.4f  (propagated %.4f, residual %.4f)\n",
             β, β_err, β_prop, β_resid)
         @printf("published %.4f ± %.4f   ->  %.1f sigma\n",
