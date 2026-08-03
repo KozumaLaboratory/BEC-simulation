@@ -132,13 +132,16 @@ only. Gated by test_taylor_tolerance_criterion.jl, which therefore licenses an \
 energy claim and not a phase-classification one.";
         getter=() -> SPIN_TAYLOR_ENABLED[], setter=v -> (SPIN_TAYLOR_ENABLED[] = v)),
     AccuracyKnob(:spin_taylor_tol, :global, 1.0e-15, 1.0e-15,
-        "Backward-error target for the Taylor degree. INERT at production angles: \
-the degree is floored at 2 and at R ≈ 1e-5 the schedule returns 2 for every \
-tolerance across ten decades, so this cannot change the answer OR the cost here. \
-It shipped at 1e-13 with 1e-15 as the 'reference' — a choice that could only be \
-equal or worse, offered for nothing — so the tighter value is now simply the \
-default and the choice is gone. Still registered because it CAN bind at large \
-rotation angles.";
+        "Backward-error target for the Taylor degree. It BINDS at production \
+angles: measured R_max = 1.3e-3…5.4e-2 for Eu F=6 (theta_max = |c1*dt|*fmax*F), \
+where 1e-13 and 1e-15 give degrees 4 vs 5 through 8 vs 9. This entry used to say \
+'INERT at production angles: the degree is floored at 2 and at R ~ 1e-5 the \
+schedule returns 2' — the 1e-5 was three orders low, and the degree returns 2 \
+only for R below ~3e-8. It shipped at 1e-13 with 1e-15 as the 'reference'; the \
+tighter value is now the default, which costs one Horner degree and buys two \
+decades of backward error. Changing the degree is not the same as changing the \
+observable: the rotation stays ~1e-8 relative, four orders inside the splitting \
+error, so this is a real control on the COST and a negligible one on the ANSWER.";
         getter=() -> SPIN_TAYLOR_TOL[], setter=v -> (SPIN_TAYLOR_TOL[] = v)),
     AccuracyKnob(:dealias_2_3, :global, true, false,
         "Orszag 2/3 filter on ψ and on the bilinear DDI field. NOTE the \
