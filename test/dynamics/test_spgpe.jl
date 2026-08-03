@@ -300,7 +300,9 @@ end
         end
         n0 = norm_sq(ws)
         res = SPGPEReservoir(; T=0.0, mu=mu_res, a_s=0.01, k_cut=6.0,
-            gamma=0.05, energy_damping=false)
+            # Rate chosen for a visible effect in a few steps, not for fidelity:
+            # the derived value here is 1.2e-8 and nothing would move.
+            gamma=0.05, energy_damping=false, allow_unphysical_rates=true)
         for _ in 1:10
             apply_spgpe_step!(ws, res, 0.002; noise=false)
         end
@@ -329,9 +331,30 @@ end
         @test spgpe_rates(off, 0.0).gamma == 0.0
         @test spgpe_rates(off, 0.0).M == 0.0
 
-        fixed = SPGPEReservoir(; T=2.0, mu=1.0, a_s=0.01, k_cut=4.0, gamma=0.3, M=0.4)
+        # An override IS honoured — but only when the caller says the mismatch is
+        # deliberate. 0.3 here is 1.25e6× the derived 2.4e-7, which is fine for a
+        # unit test that wants visible damping in a few steps and is exactly what
+        # a physics run must not be able to do by accident.
+        fixed = SPGPEReservoir(; T=2.0, mu=1.0, a_s=0.01, k_cut=4.0, gamma=0.3, M=0.4,
+            allow_unphysical_rates=true)
         @test spgpe_rates(fixed, 0.0).gamma == 0.3
         @test spgpe_rates(fixed, 0.0).M == 0.4
+
+        # …and without that flag it must not build. gamma was pinned at 0.002 and
+        # 0.02 through an entire Kibble-Zurek scan against a physical 8.2e-4 to
+        # 5.4e-5, which put the reservoir response time at 40-622 while every τ_Q
+        # in the scan was 2-32. Nothing failed: not norm conservation, not GPU/CPU
+        # parity, not one oracle. A fitted rate is invisible unless something
+        # compares it to the derivation.
+        @test_throws ArgumentError SPGPEReservoir(;
+            T=2.0, mu=1.0, a_s=0.01, k_cut=4.0, gamma=0.3, M=0.4)
+        @test_throws ArgumentError SPGPEReservoir(;
+            T=30.0, mu=15.0, a_s=0.01, k_cut=sqrt(90.0), gamma=0.002)
+
+        # The derived value itself must pass, or the gate is just an obstacle.
+        g_ok = spgpe_growth_rate(; T=30.0, mu=15.0, eps_cut=45.0, a_s=0.01)
+        @test SPGPEReservoir(; T=30.0, mu=15.0, a_s=0.01, k_cut=sqrt(90.0),
+            gamma=g_ok) isa SPGPEReservoir
     end
 
     @testset "a FIXED cutoff decouples the reservoir as T falls (the 80³ null result)" begin
@@ -412,7 +435,10 @@ end
         k2 <= kcut^2 && (rj += T / (0.5 * k2 - mu))
     end
 
-    res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut=kcut, gamma=gam, M=0.0)
+    # γ here only has to be fast enough to reach equilibrium in 2400 steps; the
+    # Rayleigh-Jeans population it equilibrates TO is independent of it.
+    res = SPGPEReservoir(; T, mu, a_s=0.01, k_cut=kcut, gamma=gam, M=0.0,
+        allow_unphysical_rates=true)
     fill!(ws.state.psi, 0)
     for s in 1:2400
         apply_spgpe_step!(ws, res, dt; t=0.0, seed=1000 + s)
@@ -459,7 +485,8 @@ end
     # This is the case that made the first combined diagnostic meaningless: it
     # reported 1.4e7 "atoms leaving the C region" when the cutoff-driven flow was
     # identically nothing.
-    noisy = SPGPEReservoir(; T=5.0, mu=1.0, a_s=0.01, k_cut=2.0, gamma=0.01, M=0.0)
+    noisy = SPGPEReservoir(; T=5.0, mu=1.0, a_s=0.01, k_cut=2.0, gamma=0.01, M=0.0,
+        allow_unphysical_rates=true)
     r3 = apply_spgpe_step!(ws, noisy, 0.002; t=0.0, seed=5, noise=true)
     @test r3.noise_truncated > 1e-3 * n0
     @test 0.0 <= r3.cutoff_outflow < 1e-25 * n0
@@ -498,7 +525,8 @@ end
         potential=HarmonicTrap{3}((ω, ω, ω)),
         sim_params=SimParams(; dt, n_steps=1, imaginary_time=false,
             save_every=1, normalize_every=0), fft_flags=FFTW.ESTIMATE)
-    res = SPGPEReservoir(; T, mu, a_s, k_cut, gamma=γ, M=0.0)
+    res = SPGPEReservoir(; T, mu, a_s, k_cut, gamma=γ, M=0.0,
+        allow_unphysical_rates=true)
     fill!(ws.state.psi, 0)
 
     N0 = 0.0
