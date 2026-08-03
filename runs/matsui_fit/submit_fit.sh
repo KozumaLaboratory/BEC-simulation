@@ -7,7 +7,7 @@
 #$ -N matsui_fit
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-46
+#$ -t 1-47
 #$ -j n
 
 set -euo pipefail
@@ -82,6 +82,7 @@ case "${SGE_TASK_ID:-1}" in
     44) CONFIG=runs/matsui_fit/sdloss_1em40.yaml ;;
     45) CONFIG=runs/matsui_fit/sdloss_5em40.yaml ;;
     46) CONFIG=runs/matsui_fit/sdloss_2em39.yaml ;;
+    47) CONFIG=runs/matsui_fit/sdloss_dip.yaml ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 

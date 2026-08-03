@@ -1,0 +1,92 @@
+# スピン依存三体損失を較正値で入れた dip スキャン
+#
+# K3(m != -6) = 2.6e-28 cm^6/s。較正: 単一磁場 40 ms で総原子数の減少が
+# 論文 Appendix D の「トラップ内 26 % / 40 ms」に一致するよう内挿した
+# （1.0e-28 -> 13.6 %、5.0e-28 -> 42.0 %、2.0e-27 -> 69.4 %）。
+# m = -6 の係数は 0、他 12 成分に同値。自由パラメータではない。
+#
+# 棄却基準（起動前に記録、単一磁場での較正 arm から引き継ぎ）:
+#   幅   実験 11.800 +- 0.279、損失なしで 13.140（4.8 sigma）
+#   深さ 実験 0.3148 +- 0.0046、損失なしの dip 最小値 0.2139（21.9 sigma）
+#   合格: 両方 2 sigma 以内 / 部分: 片方 / 棄却: どちらも超過
+#   中心は磁場軸の +-10 nT 系統誤差のため判定に使わない
+#
+# 注意: 較正 arm で B = +2.5 nT 固定の m=-6 割合は損失なしで既に 0.3151 で、
+# 実験の dip 最小値 0.3148 とほぼ一致する。だがそれは別の量（実験の 0.3148 は
+# B ~ -3.4 nT の dip 最小）。同じ量どうしで比べるためにこのスキャンが要る。
+
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: sdloss_dip
+  grid_n: 32
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776   # PAPER-N ARM 1/5
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 50000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776   # PAPER-N ARM 1/5
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      loss:
+        K3_per_m_si: ["2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","2.6e-28 cm^6/s","0.0 cm^6/s"]
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}
