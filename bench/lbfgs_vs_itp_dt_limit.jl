@@ -57,7 +57,14 @@ function itp_at(dt; steps)
     t0 = time()
     gs = find_ground_state(; grid, interactions=eu_interaction_params(C1_RATIO),
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)), psi_init=seed(grid),
-        dt, n_steps=steps, tol=ITP_TOL, tol_drho=1.0e-8, save_every=10^9,
+        # `save_every` is NOT only about saving: `itp_loop.jl:160` gates the
+        # convergence check on `step % sp.save_every == 0`, so the 10^9 used here
+        # to suppress output also suppressed the check — every arm came back
+        # `conv=NO` with `dE=NaN` while its ENERGY matched a previously converged
+        # run to seven digits. A knob named for output silently disabling a
+        # termination test is worth knowing about; 200 is what the other benches
+        # use and what produces a meaningful flag.
+        dt, n_steps=steps, tol=ITP_TOL, tol_drho=1.0e-8, save_every=200,
         verbose=false, COMMON...)
     psi = Array(gs.workspace.state.psi)
     (E=gs.energy, psi=psi, ok=gs.converged, extra=gs.dE, label=@sprintf("ITP dt=%.1e", dt),
