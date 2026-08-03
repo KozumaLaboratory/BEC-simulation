@@ -1,0 +1,119 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# 幅が保持時間の Fourier 限界かを検証（3 本）
+#
+# 理由:
+# #   論文は「The width of the dip can be regarded as the spread in the spatially
+#   distributed dipole field strength」と述べている。実測でも幅は 1/T の 0.28 倍しか
+#   応答せず（5.0 -> 5.4 ms で 12.740 -> 12.459）、Fourier 解釈は成り立たない。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
+# 総発展 5.4 ms、ランプは現行 150 us
+#
+# WHY. The dip width has resisted every parameter tried — dt, ramp shape, ramp
+# knots, grid, DDI kernel, nine values of c1_ratio, atom number, a thermal
+# fraction, and K3 over four decades. It sits at 12.7-13.8 nT against the
+# experiment's 11.800 +- 0.279.
+#
+# It may not be a parameter at all. The Zeeman shift is g_F mu_B / h =
+# 16.28 Hz/nT, so a hold of T = 5 ms has a Fourier width 1/T = 200 Hz =
+# **12.29 nT** — the observed scale. If the dip is Fourier-limited by the hold,
+# its width is set by TIME, and the experiment being narrower means its
+# effective evolution is LONGER than the 5 ms we simulate.
+#
+# The experimenter reports the quench itself takes ~0.2 ms. Reading the 5 ms
+# hold as starting after the quench completes gives 5.2 ms of total evolution.
+#
+# PREDICTIONS, recorded before the run. If width ∝ 1/T exactly, scaling our
+# measured 12.740 at 5.0 ms gives:
+#     5.2 ms -> 12.250 nT   (1.61 sigma from the experiment)
+#     5.4 ms -> 11.796 nT   (0.01 sigma)
+# The naive Fourier value at 5.2 ms is 11.81 nT, which lands on the experiment
+# exactly — the two disagree because our dip is 3.7 % wider than the pure
+# Fourier limit, so the scaling is what has to be measured rather than assumed.
+#
+# If the width does NOT scale as 1/T, the Fourier reading is wrong and the width
+# is something else entirely; that is equally informative and is why the arms
+# are a duration scan and not a single 5.2 ms run.
+#
+# duration = 3.7322122 t.u. = 5.4 ms x 691.1504 ; ramp = 0.1036726 t.u. = 150 us
+# save.every divides the step count exactly.
+
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_hold_T54
+# grid_n: 32
+
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776       # 1/36
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.7322122        # 5.4 ms x 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1036726}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 311
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}

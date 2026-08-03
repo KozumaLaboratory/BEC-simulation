@@ -1,0 +1,107 @@
+# c1_ratio = 0.1111111111111111 at the PAPER's atom number N = 5e4 — arm 3 of 5.
+#
+# Redo of the earlier c1_ratio scan, which ran at N = 3.5e4 (their shipped code's
+# Ntot) and was interpreted against the wrong targets. The paper states the trap
+# held ~5e4 atoms with a negligible thermal component, so 5e4 is the setting for
+# anything experiment-facing.
+#
+# IS c1_ratio FREE? Partly. The paper fixes c0 = 2*pi*hbar^2*a12/M and
+# c1 = (1/18)*pi*hbar^2*a12/M, i.e. r = 1/36, "determined to best reproduce the
+# observed spatial profiles". But the discriminator was the RING COUNT in the
+# m = -4 component: c1 ~ 0 and c1 < 0 give two rings, the experiment shows three.
+# That constrains the sign and the order of magnitude; it does not single out
+# 1/36 among the values that also give three rings. The c0/c1 truncation is
+# itself declared an approximation ("for simplicity"), and six of Eu's seven
+# scattering channels remain unmeasured.
+#
+# WHAT THIS CAN AND CANNOT MEASURE. The dip CENTRE cannot be used: the Fig. 4
+# caption states the field axis carries "an offset error of up to 10 nT", which
+# is 250x the residual the campaign chased. The usable observables are the
+# half-depth WIDTH (experiment 11.800 +- 0.279 on the matched window) and the dip
+# DEPTH (0.3148 +- 0.0046) — both ratios, immune to the field offset.
+#
+# Caveat on the depth: the published theory curve is the IN-SITU population while
+# the experimental points are taken after a 0.1 mT ramp, 2.7 ms expansion,
+# Stern-Gerlach and 16 ms of free fall, and the paper attributes 38 percent of
+# atom loss over 40 ms to spin-dependent three-body collisions this loss-free
+# model does not contain. A depth mismatch is expected and is not a clean
+# constraint on c1.
+#
+# Primary-source parameters: docs/validation/matsui_experiment_parameters.md
+#
+# N_atoms is patched in all three places; c1_ratio in both.
+
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_paperN_r009
+# grid_n: 32
+
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.1111111111111111   # PAPER-N ARM 3/5
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 50000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.1111111111111111   # PAPER-N ARM 3/5
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}
