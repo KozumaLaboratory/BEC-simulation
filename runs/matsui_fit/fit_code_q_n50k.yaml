@@ -1,0 +1,98 @@
+# N = 50000, c1_ratio = 0.027777777777777776、q は |B|^2 から自動導出（q: 行を削除）
+#
+# 同梱コード time.f90 を読んで見つかった 3 件の食い違いのうち 2 件を測る。
+#
+# (1) 二次 Zeeman が固定されている。setup_parameters は
+#         ZeemanQ = 1.d0 !Hz calculate from Bfield shen ZeemanQ=0
+#     と 1 Hz を直接与えており（0 にすれば B^2 から計算する経路がある）、主ループは
+#     ZeemanP だけを更新して ZeemanQ は触らない。だが q = (g_F mu_B B)^2 / E_hf なので、
+#     1.04 uT -> 2.6 nT の 400 分の 1 の変化に対し q は 16 万分の 1 になるはず。
+#     初期磁場での正しい値ですら 0.162 Hz で、1 Hz とは 6 倍違う。保持中の正しい値は
+#     ~1e-6 Hz、すなわち実質ゼロ。campaign の測定では q/h = 1 Hz は m=-6/-5 間隔を
+#     11 Hz 動かし、共鳴位置に直すと 0.68 nT に相当する。
+#
+# (2) c1/c0 が論文と 100 倍違う。NM==6 分岐は
+#         cc1 = cc0 * 1.d-2/36.d0
+#     で実効 c1/c0 = 1/3600。論文本文は c0 = 2*pi*hbar^2*a12/M,
+#     c1 = (1/18)*pi*hbar^2*a12/M すなわち 1/36。我々はこれまで論文側 (1/36) を
+#     使いつつ N は同梱コード側 (3.5e4) を使う混成だった。
+#
+# 3 件目（Ehf = 1.772e9 は Na23 の超微細分裂で Eu のものではない）は、ZeemanQ が
+# 直接与えられているため q の計算に使われず、他に使用箇所も無いので無害。
+#
+# 中心は磁場軸の +-10 nT 系統誤差のため実験比較には使えない。使えるのは幅と深さ、
+# および「彼らの公開曲線をどちらの設定が再現するか」というコード対コードの判定。
+#
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fit_code_q_n50k
+  grid_n: 32
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 50000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 50000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}
