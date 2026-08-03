@@ -1,14 +1,6 @@
 # 96³ anchor — auto-generated for Task #19B operational-transition confirm.
 # K3_factor = 200.0 × Dy proxy = 2.0e-39 m⁶/s.
 # Geometry: cigar (N=30000, ω_z=0.25). LHY off, γ_dr off.
-metadata:
-  suite: eu_k3_sweep_96
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 200.0
-  K3_per_m_si_value: 2.0e-39
-  generator: scripts/validation/eu_k3_sweep_96_gen.jl
-
 defaults:
   kind: spinor
   backend: gpu

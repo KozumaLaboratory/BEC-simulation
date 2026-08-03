@@ -5,12 +5,6 @@
 # match analytic n(t) = n0 / sqrt(1 + 2 K3 n0² t) to high precision
 # (limited by dt² Strang-split error + integration discretisation).
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 7
-  reference: analytic_K3_uniform_3body_loss_clean_IC
-  expected: norm_t_matches_analytic_within_dt_squared
-
 defaults:
   kind: spinor
   backend: cpu

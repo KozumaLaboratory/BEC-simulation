@@ -174,6 +174,21 @@ be removed without removing the rotating-basis path. Buys NO speed — measured 
 0.986× at 32³, i.e. noise, because Q_xx = Q_yy = −Q_zz/2 keeps the kernel a \
 3-component convolution with all 6 FFTs. Choose it for the physics or not at all.";
         approx_rel_cost=0.986),
+    # A WITHDRAWN CLAIM, kept as a note because the mistake is instructive.
+    #
+    # I recorded here that `:none` "diverges at the production shape", from runs at
+    # `c1_ratio = −0.05` that returned NaN. That ratio is not a production point:
+    # the constraint `c₀ + F²c₁ = c_total` with `c₁ = r·c₀` gives
+    # `c₀ = c_total/(1 + 36r)`, which flips c₀ NEGATIVE for `r < −1/36 ≈ −0.0278`.
+    # At r = −0.05 the couplings are c₀ = −5859 and c₁ = +293 — an ATTRACTIVE
+    # density interaction, so the collapse is trivial and has nothing to do with
+    # the LHY or the spin channel. `runs/eu_gs_phase_c1_B_kappa` scans
+    # r ∈ [−0.024, +0.048] and says in its own header that it stays above the
+    # singularity; I picked a value outside it without reading that.
+    #
+    # So `:none` is NOT known to fail at any production point, and the real
+    # production side — c₀ > 0 with c₁ < 0, i.e. r ∈ (−1/36, 0) — remains
+    # unmeasured.
     AccuracyKnob(:spinor_lhy, :per_run, :full_bdg, :none,
         "LHY functional. The closed forms assume a fixed ansatz — \
 polar_two_channel is ~1 % off at F=2 and 30-70 % off at F=6. full_bdg is the \
@@ -190,6 +205,50 @@ used for the whole cloud: ~5 % on converged weak-field Eu textures with a SIGN \
 that flips along a B-scan. SpatialLHY cuts that to 0.8 % and removes the flip, \
 at 1.8× in the diagonal step; its own residual is measurable via \
 spatial_lhy_residual and should be quoted with any result using it."),
+    # THE ONE THAT DOMINATES, and it was missing from this list entirely while ten
+    # knobs at the 1e-3..1e-13 level sat in it.
+    #
+    # ITP is a gradient flow with DISCRETE NORMALIZATION (GFDN, Bao & Du 2004),
+    # and that is a FIRST-order time splitting of the continuous flow: the descent
+    # substep and the normalization substep do not commute, so decoupling them
+    # costs O(Δt) — in the CONVERGED state, not merely per step. Strang's second
+    # order does not apply; it comes from time-symmetry, which imaginary time plus
+    # a projection every step does not have.
+    #
+    # Measured, Eu F=6 64³ and 96³, converged to dE ≈ 1e-10, against separate-at-
+    # dt/4 (`bench/itp_fused_chain_accuracy.jl`), density / energy:
+    #
+    #     dt   = 2e-3   2.4e-2 / 4.0e-4      ← the shipped value
+    #     dt/2 = 1e-3   8.4e-3 / 8.3e-5
+    #
+    # The halving ratio is 2.90. Against a dt/4 reference a p-th order scheme
+    # gives `2^p + 1`, so that is p ≈ 0.93 — first order, as the theory says, and
+    # NOT the 4 an earlier version of the bench compared it to.
+    #
+    # So the converged ground state carries ~2 % density error at the shipped dt,
+    # which is 5× the ddi_pad_factor residual, 10¹⁰ × the spin_taylor one, and the
+    # reason those were the wrong things to have been optimising. And because it
+    # is FIRST order, 10× the accuracy costs 10× the steps — there is no cheap
+    # refinement here.
+    #
+    # NOT FIXABLE BY A SMALLER dt ALONE, if the aim is accuracy per unit cost: the
+    # scheme's order is the ceiling. Liu & Cai 2021 (SIAM J. Sci. Comput.,
+    # 10.1137/20M1328002) restore the Lagrange multiplier to the flow (GFLM) and
+    # show that GFDN is additionally *inaccurate* — converging to a dt-dependent
+    # solution — for multicomponent BECs with TWO OR MORE constraints, with spin-1
+    # as their worked example. This code has that shape whenever
+    # `target_magnetization` is set. No `runs/` YAML sets it today, so production
+    # is in the single-constraint case, but the DSL and LBFGS paths reach it.
+    AccuracyKnob(:dt, :per_run, 5.0e-4, 2.0e-3,
+        "ITP time step. THE DOMINANT accuracy term and first order, because ITP is \
+a gradient flow with discrete normalization whose descent and normalization \
+substeps do not commute (Bao & Du 2004). Measured on the CONVERGED state at Eu \
+F=6, 64³ and 96³: 2.4e-2 density error at the shipped 2e-3, 8.4e-3 at 1e-3, \
+ratio 2.90 ⇒ p ≈ 0.93. Ten times the accuracy costs ten times the steps. Every \
+other knob in this list is between 5× and 1e10× smaller.";
+        accepted_error=2.4e-2,
+        ladder=[(value=2.0e-3, rel_error=2.4e-2, rel_cost=1.0),
+            (value=1.0e-3, rel_error=8.4e-3, rel_cost=2.0)]),
     AccuracyKnob(:dtype, :per_run, Float64, Float64,
         "Mixed precision. `f32` (rotating_basis only) halves ψ traffic; scalar \
 locks stay F64. Not used by default."),
@@ -208,6 +267,31 @@ all of them afterwards (including on exception).
 This covers the global knobs ONLY. The `:per_run` entries live in the config and
 must be set there; `accuracy_report()` lists them with their reference values so
 the gap is visible rather than assumed away.
+
+**[KNOWN-GAP] Around `run_yaml`, this can produce the degeneracy it exists to
+detect.** Both remaining `:global` knobs fail to reach the artifact id, for two
+different reasons:
+
+  * `:spin_taylor` is in no `Stage` at all — measured `:blind` by
+    `test/model/test_ambient_refs_vs_artifact_id.jl`;
+  * `:dealias_2_3` IS in the id (via `GridSpec`), but `_run_yaml_prepare` applies
+    the config's own top-level `dealias:` block AFTER the reference flip
+    (`run_registry.jl:273`), overwriting it. 75 committed configs carry that
+    block, 71 of them with `enabled: true`.
+
+So a reference-accuracy run of such a config resolves to the SAME id as the
+production run and can be served the production artifact — the instrument built
+to detect a degenerate measurement producing one. Measured, with a positive
+control isolating the block as the cause (byte-identical config either way, one
+line added):
+
+    no `dealias:` block         plain 11e53da610dc4b84  ref 235481a1f7f86e4e  MOVED
+    `dealias: {enabled: false}` plain 11e53da610dc4b84  ref 11e53da610dc4b84  SAME
+
+Until the dealias pair stops being ambient (cutover step 4 has not landed that
+half), use `with_reference_accuracy` around DIRECT solver calls, or compare the
+two runs' outputs rather than trusting that two ids differ. Pinned by
+`test/workflow/validation/test_accuracy_knobs.jl` so the fix is a visible diff.
 """
 function with_reference_accuracy(f)
     globals = filter(k -> k.scope === :global, ACCURACY_KNOBS)

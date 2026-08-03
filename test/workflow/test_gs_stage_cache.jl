@@ -1,101 +1,44 @@
-# Automatic content-addressed GS stage cache (SPINORBEC_STAGE_CACHE).
-# The key `_gs_cache_key` must be a pure function of the RESOLVED ground-state
-# physics — stable across configs/analyze blocks, sensitive to real physics
-# changes, and never thrown by the NaN the gs_ddi tuple carries for an unset
-# ddi_trunc_radius. A regression that folds the analyze block / scan into the
-# key (or that throws on non-finite ddi) would silently disable cross-config
-# reuse; these probes flip red on that.
+# The automatic content-addressed GS stage cache (SPINORBEC_STAGE_CACHE).
+#
+# Cutover step 3 flipped the key from `_gs_cache_key` to `artifact_id` and
+# deleted the old function, so this file was split rather than edited:
+#
+#   DIED WITH THE KEY, and moved to `test/model/test_gs_admission_axes.jl` in a
+#   stronger form — the `_hashable` NaN-laundering arms (the recursion is gone;
+#   `content_id` still refuses non-finite floats and `gs_ddi`'s NaN reaches it
+#   through `DDISpec`'s `nothing`-means-auto union instead), key determinism and
+#   format, and the six "sensitive to real physics" probes. Those six are now 31
+#   axes with one assertion each, because the claim they were making — that the
+#   key sees everything the solve sees — was FALSE for eleven inputs and a
+#   six-probe sample could not have found that.
+#
+#   SURVIVED, and is here: everything about the stage cache as a MECHANISM
+#   rather than as a key. The env switches, the store location, the claim that
+#   two configs differing only in their `analyze:` block share one ground state
+#   (this is what the cache is FOR), and the light-point indirection.
+#
+# The insensitivity claim survives in a changed form and is worth stating: the
+# old key read a hand-picked list of sub-blocks out of `p`, so it was insensitive
+# to unknown keys BY CONSTRUCTION. `artifact_id` is built from a `Model` plus a
+# declared parameter set, so it is insensitive to them for a different reason —
+# nothing outside those two is mapped in. The cross-analyze arm below is the
+# end-to-end statement of that, and it is the one that matters.
 
 using Test
 using JLD2
 using SpinorBEC
-using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
-    _light_points_enabled, make_grid, GridConfig, InteractionParams, resolve_atom
+using SpinorBEC:
+    _gs_stage_dir, _stage_cache_enabled, _light_points_enabled,
+    _gs_artifact_id, resolve_gs
 
 @testset "GS stage cache" begin
-    atom = resolve_atom(:Eu151)
-    grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
-    inter = InteractionParams(Dict(0 => 1.0, 1 => 0.03))
-    # gs_ddi tuple carries NaN in slot 6 (unset ddi_trunc_radius) — must not throw.
-    ddi = (true, 1.0, false, false, 0.0, NaN, false, 2.0)
-    p = Dict{String, Any}(
-        "initial_state" => "m_plus_F",
-        "potential" => Dict("type" => "harmonic", "omega" => [1.0, 1.0, 1.0]),
-        "B" => Dict("Bz" => "0.0 Gauss"),
-    )
-    k(; a=atom, g=grid, i=inter, d=ddi, tol=1e-9, ns=2500, dt=1e-3, pp=p) =
-        _gs_cache_key(:lbfgs, a, g, i, d, tol, ns, dt, pp)
-
-    @testset "non-finite ddi is hashable (no throw)" begin
-        @test _hashable(NaN) isa AbstractString
-        @test _hashable(Inf) isa AbstractString
-        @test _hashable(0.03) === 0.03
-        @test (k(); true)                       # NaN in ddi does not throw
-    end
-
-    @testset "determinism + format" begin
-        @test k() == k()
-        key = k()
-        @test key isa AbstractString
-        @test length(key) == 16
-        @test all(c -> c in "0123456789abcdef", key)
-    end
-
-    @testset "sensitivity to real physics" begin
-        @test k(i=InteractionParams(Dict(0 => 1.0, 1 => 0.031))) != k()   # c1
-        @test k(g=make_grid(GridConfig((32, 32, 32), (8.0, 8.0, 8.0)))) != k()  # grid
-        @test k(tol=1e-8) != k()
-        @test k(ns=1500) != k()
-        let p2 = copy(p)
-            p2["initial_state"] = "polar"
-            @test k(pp=p2) != k()                                          # seed
-        end
-        let p3 = copy(p)
-            p3["potential"] = Dict("type" => "harmonic", "omega" => [1.0, 1.0, 0.5])
-            @test k(pp=p3) != k()                                          # κ (ω_z)
-        end
-        let p4 = copy(p)
-            p4["B"] = Dict("Bz" => "6.0e-5 Gauss")
-            @test k(pp=p4) != k()                                          # field
-        end
-    end
-
-    @testset "INSENSITIVE to non-physics (analyze / metadata / cache in p)" begin
-        # The key reads only physics sub-blocks from p; extra keys must not move it.
-        #
-        # `analyze` is the one that matters and this testset did not have it until
-        # 2026-07-30 — the name said "analyze / metadata / cache" while the body
-        # added only `cache` and a note, so folding `analyze` into the key escaped
-        # the mutation harness. Cross-analyze reuse IS covered further down, but
-        # only inside the `SPINORBEC_RUN_HEAVY_YAML` block, which the default suite
-        # does not run. Reusing one ground state across several analyze blocks is
-        # the cache's whole purpose, so it belongs in the cheap row too.
-        let p5 = copy(p)
-            p5["cache"] = "/some/explicit/path.jld2"
-            p5["irrelevant_note"] = "hello"
-            @test k(pp=p5) == k()
-        end
-        let p6 = copy(p)
-            p6["analyze"] = Any[Dict("column_density_movie" => Dict("axis" => 3))]
-            @test k(pp=p6) == k()
-        end
-        let p7 = copy(p)
-            p7["analyze"] = Any[Dict("vortex_extraction" => Dict())]
-            p7["metadata"] = Dict("operator" => "anko", "note" => "rerun for figure 3")
-            @test k(pp=p7) == k()
-        end
-        # Positive control: the two analyze blocks above really do differ, so a
-        # key that folded them in would give three different values.
-        let pa = copy(p), pb = copy(p)
-            pa["analyze"] = Any[Dict("column_density_movie" => Dict("axis" => 3))]
-            pb["analyze"] = Any[Dict("vortex_extraction" => Dict())]
-            @test pa["analyze"] != pb["analyze"]
-        end
-    end
-
     @testset "stage dir + flag env" begin
         withenv("SPINORBEC_STAGE_DIR" => "/tmp/spinorbec_stage_probe") do
             @test _gs_stage_dir() == "/tmp/spinorbec_stage_probe"
+        end
+        # The default location is derived from the store root, not hard-coded.
+        withenv("SPINORBEC_STAGE_DIR" => nothing, "SPINORBEC_STORE" => "/tmp/some_store") do
+            @test _gs_stage_dir() == joinpath("/tmp/some_store", "_stage", "gs")
         end
         withenv("SPINORBEC_STAGE_CACHE" => "1") do
             @test _stage_cache_enabled()
@@ -103,6 +46,47 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
         withenv("SPINORBEC_STAGE_CACHE" => "0") do
             @test !_stage_cache_enabled()
         end
+        withenv("SPINORBEC_LIGHT_POINTS" => "on") do
+            @test _light_points_enabled()
+        end
+        withenv("SPINORBEC_LIGHT_POINTS" => nothing) do
+            @test !_light_points_enabled()
+        end
+    end
+
+    @testset "the id ignores keys that are not inputs to the solve" begin
+        # What the deleted "INSENSITIVE to non-physics" arm was really claiming.
+        # `cache:` names WHERE an artifact goes and an unknown key names nothing
+        # at all; neither changes what is computed, so neither may change the id.
+        # (`cache:` also disables the auto path outright, so it can only be
+        # observed at the id level, which is why it is checked here.)
+        base = Dict{String, Any}(
+            "atom" => "Rb87",
+            "method" => "itp",
+            "grid" => Dict{String, Any}("n" => [16], "box" => [8.0]),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100, "omega_ref" => 100.0, "c0" => 1.0, "c1" => 0.0),
+            "potential" => Dict{String, Any}("type" => "harmonic", "omega" => [1.0]),
+            "initial_state" => "polar",
+            "n_steps" => 20,
+            "dt" => 1.0e-3,
+            "tol" => 1.0e-6,
+        )
+        idof(p) = (q=deepcopy(p);
+            _gs_artifact_id(resolve_gs(q, nothing, nothing, nothing; verbose=false), q))
+        b = idof(base)
+        @test b !== nothing
+
+        noisy = deepcopy(base)
+        noisy["cache"] = "/some/explicit/path.jld2"
+        noisy["irrelevant_note"] = "hello"
+        @test idof(noisy) == b
+
+        # Positive control: the comparison is not trivially true. Moving a knob
+        # that IS an input moves it.
+        moved = deepcopy(base)
+        moved["tol"] = 1.0e-7
+        @test idof(moved) != b
     end
 
     # ── Integration: cross-analyze reuse via run_yaml (heavy; env-guarded) ──
@@ -125,6 +109,8 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
                 """
                 # Two configs identical in physics, differing ONLY in the analyze
                 # block — the GS must be computed once and reused by the second.
+                # This is the whole purpose of a content-addressed stage store,
+                # and it is the property a too-inclusive id would destroy.
                 cfgA = joinpath(dir, "a.yaml");
                 write(cfgA, base("{energy_decomposition: {}}"))
                 cfgB = joinpath(dir, "b.yaml");
@@ -133,10 +119,11 @@ using SpinorBEC: _gs_cache_key, _gs_stage_dir, _hashable, _stage_cache_enabled,
                     # Isolated base_dir per config so the per-point cache (runs/<hash>)
                     # doesn't short-circuit the GS step on a re-run of the suite.
                     run_yaml(cfgA; base_dir=joinpath(dir, "runsA"), verbose=false)
-                    n_after_A = length(readdir(stage))
+                    art(d) = filter(f -> endswith(f, ".jld2"), readdir(d))
+                    n_after_A = length(art(stage))
                     @test n_after_A == 1                        # one GS artifact cached
                     run_yaml(cfgB; base_dir=joinpath(dir, "runsB"), verbose=false)
-                    @test length(readdir(stage)) == n_after_A   # different analyze → NO new GS
+                    @test length(art(stage)) == n_after_A       # different analyze → NO new GS
                 end
             end
         end

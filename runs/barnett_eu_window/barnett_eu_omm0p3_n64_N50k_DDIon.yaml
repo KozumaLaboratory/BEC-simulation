@@ -5,22 +5,6 @@
 # anchor at N=1e4 — together they verify both grid- AND scale-stability
 # of the Barnett recommendation.
 
-metadata:
-  suite: barnett_eu_window
-  variant: omm0p3_n64_N50k_production
-  ladder_level: 0
-  rotating_frame_omega: -0.3
-  ddi_on: true
-  grid_n: 64
-  N_atoms: 50000
-  caveat: |
-    N=5e4 at fixed Ω=-0.3 is the experimental-scale target. Higher N
-    means stronger DDI ⟶ potentially larger Barnett signal but also
-    higher peak densities (collapse pressure increases). If peak ratio
-    stays < 1.5 and Δ⟨F_z⟩/N is order unity, the recommendation
-    Ω/ω_⊥ ≈ -0.3 promotes from "32³ window scan" to "experimentally
-    targeted parameter".
-
 defaults:
   kind: spinor
   backend: cpu   # rotating_frame_omega Coriolis step has scalar indexing on GPU (see memory).

@@ -56,7 +56,6 @@ using JLD2
     end
 
     _cfg_yaml(isp) = """
-    metadata: {owner: test}
     pipeline:
       - ground_state:
           atom: Rb87
@@ -103,7 +102,6 @@ using JLD2
         psi_seeded = run_config(load_config_from_string(
             _cfg_yaml("path: $smooth, snap: last"))).psi
         control_yaml = """
-        metadata: {owner: test}
         pipeline:
           - ground_state:
               atom: Rb87

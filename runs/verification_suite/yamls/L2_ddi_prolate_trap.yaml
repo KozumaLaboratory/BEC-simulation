@@ -11,12 +11,6 @@
 #   - The sign of (E_ddi_on - E_ddi_off) flips with trap aspect ratio
 # Run this together with L2_ddi_oblate_trap.yaml and L2_ddi_spherical_baseline.yaml.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 2
-  reference: DDI_anisotropy_prolate_attractive
-  expected: lower_energy_than_DDI_off_for_cigar_along_B
-
 defaults:
   kind: spinor
   backend: gpu

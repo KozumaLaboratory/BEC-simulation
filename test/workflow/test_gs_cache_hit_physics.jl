@@ -67,19 +67,44 @@ pipeline:
         psi = zeros(ComplexF64, 8, 8, 8, 3)
         psi[:, :, :, 2] .= 1.0
         psi ./= sqrt(sum(abs2, psi) * (4.0 / 8)^3)
+        # The energy written here has to be the energy OF this psi, and the
+        # payload has to carry a completion marker. Both are new requirements
+        # this file predates:
+        #
+        #  * cutover step 2 replaced `isfile(cache_path)` with `admit_payload`,
+        #    which refuses an unmarked payload past its dated cutoff. Without a
+        #    marker this fixture is not admitted at all, so the step recomputes
+        #    — and the four workspace assertions below pass EITHER WAY, because
+        #    a fresh solve also builds LHY, the light shift and the frame. The
+        #    test would have gone on "passing" while measuring nothing.
+        #  * `verify_verdict` re-derives {psi, E} at the stored state, so a
+        #    sentinel energy is a payload whose verdict is false of it. That is
+        #    the defect the check exists for; a fixture must not depend on it.
+        #
+        # So the energy is computed from the psi that is stored, and the hit is
+        # proved by provenance instead of by a planted number.
+        ws_probe = make_workspace(; grid=make_grid(GridConfig{3}((8, 8, 8), (4.0, 4.0, 4.0))),
+            atom=resolve_atom(:Na23), interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.03)),
+            potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            sim_params=SimParams(; dt=1.0e-3, n_steps=1, save_every=1), psi_init=psi)
+        planted_energy = Float64(total_energy(ws_probe))
         jldopen(cache_path, "w") do f
             f["psi"] = psi
-            f["energy"] = -1.234
+            f["energy"] = planted_energy
             f["converged"] = true
         end
+        SpinorBEC.write_complete_marker(cache_path, [cache_path]; kind="ground_state")
 
         _, _, _, ws, step_result = _run_step(
             step, nothing, nothing, nothing, nothing; verbose=false
         )
 
-        # The cache was actually used (no solve happened): the energy is the
-        # one we planted, not one a solver produced.
-        @test step_result[:ground_state_energy] == -1.234
+        # The cache was actually used (no solve happened). Two ways of saying
+        # it, because the first one alone is weak: a fresh solve of this tiny
+        # config could in principle land near the planted value, and the four
+        # workspace assertions below cannot tell a hit from a solve at all.
+        @test step_result[:ground_state_energy] == planted_energy
+        @test String(get(step_result, :ground_state_provenance, "")) in ("marked", "unmarked")
 
         # Each of the four is asserted separately so a future omission names
         # itself instead of failing as one opaque bundle.

@@ -1,0 +1,598 @@
+# Matsui et al. (2025) — the published numbers this repository quotes.
+#
+# `docs/design/research_spec_and_provenance_architecture.md` §2.5. Read by
+# `ref(:matsui2025, :<quantity>)` (`src/model/ref.jl`); gated by
+# `test/validation/test_matsui2025_ref.jl`.
+#
+# THE RULE THIS FILE EXISTS TO ENFORCE. A number taken from a paper is a number
+# that can drift from the paper. So no target here is hand-typed as an authority:
+# a `provenance = "measured"` row names the committed fixture, the metric, and
+# the window, and `ref` RE-RUNS that measurement on every call and refuses the
+# row if the stored `value` disagrees. The stored value is a cross-check, not the
+# source. The other two provenances cannot be re-measured, so they carry their
+# argument instead: `read_off` names the line of the authors' published source it
+# came from, and `reconstructed` — a value the shipped source does NOT contain —
+# additionally names the alternative it was chosen over and what choosing wrong
+# costs, in units and by a stated method.
+#
+# A value without its argument is what this file exists to prevent, so the schema
+# is closed on both sides: an unknown key is an error, and a missing required key
+# is an error. `provenance` decides which keys are required.
+#
+# WHAT IS NOT HERE. Only quantities that are numbers. A convention that is not a
+# number (m ordering, the sign of the Zeeman operator, which Laplacian) is a
+# contract row, not a reference value, and lives in
+# `docs/validation/parameter_contract_with_Ueda.md`. Only ONE paper: this is not
+# a bibliography, and generalising it to a registry before there is a second
+# paper would be inventing the requirement.
+
+format = 1
+
+[paper]
+citation = "K. Matsui, M. Eto, T. Hirano et al., Observation of the Einstein-de Haas effect in a Bose-Einstein condensate"
+journal = "Science"
+year = 2025
+doi = "10.1126/science.adx2872"
+arxiv = "2504.17357"
+# The data and code record. CC-BY-4.0, which is what licenses the CSV extracts
+# under test/fixtures/matsui2025/ being committed here at all.
+data_doi = "10.5281/zenodo.17303925"
+licence = "CC-BY-4.0"
+# Their Fortran (`time.f90`, `initial.f90`, `readme.txt` inside the record's
+# `code.zip`) is the locus of every `read_off` row below. It is NOT committed
+# here — only the CSV data extracts are — so the loci are pinned by content
+# hash. A `read_off` row is re-checkable by `sha256sum` on a fresh download plus
+# one `sed -n '<line>p'`; a `measured` row is re-checkable by running the suite.
+source_sha256_time_f90 = "f39ada8cc20b42f7ef7e136a90b708720d5065c9799c52c41853f474713dec72"
+source_sha256_initial_f90 = "6511f34572a5889ab25b5a301b1ea052c48d83fe181bf8be4435c84be1ce2c77"
+source_sha256_readme_txt = "1c0013e03b6e47fd24bf13defbe9d90c9b26785353ffd1220b1f1fcd82093a6f"
+
+# ---------------------------------------------------------------------------
+# datasets — the bytes a measured quantity is measured off
+# ---------------------------------------------------------------------------
+#
+# `column` is 1-indexed into the CSV: column 1 is the abscissa, columns 2..14 are
+# N_{m} for m = -6 .. +6 ASCENDING in m. That is the mirror of our own layout
+# (`c = 1` is `m = +F`), which is contract row 1.2 — so column 2 is `m = -6`, the
+# source component Fig. 4B plots, and it is column 2 rather than column 14
+# BECAUSE of that relabelling.
+
+[dataset.fig4_theo]
+path = "test/fixtures/matsui2025/dataset_fig4_theo.csv"
+sha256 = "5cd28028a215024ee7785ce07c1cff5bab0894ec9d6d076f2e958611e8df4d41"
+column = 2
+preprocess = ["sort"]
+abscissa = "Magnetic field, B (nT)"
+note = """
+Their SIMULATION, 61 points over [-20, +20] nT, totalling 49999.9 atoms at every \
+field. The grid is NOT uniform: measured step histogram is {0.5 nT: 40 steps, \
+1.0 nT: 20 steps} — 0.5 nT inside [-10, +10] and 1 nT outside. Loss-free \
+(`L3loss = 0` on the Eu branch and `L3loss_eff = 0` globally), so it must not be \
+overlaid on the experimental sheet as though one model produced both."""
+
+[dataset.fig4_exp]
+path = "test/fixtures/matsui2025/dataset_fig4_exp.csv"
+sha256 = "ab1c4fdc9ed7c725e0aea98d8ae76a190a7e47f993d91d890b9098043d28b141"
+column = 2
+preprocess = ["mean_over_repeats"]
+abscissa = "Magnetic field, B (nT)"
+note = """
+Their MEASUREMENT: 227 rows over 61 unique fields spanning [-17.4979, +17.4979] \
+nT, plotted as the per-field mean. The repeat structure is measured, not assumed: \
+{3 repeats: 30 fields, 4: 20 fields, 5: 10 fields, 7: 1 field}. The ten 5-shot \
+fields are the outermost negative ones (-17.4979 .. -12.2485) and the single \
+7-shot field is B = 0, which appears in both halves of the scan. The fixture \
+README's "4 negative / 3 positive" is therefore not the whole structure; it does \
+not bias the per-field mean, but the LEFT baseline is a 5-shot mean while the \
+rest of that side is 4-shot, and the left baseline is what sets `half_left`."""
+
+[dataset.fig2_theo]
+path = "test/fixtures/matsui2025/dataset_fig2_theo.csv"
+sha256 = "7901758ab79b902395f300cfa64fdc7aaaa3d8406ed1a508d6289e489702b064"
+column = 2
+preprocess = ["sort"]
+abscissa = "Time, t (ms)"
+note = """
+Their simulated time series at the Fig. 2C field, 2766 points to t = 40.0014 ms, \
+row 1 summing to exactly 50000. Registered so its bytes are pinned: it carries no \
+`measured` quantity here, but it is the locus of the `hold_ms` reconstruction and \
+its cross-consistency with `fig4_theo` is what licenses that reconstruction \
+(gated at < 1 % by test/validation/test_matsui_fig4_dip.jl).
+
+Sample spacing, measured off these bytes: 40.0014 ms / 2765 intervals = \
+0.014467 ms. That is what a comparable save cadence on our side has to match, \
+and it is the derivation behind `save.every: 10` in \
+`runs/matsui_fig4b/fig2c_populations_n32.yaml` (10 x dt 0.001 / omega_ref \
+691.1504 = 14.47 us). Recorded here rather than as a hand-typed cadence in the \
+config, so the cadence follows from the sheet instead of being asserted beside \
+it (`docs/validation/config_prose_harvest.toml`, item matsui_ueda-026)."""
+
+# ---------------------------------------------------------------------------
+# MEASURED — Fig. 4B targets. `ref` re-runs `resonance_dip` and refuses a
+# disagreement; `value` below is the cross-check, not the authority.
+# ---------------------------------------------------------------------------
+#
+# THE WINDOW IS PART OF THE METRIC, NOT A DETAIL. `resonance_dip`'s `center` is a
+# parabolic vertex through three samples and is invariant to the window (measured:
+# identical to all 12 digits over [-20,20], [-13,9], [-12.5,9], [-13,9.5] and
+# [-12,9]). Its `width` is a half-depth crossing against a per-side ENDPOINT
+# baseline and is therefore defined BY the window: the same simulated curve gives
+# 15.0224 nT over the full published range, 13.0734 over [-13, +9] and 12.7524
+# over [-12.5, +9]. Those are three correct measurements of three different
+# things. A row storing a bare width would be under-determined by 2.3 nT (18 %),
+# which is twice the gap it is used to arbitrate — hence `window` and
+# `window_from` are required, and `quotable_digits` records that the arbitrating
+# widths are good to two significant figures, not four.
+#
+# WHICH ROWS DECIDE, AND WHO GETS TO SAY. `arbitrates` is NOT a key here. It is
+# derived — `isempty(disqualified_by)` — and `disqualified_by` draws from a closed
+# vocabulary (`REF_DISQUALIFIERS` in `src/model/ref.jl`) in which every entry is a
+# property of the REFERENCE: their axis, the window, the metric. A free Bool would
+# be set by whoever can also see how our number compares, which is the approval-
+# testing failure mode — golden tests fail by BLESSING a wrong value — and the
+# shape is visible right here: `dip_minimum_sim_atoms`, the quantity we disagree
+# with MOST, is non-arbitrating. Its grounds are real, but under a free Bool
+# "their counting systematic swamps it" and "we do not like the number" were the
+# same three characters. Naming the systematic separates them.
+
+[quantity.dip_centre_sim_nT]
+provenance = "measured"
+value = -2.549460769257
+units = "nT"
+dataset = "fig4_theo"
+metric = "resonance_dip"
+metric_field = "center"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own simulated curve"
+disqualified_by = []
+quotable_digits = 3
+note = """
+The number a second implementation of the same model has to reproduce. The paper \
+contrasts an analytic -1.5 nT with an observed -3.5 nT and attributes the gap to \
+the gas's dipole field; their own simulation, which contains that field, lands at \
+-2.55 nT, so -2.55 is the code-vs-code target and neither -1.5 nor -3.5 is. \
+Nothing disqualifies it, for the CODE-vs-CODE comparison: the centre is \
+window-invariant (measured identical to 12 digits over five windows, so \
+`window_not_covered` cannot apply) and no experiment enters it, so neither can \
+`axis_offset`."""
+
+[quantity.dip_centre_exp_nT]
+provenance = "measured"
+value = -3.204834206752
+units = "nT"
+dataset = "fig4_exp"
+metric = "resonance_dip"
+metric_field = "center"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own measured scan"
+disqualified_by = ["axis_offset"]
+quotable_digits = 3
+note = """
+`axis_offset`, and that is the point of this row: it exists to be quotable and \
+to be REFUSED as a target. The Fig. 4 caption states the field axis "may contain \
+an offset error of up to 10 nT" — three times the centre itself — so -2.14, \
+-2.55, the measured -3.20 and even the paper's own -1.5 nT analytic estimate are \
+all consistent with this measurement. Any claim that a simulated centre "agrees \
+with experiment" claims more than this axis supports. The disqualifier is a \
+property of THEIR axis, stated in THEIR caption; it does not depend on what our \
+code produces."""
+
+[quantity.dip_width_sim_nT]
+provenance = "measured"
+value = 15.022409842932
+units = "nT"
+dataset = "fig4_theo"
+metric = "resonance_dip"
+metric_field = "width"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own simulated curve"
+disqualified_by = ["window_not_covered"]
+quotable_digits = 3
+note = """
+`window_not_covered`: no SpinorBEC scan spans [-20, +20] nT, and a width \
+measured over a window our runs do not cover is not the same measurement. This \
+is the number six configs under `runs/matsui_fig4b/` quote in their headers as \
+"the target" while the comparison that was actually performed used the \
+scan-window row below — 1.95 nT away, a gap created purely by dropping the \
+window and five times the 0.41 nT centre discrepancy being investigated. Use \
+`dip_width_sim_scanwindow_nT`."""
+
+[quantity.dip_width_exp_nT]
+provenance = "measured"
+value = 14.541355894928
+units = "nT"
+dataset = "fig4_exp"
+metric = "resonance_dip"
+metric_field = "width"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own measured scan"
+disqualified_by = ["window_not_covered"]
+quotable_digits = 3
+note = """
+Full-window counterpart of `dip_width_sim_nT`, and not comparable with it either: \
+the two curves' full windows differ ([-20, +20] against [-17.5, +17.5]), so even \
+the reference-internal simulation/experiment width comparison has to go through \
+the scan-window rows."""
+
+[quantity.dip_width_sim_scanwindow_nT]
+provenance = "measured"
+value = 13.073372787973
+units = "nT"
+dataset = "fig4_theo"
+metric = "resonance_dip"
+metric_field = "width"
+endpoint_baseline = true
+window = [-13.0, 9.0]
+window_from = "our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT"
+disqualified_by = []
+quotable_digits = 2
+note = """
+Their simulation restricted to OUR scan's window, which is the only way the two \
+widths are the same measurement. 42 of their 61 samples fall inside it. \
+Window-sensitivity measured here, so it is not a guess: moving the left edge one \
+sample to -12.5 changes this to 12.7524, i.e. 0.32 nT — hence \
+`quotable_digits = 2`. `parameter_contract_with_Ueda.md` §0.7 carries both \
+numbers and they reproduce to the digit."""
+
+[quantity.dip_width_exp_scanwindow_nT]
+provenance = "measured"
+value = 12.838286496502
+units = "nT"
+dataset = "fig4_exp"
+metric = "resonance_dip"
+metric_field = "width"
+endpoint_baseline = true
+window = [-13.0, 9.0]
+window_from = "our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT"
+disqualified_by = []
+quotable_digits = 2
+note = """
+THE arbitrating number of Fig. 4B, and the reason the width is it: an axis offset \
+shifts a dip, it does not stretch one, so this is the one Fig. 4B quantity immune \
+to the caption's stated 10 nT systematic. It does not favour us — measured on \
+this window against this value, their simulation is +1.8 % and SpinorBEC 32^3 is \
++8.8 %. This is the design document's `dip_width_nT = 12.84`, now carrying the \
+window that makes 12.84 rather than 14.54 the right answer."""
+
+[quantity.dip_minimum_sim_atoms]
+provenance = "measured"
+value = 12287.1975
+units = "atoms in m = -6"
+dataset = "fig4_theo"
+metric = "resonance_dip"
+metric_field = "minimum"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own simulated curve"
+disqualified_by = ["absolute_population"]
+quotable_digits = 5
+note = """
+The depth of the dip, out of 49999.9. Registered because it is the third number \
+in §0.5's table and because it is the quantity behind the one gap that survives \
+every cheap explanation: we move ~20 % more atoms out of m = -6 than they do, at \
+every field. `absolute_population` — it inherits both the atom-number \
+reconstruction below and the experiment's counting systematic. Note what that \
+does NOT say: the disqualifier is about the two systematics, not about the \
+disagreement being large. A row made non-arbitrating BECAUSE we disagree with it \
+is the blessing failure the closed vocabulary exists to prevent."""
+
+[quantity.dip_minimum_exp_atoms]
+provenance = "measured"
+value = 8817.460549602358
+units = "atoms in m = -6"
+dataset = "fig4_exp"
+metric = "resonance_dip"
+metric_field = "minimum"
+endpoint_baseline = true
+window = "full"
+window_from = "the published range of their own measured scan"
+disqualified_by = ["absolute_population"]
+quotable_digits = 4
+note = """
+Deeper than the simulated minimum, but the measured sheet's TOTAL over all 13 \
+components also runs from 49259 down to 25206 across the scan, so this is not a \
+population difference alone. The contract (§"Experimental corrections") reads \
+that deficit as a Stern-Gerlach counting systematic, not loss."""
+
+# ---------------------------------------------------------------------------
+# READ_OFF — literals in the authors' published Fortran. `locus` is `file:line`
+# inside Zenodo 17303925 `code.zip`, against the hashes in [paper] above.
+# ---------------------------------------------------------------------------
+
+[quantity.zeeman_q_Hz]
+provenance = "read_off"
+value = 1.0
+units = "Hz"
+locus = "time.f90:1692 (setup_parameters), branch at time.f90:248-253"
+note = """
+A LITERAL Hz input, not derived from |B|^2. Their code has two branches: \
+`ZeemanQ /= 0` is taken as Hz and merely rescaled to trap units \
+(`ZeemanQ = 2*pi*ZeemanQ/omegaX`, line 251); only `ZeemanQ == 0` computes \
+`q = (gF*muB)^2 (B*1e-7)^2 / (2*pi*hbar^2*Ehf*omegaX)`. The Fig. 2 and Fig. 4 \
+runs set it to 1.0, so the |B|^2 branch is never taken and the `Ehf = 1.772e9` \
+sitting on their Eu branch — 23-Na's hyperfine splitting, reused — is dead code \
+for these figures. Ours always derives q from |B|^2 and gets 9.6e-7 Hz at 2.6 nT: \
+six orders down, and the gap is worth more than that, hence the cost below.
+
+The cost below is `cost_kind = "analytic"`, so here is the arithmetic rather \
+than the assertion: q F_z^2 shifts the m = -6 -> -5 spacing by \
+q[(-5)^2 - (-6)^2] = -11 q, i.e. 11 Hz at q/h = 1 Hz, against the linear scale \
+p/h = 42.315 Hz at the 2.6 nT hold field (`b_field_final_nT`). 11/42.315 = 26 % \
+of the level spacing, and rescaling the resonance position by that fraction is \
+the 0.676 nT. The 11 Hz intermediate is written down because a cost recorded \
+only as its endpoint is a number nobody can re-derive or find wrong; it was \
+carried in nine `runs/matsui_fig4b/*.yaml` headers and nowhere else \
+(`docs/validation/config_prose_harvest.toml`, item matsui_ueda-011)."""
+alternative = 0.0
+alternative_locus = "time.f90:253 — the derived |B|^2 branch, which is what SpinorBEC always does"
+cost = 0.675880
+cost_units = "nT of dip centre"
+cost_kind = "analytic"
+
+[quantity.c1_over_c0]
+provenance = "read_off"
+value = 0.027777777778
+units = "dimensionless"
+locus = "time.f90:283-284 with the `_eff` knobs at time.f90:25, applied at 322 and 326"
+note = """
+`cc0 = 8*pi*Ntot*a0/aHO`, `cc1 = cc0*1e-2/36`, then `cc0 *= cc0_eff = 0.5` and \
+`cc1 *= cc1_eff = 50` — so c1/c0 = (1e-2/36)(50/0.5) = 1/36 exactly, which is our \
+`c1_ratio` default. This is NOT a fit: `readme.txt` line 3 states the design rule \
+the pair encodes — "cc0_eff + cc1_eff/100 = 1 and Esp/E0 = cc1_eff/100" — so \
+their spin-dependent energy is half the polarised contact energy BY \
+CONSTRUCTION, and 1/36 is a consequence of that choice at F = 6, not an \
+independent parameter. Their F = 6 model is c0 + c1 only: a2 = a4 = a6 = 0 and \
+cc2 = cc3 = 0 on the Eu branch (time.f90:219-228), so this dataset cannot \
+constrain the six unmeasured Eu scattering channels.
+
+The cross-check the nine `runs/matsui_fig4b/*.yaml` headers were run against, \
+recorded here because it is the number that closes the mapping and it lived \
+only in prose: with `cc0_eff = 0.5` and `cc1 = cc0/36`, c0 + 36 c1 = 2 c0, so \
+c0 = 4687.266258 / 2 = 2343.633129 — half the constraint value in \
+`N_atoms`'s note. Both sides of the mapping (their two `_eff` knobs, our one \
+`c1_ratio` under the c0 + 36 c1 constraint) land on the same c0, which is what \
+makes `c1_ratio = 1/36` the faithful translation rather than a coincidence \
+(`docs/validation/config_prose_harvest.toml`, item matsui_ueda-009).
+
+Two labels in the tree are wrong about this row and are retracted by it: \
+`runs/barnett_eu_window/*.yaml:30` calls 1/36 a "Matsui best-fit" (79 configs) \
+and `runs/eu151_edh_vs_flower/edh_checkerboard_summary.tex:56` calls it "the \
+experimentally established ratio (Buchachenko et al. antiferromagnetic \
+estimate)". It is neither: it is a modelling construction, read off their \
+source. Whether a Buchachenko estimate exists and what it says is a separate \
+open question — unverified here, not disproved."""
+
+[quantity.a_contact_bohr]
+provenance = "read_off"
+value = 110.0
+units = "Bohr radii"
+locus = "time.f90:226 (variable `a0`)"
+note = """
+The one measured Eu scattering length in their model. Ours stores the same 110 \
+a_B. Naming drift worth knowing: their variable is `a0`, our `AtomSpecies` field \
+is `a0` exported as `a_s`, and `docs/validation/matsui_reproduction_status.md` \
+calls the same quantity `a_12`. Numerically harmless — with a2 = a4 = a6 = 0 only \
+the combination c0 + 36 c1 uses it — but three names for one number. A separate \
+determination exists (135 a_B, Miyazawa 2021 thesis); this row is THEIR 110."""
+
+[quantity.g_F]
+provenance = "read_off"
+value = 1.1628
+units = "dimensionless"
+locus = "time.f90:228"
+note = """
+A 5-digit literal. Ours derives 1.1628166667 from `lande_g_factor(6, 5/2, 7/2; \
+g_J = 1.9934)`. The difference is 1.43e-5 relative and enters linearly in p, so \
+it is equivalent to a 1.43e-5 relative error in B: 3.7e-5 nT at the 2.6 nT \
+working point, four orders below the 0.41 nT gap being investigated."""
+alternative = 1.1628166667
+alternative_locus = "ours: lande_g_factor(6, 5/2, 7/2; g_J = 1.9934) in foundation/"
+cost = 0.0000372
+cost_units = "nT of dip centre"
+cost_kind = "analytic"
+
+[quantity.mass_kg]
+provenance = "read_off"
+value = 2.50741e-25
+units = "kg"
+locus = "time.f90:221"
+note = """
+Their mass is A = 151 u; ours is the isotopic 150.919857 u = 2.506083e-25 kg. The \
+difference is 5.30e-4 relative. It enters c0 + 36 c1 = 4*pi*N*a_s/a_ho with \
+a_ho ∝ m^(-1/2), so the coupling moves by half of that, 2.65e-4 relative — below \
+every effect in §0.7 and recorded so it does not have to be re-derived."""
+alternative = 2.506083e-25
+alternative_locus = "ours: ATOM_REGISTRY[:Eu151], isotopic mass 150.919857 u"
+cost = 0.000265
+cost_units = "relative in c_0 + 36 c_1"
+cost_kind = "analytic"
+
+[quantity.omega_x_Hz]
+provenance = "read_off"
+value = 110.0
+units = "Hz"
+locus = "time.f90:1668, with omegaY = omegaX at time.f90:1684"
+note = """
+The reference frequency: omega_ref = 2*pi*110 = 691.1503838 rad/s. Their trap is \
+`V = (1/4)(x^2 + y^2/aratio_y^4 + z^2/aratio_z^4)` (time.f90:1870); the 1/4 is \
+their aHO = sqrt(hbar/2*m*omega) length unit, not a different trap. Their \
+`time_step = 1e-3` transfers to our `dt` unchanged, because 1/omega_x is the time \
+unit on both sides."""
+
+[quantity.omega_z_Hz]
+provenance = "read_off"
+value = 130.0
+units = "Hz"
+locus = "time.f90:1669"
+note = "omega_z/omega_x = 1.1818181818, which is our `omega: [1, 1, 1.181818]`. Mildly oblate."
+
+[quantity.length_unit_ratio]
+provenance = "read_off"
+value = 1.4142135624
+units = "dimensionless (a_ho / aHO)"
+locus = "time.f90:245"
+note = """
+`aHO = sqrt(hbar/(2*m*omegaX))` — the factor 2 is INSIDE — against our usual \
+`a_ho = sqrt(hbar/(m*omegaX))`. Every length, density and dimensionless coupling \
+differs by a power of sqrt(2), and this is the first transformation to apply \
+before any number crosses between the two codes (contract row 8.1). It is also \
+why their kinetic prefactor is 1 rather than 1/2 and why their trap carries a \
+1/4. `docs/validation/parameter_contract_with_Ueda.md` cites line 244 for this; \
+the assignment is on 245."""
+
+[quantity.b_field_initial_mG]
+provenance = "read_off"
+value = 10.4
+units = "mG"
+locus = "time.f90:1686"
+note = """
+The field the ramp starts from, 1.04 uT. Cross-check on the whole B -> p chain: \
+`Units.bfield_to_p` returns p = -153.87336 here and their `ZeemanP` (time.f90:258, \
+taken because `ZeemanP = -10` is negative, line 1691) is +153.87. The operators \
+agree — ours is `H = -p F_z`, theirs `H = +ZeemanP F_z` — and the intermediate p \
+differs in sign only because we route through Kawaguchi-Ueda's p and they do not. \
+`docs/validation/matsui_reproduction_status.md` line 47 states 1 uT for this; the \
+shipped value is 1.04 uT."""
+
+[quantity.b_field_tau_us]
+provenance = "read_off"
+value = 50.0
+units = "us"
+locus = "time.f90:1688, converted to trap units at time.f90:1740"
+note = """
+Their ramp is EXPONENTIAL and re-evaluated every step: \
+`B(t) = (B_ini - B_fin) exp(-t/tau) + B_fin` (time.f90:1898). Ours uses a 150 us \
+LINEAR stand-in. That substitution is priced by a run, not by argument: \
+`runs/matsui_fig4b/fig4b_theirramp_n32.yaml` puts it at 0.07 nT of centre and \
+0.05 nT of width, against a 0.41 nT gap."""
+
+[quantity.b_field_final_nT]
+provenance = "read_off"
+value = 2.6
+units = "nT"
+locus = "time.f90:1687 (26e-3 mG)"
+note = """
+The Fig. 2C working point, and the knob Fig. 4B scans: `readme.txt` line 4 names \
+line 1687 as the scanned variable in so many words. p/h = 42.315 Hz here at \
+g_F = 1.16282, which is the scale every Zeeman cost above is quoted against."""
+
+[quantity.grid_points]
+provenance = "read_off"
+value = 128.0
+units = "points per axis"
+locus = "time.f90:1671"
+note = "Cubic. Ours ran 32^3 and 64^3; the 64^3 arm agrees with 32^3 to 0.48 % worst-case."
+
+[quantity.dx_aHO]
+provenance = "read_off"
+value = 0.4
+units = "aHO (their length unit — see length_unit_ratio)"
+locus = "time.f90:1672, with dy = dx at 1682"
+note = """
+0.4 aHO = 0.283 a_ho, against a healing length xi = 1/sqrt(mu) ~ 0.28 a_ho — about \
+0.7 points per healing length, where their 3-point finite-difference Laplacian \
+(time.f90:491-500) has a dispersion error that is not small. That is one of the \
+two surviving candidates for the §0.7 gap. UNPRICED AND WORTH RECORDING: 128 x \
+0.4 aHO is a 51.2 aHO = 36.2 a_ho box, and ours is 16 a_ho — 2.26x smaller. The \
+64^3 convergence arm varied dx at FIXED box, so it cannot see a box effect, and \
+the contract discusses dx at length without ever mentioning the box."""
+
+[quantity.pad_factor]
+provenance = "read_off"
+value = 2.0
+units = "dimensionless"
+locus = "time.f90:1679 (`sn = 2`); initial.f90 uses sn = 1"
+note = """
+DDI zero-padding for the dynamics, matching our `pad_factor: 2`. Their GROUND \
+STATE is unpadded, which is a real difference from ours and the only surviving \
+item of contract §0.3.5's second point. They apply no real-space truncation of \
+the kernel and no dealiasing; their k = 0 bin keeps `DD0(0) = -4*pi/3` where ours \
+sets Q(0) = 0, worth an analytically-bounded 5e-3 nT here."""
+
+[quantity.time_step_trap_units]
+provenance = "read_off"
+value = 0.001
+units = "1/omega_x"
+locus = "time.f90:1685"
+note = """
+Their integrator is Crank-Nicolson iterated to self-consistency (`zure <= 1e-10`, \
+time.f90:526), not split-step. Second order either way; the contract's acceptance \
+criteria already allow the method to differ for the energy and H-psi rows."""
+
+[quantity.L3_loss]
+provenance = "read_off"
+value = 0.0
+units = "trap units"
+locus = "time.f90:222 (Eu branch) and time.f90:25 (`L3loss_eff = 0` globally)"
+note = """
+Zero twice over, so the published THEORY curves are strictly loss-free and must \
+not be compared against the experimental sheet as if loss were in both. Their loss \
+term has our `K3_per_m_cubic` shape when enabled. Our own 10x-K3 arm is worth \
+0.07 nT of the 0.41 nT gap, and the real trap loss inferred from their Fig. S3 is \
+0.20 % — the experiment's atom-number deficit is a counting systematic, not loss. \
+`docs/validation/matsui_reproduction_status.md` lines 63-72 still frame that \
+deficit as ~40 % loss; it is contradicted by the contract and is stale."""
+
+[quantity.seed_amplitude]
+provenance = "read_off"
+value = 0.0
+units = "dimensionless"
+locus = "time.f90:1676 — `noise_amp = 5e-2` is assigned and NEVER READ"
+note = """
+Dead code in both files, so their effective seed amplitude is zero and ours is set \
+to match. Physically correct for this problem: the m = -6 -> -5 transfer is DRIVEN \
+by the DDI off-diagonal, not seeded from an instability, so there is nothing for a \
+symmetry-breaking kick to do. The row exists because "the value is 0 because the \
+variable is dead" is a different statement from "the value is 0" and only the \
+first survives someone re-reading the source."""
+
+# ---------------------------------------------------------------------------
+# RECONSTRUCTED — NOT in the shipped source. `alternative` is what the source
+# actually contains; `cost` is what choosing it would have cost.
+# ---------------------------------------------------------------------------
+
+[quantity.N_atoms]
+provenance = "reconstructed"
+value = 50000.0
+units = "atoms"
+locus = "measured off the published data: dataset_fig2_theo row 1 sums to exactly 50000.0 and dataset_fig4_theo to 49999.909 at every field"
+note = """
+The shipped `setup_parameters` does not contain the number behind the published \
+curves, so this is inferred from their own data rather than read. Note what the \
+cost is NOT: 34 % of peak density is 2^(-3/5), the figure for a FACTOR 2 in c_0, \
+and the factor-2 item is the separate `cc0_eff` disagreement between initial.f90 \
+(1.0) and time.f90 (0.5) — which contract §0.3.5 PROVES is degenerate for a \
+polarised m = -F state, since |<F>| = F n makes only c_0 + 36 c_1 enter and \
+`interaction_params_from_constraint` holds that sum fixed. Re-verified here: \
+c1_ratio = 1/36, 0, 0.5 and -0.005 all give c_0 + 36 c_1 = 4687.266258. So there \
+is no ground-state ambiguity to price, `runs/matsui_fig4b/fig4b_gsvariant_n32.yaml` \
+prices a knob the observable is degenerate in and is void, and the 34 % figure \
+still carried by matsui_reproduction_status.md:22-25 belongs to nothing. The real \
+cost of this row is the 1.4286x below."""
+alternative = 35000.0
+alternative_locus = "time.f90:1667 — what setup_parameters actually ships"
+cost = 1.428571428571
+cost_units = "x in c_0 + 36 c_1 (4687.266258 at 5.0e4 against 3281.086380 at 3.5e4)"
+cost_kind = "measured"
+
+[quantity.hold_ms]
+provenance = "reconstructed"
+value = 5.0
+units = "ms"
+locus = "cross-sheet consistency: dataset_fig2_theo at t = 5.006 ms gives N_-6 = 21448.87, and dataset_fig4_theo interpolated to the same +2.6 nT gives 21344.21 — 0.488 % apart"
+note = """
+The Fig. 4B hold time is not in the shipped code at all: `total_time = 0.04 s` \
+(time.f90:1704) is the Fig. 2C duration. Reading "5 ms" off the paper caption \
+would be unverifiable from any committed artifact, so it is reconstructed from the \
+two published sheets agreeing with each other at that time — which is the stronger \
+licence, and is gated at < 1 % by test/validation/test_matsui_fig4_dip.jl. The \
+cost is large and asymmetric: the observable is still falling at 5 ms."""
+alternative = 40.0
+alternative_locus = "time.f90:1704 — `total_time = 0.04 s`, the Fig. 2C duration the shipped code runs"
+cost = 0.843384
+cost_units = "x in N_(m=-6): 18089.64 at 40 ms against 21448.87 at 5 ms, off dataset_fig2_theo"
+cost_kind = "measured"

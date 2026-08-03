@@ -4,8 +4,6 @@
 # GS. residual_polish breaks the √eps gradient floor so the near-degenerate
 # ordering is trustworthy (gate on saved grad_norm).
 #   4 cells × 4 seeds = 16 solves @ 64³.
-metadata: {owner: anko, project: Eu151 GS — deep-converged phase representatives}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}

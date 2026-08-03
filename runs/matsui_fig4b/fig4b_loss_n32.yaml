@@ -39,14 +39,6 @@
 #   B: 10.4 mG ramped to the target with τ = 50 µs, then held; 5 ms total.
 #   Loss-free (their L3loss = 0 AND L3loss_eff = 0).
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fig4b_dip_with_loss
-  grid_n: 32
-
 defaults:
   kind: spinor
   backend: gpu

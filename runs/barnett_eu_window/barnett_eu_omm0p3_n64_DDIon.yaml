@@ -4,20 +4,6 @@
 # 1.318 at Ω/ω_⊥ = -0.3) survives at 64³ — i.e. is not a grid artifact.
 # Same N=1e4 / duration / B-ramp as the 32³ cell so the comparison is direct.
 
-metadata:
-  suite: barnett_eu_window
-  variant: omm0p3_n64_anchor
-  ladder_level: 0
-  rotating_frame_omega: -0.3
-  ddi_on: true
-  grid_n: 64
-  caveat: |
-    Grid-doubling anchor for the 32³ Ω=-0.3 cell. If ΔF_z/N agrees
-    to within ~5%, the recommendation Ω/ω_⊥ ∈ [-0.5, -0.3] for the
-    Klaus/Barnett experimental window hardens. If it diverges, the
-    32³ scan is grid-artifact contaminated and the recommendation
-    must be reset.
-
 defaults:
   kind: spinor
   backend: cpu   # rotating_frame_omega Coriolis step has scalar indexing on GPU (see memory).
