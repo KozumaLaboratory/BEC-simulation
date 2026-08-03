@@ -103,8 +103,34 @@ function main()
     proj(v) = _tangent_project(v, psi, dV, n2)
     rq(v, Hv) = _realdot(v, Hv) * dV / (_realdot(v, v) * dV)
 
+    # Start from the SOFTEST direction L-BFGS already found, not a random one.
+    # The first version started random (q ≈ 60) and after 60 iterations had
+    # reached 1.45 while still falling 8 % per step — it had not even got down
+    # to the sampled 0.18, so it could say nothing, and its fixed-iteration
+    # verdict said "no soft mode" anyway. From the history the question becomes
+    # the one that matters: can the quotient go BELOW what L-BFGS sampled?
     rng = MersenneTwister(20260803)
-    v = proj(randn(rng, ComplexF64, size(psi)))
+    v = let hist = r.lbfgs_history
+        best = nothing
+        bestλ = Inf
+        if hist !== nothing && !isempty(hist[3])
+            s_h, y_h, _ = hist
+            for i in eachindex(s_h)
+                ss = _realdot(s_h[i], s_h[i]) * dV
+                sy = _realdot(s_h[i], y_h[i]) * dV
+                (ss > 0 && sy > 0) || continue
+                λi = sy / ss
+                λi < bestλ && (bestλ = λi; best = s_h[i])
+            end
+        end
+        if best === nothing
+            @printf("  (no usable history pair; starting random)\n")
+            proj(randn(rng, ComplexF64, size(psi)))
+        else
+            @printf("  starting from the softest history direction, λ = %.4e\n\n", bestλ)
+            proj(ComplexF64.(best))
+        end
+    end
     v ./= sqrt(_realdot(v, v) * dV)
 
     # Steepest descent on the Rayleigh quotient: ∇q = 2(Hv − q v)/⟨v,v⟩. The
@@ -156,7 +182,20 @@ function main()
     @printf("  exact axial generator, re-checked here: %.4e  [must stay ~0]\n", λax)
     @printf("  overlap of the minimiser with that exact generator: %.4f\n", ov)
     println()
-    if qv < 0.05
+    # The verdict requires CONVERGENCE, not a step count. The first version
+    # asked only `qv < 0.05` after a fixed 60 iterations and printed
+    # "no such mode found" while the quotient was still falling 8 % per step —
+    # reading a non-converged state as an answer.
+    resid = let w = proj(Hv .- qv .* v)
+        sqrt(_realdot(w, w) * dV)
+    end
+    @printf("  final residual |Hv - qv| = %.3e   (%.1f %% of q)\n", resid,
+        100 * resid / abs(qv))
+    if resid > 0.2 * abs(qv)
+        println()
+        println("  => NOT CONVERGED. The descent is still moving, so this bound is")
+        println("     only where it had got to, not lambda_min. No verdict.")
+    elseif qv < 0.05
         println("  => a mode far softer than anything L-BFGS sampled EXISTS.")
         println("     Conditioning explains the ~600 iterations, and flattening")
         println("     this mode is the lever. Check the overlap above first: a")
