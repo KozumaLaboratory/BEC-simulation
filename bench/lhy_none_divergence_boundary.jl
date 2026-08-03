@@ -31,6 +31,8 @@ const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 32
 # Stepping less keeps every cell rather than thinning the sweep.
 const STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 800
 const DT = 0.002
+const TIMING_LOG = get(ENV, "SPINORBEC_CELL_TIMING",
+    joinpath(get(ENV, "SPINORBEC_GAP_CACHE", tempdir()), "boundary_cell_timing.log"))
 
 "Run a short ITP and report what happened to the state, not whether it converged."
 function probe(; c1_ratio, cdd_scale, lhy)
@@ -103,12 +105,13 @@ for lhy in (:none, :polar_contact)
         for c1 in C1S
             t0 = time()
             st, E = probe(; c1_ratio=c1, cdd_scale=sc, lhy)
-            # PER-CELL timing, printed to stderr so it does not disturb the table.
-            # Two runs died at the wall with the cost unattributed and a fix aimed
-            # at the wrong half; the way to stop guessing is to measure the cell.
-            @printf(stderr, "    cell c1=%+.3f cdd=%.2f lhy=%-14s %6.1f s  %s\n",
-                c1, sc, lhy, time() - t0, st)
-            flush(stderr)
+            # Per-cell timing to a FILE, not to stderr: the job script redirects
+            # `2>&1` into the same pipe, so stderr lands mid-row and mangles the
+            # table it was added to explain.
+            open(TIMING_LOG, "a") do io
+                @printf(io, "cell c1=%+.3f cdd=%.2f lhy=%-14s %7.1f s  %s\n",
+                    c1, sc, lhy, time() - t0, st)
+            end
             # Reclaim per CELL, not per row: seven 32³ padded-DDI workspaces
             # accumulating inside one row is what took maxvmem to 205 G.
             GC.gc(true)
