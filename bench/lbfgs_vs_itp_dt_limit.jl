@@ -123,11 +123,29 @@ println("\n  ITP energies vs dt (must be MONOTONE for the trend to mean anything
 dEs = [r.E for r in itp]
 mono = issorted(dEs) || issorted(dEs; rev=true)
 @printf("    %.8f → %.8f → %.8f   monotone: %s\n", dEs..., mono ? "yes" : "NO")
-# Richardson for a FIRST-order sequence: E(0) ≈ 2·E(h/2) − E(h). First order, not
-# second, because GFDN is a first-order splitting — using the second-order form
-# here would be the same category error as comparing the halving ratio to 4.
-rich = 2 * dEs[3] - dEs[2]
-@printf("    first-order Richardson from the last two: E(dt→0) ≈ %.8f\n", rich)
+# MEASURE the order, do not assume it. This was hard-coded to the first-order form
+# `2E(h/2) − E(h)` on the grounds that GFDN is a first-order splitting — true of
+# the STATE, false of the energy, and the difference is not a detail:
+#
+#     energy differences 0.24059 / 0.06412 → ratio 3.75 → p = 1.91
+#     density order, measured separately             → p = 0.93
+#
+# They agree once the reason is stated: E is STATIONARY at the minimum, so a state
+# error δ costs an energy error O(δ²), and 2 × 0.93 = 1.86 ≈ 1.91. The energy
+# converges at TWICE the order of the state.
+#
+# Assuming p = 1 put E(dt→0) at 770.947 instead of 770.988 and made L-BFGS look
+# 5.6e-5 off the limit when it is 3.2e-6 off — a factor of 17, in the direction
+# that would have reported the prediction as failing.
+p_ord = log2((dEs[1] - dEs[2]) / (dEs[2] - dEs[3]))
+rich = dEs[3] - (dEs[2] - dEs[3]) / (2^p_ord - 1)
+@printf("    measured order p = %.3f  (differences %.5f / %.5f)\n",
+    p_ord, dEs[1] - dEs[2], dEs[2] - dEs[3])
+@printf("    Richardson AT THAT ORDER: E(dt→0) ≈ %.8f\n", rich)
+println("    NB: p ≈ 2 here while the STATE converges at p ≈ 1 — E is stationary")
+println("    at the minimum, so energy error is the square of state error. Energy")
+println("    is therefore a POOR probe of state accuracy: it looks converged")
+println("    while the state it sits on is an order less so.")
 
 println("\n  distance to the ITP dt/4 state")
 @printf("    %-18s %12s %14s\n", "", "ΔE (rel)", "density")
