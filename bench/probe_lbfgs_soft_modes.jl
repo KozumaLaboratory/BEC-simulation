@@ -38,7 +38,7 @@
 
 using SpinorBEC
 using SpinorBEC: constrained_hessian_action, _realdot, CoriolisTerm, apply_operator!,
-    _tangent_project
+    _tangent_project, energy_gradient!
 using Printf
 using Random: MersenneTwister
 
