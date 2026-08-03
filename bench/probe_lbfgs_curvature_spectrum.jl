@@ -41,7 +41,7 @@ using Printf
 include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const GRID_N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 24
-const STAGES = [50, 100, 200, 400, 600]
+const STAGES = collect(50:50:600)
 
 function cell()
     grid = make_grid(GridConfig((GRID_N, GRID_N, GRID_N), (12.0, 12.0, 12.0)))
@@ -73,8 +73,10 @@ function main()
     println("curvature-spectrum probe — Eu151 F=6 $(GRID_N)^3 +DDI")
     println("commit: ", strip(read(`git -C $(joinpath(@__DIR__, "..")) rev-parse --short HEAD`, String)))
     println()
-    @printf("  %6s %5s %11s %11s %11s %11s %10s %10s\n",
-        "step", "pairs", "λ min", "λ med", "λ max", "μ max", "κ", "n_pred")
+    @printf("  %6s %5s %11s %11s %11s %10s %10s %11s\n",
+        "step", "pairs", "λ min", "λ med", "μ max", "κ_sampled", "n_pred", "|grad|")
+    gn = Tuple{Int, Float64}[]
+    ks = Float64[]
 
     for k in STAGES
         r = find_ground_state_lbfgs(; c..., n_steps=k, tol=0.0)
@@ -95,10 +97,42 @@ function main()
         end
         isempty(λ) && (@printf("  %6d   (no positive-curvature pairs)\n", k); continue)
         κ = maximum(μ) / minimum(λ)
-        @printf("  %6d %5d %11.4e %11.4e %11.4e %11.4e %10.3e %10.0f\n",
-            k, length(λ), minimum(λ), q(λ, 0.5), maximum(λ), maximum(μ),
-            κ, predicted_iters(κ))
+        push!(gn, (k, r.grad_norm))
+        push!(ks, κ)
+        @printf("  %6d %5d %11.4e %11.4e %11.4e %10.3e %10.0f %11.4e\n",
+            k, length(λ), minimum(λ), q(λ, 0.5), maximum(μ),
+            κ, predicted_iters(κ), r.grad_norm)
         flush(stdout)
+    end
+
+    # The decay rate, which does NOT depend on which 20 directions the history
+    # happens to hold. |grad| ~ r^k in the asymptotic linear regime, so a
+    # least-squares line through log|grad| gives r, and κ_eff = ((1+r)/(1-r))².
+    #
+    # κ_eff vs κ_sampled is the whole question. Comparable ⇒ the method is
+    # achieving what its spectrum allows and CONDITIONING is the explanation.
+    # κ_eff much larger ⇒ it is converging slower than the spectrum permits,
+    # and the cause is in the method, not the problem.
+    if length(gn) >= 4
+        # Fit over the second half only: the early steps are not in the
+        # asymptotic regime and would flatten the slope.
+        half = gn[(length(gn) ÷ 2):end]
+        xs = Float64[first(p) for p in half]
+        ys = Float64[log(last(p)) for p in half]
+        x̄, ȳ = sum(xs) / length(xs), sum(ys) / length(ys)
+        slope = sum((xs .- x̄) .* (ys .- ȳ)) / sum((xs .- x̄) .^ 2)
+        r = exp(slope)
+        println()
+        if r >= 1 || r <= 0
+            @printf("  decay rate r = %.6f — NOT a contraction over these steps;\n", r)
+            println("  the run is not in an asymptotic linear regime here, so no κ_eff.")
+        else
+            κ_eff = ((1 + r) / (1 - r))^2
+            @printf("  decay rate  r = %.6f  over steps %d..%d\n", r,
+                Int(first(xs)), Int(last(xs)))
+            @printf("  κ_eff = ((1+r)/(1-r))² = %.3e   vs  κ_sampled ≈ %.3e   ratio %.1f\n",
+                κ_eff, q(ks, 0.5), κ_eff / q(ks, 0.5))
+        end
     end
 
     println()
