@@ -267,6 +267,31 @@ all of them afterwards (including on exception).
 This covers the global knobs ONLY. The `:per_run` entries live in the config and
 must be set there; `accuracy_report()` lists them with their reference values so
 the gap is visible rather than assumed away.
+
+**[KNOWN-GAP] Around `run_yaml`, this can produce the degeneracy it exists to
+detect.** Both remaining `:global` knobs fail to reach the artifact id, for two
+different reasons:
+
+  * `:spin_taylor` is in no `Stage` at all — measured `:blind` by
+    `test/model/test_ambient_refs_vs_artifact_id.jl`;
+  * `:dealias_2_3` IS in the id (via `GridSpec`), but `_run_yaml_prepare` applies
+    the config's own top-level `dealias:` block AFTER the reference flip
+    (`run_registry.jl:273`), overwriting it. 75 committed configs carry that
+    block, 71 of them with `enabled: true`.
+
+So a reference-accuracy run of such a config resolves to the SAME id as the
+production run and can be served the production artifact — the instrument built
+to detect a degenerate measurement producing one. Measured, with a positive
+control isolating the block as the cause (byte-identical config either way, one
+line added):
+
+    no `dealias:` block         plain 11e53da610dc4b84  ref 235481a1f7f86e4e  MOVED
+    `dealias: {enabled: false}` plain 11e53da610dc4b84  ref 11e53da610dc4b84  SAME
+
+Until the dealias pair stops being ambient (cutover step 4 has not landed that
+half), use `with_reference_accuracy` around DIRECT solver calls, or compare the
+two runs' outputs rather than trusting that two ids differ. Pinned by
+`test/workflow/validation/test_accuracy_knobs.jl` so the fix is a visible diff.
 """
 function with_reference_accuracy(f)
     globals = filter(k -> k.scope === :global, ACCURACY_KNOBS)

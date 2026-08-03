@@ -16,14 +16,6 @@
 # Estimated wall time: ~10-16 h (27 points x GPU; ITP exits early when converged)
 # ============================
 
-metadata:
-  owner: Mitsuki Gotou
-  project: Project A — full DDI symmetric ±120 μG sweep v2
-  note: |
-    Full DDI (secular=false) symmetric scan -120..+120 μG.
-    v2: DDI Nyquist symmetry fix + relative ITP convergence criterion.
-    c1=1/36 (Matsui), initial_state=m_minus_F, tol=1e-7 (relative). No thermal noise.
-
 defaults:
   kind: spinor
   backend: gpu

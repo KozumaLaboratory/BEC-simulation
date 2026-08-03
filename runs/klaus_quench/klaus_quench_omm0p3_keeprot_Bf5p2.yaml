@@ -4,14 +4,6 @@
 #   B_final = -5.2000000000000004e-5 G (5.2 nT)
 #   keep_rot, m=-F init, DDI on.
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omm0p3_keeprot_Bf5p2
-  rotation_omega: -0.3
-  B_final_nT: 5.2
-  variant_kind: grid_corner
-  generator: scripts/validation/klaus_quench_batch4_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

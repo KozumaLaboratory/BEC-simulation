@@ -1,8 +1,6 @@
 # SMOKE for the c1×κ phase-diagram slices: 2 c1 × 2 κ at B=10µG with pin.
 # Tiny grid / few steps — validates schema (pin + c1/κ product + taller z-box +
 # multi-seed) and that both FM (c1<0) and AFM (c1>0) cells converge. NOT physics.
-metadata: {owner: anko, project: Eu151 GS — c1×κ smoke}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

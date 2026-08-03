@@ -1,13 +1,6 @@
 # Klaus dense Ω scan @ canonical protocol (hold_only, delay=2ms, B=2.6 nT, m=-F).
 # Source: scripts/validation/klaus_omega_dense_gen.jl
 
-metadata:
-  suite: klaus_quench_refine
-  cell_name: klaus_quench_omm0p8_holdonly_delay2ms_refine
-  rotation_omega: -0.8
-  protocol_kind: holdonly_delay2ms
-  generator: scripts/validation/klaus_omega_dense_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

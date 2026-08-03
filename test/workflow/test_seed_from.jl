@@ -91,23 +91,31 @@ using Random
     @test !isapprox(sum(abs2, seed_n) / 16^3, sum(abs2, psi_b) / 8^3; rtol=1e-3)
 end
 
+# `_resolve_pin_block(block, zeeman) -> (closure, eps)` was split by cutover
+# step 3 into `_parse_pin_block(block) -> (kind, eps)` and
+# `_pin_closure(kind, zeeman)`. `pin` selects a BRANCH of the weak-field soft
+# manifold, so it is an input to the artifact id — and a closure cannot be
+# hashed, so the pure parse had to become reachable on its own.
 @testset "pin block resolution" begin
     z = SpinorBEC.ZeemanParams(0.7, 0.02)   # (p, q) dimensionless
 
-    pin, eps = SpinorBEC._resolve_pin_block(
+    kind, eps = SpinorBEC._parse_pin_block(
         Dict{String, Any}("kind" => "transverse",
-            "epsilon_ramp" => [2.0e-3, 5.0e-4]), z)
+            "epsilon_ramp" => [2.0e-3, 5.0e-4]))
     @test eps == [2.0e-3, 5.0e-4]
+    @test kind === :transverse
+    pin = SpinorBEC._pin_closure(kind, z)
     @test pin isa Function
     ov = pin(1.0e-3)                      # ε -> (; zeeman=...)
     @test haskey(ov, :zeeman)             # pin injects a transverse-field zeeman
 
-    # no pin block → inert
-    @test SpinorBEC._resolve_pin_block(nothing, z) == (nothing, Float64[])
+    # no pin block → inert, on both halves
+    @test SpinorBEC._parse_pin_block(nothing) == (nothing, Float64[])
+    @test SpinorBEC._pin_closure(nothing, z) === nothing
     # missing ramp → loud
-    @test_throws ArgumentError SpinorBEC._resolve_pin_block(
-        Dict{String, Any}("kind" => "transverse"), z)
+    @test_throws ArgumentError SpinorBEC._parse_pin_block(
+        Dict{String, Any}("kind" => "transverse"))
     # unsupported kind → loud
-    @test_throws ArgumentError SpinorBEC._resolve_pin_block(
-        Dict{String, Any}("kind" => "trap", "epsilon_ramp" => [1.0e-3]), z)
+    @test_throws ArgumentError SpinorBEC._parse_pin_block(
+        Dict{String, Any}("kind" => "trap", "epsilon_ramp" => [1.0e-3]))
 end

@@ -3,13 +3,6 @@
 # Required for Level 6 grid convergence: 32³ → 48³ → 64³ ladder.
 # If 32 ↔ 48 ↔ 64 all agree on early-time Fz(t), grid is converged.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_Hamiltonian_only_48grid
-  expected: same_qualitative_signature_as_32_and_64
-  noise_convention: rms_rescale_2026_05_22
-
 defaults:
   kind: spinor
   backend: gpu

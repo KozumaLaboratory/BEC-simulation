@@ -3,8 +3,6 @@
 # + a near-transition cell, × 2 seeds. Short ε-ramp + tiny n_steps: checks the
 # pin block parses, builds from the cell's dimensionless p/q, runs the ε rungs,
 # and reports the ε→0 extrapolated energy. NOT a physics result.
-metadata: {owner: anko, project: Eu151 GS phase diagram — seed_from+pin smoke}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}

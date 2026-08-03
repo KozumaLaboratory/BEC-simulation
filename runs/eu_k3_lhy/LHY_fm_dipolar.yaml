@@ -48,14 +48,6 @@
 # but it is a naming lie by this repo's own convention (file name = content) and
 # the next reader will believe the name before the body.
 
-metadata:
-  suite: eu_k3_lhy
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 200.0
-  LHY_kind: fm_dipolar
-  generator: scripts/validation/eu_k3_lhy_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

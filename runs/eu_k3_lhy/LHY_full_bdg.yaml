@@ -35,14 +35,6 @@
 # name matches its content, as the convention requires; the one doc that cited
 # the old path was updated in the same commit.
 
-metadata:
-  suite: eu_k3_lhy
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 200.0
-  LHY_kind: full_bdg
-  generator: scripts/validation/eu_k3_lhy_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

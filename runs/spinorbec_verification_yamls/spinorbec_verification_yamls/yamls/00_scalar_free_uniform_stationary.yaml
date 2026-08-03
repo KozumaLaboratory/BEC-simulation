@@ -2,11 +2,6 @@
 # Physics: F=0, no trap, no interaction, uniform k=0 state.
 # Expected: only a global phase; norm, energy, populations constant to roundoff.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: scalar_GPE_free_uniform
-  expected: stationary_exact
-
 defaults:
   kind: spinor
   backend: cpu

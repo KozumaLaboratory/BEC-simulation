@@ -2,19 +2,6 @@
 # Source: scripts/validation/barnett_week1_gen.jl
 # Ω = 0.3  (rotating-frame angular velocity, in units of ω_ref).
 
-metadata:
-  suite: barnett_week1
-  ladder_level: 0
-  rotating_frame_omega: 0.3
-  generator: scripts/validation/barnett_week1_gen.jl
-  notes: |
-    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
-    Rotating-frame term -Ω·L_z applied in the dynamics step.
-    Validation target:
-      - For Ω = 0: no L_z response.
-      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
-        (Madison-Dalibard critical line; rough estimate).
-
 defaults:
   kind: spinor
   backend: cpu

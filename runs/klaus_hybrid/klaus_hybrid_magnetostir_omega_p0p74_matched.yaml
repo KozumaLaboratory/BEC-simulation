@@ -10,13 +10,6 @@
 # chirality Klaus magnetostir actually produces an orbital state that
 # carries through the B quench to amplify EdH cascade.
 
-metadata:
-  suite: klaus_hybrid
-  cell_name: klaus_hybrid_magnetostir_omega_p0p74_matched
-  rotation_omega: +0.74
-  protocol_kind: hybrid_magnetostir_matched
-  generator: hand-written 2026-05-27
-
 defaults:
   kind: spinor
   backend: cpu

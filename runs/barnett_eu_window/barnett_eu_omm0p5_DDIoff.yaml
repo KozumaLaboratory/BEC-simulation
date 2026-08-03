@@ -2,18 +2,6 @@
 # Source: scripts/validation/barnett_eu_window_gen.jl
 # Ω/ω_ref = -0.5, DDI = false
 
-metadata:
-  suite: barnett_eu_window
-  ladder_level: 0
-  rotating_frame_omega: -0.5
-  ddi_on: false
-  generator: scripts/validation/barnett_eu_window_gen.jl
-  notes: |
-    Eu-151 F=6 in near-isotropic Matsui-like trap.
-    Rotation Ω applied in rotating frame; DDI on/off as origin control.
-    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
-    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).
-
 defaults:
   kind: spinor
   backend: cpu

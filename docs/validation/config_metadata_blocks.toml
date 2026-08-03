@@ -1,0 +1,4299 @@
+# Every `metadata:` block that cutover step 6 deletes, verbatim.
+#
+# `docs/design/unified_spec_architecture.md` cutover step 6. Gated by
+# `test/validation/test_config_prose_harvest.jl`. Judgement lives in the
+# companion `config_prose_harvest.toml`; this file is the mechanical record.
+#
+# WHY BOTH FILES. The harvest is a SAMPLE -- 300 items read by hand out of 429
+# configs -- and a sample is not a licence to delete 302 blocks. Everything
+# removed from a config in this step is reproduced here byte-for-byte, so the
+# deletion is safe by construction rather than by how well the reading went.
+# `git show` would also recover it, but only for someone who already knows the
+# commit; a committed file is recoverable by someone who does not.
+#
+# WHAT WAS DELETED, MEASURED. 302 of 429 configs carried the block, 2,107
+# physical lines of block content (2,395 counting the trailing blank lines the
+# deletion also reclaims), 59 distinct keys. Not the 45 the plan estimated --
+# and five of the 59 are not keys at all but the wreckage of an unquoted comma
+# inside a YAML flow mapping (`project: Eu151 GS - precision c1* (first-order
+# FM/polar, B0 k1)` parses as a truncated `project` plus a null key named
+# `B0 k1)`). Those five have sat in the tree undetected precisely because
+# `metadata:` had no readers, which is the argument for the step in one line.
+#
+# WHY IT COULD GO. Three sites mention the key and none of them READS it:
+# `schema/schema.jl:402` lists it in `TOP_LEVEL_KEYS` so it does not warn,
+# `runfactory.jl:237` lets the DSL write one, and `inspect_checks.jl:48`
+# permits it to be dropped. Nothing in `src/`, `ext/`, `scripts/` or `test/`
+# ever looks a key up. So the block could not be wrong in a way anything would
+# notice -- and it was. Measured across this dump: `generator:` names a `.jl`
+# path in 154 configs, 23 distinct paths, and every one of the 23 is absent
+# from the tree -- each config under a header reading "auto-generated, do not
+# hand-edit", an instruction no longer possible to obey. (The remaining 2 of
+# the 156 say "hand-written", which is the only accurate value the key ever
+# held.)
+#
+# FOUR MORE SITES, OUTSIDE `runs/`, NOT ROWS BELOW. The `[[block]]` rows cover
+# `runs/**` only, which is where a config lives; the key also appeared in YAML
+# embedded in three test files and in one document. They were found by the
+# `fast` tier going red, not by the sweep that wrote this file -- a `grep` over
+# `runs/` cannot see a YAML string inside a `.jl`. Recorded here because "what
+# was deleted" is the claim this file makes, and it would otherwise be four
+# short:
+#
+#   test/workflow/test_spinor_gs_from_jld2.jl  (x2)  decorative, removed
+#   test/workflow/test_run_root_env.jl               decorative, removed
+#   test/workflow/test_schema_validation_edge_cases.jl
+#       NOT decorative: `metadata:` was the filler key in the config that
+#       asserts a MISSING `pipeline:` throws. With the key gone the throw came
+#       from "unknown top-level key" instead and the assertion kept passing
+#       while testing nothing. Replaced with `name:`, which the schema still
+#       recognises. A deletion can weaken a gate without reddening it.
+#   docs/validation/step6_ueda_reference_state/reference_state.yaml
+#       Four real provenance values (suite, ladder_level, reference, origin).
+#       Converted to comments IN THAT FILE rather than dropped -- they are the
+#       only statement of what that reference state is.
+#
+# WHAT IS NOT HERE. The comment prose. That is the larger body (4,673 lines)
+# and it is NOT deleted by this step; see `config_prose_harvest.toml` for what
+# it contains and what each item is waiting on.
+#
+
+format = 1
+
+[dump]
+configs_with_metadata = 321
+physical_lines = 2225
+distinct_keys = 60
+
+# key -> number of configs carrying it
+[dump.key_counts]
+"B0 k1)" = 1
+"B0=100uG)" = 1
+"B_final_nT" = 14
+"FL/CSV/PCV)" = 1
+"K3_factor" = 36
+"K3_on" = 28
+"K3_per_m_si_value" = 19
+"LHY_kind" = 22
+"LHY_on" = 28
+"N_atoms" = 15
+"caveat" = 18
+"cell_name" = 73
+"claim_type" = 23
+"ddi_on" = 16
+"ddi_on_dynamics" = 33
+"delay_ms" = 3
+"do_B_quench" = 33
+"dt_scale" = 10
+"expected" = 76
+"expected_energy_per_particle" = 2
+"expected_phase" = 6
+"gdr_on" = 28
+"generator" = 156
+"grid_n" = 47
+"hypothesis" = 1
+"initial_m_sign" = 10
+"ladder_level" = 179
+"lit_anchor" = 3
+"noise_convention" = 45
+"note" = 3
+"notes" = 19
+"omega_z" = 4
+"origin" = 5
+"owner" = 39
+"parent_regime" = 29
+"parent_search" = 8
+"project" = 39
+"protocol_kind" = 33
+"protocol_summary" = 16
+"purpose" = 1
+"reconstructs" = 5
+"reference" = 117
+"rot_hold" = 10
+"rot_prep" = 10
+"rot_quench" = 10
+"rotating_frame_omega" = 21
+"rotation_kept_in_hold" = 17
+"rotation_omega" = 73
+"scenario" = 12
+"seed_kind" = 11
+"static_B" = 6
+"suite" = 282
+"t_hold_dim" = 9
+"target" = 33
+"target_ms" = 9
+"theta_tilt" = 6
+"variant" = 13
+"variant_kind" = 7
+"κ=0.5/1.5)" = 1
+"κ=2.0/2.5)" = 1
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p3_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.3
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p3_n64_DDIon.yaml"
+line = 7
+keys = ["caveat", "ddi_on", "grid_n", "ladder_level", "rotating_frame_omega", "suite", "variant"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  variant: omm0p3_n64_anchor
+  ladder_level: 0
+  rotating_frame_omega: -0.3
+  ddi_on: true
+  grid_n: 64
+  caveat: |
+    Grid-doubling anchor for the 32³ Ω=-0.3 cell. If ΔF_z/N agrees
+    to within ~5%, the recommendation Ω/ω_⊥ ∈ [-0.5, -0.3] for the
+    Klaus/Barnett experimental window hardens. If it diverges, the
+    32³ scan is grid-artifact contaminated and the recommendation
+    must be reset.'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p3_n64_N50k_DDIon.yaml"
+line = 8
+keys = ["N_atoms", "caveat", "ddi_on", "grid_n", "ladder_level", "rotating_frame_omega", "suite", "variant"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  variant: omm0p3_n64_N50k_production
+  ladder_level: 0
+  rotating_frame_omega: -0.3
+  ddi_on: true
+  grid_n: 64
+  N_atoms: 50000
+  caveat: |
+    N=5e4 at fixed Ω=-0.3 is the experimental-scale target. Higher N
+    means stronger DDI ⟶ potentially larger Barnett signal but also
+    higher peak densities (collapse pressure increases). If peak ratio
+    stays < 1.5 and Δ⟨F_z⟩/N is order unity, the recommendation
+    Ω/ω_⊥ ≈ -0.3 promotes from "32³ window scan" to "experimentally
+    targeted parameter".'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p5_DDIoff.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.5
+  ddi_on: false
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p5_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.5
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p7_DDIoff.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.7
+  ddi_on: false
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p7_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.7
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omm0p9_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: -0.9
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p3_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.3
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p5_DDIoff.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.5
+  ddi_on: false
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p5_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.5
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p7_DDIoff.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.7
+  ddi_on: false
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p7_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.7
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omp0p9_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.9
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omz0p0_DDIoff.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.0
+  ddi_on: false
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_eu_window/barnett_eu_omz0p0_DDIon.yaml"
+line = 5
+keys = ["ddi_on", "generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_eu_window
+  ladder_level: 0
+  rotating_frame_omega: 0.0
+  ddi_on: true
+  generator: scripts/validation/barnett_eu_window_gen.jl
+  notes: |
+    Eu-151 F=6 in near-isotropic Matsui-like trap.
+    Rotation Ω applied in rotating frame; DDI on/off as origin control.
+    Initial m=-F polarized. B = 2.6 nT (weak, post-quench Matsui value).
+    Target observables: ⟨F_z⟩(t), ⟨L_z⟩(t), ⟨J_z⟩(t), peak density, N(t).'''
+
+[[block]]
+path = "runs/barnett_week1/scalar_rotation_om0p0.yaml"
+line = 5
+keys = ["generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_week1
+  ladder_level: 0
+  rotating_frame_omega: 0.0
+  generator: scripts/validation/barnett_week1_gen.jl
+  notes: |
+    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
+    Rotating-frame term -Ω·L_z applied in the dynamics step.
+    Validation target:
+      - For Ω = 0: no L_z response.
+      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
+        (Madison-Dalibard critical line; rough estimate).'''
+
+[[block]]
+path = "runs/barnett_week1/scalar_rotation_om0p3.yaml"
+line = 5
+keys = ["generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_week1
+  ladder_level: 0
+  rotating_frame_omega: 0.3
+  generator: scripts/validation/barnett_week1_gen.jl
+  notes: |
+    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
+    Rotating-frame term -Ω·L_z applied in the dynamics step.
+    Validation target:
+      - For Ω = 0: no L_z response.
+      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
+        (Madison-Dalibard critical line; rough estimate).'''
+
+[[block]]
+path = "runs/barnett_week1/scalar_rotation_om0p5.yaml"
+line = 5
+keys = ["generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_week1
+  ladder_level: 0
+  rotating_frame_omega: 0.5
+  generator: scripts/validation/barnett_week1_gen.jl
+  notes: |
+    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
+    Rotating-frame term -Ω·L_z applied in the dynamics step.
+    Validation target:
+      - For Ω = 0: no L_z response.
+      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
+        (Madison-Dalibard critical line; rough estimate).'''
+
+[[block]]
+path = "runs/barnett_week1/scalar_rotation_om0p7.yaml"
+line = 5
+keys = ["generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_week1
+  ladder_level: 0
+  rotating_frame_omega: 0.7
+  generator: scripts/validation/barnett_week1_gen.jl
+  notes: |
+    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
+    Rotating-frame term -Ω·L_z applied in the dynamics step.
+    Validation target:
+      - For Ω = 0: no L_z response.
+      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
+        (Madison-Dalibard critical line; rough estimate).'''
+
+[[block]]
+path = "runs/barnett_week1/scalar_rotation_om0p9.yaml"
+line = 5
+keys = ["generator", "ladder_level", "notes", "rotating_frame_omega", "suite"]
+raw = '''
+metadata:
+  suite: barnett_week1
+  ladder_level: 0
+  rotating_frame_omega: 0.9
+  generator: scripts/validation/barnett_week1_gen.jl
+  notes: |
+    Scalar (F=0) BEC in a 2D anisotropic harmonic trap.
+    Rotating-frame term -Ω·L_z applied in the dynamics step.
+    Validation target:
+      - For Ω = 0: no L_z response.
+      - For Ω > 0: vortex formation expected above Ω_c ≈ 0.7 ω_⊥
+        (Madison-Dalibard critical line; rough estimate).'''
+
+[[block]]
+path = "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.yaml"
+line = 35
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture rotating-field stir movie (vortex nucleation)}'''
+
+[[block]]
+path = "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.yaml"
+line = 35
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture rotating-field stir movie (vortex nucleation)}'''
+
+[[block]]
+path = "runs/eu151_B_sweep_pm120/config_scan_B_pm120_v3.yaml"
+line = 25
+keys = ["note", "owner", "project"]
+raw = '''
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI symmetric ±120 μG sweep v3 (64³, 47 pts)
+  note: |
+    Full DDI (secular=false) symmetric scan -120..+120 μG, 47 points,
+    dense ±50–70 μG band, 64³ grid. Designed for UGE array submission:
+    each task picks scan.points[SGE_TASK_ID] via SPINORBEC_SCAN_ONLY_INDEX.
+    c1=1/36 (Matsui), thermal=0.40, initial_state=m_minus_F, tol=1e-7 (relative).
+    Uses Nyquist DDI symmetry fix (kx/ky/kz, main @ 091367fd).'''
+
+[[block]]
+path = "runs/eu_collapse_search/N100000_omz0p25.yaml"
+line = 7
+keys = ["N_atoms", "generator", "ladder_level", "omega_z", "suite"]
+raw = '''
+metadata:
+  suite: eu_collapse_search
+  ladder_level: 12
+  N_atoms: 100000
+  omega_z: 0.25
+  generator: scripts/validation/eu_collapse_search_gen.jl'''
+
+[[block]]
+path = "runs/eu_collapse_search/N100000_omz1p0.yaml"
+line = 7
+keys = ["N_atoms", "generator", "ladder_level", "omega_z", "suite"]
+raw = '''
+metadata:
+  suite: eu_collapse_search
+  ladder_level: 12
+  N_atoms: 100000
+  omega_z: 1.0
+  generator: scripts/validation/eu_collapse_search_gen.jl'''
+
+[[block]]
+path = "runs/eu_collapse_search/N300000_omz1p0.yaml"
+line = 7
+keys = ["N_atoms", "generator", "ladder_level", "omega_z", "suite"]
+raw = '''
+metadata:
+  suite: eu_collapse_search
+  ladder_level: 12
+  N_atoms: 300000
+  omega_z: 1.0
+  generator: scripts/validation/eu_collapse_search_gen.jl'''
+
+[[block]]
+path = "runs/eu_collapse_search/N30000_omz0p25.yaml"
+line = 7
+keys = ["N_atoms", "generator", "ladder_level", "omega_z", "suite"]
+raw = '''
+metadata:
+  suite: eu_collapse_search
+  ladder_level: 12
+  N_atoms: 30000
+  omega_z: 0.25
+  generator: scripts/validation/eu_collapse_search_gen.jl'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config.yaml"
+line = 25
+keys = ["note", "owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 ground-state phase diagram (c1 × Bz × κ)
+  note: |
+    3-axis GS phase scan. Full DDI secular=false, LHY none, ITP + 2 seeds.
+    c1 crosses FM/AFM; Bz weak µG field; κ oblate trap ratio (demag).'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml"
+line = 12
+keys = ["owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — cyclic/FM boundary B_c(κ) at physical c1'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_boundary_hik_64.yaml"
+line = 5
+keys = ["owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — high-κ boundary extension (B_c above 100µG)'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1_precise_B0k1.yaml"
+line = 6
+keys = ["B0 k1)", "owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — precision c1* (first-order FM/polar, B0 k1)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1_precise_kappa2_B0.yaml"
+line = 10
+keys = ["owner", "project", "κ=2.0/2.5)"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — c1*(κ) tricritical probe (B0, κ=2.0/2.5)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1_precise_kappa_B0.yaml"
+line = 10
+keys = ["owner", "project", "κ=0.5/1.5)"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — precision c1*(κ) first-order line (B0, κ=0.5/1.5)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1_refine_order.yaml"
+line = 19
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 F=6 GS — FM/polar transition ORDER refinement}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B0.yaml"
+line = 17
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 F=6 GS — c1×κ plane at B=0}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B10.yaml"
+line = 17
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 F=6 GS — c1×κ plane at B=10µG}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B60.yaml"
+line = 16
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 F=6 GS — c1×κ plane at B=60µG}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_preview_B0.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — c1×κ B=0 local preview}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_preview_B10.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — c1×κ B=10µG local preview}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_preview_B60.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — c1×κ B=60µG local preview}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_c1kappa_smoke.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — c1×κ smoke}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_dense_32.yaml"
+line = 8
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — dense flux-closure map for smooth contours}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_midfield_newton.yaml"
+line = 8
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — mid-field GS via Newton-CG recipe}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_order_local_B0k1.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — local FM/polar order diagnostic B0 k1}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_phase_repr.yaml"
+line = 7
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — deep-converged phase representatives}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_pilot_texture_B100.yaml"
+line = 4
+keys = ["B0=100uG)", "owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture pilot (FL/CSV/PCV, B0=100uG)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_promote.yaml"
+line = 19
+keys = ["owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — Stage B promotion (128³, seed+polish)'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_promote_64.yaml"
+line = 17
+keys = ["owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — Stage B map (64³, seed+polish)'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_promote_smoke.yaml"
+line = 5
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS phase diagram — seed_from smoke}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_promote_smoke_pin.yaml"
+line = 6
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS phase diagram — seed_from+pin smoke}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_recon.yaml"
+line = 9
+keys = ["owner", "project"]
+raw = '''
+metadata:
+  owner: anko
+  project: Eu151 F=6 GS phase diagram — Stage A recon (32³, local)'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_smoke.yaml"
+line = 3
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu GS phase diagram SMOKE}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_softconv_diag.yaml"
+line = 4
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — mid-field soft convergence diagnostic}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_test.yaml"
+line = 2
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: stability probe}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_bscan.yaml"
+line = 5
+keys = ["FL/CSV/PCV)", "owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture B-scan (crossover, FL/CSV/PCV)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml"
+line = 41
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture B-scan — beyond mean field (full_bdg LHY)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_smoke.yaml"
+line = 6
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture B-scan LHY — smoke}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_quench_movie.yaml"
+line = 24
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_quench_movie_smoke.yaml"
+line = 5
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture quench movie — smoke}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_texture_stir_movie.yaml"
+line = 37
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 texture rotating-field stir movie (vortex nucleation)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_48.yaml"
+line = 7
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — vortex-phase GS verification (48³ grid check)}'''
+
+[[block]]
+path = "runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_64.yaml"
+line = 7
+keys = ["owner", "project"]
+raw = '''
+metadata: {owner: anko, project: Eu151 GS — vortex-phase GS verification (64³)}'''
+
+[[block]]
+path = "runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.yaml"
+line = 4
+keys = ["origin", "suite", "variant"]
+raw = '''
+metadata:
+  suite: eu_ham_only_conservation
+  variant: 24_nonsec
+  origin: post_interaction_params_refactor_2026_05_25_audit'''
+
+[[block]]
+path = "runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml"
+line = 5
+keys = ["origin", "suite", "variant"]
+raw = '''
+metadata:
+  suite: eu_ham_only_conservation
+  variant: 24_sec
+  origin: post_interaction_params_refactor_2026_05_25_audit'''
+
+[[block]]
+path = "runs/eu_ham_only_conservation/eu_ham_only_32_nonsec.yaml"
+line = 4
+keys = ["origin", "suite", "variant"]
+raw = '''
+metadata:
+  suite: eu_ham_only_conservation
+  variant: 32_nonsec
+  origin: post_interaction_params_refactor_2026_05_25_audit'''
+
+[[block]]
+path = "runs/eu_ham_only_conservation/eu_ham_only_48_nonsec.yaml"
+line = 4
+keys = ["origin", "suite", "variant"]
+raw = '''
+metadata:
+  suite: eu_ham_only_conservation
+  variant: 48_nonsec
+  origin: post_interaction_params_refactor_2026_05_25_audit'''
+
+[[block]]
+path = "runs/eu_ham_only_ramp_quench_24/config.yaml"
+line = 15
+keys = ["origin", "purpose", "suite"]
+raw = '''
+metadata:
+  suite: step5_eu_hamiltonian_only_sanity
+  origin: post_interaction_params_refactor_2026_05_25
+  purpose: validation_ladder_level_5_sanity'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K0_gdr0_LHY0.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: false
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K0_gdr0_LHY1.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: false
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K0_gdr1_LHY0.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: false
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K0_gdr1_LHY1.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: false
+  gdr_on: true
+  LHY_on: true
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K1_gdr0_LHY0.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: true
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K1_gdr0_LHY1.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: true
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K1_gdr1_LHY0.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: true
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_arrest/K1_gdr1_LHY1.yaml"
+line = 7
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "parent_search", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_arrest
+  ladder_level: 12
+  parent_search: eu_collapse_search/N30000_omz0p25
+  K3_on: true
+  gdr_on: true
+  LHY_on: true
+  generator: scripts/validation/eu_k3_arrest_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy/LHY_fm_dipolar.yaml"
+line = 51
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  LHY_kind: fm_dipolar
+  generator: scripts/validation/eu_k3_lhy_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy/LHY_full_bdg.yaml"
+line = 38
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  LHY_kind: full_bdg
+  generator: scripts/validation/eu_k3_lhy_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy/LHY_polar_contact.yaml"
+line = 18
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  LHY_kind: polar_contact
+  generator: scripts/validation/eu_k3_lhy_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy/LHY_scalar.yaml"
+line = 5
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  LHY_kind: scalar
+  generator: scripts/validation/eu_k3_lhy_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy_control/LHY_fm_dipolar_K0.yaml"
+line = 50
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy_control
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: fm_dipolar
+  generator: scripts/validation/eu_k3_lhy_control_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy_control/LHY_full_bdg_K0.yaml"
+line = 38
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy_control
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: full_bdg
+  generator: scripts/validation/eu_k3_lhy_control_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy_control/LHY_polar_contact_K0.yaml"
+line = 20
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy_control
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: polar_contact
+  generator: scripts/validation/eu_k3_lhy_control_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_lhy_control/LHY_scalar_K0.yaml"
+line = 7
+keys = ["K3_factor", "LHY_kind", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_lhy_control
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: scalar
+  generator: scripts/validation/eu_k3_lhy_control_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x0p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0.0
+  K3_per_m_si_value: 0.0
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x100p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 100.0
+  K3_per_m_si_value: 1.0e-39
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x10p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 10.0
+  K3_per_m_si_value: 1.0e-40
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x150p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 150.0
+  K3_per_m_si_value: 1.5e-39
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x1p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 1.0
+  K3_per_m_si_value: 1.0e-41
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x200p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  K3_per_m_si_value: 2.0e-39
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x250p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 250.0
+  K3_per_m_si_value: 2.5e-39
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x300p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 300.0
+  K3_per_m_si_value: 3.0e-39
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x30p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 30.0
+  K3_per_m_si_value: 3.0e-40
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep/K3x3p0.yaml"
+line = 7
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 3.0
+  K3_per_m_si_value: 3.0e-41
+  generator: scripts/validation/eu_k3_sweep_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep_96/K3x150p0_n96.yaml"
+line = 4
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep_96
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 150.0
+  K3_per_m_si_value: 1.5e-39
+  generator: scripts/validation/eu_k3_sweep_96_gen.jl'''
+
+[[block]]
+path = "runs/eu_k3_sweep_96/K3x200p0_n96.yaml"
+line = 4
+keys = ["K3_factor", "K3_per_m_si_value", "generator", "ladder_level", "parent_regime", "suite"]
+raw = '''
+metadata:
+  suite: eu_k3_sweep_96
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 200.0
+  K3_per_m_si_value: 2.0e-39
+  generator: scripts/validation/eu_k3_sweep_96_gen.jl'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_fm_dipolar_100ms.yaml"
+line = 48
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: fm_dipolar
+  target_ms: 100ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_fm_dipolar_200ms.yaml"
+line = 48
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: fm_dipolar
+  target_ms: 200ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_fm_dipolar_50ms.yaml"
+line = 48
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: fm_dipolar
+  target_ms: 50ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_full_bdg_100ms.yaml"
+line = 36
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: full_bdg
+  target_ms: 100ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_full_bdg_200ms.yaml"
+line = 36
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: full_bdg
+  target_ms: 200ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_full_bdg_50ms.yaml"
+line = 36
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: full_bdg
+  target_ms: 50ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_polar_contact_100ms.yaml"
+line = 18
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: polar_contact
+  target_ms: 100ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_polar_contact_200ms.yaml"
+line = 18
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: polar_contact
+  target_ms: 200ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_lhy_longtime/LHY_polar_contact_50ms.yaml"
+line = 18
+keys = ["K3_factor", "LHY_kind", "caveat", "generator", "ladder_level", "parent_regime", "suite", "target_ms"]
+raw = '''
+metadata:
+  suite: eu_lhy_longtime
+  ladder_level: 12
+  parent_regime: cigar_N30k_omz0p25
+  K3_factor: 0
+  LHY_kind: polar_contact
+  target_ms: 50ms
+  generator: scripts/validation/eu_lhy_longtime_gen.jl
+  caveat: |
+    Tests whether "polar/icosa LHY → stable_arrest with N=1.000"
+    survives at simulated time well beyond the original 30 ms window.'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K0_gdr0_LHY0.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: false
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K0_gdr0_LHY1.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: false
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K0_gdr1_LHY0.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: false
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K0_gdr1_LHY1.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: false
+  gdr_on: true
+  LHY_on: true
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K1_gdr0_LHY0.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: true
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K1_gdr0_LHY1.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: true
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K1_gdr1_LHY0.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: true
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/eu_robust_factorial/K1_gdr1_LHY1.yaml"
+line = 10
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "ladder_level", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_eu_robust_factorial
+  ladder_level: 12
+  K3_on: true
+  gdr_on: true
+  LHY_on: true
+  generator: scripts/validation/eu_robust_factorial_gen.jl'''
+
+[[block]]
+path = "runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_m0p74.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_hybrid
+  cell_name: klaus_hybrid_magnetostir_omega_m0p74
+  rotation_omega: -0.74
+  protocol_kind: hybrid_magnetostir
+  generator: scripts/validation/klaus_hybrid_magnetostir_edh_gen.jl'''
+
+[[block]]
+path = "runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_p0p74_matched.yaml"
+line = 13
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_hybrid
+  cell_name: klaus_hybrid_magnetostir_omega_p0p74_matched
+  rotation_omega: +0.74
+  protocol_kind: hybrid_magnetostir_matched
+  generator: hand-written 2026-05-27'''
+
+[[block]]
+path = "runs/klaus_hybrid/klaus_hybrid_nostir_control.yaml"
+line = 5
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_hybrid
+  cell_name: klaus_hybrid_nostir_control
+  rotation_omega: 0.0
+  protocol_kind: hybrid_nostir
+  generator: scripts/validation/klaus_hybrid_magnetostir_edh_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_om0p0.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_om0p0
+  rotation_omega: 0.0
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_om0p0_N50k.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_om0p0_N50k
+  rotation_omega: 0.0
+  rot_prep: true
+  rot_quench: true
+  rot_hold: false
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 2.6
+  dt_scale: 1.0
+  N_atoms: 50000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_om0p0_dt2.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_om0p0_dt2
+  rotation_omega: 0.0
+  rot_prep: true
+  rot_quench: true
+  rot_hold: false
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 2.6
+  dt_scale: 0.5
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_om0p0_n64.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_om0p0_n64
+  rotation_omega: 0.0
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p1_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p1_holdonly_delay2ms_refine
+  rotation_omega: -0.1
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p2_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p2_holdonly_delay2ms_refine
+  rotation_omega: -0.2
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p3
+  rotation_omega: -0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p34_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p34_holdonly_delay2ms_refine
+  rotation_omega: -0.34
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p38_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p38_holdonly_delay2ms_refine
+  rotation_omega: -0.38
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3_DDIoff.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p3_DDIoff
+  rotation_omega: -0.3
+  ddi_on_dynamics: false
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p3_holdonly_delay2ms_refine
+  rotation_omega: -0.3
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3_keeprot.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p3_keeprot
+  rotation_omega: -0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3_keeprot_Bf1p3.yaml"
+line = 7
+keys = ["B_final_nT", "cell_name", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p3_keeprot_Bf1p3
+  rotation_omega: -0.3
+  B_final_nT: 1.3
+  variant_kind: grid_corner
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p3_keeprot_Bf5p2.yaml"
+line = 7
+keys = ["B_final_nT", "cell_name", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p3_keeprot_Bf5p2
+  rotation_omega: -0.3
+  B_final_nT: 5.2
+  variant_kind: grid_corner
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p42_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p42_holdonly_delay2ms_refine
+  rotation_omega: -0.42
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p46_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p46_holdonly_delay2ms_refine
+  rotation_omega: -0.46
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5
+  rotation_omega: -0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p54_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p54_holdonly_delay2ms_refine
+  rotation_omega: -0.54
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p58_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p58_holdonly_delay2ms_refine
+  rotation_omega: -0.58
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_DDIoff.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_DDIoff
+  rotation_omega: -0.5
+  ddi_on_dynamics: false
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_holdonly.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_holdonly
+  rotation_omega: -0.5
+  rot_prep: false
+  rot_quench: false
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 2.6
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay1ms.yaml"
+line = 7
+keys = ["cell_name", "delay_ms", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_holdonly_delay1ms
+  rotation_omega: -0.5
+  delay_ms: 1.0
+  variant_kind: delay_test
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay2ms.yaml"
+line = 7
+keys = ["cell_name", "delay_ms", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_holdonly_delay2ms
+  rotation_omega: -0.5
+  delay_ms: 2.0
+  variant_kind: delay_test
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay2ms_refine.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p5_holdonly_delay2ms_refine
+  rotation_omega: -0.5
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_refine_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay5ms.yaml"
+line = 7
+keys = ["cell_name", "delay_ms", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_holdonly_delay5ms
+  rotation_omega: -0.5
+  delay_ms: 5.0
+  variant_kind: delay_test
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot
+  rotation_omega: -0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_Bf10.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_Bf10
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 10.0
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_Bf1p3.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_Bf1p3
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 1.3
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_Bf5p2.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_Bf5p2
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 5.2
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_DDIoff.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_DDIoff
+  rotation_omega: -0.5
+  ddi_on_dynamics: false
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_N50k.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_N50k
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 2.6
+  dt_scale: 1.0
+  N_atoms: 50000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_dt2.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_dt2
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: -1
+  B_final_nT: 2.6
+  dt_scale: 0.5
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mFplus.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_mFplus
+  rotation_omega: -0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: 1
+  B_final_nT: 2.6
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_keeprot_n64
+  rotation_omega: -0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p5_noBquench.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p5_noBquench
+  rotation_omega: -0.5
+  ddi_on_dynamics: true
+  do_B_quench: false
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p62_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p62_holdonly_delay2ms_refine
+  rotation_omega: -0.62
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p66_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p66_holdonly_delay2ms_refine
+  rotation_omega: -0.66
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p7.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p7
+  rotation_omega: -0.7
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p7_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p7_holdonly_delay2ms_refine
+  rotation_omega: -0.7
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p7_keeprot.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p7_keeprot
+  rotation_omega: -0.7
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p7_keeprot_Bf1p3.yaml"
+line = 7
+keys = ["B_final_nT", "cell_name", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p7_keeprot_Bf1p3
+  rotation_omega: -0.7
+  B_final_nT: 1.3
+  variant_kind: grid_corner
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p7_keeprot_Bf5p2.yaml"
+line = 7
+keys = ["B_final_nT", "cell_name", "generator", "rotation_omega", "suite", "variant_kind"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omm0p7_keeprot_Bf5p2
+  rotation_omega: -0.7
+  B_final_nT: 5.2
+  variant_kind: grid_corner
+  generator: scripts/validation/klaus_quench_batch4_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p8_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p8_holdonly_delay2ms_refine
+  rotation_omega: -0.8
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm0p9_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm0p9_holdonly_delay2ms_refine
+  rotation_omega: -0.9
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omm1p0_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omm1p0_holdonly_delay2ms_refine
+  rotation_omega: -1.0
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p0_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omp0p0_holdonly_delay2ms_refine
+  rotation_omega: 0.0
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p1_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omp0p1_holdonly_delay2ms_refine
+  rotation_omega: 0.1
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p3.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p3
+  rotation_omega: 0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p3_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omp0p3_holdonly_delay2ms_refine
+  rotation_omega: 0.3
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p3_keeprot.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p3_keeprot
+  rotation_omega: 0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p5.yaml"
+line = 17
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p5
+  rotation_omega: 0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: false
+  generator: scripts/validation/klaus_quench_gen.jl
+  protocol_summary: |
+    Rotation preparation at strong B → quench to weak B → free hold.
+    Observable: post-quench spin excitation in m=-5, m=-4 components.'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p5_holdonly_delay2ms_refine.yaml"
+line = 4
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench_refine
+  cell_name: klaus_quench_omp0p5_holdonly_delay2ms_refine
+  rotation_omega: 0.5
+  protocol_kind: holdonly_delay2ms
+  generator: scripts/validation/klaus_omega_dense_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p5_keeprot.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "rotation_kept_in_hold", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p5_keeprot
+  rotation_omega: 0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  rotation_kept_in_hold: true
+  generator: scripts/validation/klaus_quench_batch2_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mFplus.yaml"
+line = 14
+keys = ["B_final_nT", "N_atoms", "cell_name", "ddi_on_dynamics", "do_B_quench", "dt_scale", "generator", "initial_m_sign", "rot_hold", "rot_prep", "rot_quench", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: klaus_quench
+  cell_name: klaus_quench_omp0p5_keeprot_mFplus
+  rotation_omega: 0.5
+  rot_prep: true
+  rot_quench: true
+  rot_hold: true
+  ddi_on_dynamics: true
+  do_B_quench: true
+  initial_m_sign: 1
+  B_final_nT: 2.6
+  dt_scale: 1.0
+  N_atoms: 10000
+  generator: scripts/validation/klaus_quench_batch3_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_om0p0_holdonly_t350.yaml"
+line = 10
+keys = ["cell_name", "generator", "lit_anchor", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_om0p0_holdonly_t350
+  rotation_omega: 0.0
+  t_hold_dim: 350.0
+  protocol_kind: hold_only_long_time
+  lit_anchor: Prasad_2019_arXiv_1906.08664
+  generator: scripts/validation/klaus_long_time_vortex_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p3_holdonly_t100.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p3_holdonly_t100
+  rotation_omega: -0.3
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time
+  generator: scripts/validation/klaus_long_time_omega_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p42_holdonly_t100.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p42_holdonly_t100
+  rotation_omega: -0.42
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time
+  generator: scripts/validation/klaus_long_time_omega_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p5_holdonly_t100.yaml"
+line = 10
+keys = ["cell_name", "generator", "lit_anchor", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p5_holdonly_t100
+  rotation_omega: -0.5
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time
+  lit_anchor: Prasad_2019_arXiv_1906.08664
+  generator: scripts/validation/klaus_long_time_vortex_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p5_holdonly_t350.yaml"
+line = 10
+keys = ["cell_name", "generator", "lit_anchor", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p5_holdonly_t350
+  rotation_omega: -0.5
+  t_hold_dim: 350.0
+  protocol_kind: hold_only_long_time
+  lit_anchor: Prasad_2019_arXiv_1906.08664
+  generator: scripts/validation/klaus_long_time_vortex_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p7_holdonly_t100.yaml"
+line = 7
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p7_holdonly_t100
+  rotation_omega: -0.7
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time
+  generator: scripts/validation/klaus_long_time_omega_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm0p85_holdonly_t100.yaml"
+line = 5
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm0p85_holdonly_t100
+  rotation_omega: -0.85
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time_large_omega
+  generator: scripts/validation/klaus_long_omega_large_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm1p0_holdonly_t100.yaml"
+line = 5
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm1p0_holdonly_t100
+  rotation_omega: -1.0
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time_large_omega
+  generator: scripts/validation/klaus_long_omega_large_gen.jl'''
+
+[[block]]
+path = "runs/klaus_quench_long_time/klaus_long_omm1p15_holdonly_t100.yaml"
+line = 5
+keys = ["cell_name", "generator", "protocol_kind", "rotation_omega", "suite", "t_hold_dim"]
+raw = '''
+metadata:
+  suite: klaus_long_time
+  cell_name: klaus_long_omm1p15_holdonly_t100
+  rotation_omega: -1.15
+  t_hold_dim: 100.0
+  protocol_kind: hold_only_long_time_large_omega
+  generator: scripts/validation/klaus_long_omega_large_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n128_HamOnly.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 128
+  scenario: HamOnly
+  K3_on: false
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n128_K3.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 128
+  scenario: K3
+  K3_on: true
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n64_HamOnly.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 64
+  scenario: HamOnly
+  K3_on: false
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n64_K3.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 64
+  scenario: K3
+  K3_on: true
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n64_K3LHY.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 64
+  scenario: K3LHY
+  K3_on: true
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n64_K3gdr.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 64
+  scenario: K3gdr
+  K3_on: true
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n64_gdr.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 64
+  scenario: gdr
+  K3_on: false
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n96_HamOnly.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 96
+  scenario: HamOnly
+  K3_on: false
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n96_K3.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 96
+  scenario: K3
+  K3_on: true
+  gdr_on: false
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n96_K3LHY.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 96
+  scenario: K3LHY
+  K3_on: true
+  gdr_on: false
+  LHY_on: true
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n96_K3gdr.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 96
+  scenario: K3gdr
+  K3_on: true
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/l4_k3_ladder/L4_K3_n96_gdr.yaml"
+line = 6
+keys = ["K3_on", "LHY_on", "gdr_on", "generator", "grid_n", "ladder_level", "scenario", "suite"]
+raw = '''
+metadata:
+  suite: l4_k3_collapse_arrest_ladder
+  ladder_level: 12
+  grid_n: 96
+  scenario: gdr
+  K3_on: false
+  gdr_on: true
+  LHY_on: false
+  generator: scripts/validation/l4_k3_ladder_gen.jl'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_DDIoff_control.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_DDIoff_control
+  rotation_omega: 0.5
+  ddi_on_dynamics: false
+  do_B_quench: true
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.yaml"
+line = 21
+keys = ["cell_name", "generator", "hypothesis", "protocol_kind", "rotation_omega", "suite"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_adiabatic_omega_p0p5
+  rotation_omega: +0.5
+  protocol_kind: adiabatic_7stage
+  generator: hand-written 2026-05-27
+  hypothesis: |
+    Adiabatic theta tilt-up + phi spin-up at strong B should let spin
+    track B direction, so the DDI-anisotropy rotation has a coherent
+    spin sector to act on. Sudden-tilt Klaus-II gave 0.2191 (= baseline).
+    Predicted: P_{+5,+4} > 0.3 if adiabatic works.'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_noquench_control.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_noquench_control
+  rotation_omega: 0.5
+  ddi_on_dynamics: true
+  do_B_quench: false
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_omega_p0p3.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_omega_p0p3
+  rotation_omega: 0.3
+  ddi_on_dynamics: true
+  do_B_quench: true
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_omega_p0p5.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_omega_p0p5
+  rotation_omega: 0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_omega_p0p7.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_omega_p0p7
+  rotation_omega: 0.7
+  ddi_on_dynamics: true
+  do_B_quench: true
+  static_B: false
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/magnetic_stirrer/magnetic_stirrer_staticB_control.yaml"
+line = 12
+keys = ["cell_name", "ddi_on_dynamics", "do_B_quench", "generator", "protocol_summary", "rotation_omega", "static_B", "suite", "theta_tilt"]
+raw = '''
+metadata:
+  suite: magnetic_stirrer
+  cell_name: magnetic_stirrer_staticB_control
+  rotation_omega: 0.5
+  ddi_on_dynamics: true
+  do_B_quench: true
+  static_B: true
+  theta_tilt: 0.7854
+  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
+  protocol_summary: |
+    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
+    strong B, then rotation_prep with no rotation, then B quench to weak
+    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
+    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_dynamics_n64.yaml"
+line = 11
+keys = ["generator", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics
+  grid_n: 64
+  generator: scripts/validation/matsui_baseline_gen.jl'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_K3factor_10.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_refine_K3factor_10
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_K3factor_10
+  grid_n: 64
+  K3_factor: 10.0
+  K3_per_m_si_value: 1.0e-40
+  caveat: |
+    Phenomenological K3-only loss model.  Goal: identify the
+    effective K3 that reproduces Matsui's experimental ~40% atom
+    loss at 40 ms.  This is NOT a measurement of Eu's actual K3.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_K3factor_15.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_refine_K3factor_15
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_K3factor_15
+  grid_n: 64
+  K3_factor: 15.0
+  K3_per_m_si_value: 1.5e-40
+  caveat: |
+    Phenomenological K3-only loss model.  Goal: identify the
+    effective K3 that reproduces Matsui's experimental ~40% atom
+    loss at 40 ms.  This is NOT a measurement of Eu's actual K3.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_K3factor_20.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_refine_K3factor_20
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_K3factor_20
+  grid_n: 64
+  K3_factor: 20.0
+  K3_per_m_si_value: 2.0e-40
+  caveat: |
+    Phenomenological K3-only loss model.  Goal: identify the
+    effective K3 that reproduces Matsui's experimental ~40% atom
+    loss at 40 ms.  This is NOT a measurement of Eu's actual K3.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_K3factor_25.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_refine_K3factor_25
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_K3factor_25
+  grid_n: 64
+  K3_factor: 25.0
+  K3_per_m_si_value: 2.5e-40
+  caveat: |
+    Phenomenological K3-only loss model.  Goal: identify the
+    effective K3 that reproduces Matsui's experimental ~40% atom
+    loss at 40 ms.  This is NOT a measurement of Eu's actual K3.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_K3factor_5.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_refine_K3factor_5
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_K3factor_5
+  grid_n: 64
+  K3_factor: 5.0
+  K3_per_m_si_value: 5.0e-41
+  caveat: |
+    Phenomenological K3-only loss model.  Goal: identify the
+    effective K3 that reproduces Matsui's experimental ~40% atom
+    loss at 40 ms.  This is NOT a measurement of Eu's actual K3.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_medium.yaml"
+line = 11
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_on_medium
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_medium
+  grid_n: 64
+  K3_factor: 30.0
+  K3_per_m_si_value: 3.0e-40
+  caveat: |
+    Phenomenological K3 only — no γ_dr, no LHY. Goal: bracket the
+    experimental ~40% atom loss at 40 ms (Matsui Fig 2C population
+    integral). Bridge between Matsui's simulation (loss-free) and
+    Matsui's experiment (lossy).'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_40ms_lossy_strong.yaml"
+line = 6
+keys = ["K3_factor", "K3_per_m_si_value", "caveat", "grid_n", "ladder_level", "reference", "suite", "target", "variant"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  variant: loss_on_strong
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 40ms_dynamics_lossy_strong
+  grid_n: 64
+  K3_factor: 100.0
+  K3_per_m_si_value: 1.0e-39
+  caveat: |
+    Phenomenological K3 only — no γ_dr, no LHY. Pair with _medium.
+    Together the two strengths bracket the expected experimental
+    loss rate at the Matsui parameter set.'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_5ms_morphology_n32.yaml"
+line = 11
+keys = ["generator", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 5ms_morphology
+  grid_n: 32
+  generator: scripts/validation/matsui_baseline_gen.jl'''
+
+[[block]]
+path = "runs/matsui_baseline/matsui_5ms_morphology_n64.yaml"
+line = 11
+keys = ["generator", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_baseline
+  ladder_level: 12
+  reference: Matsui_2026_Science_arxiv_2504_17357
+  target: 5ms_morphology
+  grid_n: 64
+  generator: scripts/validation/matsui_baseline_gen.jl'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig2c_populations_n32.yaml"
+line = 29
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig2c_populations_40ms
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_conv_n64.yaml"
+line = 29
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_centre_and_width
+  grid_n: 64'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_gsvariant_n32.yaml"
+line = 32
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_centre_gs_variant
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_loss_n32.yaml"
+line = 42
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_with_loss
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_scan_n32.yaml"
+line = 23
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_centre_and_width
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_scan_n64.yaml"
+line = 29
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n64_full
+  grid_n: 64'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_smoke_n32.yaml"
+line = 27
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_smoke
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_theirramp_n32.yaml"
+line = 41
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_their_ramp
+  grid_n: 32'''
+
+[[block]]
+path = "runs/matsui_fig4b/gs_c1ratio_probe.yaml"
+line = 40
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = '''
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: c1_ratio_reaches_c0
+  grid_n: 32'''
+
+[[block]]
+path = "runs/projectA_pm120_v2/config.yaml"
+line = 19
+keys = ["note", "owner", "project"]
+raw = '''
+metadata:
+  owner: Mitsuki Gotou
+  project: Project A — full DDI symmetric ±120 μG sweep v2
+  note: |
+    Full DDI (secular=false) symmetric scan -120..+120 μG.
+    v2: DDI Nyquist symmetry fix + relative ITP convergence criterion.
+    c1=1/36 (Matsui), initial_state=m_minus_F, tol=1e-7 (relative). No thermal noise.'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/00_scalar_free_uniform_stationary.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: scalar_GPE_free_uniform
+  expected: stationary_exact'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/01_scalar_harmonic_oscillator_ground.yaml"
+line = 5
+keys = ["expected_energy_per_particle", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: noninteracting_harmonic_oscillator
+  expected_energy_per_particle: 1.5'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/02_spin1_polar_contact_ground.yaml"
+line = 5
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_c1_positive
+  expected_phase: polar'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/03_spin1_ferromagnetic_contact_ground.yaml"
+line = 5
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_ferro_c1_negative
+  expected_phase: ferromagnetic'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/04_spin2_cyclic_contact_ground.yaml"
+line = 6
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin2_cyclic_c1_c2_positive
+  expected_phase: cyclic'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/05_spin1_zeeman_phase_only.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: diagonal_Zeeman_phase_evolution
+  expected: population_invariant'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/06_spin1_sma_spin_mixing.yaml"
+line = 6
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_spin_mixing_SMA
+  expected: spin_exchange_with_Mz_conservation'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/07_spin1_polar_bogoliubov_stable.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_BdG_stable
+  expected: no_BdG_instability'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/08_ddi_spherical_polarized_zero_kernel.yaml"
+line = 6
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: spherical_DDI_traceless_kernel
+  expected: small_DDI_energy'''
+
+[[block]]
+path = "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/09_edh_toy_spin_orbit_transfer.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Saito_Ueda_EdH_toy
+  expected: qualitative_spin_orbit_transfer'''
+
+[[block]]
+path = "runs/verification_suite/yamls/00_scalar_free_uniform_stationary.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: scalar_GPE_free_uniform
+  expected: stationary_exact'''
+
+[[block]]
+path = "runs/verification_suite/yamls/01_scalar_harmonic_oscillator_ground.yaml"
+line = 5
+keys = ["expected_energy_per_particle", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: noninteracting_harmonic_oscillator
+  expected_energy_per_particle: 1.5'''
+
+[[block]]
+path = "runs/verification_suite/yamls/02_spin1_polar_contact_ground.yaml"
+line = 5
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_c1_positive
+  expected_phase: polar'''
+
+[[block]]
+path = "runs/verification_suite/yamls/03_spin1_ferromagnetic_contact_ground.yaml"
+line = 5
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_ferro_c1_negative
+  expected_phase: ferromagnetic'''
+
+[[block]]
+path = "runs/verification_suite/yamls/04_spin2_cyclic_contact_ground.yaml"
+line = 6
+keys = ["expected_phase", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin2_cyclic_c1_c2_positive
+  expected_phase: cyclic'''
+
+[[block]]
+path = "runs/verification_suite/yamls/05_spin1_zeeman_phase_only.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: diagonal_Zeeman_phase_evolution
+  expected: population_invariant'''
+
+[[block]]
+path = "runs/verification_suite/yamls/06_spin1_sma_spin_mixing.yaml"
+line = 6
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_spin_mixing_SMA
+  expected: spin_exchange_with_Mz_conservation'''
+
+[[block]]
+path = "runs/verification_suite/yamls/07_spin1_polar_bogoliubov_stable.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Ueda_spin1_polar_BdG_stable
+  expected: no_BdG_instability'''
+
+[[block]]
+path = "runs/verification_suite/yamls/08_ddi_spherical_polarized_zero_kernel.yaml"
+line = 6
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: spherical_DDI_traceless_kernel
+  expected: small_DDI_energy'''
+
+[[block]]
+path = "runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml"
+line = 5
+keys = ["expected", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  reference: Kawaguchi_Saito_Ueda_EdH_toy
+  expected: qualitative_spin_orbit_transfer'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L2_ddi_axis_flip_Bx.yaml"
+line = 19
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 2
+  reference: DDI_kernel_axis_flip_test
+  expected: density_elongation_aligns_with_B_axis'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L2_ddi_oblate_trap.yaml"
+line = 8
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 2
+  reference: DDI_anisotropy_oblate_repulsive
+  expected: higher_energy_than_DDI_off_for_pancake_perp_to_B'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L2_ddi_prolate_trap.yaml"
+line = 14
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 2
+  reference: DDI_anisotropy_prolate_attractive
+  expected: lower_energy_than_DDI_off_for_cigar_along_B'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L3_cr_f3_edh_toy_ddi_off.yaml"
+line = 14
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 3
+  reference: Kawaguchi_Ueda_review_EdH_canonical
+  expected: no_spin_to_orbital_transfer_without_DDI'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L3_cr_f3_edh_toy_ddi_on.yaml"
+line = 23
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 3
+  reference: Kawaguchi_Ueda_review_EdH_canonical
+  expected: Jz_conserved_with_spin_to_orbital_transfer'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_ddi_off_32.yaml"
+line = 16
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_DDI_off_control
+  expected: no_EdH_signature_without_DDI'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealias_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealias_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealias_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealias_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv3_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv3_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv3_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv3_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv4_eu_matsui_hamiltonian_only_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv4_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv4_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv4_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv4_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv5_eu_matsui_hamiltonian_only_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv5_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv5_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv5_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv5_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv6_kcut11_eu_matsui_hamiltonian_only_32.yaml"
+line = 23
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_strip
+  expected: Jz_approx_conserved_under_DDI_alone
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv6_kcut11_eu_matsui_hamiltonian_only_48.yaml"
+line = 6
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_48grid
+  expected: same_qualitative_signature_as_32_and_64
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv6_kcut11_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dealiasv6_kcut11_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4det_eu_matsui_hamiltonian_only_32.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_32
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4det_eu_matsui_hamiltonian_only_48.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_48
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4det_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_64
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4det_eu_matsui_hamiltonian_only_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_96
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4detkcut16_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_128
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4detkcut16_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_96
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dt25_kcut16_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dt5_kcut16_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4dt5_kcut16_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4itpfilter_kcut16_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4itpfilter_kcut16_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan128_kcut16p0.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan128_kcut20p0.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_128grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan_kcut11p0_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan_kcut14p0_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan_kcut16p0_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan_kcut20p0_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4kscan_kcut24p0_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4noitp_128.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_128
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4noitp_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_96
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4poldet_eu_matsui_hamiltonian_only_32.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_32
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4poldet_eu_matsui_hamiltonian_only_48.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_48
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4poldet_eu_matsui_hamiltonian_only_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "reference", "seed_kind", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_64
+  expected: grid_convergence_diagnostic
+  seed_kind: deterministic_single_mode'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe1_c1off_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe1_c1off_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe2_ddioff_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe2_ddioff_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe3_ddiOFF_64.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 4
+  reference: Matsui_Science_2026_Hamiltonian_only_64grid
+  expected: same_qualitative_signature_as_32grid_before_collapse
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L4probe3_ddiOFF_96.yaml"
+line = 9
+keys = ["expected", "ladder_level", "noise_convention", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 6
+  reference: Matsui_Science_2026_Hamiltonian_only_96grid
+  expected: convergence_test_after_anomalous_32_48_plateau
+  noise_convention: rms_rescale_2026_05_22'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L7_loss_only_uniform_K3.yaml"
+line = 6
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 7
+  reference: analytic_K3_uniform_3body_loss
+  expected: n_t_equals_n0_over_sqrt_one_plus_2K3_n0sq_t'''
+
+[[block]]
+path = "runs/verification_suite/yamls/L7clean_loss_only_uniform_K3.yaml"
+line = 8
+keys = ["expected", "ladder_level", "reference", "suite"]
+raw = '''
+metadata:
+  suite: spinorbec_physics_verification
+  ladder_level: 7
+  reference: analytic_K3_uniform_3body_loss_clean_IC
+  expected: norm_t_matches_analytic_within_dt_squared'''
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: full_bdg
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_none.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: none
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_polar_contact.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: polar_contact
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_polar_dipolar.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: polar_dipolar
+
+"""
+
+[[block]]
+path = "runs/lhy_mode_ablation_reconstructed/LHY_scalar.yaml"
+keys = ["LHY_kind", "reconstructs", "suite"]
+raw = """
+metadata:
+  suite: lhy_mode_ablation_reconstructed
+  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
+  LHY_kind: scalar
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_dt_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_dt_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_ramp_fine_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_ramp_fine_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/budget_ramp_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: budget_ramp_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/dt_where_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: dt_where_ramp_refined
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_boxscan_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_box_scan_fixed_dx
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_ddikernel_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_ddi_kernel_factorial
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_dtconv_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dt_convergence
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_gsddi_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_gs_ddi_bracket
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_gs_ddi_off
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_natoms_fixed_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_n_atoms_scan_corrected
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_natoms_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_n_atoms_scan
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n35k
+  grid_n: 32
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_theirgrid_n128.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_their_grid_n128
+  grid_n: 128
+
+"""
+
+[[block]]
+path = "runs/matsui_fig4b/fig4b_unpadded_n35k_n32.yaml"
+keys = ["claim_type", "grid_n", "ladder_level", "reference", "suite", "target"]
+raw = """
+metadata:
+  suite: matsui_fig4b
+  ladder_level: 12
+  reference: Matsui_2025_EdH_Zenodo_17303925
+  claim_type: C
+  target: fig4b_dip_n35k_unpadded
+  grid_n: 32
+
+"""

@@ -38,7 +38,6 @@
 # seeds are compared under five slightly different functionals. Cross-check the
 # winner by rebuilding the table from the CONVERGED state before believing a
 # close call (dE ~ 1e-3 in the mean-field run).
-metadata: {owner: anko, project: Eu151 texture B-scan — beyond mean field (full_bdg LHY)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

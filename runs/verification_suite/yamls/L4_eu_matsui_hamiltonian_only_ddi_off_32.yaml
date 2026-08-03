@@ -13,12 +13,6 @@
 #   - Energy decomposition: E_ddi == 0
 # This is the mechanism test that PRECEDES K3 discussion.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_DDI_off_control
-  expected: no_EdH_signature_without_DDI
-
 defaults:
   kind: spinor
   backend: gpu

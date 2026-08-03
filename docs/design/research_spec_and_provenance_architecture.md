@@ -1,5 +1,12 @@
 # Research spec and provenance architecture
 
+> **This file is now the RECORD, not the front.** The researcher-facing design is
+> [`unified_spec_architecture.md`](unified_spec_architecture.md) — one law, one
+> lookup, one register. Nothing here is retracted; what follows is the
+> measurements, the cutover log, the four step-2 deviations, the six step-3
+> corrections and the canary passes that the front is derived from. Read that
+> file first; come here for why a number is what it is.
+
 **Status:** design, revision 3 (2026-07-31). Supersedes revisions 1 and 2 entirely.
 
 **Audit trail.** Revision 1 was red-teamed across seven attack surfaces: 47
@@ -8,7 +15,7 @@ candidate findings, 15 survivors, recorded with file:line evidence as issue
 lines, and was then reconciled against its own 13 numbered invariants: **64
 findings, zero invariants clean, 15 still open at the end**. Two of its
 invariants were false about this codebase on the day they were written, and one
-fix shipped as dead code (`plan.backend_kind === :cuda`, when `_resolve_backend`
+fix was written as dead code (`plan.backend_kind === :cuda`, when `_resolve_backend`
 at `src/foundation/backend.jl:99-105` accepts `:cpu`/`:gpu` and *throws* on
 `:cuda`) because it had no positive control. Revision 3 is a **deletion pass**:
 no new mechanism, scope cut where a capability cost more concepts than it was
@@ -32,12 +39,12 @@ neither contains any code identity:
 Neither hashes `src/`. A cache admission is `isfile(result.jld2)`
 (`src/workflow/experiment.jl:190`) — file presence, nothing else.
 
-**The one stage cache is a hand-written allowlist.** `_gs_cache_key`
-(`run_step_ground_state.jl:249-271`) is 19 entries, and its own docstring
-enumerates what it drops. Two of the omissions are HamTerms that the *same
-function* passes to `make_workspace` twenty lines later: `light_shift`
-(`:479-480`, used at `:508`) and `rotating_frame_omega` (`:495`, used at `:511`).
-Changing either serves a stale ground state at full confidence.
+**The one stage cache is a hand-written allowlist.** `_gs_cache_key` was 19
+entries, and its own docstring enumerated what it drops. Two of the omissions are
+HamTerms that the *same function* passes to `make_workspace` twenty lines later:
+`light_shift` and `rotating_frame_omega`. Changing either serves a stale ground
+state at full confidence. (*Deleted by step 3, together with nine more omissions
+this paragraph did not know about — see §6.*)
 
 **Ambient numeric state is invisible to any spec.** 20 module-level `const … =
 Ref(…)` bindings exist under `src/`+`ext/`. **11 of them select a numeric path**:
@@ -219,13 +226,23 @@ value = 12.84
 kind  = "read_off"        # read_off | inferred
 note  = "Fig. 4B experimental trace, FWHM of the m=6 depletion"
 doi   = "10.1103/..."
-arbitrates = true          # this number, not the centre, decides the comparison
+disqualified_by = []       # nothing stops this number deciding the comparison
 ```
 
-Provenance becomes data. `arbitrates` is the column that matters and the pattern
-already ships: `test/validation/test_matsui_fig4_dip.jl` pins width and centre
-and carries a canary at `:122` — shift the curve and the centre moves by exactly
-the shift while the width does not; stretch it and the width doubles.
+Provenance becomes data. Whether a number DECIDES is the column that matters and
+the pattern already ships: `test/validation/test_matsui_fig4_dip.jl` pins width
+and centre and carries a canary at `:122` — shift the curve and the centre moves
+by exactly the shift while the width does not; stretch it and the width doubles.
+
+**As shipped, that column is `disqualified_by` and `arbitrates` is derived from
+it** (`arbitrates == isempty(disqualified_by)`). A free `arbitrates` Bool is set
+by whoever can also see how our number compares, which is the approval-testing
+failure mode — golden tests fail by BLESSING a wrong value. `REF_DISQUALIFIERS`
+is a closed vocabulary (`:axis_offset`, `:window_not_covered`,
+`:absolute_population`) in which every entry is a property of the REFERENCE, so
+there is no field to set while looking at our result. `Claim` refuses a `:C`
+claim whose target does not arbitrate, which is what makes the flag load-bearing
+rather than documentation with a Bool type.
 
 ### 2.6 `run!` — idempotent, returns records
 
@@ -388,10 +405,10 @@ code_rev)`.
 (`src/workflow/experiment.jl:103`) and on non-finite floats (`:86`) — an omitted
 field is a hard error, not a silent skip. Both encoders exist:
 `model_toml_dict` (`src/model/io.jl:89`) and `_enc` (`src/model/io.jl:58`).
-*Gate:* grep — exactly one call site constructs an id. This deletes
-`_gs_cache_key` (`run_step_ground_state.jl:249-271`), 19 hand-listed entries
-whose own docstring enumerates its exclusions and which omits `light_shift`
-(`:479`) and `rotating_frame_omega` (`:495`).
+*Gate:* grep — exactly one call site constructs an id. This deleted
+`_gs_cache_key`, 19 hand-listed entries whose own docstring enumerated its
+exclusions and which omitted `light_shift` and `rotating_frame_omega` (step 3;
+`test/model/test_gs_admission_axes.jl` is the per-axis gate).
 
 **2. The declaration is closed.** No field reachable from `Model` is typed `Any`,
 `Function`, or an abstract non-union type; and no mutable module-level binding
@@ -432,7 +449,9 @@ its *need* is verified, which is why it is here and not in §4.
 `:pass`/`:fail`/`:indeterminate` (`src/workflow/validation/specs.jl:33-48`); the
 same shape ships as a canary in `test/validation/test_matsui_fig4_dip.jl:122`.
 This is the one discipline that would have caught
-`engaged(::Val{:gpu}, p) = p.backend_kind === :cuda` before it shipped.
+`engaged(::Val{:gpu}, p) = p.backend_kind === :cuda`. It was caught in review
+before it was committed, by reading `backend.jl` rather than by a test — which is
+luck, not process, and is why the control is required rather than encouraged.
 
 ---
 
@@ -453,27 +472,451 @@ a test that `kill -INT`s an ITP mid-run and asserts the next `run!` recomputes.
 **Do not merge this step without that test** — that is the failure mode this
 whole pass exists to stop.
 
-**Step 3 — flip admission to `artifact_id`.** One-line change once steps 1 and 2
-are green. `git rm src/workflow/experiments/pipeline/run_step_ground_state.jl`'s
-`_gs_cache_key` (`:249-271`) and its `_hashable` helpers (`:235-241`) in the same
-commit.
+*As landed* (`src/model/complete.jl`, four deviations a future reader should not
+undo):
+
+1. **Sidecar, not one file per directory.** `<payload>.complete.toml`. Every
+   admission site in the tree tests ONE file, a scan directory is written by N
+   independent processes under `SPINORBEC_SCAN_ONLY_INDEX`, and the sidecar sorts
+   *after* its payload under `rsync`, so a collect cannot expose a marker whose
+   bytes have not landed.
+2. **Arm (b): a payload with NO marker is still admitted**, as `:unmarked`, warned
+   once per store. Measured at cutover: 671 `.jld2` under `runs/`, zero markers.
+   A cold flip meant recomputing the tree. Deleting arm (b) is step 3's business
+   and it needs a dated cutoff.
+3. **A tombstone, `<payload>.incomplete.toml`, written by a run that knows it did
+   not finish.** Without it the mandatory control *cannot pass*: a run killed
+   after its payload lands and before its marker is written is byte-identical to
+   a pre-cutover artifact, so arm (b) would serve it and nothing would recompute.
+   The tombstone is the discriminator; `write_complete_marker` clears it.
+4. **The control does not use `kill -INT`, and the design's suggestion to is
+   wrong.** Julia 1.12 script mode has `exit_on_sigint == true`, so a real SIGINT
+   aborts the process before `itp_loop.jl:223` runs — nothing is written, the next
+   run recomputes because there is nothing to serve, and the test is green before
+   *and* after this step. `schedule(task, InterruptException(); error=true)` on an
+   `@async` task reaches the swallow path, which is where the payload gets
+   written. `Base.throwto` deadlocks; `Threads.@spawn` aborts the process.
+
+The defect measured before the fix: a 64-point ITP killed at step 20 000 of
+2 000 000 wrote a full `point_001.jld2` at E = 0.96272 against a converged
+0.94108, `_exit_summary.json` said `completed: true`, the interrupt checkpoint
+was deleted as "point completed successfully", and the next run served it in
+0.008 s.
+
+Two more things the same step had to close, found by corrupting the fix and
+watching the suite stay green (canary pass, 2026-08-01):
+
+5. **There are THREE swallowing loops, not one.** `itp_loop.jl:223` and both RTP
+   loops (`simulation/run_loops.jl`). Forcing `interrupted[] = false` in the two
+   RTP loops left every suite green, because the only interrupt test's kill
+   landed in the GS and rode the `|` accumulation in `_step_dispatch!` — so a
+   dynamics-only run killed mid-evolution was still certified and served.
+   `test_interrupted_dynamics_recomputes.jl` drives both loops directly and then
+   kills a `run_yaml` mid-dynamics, waiting on `_live_status.json` (written by
+   the dynamics step and by nothing else) as the "the GS is done and the RTP is
+   running" signal.
+   A scheduler-delivered `InterruptException` can also land BETWEEN the pushes
+   inside `_record_snapshot!` (measured: `times = 6`, everything else 5), and the
+   ragged tail made the pipeline's dynamics auto-save raise — so the interrupted
+   run wrote no `result.jld2` at all, losing both the forensic record and the
+   tombstone. `_trim_interrupted_traces!` drops the partial row.
+
+6. **`point_001.jld2` was not always a payload.** `save_rotating_basis_result!`
+   published it as a symlink to `result.jld2` and `rm`'d whatever was there
+   first; `run_pipeline` calls that once per scan point, so in a multi-point scan
+   the name ended up on the LAST point's data (3 such symlinks under `runs/`,
+   one in a 3-point scan). Pre-existing, surfaced by this step because the marker
+   written for the real point 1 then disagreed with the link's target size. The
+   alias is now published only into a name no point writer has claimed, and a
+   rejection on a symlink says so instead of reporting truncation.
+
+**Step 1b — `yaml_to_model` (ADDED 2026-08-01, after step 3 was attempted and
+refused).** The plan as first written went from step 1 to step 3 assuming a
+resolver from raw YAML to a `Model`, and there is none: `src/model.jl:8` itself
+says the rewiring "is Step 1b" while section 6 listed no such step. That is a
+hole in this plan, not in the code. Step 3 cannot flip admission to
+`artifact_id` because nothing at the flip site can build the `Model` the id is
+derived from.
+
+Measured before writing this, on the 407 committed configs that carry a
+`ground_state` step, attempting only 4 of the 14 slots (grid, atom,
+interactions, ddi) with the same preprocessing `run_yaml` applies:
+
+```
+Model built:  42 / 407
+        364   ArgumentError: trunc_radius must be >= 0 (0 = untruncated); got -1.0
+          1   KeyError: "omega"   (one lab-calibration config)
+```
+
+**89.4 % fail on a single defect, and it is a representation defect rather than
+a parsing one.** `_parse_ddi_trunc_radius`
+(`src/workflow/experiments/schema/parsing_blocks.jl:468-482`) is THREE-valued:
+
+```
+absent / "auto" / "box_half"  ->  -1.0    auto — derive from the box (283 configs)
+"none" / "off"                ->   NaN    no truncation, bare periodic kernel
+a number                      ->  itself  explicit radius
+```
+
+`DDISpec.trunc_radius::Float64` accepts only `>= 0` with `0.0` meaning
+untruncated, so it **has no representation for auto at all**, and the obvious
+`NaN -> 0.0` mapping would collide *auto* with *none*. Those are different
+physics: the bare kernel carries a 2-5 % dipolar field error that is flat in
+resolution and does not go away by refining. A wrong translation here is a
+physics collision, not a hashing detail.
+
+**Decision: `trunc_radius::Union{Nothing, Float64}`**, `nothing` meaning auto.
+A small closed union is the same shape the design already accepts for
+`ModelWaveform`, it makes the third state unrepresentable-as-a-number rather
+than encoded in a sentinel, and sentinels are precisely what this design exists
+to delete. Rejected: keeping `-1.0` (a sentinel by another name), and a
+mode-enum plus value (two fields that can disagree).
+
+Scope: resolve `ground_state` blocks only — that is what admission keys on.
+`Initial`, `InitialSpec` and the dynamics half stay out. The gate is that
+`yaml_to_model` round-trips all committed `ground_state` steps, with any config
+it cannot resolve listed by name and reason rather than skipped.
+
+**The architectural requirement, and the shape it forces.** Re-interpreting
+`potential:` / `B:` / `lhy:` / `ddi:` from raw YAML would be a second
+declaration of the same physics — two readers, each self-consistent, drifting
+silently. So the resolution was EXTRACTED rather than duplicated:
+`resolve_gs(p, grid_prev, atom_prev, ws_prev) -> GSResolved`
+(`src/workflow/experiments/pipeline/resolve_gs.jl`) is the one resolver, and it
+has two consumers — `_run_step(::GroundStateStep, …)`, which reads the solver
+faces off it, and `gs_model(r) -> Model`, which is a pure function of the same
+struct and touches no dict. Everything `gs_model` needs that the solver does not
+(`N_atoms`, `omega_ref`, the light-shift coupling triple, the dealias globals)
+is read in the resolver and carried. `test/model/test_resolve_gs_is_shared.jl`
+gates the property with three independent arms — the runner's lowered code names
+`resolve_gs`; the runner's source calls no physics parser; and both consumers
+reproduce the same LITERAL pinned numbers — because a second parser reappearing
+is the failure this step exists to prevent.
+
+Model-construction failures live in `gs_model`, not `resolve_gs`, so
+`_run_step`'s behaviour does not change: a config with no `N_atoms` still
+*solves*, it just has no model. Verified by a 10-scenario before/after probe
+(itp, lbfgs, no ddi, scalar LHY, no potential, `trunc_radius: none`, explicit
+radius, no `B`, chained inheritance) diffing byte-identical on energies to 14
+digits, ψ samples and workspace digests.
+
+**`yaml_to_model` had to be made PURE in the dealias globals.** Found by the
+corpus gate, not by reading: `_run_yaml_prepare` is only the prepare half of a
+prepare/execute pair — it applies a top-level `dealias:` block to
+`DEALIAS_2_3_ENABLED[]` / `DEALIAS_K_CUTOFF[]` and leaves them set, and it is
+`run_yaml`'s execute half that restores them in a `finally`
+(`run_registry.jl:421-445`). `yaml_to_model` runs prepare alone, so until it did
+the same restore, resolving a config that carried the block **rewrote the
+`GridSpec` of every config resolved after it in the same session**:
+`runs/validation_level10/L10_F1_smoke.yaml` measured
+`dealias_two_thirds=false, k_cut=0.0` alone and `true, 10.0` after
+`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml`, and the two models
+compared unequal. For a resolver whose output is a content id that is fatal, and
+it is invisible to any single-config test. Both the Refs and the pending-snapshot
+slot are now restored in a `finally`; the order-independence arm of
+`test/model/test_corpus_resolves.jl` gates it, with the disagreeing pair asserted
+so the equality cannot pass vacuously.
+
+**Three corrections to what this section said before it was implemented.**
+
+1. **The premise that `light_shift` / `lhy_kind` / `lhy_opts` /
+   `rotating_frame_omega` had already been hoisted above the cache branch was
+   FALSE.** They sat ~170 lines below the cache-hit `return`; `git log -S` finds
+   no hoist commit on any branch. Step 1b does the hoist. That closes a live
+   gap as a side effect — the cache-hit `make_workspace` could not have been
+   given those four, because they were not resolved yet — but the call itself is
+   left unchanged, since passing them would change what a cache hit computes.
+   Marked `[KNOWN-GAP]` at the site for step 3.
+
+2. **`nothing` means AUTO in `DDISpec` and OFF in `make_ddi_params`**
+   (`_build_q_tensor!`'s `do_trunc = trunc_radius !== nothing`,
+   `qtensor.jl:145`), and `make_workspace` reads `<= 0.0` as auto — so the
+   identity map is wrong in *both* directions and a naive conversion silently
+   turns every untruncated run into an auto-truncated one. The conversion is
+   `ddi_trunc_radius_kwarg` / `ddi_trunc_radius_from_kwarg`, declared once in
+   `specs.jl`, and it is non-identity on `0.0` by construction. Also corrected:
+   `DDISpec`'s docstring claimed "a model carries the one radius its own `padded`
+   setting selects", which is false — `make_workspace` derives TWO radii from the
+   one input and builds both objects, which is *why* auto cannot be resolved to a
+   number before the model exists.
+
+3. **The "364 / 407" measurement used 4 of the 14 slots**, so it saw only the
+   `trunc_radius` defect. Over all 14, on the 429 config files under `runs/`
+   — of which **407 carry a spinor `ground_state:` step** in the YAML, six of
+   those being refused by `_run_yaml_prepare` before any resolver runs, so 401
+   reach one:
+
+   ```
+   351  resolve AND round-trip through TOML unchanged
+    22  tabulated LHY with no resolved n_max (NaN = "3x max|psi_init|^2")
+    16  no N_atoms anywhere (bare c0/c1 verification configs)
+    15  no spinor ground_state step (rotating_basis path)
+     9  strict-schema failures that predate this step (`omega_ref` at step level)
+     5  two ground_state steps, index required rather than guessed
+     5  87Rb + auto-derived q, which `_resolve_q_waveform` refuses
+     2  a B tilt the spinor runner drops (`B_direction`; klaus_hybrid)
+     4  not pipeline configs / not parseable YAML
+   ```
+
+   351 + 56 in scope + 22 out of scope = 429. The list is not a report: it is
+   `CORPUS_UNRESOLVED` in `test/model/test_corpus_resolves.jl`, config by config
+   with its reason, gated in both directions — a config that stops resolving is
+   red until someone writes down why, and one that starts resolving is red until
+   it leaves the list. That gate also re-reads all 351 resolved models against
+   their own YAML (5 255 checks: atom, grid, N, ω_ref, the c₀/c₁ constraint,
+   c_dd, secular, LHY kind, trap ω, p, q) so that "constructs" and "carries the
+   physics" are separate claims.
+
+   The nine `:schema_strict` refusals are `_run_yaml_prepare`'s, and that is the
+   same function `run_yaml` calls (`run_registry.jl:205`), so **those nine are
+   unrunnable today** — independently of anything in this layer.
+
+   One pre-existing defect the sweep surfaced and this step does NOT fix:
+   `_parse_gs_interactions` (`parsing_blocks.jl:363-391`) tries `c_total`, then
+   `N_atoms + omega_ref`, then explicit `c0`/`c1`, with **no warning when a
+   later-priority key is present**. Two configs —
+   `runs/verification_suite/yamls/L7{,clean}_loss_only_uniform_K3.yaml`, whose
+   header says "no trap, no DDI, no contact, no LHY" — declare
+   `{N_atoms: 100000, omega_ref: 628.3, c0: 0.0, c1: 0.0}` and therefore run
+   with `c0 = 5338.9`, not 0. The model is faithful (both consumers share the
+   resolver, so the run uses the same number); it is the config that is not
+   doing what it says. Fixing the precedence changes what those runs compute and
+   needs its own gate plus a retraction of any L7 claim, so it is filed here
+   rather than done inside a cutover step.
+
+   Every one of the 22 + 16 + 5 + 2 is a REAL gap in the config, not in the
+   resolver: `gs_model` refuses rather than substituting a default, because a
+   model that guessed would be a wrong answer wearing a content id in a shared
+   store. The 2 `B_direction` configs are the pair that silently run with **B
+   along +z instead of −z** today.
+
+**Step 3 — flip admission to `artifact_id`.** The GS stage cache is keyed on
+`artifact_id(gs_stage(r, p))`. `_gs_cache_key` and `_hashable` are deleted in the
+same commit, and nothing falls back to them.
+
+*As landed*, with the six things the one-line framing above got wrong:
+
+1. **It is not one line, because the id has to be BUILT.** `artifact_id` hashes
+   the whole `Stage`, so nothing is selected out of it — but turning a step dict
+   into a `Stage` is a mapping, and a mapping is where an omission hides. The
+   physics half is not mapped at all (`gs_model(r)`, the pure function of the
+   same `GSResolved` the solver reads); the numerics half is
+   `_gs_stage_params(r, p)`, and `test/model/test_gs_admission_axes.jl`
+   partitions every `GS_SCHEMA` key into {model, stage, refused,
+   not-on-this-path, destination}, asserts the partition is TOTAL, then moves
+   each axis one at a time and asserts the id moves with it.
+
+2. **The old key was blind to eleven inputs, not two.** Measured one knob at a
+   time through `_gs_cache_key`: `m_lbfgs`, `newton_polish`, `residual_polish`,
+   `pin`, `tol_drho`, `seed_from`, `noise_seed`, `light_shift`,
+   `rotating_frame_omega`, `backend`, and the code revision. `config_c1kappa_B0`
+   and `B10` carry a `pin:` block selecting a symmetry-broken BRANCH and
+   `config_c1kappa_B60` does not; the only thing keeping the three apart today is
+   that their `Bz` differ.
+
+3. **FAIL-SAFE: no `Model`, no id, never a hit.** 78 of 429 committed configs do
+   not resolve to a `Model`, and roughly 40 of those are runnable today. Such a
+   config recomputes every time and says so once per distinct reason. Recomputing
+   is only slower; serving an artifact under a key that cannot express the
+   question is wrong. Measured before flipping: of the three submit scripts that
+   `export SPINORBEC_STAGE_CACHE=1`, only `submit_texture_bscan_lhy.sh` launches
+   configs that lose caching, and that config's own first line is
+   `⚠️ DO NOT RUN AS-IS` for a reason reproduced at the time (`full_bdg` reports
+   the mean field dynamically unstable, max Im ω = 1050).
+
+4. **`seed_from` had to be refused.** `_gs_cache_key`'s docstring claimed
+   warm-started solves "are never auto-cached", and the guard it relied on
+   (`psi_prev === nothing`) does not catch `seed_from`, which warm-starts from
+   bytes at a path. 19 committed configs use it. `Stage.from` is the slot a warm
+   start belongs in and `artifact_id` recurses into it, but the predecessor here
+   is a directory of point files rather than a `Stage`, so this is refused rather
+   than mis-declared as from-scratch.
+
+5. **`gs_model` gained one refusal.** `_resolve_lhy_block!` copies `lhy.c_lhy`
+   into `interactions.c_lhy` for any kind but only sets `lhy_kind` when the kind
+   is not `none`, so `lhy: {kind: none, c_lhy: 5.0}` runs with a `ScalarLHY`
+   (`make_workspace.jl:435`) while `_lhy_spec` returns the inactive `LHYSpec()`.
+   That is a model claiming there is no LHY over a run that has one — found by
+   this step's acceptance condition, since `c_lhy` was one of the old key's 19
+   entries. No committed config is that shape.
+
+6. **The `[KNOWN-GAP]` correction 1 left here is CLOSED.** The cache-hit
+   `make_workspace` now receives `light_shift`, `spinor_lhy`, `lhy_opts` and
+   `rotating_frame_omega`. It has to close here because step 3 is what makes it
+   dangerous — those are slots of the model the id is derived from, so a hit is
+   by construction a hit for a config that declared them, and an id that promises
+   LHY over a workspace that has none is the id lying about its own artifact. The
+   flip is also what makes it safe: a tabulated LHY with no explicit `n_max` has
+   no id and can never reach that branch, so the table can no longer be built
+   from a different ψ than the solve used. Residual, named: `:full_bdg` still
+   takes its SPINOR from `psi_init`.
+
+**Two consequences to state plainly.**
+
+*Every `src/` edit now invalidates the whole GS stage store*, because
+`artifact_id` digests `code_tree_hash()`. That is invariant 3 working as
+designed, and it is §7 question 1 — which is still open. It was measurable
+before only as a hypothetical; from this commit it is the behaviour.
+
+*Arm (b) of `admit_payload` is NOT deleted here.* Step 2's deviation 2 assigned
+it to step 3, and it needs a dated cutoff plus its own gate. Its population at
+this site is nevertheless zero twice over: the stage store
+(`SPINORBEC_STAGE_DIR`, default `<store>/_stage/gs`) does not exist, and the
+flip changes every id in the store, so a pre-flip artifact is no longer
+ADDRESSABLE.
+
+`scripts/backfill_gs_stage.jl` is deleted rather than rewritten. It reconstructed
+a live `_gs_cache_key` for each old point and copied ψ into the stage store;
+under an id that digests the code revision, an artifact backfilled from a run of
+an OLD revision would be filed under the CURRENT one, which is a lie about what
+produced it. It also had nothing to do: 0 `.jld2` exist under `runs/`.
 
 **Step 4 — the 11 ambient `Ref`s become `stage.params` fields.** Eleven
 mechanical edits, listed by file:line in §1. `DEALIAS_K_CUTOFF` and
 `DEALIAS_2_3_ENABLED` first: they are the pair that 75 committed configs set and
-that no spec-derived key could see. Gate is a grep for `const … = Ref(` under
-`src/hamiltonian/` and `src/foundation/spinor_utils/`.
+that no spec-derived key could see. ~~Gate is a grep for `const … = Ref(` under `src/hamiltonian/` and
+`src/foundation/spinor_utils/`.~~ **That gate, as I specified it, was defective
+and was replaced when step 4 ran it verbatim.** It matches `Ref(` but not
+`Ref{Union{…}}(`, so it cannot see `DEALIAS_K_CUTOFF` — one of the two the same
+sentence calls out as the pair to do first — and it scans two directories, so
+both euler warps in `ext/SpinorBECCUDAExt/` are outside it. Three of eleven
+invisible; measured, the grep returns 6 lines against 15 module-level `Ref`s
+under `src/` + `ext/`.
+
+The gate is now a scanner over `CODE_TREE_DIRS` (asserted equal to
+`("src", "ext")` rather than restated, so it cannot drift from what
+`code_tree_hash` covers) matching `Ref(` / `Ref{` / `Base.RefValue`, compared
+against a **pinned literal set with a reason per entry**, checked in both
+directions so neither an addition nor a rename can pass. `test_no_ambient_module_refs.jl`.
+
+Two further gates were found broken while doing this, both reported rather than
+quietly strengthened. `bench/verify_euler_warp.jl` flipped `_DDI_EULER_WARP[]`
+and then called a function that takes the Taylor path first at `D <= 16`, so it
+compared the Taylor kernel with itself, measured relerr `0.0`, and printed OK
+under a tolerance implying its author expected a difference; `_SM_EULER_WARP` had
+no coverage at all. And `test_cpu_spin_rotation_taylor_parity.jl` did not gate
+`SPIN_TAYLOR_RSAFE` — its own comment claims the sweep runs "far past
+`SPIN_TAYLOR_RSAFE`, where every voxel halves", but the largest R it reaches is
+8.17, where an unhalved degree-40 Horner is still 3.8e-12.
 
 **Step 5 — `refs/<paper>.toml` + `claim`.** One file, `refs/matsui2025.toml`,
-populated from the numbers already pinned in
-`test/validation/test_matsui_fig4_dip.jl`. `Claim`'s inner constructor is 8
+~~populated from the numbers already pinned in
+`test/validation/test_matsui_fig4_dip.jl`~~. `Claim`'s inner constructor is 8
 lines.
+
+**That instruction, and the example row in §2.5, were both wrong, and the way
+they were wrong is the reason the step exists.** §2.5 shows
+`[dip_width_nT] value = 12.84`. That number appears nowhere in
+`test_matsui_fig4_dip.jl`, which pins `14.5414`. Both are correct measurements
+by the same metric of the same published curve: `14.5414` is the experimental
+width over the full published range, `12.8383` is the same width restricted to
+**our own scan's** `[-13, +9]` nT window, which is what §0.7 of the parameter
+contract actually arbitrated on. `resonance_dip`'s `center` is a parabolic
+vertex and is window-invariant (measured: identical to 12 digits across five
+windows); its `width` is a half-depth crossing against a per-side **endpoint**
+baseline and is therefore *defined by* the window — the simulated curve gives
+15.0224 / 13.0734 / 12.7524 nT over `[-20,20]` / `[-13,9]` / `[-12.5,9]`. A row
+storing a bare `dip_width_nT` is under-determined by 2.3 nT, **18 %, twice the
++8.8 % excess it is used to arbitrate**. So `window` and `window_from` are
+required fields on every measured row, and `quotable_digits` carries §0.7's
+"quote it to two significant figures, not four" as a column rather than a
+parenthesis. Six configs under `runs/matsui_fig4b/` quote the full-window
+`15.0224` in their headers as "the target" while the comparison used the
+scan-window number — a live instance of exactly the drift this file removes.
+
+The shipped shape is therefore not "the numbers, copied". A `measured` row names
+the fixture (by path **and sha256**), the metric, the metric field, the baseline
+convention and the window; `ref` **re-runs that measurement on every call** and
+refuses the row if the stored value disagrees by more than `1e-9 / 1e-12`. The
+stored number is a cross-check, never the authority. Two further provenances
+carry what cannot be re-measured: `read_off` names `file:line` in the authors'
+published Fortran (pinned by content hash, since only the CSV extracts are
+committed), and `reconstructed` — a value that source does **not** contain —
+additionally owes the alternative it was chosen over and what choosing wrong
+costs, in units and by a stated method (`analytic` / `measured` / `unpriced`).
+27 quantities: 8 measured, 17 read-off, 2 reconstructed.
+
+`ref` returns a `RefRow`, an explicitly-typed `NamedTuple` — that is the
+`Union{Nothing, NamedTuple}` §2.5 types `Claim.target` as, pinned so the shape
+does not vary per row. It has to be the **whole row**: `target.value` is what a
+comparison compares, but `target.window`, `target.metric` and
+`target.endpoint_baseline` are what the comparison must consume to measure our
+run the same way. `scripts/validation/matsui_fig4b_report.jl:86` already does
+this by hand.
+
+**Two numbers this document and its neighbours carried were re-derived and are
+wrong.** (a) "`Ntot = 3.5e4` vs `5.0e4` is a factor 2 in `c_0`, worth 34 % in
+peak density" — measured, it is **10/7** (`c_0 + 36c_1` = 4687.266 against
+3281.086), and 34 % is `2^(-3/5)`, the figure for a factor 2. The factor 2 is
+the *separate* `cc0_eff` item, which §0.3.5 of the parameter contract **proves
+is degenerate** for a polarised `m = -F` state — so
+`runs/matsui_fig4b/fig4b_gsvariant_n32.yaml` prices a knob the observable cannot
+see, and `matsui_reproduction_status.md:22-25` still asserts the retracted
+version. (b) `ZeemanQ = 1 Hz ⇒ 0.68 nT` **checks out** (11q against
+p/h = 16.275 Hz/nT ⇒ 0.6759 nT) and is now a gated arithmetic identity rather
+than a sentence.
+
+**A gate that reads the TOML and checks the TOML proves nothing**, so
+`test/validation/test_matsui2025_ref.jl` (391 assertions, tier `ci`) has three
+independent arms: `ref_measure` against the fixture, literals pinned in the test
+file, and the raw stored value parsed straight out of the TOML. That third arm
+is not decoration — the first version of arm 1 compared `ref_measure(q)` with
+`ref(q).value`, and since `ref` *returns the fresh measurement*, that was a
+measurement compared with itself. It was caught by canary, not by review:
+neutering `ref`'s own cross-check and perturbing a stored value by 0.1 left arms
+1 and 2 fully green, and only the in-test canary went red.
+
+Eight canaries were run by breaking source, reading the log from disk, and
+restoring byte-identically — the fixture shifted 1 nT *with its declared hash
+updated to match* (so only the measurement can catch it), each of `Claim`'s
+three refusals deleted in turn, `ref`'s value cross-check / hash check /
+reconstruction required-key clause neutered, and a positive control for the
+"only reader of `refs/`" tripwire. **Two gates were found green and are reported,
+not quietly strengthened**: arm 1's circularity above, and a canary aimed at the
+reconstruction-specific required-key clause, which is redundant whenever a row
+retains *any* other cost key — stripping one key still trips the general
+all-or-nothing rule, so the canary had to strip the whole group.
+
+**What is NOT shipped, and why.** No type-C Matsui claim is constructed. It
+needs 45 `:evolve` cells plus a `c_dd = 0` control, and **zero of those 46
+stages are constructible**: `gs_stage` (`run_step_ground_state.jl:310`) is the
+only `Stage` producer in `src/`, and `run_step_dynamics.jl` declares none — the
+same blocker two committed tests in `test/model/` already name. Offering the
+ground-state stage as evidence for a dip-width claim would restate a different
+observable, which is the failure the `control` field exists to name. What ships
+instead is the type-**A** claim the tree does support — that
+`fig4b_scan_n32.yaml` resolves to the parameters registered for the paper,
+checked against `ref` rather than against the config's own header prose — plus a
+tripwire that fires the day an `:evolve` producer appears. `Claim`'s constructor
+is the specified 8 lines and no more; the one hole they leave (`evidence =
+Stage[]` constructs) is pinned as an executable statement instead of closed
+unilaterally.
+
+**Answers §7 question 4:** `refs/` at the repo root. `docs/refs/` holds PDFs for
+people; this is machine-read and gated. The CSV fixtures stay in
+`test/fixtures/matsui2025/` — already committed, already gated, already rsynced
+to TSUBAME, and outside `code_tree_hash`, so neither location touches identity.
+
+**`claim` collided with the test runner, and only in parallel.** `run_chunk.jl`
+does `using SpinorBEC` and then defined its own `claim(dir, i)` — the O_EXCL
+queue helper — at top level, so `Main.claim` shadowed `SpinorBEC.claim` for
+every file that process included. `test_matsui2025_ref.jl` was **green run
+directly and red under `SPINORBEC_TEST_WORKERS=auto`**, which is the worst shape
+a name collision can take. The runner's helper is renamed `claim_work_item`
+(root fix: a private queue helper should not squat on a package export), and the
+existing "no test file shadows a SpinorBEC export" gate — whose regex covered
+`struct` / `const` / `abstract type` but **not `function`**, which is precisely
+why it had been green over this collision since the day `claim` was exported —
+now covers `function` too. Scanning `test/` with the extended pattern returns
+exactly one hit, that one, so closing the class cost nothing. This is a live
+argument for §7's unasked question: `ref` and `claim` are extremely generic
+names to export from a package, and the first one has already bitten.
 
 **Step 6 — delete `metadata:`.** `schema.jl:402`, plus the 45 keys in configs,
 after grepping that nothing reads them (it does not, by §1).
 
-**Deleted from `src/` by the end:** `_gs_cache_key` + `_hashable`
-(`run_step_ground_state.jl:235-271`), the `"metadata"` schema key
+**Deleted from `src/` by the end:** `_gs_cache_key` + `_hashable` (done, step 3;
+`scripts/backfill_gs_stage.jl` went with them), the `"metadata"` schema key
 (`schema.jl:402`), and 11 `const Ref` bindings. Nothing else is removed —
 `src/model/` is kept as-is and `content_id` is untouched.
 
@@ -512,3 +955,37 @@ face on all 14 `HamTerm`s.
    3 makes that *visible* — the id changes — but only if the hash is computed on
    the compute node from the actual checkout, not baked at submit time. Confirm
    that is the intended reading before step 1 ships.
+
+---
+
+## Appendix: requirements discovered after the unified-design inventory began
+
+Recorded here so the unified redesign cannot silently drop them. Each was found
+by a canary that came back GREEN, i.e. by a gate proving itself not to work.
+
+**R-VERDICT-TRUTH (2026-08-02, W2-d).** The completion marker carries the solve's
+verdict — `converged`, `stop_reason`, `floor_limited`, `grad_norm` — and admission
+can require it. But every gate over it checks the verdict's PRESENCE and INTERNAL
+CONSISTENCY, never its TRUTH. Forcing `Bool(gs.converged)` to `true` at the writer
+(`run_step_ground_state.jl:709`) leaves all 168 assertions across
+`test_marker_verdict.jl`, `test_admission_requires_marker.jl` and
+`test_completion_marker.jl` **green**.
+
+So a marker can lie, and the design has no answer for that. It is the same shape
+as an id that lies — the difference being that identity is DERIVED from the
+declaration and therefore cannot disagree with it, whereas the verdict is
+REPORTED by the thing being judged. Anything a run says about itself is in this
+class; anything derived from what a run *is* is not.
+
+The candidate fix is an independent re-derivation — recompute `grad_norm` from
+the stored psi and compare — which is cheap relative to the solve it certifies.
+That is not implemented. A unified design must either derive the verdict rather
+than accept it, or state plainly that self-reported fields are trusted and mark
+them as such wherever they are read.
+
+**R-ARM-INDEPENDENCE (2026-08-02, R8).** The literature-target gate has three
+arms and only their COMPOSITION is sound: making `ref_measure` return the stored
+value leaves arms 1 and 2 green while the three canary arms fire. That is by
+design and it is verified, but it means no single arm may be dropped or
+simplified without re-establishing the composition. A design that keeps one arm
+and calls it "the gate" reopens the hole.

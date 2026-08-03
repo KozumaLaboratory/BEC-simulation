@@ -34,11 +34,19 @@
 #   julia --project=. scripts/validation/compare_operator_rhs.jl \
 #       ours/operator_rhs.jld2 theirs/operator_rhs.jld2
 
-metadata:
-  suite: step6_ueda_reference_state
-  ladder_level: 10
-  reference: parameter_contract_with_Ueda.md_signed_2026_05_26
-  origin: locked_in_post_parser_fix_e8584f4
+# Provenance. This was a `metadata:` block until the step-6 cutover deleted
+# that key (59 keys, no readers — see `docs/validation/config_prose_harvest.toml`).
+# The four values are kept verbatim as comments because they are the only
+# statement of what this reference state IS, and because a key nothing reads
+# cannot be the place they live:
+#
+#   suite         step6_ueda_reference_state
+#   ladder_level  10
+#   reference     parameter_contract_with_Ueda.md, signed 2026-05-26
+#   origin        locked in AFTER the parser fix e8584f4 — which matters, because
+#                 that commit reversed what `duration: 0.0` inside a ramp means
+#                 (it is now an instantaneous jump, not a full-window ramp), so a
+#                 state locked before it is not this one.
 
 defaults:
   kind: spinor

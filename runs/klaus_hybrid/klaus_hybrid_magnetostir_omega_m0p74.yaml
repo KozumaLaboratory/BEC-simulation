@@ -1,13 +1,6 @@
 # Klaus hybrid Cell B — MAGNETOSTIR + weak-field EdH readout.
 # GS → tilt-up → spin-up → steady Klaus magnetostir → B quench → weak-field readout.
 
-metadata:
-  suite: klaus_hybrid
-  cell_name: klaus_hybrid_magnetostir_omega_m0p74
-  rotation_omega: -0.74
-  protocol_kind: hybrid_magnetostir
-  generator: scripts/validation/klaus_hybrid_magnetostir_edh_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

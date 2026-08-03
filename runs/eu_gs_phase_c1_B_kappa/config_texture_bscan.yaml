@@ -2,7 +2,6 @@
 # (flower/CSV/PCV) diverge from a uniform axial FM. FM-region c1, κ=1, 5 competing
 # seeds per cell (min-E = the phase). Below the crossover the spin is in-plane
 # (soft manifold); above it pins axial. The texture window (if any) is just above.
-metadata: {owner: anko, project: Eu151 texture B-scan (crossover, FL/CSV/PCV)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
