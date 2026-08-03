@@ -518,10 +518,11 @@ function _run_step(
             enable_ddi, c_dd=c_dd_val,
             secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
             ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
-            light_shift=gs_light_shift,
-            spinor_lhy=spinor_lhy_mode,
-            lhy_opts=gs_lhy_opts,
             backend,
+            # Both sides of the merge independently closed the step-1b
+            # [KNOWN-GAP] here — main and this branch each added these three,
+            # and git took both copies without reporting a conflict, which is
+            # why the package stopped parsing. One copy.
             light_shift=gs_light_shift,
             spinor_lhy=spinor_lhy_mode,
             lhy_opts=gs_lhy_opts,
