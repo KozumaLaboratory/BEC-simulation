@@ -43,13 +43,14 @@
 # duration = 3.5939821 t.u. = 5.2 ms x 691.1504 ; ramp = 0.1036726 t.u. = 150 us
 # save.every divides the step count exactly.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fit_hold_T52
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_hold_T52
+# grid_n: 32
+
 
 defaults:
   kind: spinor

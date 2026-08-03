@@ -31,13 +31,14 @@
 #
 # N_atoms is patched in all three places; c1_ratio in both.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fit_paperN_r018
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_paperN_r018
+# grid_n: 32
+
 
 defaults:
   kind: spinor

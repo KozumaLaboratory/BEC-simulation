@@ -15,13 +15,14 @@
 # 実験の dip 最小値 0.3148 とほぼ一致する。だがそれは別の量（実験の 0.3148 は
 # B ~ -3.4 nT の dip 最小）。同じ量どうしで比べるためにこのスキャンが要る。
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: sdloss_dip
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: sdloss_dip
+# grid_n: 32
+
 
 defaults:
   kind: spinor

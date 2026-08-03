@@ -33,13 +33,14 @@
 # N_atoms is patched in all THREE places it can enter (defaults.interactions,
 # the ground_state block, and the dynamics block); c1_ratio in both of its two.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fit_expN_r015
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_expN_r015
+# grid_n: 32
+
 
 defaults:
   kind: spinor

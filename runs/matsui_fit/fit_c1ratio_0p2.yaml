@@ -39,13 +39,14 @@
 #
 # c1_ratio is set in BOTH the ground_state and dynamics blocks.
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fit_c1ratio_0p2
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_c1ratio_0p2
+# grid_n: 32
+
 
 defaults:
   kind: spinor

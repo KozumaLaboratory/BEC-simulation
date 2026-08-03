@@ -11,13 +11,14 @@
 # 論文の値は 1/36 = 0.0278、同梱コードの実効値は 1e-2/36 = 0.000278（1 本になり、
 # 論文が図示する 3 本を再現しない）。
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: rc0p0139
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: rc0p0139
+# grid_n: 32
+
 
 defaults:
   kind: spinor

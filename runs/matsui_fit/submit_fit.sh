@@ -78,7 +78,6 @@ case "${SGE_TASK_ID:-1}" in
     40) CONFIG=runs/matsui_fit/rc0p0139.yaml ;;
     41) CONFIG=runs/matsui_fit/rc0p5.yaml ;;
     42) CONFIG=runs/matsui_fit/rc1p0.yaml ;;
-    43) CONFIG=runs/matsui_fit/rc2p0.yaml ;;
     44) CONFIG=runs/matsui_fit/sdloss_1em40.yaml ;;
     45) CONFIG=runs/matsui_fit/sdloss_5em40.yaml ;;
     46) CONFIG=runs/matsui_fit/sdloss_2em39.yaml ;;

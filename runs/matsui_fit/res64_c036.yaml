@@ -12,13 +12,14 @@
 # 判定: 時間パターンが 32/64/128 で保たれるなら本数は物理。変わるなら 32^3 の
 # 結論（および論文の 3 本という記述の再現）は分解能に依存していたことになる。
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: res64_c036
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: res64_c036
+# grid_n: 32
+
 
 defaults:
   kind: spinor

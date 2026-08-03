@@ -25,13 +25,14 @@
 #
 # 一次情報: docs/validation/matsui_experiment_parameters.md
 
-metadata:
-  suite: matsui_fig4b
-  ladder_level: 12
-  reference: Matsui_2025_EdH_Zenodo_17303925
-  claim_type: C
-  target: fit_code_qc1e2_n35k
-  grid_n: 32
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_code_qc1e2_n35k
+# grid_n: 32
+
 
 defaults:
   kind: spinor
