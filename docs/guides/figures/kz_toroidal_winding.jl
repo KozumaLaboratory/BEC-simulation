@@ -236,6 +236,7 @@ function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
     shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
+    L::Float64=KZ_L,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -273,7 +274,7 @@ function kz_winding_scan(;
         for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold)
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L)
             push!(Ws, r.W);
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
@@ -409,17 +410,25 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # So the same window in t_hat/tau_Q at three rates is simultaneously the
         # affordable measurement and the check that the number is an exponent at
         # all rather than a local slope.
-        m = match(r"^gam(\d+)of(\d+):([0-9.]+):(nd|full):(\d+)$", mode)
-        m === nothing && error("gam mode: gamIofN:GAMMA:nd|full:NTRAJ, got $mode")
+        m = match(r"^gam(\d+)of(\d+):([0-9.]+):(nd|full):(\d+)(?::L([0-9.]+))?$", mode)
+        m === nothing && error("gam mode: gamIofN:GAMMA:nd|full:NTRAJ[:L<len>], got $mode")
         i, n = parse(Int, m[1]), parse(Int, m[2])
         γ = parse(Float64, m[3])
+        # xi_hat = L/(4 sigma(W)^2) reached 145-153 on the paper's ring of 200 at
+        # the slow end of the FULL runs — three quarters of the circumference. The
+        # winding cannot fall further once a single domain spans the ring, so the
+        # last interval flattens and beta is biased low. The size test already
+        # showed xi_hat is physical and sigma(W) ∝ sqrt(L), so a longer ring buys
+        # headroom without changing the length being measured.
+        local Lr = m[6] === nothing ? KZ_L : parse(Float64, m[6])
+        local Mg = round(Int, 256 * Lr / KZ_L)      # dx held fixed
         # Fixed window in t_hat/tau_Q = 3.4/sqrt(gamma tau_Q): span the same
         # ratios 0.34 … 0.034 at every gamma, i.e. tau_Q = 100/gamma … 1e4/gamma.
         τs = (1 / γ) .* [1e2, 3e2, 1e3, 3e3, 1e4]
         kz_winding_scan(; tau_Qs=τs, n_traj=parse(Int, m[5]),
-            M_damp=(m[4] == "full" ? γ : 0.0), gamma=γ, dt=0.05, M_grid=256,
+            M_damp=(m[4] == "full" ? γ : 0.0), gamma=γ, dt=0.05, M_grid=Mg, L=Lr,
             backend, shard=(i, n), raw_only=true,
-            tag="kz_torus_gam$(replace(string(γ), "." => "p"))$(m[4])_s$(i)of$(n)")
+            tag="kz_torus_gam$(replace(string(γ), "." => "p"))$(m[4])L$(round(Int, Lr))_s$(i)of$(n)")
     elseif startswith(mode, "size")
         # Is xi_hat physical or is it the ring? It came out 20-37 at every quench
         # rate on a ring of 200 — L/6, six to eight domains, which is no dynamic

@@ -32,7 +32,7 @@ echo "[kzprod] md5=$(md5sum docs/guides/figures/kz_toroidal_winding.jl | cut -d'
 pids=""
 for i in $(seq 1 $NSHARD); do
     "$JULIA" --project=. docs/guides/figures/kz_toroidal_winding.jl \
-        "gam${i}of${NSHARD}:${SBEC_GAMMA}:${MD}:${NTRAJ}" > "$OUT/gam${SBEC_GAMMA}_${MD}_${i}.log" 2>&1 &
+        "gam${i}of${NSHARD}:${SBEC_GAMMA}:${MD}:${NTRAJ}${SBEC_L:+:L${SBEC_L}}" > "$OUT/gam${SBEC_GAMMA}_${MD}_L${SBEC_L:-200}_${i}.log" 2>&1 &
     pids="$pids $!"
 done
 fail=0
