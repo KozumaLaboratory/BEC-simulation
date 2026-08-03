@@ -116,11 +116,16 @@ function find_ground_state_lbfgs(;
     precond_alpha_k::Float64=1.0,         # kinetic shift for the P_C kinetic factor
     # OFF by default because it was MEASURED, not because nobody tried it: on
     # the weak-field Eu+DDI soft manifold at 24³ it made convergence ~40×
-    # WORSE (d496dd71, 2026-06-23). The reason is structural, so do not expect
-    # a better α to rescue it — that ground state spontaneously breaks the
-    # exact axial U(1) `e^{-iθ(L_z+F_z)}`, so the minimum is a degenerate
-    # ORBIT with a Goldstone flat direction, and a DIAGONAL preconditioner
-    # cannot precondition a collective zero mode.
+    # WORSE (d496dd71, 2026-06-23).
+    #
+    # The MECHANISM is open. It was recorded as "a diagonal preconditioner
+    # cannot precondition a collective Goldstone", and that does not survive
+    # measurement: `bench/probe_lbfgs_orbit_fraction.jl` finds the L-BFGS step
+    # orthogonal to the orbit tangent to machine precision (median 2.4e-17
+    # against a positive control of 1.000000), so the Goldstone is not in the
+    # iterate path and cannot be the thing P_C fails to fix. The ground state
+    # does break the exact axial U(1) `e^{-iθ(L_z+F_z)}`; it is the causal step
+    # that does not follow. Do not read the 40 % as explained.
     #
     # This is worth stating here rather than only in a commit message: the
     # bench that was kept expressly "so the next session does not re-derive
