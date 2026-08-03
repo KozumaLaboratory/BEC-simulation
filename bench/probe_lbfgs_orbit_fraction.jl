@@ -52,7 +52,19 @@ function cell()
         zeeman=ZeemanParams(EU_p_weak, 0.0),
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
         enable_ddi=true, c_dd=EU_c_dd, backend=CPUBackend(),
-        initial_state=:m_plus_F, verbose=false,
+        # NOT `:m_plus_F`, and that is the whole fixture. From it `L_zψ = 0`
+        # exactly (no azimuthal dependence) and `F_zψ = Fψ`, so the orbit
+        # tangent `-i(L_z+F_z)ψ` is PARALLEL to the phase tangent `iψ` — the two
+        # generators are indistinguishable and both are trivially orthogonal to
+        # any norm-preserving step. The first run of this probe measured exactly
+        # that and reported 0.0000 for the signal AND the control.
+        #
+        # A transverse spin-coherent state separates them: `F_zψ` is no longer
+        # proportional to ψ, so the co-rotation generator acts. It is also the
+        # weak-field starting point the soft-manifold work uses.
+        initial_state=:spin_coherent,
+        init_state_params=Dict(:init_theta => Float64(π) / 2, :init_phi => 0.0),
+        verbose=false,
     )
 end
 
@@ -88,13 +100,65 @@ function along(t, s, dV)
     abs(_realdot(t, s) * dV) / (nt * ns)
 end
 
+"""
+    control(psi, ws, dV) → Float64
+
+Apply the group element itself and measure the displacement it produces. A
+finite θ rotation gives a step that is almost entirely orbit motion, so this
+must come back near 1. Anything else means `orbit_tangent` is not the tangent
+to the orbit and every number below it is meaningless — which is exactly how
+the first version of this probe reported a clean 0.0000 for signal and control
+alike.
+"""
+function control(psi, ws, dV, θ)
+    lz = similar(psi)
+    fill!(lz, zero(eltype(lz)))
+    apply_operator!(lz, CoriolisTerm(1.0), ws, psi)
+    lz .*= -1
+    sys = ws.spin_matrices.system
+    F, D = sys.F, sys.n_components
+    # `e^{-iθ(L_z+F_z)}` is not available as one operator here, so rotate by the
+    # F_z part only and check THAT generator, which is the half that
+    # distinguishes this orbit from the global phase.
+    rot = similar(psi)
+    for c in 1:D
+        m = Float64(F - (c - 1))
+        idx = ntuple(d -> d == ndims(psi) ? (c:c) : Colon(), ndims(psi))
+        @views rot[idx...] .= cis(-θ * m) .* psi[idx...]
+    end
+    s = rot .- psi
+    tF = similar(psi)
+    for c in 1:D
+        m = Float64(F - (c - 1))
+        idx = ntuple(d -> d == ndims(psi) ? (c:c) : Colon(), ndims(psi))
+        @views tF[idx...] .= (-im * m) .* psi[idx...]
+    end
+    along(tF, s, dV)
+end
+
 function main()
     c = cell()
     dV = cell_volume(c.grid)
     println("orbit-fraction probe — Eu151 F=6 $(GRID_N)^3 +DDI, steps 1..$K")
     println("commit: ", strip(read(`git -C $(joinpath(@__DIR__, "..")) rev-parse --short HEAD`, String)))
     println()
-    @printf("  %5s %12s %12s %12s\n", "step", "|s_k|", "orbit frac", "phase frac")
+    # Instrument check BEFORE any measurement. A small rotation is almost pure
+    # orbit motion; if this is not ~1 the tangent is wrong.
+    let r0 = find_ground_state_lbfgs(; c..., n_steps=1, tol=0.0)
+        ws0 = r0.workspace
+        p0 = copy(ws0.state.psi)
+        for θ in (1.0e-4, 1.0e-2)
+            ctl = control(p0, ws0, dV, θ)
+            @printf("  positive control: rotate by θ=%.0e ⇒ orbit frac %.6f\n", θ, ctl)
+            if !(ctl > 0.99)
+                println("  !! INSTRUMENT BROKEN — the tangent does not follow the group. Stop.")
+                return
+            end
+        end
+        println()
+    end
+
+    @printf("  %5s %12s %14s %14s\n", "step", "|s_k|", "orbit frac", "phase frac")
 
     prev = nothing
     ws_ref = nothing
@@ -111,7 +175,10 @@ function main()
             fp = along(phase_tangent(prev), s, dV)
             push!(fr_orbit, fo)
             push!(fr_phase, fp)
-            k % 5 == 1 && @printf("  %5d %12.4e %12.4f %12.4f\n", k - 1, ns, fo, fp)
+            # Scientific notation on purpose: `%.4f` printed 1e-5 and 1e-16
+            # both as 0.0000, which hid whether the first run's null was a
+            # measurement or a degenerate fixture.
+            k % 5 == 1 && @printf("  %5d %12.4e %14.4e %14.4e\n", k - 1, ns, fo, fp)
             flush(stdout)
         end
         prev = psi
@@ -120,9 +187,9 @@ function main()
     srt(v) = sort(v)
     q(v, p) = srt(v)[clamp(round(Int, p * length(v)), 1, length(v))]
     println()
-    @printf("  orbit fraction  median %.4f   p90 %.4f   max %.4f   (n=%d)\n",
+    @printf("  orbit fraction  median %.3e   p90 %.3e   max %.3e   (n=%d)\n",
         q(fr_orbit, 0.5), q(fr_orbit, 0.9), maximum(fr_orbit), length(fr_orbit))
-    @printf("  phase fraction  median %.4f   p90 %.4f   max %.4f   [control]\n",
+    @printf("  phase fraction  median %.3e   p90 %.3e   max %.3e   [reference]\n",
         q(fr_phase, 0.5), q(fr_phase, 0.9), maximum(fr_phase))
     println()
     println("  A step is a unit vector, so `frac` is the cosine to the orbit tangent.")
