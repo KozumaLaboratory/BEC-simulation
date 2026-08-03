@@ -249,7 +249,14 @@ the record of that.)
 
 `test/fixtures/matsui2025/dataset_fig4_theo.csv` is a 1 nT grid descending from
 +20 nT (0.5 nT between −10 and +10), 61 points, totalling 49999.9 atoms at every
-field. The Fig. 4B observable is `N_{m=−6}` after a 5 ms hold. Applying
+field. The Fig. 4B observable is `N_{m=−6}` after a 5 ms hold — confirmed from
+the paper on 2026-08-02 ("subjected to varying magnetic fields for a period of
+5 ms"), having previously been asserted here without a source. **The published
+theory curve is the in-situ population; the experimental points are taken after
+a 0.1 mT ramp, 2.7 ms expansion, Stern-Gerlach and 16 ms of free fall, so the two
+are not the same quantity. The field axis carries an offset error of up to 10 nT
+and ~1 nT of random fluctuation.** All three are stated in the Fig. 4 caption and
+Appendix E; see `matsui_experiment_parameters.md`. Applying
 `resonance_dip` (parabolic vertex; half-depth crossings against a per-side endpoint
 baseline) to both published curves:
 
@@ -637,6 +644,15 @@ Still open, and both small:
 This is **convention independence and reference generation on the same
 Ref-(19) model lineage**, not physics independence. It does not replace S-A1 or
 S-A2.
+
+**And it is a comparison against their SIMULATION, not their experiment.** The
+paper states the trap held ~5×10⁴ atoms with a negligible thermal component, so
+their published theory curve was computed at 70 % of the experimental atom
+number. Attempts made on 2026-08-02 to fit the experiment by scanning
+`c1_ratio`, `N`, `K3` and the hold time are retracted in full — every premise
+was wrong and every one is stated in the paper. The primary-source parameters
+are collected in `matsui_experiment_parameters.md`; read that before comparing
+anything to the experiment.
 
 ---
 
