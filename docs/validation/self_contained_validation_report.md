@@ -114,20 +114,26 @@ production runs.
 ### Layer F — DDI convention factorial
 
 Script: `test/hamiltonian/test_ddi_convention_factorial.jl` — **in `FAST_TESTS`,
-so it runs on every PR.** ~~Output: `runs/ddi_convention_factorial/results.jld2` (gone).~~
+so it runs on every PR.** Output: `runs/ddi_convention_factorial/results.jld2` (untracked).
 
-> **The authority here is the test, not the table (2026-07-31).**
-> `runs/ddi_convention_factorial/` (gone) has never existed in any commit, so the numeric
-> rows below cannot be re-checked. That matters less than it does elsewhere,
-> because what the test asserts is the *relations* — spherical → 0 (traceless Q),
-> prolate along B → E_DDI < 0 (head-to-tail attractive), oblate ⊥ B → E_DDI > 0,
-> and invariance under the axis flip — and those are gated on every push. The
-> vintage audit's own carve-out applies: "everything gated by a test in a tier"
-> is unaffected.
+> **Correction (2026-08-02): the output is on disk.** The 2026-07-31 version of
+> this box said `runs/ddi_convention_factorial/` (untracked) "has never existed in any commit,
+> so the numeric rows below cannot be re-checked", and struck the output line
+> through. Half right and wrongly concluded: **no commit contains it — and
+> `results.jld2` is 10 885 bytes in the main checkout, dated 2026-05-26.** It is
+> untracked, not gone, so it is invisible from a clone, from CI and from a
+> worktree, and the rows below *can* be re-checked here.
 >
-> So: **the physics stands, the printed numbers are illustration.** They were
-> produced by a run that is not in the repository and are not asserted anywhere.
-> Quote the relations, or re-run the test and quote its output.
+> The mistake was reading "untracked" as "absent" — the same conflation the
+> disposal manifest made across 474 directories, and the reason the citation gate
+> now carries an `(untracked)` marker
+> ([`stored_run_disposal.md`](../campaign/stored_run_disposal.md)).
+>
+> **The authority here is still the test, not the table.** What the test asserts
+> is the *relations* — spherical → 0 (traceless Q), prolate along B → E_DDI < 0
+> (head-to-tail attractive), oblate ⊥ B → E_DDI > 0, and invariance under the axis
+> flip — and those are gated on every push, which no stored number is. Quote the
+> relations, or re-run the test and quote its output.
 
 Factors: cloud shape ∈ {spherical, prolate, oblate}; B-axis ∈ {z, x};
 secular ∈ {false, true}; grid n ∈ {16, 24}. 24 rows total.

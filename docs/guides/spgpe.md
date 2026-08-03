@@ -121,14 +121,14 @@ real Eu evaporation, which is non-adiabatic spilling rather than evaporation. Wi
 the reservoir, the thermal cloud is not simulated at all; it is the I region, and
 the 0-D model already describes it on the experimental timescale.
 
-**What is and is not predicted.** Below $T_c$ the reservoir $\mu$ is pinned by
-the condensate, so prescribing $\mu(t)$ from the 0-D $N_0$ ties the c-field's
-*equilibrium* population to the 0-D answer by construction — the absolute $N_0$
-is a consistency check, not an independent measurement. What is independent is
-the **lag**: growth proceeds at finite $\gamma$, so a ramp faster than $1/\gamma$
-leaves the condensate behind its quasi-static value. The 0-D model cannot produce
-that gap at all, and it is what decides whether an "optimised" fast ramp actually
-delivers atoms.
+**What is and is not predicted.** Prescribing $\mu(t)$ **prescribes $N_0$** — see
+the euv3 section below; this is a property of the grand-canonical ensemble, not of
+how $\mu$ is derived. The absolute condensate number is therefore an input, and
+"does a BEC form" is not a question this configuration answers. What is
+independent is the **lag**: growth proceeds at finite $\gamma$, so a ramp faster
+than $1/\gamma$ leaves the condensate behind its quasi-static value. The 0-D model
+cannot produce that gap at all, and it is what decides whether an "optimised"
+fast ramp actually delivers atoms.
 
 ### The window a c-field can represent
 
@@ -148,62 +148,53 @@ than quietly lowering it — a lowered cutoff would let the *grid* define the C
 region and would push $\epsilon_\mathrm{cut}$ below $\mu$, where the reservoir
 formulas are undefined.
 
-### Result on the euv3 ramp: the c-field cannot follow
+### The euv3 ramp: a diagnostic, NOT a physics result
 
 ![second-scale SPGPE evaporation](../../figs/eu_evaporation_optimization/eu_evap_spgpe.png)
 
-Run it and the condensate does not form — and after four attempts the reason is
-not a setting. The reservoir $\mu(t)$ **peaks 95 of 1288 internal units in**
-(0.053 s of a 0.714 s window) and falls for the rest, because $\mu=\mu_{\rm TF}(N_0)$
-follows the 0-D condensate down as $K_3$ eats it from $1.4\times10^4$ to
-$1.8\times10^3$. The c-field is told to grow briefly and to shrink for 96 % of the
-run; $N_C$'s monotone $1.15\times10^4\to158$ is that instruction followed correctly.
+Run it and no condensate forms. **Do not read that as a statement about ¹⁵¹Eu.**
+It is a statement about the reservoir trajectory that was fed in, and it fails two
+independence tests.
 
-A condensate can only be built while $\mu$ is **rising**, so that is the only part
-of the budget that counts:
+**It does not survive the $K_3$ systematic.** $\mu = \mu_\mathrm{TF}(N_0)$ follows the
+0-D condensate down as three-body loss eats it, so the verdict tracks a
+one-parameter fit:
 
-| | $G$ | $G_\mathrm{eff}=\eta G$ |
-|---|---|---|
-| $\mu$ rising (usable) | 13.4 | **4.5** — against 6.9 needed |
-| $\mu$ falling | 45.2 | 15.1 |
-| whole window | 58.7 | 19.6 |
+| $K_3$/fit | 0-D final $N_0$ | vs measured | $\mu$ peak@ | $G_\mathrm{eff}$ | verdict |
+|---|---|---|---|---|---|
+| 1 | 1789 | **0.04** | 7.4 % | 4.5 | SHORT |
+| 0.25 | 7200 | 0.14 | 10.4 % | 15.3 | FORMS |
+| 0.02 | $6.1\times10^4$ | 1.21 | 19.5 % | 60.8 | FORMS |
 
-77 % of the budget lands after the turnover, where the damping term *removes*
-condensate. Integrating over the whole window is what reported a "2.8× margin"
-for a configuration whose usable budget was 0.65×. With the correction **every**
-cutoff depth is short — $n_T=0.5\to1.97$, $1.0\to0.44$, $2.0\to0.04$ — so no
-choice of $n_T$ makes this window work.
+The fitted $K_3$ leaves 4 % of the **measured** $5.02\times10^4$ (PRL 129, 223401).
+Reproducing the measurement takes $K_3\approx$ fit/50 — near the independent
+BEC-fit estimate — and there the budget clears by $8.8\times$. The verdict flips at
+$K_3/\mathrm{fit}\approx0.3$. Tuning $K_3$ until a condensate appears would be
+fitting the input to the desired answer, so it is not done here.
 
-**Read this as a statement about the window, not about the method.** $\mu$ is
-driven down by the 0-D condensate's three-body decay, which carries the known
-$\sim2\times$ systematic of issue #75; if the 0-D over-destroys the condensate it
-over-drops $\mu$ with it. What is established independently is that the solver
-condenses when the reservoir lets it: at fixed $\mu=5$, $T=2$ it reaches 82 % of
-the Thomas–Fermi number and is still rising.
+**And the deeper problem is the ensemble, not the fit.** In a grand-canonical
+SPGPE, $\mu$ below $\varepsilon_0$ forbids a condensate and $\mu$ above it *sets* the
+equilibrium size via $\mu = \varepsilon_0 + c_0n_0$. **Prescribing $\mu$ is
+prescribing $N_0$**, whatever $\mu$ is derived from. Taking $\mu$ from the I region
+instead (`mu_branch=:thermal`) does not escape it — an ideal Bose gas caps $\mu$ at
+$0$ while $\varepsilon_0 = \tfrac32\bar\omega \ge 0.62$, so the drive is negative at
+**all 447** trajectory points and $N_0 \equiv 0$ is imposed rather than predicted.
 
-## Cost — why this is now affordable
+So this configuration cannot answer "does Eu form a BEC, and how many atoms".
+What it does answer:
 
-Second-scale runs were previously written off as out of reach. The binding
-constraint was not physics but the noise draw: `_sgpe_add_noise!` generated every
-random number on the **host** and copied it across PCIe each step. Measured at
-$48^3$/D=3 on an RTX 5070 Ti (parts reconciled to the whole within 1 %):
+- **The lag.** For a *given* $(T(t),\mu(t))$, finite $\gamma$ decides whether the
+  c-field tracks. Here $\mu$ peaks 95 of 1288 internal units in — 0.053 s of a
+  0.714 s window — and falls for the rest; only the rising phase can build
+  anything, and it carries $G_\mathrm{eff}=4.5$ against 6.9 needed, with 77 % of the
+  budget landing after the turnover where damping *removes* condensate. That the
+  0-D quasi-static assumption breaks here is a real finding about the handoff.
+- **That the solver condenses when the reservoir allows it** — 82 % of
+  $N_\mathrm{TF}$ at fixed $\mu=5$, $T=2$, still rising.
 
-| | before | after |
-|---|---|---|
-| unitary `split_step!` | 0.45 ms | 0.45 ms |
-| dissipative sub-step | **21.1 ms** (88 % of it host RNG) | **2.4 ms** — *and it now also does energy damping* |
-| noise alone | 18.5 ms | 0.53 ms |
-
-The fix is `_randn_fill!`, dispatched on the backend, with a CURAND
-implementation in the CUDA extension (`ext/SpinorBECCUDAExt/gpu_rng.jl`). The CPU
-path draws from `rng` in the same order as before, so existing seeded streams are
-bit-identical; GPU reproducibility is **per trajectory**, seeded with
-`seed_device_rng!`, not per step.
-
-Budget: a full 1.5 s ramp at $64^3$ is ~0.55 h per trajectory with the reservoir
-applied every 5 steps. The 0.714 s Eu window sized by the growth budget lands at
-$48^3$ — an order of magnitude cheaper than the $96^3$ an over-deep cutoff
-demanded, because a shallower cutoff raises $\gamma$ *and* shrinks the grid.
+Answering the atom-number question needs a **number-conserving** formulation, with
+$\mu(t)$ solved so that $N_C+N_I$ matches a measured total. That is not
+implemented.
 
 ## Validation
 
@@ -243,3 +234,8 @@ Known limits, unchanged by this work:
 - The growth budget's efficiency $\eta\approx1/3$ is calibrated on one static
   test. It is an order-of-magnitude gate, not a predictor — treat $G_\mathrm{eff}$
   as "this window cannot possibly work" when short, not as a guarantee when large.
+- **Grand-canonical: $\mu$ is an input and it fixes $N_0$.** Below $\varepsilon_0$ no
+  condensate is possible; above it the equilibrium size follows from
+  $\mu=\varepsilon_0+c_0n_0$. `mu_branch=:thermal` does not escape this — it caps
+  $\mu$ at $0<\varepsilon_0$ and forbids condensation outright. Atom-number questions
+  need a number-conserving formulation, which is not implemented.

@@ -8,6 +8,7 @@
 #     --workers N         parallel test processes          (default: CPU threads − 2)
 #     --out DIR           where the matrix + report go      (default: mutation_out/)
 #     --allow-dirty       run with uncommitted src changes  (default: refuse)
+#     --no-negative-control  skip the repeat-baseline pass     (default: run it)
 #
 # Cost: one package precompile per mutant. On-demand / nightly, not a PR gate.
 #
@@ -32,6 +33,10 @@ _arg(flag, default) = (i=findfirst(==(flag), ARGS);
 const OUT = abspath(_arg("--out", joinpath(_ROOT, "mutation_out")))
 const NWORKERS = parse(Int, _arg("--workers", string(max(1, Sys.CPU_THREADS - 2))))
 const ALLOW_DIRTY = "--allow-dirty" in ARGS
+# The negative control costs one probe pass and is what makes a catch mean
+# something, so it is on by default. The escape hatch exists for a re-probe of a
+# handful of mutants where the noise floor was already measured this session.
+const SKIP_NEGATIVE_CONTROL = "--no-negative-control" in ARGS
 
 const MAX_COST = parse(Float64, _arg("--max-cost", "15"))
 
@@ -321,7 +326,35 @@ function main()
                  holds SpinorBEC + CUDA. Excluded:")
         foreach(f -> println("    ", f), base_unknown)
     end
-    live = filter(f -> baseline[f] === :green, files)
+    # ── negative control: the same baseline, twice ──────────────────
+    # The positive control (a known-caught mutant, carried per shard) proves the
+    # harness can still DETECT. It says nothing about what the harness detects
+    # when there is nothing to detect — and a catch is credited on a file turning
+    # RED, so any file that can turn red on its own manufactures catches, which
+    # book a real gap as covered.
+    #
+    # A second IDENTICAL pass measures exactly that noise floor. It needs no fake
+    # mutant and no anchor: `src/` is untouched, so it is provably inert, the
+    # precompile is a no-op, and it costs one probe pass. Anything that differs
+    # between two runs of the same tree is flaky, and a catch attributed only to
+    # a flaky file is not evidence.
+    flaky = String[]
+    if !SKIP_NEGATIVE_CONTROL
+        println("\n[negative control] re-running the unmutated probe set…")
+        baseline2 = run_probe(files, NWORKERS)
+        flaky = sort([f for f in files if baseline[f] !== baseline2[f]])
+        if isempty(flaky)
+            println("  0 files differed between two identical passes.")
+        else
+            println("  $(length(flaky)) file(s) DIFFERED with no mutation applied \
+                     — excluded, and any catch credited to them would have been \
+                     noise:")
+            foreach(f -> println("    ", f, "  ", baseline[f], " → ", baseline2[f]),
+                flaky)
+        end
+    end
+
+    live = filter(f -> baseline[f] === :green && !(f in flaky), files)
 
     # catch[mutant id] = files that went red under it. `unknowns` is kept SEPARATE:
     # a file that never reported cannot be credited with a catch (that books a real
@@ -362,7 +395,7 @@ function main()
     git_src_dirty() && @error "src/ is dirty after the run — inspect `git diff -- src`"
 
     write_matrix(muts, live, catches)
-    report(muts, live, catches, already_red, unknowns, base_unknown)
+    report(muts, live, catches, already_red, unknowns, base_unknown, flaky)
 end
 
 function write_matrix(muts, files, catches)
@@ -400,7 +433,7 @@ function min_cover(muts, files, catches)
 end
 
 function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{String}}(),
-    base_unknown=String[])
+    base_unknown=String[], flaky=String[])
     io = IOBuffer()
     println(io, "# Mutation report — ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
     println(io, "\n$(length(muts)) cataloged defect classes × $(length(files)) probe files.\n")
@@ -494,6 +527,21 @@ function report(muts, files, catches, already_red, unknowns=Dict{Symbol, Vector{
     foreach(
         f -> println(io, "- `$f` ($(round(Int, cost_of(f)))s",
             is_measured(f) ? " measured" : " est.", ")"), cover)
+
+    println(io, "\n## Negative control: two identical baseline passes\n")
+    if SKIP_NEGATIVE_CONTROL
+        println(io, "**NOT RUN** (`--no-negative-control`). A catch is credited on ",
+            "a file turning red, so without this the report cannot distinguish a ",
+            "catch from a flake.\n")
+    elseif isempty(flaky)
+        println(io, "0 files differed with no mutation applied — every catch below ",
+            "is a change the mutation caused.\n")
+    else
+        println(io, "**$(length(flaky)) file(s) differed with no mutation applied** ",
+            "and were excluded. A catch credited to one of these would have been ",
+            "noise:\n")
+        foreach(f -> println(io, "- `$f`"), flaky)
+    end
 
     if !isempty(already_red)
         println(io, "\n## Excluded: red before any mutation\n")
