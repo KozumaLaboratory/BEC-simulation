@@ -806,11 +806,28 @@ read as a known-wrong answer rather than a caveat; the other had no subject.
 
 **Three where the mechanism is weaker than the requirement asks.**
 
-8. **A2:R-CHAIN-03 — the fork-resolution policy.** The policy (replay from the
-   nearest held ancestor) is stated, but the per-method materialisation costs
-   that would make it real — 54 MB for psi against roughly 2.1 GB of L-BFGS
-   two-loop memory at 64^3 x 13 — are quoted from issue #250, not measured under
-   this design.
+8. **A2:R-CHAIN-03 — the fork-resolution policy. The quoted costs are now
+   DERIVED rather than cited (2026-08-04); the policy question they were
+   supposed to settle is still open.** The row's complaint was that 54 MB for
+   psi against ~2.1 GB of L-BFGS two-loop memory at 64³ × 13 came from issue
+   #250 and had never been checked under this design. Recomputed from the
+   shapes and the shipped defaults:
+
+   | | |
+   |---|---|
+   | ψ at 64³ × 13, `ComplexF64` | 64³·13·16 B = **54.5 MB** (52.0 MiB) |
+   | L-BFGS history, `m_lbfgs = 20` (`lbfgs/driver.jl:78`) | 2·m·\|ψ\| = **2.18 GB** (2.03 GiB) |
+   | ratio | **40×** |
+
+   Both figures reproduce, so #250 is not the authority for them any more — the
+   arithmetic is, and it is one line from the grid shape and one default. The
+   40× is what makes the policy's shape obvious: replaying from an ancestor is
+   cheap in ψ and ruinous in solver state, so the ancestor must be a ψ.
+
+   **What remains open is not a number.** Whether "replay from the nearest held
+   ancestor" is right depends on how often a fork actually lands mid-solve
+   rather than between stages, and nothing measures that. The cost table no
+   longer blocks it; the frequency does.
 9. **A5:R-NIX-07 — trusted producers.** `require` is verdict-shaped, not
    host-shaped. The capability is not designed out, but it is not built, and the
    day a stale-sysimage TSUBAME artifact enters a shared store is when it is
