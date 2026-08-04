@@ -1,5 +1,8 @@
 # What the 481 stored summaries are still for, and what they are not
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Measured 2026-08-02** across all worktrees. Companion to
 [`doc_run_citation_inventory.md`](doc_run_citation_inventory.md) and the
 re-derivation write-ups. **Nothing is deleted by this document** — it records the

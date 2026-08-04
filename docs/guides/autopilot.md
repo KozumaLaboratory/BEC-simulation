@@ -1,5 +1,8 @@
 # Autopilot — queue + tick + recipe + budget + trust
 
+> **FROZEN 2026-05-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 A thin meta-loop on top of existing pieces (CAS, Experiment, inspector,
 `_live_status.json`, notify_slack). No new framework — a `tick` function
 that walks `runs/<content_id>/state.toml`. The 2026-05-28 re-foundation
@@ -345,11 +348,10 @@ without spending GPU·h.
 
 ### Day-1 recipes (`setup_default_recipes!()`)
 
-Four starters at `autonomy_level=:suggest` by default:
+Three starters at `autonomy_level=:suggest` by default:
 
 - `:next_random_in_bounds` — warmup random sampling within `[lo, hi]`
 - `:refine_around_best` — hierarchical ±scale refinement
-- `:twin_with_loss_off` — auto-twin every parent (K3-off control)
 - `:analyze_majorana` — analysis-only pass
 
 ## Observability + watchdog

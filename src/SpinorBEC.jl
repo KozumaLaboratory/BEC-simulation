@@ -30,6 +30,7 @@ const TIMER = TimerOutput()
 
 include("foundation.jl")    # types + math primitives + backends
 include("hamiltonian.jl")   # interactions + potentials + integrators
+include("model.jl")         # Model: resolved physics as ONE concrete value (additive; nothing uses it yet)
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments

@@ -186,9 +186,12 @@ function Experiment(yaml_path::AbstractString; store::CASStore=default_store())
     Experiment(spec_dict, store, nothing, Dict{Symbol, Any}())
 end
 
+# One declaration, used by BOTH the constructor's path resolution and `run!`'s
+# admission. Before cutover step 2 the same `isfile` predicate was written out
+# twice (here and in `_result_path_or_nothing`), which is how the two would have
+# drifted the moment one of them learned about the marker.
 _has_result(dir::AbstractString) =
-    isdir(dir) && (isfile(joinpath(dir, "result.jld2")) ||
-                   isfile(joinpath(dir, "point_001.jld2")))
+    isdir(dir) && _admitted_result_path(dir) !== nothing
 
 # --- outdir (CAS-derived getter; no field access) ---
 
@@ -229,14 +232,32 @@ Base.propertynames(::Experiment) = (:spec, :store, :memo, :outdir)
 
 const _RESULT_NAMES = ("result.jld2", "point_001.jld2")
 
-function _result_path_or_nothing(exp::Experiment)
-    dir = outdir(exp)
+"""
+    _admitted_result_path(dir) -> Union{Nothing,String}
+
+The run's payload, or `nothing` if the directory does not admit (cutover step 2,
+invariant 4). Replaces the bare `isfile` that served a killed run's output as
+converged.
+
+**A rejection poisons the whole directory**, and that is deliberate rather than
+conservative. `save_rotating_basis_result!` makes `point_001.jld2` a SYMLINK to
+`result.jld2`; if a marked-and-disagreeing `result.jld2` merely fell through to
+the next candidate, the unmarked symlink pointing at those exact bytes would be
+admitted under arm (b) and the rejection would have achieved nothing.
+"""
+function _admitted_result_path(dir::AbstractString)
+    hit = nothing
     for n in _RESULT_NAMES
         p = joinpath(dir, n)
-        isfile(p) && return p
+        isfile(p) || continue
+        adm = admit_payload(p)
+        adm.hit || return nothing
+        hit === nothing && (hit = p)
     end
-    nothing
+    hit
 end
+
+_result_path_or_nothing(exp::Experiment) = _admitted_result_path(outdir(exp))
 
 function _result_path(exp::Experiment)
     p = _result_path_or_nothing(exp)

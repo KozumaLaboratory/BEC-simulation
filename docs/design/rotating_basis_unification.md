@@ -1,5 +1,8 @@
 # Rotating-basis ⇄ standard path: term-level unification plan
 
+> **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status:** design (2026-06-19). Companion to `option_gamma_rotating_basis.md`.
 
 ## Thesis (verified)

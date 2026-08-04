@@ -310,8 +310,12 @@ function _tabulate_lhy(energy_fn, ::Type{ResultT};
             "— ε is $(energy[bad]) at n = $(densities[bad]). This is the closed form " *
             "refusing to extrapolate (I_h: c_0 < 0 means the state is not the ground " *
             "state; λ_spin < 0 means its spin-Goldstone branch is dynamically " *
-            "unstable, where ε_LHY is scheme-dependent). Use `kind: full_bdg`, which " *
-            "diagonalises instead of assuming the branch structure."),
+            "unstable. polar_contact: σ₀ < 0 is the same thing for the density " *
+            "Goldstone branch, and it is what c₁ < 0 gives — the sign Eu F=6 " *
+            "production uses). ε_LHY is scheme-dependent in all of them. Use " *
+            "`kind: full_bdg`, which diagonalises instead of assuming the branch " *
+            "structure — but check `lhy_mean_field_max_growth` first, since with " *
+            "an active dipole that has no stable point either."),
     )
     ResultT(densities, _numerical_derivative(densities, energy))
 end

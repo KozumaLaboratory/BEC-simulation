@@ -52,6 +52,7 @@ docs/
 | Rotating-basis derivation (math) | `design/option_gamma_rotating_basis.md` |
 | Integrator roadmap + Ch.3 thesis plan | `design/integrator_modernization_plan.md` + `design/integrator_ch3_plan.md` |
 | TDHFB pilot | `design/tdhfb_pilot_design.md` |
+| What limits L-BFGS speed (per-iteration cost + why ~600 iterations) | `design/lbfgs_speed_limits.md` |
 | Mixed precision rollout | `design/mixed_precision_design.md` |
 | All other active design notes | `design/*.md` |
 

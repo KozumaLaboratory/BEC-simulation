@@ -4,8 +4,6 @@
 # If the vortex seed wins converged, the vortex is the GS. Pair with the 48³
 # variant for lattice-independence.
 #   3 cells × 4 seeds = 12 solves @ 64³.
-metadata: {owner: anko, project: Eu151 GS — vortex-phase GS verification (48³ grid check)}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}

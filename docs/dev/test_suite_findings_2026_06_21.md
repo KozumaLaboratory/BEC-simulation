@@ -1,5 +1,8 @@
 # Test-suite audit findings (2026-06-21)
 
+> **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Surfaced while adding the parallel test runner + optimising the full tier.
 Records what was fixed and what remains open (with enough detail to resume).
 

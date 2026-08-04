@@ -15,14 +15,6 @@
 # instead, which is the more dangerous half. Neither the "scope note" nor any
 # generator named in these headers exists in the tree.
 
-metadata:
-  suite: eu_k3_lhy
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 200.0
-  LHY_kind: polar_contact
-  generator: scripts/validation/eu_k3_lhy_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

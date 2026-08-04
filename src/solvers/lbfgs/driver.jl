@@ -114,6 +114,37 @@ function find_ground_state_lbfgs(;
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     precond_alpha_v::Float64=-1.0,        # ≥0 ⇒ combined P_C = P_V^½ P_K P_V^½
     precond_alpha_k::Float64=1.0,         # kinetic shift for the P_C kinetic factor
+    # OFF by default because it was MEASURED, not because nobody tried it: on
+    # the weak-field Eu+DDI soft manifold at 24³ it made convergence ~40×
+    # WORSE (d496dd71, 2026-06-23).
+    #
+    # The recorded mechanism was wrong. It said "a diagonal preconditioner
+    # cannot precondition a collective Goldstone"; the L-BFGS step is
+    # orthogonal to that orbit to machine precision (2.4e-17 against a positive
+    # control of 1.000000, `bench/probe_lbfgs_orbit_fraction.jl`), so the exact
+    # Goldstone is never in the iterate path.
+    #
+    # The ~600 iterations are CONDITIONING. `probe_lbfgs_lambda_min_bound.jl`
+    # bounds λ_min ≤ 3.0e-2 — still falling, and overlap 0.0000 with the exact
+    # generator, so a genuine soft mode rather than the null space — against
+    # μ_max ≈ 1.4e2, giving κ ≥ 4.7e3. The measured decay rate implies
+    # κ_eff ≈ 9e3, within 2×, and that κ predicts 472 iterations against ~600
+    # observed. The method is achieving what its conditioning permits.
+    #
+    # So preconditioning IS the lever and P_C is the wrong preconditioner: it
+    # is diagonal in real space and in Fourier space, and the soft mode is
+    # neither.
+    #
+    # This is worth stating here rather than only in a commit message: the
+    # bench that was kept expressly "so the next session does not re-derive
+    # it" was itself deleted two days later by a sweep that dropped one-off
+    # drivers (40c329a5), and the finding survived only in `git log`.
+    #
+    # It also says what the iteration count on that problem IS limited by.
+    # `P_C` is the Antoine-Levitt-Tang preconditioner (J. Comput. Phys. 343
+    # (2017), arXiv:1611.02045), where it is the dominant lever — for TRAPPED,
+    # GAPPED problems. This one is neither, so per-iteration cost is the lever
+    # here and the flat direction is what would have to be quotiented out.
     rotating_frame_omega::Float64=0.0,
     newton_polish::Bool=false,
     newton_max_outer::Int=20,
@@ -318,18 +349,25 @@ function find_ground_state_lbfgs(;
 
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        # Fuse the first trial with the gradient where that is free. On the
-        # GPU `energy_gradient!` and `gradient_only!` are the SAME fused kernel
-        # (1.383 vs 1.382 ms at 24³ D=13) because the energy falls out of the
-        # pass that forms H·ψ, so evaluating the α=1 trial that way and reusing
-        # its gradient removes a whole `total_energy` — 1.306 ms of a measured
-        # 5.83 ms iteration, on the ~85 % of iterations where α=1 is accepted.
+        # Fuse the first trial with the gradient. `energy_gradient!` returns
+        # both for barely more than the gradient alone, so evaluating the α=1
+        # trial that way and reusing its gradient removes a whole
+        # `total_energy` on the ~85 % of iterations where α=1 is accepted
+        # (n_ls measured at 1.07-1.13).
         #
-        # NOT done on the CPU, and that is a measurement: there
-        # `energy_gradient!` traverses the term registry twice, 12.80 ms
-        # against 6.57 + 6.11 for the two passes separately, so fusing would
-        # cost 0.1 ms rather than save.
-        fused_grad = _is_gpu(psi) ? grad_new : nothing
+        # GPU: 1.383 ms against `gradient_only!`'s 1.382 — the same fused
+        # kernel, the energy falls out of the pass that forms H·ψ. Saves
+        # 1.306 of a 5.83 ms iteration.
+        #
+        # CPU: this was excluded until `operator_and_energy_via_registry!`
+        # landed, and that was a measurement, not caution — `energy_gradient!`
+        # used to traverse the registry TWICE, 14.2 ms against 6.6 + 7.7 for
+        # the two passes separately, so fusing cost 0.1 ms instead of saving.
+        # Reading each term's energy off the accumulation it already builds
+        # took it to 8.8 ms, and the arithmetic inverts:
+        #   separate  1.08 × 6.63 + 7.71 = 14.9 ms
+        #   fused     8.53 + 0.08 × 6.63 =  9.1 ms
+        fused_grad = grad_new
         α, E_trial, psi_accepted, n_ls, grad_ready = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
             slope=slope, expand=is_sd, grad_out=fused_grad, k_squared_dev,

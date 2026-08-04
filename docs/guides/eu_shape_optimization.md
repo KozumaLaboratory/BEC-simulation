@@ -1,5 +1,8 @@
 # ¹⁵¹Eu dynamic trap-shape optimization
 
+> **FROZEN 2026-07-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Extends the power-ramp evaporation study (issue #75) to the trap **geometry**
 $V(r,t)$: expand or box the trap as the BEC forms to cut three-body loss and
 keep more condensate. Physics derivation: `docs/theory/eu_evaporation_three_body_theory.md`.

@@ -12,6 +12,15 @@
 #   EU_HEATING [1/s] (MEASURE — sets coldest T)  EU_K3 [m⁶/s]  EU_TAUBG [s]
 #   EU_TTARGET [nK] (operating point; default 50) EU_N0 EU_T0 EU_WH EU_WV EU_ALPHA
 #   usage:  EU_HEATING=0.02 EU_TTARGET=40 julia --project=. eu_evaporation_reoptimize.jl OUTDIR
+# NOTE (2026-08-04): `a_s = 135 a_B` below is the SUPERSEDED thesis value.
+# `docs/guides/eu_evaporation_calibration.md:37` records the refinement —
+# "a_s = 135 a_B (thesis) -> 110(4) a_B (PRL refined)" — and the atom registry
+# ships 110 (`initialization/atoms.jl:198`, Matsui et al. Science 2026). Every
+# number this script produced was computed at 135, so its outputs are of that
+# vintage; a_s enters the elastic rate linearly and the collision rate as a_s^2,
+# so the difference is not cosmetic. Left as it stands rather than silently
+# re-run: re-running changes published-adjacent numbers and is a decision, not
+# a doc fix.
 
 using SpinorBEC
 using Printf, Random

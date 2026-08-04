@@ -28,10 +28,21 @@ Conventions:
 | `mixins` | dict {name: param-set} | named param bundles; pulled in via `use:` |
 | `accuracy` | Real | seeds `epsilon:` on rotating_basis steps |
 | `auto_grid` | bool | enable TF-radius grid auto-derivation |
-| `metadata`, `name`, `notes`, `version` | free-form | provenance, ignored at runtime |
 
 Any other top-level key triggers a typo warning (strict-mode error). The
 warning suggests the closest known key via Levenshtein distance.
+
+> **`metadata` / `name` / `notes` / `version` were DELETED 2026-08-04.** This
+> table listed them as "free-form, ignored at runtime" — and "ignored at
+> runtime" was the problem: a slot no code reads cannot be contradicted, so the
+> only thing that can happen to it is that it rots. Across the 302 configs that
+> carried a `metadata:` block there were 59 distinct keys, five of them the
+> wreckage of an unquoted comma, and `generator:` named a script that no longer
+> existed in 156 of them. They were also not free: `_canonical_bytes!` hashes
+> every key of the spec, so rewording a comment renamed the run and orphaned its
+> cache. They are now unknown keys and warn like any typo. Use a YAML comment
+> (`#`), which never reaches the hasher. The 302 blocks are preserved verbatim
+> in `docs/validation/config_metadata_blocks.toml`.
 
 ## Pipeline-step envelope
 
@@ -107,7 +118,7 @@ a typo warning.
 | `seed_mode` | dict | — | deterministic single-k seed; see block below |
 | `hard_polarize` | Real [-12, 12] | — | force `<F_z>=value` at step start |
 | `noise_seed` | Number | random | RNG seed for thermal / mode noise |
-| `integrator` | strang / yoshida / adaptive / richardson / yoshida4 / yoshida6 / cfet4 | strang | standard path uses first four; rotating_basis uses last four |
+| `integrator` | standard: strang / midpoint / rk4ip — rotating_basis: strang / yoshida4 / yoshida6 / cfet4 | strang | any other value raises `ArgumentError`; `yoshida` / `adaptive` / `richardson` are NOT implemented on the standard path (`_resolve_dynamics_stepper`, `run_step_dynamics.jl:463`) |
 | `backend` | cpu / gpu | inherited | per-step override |
 | `kind` | binary / rotating_basis | inherited | per-step solver override |
 | `B_direction` | dict | — | rotating_basis only |
@@ -233,7 +244,11 @@ either of those triggers an `ArgumentError` with a migration hint.
 
 The Zeeman Hamiltonian has two mathematically independent contributions:
 
-    H_Zeeman = -(g_F μ_B B · F) + q F_z²
+    H_Zeeman = -p·F_z + q·F_z²          # operator form (Kawaguchi-Ueda)
+             = +(g_F μ_B B · F) + q F_z²   # in lab field, since p ≡ -g_F μ_B B
+    # Read `-(g_F μ_B B · F)` until 2026-08-04 — the lab-field sign was inverted
+    # here and in docs/conventions/hamiltonian_sign_audit.md. +Bz on a g_F>0 atom
+    # (Eu, Cr, He*) gives ground state m = -F. Declared once in Units.bfield_to_p.
                ↑ vector (chooses coord system)   ↑ scalar (orthogonal)
 
 The vector term `B · F` accepts three input coord systems, auto-detected
@@ -332,7 +347,6 @@ Accepts a Number / Bool (scalar shortcut) or a Dict with these keys:
 | `L3_per_m` | Vector | per-component L3 (legacy linear-in-n) |
 | `K3_cubic` | Number | [0, 1e10] — m-independent true 3-body |
 | `K3_per_m_cubic` | Vector | per-component true 3-body (dimless) |
-| `K3_per_m` | Vector | dimless alias of `K3_per_m_cubic` |
 | `K3_per_m_si` | Vector | SI-unit strings (`"3.5e-30 cm^6/s"`) |
 | `evap_energy_cutoff` | Number | [0, 1e10] — single-particle ε cutoff |
 | `evap_rate` | Number | [0, 1e10] — rate coefficient |
@@ -435,13 +449,12 @@ at parse time.
 
 ### `photon_scattering`
 
-Either `Gamma_sc` (canonical) or `gamma_sc` (lowercase alias accepted by
-the parser) is required.
+`Gamma_sc` is required. The lowercase `gamma_sc` alias was removed
+2026-05-24 and now raises `ArgumentError` (`pipeline_callbacks.jl:45`).
 
 | key | type | range |
 |---|---|---|
 | `Gamma_sc` | Number | [0, 1e10] |
-| `gamma_sc` | Number | [0, 1e10] |
 | `seed` | Int | — |
 
 ### `live_monitor`

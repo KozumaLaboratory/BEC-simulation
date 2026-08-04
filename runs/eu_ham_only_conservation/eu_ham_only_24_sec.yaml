@@ -2,11 +2,6 @@
 # See _template.yaml.md for full design rationale.
 # Compare against 24_nonsec to isolate the impact of off-diagonal DDI terms.
 
-metadata:
-  suite: eu_ham_only_conservation
-  variant: 24_sec
-  origin: post_interaction_params_refactor_2026_05_25_audit
-
 defaults:
   kind: spinor
   backend: cpu

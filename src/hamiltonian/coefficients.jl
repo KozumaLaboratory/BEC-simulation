@@ -343,10 +343,38 @@ end
 """
     linear_zeeman_p(atom, B, omega_ref)
 
-Dimensionless linear Zeeman shift: p = g_F × μ_B × B / (ℏ × omega_ref).
+Dimensionless linear Zeeman shift, `p = -g_F μ_B B / (ℏ ω_ref)`, delegating to
+[`Units.bfield_to_p`]. `B` is in TESLA.
+
+This computed `+g_F μ_B B / (ℏ ω_ref)` and delegated to nothing until
+2026-08-04 — the OPPOSITE sign, measured: at B = 2.6 nT on Eu151 it returned
++0.3847 where `Units.bfield_to_p` returns −0.3847 for the same field and the
+same g_F > 0 atom. Both `Units.bfield_to_p`'s own docstring and CLAUDE.md:153
+asserted that the sign "is declared once" and that every sibling converter
+delegates; this was the counterexample to both, and it was exported.
+
+The sign is physical, not a convention choice: the atomic moment is
+`μ = -g_F μ_B F`, so `H = -μ·B = +g_F μ_B B·F_z = -p·F_z` requires
+`p = -g_F μ_B B`. +Bz on a g_F>0 atom (Eu, Cr, He*) puts the ground state at
+m = -F. The same defect was fixed in `Units.bfield_to_p` on 2026-06-10
+(`mistake_zeeman_groundstate_direction_inverted_2026_06_10`); this copy
+survived because nothing compared the two.
 """
 function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
-    atom.g_F * Units.BOHR_MAGNETON * B / (Units.HBAR * omega_ref)
+    # Delegates — the sign is NOT restated here. This file is included before
+    # `Units`, but the call resolves at run time, not at parse time.
+    #
+    # `u"T"` is load-bearing: `bfield_to_p(::Real, …)` reads a bare number as
+    # GAUSS, and `B` here is TESLA, so delegating without the unit would be
+    # wrong by 1e4 — a second, quieter bug than the sign this call fixes.
+    # `B` is TESLA here (this function's own signature); the project's bare-number
+    # convention is GAUSS, so the 1e4 is a real conversion, not a fudge. Calling
+    # the suffixed name makes the unit visible at the call site — the un-suffixed
+    # `bfield_to_p(::Real, …)` also reads Gauss, but silently.
+    #
+    # `Units.u"T"` cannot be used instead: `u_str` is a macro and resolves at
+    # PARSE time, while this file is included before the Units submodule exists.
+    Units.bfield_to_p_gauss(B * 1.0e4, atom.g_F, omega_ref)
 end
 
 # --- Quasi-2D LHY ---

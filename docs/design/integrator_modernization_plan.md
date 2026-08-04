@@ -1,5 +1,8 @@
 # Integrator modernization plan — verified against primary sources
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status:** Track A1 implementation COMPLETE (commits 98213f6 + 59422e6 +
 63ad7c1). Track A1.5 (state-averaging trap) NEGATIVE. Track C moved behind
 a hard `Phase -1` paper-fetch + 紙-derivation gate. See:

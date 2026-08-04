@@ -16,8 +16,6 @@
 #
 #  16 (c1) × 3 (κ) × 2 (B) = 96 points × 2 seeds. Grid/box match production.
 # ─────────────────────────────────────────────────────────────────────
-metadata: {owner: anko, project: Eu151 F=6 GS — FM/polar transition ORDER refinement}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

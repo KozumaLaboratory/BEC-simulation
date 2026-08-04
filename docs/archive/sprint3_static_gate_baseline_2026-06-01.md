@@ -1,3 +1,6 @@
+> **FROZEN 2026-06-01.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 <!-- promoted from agent memory `sprint3_static_gate_baseline_2026_06_01.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- "F=6 Eu static stretched GS Fisher gate (Sprint 3) yields 0/5 NEW c information — the one MEAS direction is the already-known a_12 prior constraint, the other 4 directions are null by construction. The c sensitivity actually lives in EdH dynamics (m=-6 cascade depolarization), which has not yet been Fisher-analyzed. Sprint 4 item 0 added: dynamic EdH Fisher before any new-protocol additions." -->
 

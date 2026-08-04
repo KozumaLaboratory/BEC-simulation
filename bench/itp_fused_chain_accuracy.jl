@@ -38,7 +38,32 @@ include(joinpath(@__DIR__, "eu151_params.jl"))
 
 const N_GRID = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 64
 const MAX_STEPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 40000
-const DT = 0.002
+# `c1_ratio` IS NOT c₁/c₀ IN THE OBVIOUS DIRECTION, and reading it as such cost a
+# day. The constraint is `c₀ + F²c₁ = c_total` with `c₁ = r·c₀`, so
+# `c₀ = c_total/(1 + 36r)` — which flips c₀ NEGATIVE for `r < −1/36 ≈ −0.0278`.
+#
+#   r = −0.05   c₀ = −5859, c₁ = +293   ← c₀ ATTRACTIVE. Not a production point.
+#   r = −0.024  c₀ = +34465, c₁ = −827  ← c₀ > 0 with c₁ < 0. This IS one.
+#
+# Runs at r = −0.05 returned NaN in every arm and I read that as "the production
+# sign diverges". It is a negative c₀, i.e. an attractive condensate, and the
+# collapse says nothing about the LHY or the spin channel.
+# `runs/eu_gs_phase_c1_B_kappa` scans r ∈ [−0.024, +0.048] and states in its own
+# header that it "stays > singularity −1/36"; I picked outside it without reading.
+#
+# So the production side — c₀ > 0 with c₁ < 0 — is what the default now names.
+const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : -0.024
+# The LHY kind is an argument because `polar_contact` CANNOT be built at c₁ < 0 —
+# σ₀ goes negative and the closed form refuses (it used to die in `^`). That is
+# not a limitation of the fusion question: the fused diagonal absorbs a tabulated
+# LHY completely (measured under 2 % in every substep), so `none` exercises the
+# same diag + spin-mixing + DDI chain the fusion changes.
+const LHY = length(ARGS) >= 4 ? Symbol(ARGS[4]) : :polar_contact
+# dt is an ARGUMENT. At the production ratio r = −0.024 the shipped 2e-3 DIVERGES
+# — c₀ = 34465 there and the stability limit sits between 1e-3 and 2e-3, measured
+# in `bench/itp_stability_limit_vs_c0.jl` — so BOTH arms blew up and the fusion
+# could not be compared at that point at all. 5e-4 converged there in 15400 steps.
+const DT = length(ARGS) >= 5 ? parse(Float64, ARGS[5]) : 0.002
 const TOL = 1.0e-10
 
 function build(dt)
@@ -46,14 +71,14 @@ function build(dt)
     psi0 = init_psi(grid, SpinSystem(6); state=:spin_coherent,
         init_theta=π / 4, init_phi=0.3)
     ws = make_workspace(;
-        grid, atom=Eu151, interactions=eu_interaction_params(0.05),
+        grid, atom=Eu151, interactions=eu_interaction_params(C1_RATIO),
         zeeman=ZeemanParams(EU_p_weak, 0.0),
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
         sim_params=SimParams(; dt=dt, n_steps=1, imaginary_time=true,
             save_every=10^9),
         psi_init=psi0, enable_ddi=true, c_dd=EU_c_dd,
         ddi_padding=true, ddi_trunc_radius=-1.0,
-        spinor_lhy=:polar_contact, backend=CUDABackend())
+        spinor_lhy=(LHY === :none ? nothing : LHY), backend=CUDABackend())
     ws
 end
 
@@ -77,7 +102,8 @@ end
 `n_steps` scales as 1/dt so every arm covers the same imaginary time — without
 that the dt/2 arm is a shorter run wearing a smaller-error label, which is a
 mistake this project has already made once in this bench family."""
-function relax(half!; dt, max_steps)
+function relax(half!; dt, max_steps, label="")
+    t0 = time()
     ws = build(dt)
     nc = ws.spin_matrices.system.n_components
     psi = ws.state.psi
@@ -102,7 +128,23 @@ function relax(half!; dt, max_steps)
         end
     end
     CUDA.synchronize()
-    (psi=Array(psi), E=SpinorBEC.total_energy(ws), conv=conv, dE=dE, steps=last)
+    # DIVERGED is not UNCONVERGED. A NaN energy was being folded into `conv=false`
+    # and printed beside runs that were merely slow, so `c₁ < 0, lhy=none` — which
+    # blows up — read as "did not reach tolerance" for a whole job. They are
+    # different events and the second is not a weaker form of the first: an
+    # unconverged run has a state, a diverged one does not.
+    E_final = SpinorBEC.total_energy(ws)
+    psi_h = Array(psi)
+    diverged = !isfinite(E_final) || !all(isfinite, psi_h)
+    # ONE LINE PER ARM, flushed. Without it a config prints nothing until all five
+    # relaxations finish, so a slow arm and a hung one look identical from
+    # outside — which is how a run sat unreadable for 2.5 h before being killed.
+    # "Absent" was being read as "still fine".
+    @printf("    %-18s dt=%.1e  %6d steps  dE=%.2e  %-9s %6.1f s\n",
+        label, dt, last, dE,
+        diverged ? "DIVERGED" : (conv ? "conv=yes" : "conv=NO"), time() - t0)
+    flush(stdout)
+    (psi=psi_h, E=E_final, conv=conv, dE=dE, steps=last, diverged=diverged)
 end
 
 "Relative L2 distance between two states' DENSITIES.
@@ -117,19 +159,20 @@ function ddist(a, b)
 end
 
 println("="^78)
-println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, tol=$(TOL), $(CUDA.name(CUDA.device()))")
+println("ITP fused-chain ACCURACY — Eu F=6 D=13, $(N_GRID)³, c₁/c₀=$(C1_RATIO), lhy=$(LHY), tol=$(TOL), $(CUDA.name(CUDA.device()))")
 println("verdict = |F−S| / |S−B|, where S−B is the error dt ALREADY costs")
 println("="^78)
 
-S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS)
-B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS)
-F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS)
+println("  arms (streamed as each finishes):"); flush(stdout)
+S = relax(half_separate!; dt=DT, max_steps=MAX_STEPS, label="S separate dt")
+B = relax(half_separate!; dt=DT / 2, max_steps=2 * MAX_STEPS, label="B separate dt/2")
+F = relax(half_fused!; dt=DT, max_steps=MAX_STEPS, label="F fused dt")
 # A THIRD dt, which is what turns "closer to the dt/2 reference" into a statement
 # about accuracy. With only dt and dt/2 there is no way to tell a smaller error
 # from a different one that happens to land nearby, and the first run of this
 # bench was read exactly that far and no further.
-R = relax(half_separate!; dt=DT / 4, max_steps=4 * MAX_STEPS)
-Fh = relax(half_fused!; dt=DT / 2, max_steps=2 * MAX_STEPS)
+R = relax(half_separate!; dt=DT / 4, max_steps=4 * MAX_STEPS, label="R separate dt/4")
+Fh = relax(half_fused!; dt=DT / 2, max_steps=2 * MAX_STEPS, label="F fused dt/2")
 
 @printf("\n  %-28s %14s %6s %10s %8s\n", "arm", "E", "conv", "final dE", "steps")
 for (name, r) in (("S separate, dt", S), ("B separate, dt/2", B),
@@ -181,6 +224,20 @@ println("  can coincide between states that differ.")
 # The practical question is on the same table: if the fused chain at dt is closer
 # to R than the separate chain at dt/2 is, then it wins twice — 0.70× the step AND
 # half the steps for the same distance to the reference.
+# EVERY verdict below is gated on this. At the production point three of five arms
+# did not converge, the energies spanned 70 % and the densities were O(1) apart —
+# and this file still printed "the fused chain wins twice", because that line sat
+# in the Richardson block with no precondition while the convergence warning sat
+# at the END. A favourable-sounding conclusion emitted from unusable data is worse
+# than no conclusion.
+const ALL_CONV = S.conv && B.conv && R.conv && F.conv && Fh.conv
+if !ALL_CONV
+    println("\n  VERDICTS SUPPRESSED — $(count(a -> !a.conv, (S, B, R, F, Fh))) of 5 arms did not converge.")
+    println("  Distances between arms that never reached a fixed point are distances")
+    println("  between arbitrary points on trajectories, and an order read off them is")
+    println("  not an order. The numbers below are printed as DIAGNOSTICS only.")
+end
+
 println("\n  distance to R = separate at dt/4 (the finest reference here)")
 @printf("  %-32s %12s %12s\n", "", "density", "energy")
 rows = (("S separate, dt", S), ("S separate, dt/2", B),
@@ -196,11 +253,26 @@ let sd = ddist(S.psi, R.psi), bd = ddist(B.psi, R.psi),
         sd / max(bd, eps()), fd / max(fhd, eps()))
     println("    ~4 = second order and converging. Far from it ⇒ the arm is not in")
     println("    its asymptotic regime and no order can be read from these three.")
-    println(fd < bd ?
+    ALL_CONV || println("\n  (no verdict — see the suppression note above)")
+    ALL_CONV && println(fd < bd ?
             "\n  F at dt is CLOSER to R than S at dt/2 is — the fused chain wins twice:
   0.70× the step AND half the steps for the same distance to the reference." :
             "\n  F at dt is NOT closer to R than S at dt/2 — the fusion buys step time
   only, and the step-count comparison has to be made on equal footing.")
+end
+
+# Divergence is reported FIRST and separately, because "no arm converged" invites
+# raising the step cap, and no step count fixes a blow-up.
+let arms = (S, B, R, F, Fh), div = count(a -> a.diverged, (S, B, R, F, Fh))
+    if div > 0 || !ALL_CONV
+        println("""
+
+  $(div) OF 5 ARMS DIVERGED — the state left the finite range, so every number
+  above is NaN-contaminated and none of them measures anything. This is NOT a
+  tolerance or step-count problem: no larger cap fixes a blow-up. At Eu with an
+  active dipole the LHY is the term that arrests collapse, so `lhy=none` is the
+  first thing to suspect, and `c₁ < 0` the second.""")
+    end
 end
 
 if !(S.conv && B.conv && F.conv && R.conv && Fh.conv)
@@ -227,3 +299,8 @@ If the verdict is < 1 in BOTH columns the fusion is admissible at this dt and
 grid, and it saves 30.6 % of the step at 64³. If it is ≳ 1 the fusion is a real
 change to the answer and the speed does not buy it — the fallback, dt/2 with the
 fused chain, is 2× the steps at 0.70× the step, i.e. a loss, so the idea dies.""")
+
+# A void result must not exit 0. The smoke gate in the submit script checks the
+# exit code, and this file previously returned success while every arm diverged —
+# so "smoke rc=0" was certifying a run that measured nothing.
+ALL_CONV || exit(2)

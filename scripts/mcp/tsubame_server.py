@@ -399,7 +399,7 @@ async def tsubame_pull_results(params: PullInput) -> str:
     argv = [
         "rsync", "-az", "--prune-empty-dirs",
         "--include=*/",
-        "--include=*.jld2", "--include=outcome.toml",
+        "--include=*.jld2", "--include=_exit_summary.json",
         "--include=_exit_summary.json", "--include=_live_status.json",
         "--include=config.yaml",
         "--exclude=*",

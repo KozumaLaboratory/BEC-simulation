@@ -1,5 +1,8 @@
 # Kibble–Zurek with the SPGPE: what the literature fixes, and what it leaves open
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Written 2026-08-02, after a first attempt whose every structural choice was wrong
 and whose reported exponent (`α = 0.93 ± 0.08`) is retracted. This document is
 the literature basis for the second attempt, so the choices are traceable to

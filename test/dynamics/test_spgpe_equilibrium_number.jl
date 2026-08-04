@@ -116,16 +116,37 @@ using SpinorBEC
     # That is the whole lesson: at c0 = 0.002 the run holds 7.2e6 against a
     # Thomas-Fermi 7.5e6, 4% low, while the thermal-only predictor said 2.2e5 —
     # and the 33x was charged to the code.
+    #
+    # `condensed` is the SELECTOR for which prediction applies, not a property all
+    # three cells have. It used to be asserted of all three ("all three are
+    # condensed") and c0 = 0.19 does not satisfy it: raising c0 lifts
+    # d = k^2/2 + 2 c0 n - mu through the mean-field shift, so the d <= 0
+    # condensate signal never fires there. That cell is the LEAST condensed of the
+    # three, which is also why it is the one far from Thomas-Fermi.
     for c0_run in (0.19, 0.02, 0.002)
         r = run_equilibrium(c0_run)
         @test r.settled
         rj = rj_at(c0_run)
         N_TF = mu * V / c0_run
-        @info "equilibrium" c0_run N_run=r.N N_TF ratio_TF=r.N / N_TF rj_applies=!rj.condensed
-        @test rj.condensed                              # all three are condensed
-        @test r.N≈N_TF rtol=1.0                         # and near the TF number
+        @info "equilibrium" c0_run N_run=r.N N_TF ratio_TF=r.N / N_TF rj_applies=!rj.condensed N_rj=rj.N
+
+        if rj.condensed
+            # mu above the Hartree-Fock floor: the thermal-only sum does not
+            # apply and Thomas-Fermi is what to check. Measured 0.876 (c0 = 0.02)
+            # and 0.960 (c0 = 0.002), so 0.15 is the tolerance the data supports.
+            # It was rtol = 1.0, which admits anything inside a factor of two and
+            # passed the 1.91 below without objecting.
+            @test r.N≈N_TF rtol=0.15
+        else
+            # c0 = 0.19 lands here and matches NEITHER convention: 2.29x the
+            # Rayleigh-Jeans mode sum (150819 vs 65936) and 1.91x Thomas-Fermi
+            # (vs 78947). The header's question — "one of the two is wrong" — is
+            # still open at the strong-coupling end, and nothing here resolves it.
+            #
+            # `@test_broken` rather than a deleted cell or a loosened bound: the
+            # discrepancy stays visible, stays measured, and turns the suite RED
+            # the moment it closes, so whoever closes it is told.
+            @test_broken r.N≈rj.N rtol=0.15
+        end
     end
-    # The deeply condensed end is where the thermal fraction is negligible and
-    # Thomas-Fermi is sharp, so that is where agreement is required.
-    @test run_equilibrium(0.002).N≈mu * V / 0.002 rtol=0.15
 end

@@ -18,18 +18,6 @@
 # Matched chirality with m=+F initial state ⇒ Ω = +0.5 (per Gate 4).
 # If P_{+5,+4} > Klaus-II sudden-tilt value (0.219), adiabatic ramp works.
 
-metadata:
-  suite: magnetic_stirrer
-  cell_name: magnetic_stirrer_adiabatic_omega_p0p5
-  rotation_omega: +0.5
-  protocol_kind: adiabatic_7stage
-  generator: hand-written 2026-05-27
-  hypothesis: |
-    Adiabatic theta tilt-up + phi spin-up at strong B should let spin
-    track B direction, so the DDI-anisotropy rotation has a coherent
-    spin sector to act on. Sudden-tilt Klaus-II gave 0.2191 (= baseline).
-    Predicted: P_{+5,+4} > 0.3 if adiabatic works.
-
 defaults:
   kind: spinor
   backend: cpu

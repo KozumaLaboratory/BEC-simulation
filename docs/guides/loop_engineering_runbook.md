@@ -1,5 +1,8 @@
 # Loop Engineering runbook — a runnable verifier-centric loop
 
+> **FROZEN 2026-06-22.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The minimal, runnable form of the architecture in
 `docs/design/loop_engineering_architecture.md`, native to this repo (the old
 autonomous `.claude/` loop is retired; this is its research-validated, supervised

@@ -1,5 +1,8 @@
 # Integrator: state-averaged trap step and the AVF distinction
 
+> **FROZEN 2026-06-06.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Provenance**: physics content extracted from docstrings of
 `_half_potential_step_trap!` and `split_step_trap!` in
 `src/hamiltonian/integrator/split_step.jl`, deleted 2026-06-06.

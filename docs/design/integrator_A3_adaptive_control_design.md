@@ -1,5 +1,8 @@
 # A3 — Adaptive Timestep Control (Design)
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: design only, no current implementation.
 **Master plan reference**: `docs/design/integrator_architecture_completion_plan.md` §A3.
 **Estimated implementation scope**: 2–3 sessions.

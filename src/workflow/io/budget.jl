@@ -54,13 +54,27 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
         p = step["dynamics"]
         dur = Float64(get(p, "duration", 0.0))
         dt = Float64(get(p, "dt", 1.0))
-        every = Int(get(p, "save_every", 1))
         n_steps = round(Int, dur / dt)
-        total_steps += n_steps
-        total_snapshots += max(1, n_steps ÷ every)
         save_block = get(p, "save", Dict{Any, Any}())
+        # `save:` block, not the flat `save_every` / `save_snapshot_compression`
+        # this read until 2026-08-04. Those spellings were folded into `save:`
+        # and are now REJECTED by the schema, so `get(p, "save_every", 1)` fell
+        # through to its default on every config that exists — a run with
+        # `save: {every: 7000}` was budgeted at one snapshot per step, i.e.
+        # 7000x over-counted. Same for compression, which read as false always.
+        # This function was already half-migrated: the psi flag two lines down
+        # read the new block while these two read the old keys.
+        every = if haskey(save_block, "every")
+            Int(save_block["every"])
+        elseif haskey(save_block, "n_snapshots")
+            max(1, n_steps ÷ max(1, Int(save_block["n_snapshots"])))
+        else
+            1
+        end
+        total_steps += n_steps
+        total_snapshots += max(1, n_steps ÷ max(1, every))
         save_psi |= Bool(get(save_block, "psi", false))
-        save_compressed |= Bool(get(p, "save_snapshot_compression", false))
+        save_compressed |= Bool(get(save_block, "compression", false))
     end
 
     # Scan multiplier. Each scan point re-runs the whole pipeline.

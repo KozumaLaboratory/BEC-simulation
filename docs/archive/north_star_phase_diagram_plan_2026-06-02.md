@@ -1,3 +1,6 @@
+> **FROZEN 2026-06-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 <!-- promoted from agent memory `north_star_phase_diagram_plan_2026_06_02.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- "North Star plan after closing the c-determination protocol. Eu (F=6) ground-state phase diagram + vortex/spontaneous-circulation predictions. 4-track roadmap (A=phase diagram, B=fluctuation selection, C=vortices, D=experimental anchor). Execution discipline encodes the failure modes caught during the Sprint 1-5 arc." -->
 

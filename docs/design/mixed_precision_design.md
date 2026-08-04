@@ -1,5 +1,8 @@
 # Mixed-precision (ComplexF32) simulation — design sketch
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Target: run the full split-step pipeline with ψ ∈ ComplexF32 to halve VRAM and roughly double FFT throughput on GPUs, enabling 256³–384³ grids on an H100. Not yet implemented — this note captures the plan.
 
 ## Scope of the refactor

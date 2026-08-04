@@ -4,7 +4,7 @@ using JSON
 using TOML
 using SpinorBEC
 using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
-    _is_divergent, _maybe_fire_on_complete!, OUTCOME_FILENAME,
+    _is_divergent, _maybe_fire_on_complete!, EXIT_SUMMARY_FILENAME,
     RUN_STATE_FILENAME,
     AutopilotConfig, AutopilotBackend, LocalBackend, UGEBackend,
     resolve_backend, stage_in, pull_live, collect!, prepare_status_snapshot,
@@ -733,23 +733,19 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                     rd, e
                 end
 
-                # 1. outcome.toml wins.
-                rd, e = _mkentry("ana_outcome_aaaaaa", :oom)
-                open(joinpath(rd, "outcome.toml"), "w") do io
-                    TOML.print(
-                        io,
-                        Dict(
-                            "outcome" => Dict(
-                                "terminal" => "killed_bug",
-                                "reason" => "OOM_KILLED at step 1500"),
-                        ),
-                    )
-                end
-                a = SpinorBEC.analyze_failure(e)
-                @test a.category === :oom
-                @test occursin("OOM_KILLED", a.summary)
+                # The `outcome.toml` arm that stood here until 2026-08-04 is
+                # deleted with the file. It wrote the artefact itself and then
+                # asserted the reader consumed it — so it stayed green while
+                # nothing in production ever produced one. Building the input a
+                # reader wants, without asking who writes it, is the same shape
+                # as `is_divergent_status(Dict("norm_drift" => 0.5))`: a gate
+                # that never crosses the producer/consumer boundary.
+                #
+                # `_exit_summary.json` has a producer (`pipeline/runner.jl`),
+                # and the OOM case it used to cover is now the `oom_killed`
+                # Boolean arm in `test_terminal_record_has_a_producer.jl`.
 
-                # 2. _exit_summary.json with NaN flag.
+                # _exit_summary.json with NaN flag.
                 rd2, e2 = _mkentry("ana_nan_aaaaaaa", :nan)
                 open(joinpath(rd2, "_exit_summary.json"), "w") do io
                     write(io, "{\"nan_encountered\":true,\"last_step\":2700}")

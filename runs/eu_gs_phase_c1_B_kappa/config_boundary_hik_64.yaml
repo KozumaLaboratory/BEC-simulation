@@ -2,10 +2,6 @@
 # cyclic→FM transition is above the 96µG window of config_boundary_64, so probe
 # B = 105–145 µG there. Same machinery: explicit (Bz, κ) points via zip,
 # seed_from nearest off the coarse 64³ map + pin. 10 points × 2 seeds = 20 solves.
-metadata:
-  owner: anko
-  project: Eu151 F=6 GS phase diagram — high-κ boundary extension (B_c above 100µG)
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}

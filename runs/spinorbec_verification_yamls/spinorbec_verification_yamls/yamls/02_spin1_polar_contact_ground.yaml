@@ -2,11 +2,6 @@
 # Physics: E_spin=(c1/2)|F|^2. For c1>0, polar state minimizes |F|.
 # Expected: phase_classify -> polar-like, spin_order ~ 0, Mz ~ 0.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Ueda_spin1_polar_c1_positive
-  expected_phase: polar
-
 defaults:
   kind: spinor
   backend: cpu

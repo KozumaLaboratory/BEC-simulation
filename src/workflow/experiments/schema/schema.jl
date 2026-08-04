@@ -211,8 +211,13 @@ const LIVE_MONITOR_SCHEMA = Dict{String, FieldSpec}(
 # but at least enforce the `t` / `apply` envelope.
 const PULSE_EVENT_SCHEMA = Dict{String, FieldSpec}(
     "t" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    # NOT "trap". `PULSE_TARGETS` (`runtime/pulse_sequence.jl:19`) is the set
+    # `compile_pulse_sequence` actually compiles, and its own docstring records
+    # that `apply: trap` was "documented in yaml_schema_reference.md but never
+    # implemented" — it parsed, grouped, and compiled to NOTHING. Admitting it
+    # here made that silent no-op reachable from a config that validates.
     "apply" => FieldSpec(; required=true, type=String,
-        enum=["B", "raman", "interactions", "trap"]),
+        enum=["B", "raman", "interactions"]),
     "duration" => FieldSpec(; type=Number, range=(0.0, 1e6)),
     # Per-target params (left permissive; `_apply_pulse_sequence` validates):
     "p" => FieldSpec(), "q" => FieldSpec(), "bx" => FieldSpec(), "by" => FieldSpec(),
@@ -399,10 +404,24 @@ const TOP_LEVEL_KEYS = Set([
     "mixins",            # named parameter sets pulled into the config
     "accuracy",          # ε accuracy budget — seeds rotating_basis epsilon
     "auto_grid",         # bool — enable TF-radius grid auto-derivation
-    "metadata",          # free-form provenance, ignored at runtime
-    "name",              # human-readable label for the scenario
-    "notes",             # free-form notes
-    "version",           # YAML schema version stamp
+    # `metadata` was here until the step-6 cutover. A structured slot with no
+    # readers is a name nothing looks up: 59 keys across 302 configs, and the
+    # only thing that can happen to a field nothing reads is that it rots —
+    # `generator:` named a script that does not exist in 156 of them, each
+    # under a header reading "auto-generated, do not hand-edit", and five of
+    # the 59 "keys" were the wreckage of an unquoted comma in a flow mapping.
+    # The blocks are preserved verbatim in
+    # `docs/validation/config_metadata_blocks.toml`. Do not re-add: the point
+    # is that provenance lives where it is READ (refs/*.toml via `ref`, the
+    # A/B/C taxonomy via `Claim`), not in a slot that cannot be wrong.
+    #
+    # `name`, `notes` and `version` left with it, for the same reason and at no
+    # cost: measured 2026-08-03, they have zero readers under `src/` and zero
+    # occurrences across the 302 configs in `runs/`. They were three more slots
+    # that could be written and never contradicted — and, because
+    # `_canonical_bytes!` hashes every key it is handed, three more ways for a
+    # label to move `content_id` and orphan a cached run. A comment does the
+    # same job: `#` never reaches the hasher.
 ])
 
 """

@@ -1,5 +1,8 @@
 # ¹⁵¹Eu Bogoliubov spectroscopy → scattering-length determination
 
+> **FROZEN 2026-06-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Honest framing (2026-06-02 close)**
 
 This document describes a **proposed protocol**, not a completed

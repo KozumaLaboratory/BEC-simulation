@@ -1,5 +1,8 @@
 # F=12 closed-form $\beta_S^{(c_0)}$ — rational identification result
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Script**: `test/manuscript/test_f12_rational.jl`
 **Status**: Numerical $\beta_S^{(c_0)}$ values + rational approximations identified;

@@ -21,7 +21,6 @@
 #
 # LHY is on (full_bdg): the F=6 phases this texture chooses between are
 # mean-field degenerate.
-metadata: {owner: anko, project: Eu151 texture B-quench movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 # DEALIAS OFF here, but do NOT read that as "off is correct" — the question is

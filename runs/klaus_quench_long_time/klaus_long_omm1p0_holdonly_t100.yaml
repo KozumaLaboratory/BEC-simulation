@@ -2,14 +2,6 @@
 # Source: scripts/validation/klaus_long_omega_large_gen.jl
 #   Ω/ω_⊥ = -1.0  (near centrifugal limit Ω/ω_⊥ = 1)
 
-metadata:
-  suite: klaus_long_time
-  cell_name: klaus_long_omm1p0_holdonly_t100
-  rotation_omega: -1.0
-  t_hold_dim: 100.0
-  protocol_kind: hold_only_long_time_large_omega
-  generator: scripts/validation/klaus_long_omega_large_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

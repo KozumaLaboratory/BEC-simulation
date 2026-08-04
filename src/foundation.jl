@@ -8,6 +8,7 @@
 # spherical harmonics).
 
 # Type definitions (must come first; Workspace depends on everything above).
+include("foundation/real_dot.jl")             # _realdot: blocked Re⟨a,b⟩, used by lbfgs AND the term registry
 include("foundation/waveform.jl")
 include("foundation/noise_waveform.jl")           # seeded analytic field-noise waveform
 include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid
