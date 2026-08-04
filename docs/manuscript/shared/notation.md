@@ -1,5 +1,8 @@
 # SpinorBEC manuscript notation conventions
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Single source of truth for symbols across the three papers and the master
 thesis. Refinement-round-1 (2026-05-07): this document seeds the
 conventions; deviations found during chapter integration should be

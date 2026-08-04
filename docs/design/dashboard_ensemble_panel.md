@@ -1,5 +1,8 @@
 # Dashboard ensemble panel (Round-2 Task 5)
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: scalar-summary surface shipped 2026-05-07. 3D mean/variance volume rendering deferred — the toggle row labels those modes "follow-up" rather than wiring partial behaviour.
 
 ## What it shows

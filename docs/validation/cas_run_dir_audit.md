@@ -1,5 +1,8 @@
 # `run_yaml`'s run directory is not content-addressed in the CLAUDE.md sense
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Audited 2026-07-31 after the question "the CAS might be wrong" was raised against
 the Fig. 4B campaign. **It did not invalidate any result in that campaign** — but
 the mechanism is not what commitment #4 describes, and one failure mode is live.

@@ -1,5 +1,8 @@
 # Matsui Fig. 2C — reproduction, and what the atom number says
 
+> **FROZEN 2026-08-04.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Type A (code correctness) for §1; type C (model fidelity) for §3–4.
 Produced at `5b703994` on `research/matsui-fig2c`. Numbers in §1 come from a
 run; §2–4 are read off the published fixtures and need no run.

@@ -1,5 +1,8 @@
 # UMS low-latency path — leased `node_f` + `UMSBackend`
 
+> **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status: DEFERRED — premise not met (2026-06-21).** UMS exists to kill queue
 wait. A direct measurement on TSUBAME shows there is none worth killing:
 **trial-mode `qsub`→running latency = 7.8 s** (and trial is *lowest priority* =

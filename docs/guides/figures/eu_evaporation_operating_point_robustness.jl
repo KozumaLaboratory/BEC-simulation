@@ -1,6 +1,15 @@
 # Robustness of the CONFIRMED operating point (issue #75): evaluate the FIXED balanced
 # ramp along each unknown parameter (fine 1-D sweeps, others at nominal) and report the
 # spread of N₀, T_final, condensate fraction. K₃ swept over the full [1e-42, 1e-40].
+# NOTE (2026-08-04): `a_s = 135 a_B` below is the SUPERSEDED thesis value.
+# `docs/guides/eu_evaporation_calibration.md:37` records the refinement —
+# "a_s = 135 a_B (thesis) -> 110(4) a_B (PRL refined)" — and the atom registry
+# ships 110 (`initialization/atoms.jl:198`, Matsui et al. Science 2026). Every
+# number this script produced was computed at 135, so its outputs are of that
+# vintage; a_s enters the elastic rate linearly and the collision rate as a_s^2,
+# so the difference is not cosmetic. Left as it stands rather than silently
+# re-run: re-running changes published-adjacent numbers and is a decision, not
+# a doc fix.
 
 using SpinorBEC
 using Printf

@@ -1,5 +1,8 @@
 # Sinatra criterion for TWA validity in F=6 spinor BECs
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Stage**: validation infrastructure shipped 2026-05-07; awaiting GPU runs to fill in the empirical verdict (`docs/research_notes/twa_sinatra_validation.md`).
 
 ## TWA validity condition
@@ -26,18 +29,18 @@ This is well into the danger regime — most published TWA work targets ratio �
 
 1. **Grid coarsening** (dominant for short healing length). 16³ → 4096 voxels → ratio ≈ 5.3, marginal but improved 8×. When the healing length is much shorter than the box but the physics of interest lives at scales comparable to the box, the excess high-k modes contribute only spurious noise, and dropping them by coarsening costs negligible physical accuracy.
 
-2. **Energy-space mode cutoff**. `add_vacuum_noise(...; cutoff_energy=E_cut)` zeros plane-wave noise modes with `ε_k = k²/2 > E_cut`. Convention: `k_cut = 2 / ξ`, twice the inverse healing length, so modes carrying physical structure of the GS are kept and high-k thermal-like populations are dropped. For `M = ℏ = 1`, this is `E_cut = 2 g n`.
+2. **Energy-space mode cutoff**. `add_vacuum_noise(...; cutoff_energy=E_cut)` zeros plane-wave noise modes with `ε_k = k²/2 > E_cut`. Convention: `k_cut = 2 / ξ`, twice the inverse healing length, so modes carrying physical structure of the GS are kept and high-k thermal-like populations are dropped. For `M = ℏ = 1`, this is `E_cut = 4 g n`.
 
 `src/analysis/sinatra_diagnostics.jl` exposes the conversions:
 
 * `healing_length(g, n)` → ξ = 1/√(2 g n)
 * `cutoff_energy_from_xi(ξ; factor=2.0)` → `E_cut = (factor/ξ)²/2`
-* `cutoff_energy_from_gn(g, n; factor=2.0)` → composition; for the Sinatra-recommended factor=2 this evaluates to 2·factor²·g·n.
+* `cutoff_energy_from_gn(g, n; factor=2.0)` → composition; this evaluates to `factor²·g·n`, i.e. `4 g n` at the Sinatra-recommended factor=2.
 * `effective_n_modes(grid, cutoff_energy; D)` and `sinatra_ratio(grid, D, N_atoms; cutoff_energy)` for diagnostic evaluation against any candidate (grid, cutoff) pair.
 
 ## Recommended setup for Eu EdH-class runs
 
-Given Eu's short healing length (ξ ≈ 0.92 a_ho at n_peak ≈ 0.118), a k-cutoff at 2/ξ doesn't actually filter any mode (BZ ⊂ k < 2/ξ). The effective remedy is **grid coarsening**:
+Given Eu's healing length (ξ ≈ 0.92 a_ho at n_peak ≈ 0.118), a k-cutoff at 2/ξ ≈ 2.2 a_ho⁻¹ lies *well inside* the BZ — at the dx = 0.625 a_ho of these runs the grid reaches |k|_max = π/dx ≈ 5.0 a_ho⁻¹ — so the cutoff does bite, and hard. (Recheck which remedy dominates before relying on the recommendation below.) The remedy documented here is **grid coarsening**:
 
 * 16³ × 13 / N_atoms = 5.3 (marginal — the safest practical choice).
 * 32³ should only be trusted if the σ/μ at peak is verified to be grid-independent against the 16³ result (see validation procedure below).

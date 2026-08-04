@@ -1,5 +1,8 @@
 # Scan group redesign — 2026-04-29
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Pain point identified by anko: 70+ `runs/<...>/config.yaml` files, many of which are 1-parameter sweeps (8 phi_omega, 6 Berry, 24 thesis batch). Currently:
 
 - Each sweep point lives as its own dir with its own config.yaml.

@@ -1,5 +1,8 @@
 # D 論 Year 1 roadmap (post-修論, ~12 ヶ月 plan)
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Status**: forward-looking plan; assumes 修論 defense 2026-12, D-thesis Year 1 starts
 ~2027-04 (academic year boundary).

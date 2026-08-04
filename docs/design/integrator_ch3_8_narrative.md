@@ -1,5 +1,8 @@
 # §3.8 Comparison & recommendations — narrative draft
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: draft, 2026-05-11. Final section of Ch.3 closure.
 
 ## §3.8.1 Method hierarchy summary

@@ -1,5 +1,8 @@
 # 修士論文 Chapter 3: F=2 Cyclic Phase の Lee-Huang-Yang 解析公式
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、F=2 スピノル BEC の cyclic phase に対する Lee-Huang-Yang (LHY) 量子ゆらぎ
 補正の解析的閉形式を導出する。これは本研究の理論的 core の一つであり、文献的に新規な
 結果として、修論期間内の論文 submission [Paper #1] に直接対応する。

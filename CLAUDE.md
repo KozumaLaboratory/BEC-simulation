@@ -13,7 +13,7 @@ Anchors:
 - `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 lists doc claims measured against the code; a row still marked OPEN overrides this file until the source doc is fixed. Four of the original five discharged within three days and none announced itself — check the row before trusting it.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
-`AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.
+`AGENTS.md` is a pointer here (it was a stale fork; reduced 2026-08-04 after it turned up in 28 of the tree's duplicated-fact disagreements).
 
 ## Commands
 
@@ -26,7 +26,7 @@ LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU REPL on 
 julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / autopilot / tag / catalog / tsubame)
 ```
 
-`SPINORBEC_TEST_TIER` ∈ `{fast, ci, full, physics}` plus two **derived views** used as per-PR gates: `oracles` (every `test/oracles/` file, from any tier) and `integration` (`CI_EXTRA` minus the oracles). `fast` + `oracles` + `integration` run as three parallel per-PR jobs and between them cover the whole `ci` tier — a property `test_tier_membership.jl` enforces by reading the tiers back out of `.github/workflows/ci.yml`, so deleting a job reddens the suite rather than shrinking coverage silently. Tier membership is **explicit in `test/runtests.jl`** — every test belongs to exactly one list. New tests get added to a list, not auto-discovered. The runner also honours `SPINORBEC_TEST_WORKERS` (`1` default = serial in-process / `N` / `auto` = N **independent julia processes** taking files **on demand** from a shared O_EXCL claim queue, heaviest first — separate processes, not Distributed workers, so each loads SpinorBEC once in a clean session; a shared worker pool reloads the package mid-run and `x isa T` flakes false. `_COST` is only the hand-out order: per-file times swing ±30 % run to run, so static bin-packing left the makespan 8-21 % above the floor no matter how well it was fitted), `SPINORBEC_TEST_SKIP` (comma-separated paths to omit), and `SPINORBEC_TEST_TIMING=quiet`. Parallel mode requires each test file to stay a dependency-free unit (own `using` / `@testset` / `@__DIR__` helpers, no cross-file fixed `/tmp` paths) — preserve that when adding tests.
+`SPINORBEC_TEST_TIER` ∈ `{fast, ci, full, physics}` plus two **derived views** used as per-PR gates: `oracles` (every `test/oracles/` file, from any tier) and `integration` (`CI_EXTRA` minus the oracles). `fast` + `oracles` + `integration` run as three parallel per-PR jobs and between them cover the whole `ci` tier — a property `test_tier_membership.jl` enforces by reading the tiers back out of `.github/workflows/ci.yml`, so deleting a job reddens the suite rather than shrinking coverage silently. Tier membership is **explicit in `test/_tiers.jl`** — every test belongs to exactly one list. (`runtests.jl` is the runner; it `include`s `_tiers.jl`, which is where a new test is added. This said `runtests.jl` until 2026-08-04.) New tests get added to a list, not auto-discovered. The runner also honours `SPINORBEC_TEST_WORKERS` (`1` default = serial in-process / `N` / `auto` = N **independent julia processes** taking files **on demand** from a shared O_EXCL claim queue, heaviest first — separate processes, not Distributed workers, so each loads SpinorBEC once in a clean session; a shared worker pool reloads the package mid-run and `x isa T` flakes false. `_COST` is only the hand-out order: per-file times swing ±30 % run to run, so static bin-packing left the makespan 8-21 % above the floor no matter how well it was fitted), `SPINORBEC_TEST_SKIP` (comma-separated paths to omit), and `SPINORBEC_TEST_TIMING=quiet`. Parallel mode requires each test file to stay a dependency-free unit (own `using` / `@testset` / `@__DIR__` helpers, no cross-file fixed `/tmp` paths) — preserve that when adding tests.
 
 ## Project structure
 
@@ -74,7 +74,7 @@ Umbrella files `Foo.jl` `include` sub-files in dependency order; public exports 
 5. **YAML-disk + DSL-memory duality.** Every spec is YAML-serialisable (resumable via `run_yaml`) and Julia-constructible (`config([ground_state(...), dynamics(...), analyze(...)])`). Sweeps/tests use DSL; production uses YAML.
 6. **Layered validation.** Code correctness (A: oracle + GPU=CPU + Hψ self-consistency) ⊥ physics agreement (B: closed-form limits + F=1 polar/FM + polyhedral) ⊥ model fidelity (C: published experimental data). Never conflate. Self-contained chain (A + B + reference-RHS oracle) holds correctness without external code.
 7. **Tier-gated tests with explicit lists.** `fast` (pure units, quick) / `ci` (+ integration + all oracle gates) / `full` (+ heavy ITP/RTP/BO/GPU) / `physics` (analytic-only). Heavy YAML tests behind env-var guards.
-8. **Type stability firewalls at dispatch barriers.** `Workspace` has 23+ type parameters; `Dict{Symbol,Any}` or closures escaping into Workspace paths cause inference to explode (multi-minute JIT hang, no stack trace). `@noinline _step_dispatch!(@nospecialize(step), ...)` in `pipeline/runner.jl` is the load-bearing firewall — do NOT specialize through.
+8. **Type stability firewalls at dispatch barriers.** `Workspace` has 23+ type parameters; `Dict{Symbol,Any}` or closures escaping into Workspace paths cause inference to explode (multi-minute JIT hang, no stack trace). `_step_dispatch!(@nospecialize(step), ...)` in `pipeline/runner.jl` is the load-bearing firewall — and it is **`@nospecialize` that carries it**, not `@noinline` (`runner.jl:273`: "`@nospecialize` on `step` is the load-bearing annotation"). Without it Julia specialises the whole loop body per `PipelineStep` concrete type and the binary GP path's return tuple takes 10+ min of inference. Both annotations are present; do NOT specialize through.
 9. **Convention discipline over backward compat.** File name = primary export; function name = what the body computes; YAML analyzer name = real implementation. Renames delete the old name in the same commit; no `const Old = New` aliases by default; no version suffixes (name by content).
 10. **Cost-aware execution.** Trivial `run_yaml` pays multi-minute JIT cascade; mixed-precision F32 first-JIT ~10 min; closure-escape triggers 30-min hang. Smoke-test (`--smoke` rendering every code path in ≤ 2 min) before > 10 min launch. CPU success ⇏ GPU works. Background long jobs; don't poll.
 
@@ -113,7 +113,7 @@ Four primitives:
 | **solvers/ground_state + lbfgs** | ITP (`find_ground_state`) + checkpoint + adaptive + advanced (multistart + Jz-constrained) + LBFGS with Sobolev preconditioner. | ITP Zeeman shift subtracts `min(E_m)`. `find_ground_state_lbfgs` returns an atomic NamedTuple incl. `grad_norm` (spine G). Tensor c2/c4 falls back to ITP with `@warn`. |
 | **solvers/continuation** | scan_1d + scan_2d + boundary tracing + pseudo_arclength + triple_point. | `make_params(val)` returns kwarg NamedTuple or `InteractionParams`. Legacy `make_interactions` removed. |
 | **solvers/simulation + twa + sgpe + spgpe + projected_gp + photon_heating + binary** | RTP (`run_simulation!`) + adaptive + embedded-adaptive + Truncated Wigner + SGPE callback (true thermal init) + **full SPGPE** (growth + energy-damping reservoirs, rates from (μ,T,ε_cut); ramped reservoir drives s-scale evaporation) + projected GP + photon scattering + two-component GP. | TWA σ/μ is chaotic-dipolar divergence, NOT classical thermalization. Stoof-form SGPE **is** the SPGPE growth term — don't restate it. Stochastic noise must be drawn on-device (`_randn_fill!`); host draws were 88 % of the step. |
-| **workflow/experiments/{schema,runtime,analyzers,pipeline}** | YAML compile (units + templates + mixins + defaults + B-block + noise-block + auto-defaults + ε hardening) + runtime helpers (b_block_builders, pulse_sequence, STA counter-diabatic, Feshbach ramp) + analyzers + pipeline runner. | `_step_dispatch!` has `@noinline` + `@nospecialize(step)` — the inference firewall. |
+| **workflow/experiments/{schema,runtime,analyzers,pipeline}** | YAML compile (units + templates + mixins + defaults + B-block + noise-block + auto-defaults + ε hardening) + runtime helpers (b_block_builders, pulse_sequence, STA counter-diabatic, Feshbach ramp) + analyzers + pipeline runner. | `_step_dispatch!` has `@nospecialize(step)` (load-bearing) + `@noinline` — the inference firewall. |
 | **workflow/autopilot/** | Queue + tick + 2-stage submit + LocalBackend + UGEBackend (TSUBAME) + budget cap + circuit breakers (recipe / lineage / rate / kill) + on_complete recipe lineage + retry + qw_history + trust gradient + Day-1 recipes (next_random / refine / analyze) + failure_analysis + profile_recommend + observability. | TSUBAME uses UGE not Slurm; `qsub -g <group>` is CLI flag not directive. `.autopilot.{dry_run,paused}` persisted file sentinels. UGE auto-registers from `SPINORBEC_TSUBAME_{HOST,PROJECT_ROOT,RUNS_ROOT,…}` env. |
 | **workflow/io/dashboard/** | `module Dashboard`. HTTP + WebSocket + binary packers + JLD2 cache. Routes for density / phase / vortex / scan / catalog / sweep / autopilot queue / budget / inspect / tags. | Caddy admin via Unix socket; oauth2-proxy `hd=isct.ac.jp` admits whole tenant — default to anko-only `authenticated_emails_file`. |
 | **workflow/experiments/optimization.jl** | `module Optimization`. `bayesian_optimize` + `multi_fidelity_optimize_2tier` + `active_learn_phase_scan` + GP/EI + Faraday fit. YAML and direct-Julia entry points; built-in objectives `bo_objective_{max_m_transfer,max_lz,min_energy}` + custom via closure. | GP fitting > 100 s wall ⇒ heavy-tier only. |
@@ -127,7 +127,7 @@ Four primitives:
 ## Wavefunction conventions
 
 - **Layout**: `psi[x, y, …, c]`. Spatial dims first, spinor last. `c=1 → m=F`, `c=D → m=−F`.
-- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric: `diag SM singlet_pair tensor raman DDI raman tensor singlet_pair SM diag`. Substeps auto-skip on ≈ 0 coupling.
+- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric: `diag light_shift_offdiag SM singlet_pair tensor transverse_zeeman raman DDI raman transverse_zeeman tensor singlet_pair SM light_shift_offdiag diag` — the forward half is declared once at `integrator/split_step.jl:542`. (This line listed five operators until 2026-08-04, omitting `light_shift_offdiag` and `transverse_zeeman`.). Substeps auto-skip on ≈ 0 coupling.
 - **Two interaction paths**, auto-selected in `make_workspace`:
   - **c₀/c₁ path**: `diagonal(c₀) + spin_mixing(c₁) + singlet_pair(c₂) + tensor(residual c₄, c₆, …)`.
   - **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, `c₀ = c₁ = 0`.
@@ -171,7 +171,7 @@ Full procedure: `docs/conventions/adding_new_hamiltonian_term.md`. Audit table: 
 
 ## Test taxonomy + oracle gates
 
-Tier membership is **explicit in `test/runtests.jl`** — no auto-discovery.
+Tier membership is **explicit in `test/_tiers.jl`** — no auto-discovery. (`runtests.jl` includes it; `_tiers.jl` holds `FAST_TESTS` / `CI_EXTRA` / … and is the file you edit.)
 
 **Oracle test families** under `test/oracles/`, each gating one bug class:
 
@@ -287,7 +287,7 @@ F = 6, g_J = 1.9934, g_F ≈ 1.163, μ ≈ 6.977 μ_B, a_s ≈ 110 a₀. 7 unkno
 - Workspace has 23+ type params — never write explicit type params.
 - D=13 (Eu): `SMatrix` heap-allocates. Use `Matrix` / `MVector` in hot loops.
 - `Val(N)` from a type parameter, not `Val(ndim::Int)`.
-- `@noinline _step_dispatch!` with `@nospecialize(step)` is load-bearing inference firewall in `pipeline/runner.jl` — do NOT remove or specialize through.
+- `_step_dispatch!`'s `@nospecialize(step)` is the load-bearing half of the inference firewall in `pipeline/runner.jl` (`@noinline` is also present); do NOT remove or specialize through.
 
 ## Naming convention
 

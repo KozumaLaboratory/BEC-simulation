@@ -72,9 +72,27 @@ function bfield_to_p(B::Quantity, g_F::Real, omega_ref::Real)
     B_T = ustrip(u"T", B)
     -g_F * BOHR_MAGNETON * B_T / (HBAR * omega_ref)
 end
-bfield_to_p(B::Real, g_F::Real, omega_ref::Real) = bfield_to_p(
-    Float64(B) * u"Gauss", g_F, omega_ref
-)
+"""
+    bfield_to_p_gauss(B_gauss, g_F, omega_ref) -> Float64
+
+`bfield_to_p` for a bare number in GAUSS. The unit is in the NAME because a
+bare `Real` carrying an implied unit is how a 1e4 error gets written: on
+2026-08-04 `linear_zeeman_p` (`hamiltonian/coefficients.jl`) was found passing
+TESLA to the un-suffixed method, which reads Gauss.
+
+Gauss is the project's bare-number convention throughout — YAML writes
+`Bz: "0.01 Gauss"`, `b_block_builders.jl` names its variable `B_gauss`, and the
+per-field factor is per-Gauss. Callers holding Tesla should either attach the
+unit (`B * u"T"`) or convert explicitly; there is no bare-Tesla entry point,
+deliberately.
+"""
+bfield_to_p_gauss(B_gauss::Real, g_F::Real, omega_ref::Real) =
+    bfield_to_p(Float64(B_gauss) * u"Gauss", g_F, omega_ref)
+
+# Kept: `Real` still means Gauss, so no call site changes behaviour. New code
+# should prefer the suffixed name or a `Quantity`.
+bfield_to_p(B::Real, g_F::Real, omega_ref::Real) =
+    bfield_to_p_gauss(B, g_F, omega_ref)
 
 """
     freq_to_angular(f) -> Float64 (rad/s)

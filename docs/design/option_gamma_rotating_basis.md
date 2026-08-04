@@ -1,5 +1,8 @@
 # Option γ: Instantaneous Local Frame Spinor GPE — derivation
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Mathematical derivation behind `kind: rotating_basis`. **For how to use it (YAML, validation results, ε rule, gauge gotcha), read `guides/klaus_regime.md` first.** This file is the term-by-term Hamiltonian transform — read it when you need to understand or extend the math.
 
 Status: **production**. Phase II/III validation passed 2026-04-27 (see guide for the table). Scalar eGPE (`src/rotating_basis/scalar_egpe.jl`) is the adiabatic limit ($\tilde\psi_{m\neq -F}\to 0$) and serves as the Phase II reference.

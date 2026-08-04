@@ -1,5 +1,8 @@
 # Figure 3 re-derived: seven of ten classifications changed
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **2026-07-31, TSUBAME job 8309924 (cpu_16).** Re-runs the ten committed
 `runs/eu_k3_sweep/*.yaml` on current `main` and compares against the stored
 `summary.json` of 2026-05-26 — one of the 230 that predate every correction and

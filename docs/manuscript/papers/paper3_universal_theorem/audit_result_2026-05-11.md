@@ -1,5 +1,8 @@
 # paper3 v3 independent audit — 5 polyhedral cases VERIFIED
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Script**: `test/manuscript/test_paper3_audit.jl`
 **Status**: ALL 5 paper3 polyhedral cases pass independent verification.

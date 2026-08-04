@@ -1,5 +1,8 @@
 # SpinorBEC manuscript working area
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 This directory holds the active drafting / refinement workspace for
 three papers and the master thesis on Eu F=6 dipolar spinor BECs.
 

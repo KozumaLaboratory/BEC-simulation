@@ -123,7 +123,8 @@ function _lhy_energy(psi, c_lhy, n_comp, ndim, n_pts, dV)
     if n_comp > 1
         @warn """LHY energy uses scalar (fully-polarized) approximation for a \
 spinor condensate (n_comp=$n_comp). Spin-dependent LHY corrections are not \
-included. To use the two-channel spinor LHY table, set `lhy: {kind: two_channel}` \
+included. To use the two-channel spinor LHY table, set \
+`lhy: {kind: polar_two_channel}` \
 in the YAML ground_state step. \
 For F ≥ 3 the two-channel table is also incomplete — see _lhy_energy docstring.""" maxlog=1
     end

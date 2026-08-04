@@ -1,5 +1,8 @@
 # bench/ + diagnostic/ archive — 2026-05-27
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 `scripts/bench/` and `scripts/diagnostic/` are retired. Each file there
 was a one-shot research probe — printed measurements + findings to
 stdout, no `@test` blocks, no regression contract. Per the architectural

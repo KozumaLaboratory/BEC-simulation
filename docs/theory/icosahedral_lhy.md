@@ -1,5 +1,8 @@
 # F=6 icosahedral (I_h) Lee–Huang–Yang correction — closed form
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Stage**: D (parallel-session derivation 2026-05-07; verified numerically in this codebase via `test_icosahedral_lhy.jl`, 113 tests).
 
 ## Ground state
@@ -14,7 +17,7 @@ The F=6 I_h ground state spinor lives in the m = ±5 / m = 0 doublet of the Hilb
 
 ## BdG block structure (mod 5)
 
-The 26×26 BdG operator on an F=6 condensate decomposes under the I_h symmetry into blocks labelled by the 5-fold rotation eigenvalue. Block 0 — the gauge / phonon channel — is 6-dimensional (m = 0, ±5, both u and v branches) but factors further by parity into one phonon-like 2×2 block and a triple of spin-Goldstone 2×2 blocks. The Schur lemma decomposition (parallel-session derivation, Appendix VI.A) gives closed-form dispersions:
+The 26×26 BdG operator on an F=6 condensate decomposes under the I_h symmetry into blocks labelled by the 5-fold rotation eigenvalue. Block 0 — the gauge / phonon channel — is 6-dimensional (m = 0, ±5, both u and v branches) and factors further by parity into one phonon-like 2×2 block, one spin-Goldstone 2×2 block (the F_z generator), and one gapped 2×2 block. The other two spin Goldstones sit in the mod-5 = ±1 blocks: F_+ ζ has support at m = +6, +1, −4 (all ≡ 1 mod 5) and F_− ζ at m = +4, −1, −6 (all ≡ 4 mod 5). Across all blocks the count is 1 phonon + 3 spin Goldstones. The Schur lemma decomposition (parallel-session derivation, Appendix VI.A) gives closed-form dispersions:
 
 * Phonon: ω_phonon(k) = √( ε_k (ε_k + 2 c_0 n) ),   ε_k = ℏ² k² / (2M)
 * Spin Goldstone (×3 degenerate): ω_spin(k) = √( ε_k (ε_k + 2 |λ_spin| n) )
@@ -53,7 +56,7 @@ For g_S = (1.00, 1.05, 0.98, 1.02, 0.97, 1.01, 0.99):
 
 c_0     = 1.0095268024477877 λ_spin  = −0.004061060086770152
 
-so the spin-Goldstone contribution to LHY is 3 × |λ|^(5/2) ≈ 5×10⁻⁶ × 3 ≈ 1.5×10⁻⁵ — five orders of magnitude smaller than the phonon contribution (≈ 1) at this slight detuning from scalar uniformity. LHY is dominated by the phonon stiffness c_0 in the Eu-like regime.
+so the spin-Goldstone contribution to LHY is 3 × |λ|^(5/2) ≈ 1.05×10⁻⁶ × 3 ≈ 3.2×10⁻⁶ — five and a half orders of magnitude smaller than the phonon contribution (≈ 1) at this slight detuning from scalar uniformity. LHY is dominated by the phonon stiffness c_0 in the Eu-like regime.
 
 ## Implementation references
 
