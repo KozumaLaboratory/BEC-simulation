@@ -165,7 +165,17 @@ end
         # correctness — but silently, and it would never be noticed. Name the
         # exemptions so each is a deliberate act. Keyed on the TYPE, since the
         # registry is a tuple of instances and there is no name accessor.
-        exempt = Set([:LossTerm])
+        exempt = Set([
+            # Not in the energy functional at all — a non-Hermitian channel.
+            :LossTerm,
+            # Deliberately non-derivable: 2/5 is the closed form's constant and
+            # the implementation integrates a piecewise-linear table, measured
+            # at 0.96 rather than 0.40. Declaring a fitted 0.96 would pin a
+            # constant the physics derives; see the comment on
+            # `energy_operator_ratio(::LHYTerm)`. The NaN arm above checks that
+            # this exemption is not hiding a ratio that does exist.
+            :LHYTerm,
+        ])
         missing_decl = Symbol[]
         for term in registry
             isnan(energy_operator_ratio(term)) || continue
