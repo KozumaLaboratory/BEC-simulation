@@ -10,7 +10,11 @@ using SpinorBEC
 using SpinorBEC: ground_state_preflight, print_preflight, passed
 
 @testset "ground state preflight" begin
-    ok_ip = InteractionParams(Dict(0 => 4687.3, 1 => -100.0))   # c₀ > 0, c₁ < 0
+    # c₀ > 0 with c₁ < 0 and NO material cancellation: c₀ + 36c₁ = 3967, i.e. 85 %
+    # of c₀. The first version used c₁ = −100, which puts the combination at 23 %
+    # of c₀ — inside the stiff near-pole band — so the "clean setup" fixture was
+    # itself a point the cancellation rule correctly flags, and the control failed.
+    ok_ip = InteractionParams(Dict(0 => 4687.3, 1 => -20.0))
     bad_ip = InteractionParams(Dict(0 => -5859.1, 1 => 293.0))  # c₀ < 0: past −1/36
 
     @testset "a clean production setup PASSES" begin

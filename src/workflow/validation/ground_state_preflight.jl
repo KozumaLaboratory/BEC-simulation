@@ -103,7 +103,17 @@ function ground_state_preflight(; interactions::InteractionParams,
     c1 = get_cn(interactions, 1)
     if c0 > 0 && c1 != 0
         combo = c0 + 36 * c1              # F=6, the constraint this project uses
-        if abs(combo) < 0.3 * c0
+        # 0.5, ANCHORED ON THE LADDER rather than picked as a round number. The
+        # measured dt limits against `|c₀+36c₁| / c₀`:
+        #
+        #     13.6 %  →  1.0e-3      (the most limited point)
+        #     46   %  →  1.6e-2      (≥4× below the unbounded rows)
+        #     82   %  →  ≥6.4e-2     (unbounded by the ladder)
+        #
+        # So the degradation is already material at 46 % and absent by 82 %. A
+        # threshold of 0.3 was interpolated between the first two and flagged
+        # nothing at 46 %, where the limit is demonstrably reduced.
+        if abs(combo) < 0.5 * c0
             push!(
                 warns,
                 "c₀ = $(round(c0; sigdigits=5)) is large mainly by CANCELLATION: " *
