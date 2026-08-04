@@ -456,6 +456,6 @@ When CLAUDE.md and a memory file disagree: **CLAUDE.md wins for structural quest
 - Ramp `:log` scale = time-warp `g(t) = log(1 + (e-1) t)`, NOT geometric. Scan `:log` IS geometric.
 - `find_ground_state_lbfgs` returns an atomic NamedTuple **including `grad_norm`** (spine G, recomputed at the returned ψ — never trust disk-cached grad_norm).
 - `_run_analyzer` needs `ws_prev` even on cache hit.
-- `pipeline_runner.jl` doesn't forward `verbose` to ITP (loud); does forward to LBFGS (silent).
+- The GS step forwards `verbose` to BOTH solvers — `find_ground_state(; … verbose=verbose)` at `pipeline/run_step_ground_state.jl:697` and `find_ground_state_lbfgs` at `:719`/`:730`. This line said ITP is not forwarded and is therefore always loud, and pointed at `pipeline_runner.jl`, a file that does not exist (it is `pipeline/runner.jl`). Both halves were false; corrected 2026-08-04.
 - `_cuda_reclaim_callback` runs between scan points.
 - `rotating_basis_history` is multi-phase concatenated.
