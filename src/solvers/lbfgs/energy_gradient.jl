@@ -86,8 +86,14 @@ function energy_gradient!(
         # oracle + a grad/energy-consistency test.
         E = _energy_and_gradient_gpu!(grad, ws)
     else
-        apply_operator_via_registry!(grad, ws)
-        E = energy_decomposition(ws).total
+        # ONE registry traversal, not two. `energy_decomposition` here was a
+        # second full pass over every term for a number this pass can produce:
+        # each term's energy is `energy_operator_ratio(term)` times the
+        # operator expectation `grad` is already accumulating (see
+        # `terms/base.jl`). Measured 12.80 ms against 6.11 for the gradient
+        # alone at 24³ D=13, in a ~30 ms iteration; the extra reductions cost
+        # 0.076 ms per term.
+        _, E = operator_and_energy_via_registry!(grad, ws, cell_volume(ws.grid))
     end
     # Wirtinger scaling: δE = 2·Re⟨δE/δψ̄, δψ⟩ ⇒ grad_R = 2·δE/δψ̄
     # makes δE = Re⟨grad_R, δψ⟩ (standard real inner product).

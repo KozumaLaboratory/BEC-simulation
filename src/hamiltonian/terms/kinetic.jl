@@ -119,6 +119,11 @@ function apply_operator!(out::AbstractArray, ::KineticTerm, ws, psi::AbstractArr
     return out
 end
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body k²/2.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::KineticTerm) = 1.0
+
 function energy_contribution(::KineticTerm, psi::AbstractArray{<:Complex}, ws)
     # Linear: E = Re⟨ψ, H·ψ⟩·dV. Retains the manual reduction form
     # (faster than apply_operator + dot at scale; bit-equivalent for H_kin).

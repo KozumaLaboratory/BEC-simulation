@@ -84,8 +84,19 @@ reldiff(a, b) = maximum(abs, a .- b) / max(maximum(abs, b), eps())
         SpinorBEC.gradient_only!(g_only, psi, ws)
         @test g_only == g_full
         # Same ψ, same registry ⇒ the energy the driver skips is the energy it
-        # would have recomputed.
-        @test total_energy(ws) == E
+        # would have recomputed — but NOT bit for bit, and deliberately so.
+        # `energy_gradient!` now reads each term's energy off the operator
+        # accumulation it already builds (`operator_and_energy_via_registry!`),
+        # while `total_energy` sums `energy_decomposition`. Same quantity,
+        # different summation order and a blocked `_realdot` rather than each
+        # term's own reduction, so they part company in the last ulps.
+        #
+        # The tolerance is derived, not fitted: what consumes this number is the
+        # Armijo comparison, whose floor on this solver is ~1e-7 relative
+        # (`stop_at_floor`). 1e-12 is five orders tighter than anything that
+        # reads it, and still four orders tighter than the ~1e-15 observed —
+        # a term dropped or a coefficient wrong would miss by far more.
+        @test isapprox(total_energy(ws), E; rtol=1.0e-12)
     end
 
     @testset "batched Sobolev preconditioner == per-component loop" begin

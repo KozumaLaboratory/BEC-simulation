@@ -264,6 +264,11 @@ end
 # Energy face: ⟨ψ|H|ψ⟩
 # ---------------------------------------------------------------------------
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body −(b·F) + q(b̂·F)².
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::ZeemanTerm) = 1.0
+
 function energy_contribution(term::ZeemanTerm, psi::AbstractArray{<:Complex}, ws)
     _is_inactive(term) && return 0.0
     sm = ws.spin_matrices

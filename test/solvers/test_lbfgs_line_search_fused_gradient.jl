@@ -62,10 +62,18 @@ end
         a1, E1, psi_acc, n1, v1 = _line_search_energy_decrease(
             common...; slope=f.slope, α_init=αi, grad_out=gbuf, k_squared_dev=f.k2)
 
-        # Passing the buffer must not change the search.
+        # Passing the buffer must not change the SEARCH: the same step is
+        # accepted after the same number of evaluations.
         @test a1 == a0
-        @test E1 == E0_
         @test n1 == n0
+        # The energy does move, in the last ulps, and that is the mechanism
+        # rather than a defect: with the buffer the first trial is evaluated by
+        # `energy_gradient!`, which reads each term's energy off the operator
+        # accumulation, and without it by `total_energy`, which sums
+        # `energy_decomposition`. Different summation order, same quantity.
+        # Bounded by what reads it — the Armijo test, floor ~1e-7 relative —
+        # with five orders of margin.
+        @test isapprox(E1, E0_; rtol=1.0e-12)
         @test v1 == true
 
         # And the buffer holds the gradient the driver no longer computes.

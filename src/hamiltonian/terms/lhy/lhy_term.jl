@@ -34,6 +34,26 @@ function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
     return nothing
 end
 
+"""NOT derivable from the operator, so the registry falls back to
+`energy_contribution` for this term.
+
+`0.4` is the right constant for the CLOSED FORM: `ε ∝ n^(5/2)` and `V = dε/dn`
+give `n·V = (5/2)ε`. It is not right for the implementation. The tabulated
+modes integrate a piecewise-linear `V`, and `energy_contribution` measured
+`0.96·⟨ψ,V·ψ⟩` against the `0.4` this declared — a 0.93 % error in the total
+energy, which surfaced as every cached ground state failing its own verdict
+check (`test_gs_admission_axes.jl`).
+
+Declared `NaN` rather than `0.96`: that number is a fit to one fixture at one
+density, and pinning a constant that the physics derives is a mistake this
+repository has made before. The relationship may well be recoverable — `ε` is
+the exact integral of the same piecewise-linear `V` the propagator uses — but
+recovering it is a change to `energy_contribution`, not a coefficient to guess
+here.
+
+Costs one `energy_contribution` call per gradient pass when LHY is active."""
+energy_operator_ratio(::LHYTerm) = NaN
+
 function energy_contribution(::LHYTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
