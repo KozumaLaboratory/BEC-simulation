@@ -614,13 +614,15 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-04. Six of the fourteen ids are resolved, across four of the
-twelve items; eight ids remain.**
+**Status, 2026-08-04. Eight of the fourteen ids are resolved, across six of the
+twelve items; six ids remain.**
 
 | item | ids | how |
 |---|---|---|
 | 1 | A2:R-OPEN-03, A5:R-NIX-03B | measured — the document's own "largest single unknown" |
 | 2 | A2:R-OPEN-01 | measured |
+| 3 | A2:R-OPEN-05 | measured — mean 1.24 against a threshold of 3 |
+| 5 | A2:R-ENS-01 | **fixed in code** — plus a second defect found while fixing it |
 | 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
 | 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
 
@@ -700,11 +702,37 @@ this is what promotion looks like.
    sharing is real: those 59 runs genuinely want one ground state, which is the
    stage cache's entire purpose. So the concurrent-write path is hot *because
    the design is working*, not because the id is blind to something.
-3. **A2:R-OPEN-05 — write amplification of per-attempt records.** This design
-   commits to an append-only `attempts/` shape without the
-   executions-per-artifact measurement the requirement says must come first. If
-   the mean is 3 or more, the index needs sharding and "rebuildable and safe to
-   delete" has to go.
+3. **A2:R-OPEN-05 — write amplification of per-attempt records. MEASURED
+   2026-08-04: mean 1.24, so the append-only shape stands.** The requirement
+   said the executions-per-artifact mean must be measured first, and that at
+   3 or more the index needs sharding and "rebuildable and safe to delete" has
+   to go.
+
+   | | |
+   |---|---|
+   | run directories under `runs/` | 294 |
+   | content-addressed (`<basename>_<sha>`) | 219 |
+   | distinct config basenames | 176 |
+   | **mean directories per config** | **1.24** |
+   | configs with more than one | 34 |
+   | most re-run | 4 (`L4_eu_matsui_hamiltonian_only_{32,64}`) |
+
+   Well under the threshold. No sharding; the index stays rebuildable and safe
+   to delete.
+
+   **What this measurement is NOT, stated because the difference matters.** It
+   counts DIRECTORIES per config, not executions per artifact. The direct
+   quantity is unmeasurable in this tree: there are **0 completion markers and
+   0 `_exit_summary.json`** anywhere under `runs/`, so every one of those 294
+   directories predates the record-keeping that would have counted executions.
+   A re-run that overwrote its directory in place leaves no trace at all, and
+   the stage cache — the one thing keyed on `artifact_id` rather than on config
+   bytes — is opt-in (`SPINORBEC_STAGE_CACHE`) and has never been populated
+   here. So 1.24 is a LOWER BOUND on write amplification, and the true figure
+   would need the markers this design introduces. It is quoted as a lower bound
+   because the decision it feeds is one-sided: a lower bound of 1.24 against a
+   threshold of 3 is already decisive, and no amount of undercounting reverses
+   that unless the true mean is more than double.
 
 **Two things the register names but does not build.**
 
@@ -713,12 +741,35 @@ this is what promotion looks like.
    way, but S1's severity is still unmeasured. `kill -INT` is verified
    uncatchable in Julia script mode; whether UGE delivers something catchable at
    the `h_rt` boundary is not.
-5. **A2:R-ENS-01 — the TWA ensemble.** `grep -n isfinite src/solvers/twa.jl`
-   returns nothing, and `_welford_update!` is in-place and cumulative, so one
-   diverging member NaNs the mean for every later member. The ledger gives each
-   member a name and the diverging member a refusal — but that requires a change
-   inside `twa.jl` that this document specifies only in shape, not in detail.
-   33 configs under `runs/` use `twa:`.
+5. **A2:R-ENS-01 — the TWA ensemble. FIXED 2026-08-04.** The row said the
+   repair "requires a change inside `twa.jl` that this document specifies only
+   in shape, not in detail". The detail turned out to be small, and the row was
+   right about the defect: `grep isfinite src/solvers/twa.jl` returned nothing,
+   `_welford_update!` is cumulative and in place (`mean[I] += delta / i`), so
+   one diverging member NaNed the mean and the variance for every member after
+   it, with no recovery and no record — a 200-member ensemble returning an
+   all-NaN answer with `n_trajectories` still reading 200. 33 configs use
+   `twa:`.
+
+   `_all_finite(traj_obs)` now refuses a member before it is folded in, and the
+   refusal is recorded: `EnsembleResult.rejected::Vector{Int}`, a vector rather
+   than a count so that "none rejected" and "rejections not tracked" cannot look
+   alike, and so a caller can name the member. Checked at the OBSERVABLE, not at
+   ψ — an ensemble is a statement about its observables, and a trajectory can be
+   finite in ψ while producing a non-finite observable.
+
+   **A second defect, found while fixing the first and quieter than it.** The
+   variance divided M2 by `n_traj`, the number of trajectories REQUESTED. Adding
+   a rejection path without touching that denominator would have inflated the
+   sample count and biased the variance low — a wrong number in place of an
+   obvious NaN. Both the Welford weighting and the denominator now use the
+   contributing count.
+
+   Gated by `test/solvers/test_twa_rejects_diverged_members.jl`. Worth recording
+   about the gate itself: its first version tested the predicate, the weighting
+   and the record, and **stayed green when the rejection branch was disabled
+   outright** — every piece was covered and nothing checked that the loop
+   CONSULTS them. It now asserts that too.
 
 **Two the row proposed to register rather than repair — and neither survived
 that disposition.** One was repaired because a register entry for it would have
@@ -779,11 +830,28 @@ read as a known-wrong answer rather than a caveat; the other had no subject.
 
 **Three where the mechanism is weaker than the requirement asks.**
 
-8. **A2:R-CHAIN-03 — the fork-resolution policy.** The policy (replay from the
-   nearest held ancestor) is stated, but the per-method materialisation costs
-   that would make it real — 54 MB for psi against roughly 2.1 GB of L-BFGS
-   two-loop memory at 64^3 x 13 — are quoted from issue #250, not measured under
-   this design.
+8. **A2:R-CHAIN-03 — the fork-resolution policy. The quoted costs are now
+   DERIVED rather than cited (2026-08-04); the policy question they were
+   supposed to settle is still open.** The row's complaint was that 54 MB for
+   psi against ~2.1 GB of L-BFGS two-loop memory at 64³ × 13 came from issue
+   #250 and had never been checked under this design. Recomputed from the
+   shapes and the shipped defaults:
+
+   | | |
+   |---|---|
+   | ψ at 64³ × 13, `ComplexF64` | 64³·13·16 B = **54.5 MB** (52.0 MiB) |
+   | L-BFGS history, `m_lbfgs = 20` (`lbfgs/driver.jl:78`) | 2·m·\|ψ\| = **2.18 GB** (2.03 GiB) |
+   | ratio | **40×** |
+
+   Both figures reproduce, so #250 is not the authority for them any more — the
+   arithmetic is, and it is one line from the grid shape and one default. The
+   40× is what makes the policy's shape obvious: replaying from an ancestor is
+   cheap in ψ and ruinous in solver state, so the ancestor must be a ψ.
+
+   **What remains open is not a number.** Whether "replay from the nearest held
+   ancestor" is right depends on how often a fork actually lands mid-solve
+   rather than between stages, and nothing measures that. The cost table no
+   longer blocks it; the frequency does.
 9. **A5:R-NIX-07 — trusted producers.** `require` is verdict-shaped, not
    host-shaped. The capability is not designed out, but it is not built, and the
    day a stale-sysimage TSUBAME artifact enters a shared store is when it is

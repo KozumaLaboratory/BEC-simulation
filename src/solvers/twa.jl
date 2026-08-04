@@ -39,6 +39,10 @@ function run_twa(;
     M2_obs = nothing
     ref_times = nothing
     last_traj_result = nothing
+    # Contributing samples and the members refused. Separate counters because
+    # `n_traj` is what was ASKED for and the statistics are over what arrived.
+    n_used = 0
+    rejected = Int[]
 
     for i in 1:n_traj
         t_start = time_ns()
@@ -66,6 +70,26 @@ function run_twa(;
 
         traj_obs = _extract_trajectory_observables(result, grid, atom, obs_list)
 
+        # REFUSE a diverged member instead of folding it in. `_welford_update!`
+        # is cumulative and in place — `mean[I] += delta / i` — so a single NaN
+        # anywhere in a trajectory's observables destroys the mean and the
+        # variance for that observable for EVERY member after it, and there is
+        # no recovery and no record. Until 2026-08-04 `grep isfinite
+        # src/solvers/twa.jl` returned nothing: one diverging trajectory in a
+        # 200-member ensemble returned an all-NaN answer with n_trajectories
+        # still reading 200. 33 configs under `runs/` use `twa:`.
+        #
+        # Checked at the OBSERVABLE, not at psi: an ensemble is a statement
+        # about its observables, a trajectory may be finite in psi and produce a
+        # non-finite observable, and this is also the cheap place to look.
+        if !_all_finite(traj_obs)
+            push!(rejected, i)
+            verbose && @warn "TWA: trajectory $i produced a non-finite observable; \
+                              excluded from the ensemble" trajectory = i
+            continue
+        end
+        n_used += 1
+
         if ref_times === nothing
             ref_times = result.times
             mean_obs = Dict{Symbol, Vector{Array{Float64}}}()
@@ -77,8 +101,11 @@ function run_twa(;
         else
             for sym in keys(traj_obs)
                 for t_idx in eachindex(traj_obs[sym])
+                    # `n_used`, not `i`: Welford's 1/i weighting counts
+                    # CONTRIBUTING samples. Passing the loop index would give a
+                    # rejected member's slot a share of the weight.
                     _welford_update!(mean_obs[sym][t_idx], M2_obs[sym][t_idx],
-                        traj_obs[sym][t_idx], i)
+                        traj_obs[sym][t_idx], n_used)
                 end
             end
         end
@@ -91,17 +118,43 @@ function run_twa(;
         end
     end
 
-    # Finalize variance
+    # Finalize variance. `n_used`, not `n_traj`: dividing M2 by the number of
+    # trajectories REQUESTED rather than the number that contributed inflates
+    # the sample count and biases the variance low — a second, quieter error
+    # than the NaN, and one that would survive the fix above on its own.
     var_obs = Dict{Symbol, Vector{Array{Float64}}}()
     for sym in keys(M2_obs)
-        var_obs[sym] = if n_traj > 1
-            [m2 ./ (n_traj - 1) for m2 in M2_obs[sym]]
+        var_obs[sym] = if n_used > 1
+            [m2 ./ (n_used - 1) for m2 in M2_obs[sym]]
         else
             [zeros(size(m2)) for m2 in M2_obs[sym]]
         end
     end
 
-    EnsembleResult(ref_times, mean_obs, var_obs, n_traj, all_traj_results, last_traj_result)
+    isempty(rejected) ||
+        @warn "TWA ensemble: $(length(rejected)) of $n_traj trajectories were \
+               excluded for producing non-finite observables; mean and variance \
+               are over $n_used samples" rejected = rejected
+
+    EnsembleResult(ref_times, mean_obs, var_obs, n_used, rejected,
+        all_traj_results, last_traj_result)
+end
+
+"""
+    _all_finite(traj_obs) -> Bool
+
+Every value of every observable at every snapshot is finite.
+
+Guards `_welford_update!`, which is cumulative and in place, so one non-finite
+entry propagates to every later member with no recovery and no record.
+Short-circuits on the first offender — the common case is all-finite and pays
+one pass.
+"""
+function _all_finite(traj_obs)
+    for (_, series) in traj_obs, arr in series
+        all(isfinite, arr) || return false
+    end
+    true
 end
 
 """

@@ -106,9 +106,25 @@ Real-time TOF propagator with a magnetic-gradient-driven Stern-Gerlach
 separation. Takes the wavefunction from `ws_source` (a `Workspace`), clones
 it into a temporary TOF workspace with the trap disabled (default) and the
 contact interactions zeroed (default), then adds a linear gradient potential
-`V_m(r) = m · g_F · gradient · r[axis]` per spin component via the existing
-`MagneticGradient` struct, and integrates for `t_tof` using `n_steps`
-split-step ticks.
+`V(r) = g_F · gradient · r[axis]` via the existing `MagneticGradient` struct,
+and integrates for `t_tof` using `n_steps` split-step ticks.
+
+!!! warning "This does NOT separate spin components"
+    `MagneticGradient` is **spin-INDEPENDENT**. Its own implementation says so
+    (`hamiltonian/terms/magnetic_gradient.jl:15-18`: "This is NOT a true
+    Stern-Gerlach gradient (which would carry an F_z factor) … users who need
+    m-dependence must use a different mechanism"), and CLAUDE.md lists it as
+    "spin-independent tilt, NOT a Zeeman".
+
+    This docstring and the comment at the call site carried `V_m(r) = m · g_F ·
+    …` — an `m` the term does not have — until 2026-08-04. Every component gets
+    the SAME tilt, so the cloud translates and does not split. **A
+    Stern-Gerlach separation claimed from this function is false.**
+
+    For genuine m-dependence use `SpatialZeemanTerm` (an arbitrary B(r) whose
+    Zeeman coupling is per-m by construction). The name
+    `simulate_tof_with_gradient` is kept because the gradient is real; only the
+    spin dependence was never there.
 
 Returns a `Dict(m => density_2d)` column-integrated along `imaging_axis`
 (or `density_1d` for N=1).
@@ -156,8 +172,10 @@ function simulate_tof_with_gradient(
         normalize_every=0,
         save_every=max(1, n_steps ÷ 4))
 
-    # Use existing MagneticGradient — the hot-path split_step already
-    # integrates V_mg(r, m) = m · g_F · gradient · r[axis] per component.
+    # Use existing MagneticGradient — the hot-path split_step integrates
+    # V_mg(r) = g_F · gradient · r[axis], the SAME for every component. This
+    # comment read `V_mg(r, m) = m · g_F · …` until 2026-08-04; there is no `m`
+    # (`terms/magnetic_gradient.jl:15-18`). See the warning in the docstring.
     mg = MagneticGradient{N}(gradient, gradient_axis, atom.g_F)
 
     ws_tof = make_workspace(;
