@@ -39,6 +39,11 @@ const LIVE_DOCS = [
     "docs/validation/config_metadata_blocks.toml",
     "docs/validation/config_prose_harvest.toml",
     "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
+    # Arrived with main 2026-08-04. It calls itself the "single entry point for
+    # what this campaign established, excluded, and could not close", and
+    # matsui_reproduction_status.md now points readers at it — so it is what a
+    # reader is sent to, which is the LIVE test.
+    "docs/validation/matsui_campaign_report.md",
     "docs/validation/parameter_contract_with_Ueda.md",
     "docs/validation/step6_ueda_reference_state/reference_state.yaml",
     "docs/validation/ueda_status.md"]

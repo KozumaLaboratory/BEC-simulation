@@ -116,6 +116,11 @@ function _raman_energy(psi, sm::SpinMatrices{D}, raman::RamanCoupling{N},
     E
 end
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body coupling.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::RamanTerm) = 1.0
+
 function energy_contribution(::RamanTerm, psi::AbstractArray{<:Complex}, ws)
     ws.raman === nothing && return 0.0
     # Resolve at ws.state.t — the SAME resolution apply_step! uses above.
