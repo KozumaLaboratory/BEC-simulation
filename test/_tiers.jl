@@ -669,6 +669,14 @@ const FULL_EXTRA = [
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_lhy_term_faces.jl",
+    # Same bug class again, this time in the dispatch itself: `energy_gradient!`
+    # chose CPU vs GPU from `psi`, while computing on `ws.state.psi` and writing
+    # `grad`. A ground state read back from jld2 is a host Array whatever wrote
+    # it, so the GS stage-cache audit — host ψ, GPU workspace — took the CPU
+    # branch and scalar-indexed. Needs a cache HIT to appear: the run that fills
+    # the cache never loads from it, so only the SECOND GPU run of a given
+    # ground state dies.
+    "gpu/test_gpu_energy_gradient_host_psi.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     # The OTHER pair of realizations on the device: the warp-cooperative fused
     # Euler kernels vs the one-thread-per-voxel ones. Replaces

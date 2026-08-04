@@ -66,7 +66,19 @@ function energy_gradient!(
     # The ctx pre-builds shared scratch (fft_buf, fx/fy/fz, n_density)
     # so each term's hot-path skips per-call alloc.
     copyto!(ws.state.psi, psi)
-    if _is_gpu(psi)
+    # The branch keys on `ws.state.psi`, NOT on `psi`. Everything below the
+    # copyto! reads the workspace and writes `grad`; `psi` is only the source
+    # of that copy, and may legitimately be host-resident for a GPU workspace
+    # -- a ground state loaded back from jld2 always is. Keying on `psi` sent
+    # exactly that case down the CPU branch, where the registry's device
+    # buffers met a host `grad` and every accumulate scalar-indexed. The GS
+    # stage-cache audit could therefore never run on GPU.
+    _is_gpu(grad) == _is_gpu(ws.state.psi) || throw(
+        ArgumentError(
+            "energy_gradient!: `grad` must be resident where the workspace is " *
+            "($(typeof(grad)) vs $(typeof(ws.state.psi)))"),
+    )
+    if _is_gpu(ws.state.psi)
         # Fused GPU path: fill grad with Σ_term H_term·ψ AND return total energy
         # in ONE per-term apply_operator! pass (the FFT-heavy kinetic/DDI faces
         # run once, not once for grad + once for energy_decomposition). Bit-
@@ -101,7 +113,19 @@ function gradient_only!(
     ws::Workspace{N},
 ) where {N}
     copyto!(ws.state.psi, psi)
-    if _is_gpu(psi)
+    # The branch keys on `ws.state.psi`, NOT on `psi`. Everything below the
+    # copyto! reads the workspace and writes `grad`; `psi` is only the source
+    # of that copy, and may legitimately be host-resident for a GPU workspace
+    # -- a ground state loaded back from jld2 always is. Keying on `psi` sent
+    # exactly that case down the CPU branch, where the registry's device
+    # buffers met a host `grad` and every accumulate scalar-indexed. The GS
+    # stage-cache audit could therefore never run on GPU.
+    _is_gpu(grad) == _is_gpu(ws.state.psi) || throw(
+        ArgumentError(
+            "gradient_only!: `grad` must be resident where the workspace is " *
+            "($(typeof(grad)) vs $(typeof(ws.state.psi)))"),
+    )
+    if _is_gpu(ws.state.psi)
         _energy_and_gradient_gpu!(grad, ws)
     else
         apply_operator_via_registry!(grad, ws)
