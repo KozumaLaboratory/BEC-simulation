@@ -59,7 +59,11 @@ const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : -0.024
 # LHY completely (measured under 2 % in every substep), so `none` exercises the
 # same diag + spin-mixing + DDI chain the fusion changes.
 const LHY = length(ARGS) >= 4 ? Symbol(ARGS[4]) : :polar_contact
-const DT = 0.002
+# dt is an ARGUMENT. At the production ratio r = −0.024 the shipped 2e-3 DIVERGES
+# — c₀ = 34465 there and the stability limit sits between 1e-3 and 2e-3, measured
+# in `bench/itp_stability_limit_vs_c0.jl` — so BOTH arms blew up and the fusion
+# could not be compared at that point at all. 5e-4 converged there in 15400 steps.
+const DT = length(ARGS) >= 5 ? parse(Float64, ARGS[5]) : 0.002
 const TOL = 1.0e-10
 
 function build(dt)
@@ -220,6 +224,20 @@ println("  can coincide between states that differ.")
 # The practical question is on the same table: if the fused chain at dt is closer
 # to R than the separate chain at dt/2 is, then it wins twice — 0.70× the step AND
 # half the steps for the same distance to the reference.
+# EVERY verdict below is gated on this. At the production point three of five arms
+# did not converge, the energies spanned 70 % and the densities were O(1) apart —
+# and this file still printed "the fused chain wins twice", because that line sat
+# in the Richardson block with no precondition while the convergence warning sat
+# at the END. A favourable-sounding conclusion emitted from unusable data is worse
+# than no conclusion.
+const ALL_CONV = S.conv && B.conv && R.conv && F.conv && Fh.conv
+if !ALL_CONV
+    println("\n  VERDICTS SUPPRESSED — $(count(a -> !a.conv, (S, B, R, F, Fh))) of 5 arms did not converge.")
+    println("  Distances between arms that never reached a fixed point are distances")
+    println("  between arbitrary points on trajectories, and an order read off them is")
+    println("  not an order. The numbers below are printed as DIAGNOSTICS only.")
+end
+
 println("\n  distance to R = separate at dt/4 (the finest reference here)")
 @printf("  %-32s %12s %12s\n", "", "density", "energy")
 rows = (("S separate, dt", S), ("S separate, dt/2", B),
@@ -235,7 +253,8 @@ let sd = ddist(S.psi, R.psi), bd = ddist(B.psi, R.psi),
         sd / max(bd, eps()), fd / max(fhd, eps()))
     println("    ~4 = second order and converging. Far from it ⇒ the arm is not in")
     println("    its asymptotic regime and no order can be read from these three.")
-    println(fd < bd ?
+    ALL_CONV || println("\n  (no verdict — see the suppression note above)")
+    ALL_CONV && println(fd < bd ?
             "\n  F at dt is CLOSER to R than S at dt/2 is — the fused chain wins twice:
   0.70× the step AND half the steps for the same distance to the reference." :
             "\n  F at dt is NOT closer to R than S at dt/2 — the fusion buys step time
@@ -245,7 +264,7 @@ end
 # Divergence is reported FIRST and separately, because "no arm converged" invites
 # raising the step cap, and no step count fixes a blow-up.
 let arms = (S, B, R, F, Fh), div = count(a -> a.diverged, (S, B, R, F, Fh))
-    if div > 0
+    if div > 0 || !ALL_CONV
         println("""
 
   $(div) OF 5 ARMS DIVERGED — the state left the finite range, so every number
@@ -280,3 +299,8 @@ If the verdict is < 1 in BOTH columns the fusion is admissible at this dt and
 grid, and it saves 30.6 % of the step at 64³. If it is ≳ 1 the fusion is a real
 change to the answer and the speed does not buy it — the fallback, dt/2 with the
 fused chain, is 2× the steps at 0.70× the step, i.e. a loss, so the idea dies.""")
+
+# A void result must not exit 0. The smoke gate in the submit script checks the
+# exit code, and this file previously returned success while every arm diverged —
+# so "smoke rc=0" was certifying a run that measured nothing.
+ALL_CONV || exit(2)

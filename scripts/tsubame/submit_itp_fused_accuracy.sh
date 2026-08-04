@@ -8,7 +8,10 @@
 source "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-gapbench}/scripts/tsubame/_preamble.sh"
 nvidia-smi --query-gpu=name --format=csv,noheader || true
 echo "### SMOKE"
-$JULIA --project=. bench/itp_fused_chain_accuracy.jl 16 400 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
+# The smoke must pass a dt CONSISTENT with the ratio it runs at. The bench default
+# ratio moved to the production −0.024, where dt = 2e-3 diverges, so a smoke that
+# passed no dt was guaranteed to blow up — and still exited 0.
+$JULIA --project=. bench/itp_fused_chain_accuracy.jl 16 400 -0.024 polar_contact 0.0005 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
 rc=${PIPESTATUS[0]}; echo "### smoke rc=$rc"
 [ "$rc" -ne 0 ] && { echo "SMOKE FAILED"; echo "ALL DONE $(date)"; exit 1; }
 # A MATRIX, not one point. The 2.9x-at-equal-accuracy claim rests on 64^3 with
@@ -26,7 +29,7 @@ rc=${PIPESTATUS[0]}; echo "### smoke rc=$rc"
 # split by the shell before UGE ever sees it — "Unable to read script file because
 # of error: error opening 40000". Nothing about a space-containing value survives
 # that path, so the config is passed as separate names.
-CFG="${CFG_N:-64} ${CFG_STEPS:-40000} ${CFG_C1:-0.05} ${CFG_LHY:-polar_contact}"
+CFG="${CFG_N:-64} ${CFG_STEPS:-40000} ${CFG_C1:-0.05} ${CFG_LHY:-polar_contact} ${CFG_DT:-0.002}"
 echo; echo "### PRODUCTION n/steps/c1/lhy = ${CFG}"
 $JULIA --project=. bench/itp_fused_chain_accuracy.jl ${CFG} 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
 echo "ALL DONE $(date)"
