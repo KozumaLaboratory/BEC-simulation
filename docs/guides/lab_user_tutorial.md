@@ -51,7 +51,7 @@ pipeline:
   - dynamics:
       duration: 5.0
       dt: 0.005
-      save_every: 100
+      save: {every: 100}          # NOT `save_every:` — folded into `save:`
       save:
         psi: true
         precision: "f32"

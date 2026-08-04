@@ -182,7 +182,8 @@ pipeline:
   - dynamics:
       duration: 107.6
       dt: 1.0e-4
-      save_every: 7000         # → 154 snapshots
+      save: {every: 7000}      # → 154 snapshots. NOT `save_every:`: the flat
+                               # spellings were folded into `save:` and are rejected.
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 

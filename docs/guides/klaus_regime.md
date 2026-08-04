@@ -22,8 +22,9 @@ pipeline:
       ddi: {enabled: true}
       B:                       # unified Zeeman block (:spherical coord)
         B_mag: 1.0             # Gauss
-        theta_deg: 0
-        phi_deg: 0
+        theta: 0.0               # RADIANS. `theta_deg`/`phi_deg` are not
+        phi: 0.0                 # accepted keys — and they were DEGREES, so a
+                                 # bare rename would change the physics.
       potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
       epsilon: 1.0e-6          # required — see "ε rule" below
       backend: gpu
