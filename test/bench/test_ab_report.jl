@@ -1,4 +1,9 @@
 using Test
+# Present for the suite-wide invariant in test_tier_membership.jl -- every test
+# file declares a plain `using SpinorBEC` so it can run standalone in a worker
+# that has not loaded it. This file genuinely needs nothing from the package;
+# the rule is not worth an exemption for one file.
+using SpinorBEC
 
 include(joinpath(@__DIR__, "..", "..", "bench", "ab_report.jl"))
 using .ABReport: Arm, compare, summarize, read_rows
