@@ -17,9 +17,15 @@
 #
 # WHAT THIS DOES NOT CHECK, and must not be read as covering:
 #   * grid resolution / box size — `grid_resolution` planning is a separate tool
-#   * whether `dt` is STABLE. The stability limit was bracketed at ONE point
-#     (between 1e-3 and 2e-3 at c₀ ≈ 34000) and no criterion was established, so
-#     this warns on the ITP error and refuses nothing on stability.
+#   * whether `dt` is STABLE. Measured across the production c₀ range and
+#     `c₀·dt < const` does NOT hold — the two bracketed points differ 4.7× and
+#     four of six are unbounded by the ladder — so there is no rule to refuse on.
+#     What the measurement DID settle is why: at fixed c₀, making the physical
+#     combination `c₀ + F²c₁` seven times larger left the limit unchanged (1.0e-3
+#     both ways), so the limit is set by SUBSTEP MAGNITUDE, not by the interaction.
+#     Near the `−1/F²` pole c₀ is large only because c₀ and c₁ blow up while
+#     cancelling, and there LOWERING dt refines an ill-conditioned splitting rather
+#     than improving the physics. That is a warning below.
 #   * the trapped state's dynamical stability, which is a trapped-BdG question
 #   * anything about dynamics; this is ground states only
 
@@ -86,6 +92,30 @@ function ground_state_preflight(; interactions::InteractionParams,
             "LHY term (this is the droplet regime), but the ITP stability limit and the " *
             "dt error were both measured at c₀ > 0 and neither transfers.",
         )
+    end
+
+    # 1b. NEAR the pole c₀ is large without the PHYSICS being large, and that is a
+    #     numerical trap rather than a strong interaction: `c₀ + F²c₁` is what the
+    #     scattering data fixes, while c₀ and c₁ blow up individually and cancel.
+    #     Measured — at fixed c₀ = 34465, making the combination 7× larger left the
+    #     ITP dt limit at 1.0e-3 either way, so the limit tracks the SUBSTEP.
+    #     Lowering dt there refines a stiff splitting; it does not buy physics.
+    c1 = get_cn(interactions, 1)
+    if c0 > 0 && c1 != 0
+        combo = c0 + 36 * c1              # F=6, the constraint this project uses
+        if abs(combo) < 0.3 * c0
+            push!(
+                warns,
+                "c₀ = $(round(c0; sigdigits=5)) is large mainly by CANCELLATION: " *
+                "c₀ + 36c₁ = $(round(combo; sigdigits=5)), i.e. " *
+                "$(round(100 * abs(combo) / c0; sigdigits=2))% of c₀. Near the −1/F² pole the " *
+                "substeps are individually huge while the physics is not, and the ITP dt " *
+                "limit tracks the SUBSTEP (measured: 7× the physical combination at fixed " *
+                "c₀ left the limit at 1.0e-3 either way). Lowering dt refines an " *
+                "ill-conditioned splitting rather than improving the answer — prefer a " *
+                "dt-free solver here.",
+            )
+        end
     end
 
     # 2. The LHY functional has to be valid AT THIS POINT, and three of the four
