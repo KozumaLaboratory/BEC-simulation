@@ -29,6 +29,7 @@ include("validation/stability_spec.jl")         # 3-valued energetic-stability g
 include("validation/error_budget.jl")           # is a numerical knob justified? (mandatory positive control)
 include("validation/accuracy_knobs.jl")         # what trades accuracy, and what the most accurate setting is
 include("validation/accuracy_profiles.jl")      # :reference / :production / :fast, derived from the registry
+include("validation/ground_state_preflight.jl") # one gate before spending compute: the traps that actually cost time
 include("validation/save_operator_rhs.jl")      # Level-10 hand-off (operator_rhs.jld2 + MANIFEST)
 include("validation/convenience.jl")            # audit / hand_off / diff_yamls — top-level 1-liners
 include("validation/show.jl")                   # Base.show pretty printing for REPL
