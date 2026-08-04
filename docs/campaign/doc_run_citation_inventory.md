@@ -78,7 +78,32 @@ lost; the citation points at the pre-move path. Repointing it is a doc fix.
 `12174e883326ecac`). These describe a tree the reader does not have. They mislead,
 but they assert no result.
 
-### Live claims with a stated result — 4
+### Live claims with a stated result — 4, of which 2 were false alarms
+
+> **Correction (2026-08-02): two of these four are on disk.** This list was built
+> with the matcher whose three defects are documented in
+> [`stored_run_disposal.md`](stored_run_disposal.md). Re-adjudicated with the
+> fixed resolver against the main checkout:
+>
+> | run | verdict | what is actually there |
+> |---|---|---|
+> | `lhy_mode_ablation` | absent | — |
+> | `twa_sinatra` | absent | — |
+> | `sprint5_M1_multistart_groundstate` | **on disk** | 30 `cell_B*_Om*.jld2` + `groundstate_audit.jld2`, 83 MB |
+> | `ddi_convention_factorial` | **on disk** | `results.jld2`, 10 885 bytes, 2026-05-26 |
+>
+> Both are **untracked**, so they are invisible from a clone, from CI and from a
+> worktree — but the numbers they back can be re-checked in the main checkout.
+> Both also have a **producer committed** — `scripts/m1_b1_multistart_newton.jl`
+> and `scripts/validation/run_validation_matrix.jl` — so they are regenerable
+> too, not merely re-readable. Neither retraction was warranted on any reading.
+> The two documents that had struck their claims through on the strength of this
+> list have been corrected (`m1_groundstate_audit_2026-06-08.md`,
+> `self_contained_validation_report.md` Layer F). Reading "untracked" as "gone" is
+> the same conflation that put the canonical Eu Hamiltonian-only runs on a
+> disposal list.
+>
+> **The regenerate-or-retract list is therefore 2, not 4.**
 
 **This is the regenerate-or-retract list.**
 

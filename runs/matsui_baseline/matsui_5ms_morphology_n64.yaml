@@ -8,14 +8,6 @@
 #   B (ground state) = 1 µT;  B (dynamics) = 2.6 nT
 #   DDI: secular for GS, full for dynamics
 
-metadata:
-  suite: matsui_baseline
-  ladder_level: 12
-  reference: Matsui_2026_Science_arxiv_2504_17357
-  target: 5ms_morphology
-  grid_n: 64
-  generator: scripts/validation/matsui_baseline_gen.jl
-
 defaults:
   kind: spinor
   backend: gpu

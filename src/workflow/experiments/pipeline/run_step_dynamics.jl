@@ -379,10 +379,19 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
+    # Cutover step 2, invariant 4: the RTP loops swallow `InterruptException`
+    # exactly as the ITP does (`simulation/run_loops.jl:51`, `:207`) — they
+    # record a final snapshot, print, and return normally, so a killed dynamics
+    # run is otherwise INDISTINGUISHABLE from a finished one. `converged` cannot
+    # cover it either: there is no GS step in a dynamics-only pipeline, so
+    # `run_registry.jl` records `converged = true` unconditionally. This Ref is
+    # the only signal, and it is what withholds the completion marker.
+    rtp_interrupted = Ref(false)
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
         extra_on_step=extra_cb,
         stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
+        interrupted=rtp_interrupted,
     )
 
     if verbose
@@ -399,6 +408,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         :save_snapshot_compression => save_compress,
         :snapshot_tmp_path => snap_tmp_path,
         :snapshot_count => snap_count,
+        :interrupted => rtp_interrupted[],
     )
     (psi_out, grid, atom, ws, step_result)
 end
@@ -422,13 +432,29 @@ measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
 off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
 ~1.3× the step, for 1.49× the per-step cost. Close to a wash.
 
-`rk4ip` is 4th order and, measured on an Eu-like 12³ DDI config, **cheaper per
-step than the default** (2.61 ms against 3.00; `midpoint` is 4.46) because the
-default runs the predictor-corrector twice per step while RK4IP makes four
-accumulating registry passes. Net of the larger step it holds: **2.7× at a 1e-4
-error budget, 4.9× at 1e-5**. Those are CPU at 12³; the GPU ratio is unmeasured
-and RK4IP's five scratch buffers are ~2.2 GB at 128³ F64 D=13, so check both
-before assuming it transfers. Two more things to know. It is not
+`rk4ip` is 4th order, and whether that is worth taking is a question about the
+required TOLERANCE, not about the order. Full measurement:
+`docs/validation/rk4ip_cost_on_gpu.md`.
+
+At the same `dt` it is more accurate and dearer — H100 64³, `dt` = 7.81e-4:
+**7090x the accuracy at 3.28x the cost per step**. At the same accuracy, time to
+solution (measured at 64³):
+
+    budget    rk4ip dt    split dt    TIME RATIO
+     1e-3     4.23e-2     2.62e-2       0.49x
+     1e-4     2.34e-2     8.29e-3       0.86x
+     1e-5     1.31e-2     2.62e-3       1.53x
+     1e-6     7.38e-3     8.29e-4       2.71x
+
+**Break-even is between 1e-4 and 1e-5**, and production sits near 1e-4 — so at
+default tolerances this is slower for the same answer. Select it when the
+tolerance is tight, or on CPU, where it is cheaper per step outright (2.61 ms
+against `split_step!`'s 3.00 at 12³; on the H100 it is 2.87x at 128³, 3.28x at
+64³, 7.44x at 32³, because it applies `e^{K dt/2}` four times per step where
+Strang applies `e^{K dt}` once and the GPU is FFT-bound). Memory is the other
+constraint: five full-state scratch buffers, measured 12.9 GiB allocator
+high-water for one 128³ step on the H100 and 4.8 GiB of a 15.9 GiB consumer
+card. Two more things to know. It is not
 norm-conserving — the drift is a free error monitor, and `normalize_every` is not
 honoured. And its failure mode is a wall rather than a slope: measured on an
 Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns
@@ -471,11 +497,12 @@ function _run_dynamics_with_optional_streaming!(
     snap_type::Type{<:Complex}=ComplexF32;
     extra_on_step::Union{Nothing, Function}=nothing,
     stepper::Union{Nothing, Function}=nothing,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
              SimulationCallbacks(; on_step=extra_on_step)
-        return (run_simulation!(ws; callbacks=cb, stepper), nothing, 0)
+        return (run_simulation!(ws; callbacks=cb, stepper, interrupted), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -507,6 +534,7 @@ function _run_dynamics_with_optional_streaming!(
             ),
             stream_snapshots=true,
             stepper,
+            interrupted,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]

@@ -10,6 +10,7 @@ Anchors:
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
 - `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit,adding_new_hamiltonian_term}.md` — physics convention authority + 14-term sign × path audit.
 - `docs/conventions/testing_strategy.md` — what a test may claim when there is no experiment: the five grounding methods (exact / order / invariant / metamorphic / differential) vs the two that are not grounding (pin / api), the claim × path coverage model, and the two instruments (`test/_inventory.jl`, `test/mutation/`).
+- `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 lists doc claims measured against the code; a row still marked OPEN overrides this file until the source doc is fixed. Four of the original five discharged within three days and none announced itself — check the row before trusting it.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
 `AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.
@@ -252,6 +253,7 @@ NOT bugs — don't "fix".
 - **`PolarTwoChannelLHY` is polar-only**, exact at F=1, ~1 % off at F=2, **30–70 % off at F=6** (pinned by `test_spinor_lhy.jl`). Two-channel reduction sums (S=0, S=2) only — exhaustive only up to F=2. For F ≥ 2 polar use `PolarContactLHY` / `PolarDipolarLHY`; FM → `FMContactLHY` / `FMDipolarLHY` (**any F** since 2026-07-27 — the FM closed form needs only `g_{2F}`, and the former F=6-only lookup table was gating an unused field); F=6 I_h → `IcosahedralLHY` (genuinely F=6, the I_h channel structure is specific).
 - **`IcosahedralLHY` refuses at `λ_spin < 0`, i.e. at `c₁ < 0`** (2026-07-30). The closed form is `c_0^(5/2) + 3|λ_spin|^(5/2)`; the `|·|` made it symmetric under `c₁ → −c₁` and returned a real energy where the spin-Goldstone branch is dynamically unstable (`full_bdg` reports max Im ω = 2.8 at c₀=10, c₁=−0.2, and the closed form ran 0.4 / 2.1 / 11.0 % high at c₁ = −0.05 / −0.1 / −0.2). `epsilon_LHY_F6_Ih` now returns NaN there and `_tabulate_lhy` turns any non-finite table into an `ArgumentError` at build time — which also closes the pre-existing `c_0 < 0` NaN, previously propagated silently into ψ. **`c₁ < 0` is the sign Eu F=6 production uses, so those configs now error and must move to `kind: full_bdg`.** Gated by `test_lhy_full_bdg_closed_form_parity.jl` + `test_lhy_magnitude_si_anchor.jl`.
 - **`FullBdGLHY` is the general-spinor path** — correct for any `F` and any spinor, gated against `polar_contact` / `fm_contact` / the scalar limit to ~1e-4 by `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`. It warns only when the mean field is **dynamically** unstable (`Im ω ≠ 0`), where ε_LHY is scheme-dependent for closed forms too. (The former "~3000× spurious offset at F=6 polar" was a UV counterterm subtracting ε_k twice — divergent at every F and phase, fixed 2026-07-27.) Prefer the closed forms when the state matches their ansatz: ~100× cheaper.
+- **The combined preconditioner `P_C` (`precond_alpha_v ≥ 0`) is OFF by default because it LOSES** — ~40× worse on the weak-field Eu+DDI soft manifold at 24³ (measured 2026-06-23, `d496dd71`). The 40× is measured; the recorded mechanism was WRONG and is now replaced. It said "a diagonal preconditioner cannot precondition a collective Goldstone"; the L-BFGS step is orthogonal to that orbit to machine precision (2.4e-17 against a positive control of 1.000000, `bench/probe_lbfgs_orbit_fraction.jl`), so the exact Goldstone is not in the iterate path at all. **What the ~600 iterations actually are is conditioning.** `bench/probe_lbfgs_lambda_min_bound.jl` bounds `λ_min ≤ 3.0e-2` (still falling, overlap 0.0000 with the exact generator, so a genuine soft mode) against `μ_max ≈ 1.4e2`, i.e. `κ ≥ 4.7e3` — within 2× of the `κ_eff ≈ 9e3` the measured decay rate implies, and predicting 472 iterations against ~600 observed. The method is achieving what its conditioning permits; it is not losing. So preconditioning IS the lever, and P_C is simply the wrong preconditioner: it is diagonal in real space and in Fourier space, and the soft mode is neither. `P_C` is Antoine-Levitt-Tang (arXiv:1611.02045), where it is dominant for trapped, gapped problems.
 - **`secular_ddi=true` is user-chosen**, not auto. `make_workspace` `@info` advisory in secular regime.
 - **`spin_rotating_frame_omega ≠ 0` requires `secular_ddi=true`** (enforced via `ArgumentError`). Full DDI's off-diagonal components Larmor-average to zero only in secular limit.
 - **`even_c_extra(F; c2, c4, c6, …)` is canonical** — hand-written `[c2, c4, c6]` silently misindexes for F ≥ 3.
@@ -328,6 +330,52 @@ Semantic mismatch is not type-visible — static analysis cannot catch file/func
 - `Cthulhu.descend(run_pipeline, (typeof(config),))` for deep inspection.
 
 **User-supplied callbacks** (live_monitor `extract_observables`, simulation `SimulationCallbacks.on_step`) accept `::Function` — OK in cold paths; hot-loop callbacks must parameterize: `struct Cb{F1,F2} ...`.
+
+## Before computing — five gates
+
+Measured 2026-08-02: a request to fit an experiment produced **24 × 45-point GPU
+scans (~3 h) in which every premise was wrong**, and every one was stated in the
+paper's Results and appendices. The atom number, the thermal fraction, the value
+and provenance of `c1_ratio`, the loss mechanism, the origin of the dip width,
+and a **10 nT systematic on the field axis** — 250× the residual being chased —
+were all published. The same shape recurred four times that day: act on a
+plausible model of the situation instead of verifying the model, when
+verification was cheaper than the action.
+
+These are gates, not advice. Each one is cheap and each one would have stopped a
+day of work.
+
+1. **Read the primary source before spending compute.** A campaign document
+   summarising a paper is not the paper. Before any comparison to an experiment,
+   write down — with quotes — the atom number, temperature/condensate fraction,
+   every already-fitted parameter and what it was fitted to, the loss mechanism,
+   the systematic error on each axis, and whether the published theory curve is
+   the same observable as the published data. `WebFetch` on an arXiv PDF saves
+   it locally even when it cannot parse it; grep the text.
+2. **Sensitivity table before any scan.** Two points per (parameter, observable)
+   cell, and normalise by that observable's uncertainty. Most cells are zero, and
+   knowing which is the result: "`c1_ratio` does not move the dip" means the dip
+   is *robust* to not knowing `c1_ratio`. It also means twelve arms scanning
+   `c1_ratio` against the dip could not have worked.
+3. **Systematic errors before residuals.** State the systematic on every axis
+   first. A statistical bootstrap that omits a quoted systematic reports a σ that
+   is a fiction. No parameter can be constrained below the systematic.
+4. **Rejection criterion written into the config before launch.** "Centre within
+   0.005 nT; not worth taking beyond 0.01" made the DDI-padding verdict
+   automatic. Without it, a run finishes and the interpretation is chosen
+   afterwards, which is not a measurement.
+5. **One arm, then report.** Batches of four to six hide a wrong premise until
+   all of them have run.
+
+**Prefer discrete observables.** A ring count, a winding number, a vortex count,
+a symmetry present-or-absent carries no error bar and no calibration. The 5 ms
+`m = −4` ring count rejected a candidate `c1_ratio` in one run and was
+resolution-independent across 32³/64³/128³; twenty-four continuous-observable
+arms decided nothing.
+
+**Check the reference implementation against the data before chasing a
+residual.** If the published simulation misses the published experiment by the
+same amount you do, the gap is model deficiency and no parameter closes it.
 
 ## Cost model + execution discipline
 

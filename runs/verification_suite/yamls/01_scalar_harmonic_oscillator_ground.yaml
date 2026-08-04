@@ -2,11 +2,6 @@
 # Physics: scalar F=0 GPE with c0=0. In dimensionless units, E/N = 3/2 for omega=(1,1,1).
 # Expected: Gaussian ground state, zero spin order, energy converges to 1.5 per particle.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: noninteracting_harmonic_oscillator
-  expected_energy_per_particle: 1.5
-
 defaults:
   kind: spinor
   backend: gpu

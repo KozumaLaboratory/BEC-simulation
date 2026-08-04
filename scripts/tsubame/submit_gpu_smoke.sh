@@ -5,16 +5,11 @@
 #$ -N gpu_smoke
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
+source "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-gapbench}/scripts/tsubame/_preamble.sh"
 #
 # Minimal GPU smoke: build a workspace with a TABULATED LHY and take one step.
 # Deliberately does NOT pipe through `tail` — truncating the output is how the
 # A/B job hid the exception header that made this necessary.
-set -u
-export JULIA_DEPOT_PATH="$HOME/.julia"
-module load cuda/12.6 2>/dev/null || module load cuda 2>/dev/null || true
-JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
-cd "${SPINORBEC_BENCH_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/bec-ddi-conv}"
-echo "host=$(hostname) commit=$(git rev-parse --short HEAD)"
 $JULIA --project=. -e '
 import CUDA; using SpinorBEC
 grid = make_grid(GridConfig((16,16,16),(12.0,12.0,12.0)))

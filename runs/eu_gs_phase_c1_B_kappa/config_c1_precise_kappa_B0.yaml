@@ -7,7 +7,6 @@
 # κ=1.5 in (0.027,0.029)). Two bare seeds (m_plus_F FM vs polar), no pin; newton_polish
 # + tol 1e-9 + extra ITP steps for the soft near-spinodal FM branch. Grid/box match the
 # refine + κ=1 precise runs. 17 c1 × 2 κ = 34 tasks × 2 seeds.
-metadata: {owner: anko, project: Eu151 GS — precision c1*(κ) first-order line (B0, κ=0.5/1.5)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

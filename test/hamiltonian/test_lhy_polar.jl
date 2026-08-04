@@ -472,3 +472,49 @@ end
     @test table_contact.densities ≈ table_dipolar.densities
     @test maximum(abs.(table_contact.potential_values .- table_dipolar.potential_values)) < 1e-8
 end
+
+@testset "polar_contact REFUSES at c₀ < 0 instead of dying in `^`" begin
+    # A negative c₀ drives the density Goldstone stiffness σ₀ negative, and the
+    # closed form then evaluated `(n·σ₀)^2.5` and threw a bare DomainError twelve
+    # frames deep — "Exponentiation yielding a complex result requires a complex
+    # argument" — naming no coupling and suggesting no fix. `epsilon_LHY_F6_Ih`
+    # already refuses the SAME case (`c_0 < 0 && return NaN`, "I_h not the GS");
+    # polar_contact simply never got that treatment.
+    #
+    # How it was found is worth recording, because the first version of this test
+    # was wrong: it passed `(c₀ = 10, c₁ = −0.5)` on the assumption that a
+    # negative c₁ is what triggers it, and that builds fine. The real trigger came
+    # from `c₀ + F²c₁ = c_total` with `c₁ = r·c₀`, i.e. `c₀ = c_total/(1 + 36r)`,
+    # which flips c₀ NEGATIVE for `r < −1/36`. So the couplings are constructed
+    # here the way that constraint constructs them, rather than guessed.
+    F = 6
+    c_total = 4687.3
+    r_bad = -0.05                    # past the −1/36 singularity ⇒ c₀ < 0
+    c0_bad = c_total / (1 + F^2 * r_bad)
+    @test c0_bad < 0                 # the premise, asserted rather than assumed
+    err = try
+        SpinorBEC.compute_spinor_lhy_polar_contact(;
+            F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_bad, r_bad * c0_bad),
+            n_max=2.0, n_points=8)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("not applicable", err.msg)
+    @test occursin("full_bdg", err.msg)
+
+    # POSITIVE CONTROL at a REAL production point. `runs/eu_gs_phase_c1_B_kappa`
+    # scans r ∈ [−0.024, +0.048] and says in its header that it "stays >
+    # singularity −1/36" — so r = −0.024 has c₀ > 0 with c₁ < 0, which is the
+    # combination production actually uses, and it must still build. Without this
+    # the test would pass on a form that refuses everything.
+    r_ok = -0.024
+    c0_ok = c_total / (1 + F^2 * r_ok)
+    @test c0_ok > 0 && r_ok * c0_ok < 0        # c₀ > 0 AND c₁ < 0
+    tbl = SpinorBEC.compute_spinor_lhy_polar_contact(;
+        F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_ok, r_ok * c0_ok),
+        n_max=2.0, n_points=8)
+    @test tbl isa SpinorBEC.PolarContactLHY
+    @test all(isfinite, tbl.potential_values)
+end

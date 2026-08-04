@@ -14,8 +14,6 @@
 #  the ε→0 flower/flux-closure GS. Two seeds (m_plus_F, polar); min-E = GS.
 #  195 (c1×κ) tasks × 2 seeds. Post-process → eu_phase_fingerprint → contour.
 # ─────────────────────────────────────────────────────────────────────
-metadata: {owner: anko, project: Eu151 F=6 GS — c1×κ plane at B=10µG}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

@@ -83,6 +83,22 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
     every >= 1 || throw(ArgumentError("live_monitor.every must be >= 1"))
     status_dir = dirname(status_path)
     isempty(status_dir) || mkpath(status_dir)
+    # The two quantities the DIVERGENCE KILL reads, held across calls because
+    # both are differences. Until 2026-08-04 this callback wrote none of them,
+    # and `is_divergent_status` (`autopilot/monitor.jl:56-68`) defaults every one
+    # of its three inputs to a healthy value when the key is absent — `0.0` for
+    # `norm_drift`, `nothing` for `classify`, `0.0` for `fz_jump`. The writer's
+    # keys and the reader's keys had an EMPTY intersection, so the predicate
+    # returned `false` for every run that has ever been monitored, however far
+    # it had diverged.
+    #
+    # Both suites were green throughout, because each drives its own side with
+    # synthetic input: `test_autopilot.jl:75-79` hands the reader a dict
+    # containing the reader's own keys. A gate that builds its input from the
+    # thing under test never crosses the producer/consumer boundary, which is
+    # the only place this defect lives.
+    norm_0 = Ref(NaN)
+    fz_prev = Ref(NaN)
     function (ws, step, times, energies)
         step % every == 0 || return nothing
         psi = ws.state.psi
@@ -95,13 +111,32 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
         end
         e_now = isempty(energies) ? NaN : Float64(energies[end])
         t_now = isempty(times) ? Float64(ws.state.t) : Float64(times[end])
+        norm_now = Float64(n_total) * Float64(cell_volume(ws.grid))
+        isnan(norm_0[]) && (norm_0[] = norm_now)
+        # Relative to this run's FIRST observed norm, not to 1.0: a run may be
+        # normalised to something else, and the kill is about drift, not about
+        # the absolute value.
+        norm_drift = norm_0[] == 0 ? 0.0 : abs(norm_now / norm_0[] - 1)
+        # <F_z> from the populations already computed above — m runs F, F-1, …,
+        # -F over c = 1..D (CLAUDE.md: `c=1 -> m=F`), so no spin matrices and no
+        # second pass over psi.
+        F = (D - 1) / 2
+        fz_now = sum((F - (c - 1)) * pops[c] for c in 1:D)
+        fz_jump = isnan(fz_prev[]) ? 0.0 : abs(fz_now - fz_prev[])
+        fz_prev[] = fz_now
         data = Dict{String, Any}(
             "step" => step,
             "t" => t_now,
             "energy" => e_now,
-            "norm" => Float64(n_total) * Float64(cell_volume(ws.grid)),
+            "norm" => norm_now,
             "populations" => pops,
             "updated_ms" => round(Int, time() * 1000),
+            # Read by `is_divergent_status`. `classify` is deliberately NOT
+            # written: the predicate already skips a `nothing` classification,
+            # and inventing one here would be a second classifier competing with
+            # `analysis/phases/`.
+            "norm_drift" => norm_drift,
+            "fz_jump" => fz_jump,
         )
         # Atomic write: tmp file + rename so HTTP readers never see partial JSON
         tmp_path = status_path * ".tmp"

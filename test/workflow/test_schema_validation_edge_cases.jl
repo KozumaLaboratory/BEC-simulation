@@ -105,8 +105,13 @@ using SpinorBEC: load_config_from_string
         # Empty pipeline is technically allowed by schema but run_pipeline
         # handles it as a no-op. The key check is that missing 'pipeline'
         # is an error.
+        # The filler key has to be one the schema still RECOGNISES, or this
+        # stops testing what it says. It was `metadata:` until the step-6
+        # cutover deleted that key; the throw then came from "unknown top-level
+        # key" and the assertion went on passing while no longer exercising the
+        # missing-`pipeline` path at all.
         yaml_missing = """
-        metadata: {note: "no pipeline"}
+        name: "no pipeline"
         """
         # load_config requires `pipeline` key — see pipeline_api.jl line 21
         @test_throws ArgumentError load_config_from_string(yaml_missing; strict=true)

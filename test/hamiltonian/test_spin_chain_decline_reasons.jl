@@ -132,15 +132,24 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
         # the same reason the tensor channels do.
         ("c₂ ≠ 0", "c₂ ≠ 0",
             () -> (_ws(), InteractionParams(Dict(0 => 20.0, 1 => -0.4, 2 => 0.1)))),
-        # A tabulated LHY is a lookup, not the closed-form `V + c₀n + c·n^{3/2}`
-        # phase the fused kernel carries.
-        ("tabulated LHY", "a tabulated LHY",
-            () -> (_ws(; spinor_lhy=:polar_contact), inter)),
     ]
         ws, ip = build()
         reason = _spin_chain_reason(ws, ip, copy(ws.state.psi))
         @test reason !== nothing
         @test occursin(expect, reason)
+    end
+
+    # The one entry that moved the other way. Until 2026-08-02 a tabulated LHY was
+    # DECLINED, and since every production Eu run is tabulated that meant no
+    # production run ever took the fused half-step — on any grid, RTP included.
+    # The table is a lookup `_lhy_interp_uniform` performs inside the fused
+    # prepass, so it is accepted now, and this arm pins the ACCEPTANCE for the
+    # same reason the others pin refusals: so it cannot regress silently back to
+    # a refusal nobody notices.
+    @testset "arm: a tabulated LHY is ACCEPTED, not declined" begin
+        ws = _ws(; spinor_lhy=:polar_contact)
+        @test ws.lhy isa SpinorBEC.TabulatedLHY
+        @test _spin_chain_reason(ws, inter, copy(ws.state.psi)) === nothing
     end
 
     @testset "arm: the mean field is not frozen" begin
@@ -260,11 +269,21 @@ using SpinorBEC: _spin_chain_reason, SPIN_CHAIN_FUSION_ENABLED
         # it would not be in this list and the test goes red. Delete a line from
         # here as its arm lands.
         # BACKLOG-BEGIN
-        # EMPTY, as of 2026-07-31 — every reason in the list is now named by a
-        # test. It is kept because the mechanism, not the contents, is the point:
-        # a new entry lands in `newly_unarmed` and this gate goes red until it is
-        # either armed or listed here with a reason.
-        known_unarmed = Set{String}()
+        # ONE entry, and it is unarmed because it is UNREACHABLE rather than
+        # unwritten. The refusal fires when `ws.lhy` is neither a scalar form nor
+        # a `TabulatedLHY`, and no such workspace can be built today:
+        # `InteractionParams` takes `c_lhy::Real`, and `SpatialLHY` — the only
+        # other kind — is declined earlier by `_lhy_needs_spin`. So it is a guard
+        # against a future kind, and the honest arm would be a fake type that
+        # cannot be installed anyway.
+        #
+        # It is load-bearing regardless: the fused prepass collapses an
+        # unrecognised `c_lhy` to zero, so admitting one would run with NO LHY and
+        # report nothing — the defect that hit the fused diagonal in July. Arm
+        # this the day a third kind lands, and delete the line.
+        known_unarmed = Set{String}([
+            "this LHY is neither the closed-form diagonal phase nor a table"
+        ])
         # BACKLOG-END
         newly_unarmed = setdiff(Set(unarmed), known_unarmed)
         @test isempty(newly_unarmed)

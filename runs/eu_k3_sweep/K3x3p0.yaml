@@ -4,14 +4,6 @@
 # K3_factor = 3.0 × Dy proxy = 3.0e-41 m⁶/s
 # LHY off, γ_dr off — isolating pure K3 response.
 
-metadata:
-  suite: eu_k3_sweep
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 3.0
-  K3_per_m_si_value: 3.0e-41
-  generator: scripts/validation/eu_k3_sweep_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

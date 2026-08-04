@@ -114,6 +114,37 @@ function find_ground_state_lbfgs(;
     sobolev_alpha::Union{Float64, Symbol}=:auto,
     precond_alpha_v::Float64=-1.0,        # ≥0 ⇒ combined P_C = P_V^½ P_K P_V^½
     precond_alpha_k::Float64=1.0,         # kinetic shift for the P_C kinetic factor
+    # OFF by default because it was MEASURED, not because nobody tried it: on
+    # the weak-field Eu+DDI soft manifold at 24³ it made convergence ~40×
+    # WORSE (d496dd71, 2026-06-23).
+    #
+    # The recorded mechanism was wrong. It said "a diagonal preconditioner
+    # cannot precondition a collective Goldstone"; the L-BFGS step is
+    # orthogonal to that orbit to machine precision (2.4e-17 against a positive
+    # control of 1.000000, `bench/probe_lbfgs_orbit_fraction.jl`), so the exact
+    # Goldstone is never in the iterate path.
+    #
+    # The ~600 iterations are CONDITIONING. `probe_lbfgs_lambda_min_bound.jl`
+    # bounds λ_min ≤ 3.0e-2 — still falling, and overlap 0.0000 with the exact
+    # generator, so a genuine soft mode rather than the null space — against
+    # μ_max ≈ 1.4e2, giving κ ≥ 4.7e3. The measured decay rate implies
+    # κ_eff ≈ 9e3, within 2×, and that κ predicts 472 iterations against ~600
+    # observed. The method is achieving what its conditioning permits.
+    #
+    # So preconditioning IS the lever and P_C is the wrong preconditioner: it
+    # is diagonal in real space and in Fourier space, and the soft mode is
+    # neither.
+    #
+    # This is worth stating here rather than only in a commit message: the
+    # bench that was kept expressly "so the next session does not re-derive
+    # it" was itself deleted two days later by a sweep that dropped one-off
+    # drivers (40c329a5), and the finding survived only in `git log`.
+    #
+    # It also says what the iteration count on that problem IS limited by.
+    # `P_C` is the Antoine-Levitt-Tang preconditioner (J. Comput. Phys. 343
+    # (2017), arXiv:1611.02045), where it is the dominant lever — for TRAPPED,
+    # GAPPED problems. This one is neither, so per-iteration cost is the lever
+    # here and the flat direction is what would have to be quotiented out.
     rotating_frame_omega::Float64=0.0,
     newton_polish::Bool=false,
     newton_max_outer::Int=20,

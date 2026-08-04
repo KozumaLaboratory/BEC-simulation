@@ -20,12 +20,6 @@
 #   - m=-F+2 component winding ℓ ≈ 2 (if populated)
 #   - DDI off (companion YAML) shows none of the above
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 3
-  reference: Kawaguchi_Ueda_review_EdH_canonical
-  expected: Jz_conserved_with_spin_to_orbital_transfer
-
 defaults:
   kind: spinor
   backend: gpu                              # CPU sufficient for 32^3 toy

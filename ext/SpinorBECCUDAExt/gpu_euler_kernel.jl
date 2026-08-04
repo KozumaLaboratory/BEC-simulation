@@ -187,24 +187,35 @@ end
     return nothing
 end
 
-const _SM_EULER_WARP = Ref(true)
-
 """
-    apply_euler_5stage_fused_kernel!(psi_2d, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V; imaginary_time)
+    apply_euler_5stage_fused_kernel!(psi_2d, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V;
+                                     imaginary_time, warp)
 
 Single-launch fused Euler rotation with angles supplied as `(N,1)` arrays.
 Uses the warp-cooperative kernel (no local-memory spill at D=13) by default.
+
+`warp` was the module-level `Ref` `_SM_EULER_WARP` until cutover step 4. It is
+an argument now for the reason the step exists: an ambient switch selects a
+different kernel, and `artifact_id` hashes the declaration and the code bytes,
+neither of which a post-load assignment is. As a keyword with a literal default
+the choice IS code — `code_tree_hash` covers it — and a gate that wants both
+realizations on one input passes it explicitly, which is what
+`test/gpu/test_gpu_euler_warp_parity.jl` does.
+
+`false` selects `_euler_5stage_kernel!`, one thread per voxel, which spills the
+D=13 spinor to local memory. It is the reference, not a fallback: production
+never asks for it.
 """
 function apply_euler_5stage_fused_kernel!(
     psi_2d::CuArray{Complex{T}, 2},
     α::CuArray{T, 2}, β::CuArray{T, 2}, θ::CuArray{T, 2},
     m_gpu::CuArray{T, 2}, m_shift::CuArray{T, 2}, λ_gpu::CuArray{T, 2},
     V::CuArray{Complex{T}, 2}, conj_V::CuArray{Complex{T}, 2};
-    imaginary_time::Bool=false,
+    imaginary_time::Bool=false, warp::Bool=true,
 ) where {T <: AbstractFloat}
     N = size(psi_2d, 1)
     D = size(psi_2d, 2)
-    if _SM_EULER_WARP[]
+    if warp
         threads = 256                       # 32 lanes × 8 warps × 2 voxels = 16/block
         blocks = cld(N, 16)
         CUDA.@cuda threads = threads blocks = blocks _euler_5stage_warp_kernel!(
@@ -229,7 +240,9 @@ end
 # shfl-broadcast reduction. Two voxels share a 32-lane warp via width-16
 # subgroups (lanes 13–15 / 29–31 idle). The sign-bearing 5-stage body is the
 # SAME math as `_euler_apply_voxel!` (single physics declaration preserved).
-const _DDI_EULER_WARP = Ref(true)
+#
+# Which of the two runs is the `warp` keyword on `apply_ddi_euler_fused_kernel!`
+# below — a module-level `Ref` (`_DDI_EULER_WARP`) until cutover step 4.
 
 # Broadcast lane `src` (1-based) within this lane's width-W subgroup.
 @inline function _shfl_c(z::Complex{T}, src::Integer, ::Val{W}) where {T, W}
@@ -324,12 +337,14 @@ end
 end
 
 """
-    apply_ddi_euler_fused_kernel!(psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt; imaginary_time)
+    apply_ddi_euler_fused_kernel!(psi_2d, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt;
+                                  imaginary_time, warp)
 
 DDI rotation: per-voxel Euler angles computed in-register from the dipolar
 field `Φ` (N-vectors `phi_x/y/z`) then the 5-stage rotation — one launch, no
 separate angle-broadcast pass. Uses the warp-cooperative kernel (one component
-per lane, no local-memory spill) unless `_DDI_EULER_WARP[]` is disabled.
+per lane, no local-memory spill) unless `warp=false`, which selects the
+one-thread-per-voxel `_ddi_euler_kernel!` reference.
 """
 function apply_ddi_euler_fused_kernel!(
     psi_2d::CuArray{Complex{T}, 2},
@@ -337,11 +352,11 @@ function apply_ddi_euler_fused_kernel!(
     m_gpu::CuArray{T, 2}, λ_gpu::CuArray{T, 2},
     V::CuArray{Complex{T}, 2}, conj_V::CuArray{Complex{T}, 2},
     dt::Real;
-    imaginary_time::Bool=false,
+    imaginary_time::Bool=false, warp::Bool=true,
 ) where {T <: AbstractFloat}
     N = size(psi_2d, 1)
     D = size(psi_2d, 2)
-    if _DDI_EULER_WARP[]
+    if warp
         voxels_per_block = 16        # 256 threads / 32 × 2 voxels per warp
         threads = 256
         blocks = cld(N, voxels_per_block)

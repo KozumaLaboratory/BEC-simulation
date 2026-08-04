@@ -3,7 +3,6 @@
 # coarse grid with few iterations. Cheap enough to run before a launch, useless
 # as physics. CPU success does not imply GPU works, so run this on the backend
 # the real job will use.
-metadata: {owner: anko, project: Eu151 texture B-scan LHY — smoke}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

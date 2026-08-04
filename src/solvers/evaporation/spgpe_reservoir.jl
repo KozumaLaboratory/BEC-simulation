@@ -15,33 +15,62 @@
 export spgpe_reservoir, reservoir_chemical_potential
 
 """
-    reservoir_chemical_potential(N, T, ω̄, m, a_s) -> μ [J]
+    reservoir_chemical_potential(N, T, ω̄, m, a_s; branch=:condensate) -> μ [J]
 
 Chemical potential of a harmonically-trapped Bose gas of `N` atoms at temperature
-`T`, in the two regimes the evaporation passes through:
+`T`. Above `T_c` it follows from the ideal-Bose phase-space density,
+`Li₃(z) = N(ℏω̄/k_BT)³` with `z = e^{μ/k_BT}` — negative, rising toward `0⁻` as the
+gas degenerates. Below `T_c` the two branches differ:
 
-- **Above `T_c`** the gas is non-degenerate and `μ` follows from the ideal-Bose
-  phase-space density, `Li₃(z) = N(ℏω̄/k_BT)³` with `z = e^{μ/k_BT}` — negative,
-  rising toward `0⁻` as the gas degenerates.
-- **Below `T_c`** the thermal cloud saturates and `μ` is pinned by the condensate,
-  `μ = ½ℏω̄(15N₀a_s/a_ho)^{2/5}` (Thomas–Fermi), with `N₀ = N − N_th` from
-  [`condensate_split`](@ref).
+- `:condensate` (default) — the thermal cloud is saturated and `μ` is pinned by
+  the condensate, `μ = ½ℏω̄(15N₀a_s/a_ho)^{2/5}` (Thomas–Fermi), with `N₀` from
+  [`condensate_split`](@ref). Continuous at the transition: `N₀ → 0` sends this to
+  `0` and the ideal branch to `0⁻`.
+- `:thermal` — ideal-Bose throughout, i.e. `μ` saturates at `0⁻`.
 
-Continuous at the transition: `N₀ → 0` sends the TF branch to `0` and the ideal
-branch to `0⁻`.
+# `:thermal` FORBIDS condensation — do not reach for it as the "less circular" option
 
-The below-`T_c` branch is why an SPGPE run driven this way is a check on the
-condensate's **dynamics** rather than an independent measurement of its **size**:
-prescribing `μ` from the 0-D `N₀` means the c-field's equilibrium population is
-pinned to the 0-D answer by construction. What the c-field is free to do — and
-what the 0-D model cannot say — is *lag*: growth proceeds at a finite rate `γ`, so
-a ramp faster than `1/γ` leaves `N₀(t)` behind its quasi-static value.
+It looks like the principled choice: the SPGPE reservoir is the I region, so take
+its `μ` and let `N₀` come out as a prediction. Measured on the euv3 window, it
+does not work, and not marginally:
+
+    branch       μ range              drive μ−ε₀ > 0 at
+    :condensate  −4.46 → 1.74 (max 10.80)   436/447 points
+    :thermal     −4.46 → 0.00 (max  0.00)     0/447 points
+
+An ideal Bose gas caps `μ` at `0`, while the trap ground state sits at
+`ε₀ = 3/2 ω̄ = 0.62–1.50`. So `μ − ε₀ < 0` everywhere and the growth term can
+never build a condensate: `N₀ ≡ 0` is *imposed*, not predicted.
+
+# The circularity is the ensemble, not this function
+
+The `:condensate` branch does tie the c-field's equilibrium population to the 0-D
+`N₀`, so "does a condensate form" is an input. But no choice here fixes that: in a
+GRAND-CANONICAL SPGPE, `μ` below `ε₀` forbids a condensate and `μ` above it sets
+the equilibrium size through `μ = ε₀ + c₀n₀`. Prescribing `μ` *is* prescribing
+`N₀`, whatever `μ` is derived from.
+
+What the c-field genuinely adds on top of a prescribed `μ(t)` is the **lag** —
+growth proceeds at finite `γ`, so a ramp faster than `1/γ` leaves the condensate
+behind its quasi-static value, which the 0-D model cannot produce. Answering
+"how many atoms condense" instead needs a number-conserving formulation, where
+`μ(t)` is solved so that `N_C + N_I` matches a measured total; that is not this
+function.
 """
-function reservoir_chemical_potential(N::Real, T::Real, ω̄::Real, m::Real, a_s::Real)
+function reservoir_chemical_potential(
+    N::Real, T::Real, ω̄::Real, m::Real, a_s::Real; branch::Symbol=:condensate
+)
+    branch in (:condensate, :thermal) ||
+        throw(
+            ArgumentError(
+                "reservoir_chemical_potential: branch must be " *
+                ":condensate or :thermal, got $branch",
+            ),
+        )
     (N <= 0 || T <= 0 || ω̄ <= 0) && return 0.0
     kBT = Units.KB * Float64(T)
     N0, _ = condensate_split(N, T, ω̄)
-    if N0 > 0
+    if N0 > 0 && branch === :condensate
         a_ho = sqrt(Units.HBAR / (Float64(m) * Float64(ω̄)))
         return 0.5 * Units.HBAR * Float64(ω̄) * (15 * N0 * Float64(a_s) / a_ho)^0.4
     end
@@ -114,6 +143,7 @@ timescale it is about to run (and notice if it is about to run a millisecond).
 function spgpe_reservoir(
     r::EvapBecResult, trap::EvapTrap, ramp::FortRamp;
     omega_ref::Real, a_s::Real, k_cut=nothing, cutoff_n_T::Real=0.3,
+    mu_branch::Symbol=:condensate,
     t_start=nothing, t_end=nothing, omega_mult=(t -> 1.0),
     number_damping::Bool=true, energy_damping::Bool=true,
     gamma=nothing, M=nothing,
@@ -162,7 +192,7 @@ function spgpe_reservoir(
     ωbar = Float64[]
     for i in sel
         ω̄ = ω̄_of(r.t[i])
-        μ_SI = reservoir_chemical_potential(r.N[i], r.T[i], ω̄, m, a_s)
+        μ_SI = reservoir_chemical_potential(r.N[i], r.T[i], ω̄, m, a_s; branch=mu_branch)
         push!(t_int, (r.t[i] - t_ref) * ωref)
         push!(T_int, Units.KB * r.T[i] / (Units.HBAR * ωref))
         push!(mu_int, μ_SI / (Units.HBAR * ωref))

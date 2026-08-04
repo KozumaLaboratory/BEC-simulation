@@ -9,21 +9,6 @@
 #   theta tilt during hold        : 0.7854 rad ≈ π/4
 #   B magnitude during hold       : 2.6e-5 G
 
-metadata:
-  suite: magnetic_stirrer
-  cell_name: magnetic_stirrer_omega_p0p7
-  rotation_omega: 0.7
-  ddi_on_dynamics: true
-  do_B_quench: true
-  static_B: false
-  theta_tilt: 0.7854
-  generator: scripts/validation/klaus_magnetic_stirrer_gen.jl
-  protocol_summary: |
-    Klaus-II rotating-B / DDI-anisotropy stirrer. m=+F GS in +z-aligned
-    strong B, then rotation_prep with no rotation, then B quench to weak
-    field, then weak-field hold with B tilted at π/4 and phi rotated at Ω.
-    Matched-chirality for m=+F init is Ω > 0 (Klaus-I Gate 4 verified).
-
 defaults:
   kind: spinor
   backend: cpu

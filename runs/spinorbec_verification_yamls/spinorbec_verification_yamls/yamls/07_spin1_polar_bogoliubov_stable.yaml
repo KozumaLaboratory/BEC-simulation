@@ -2,11 +2,6 @@
 # Physics: stable polar state for c1>0 and q>=0. The BdG analyzer should not report growing modes.
 # Expected: max growth rate zero within numerical tolerance; dispersion has real modes.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Ueda_spin1_polar_BdG_stable
-  expected: no_BdG_instability
-
 defaults:
   kind: spinor
   backend: cpu

@@ -6,13 +6,6 @@
 #   - if 64 disagrees with 32 BEFORE collapse onset → unconverged
 # This run is significantly more expensive (64³ ≈ 8× 32³ on the same dt).
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_Hamiltonian_only_64grid
-  expected: same_qualitative_signature_as_32grid_before_collapse
-  noise_convention: rms_rescale_2026_05_22
-
 defaults:
   kind: spinor
   backend: gpu                              # use cuda for production

@@ -19,11 +19,6 @@
 #
 # §5.2 is an ITP / ground-state ablation. The sibling is post-quench dynamics.
 # The 2026-07-29 re-derivation covered the sibling, so it does NOT answer §5.2.
-metadata:
-  suite: lhy_mode_ablation_reconstructed
-  reconstructs: "docs/manuscript/thesis/chapters/Ch5_TWA_chaotic_dynamics_integrated.md 5.2"
-  LHY_kind: polar_contact
-
 defaults:
   kind: spinor
   backend: cpu

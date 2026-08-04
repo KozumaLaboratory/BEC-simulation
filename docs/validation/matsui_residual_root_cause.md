@@ -1,10 +1,26 @@
-# Fig. 4B residual — RESOLVED: their published run used N = 3.5×10⁴
+# Fig. 4B residual — their SIMULATION ran at N = 3.5×10⁴, 70 % of the experiment
 
-**Resolved 2026-08-01.** The whole residual was the atom number. Their published
-simulation ran at `Ntot = 3.5×10⁴` — the value shipped in their
-`setup_parameters` — while the published curves are normalised to 5×10⁴, which
-is what we had assumed. Given the right `N`, our code reproduces their Fig. 4B to
-**1 %**.
+**Resolved 2026-08-01 against their simulation; reframed 2026-08-02 after reading
+the paper.** The residual was the atom number. Their published *simulation* ran
+at `Ntot = 3.5×10⁴` — the value shipped in their `setup_parameters` — while the
+published curves are normalised to 5×10⁴, which is what we had assumed. Given
+that `N`, our code reproduces their Fig. 4B to **1 %**.
+
+> **What this is NOT.** It is not a statement about the experiment's atom number.
+> The paper (Matsui et al., *Science* **391**, 384 (2026); arXiv:2504.17357)
+> states "The trap typically contained approximately **5×10⁴ atoms**, with a
+> negligible thermal component." So their published theory curve was computed at
+> **70 % of the experimental atom number** — an inconsistency inside their
+> release (shipped `Ntot = 3.5d4` against 5×10⁴ in the text), not a property of
+> the experiment.
+>
+> Everything below is a **code-to-code** comparison and is unaffected. The
+> three-observable identification against `dataset_fig1/F.txt` — their own
+> Fortran's 5 ms state — is what pins their simulation to 3.5×10⁴, and it stands.
+>
+> Attempts to fit the **experiment** made on 2026-08-02 are retracted in full:
+> every premise was wrong and every one was in the paper. See
+> `docs/validation/matsui_experiment_parameters.md`.
 
 Both columns read from the final `psi`; widths on the matched window [−12, +9]
 (see "the width DOES close" below for why the window has to be stated).

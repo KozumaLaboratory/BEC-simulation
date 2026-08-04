@@ -3,16 +3,6 @@
 # Grid: 128³, scenario: HamOnly, t_evolution: 20.0 dimless
 # Pass criteria: see runs/l4_k3_ladder/README.md
 
-metadata:
-  suite: l4_k3_collapse_arrest_ladder
-  ladder_level: 12
-  grid_n: 128
-  scenario: HamOnly
-  K3_on: false
-  gdr_on: false
-  LHY_on: false
-  generator: scripts/validation/l4_k3_ladder_gen.jl
-
 defaults:
   kind: spinor
   backend: gpu
