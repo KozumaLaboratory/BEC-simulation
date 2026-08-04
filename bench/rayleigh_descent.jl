@@ -8,7 +8,8 @@
 # step size: a stall has to be readable as a stall rather than as a step too
 # small, and reading the stall is the point.
 
-using SpinorBEC: constrained_hessian_action, _realdot, _tangent_project
+using SpinorBEC: constrained_hessian_action, _realdot, _tangent_project,
+    _sobolev_precondition!
 using Printf
 
 """
