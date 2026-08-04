@@ -23,20 +23,9 @@ Minimise `⟨v,Hv⟩/⟨v,v⟩` over the constrained tangent space from `v0`.
 UPPER BOUND on `λ_min` either way — any `v` gives one — but it is only close to
 `λ_min` when the descent has actually stopped moving.
 """
-function rayleigh_descent(ws, psi, v0; μ, dV, n2, n_iter::Int, verbose::Bool=true,
-    deflate=())
+function rayleigh_descent(ws, psi, v0; μ, dV, n2, n_iter::Int, verbose::Bool=true)
     H(v) = constrained_hessian_action(ws, psi, v; μ, dV, n2, ε=1.0e-5, order=4)
-    # Deflation is folded into the projector rather than applied afterwards, so
-    # every iterate stays in the complement — a descent that re-enters the
-    # deflated subspace between steps would quietly return λ₁ again and read as
-    # a cluster.
-    function proj(v)
-        w = _tangent_project(v, psi, dV, n2)
-        for u in deflate
-            w = w .- u .* (_realdot(u, w) * dV / (_realdot(u, u) * dV))
-        end
-        w
-    end
+    proj(v) = _tangent_project(v, psi, dV, n2)
     rq(v, Hv) = _realdot(v, Hv) * dV / (_realdot(v, v) * dV)
 
     v = proj(v0)
