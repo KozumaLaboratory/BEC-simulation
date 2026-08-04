@@ -92,6 +92,8 @@ const FAST_TESTS = [
     "workflow/test_live_status_reaches_the_detector.jl",
     # A name the autopilot reads must be a name something writes.
     "workflow/test_terminal_record_has_a_producer.jl",
+    # The budget read the pre-2026 flat save_* keys the schema now rejects.
+    "workflow/test_budget_reads_the_save_block.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
