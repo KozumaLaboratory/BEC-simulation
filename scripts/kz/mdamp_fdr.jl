@@ -17,7 +17,7 @@
 # the measure is dk and int dk/|k| diverges logarithmically, cut off only by the
 # box — so the term's strength would depend on L, which is not a property an
 # operator should have. Run at two box sizes to see it.
-using SpinorBEC, FFTW, Printf, Statistics
+using SpinorBEC, FFTW, Printf, Statistics, Random
 mu, T, c0 = 1.0, 1.026, 0.0139
 k_cut = sqrt(2 * (mu + T))
 
