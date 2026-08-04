@@ -75,6 +75,7 @@ function main()
 
     modes = Any[]
     λs = Float64[]
+    convs = Bool[]
     for k in 1:NMODES
         start = k == 1 ? ComplexF64.(v0) : ComplexF64.(v0) .+ 0.1 .* randn(ComplexF64, size(psi))
         res = rayleigh_descent(ws, psi, start; μ, dV, n2, n_iter=NITER,
@@ -83,6 +84,7 @@ function main()
                sqrt(_realdot(u, u) * dV * _realdot(res.v, res.v) * dV) for u in modes]
         push!(modes, res.v)
         push!(λs, res.q)
+        push!(convs, res.converged)
         @printf("  mode %d:  λ ≤ %.6e   resid %.2e (%3.0f %% of λ)  converged=%-5s  max overlap with earlier %.1e\n",
             k, res.q, res.resid, 100 * res.resid / abs(res.q), res.converged,
             isempty(ovs) ? 0.0 : maximum(ovs))
@@ -102,7 +104,15 @@ function main()
                 log(1.0e-6) / log((sqrt(μ_max / λ) - 1) / (sqrt(μ_max / λ) + 1)))
         end
         println()
-        if gaps[1] > 3
+        # The verdict consults `converged`. The first run printed ISOLATED off a
+        # 6.08 ratio between two bounds at 150-200 % residual -- both are UPPER
+        # bounds, so the ratio can move either way and establishes nothing. A
+        # verdict that ignores its own convergence flag is the third of these I
+        # have written on this task.
+        if !all(convs[1:2])
+            println("  => NOT CONVERGED (modes 1-2). The ratio is between two upper")
+            println("     bounds that are still moving, so it establishes nothing.")
+        elseif gaps[1] > 3
             println("  => ISOLATED. A rank-1 deflation is enough and κ drops by that ratio.")
         else
             println("  => a CLUSTER. Rank 1 buys almost nothing; the preconditioner needs")

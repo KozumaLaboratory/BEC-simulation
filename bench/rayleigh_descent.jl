@@ -10,6 +10,7 @@
 
 using SpinorBEC: constrained_hessian_action, _realdot, _tangent_project
 using Printf
+using LinearAlgebra: eigen, Symmetric
 
 """
     rayleigh_descent(ws, psi, v0; μ, dV, n2, n_iter, verbose=true)
@@ -42,6 +43,14 @@ function rayleigh_descent(ws, psi, v0; μ, dV, n2, n_iter::Int, verbose::Bool=tr
     Hv = H(v)
     qv = rq(v, Hv)
     nw = Inf
+    # Previous iterate, carried so the search space is span{v, w, v_prev} —
+    # LOBPCG's three-term form. Plain 2×2 steepest descent on a Rayleigh
+    # quotient converges at (κ-1)/(κ+1) per step, which at κ ~ 5e3 is 0.9996:
+    # 300 iterations left every mode at 150-200 % residual and the verdict was
+    # read off bounds that had not settled. The third term is what makes this
+    # affordable.
+    vp = nothing
+    Hvp = nothing
     verbose && @printf("  %5s %14s %12s\n", "iter", "Rayleigh q", "|resid|")
     for it in 1:n_iter
         w = proj(Hv .- qv .* v)
@@ -51,16 +60,36 @@ function rayleigh_descent(ws, psi, v0; μ, dV, n2, n_iter::Int, verbose::Bool=tr
         nw < 1.0e-12 && break
         w ./= nw
         Hw = H(w)
-        a, b, d = qv, _realdot(v, Hw) * dV, _realdot(w, Hw) * dV
-        θ = 0.5 * atan(2b, a - d)
-        cs, sn = cos(θ), sin(θ)
-        v1, v2 = cs .* v .+ sn .* w, -sn .* v .+ cs .* w
-        H1, H2 = cs .* Hv .+ sn .* Hw, -sn .* Hv .+ cs .* Hw
-        q1, q2 = rq(v1, H1), rq(v2, H2)
-        v, Hv, qv = q1 <= q2 ? (v1, H1, q1) : (v2, H2, q2)
+        # Rayleigh-Ritz over the basis, orthonormalised in the real inner
+        # product the whole solver uses. Two vectors on the first step, three
+        # afterwards.
+        basis = vp === nothing ? [v, w] : [v, w, vp]
+        hbas = vp === nothing ? [Hv, Hw] : [Hv, Hw, Hvp]
+        for i in eachindex(basis)
+            for j in 1:(i - 1)
+                c = _realdot(basis[j], basis[i]) * dV
+                basis[i] = basis[i] .- c .* basis[j]
+                hbas[i] = hbas[i] .- c .* hbas[j]
+            end
+            nb = sqrt(_realdot(basis[i], basis[i]) * dV)
+            nb < 1.0e-10 && (nb = Inf)
+            basis[i] = basis[i] ./ nb
+            hbas[i] = hbas[i] ./ nb
+        end
+        keep = [i for i in eachindex(basis) if all(isfinite, basis[i])]
+        nb = length(keep)
+        A = [_realdot(basis[keep[i]], hbas[keep[j]]) * dV for i in 1:nb, j in 1:nb]
+        A = (A .+ A') ./ 2
+        F = eigen(Symmetric(A))
+        cvec = F.vectors[:, 1]
+        vnew = sum(cvec[i] .* basis[keep[i]] for i in 1:nb)
+        Hnew = sum(cvec[i] .* hbas[keep[i]] for i in 1:nb)
+        vp, Hvp = v, Hv
+        v, Hv = vnew, Hnew
         nv = sqrt(_realdot(v, v) * dV)
         v ./= nv
         Hv ./= nv
+        qv = rq(v, Hv)
     end
     (; v, q=qv, resid=nw, converged=(nw <= 0.2 * abs(qv)))
 end
