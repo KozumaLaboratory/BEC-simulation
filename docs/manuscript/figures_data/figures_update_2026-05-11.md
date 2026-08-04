@@ -1,5 +1,8 @@
 # Figure inventory — Round 7 (2026-05-11) update
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 doc は `shared/figures.md` の 2026-05-11 session updates。新 figures (本 session
 で生まれた結果用) + data-ready figures の status update。
 

@@ -1,5 +1,8 @@
 # Sign Pattern Strategy A — Layer L1 detailed derivation
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Status**: Algebraic derivation of $\beta_S^{\lambda_{\rm spin}} \propto X_S^{(\rm anom)} + \text{correction}$ at the structural level. Closure pending sympy verification of coefficient factors.
 

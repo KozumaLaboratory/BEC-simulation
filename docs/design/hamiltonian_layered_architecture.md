@@ -294,7 +294,7 @@ comment fix, the audit + defect list (Appendix A).
 - Registry stays type-stable on the production side (`NTuple`); no
   `Dict{Symbol,Any}`, no closures toward Workspace; θ is a concrete
   struct. Test-side fixtures may hold closures (cold path).
-- `@noinline _step_dispatch!(@nospecialize(step), …)` firewall
+- `_step_dispatch!(@nospecialize(step), …)` firewall — `@nospecialize` is the load-bearing half (`pipeline/runner.jl:273`); `@noinline` is also present
   untouched. D=13: `Matrix`/`MVector` in hot loops.
 - Production kernels replaced only behind a **correctness gate**
   (tight-tol / bit-identity, class-appropriate per §4) AND a

@@ -358,7 +358,7 @@ What this does and does not say:
 - **The sign and the scale of the offset reproduce.** The dip is on the negative
   side and it is a couple of nT there — that is the resonant-EdH claim, and an
   independent implementation with independently-declared conventions lands on it.
-- **The two simulations disagree by 0.41 nT in the centre and 15 % in the width**,
+- **The two simulations disagree by 0.41 nT in the centre and 9.6 % in the width**,
   and that is larger than every kernel-convention difference bounded in §0.3.3
   combined (~0.02 nT), so it is not the `k=0` bin or the spherical truncation.
 
@@ -673,7 +673,7 @@ anything to the experiment.
 |---|---|---|---|---|---|
 | 2.1 | Linear Zeeman | `H_Z^lin = -p · F_z` so `(Hψ)_m = -p·m·ψ_m` | _to fill_ | _to fill_ | sign: p > 0 lowers m=+F |
 | 2.2 | Quadratic Zeeman | `H_Z^quad = +q · F_z²` so `(Hψ)_m = +q·m²·ψ_m` | _to fill_ | _to fill_ | sign: q > 0 raises \|m\|=F |
-| 2.3 | p relationship to B | `p = g_F · μ_B · B_z / (ℏ · ω_ref)` (dimensionless) | _to fill_ | _to fill_ | `src/foundation/units.jl` `bfield_to_p`. Sign: same sign as B_z when g_F > 0. |
+| 2.3 | p relationship to B | `p = −g_F · μ_B · B_z / (ℏ · ω_ref)` (dimensionless) | _to fill_ | _to fill_ | `src/workflow/io/units.jl` `Units.bfield_to_p` — the single declaration. Sign: **opposite** to B_z when g_F > 0, because the atomic moment is `μ = −g_F μ_B F` (Kawaguchi-Ueda). With row 2.1's `H_Z = −p·F_z` this gives `H_Z = +g_F μ_B B_z F_z`, so +B_z on a g_F>0 atom makes m=−F the ground state. See §0.3.1. |
 | 2.4 | q relationship to B | Auto-derived from \|B\|² unless explicit. Formula: see source. | _to fill_ | _to fill_ | `src/workflow/experiments/schema/B_block.jl` |
 | 2.5 | g_F sign convention | Per-atom from CODATA tables; Eu151 g_F ≈ +1.163 (positive) | _to fill_ | _to fill_ | `src/workflow/initialization/atoms.jl` |
 | 2.6 | B-field direction | Spherical: \|B\| · (sin θ cos φ, sin θ sin φ, cos θ). θ=0 ⇒ +ẑ | _to fill_ | _to fill_ | `src/workflow/experiments/schema/B_block.jl` |
@@ -754,7 +754,7 @@ here so the contract covers the full pipeline.
 | 9.1 | Real-time propagator | `exp(-i·dt·H)` (signed: `cis(-dt·H)`) | _to fill_ | _to fill_ | Standard QM time evolution |
 | 9.2 | Imaginary-time propagator (ITP) | `exp(-τ·H)` with normalization renorm after each step | _to fill_ | _to fill_ | `src/solvers/ground_state/itp_loop.jl` |
 | 9.3 | Strang splitting | `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)` | _to fill_ | _to fill_ | `src/hamiltonian/integrator/split_step.jl` |
-| 9.4 | Inner V ordering | `diag SM singlet_pair tensor raman DDI raman tensor singlet_pair SM diag` (symmetric/palindrome) | _to fill_ | _to fill_ | Symmetric to preserve 2nd-order Strang accuracy |
+| 9.4 | Inner V ordering | `diag light_shift_offdiag SM singlet_pair tensor transverse_zeeman raman DDI raman transverse_zeeman tensor singlet_pair light_shift_offdiag SM diag` (symmetric/palindrome). Forward half declared once at `integrator/split_step.jl:542`; this row omitted `light_shift_offdiag` and `transverse_zeeman` until 2026-08-04 | _to fill_ | _to fill_ | Symmetric to preserve 2nd-order Strang accuracy |
 | 9.5 | Default integrator order | Strang (2nd-order). Higher: Yoshida-4, CFET4 opt-in | _to fill_ | _to fill_ | `_YOSHIDA_W0 < 0` is correct (backward middle substep) |
 
 ## 10. Initial state conventions

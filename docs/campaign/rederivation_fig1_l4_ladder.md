@@ -1,5 +1,8 @@
 # Figure 1 re-derived: peak density is 16.5 % lower, and the grid axis is irrelevant
 
+> **FROZEN 2026-08-01.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **2026-08-01, TSUBAME jobs 8310351 / 8313735 (gpu_h).** Re-runs the committed n64
 rung of `runs/l4_k3_ladder/*.yaml` and the two `runs/matsui_baseline/*_n64.yaml`
 against their stored summaries of 2026-05-26 — among the 230 that predate every

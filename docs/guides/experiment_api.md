@@ -1,5 +1,8 @@
 # Experiment / Batch — the unified workflow API
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 `Experiment` is the unit object of SpinorBEC. A pair
 
 ```
@@ -50,12 +53,12 @@ outdir(exp)                  # e.g. "runs/12174e883326ecac"
 write_run!(exp)              # writes config.yaml into outdir
 run!(exp)                    # runs (idempotent — no-op if result.jld2 exists)
 
-exp.times                    # Vector{Float64}, snapshot time axis
-exp.peaks                    # max(total_density) per snapshot
-exp.Fz_t                     # ⟨F_z⟩ trajectory
-exp.classification           # :delay  / :collapse / :stable_arrest / …
-exp.density_at(20.0)         # 3D density at t≈20 (closest snapshot)
-exp.density_stats_at(20.0)   # (peak, fwhm_x, fwhm_z, on_axis, σ/μ)
+times(exp)                   # Vector{Float64}, snapshot time axis
+peaks(exp)                   # max(total_density) per snapshot
+Fz_t(exp)                    # ⟨F_z⟩ trajectory
+classify(exp)                # :delay  / :collapse / :stable_arrest / …
+density(exp, 20.0)           # 3D density at t≈20 (closest snapshot)
+density_stats_at(exp, 20.0)  # (peak, peak_voxel, fwhm_x, fwhm_z, on_axis, σ/μ)
 ```
 
 The Experiment is cheap to construct (no I/O until you touch an

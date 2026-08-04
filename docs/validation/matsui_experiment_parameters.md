@@ -1,5 +1,8 @@
 # Matsui et al. の実験パラメータ — 論文からの引用
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Matsui, Miyazawa, Goto, Nakano, Kawaguchi, Ueda, Kozuma,
 "Observation of the Einstein–de Haas effect in a Bose–Einstein condensate,"
 *Science* **391**, 384 (2026). [arXiv:2504.17357](https://arxiv.org/abs/2504.17357)

@@ -1,5 +1,8 @@
 # Fig. 4B residual — their SIMULATION ran at N = 3.5×10⁴, 70 % of the experiment
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Resolved 2026-08-01 against their simulation; reframed 2026-08-02 after reading
 the paper.** The residual was the atom number. Their published *simulation* ran
 at `Ntot = 3.5×10⁴` — the value shipped in their `setup_parameters` — while the

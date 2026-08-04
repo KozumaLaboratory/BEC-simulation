@@ -1,5 +1,8 @@
 # M1 Ω>0 conditioning floor — diagnosis + fix (2026-06-08)
 
+> **FROZEN 2026-06-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The Ω>0 Barnett-map cells do not converge (18/30 stuck at ‖∇E‖ ~ 1-4,
 the "conditioning floor"). A continuation warm-start smoke (B=1/Ω=0.1
 from the converged Ω=0 neighbour) ran > 54 min without early-stopping —

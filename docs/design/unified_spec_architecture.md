@@ -614,12 +614,23 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-03.** Three of the fourteen are closed with measurements —
-A2:R-OPEN-03 / A5:R-NIX-03B (item 1, which this document called its largest
-single unknown) and A2:R-OPEN-01 (item 2). Eleven remain. Both closures cost
-almost nothing to obtain, which is itself the lesson worth recording: item 2 was
-never a compute measurement at all — it is resolution and hashing, and it sat
-open because it was filed alongside a genuinely expensive one.
+**Status, 2026-08-04. Six of the fourteen ids are resolved, across four of the
+twelve items; eight ids remain.**
+
+| item | ids | how |
+|---|---|---|
+| 1 | A2:R-OPEN-03, A5:R-NIX-03B | measured — the document's own "largest single unknown" |
+| 2 | A2:R-OPEN-01 | measured |
+| 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
+| 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
+
+Two lessons the count does not carry. **Item 2 was never a compute measurement**
+— it is resolution and hashing — and it sat open only because it was filed beside
+a genuinely expensive one. **Item 6 should not have been proposed as a register
+row**: "record it in both directions and do not repair it" is right for a caveat
+and wrong for a mechanism that reports crashed jobs as complete. The test for
+which one you have is whether the honest register entry would read as a caveat
+or as a known-wrong answer.
 
 **Three measurements the design demands and this document did not perform —
 TWO OF THEM HAVE SINCE BEEN MADE (2026-08-03).** They are kept in place, with
@@ -709,19 +720,62 @@ this is what promotion looks like.
    inside `twa.jl` that this document specifies only in shape, not in detail.
    33 configs under `runs/` use `twa:`.
 
-**Two mechanisms the register records rather than repairs.**
+**Two the row proposed to register rather than repair — and neither survived
+that disposition.** One was repaired because a register entry for it would have
+read as a known-wrong answer rather than a caveat; the other had no subject.
 
-6. **A2:R-CLASS-01/02 — `outcome.toml` has no producer.** Verified today: five
-   readers treat it as authoritative and the only writer in `src/` is the dry-run
-   synthetic at `tick.jl:607`, whose own comment ("Real runs overwrite this file
-   at process exit") is false. `queue.jl:13` still asserts the producer. And
-   `backend_failure_reason(::UGEBackend)` returns qacct strings, never the SLURM
-   `OUT_OF_MEMORY` / `TIMEOUT` that `retry.jl` matches, so the resource-permanent
-   escalation is unreachable on the production backend. Both become both-directions
-   register rows; neither is fixed here.
-7. **A2:R-MIG-01 — the keep/delete partition against actual type usage.** The
-   autopilot's kept files are typed on the deleted ones. The register can express
-   it; this design does not perform that audit.
+6. **A2:R-CLASS-01/02 — `outcome.toml` has no producer. FIXED 2026-08-04 (#313),
+   not registered.** The row said both halves would become register rows and
+   neither would be repaired. That was the wrong call, and why is the part worth
+   keeping: the file was not inert. `run_dir` is content-addressed, the dry-run
+   synthetic wrote `terminal = "done"` into it, `collect!` does not write the
+   file and the rsync collect carries no `--delete` — so a later LIVE run of the
+   same spec whose job left `qstat` for any reason found the stale file and
+   `backends_uge.jl` returned `:done`. **A crashed job reported as successfully
+   completed**, then credited to its recipe's trust store and counted as a
+   non-failure by the circuit breakers. A register row describing that is not a
+   caveat; it is a known-wrong answer left in place.
+
+   Closed by deletion, not by adding a producer: the synthetic write is gone,
+   `OUTCOME_FILENAME` becomes `EXIT_SUMMARY_FILENAME` behind ONE reader
+   replacing five hand-rolled ones (returning `nothing` for absence, never an
+   empty Dict), and `failure_analysis.jl`'s phantom block goes because the block
+   below it was already reading `_exit_summary.json` correctly.
+
+   The second half went with it. `_exit_summary.json` carries `oom_killed` as a
+   **Boolean** set from the actual exception (`runner.jl:238`), so the
+   qacct-vs-SLURM vocabulary mismatch is deleted rather than patched with a
+   second dialect — a matcher that needs no strings cannot fail to match one.
+
+   **The row's real content was never the two instances.** Four gates missed
+   this class, each building its input out of the vocabulary of the thing it
+   tests: `is_divergent_status(Dict("norm_drift" => 0.5))` hands the reader the
+   reader's own key; `classify_failure(Dict(), "OUT_OF_MEMORY|...")` hands the
+   matcher its own literal; `test_autopilot.jl` WROTE an `outcome.toml` and then
+   asserted the reader consumed it; and a canary perturbed `c1` on a polar state
+   where ⟨F⟩ = 0 makes the term contribute nothing. A gate that constructs its
+   input from the thing under test never crosses the producer/consumer boundary,
+   and that boundary is the only place this class of defect lives. The same
+   audit found `is_divergent_status` had NEVER returned `true` for any run in
+   the project's history — the writer's keys and the reader's keys had an empty
+   intersection, with every reader lookup defaulting to a healthy value.
+7. **A2:R-MIG-01 — the keep/delete partition. WITHDRAWN 2026-08-04: the row
+   describes a partition this design does not contain.** "The autopilot's kept
+   files are typed on the deleted ones" refers to the split in revision
+   `19caa3f4` (2026-07-31), which deleted
+   `autopilot/{queue,queue_toml,tick,on_complete,recipes,trust,qw_history}.jl`
+   and repurposed `{backends,backends_uge,ssh_transport,budget,breakers,retry,
+   observability}.jl`. That revision was cut by `3de0d8a2` on 2026-08-01 — a day
+   and a half BEFORE `f758d7d3` wrote this row. Section 6 of the present design
+   deletes no autopilot file at all; its only deletions are `_gs_cache_key` /
+   `_hashable`, the `metadata:` schema key and 11 `const Ref` bindings, none of
+   which any autopilot file names.
+
+   So there is nothing here to audit, and the honest disposition is neither
+   "open" nor "covered": the requirement has no subject in this design. Kept as
+   a pointer rather than deleted outright, because the observation is real of
+   the withdrawn split and issue #250 already enumerated it — if that partition
+   is ever revived, the dependency direction is the first thing to measure.
 
 **Three where the mechanism is weaker than the requirement asks.**
 

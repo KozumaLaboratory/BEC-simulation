@@ -1,5 +1,8 @@
 # Sign Pattern Systematic — proof attempt + partial results
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Source**: paper3 v3 §IX.B open question (Spinor-Rank Matching Principle)
 **Status**: 2 partial lemmas proved (endpoint signs); full conjecture remains open.

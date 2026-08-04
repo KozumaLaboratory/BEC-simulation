@@ -1,5 +1,8 @@
 # Appendix E: Verify-first audit details + bug analysis
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 appendix では、Chapter 7 §7.6 で言及した verify-first methodology の concrete
 operational instances を 詳述する。paper3 v3 5-case audit + F=12 verification +
 Sign Pattern Anomalous Identity の execution detail、bug catches の root-cause

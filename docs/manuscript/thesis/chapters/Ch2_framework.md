@@ -1,5 +1,8 @@
 # 修論 Chapter 2: Spinor BEC framework
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、Chapter 3-6 で使う technical tools を体系的に preview する: spinor BEC
 Hamiltonian, $c_n$ vs $g_S$ coupling conventions, BdG matrix 構築, Goldstone 定理,
 mean-field ground state computation (ITP), real-time evolution (RTP), TWA, 数値

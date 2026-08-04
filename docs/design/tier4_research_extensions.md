@@ -1,5 +1,8 @@
 # Tier 4 research extensions
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The original 50-scenario plan flagged three items as "別ロードマップ" (separate roadmap, essentially new research projects). Each of these needs a real physics + ML investment, not just engineering. This doc pins down the scope so a future contributor can pick one up.
 
 ## #61 Bayesian optimization over a YAML scan

@@ -1,5 +1,8 @@
 # TDHFB Y4 Palindromic Substep Design — Post-修論 Task #86
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: design only. Multi-session implementation pending.
 **Related code**: `src/hamiltonian/tdhfb/y4_midpoint_step.jl` (current Y4 wrapper, empirically order 2).
 **Origin**: blocking factor identified in `y4_midpoint_step.jl` file header — the TDHFB Strang substep is not palindromic at O(dt²), preventing Yoshida composition from delivering order 4.

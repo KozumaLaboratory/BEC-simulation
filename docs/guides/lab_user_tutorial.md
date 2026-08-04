@@ -35,7 +35,7 @@ pipeline:
       grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.028}
       ddi: {enabled: true}
-      zeeman:
+      B:
         p_mv: 2.5             # ← knobs on your driver, not Gauss
         coil_mode: strong
         q: 0.1
@@ -51,7 +51,7 @@ pipeline:
   - dynamics:
       duration: 5.0
       dt: 0.005
-      save_every: 100
+      save: {every: 100}          # NOT `save_every:` — folded into `save:`
       save:
         psi: true
         precision: "f32"

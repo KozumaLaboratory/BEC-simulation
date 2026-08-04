@@ -1,5 +1,8 @@
 # Appendix A: Sympy / 数値 verification scripts catalog
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 appendix では、本修論で実行した polyhedral phase verifications + Sign Pattern
 analysis の reproducibility chain を catalog する。全 scripts は repository に track
 され、`julia --project=.` で再現可能。

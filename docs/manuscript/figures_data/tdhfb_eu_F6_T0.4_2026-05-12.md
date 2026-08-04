@@ -1,5 +1,8 @@
 # TDHFB Eu F=6 post-quench production run — 2026-05-12
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Run script**: `scripts/bench/tdhfb_eu_production.jl`
 **Configuration**: F=6 (D=13), 16³ grid, T=0.4 ω⁻¹, dt=0.002, 200 steps,
                    anti-polar `|+6⟩+|-6⟩` initial, harmonic trap (anisotropy 1.4²)

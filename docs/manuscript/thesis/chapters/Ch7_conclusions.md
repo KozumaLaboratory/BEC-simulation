@@ -1,5 +1,8 @@
 # 修論 Chapter 7: 結論と展望
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、本修論で確立した結果を統合的に総括し、D 論期間および post-修論 follow-up
 論文への展望を整理する。
 

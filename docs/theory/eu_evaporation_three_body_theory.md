@@ -1,5 +1,8 @@
 # ¹⁵¹Eu 蒸発冷却モデルの理論 — 導出と洞察
 
+> **FROZEN 2026-07-25.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **状態: 議論用ドラフト（anko + Claude）。** issue #75 に蒸留する前の作業文書（日本語）。モデル（`src/solvers/evaporation/`）は 0 次元・2 成分（熱雲＋凝縮体）の蒸発冷却モデル。この文書の中心は、**BEC の原子数が「入れた原子数」ではなく「三体損失 × 密度の履歴」で決まる**という一点（アトラクタ）と、そこから出る「BEC を希薄に保て」という最適化指針。規約は atoms-lost（$K_3\equiv$ 博論の Söding $L_3$）。
 
 ## BEC 数を決めるアトラクタ

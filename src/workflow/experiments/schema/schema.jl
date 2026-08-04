@@ -211,8 +211,13 @@ const LIVE_MONITOR_SCHEMA = Dict{String, FieldSpec}(
 # but at least enforce the `t` / `apply` envelope.
 const PULSE_EVENT_SCHEMA = Dict{String, FieldSpec}(
     "t" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    # NOT "trap". `PULSE_TARGETS` (`runtime/pulse_sequence.jl:19`) is the set
+    # `compile_pulse_sequence` actually compiles, and its own docstring records
+    # that `apply: trap` was "documented in yaml_schema_reference.md but never
+    # implemented" — it parsed, grouped, and compiled to NOTHING. Admitting it
+    # here made that silent no-op reachable from a config that validates.
     "apply" => FieldSpec(; required=true, type=String,
-        enum=["B", "raman", "interactions", "trap"]),
+        enum=["B", "raman", "interactions"]),
     "duration" => FieldSpec(; type=Number, range=(0.0, 1e6)),
     # Per-target params (left permissive; `_apply_pulse_sequence` validates):
     "p" => FieldSpec(), "q" => FieldSpec(), "bx" => FieldSpec(), "by" => FieldSpec(),

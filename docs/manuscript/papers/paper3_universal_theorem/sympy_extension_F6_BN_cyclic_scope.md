@@ -1,5 +1,8 @@
 # Paper #3 §VII extension scope: F=6 biaxial nematic + F=6 cyclic_tetrahedral LHY
 
+> **FROZEN 2026-06-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Scoping note for the sympy work needed to close Track B (LHY order-by-disorder
 between Eu nominal polyhedral inert candidates). Written 2026-06-02 night to
 identify what is/isn't covered by existing Paper #3 closed forms.

@@ -14,6 +14,8 @@ const FAST_TESTS = [
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
+    "test_docs_live_set.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
@@ -93,6 +95,12 @@ const FAST_TESTS = [
     "workflow/test_live_status_reaches_the_detector.jl",
     # A name the autopilot reads must be a name something writes.
     "workflow/test_terminal_record_has_a_producer.jl",
+    # The budget read the pre-2026 flat save_* keys the schema now rejects.
+    "workflow/test_budget_reads_the_save_block.jl",
+    # A YAML key a maintained doc teaches must be one the schema accepts.
+    "workflow/test_docs_yaml_against_schema.jl",
+    # A schema enum must name what the implementation can actually do.
+    "workflow/test_schema_enum_matches_implementation.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",

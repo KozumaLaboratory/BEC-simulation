@@ -1,3 +1,6 @@
+> **FROZEN 2026-06-05.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 <!-- promoted from agent memory `project_hamiltonian_layered_architecture_2026_06_05.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- hamiltonian/ redesign arc adopted 2026-06-05 — L0-L3 layered architecture + Stage 0-3 plan; doc at docs/design/hamiltonian_layered_architecture.md; 9 verified live defects pending Stage 0 -->
 

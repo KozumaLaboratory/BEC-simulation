@@ -1,3 +1,6 @@
+> **FROZEN 2026-05-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 ---
 
 ## レビュー論文の内容と Eu への拡張
@@ -131,7 +134,9 @@ $$\tau_{\text{EdH}} \sim \frac{h}{c_{\text{dd}} n}, \qquad c_{\text{dd}} = \mu_0
 
 **Cr（6µ_B）に対するEu（7µ_B）の比**：
 
-$$\frac{\tau_{\text{Eu}}}{\tau_{\text{Cr}}} \sim \frac{g_{\text{Cr}}^2 \cdot 36\mu_B^2}{g_{\text{Eu}}^2 \cdot 49\mu_B^2}$$
+$$\frac{\tau_{\text{Eu}}}{\tau_{\text{Cr}}} \sim \frac{\mu_{\text{Cr}}^2}{\mu_{\text{Eu}}^2} = \frac{36\mu_B^2}{49\mu_B^2} \approx 0.73$$
+
+（$c_{\rm dd}$ は単位スピンあたりなので、物理的な DDI 強度は $c_{\rm dd}F^2=\mu_0(g F\mu_B)^2=\mu_0\mu^2$。$g$ を二重に数えないこと。）
 
 さらに重要なのは、**EdH後に形成される渦の巻き付き数がJz-mになる**（式432）。Crは $m = -3$ スタートで $J_z = -3$ → 渦の巻き付きは 0, 1, 2。
 

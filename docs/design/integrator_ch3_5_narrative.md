@@ -1,5 +1,8 @@
 # §3.5 Force-gradient extension to spinor + DDI — narrative draft
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: draft, 2026-05-11. To be folded into Ch.3 main text.
 **Track C closure**. See `docs/design/integrator_ch3_plan.md` for overall Ch.3.
 

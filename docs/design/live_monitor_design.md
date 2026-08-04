@@ -1,5 +1,8 @@
 # Live monitoring — design note
 
+> **FROZEN 2026-04-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: **partially implemented** (2026-04-26). The two halves of the "live monitor" idea were split and implemented separately:
 
 - **Lab-image side (items 1-3 below): IMPLEMENTED.** `/api/lab/image` POST + `/api/lab/list` GET in `dashboard.jl` accept and serve `runs/<run>/lab_images/shot_*.png`; the React `LabImageOverlay` component renders them in the 3D view. Auth (item 4) is still deferred — server is LAN-only.

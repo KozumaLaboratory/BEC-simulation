@@ -40,8 +40,27 @@ using SpinorBEC
     @testset "linear_zeeman_p" begin
         omega = 2π * 110.0
         p = linear_zeeman_p(Eu151, 2.6e-9, omega)
-        @test p > 0.3
-        @test p < 0.5
+        # NEGATIVE. This pinned `p > 0.3` and stayed green while the function
+        # computed +g_F μ_B B — the opposite sign to `Units.bfield_to_p`, which
+        # both that file's docstring and CLAUDE.md called the single
+        # declaration. Physical: μ = -g_F μ_B F, so p ≡ -g_F μ_B B, and +Bz on
+        # a g_F>0 atom (Eu) puts the ground state at m = -F.
+        @test p < -0.3
+        @test p > -0.5
+
+        # THE ARM THAT WOULD HAVE CAUGHT IT: the two converters, on the same
+        # field and the same atom, must agree exactly. A test that only checks
+        # one side of a "declared once" claim cannot see a second declaration.
+        # Note the units: `linear_zeeman_p` takes TESLA, `bfield_to_p(::Real,…)`
+        # reads GAUSS.
+        @test p == SpinorBEC.Units.bfield_to_p(2.6e-9 * 1.0e4, Eu151.g_F, omega)
+
+        # POSITIVE CONTROL: the sign must FOLLOW g_F, or the equality above is
+        # satisfied by two functions that both ignore it.
+        neg = AtomSpecies(Eu151.name, Eu151.mass, Eu151.F, Eu151.a0, Eu151.a2,
+            Eu151.mu_mag, -Eu151.g_F, copy(Eu151.scattering_lengths);
+            Eu151.Delta_E_hf, Eu151.g_J, Eu151.nuclear_I, Eu151.electronic_J)
+        @test linear_zeeman_p(neg, 2.6e-9, omega) > 0
     end
 
     @testset "AtomSpecies g_F field" begin

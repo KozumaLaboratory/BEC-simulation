@@ -1,5 +1,8 @@
 # Figure 4 re-derived: the ±Ω asymmetry does not reproduce
 
+> **FROZEN 2026-08-01.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **2026-08-01, TSUBAME job 8314495 (cpu_16), 16 of 16 configs completed, none
 threw.** Re-runs every committed `runs/barnett_eu_window/*.yaml` against the
 stored summary of 2026-05-26 — one of the 230 that predate every correction and

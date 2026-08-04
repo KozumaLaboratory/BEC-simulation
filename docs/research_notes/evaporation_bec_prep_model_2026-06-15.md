@@ -1,3 +1,6 @@
+> **FROZEN 2026-06-15.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 <!-- promoted from agent memory `project_evaporation_bec_prep_model_2026_06_15.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- 0-D truncated-Boltzmann evaporative-cooling model for ¹⁵¹Eu BEC prep + FORT ramp optimizer; branch feat/evaporation-ramp-optimizer -->
 

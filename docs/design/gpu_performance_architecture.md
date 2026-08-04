@@ -1,5 +1,8 @@
 # GPU performance architecture — P0-P5
 
+> **FROZEN 2026-06-06.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: adopted 2026-06-06. The speed layer over the frozen correctness
 core (`hamiltonian_layered_architecture.md`). Per the freeze
 discipline, every P-stage decision below is either (a) decided
