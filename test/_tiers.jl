@@ -44,6 +44,7 @@ const FAST_TESTS = [
     "workflow/test_gs_cache_hit_physics.jl",
     "solvers/test_lbfgs_forward_coverage.jl",
     "solvers/test_precond_default_is_off.jl",
+    "bench/test_ab_report.jl",
     "oracles/test_lhy_table_path_coverage.jl",
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
@@ -77,6 +78,7 @@ const FAST_TESTS = [
     # names the per-run knobs it does NOT set.
     "workflow/validation/test_accuracy_knobs.jl",
     "workflow/validation/test_accuracy_profiles.jl",
+    "workflow/validation/test_ground_state_preflight.jl",
     "workflow/validation/test_save_operator_rhs.jl",
     "workflow/validation/test_show.jl",
     "workflow/validation/test_twin_audit.jl",
@@ -85,6 +87,12 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
+    # Does what a run WRITES reach what the reaper READS? The autopilot suite
+    # drives `is_divergent_status` with dicts it builds itself, so it passed
+    # while the writer and the reader shared no keys at all.
+    "workflow/test_live_status_reaches_the_detector.jl",
+    # A name the autopilot reads must be a name something writes.
+    "workflow/test_terminal_record_has_a_producer.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
@@ -918,6 +926,7 @@ const _COST = Dict{String, Float64}(
     "workflow/test_dynamics_lhy_normalisation.jl" => 3.0,
     "solvers/test_lbfgs_forward_coverage.jl" => 2.0,
     "solvers/test_precond_default_is_off.jl" => 4.0,
+    "bench/test_ab_report.jl" => 2.0,
     "oracles/test_lhy_table_path_coverage.jl" => 2.0,
     "analysis/test_diagnostics.jl" => 21.3,
     "oracles/test_zeeman_diagonal_analytic.jl" => 19.9,

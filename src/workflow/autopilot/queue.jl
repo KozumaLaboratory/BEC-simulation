@@ -10,7 +10,7 @@
 #     <content_id>/
 #       config.yaml        ← user spec
 #       state.toml         ← queue entry (this file's responsibility)
-#       outcome.toml       ← structured terminal status (written by run_yaml)
+#       _exit_summary.json ← structured terminal status (written by run_pipeline)
 #       ... run artefacts (point_NNN.jld2, _live_status.json, ...)
 #     .autopilot.lock      ← process-level lockfile
 #     .autopilot.paused    ← drain / pause sentinel (touched by operator CLI)
@@ -31,7 +31,7 @@ import TOML
 import Base.Filesystem: mkpath, mv
 
 export QueueEntry, QueueRoot,
-    QUEUE_STATES, RUN_STATE_FILENAME, OUTCOME_FILENAME,
+    QUEUE_STATES, RUN_STATE_FILENAME, EXIT_SUMMARY_FILENAME,
     STATE_TOML_SCHEMA_VERSION,
     enqueue!, list_queue, get_entry, save_entry!,
     backfill_group_ids!,
@@ -39,7 +39,53 @@ export QueueEntry, QueueRoot,
     set_status!, with_autopilot_lock, with_entry_lock
 
 const RUN_STATE_FILENAME = "state.toml"
-const OUTCOME_FILENAME = "outcome.toml"
+# `outcome.toml` was the name here until 2026-08-04. It had five readers and no
+# producer: the only writer in `src/` was the dry-run synthetic in `tick.jl`,
+# whose comment "Real runs overwrite this file at process exit" was false —
+# `run_pipeline` writes `_exit_summary.json` (`pipeline/runner.jl:157-166`) and
+# nothing writes an outcome.
+#
+# It was not merely inert. `run_dir` is content-addressed, the dry-run wrote
+# `terminal = "done"` into it, `collect!` does not write the file and the rsync
+# collect carries no `--delete` — so a later LIVE run of the same spec whose job
+# left `qstat` for any reason found the stale file and was reported `:done`
+# (`backends_uge.jl`). A crashed job read as successfully completed.
+#
+# `_exit_summary.json` is the same information from a writer that exists, and it
+# is strictly better: `nan_encountered` and `oom_killed` are BOOLEANS set from
+# the actual exception (`runner.jl:237-238`), so the classifiers stop matching
+# free text. `failure_analysis.jl` already read this file and was the only
+# reader that worked.
+const EXIT_SUMMARY_FILENAME = "_exit_summary.json"
+
+"""
+    _read_exit_summary(entry) -> Union{Nothing, Dict{String,Any}}
+
+The terminal record `run_pipeline` actually writes
+(`pipeline/runner.jl:157-166`), parsed, or `nothing` when it is absent or
+unreadable.
+
+ONE reader for five call sites. Until 2026-08-04 each of them opened
+`outcome.toml` — a name with no producer — and three of them parsed it as TOML
+while naming keys that only exist in this JSON file. `failure_analysis.jl` was
+the sharpest: it read `nan_encountered` / `oom_killed` correctly and reported
+them as `"_exit_summary.json: nan_encountered=true"`, a file it never opened.
+
+`nothing` is returned for absence, never an empty Dict. An empty Dict is how a
+missing record becomes a healthy verdict at the call site, which is the class of
+bug this replacement exists to end.
+"""
+function _read_exit_summary(entry)
+    p = joinpath(entry.run_dir, EXIT_SUMMARY_FILENAME)
+    isfile(p) || return nothing
+    d = try
+        JSON.parsefile(p)
+    catch
+        return nothing
+    end
+    d isa AbstractDict ? Dict{String, Any}(d) : nothing
+end
+
 const QUEUE_STATES = (:pending, :running, :done, :killed_data, :killed_bug)
 
 """
