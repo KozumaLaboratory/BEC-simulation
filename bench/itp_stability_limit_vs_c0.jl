@@ -38,8 +38,14 @@ const TIMING = get(ENV, "SPINORBEC_CELL_TIMING",
 
 # Production axis. All of these have c₀ > 0 and stay above the −1/36 pole.
 const RATIOS = (-0.024, -0.015, -0.005, 0.0, 0.02, 0.05)
-# Geometric in dt so the answer is a factor, not an offset.
-const DTS = (4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4, 2.5e-4, 1.25e-4)
+# Geometric in dt so the answer is a factor, not an offset — and the top of the
+# ladder has to BRACKET, or `largest ok` is the ladder's edge rather than the
+# limit. The first version topped out at 4e-3 and five of six rows were still
+# stable there, so it printed 4e-3 six times and computed a `c₀·dt_max` spread of
+# 6.09× that was entirely an artifact of the ceiling. Censoring is now detected
+# and excluded rather than reported as a value.
+const DTS = (6.4e-2, 3.2e-2, 1.6e-2, 8.0e-3, 4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4,
+    2.5e-4, 1.25e-4)
 
 "Does a short ITP at this (c₁ ratio, dt) stay finite? Convergence is not asked."
 function stays_finite(r, dt)
@@ -101,15 +107,23 @@ for r in RATIOS
         GC.gc(true)
         CUDA.reclaim()
     end
-    @printf("  %12s\n", best === nothing ? "none" : @sprintf("%.2e", best))
+    # CENSORED = the largest dt in the ladder is still stable, so the limit is
+    # above the ladder and `best` is the edge, not a measurement.
+    censored = best !== nothing && best == first(DTS)
+    @printf("  %12s\n", best === nothing ? "none" :
+                         censored ? @sprintf("≥%.1e", best) : @sprintf("%.2e", best))
     flush(stdout)
-    push!(limits, (r, c0, best))
+    push!(limits, (r, c0, censored ? nothing : best))
 end
 
 println("\n  the relation")
+# Censored rows were set to `nothing` above, so they cannot enter the relation.
 usable = [(c0, b) for (_, c0, b) in limits if b !== nothing]
+n_cens = count(x -> x[3] === nothing, limits) - count(x -> x[3] === nothing, limits)
 if length(usable) < 2
-    println("    fewer than two c₀ values have a stable dt in the ladder — no relation")
+    println("    fewer than two c₀ values are BRACKETED by this ladder — the rest are")
+    println("    censored at its top or bottom, and a limit read off a ladder edge is")
+    println("    the edge. Widen the ladder before quoting a relation.")
 else
     @printf("    %-10s %12s %14s\n", "c₀", "dt_max", "c₀ · dt_max")
     for (c0, b) in usable
