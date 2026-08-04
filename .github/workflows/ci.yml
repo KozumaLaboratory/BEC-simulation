@@ -52,7 +52,10 @@ env:
 # `mergeStateStatus=BLOCKED`, and `gh pr merge --admin` refused.
 #
 # So the jobs now always run and always report their context; only the costly
-# STEPS are gated on `needs.changes.outputs.code`. Step-level rather than
+# STEPS are gated on the `changes` outputs — `code` for the tiers that test code,
+# `code || docs` for the two that contain a gate whose INPUT is `docs/**.md`
+# (fast, via `test_docs_live_set.jl`; oracles, via the citation resolver).
+# Step-level rather than
 # job-level gating on purpose: a job skipped by a job-level `if` reports the
 # conclusion "skipped", and whether that satisfies a required check is a
 # GitHub-side semantic we would rather not depend on. A job that runs and
@@ -128,6 +131,15 @@ jobs:
     # not CI flake.
     timeout-minutes: 15
     env:
+      # The steps below honour `docs` as well as `code`, because the FAST tier
+      # contains `test_docs_live_set.jl`, whose INPUT is `docs/**.md`. Gating it
+      # on `code` alone made it unreachable from the only change that can break
+      # it. That hole was closed for the oracles tier on 2026-07-31 and
+      # reopened one tier over when this gate was added to FAST: main went red
+      # on 2026-08-04 when a docs-only PR added a document with neither a LIVE
+      # entry nor a FROZEN header, and merged with four green checks of which
+      # two were 8- and 10-second skips. A docs-only PR now pays this job.
+      #
       # Per-push CI runs the `fast` tier: unit tests only, no
       # ITP/RTP integration. The `ci` (fast + integration) and `full`
       # (everything) tiers — both ~30-45 min — run in the nightly
@@ -139,11 +151,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Share ONE depot cache across the per-PR `test` + `oracles` jobs: same
           # Project/Manifest/Julia/OS ⇒ byte-identical depot. The action's
@@ -158,9 +170,9 @@ jobs:
           # depot.
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - uses: julia-actions/julia-runtest@v1
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Coverage instrumentation forces re-precompile of every package
           # because the precompile cache is keyed on compile flags. We don't

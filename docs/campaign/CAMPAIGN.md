@@ -6,6 +6,12 @@ point here; do not paste this content into a prompt.
 Scope: one campaign, four lanes (A/B/C/D), two gates (G1/G2). A session is one lane
 item, one PR, one machine-checkable exit criterion.
 
+Cross-cutting record (dated, FROZEN): **`lessons_2026_08_04.md`** — one latent code defect (a
+GPU dispatch reachable only on a stage-cache hit), two defects in the instruments
+used to observe the work (no clock; a memory index 43 % over its load limit with
+41 % never loaded), and the classes the day's six self-corrections fell into. Five
+of the six were invisible from the inside.
+
 ---
 
 ## 1. Why this campaign exists
