@@ -1,6 +1,7 @@
 # What one L-BFGS iteration costs
 
 > **FROZEN 2026-07-29.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> **Superseded by [`lbfgs_speed_limits.md`](lbfgs_speed_limits.md)** (2026-08-04), which carries the current per-iteration numbers and answers the question this note could not: why there are ~600 iterations. Two figures here are now known to be artefacts of the regime measured — the 235.6 ms iteration and the 29.41 evals/iteration are POST-CONVERGENCE, since `tol` sat below this problem's gradient floor; in the useful regime they are ~32 ms and ~1.1.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 
 Scope: `find_ground_state_lbfgs` (`src/solvers/lbfgs/`).
