@@ -99,23 +99,44 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 
 ---
 
-## Coverage scoreboard (as of 2026-06-04)
+## Coverage scoreboard (re-measured 2026-08-04)
 
-- **Directional test present**: 5 / 16 terms
-  - Linear z-Zeeman ✓
-  - Transverse x-Zeeman ✓ (new, post-2026-06-04)
-  - Transverse y-Zeeman ✓ (new)
-  - Coriolis orbital ✓
-  - Barnett spin ✓
+**14 terms, 14 `sign_oracle` methods.** `H_TERMS_CANONICAL_ORDER` has 14 entries
+and `methods(sign_oracle)` returns 14 concrete methods — every registry slot
+declares one. Measured, not counted by hand:
+
+```julia
+length(SpinorBEC.H_TERMS_CANONICAL_ORDER)   # 14
+length(methods(SpinorBEC.sign_oracle))      # 14
+```
+
+This section said "5 / 16" present and "11 / 16 missing" as of 2026-06-04. Both
+the numerator and the denominator were wrong by the time the HamTerm protocol
+landed: the registry is 14, not 16, and step 4 of the protocol
+(CLAUDE.md, "Adding a new HamTerm") makes a `sign_oracle` mandatory, so a new
+term cannot be added without one. Do not restate the count here — derive it, as
+above, or read `test/oracles/test_hamiltonian_sign_oracles.jl` and
+`test_term_fd_registry_coverage.jl`, which assert the coverage rather than
+describe it.
+
+**What a `sign_oracle` existing does NOT mean.** The protocol warns that a
+predicate returning `true` regardless is a placeholder, and that a term whose
+energy has the tautological shape `sign(E) = sign(c)·X²` needs a second,
+physics-anchored oracle in `test_physics_aware_sign_oracles.jl`. Presence is
+gated; strength is a judgement.
+
 - **Cross-path consistency verified** (CPU=GPU energy, gradient = ∂energy):
   - Linear z-Zeeman ✓
-  - Transverse x/y-Zeeman: **partial** — propagator fixed, gradient gap remains (`_grad_zeeman!` only diagonal — `energy_gradient!` is wrong at non-zero bx/by). Marker `[GAP-1]`.
+  - Transverse x/y-Zeeman: **partial** — propagator fixed, gradient gap remains
+    (`_grad_zeeman!` only diagonal — `energy_gradient!` is wrong at non-zero
+    bx/by). Marker `[GAP-1]`.
   - Coriolis orbital ✓ (per-cell FD audit)
   - Barnett spin ✓ (per-cell FD audit)
   - c0 / c1 / DDI / LHY ✓ (per-cell FD audit, post-fix)
-  - Tensor (c2, c4) ✓ since 2026-06-09 — the anomalous gradient face is implemented and `energy_gradient!` is registry-only, so tensor-active configurations are optimised, not bounced to ITP. FD-gated in `test_term_consistency.jl`. (Was `[KNOWN-LIMIT]`.)
-- **Directional test missing**: 11 / 16 terms (trap, q, c0, c1 directly, DDI, LHY, tensor, raman, light_shift, mag-grad, loss).
-  Each is a future-bug opportunity if the term gets refactored.
+  - Tensor (c2, c4) ✓ since 2026-06-09 — the anomalous gradient face is
+    implemented and `energy_gradient!` is registry-only, so tensor-active
+    configurations are optimised, not bounced to ITP. FD-gated in
+    `test_term_consistency.jl`. (Was `[KNOWN-LIMIT]`.)
 
 ### Known gaps requiring follow-up
 
