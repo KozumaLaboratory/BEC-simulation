@@ -80,6 +80,29 @@ using SpinorBEC
         @test !any(f -> endswith(f, "w.csv"), u)     # recurses into subdirs
     end
 
+    @testset "the fingerprint is captured at LOAD, over the whole src tree" begin
+        fp = src_fingerprint()
+        @test length(fp) == 12
+        @test fp != "uninitialised"          # __init__ ran
+        # Stable within a session: taken at load, so writing a file later cannot
+        # change it. A sync that lands mid-run once made 16 shards stamp the
+        # POST-sync commit while running pre-sync code, which is the failure this
+        # closes — the stamp must describe the process, not the disk.
+        @test src_fingerprint() == fp
+        sleep(0.01)
+        @test src_fingerprint() == fp
+
+        # Whole tree, not a named subset: an earlier version hashed three files by
+        # name and would have missed sgpe.jl, which holds the SPGPE noise and
+        # damping kernels. Every source must be inside the fingerprint.
+        h1 = provenance_header()
+        @test occursin("src=$fp", h1)
+        @test occursin("julia=$(VERSION)", h1)
+        @test occursin("host=", h1)
+        # and the fingerprint travels even with no per-file list given
+        @test startswith(h1, "# provenance:")
+    end
+
     @testset "the header records HEAD, dirtiness and per-source hashes" begin
         h = provenance_header("src/solvers/spgpe.jl", "Project.toml")
         @test startswith(h, "# provenance:")

@@ -185,6 +185,9 @@ include("precompile.jl")
 
 function __init__()
     __init_templates__()
+    # Fingerprint the source tree at LOAD, so a measurement written later stamps
+    # what the process is running rather than what is on disk at write time.
+    _capture_provenance!()
 end
 
 end # module

@@ -1,4 +1,78 @@
 export provenance_header, assert_same_provenance, stamped_csv, unstamped_outputs
+export src_fingerprint, load_environment
+
+# Captured at LOAD, not at write. A job that loads code at 18:00 and writes a file
+# at 21:33 must not stamp the 21:33 tree — that names code which did not produce
+# the numbers, and it happened: a sync ran while 16 shards were mid-flight and
+# every shard stamped the post-sync commit. Reading the sources when the module
+# loads is the closest a process can get to "what am I running".
+const _SRC_FINGERPRINT = Ref{String}("uninitialised")
+const _LOAD_ENV = Ref{String}("uninitialised")
+
+"""
+    src_fingerprint() -> String
+
+SHA-1 over every `.jl` file under `src/`, computed once when the module loads.
+
+The whole tree, not a hand-listed subset: an earlier version hashed three files by
+name and would have missed a change to `sgpe.jl`, which holds the noise and
+damping kernels the SPGPE runs on. A list of "the files that matter" is a
+convention, and conventions drift out of date silently.
+
+# What this does NOT establish
+
+Julia may load a **precompiled cache** built from different sources than the ones
+on disk — the depot is shared between jobs, and "SpinorBEC being precompiled by
+another machine" is a message this project sees. So a matching fingerprint means
+the sources agreed, not that the executed machine code came from them. Closing
+that would mean interrogating the cache, and until then it is a documented hole
+rather than an assumed non-issue.
+"""
+src_fingerprint() = _SRC_FINGERPRINT[]
+
+"""
+    load_environment() -> String
+
+Julia version, thread count and hostname, captured at load. Results here have
+differed across CPU/GPU and across worker counts before, so the environment is
+part of what produced a number.
+"""
+load_environment() = _LOAD_ENV[]
+
+function _capture_provenance!()
+    root = normpath(joinpath(@__DIR__, "..", "..", ".."))
+    src = joinpath(root, "src")
+    files = String[]
+    isdir(src) && for (dir, _, fs) in walkdir(src), f in fs
+        endswith(f, ".jl") && push!(files, joinpath(dir, f))
+    end
+    sort!(files)
+    ctx = SHA.SHA1_CTX()
+    for f in files
+        SHA.update!(ctx, codeunits(relpath(f, root)))
+        try
+            SHA.update!(ctx, read(f))
+        catch
+            SHA.update!(ctx, codeunits("unreadable"))
+        end
+    end
+    _SRC_FINGERPRINT[] = isempty(files) ? "no-src" : bytes2hex(SHA.digest!(ctx))[1:12]
+    # `cache=` says whether Julia loaded this module from a precompiled image, which
+    # the source fingerprint cannot tell you: the depot is shared between jobs and
+    # a cache built from other sources can be loaded against a src/ tree that has
+    # since changed. A run whose fingerprint matches but which came off a stale
+    # cache is not reproducible, and this is the field that makes that visible
+    # rather than assumed away.
+    cached = try
+        !isnothing(Base.cache_file_entry(Base.PkgId(@__MODULE__)))
+    catch
+        false
+    end
+    _LOAD_ENV[] =
+        "julia=$(VERSION) threads=$(Threads.nthreads()) " *
+        "host=$(gethostname()) cached=$cached"
+    nothing
+end
 
 """
     provenance_header(sources...) -> String
@@ -45,7 +119,11 @@ function provenance_header(sources::AbstractString...)
         h = isfile(f) ? bytes2hex(SHA.sha1(read(f)))[1:12] : "missing"
         "$(basename(f))=$h"
     end
-    "# provenance: head=$head dirty=$dirty " * join(hashes, " ")
+    # src= is the load-time fingerprint of the whole tree and is the load-bearing
+    # field; the per-file hashes are read now and are only a convenience for
+    # eyeballing which file moved.
+    "# provenance: head=$head dirty=$dirty src=$(src_fingerprint()) " *
+    "$(load_environment())" * (isempty(hashes) ? "" : " " * join(hashes, " "))
 end
 
 """
