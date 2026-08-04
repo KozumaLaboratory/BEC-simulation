@@ -34,7 +34,9 @@ function _ws_all_terms()
         interactions=InteractionParams(Dict(0 => 20.0, 1 => -0.6)),
         zeeman=ZeemanParams(0.35, 0.12),
         potential=HarmonicTrap((1.0, 1.1, 0.9)),
-        sim_params=SimParams(; dt=0.005, n_steps=1),
+        # The rotating frame lives in SimParams, not in make_workspace — that
+        # is where CoriolisTerm reads it from.
+        sim_params=SimParams(; dt=0.005, n_steps=1, rotating_frame_omega=0.3),
         enable_ddi=true, c_dd=1.5,
         spinor_lhy=:polar_contact,
         light_shift=make_light_shift(; F=1, alpha_vector=0.12, alpha_tensor=0.2,
@@ -42,7 +44,6 @@ function _ws_all_terms()
                 exp(-(x^2 + y^2 + z^2) / 8) for x in range(-3, 3; length=8),
                 y in range(-3, 3; length=8), z in range(-3, 3; length=8)
             ]),
-        rotating_frame_omega=0.3,
     )
     # A state with structure in every component, so no term is accidentally
     # evaluated at zero — a ratio checked against 0 == 0 is checked against
