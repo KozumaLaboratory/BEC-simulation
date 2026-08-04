@@ -13,7 +13,7 @@ Anchors:
 - `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 lists doc claims measured against the code; a row still marked OPEN overrides this file until the source doc is fixed. Four of the original five discharged within three days and none announced itself — check the row before trusting it.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
 
-`AGENTS.md` is a stale fork (pre-rename names `nematic` / `TwoChannelLHY`, predates HamTerm protocol); prefer this file.
+`AGENTS.md` is a pointer here (it was a stale fork; reduced 2026-08-04 after it turned up in 28 of the tree's duplicated-fact disagreements).
 
 ## Commands
 
