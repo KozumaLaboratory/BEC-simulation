@@ -35,10 +35,18 @@ spinor $\zeta = (1, 0, i\sqrt{2}, 0, 1)/2$ — a symmetry whose physical content
 
 ### Key results
 
-1. **m-parity Even/Odd factorization of the 10×10 BdG matrix** into 5×5 + 5×5
-   independent blocks. The factorization is exact (not perturbative) and
-   reflects the discrete tetrahedral symmetry of the cyclic spinor's Majorana
-   configuration.
+1. **m-parity Even/Odd factorization of the 10×10 BdG matrix** into 6×6 even
+   and 4×4 odd independent blocks. The factorization is exact (not
+   perturbative) and reflects the discrete tetrahedral symmetry of the cyclic
+   spinor's Majorana configuration.
+
+   > **Corrected 2026-08-04.** This read "5×5 + 5×5", contradicting `main.md`
+   > (and `main_raw.md:22-24`), which has 6×6 even ⊕ 4×4 odd. The main text is
+   > right and the arithmetic says so: at F=2 the even-m sector is
+   > {−2, 0, +2} — three components, six BdG rows — and the odd-m sector is
+   > {−1, +1} — two components, four rows. An equal 5+5 split is not what
+   > m-parity produces. Both halves summed to 10, which is why the error
+   > survived: the total was right.
 
 2. **Closed-form mode dispersions** for all five Bogoliubov modes (one phonon,
    three spin Goldstones in the $T_1$ irreducible representation of $T_d$, and

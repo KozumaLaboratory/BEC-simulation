@@ -614,8 +614,10 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-04. Eight of the fourteen ids are resolved, across six of the
-twelve items; six ids remain.**
+**Status, 2026-08-04. Twelve of the fourteen ids are resolved, across ten of
+the twelve items; two ids remain — and both need something this session cannot
+supply: `A2:R-OPEN-02` needs a TSUBAME job (real money) and the residue of
+`A2:R-CHAIN-03` needs an observation of how often forks land mid-solve.**
 
 | item | ids | how |
 |---|---|---|
@@ -623,6 +625,10 @@ twelve items; six ids remain.**
 | 2 | A2:R-OPEN-01 | measured |
 | 3 | A2:R-OPEN-05 | measured — mean 1.24 against a threshold of 3 |
 | 5 | A2:R-ENS-01 | **fixed in code** — plus a second defect found while fixing it |
+| 10 | A5:R-BSALC-03 | measured — already holds; now gated with a positive control |
+| 11 | A3:R-DOC-01 | **built** — the "cannot mechanise" reasoning was wrong |
+| 12 | A1:R-ERG-01 | measured — 4 names in practice, against a budget of 6 |
+| 9 | A5:R-NIX-07 | **hazard closed in code**; the general capability stays open by choice |
 | 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
 | 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
 
@@ -852,28 +858,109 @@ read as a known-wrong answer rather than a caveat; the other had no subject.
    ancestor" is right depends on how often a fork actually lands mid-solve
    rather than between stages, and nothing measures that. The cost table no
    longer blocks it; the frequency does.
-9. **A5:R-NIX-07 — trusted producers.** `require` is verdict-shaped, not
-   host-shaped. The capability is not designed out, but it is not built, and the
-   day a stale-sysimage TSUBAME artifact enters a shared store is when it is
-   needed.
-10. **A5:R-BSALC-03 — within-build deduplication.** Identical names within one
-    `run!` are asserted to be one lookup; nothing enforces it yet, and the
-    frontier releases up to 64 stages.
+9. **A5:R-NIX-07 — trusted producers. The DANGER named here is closed
+   2026-08-04; the general capability is not, and should not be.** The row
+   worried about "the day a stale-sysimage TSUBAME artifact enters a shared
+   store". That day is reachable today, and by a precise route:
+
+   - `code_tree_hash` reads the DISK (limit 1 of its own docstring);
+   - `backends_uge.jl:191` adds `-J <sysimage>` whenever
+     `SPINORBEC_TSUBAME_SYSIMAGE` is set (`tick.jl:95`);
+   - so on such a job the recorded `code_rev` names bytes the process is not
+     executing, and a wrong revision is indistinguishable from a right one.
+
+   `_code_rev_or_nothing` now RETURNS NOTHING under a custom sysimage rather
+   than recording a revision it cannot vouch for. Absent is absent; that is the
+   rule the rest of this design is built on. Gated by
+   `test/model/test_code_rev_refuses_under_sysimage.jl`.
+
+   **The discrimination is the whole gate.** Every julia process carries
+   `-J <juliaup>/lib/julia/sys.so`, so testing for `-J` alone refuses
+   everything — measured: the first version returned `nothing` in an ordinary
+   REPL, and a writer that always declines is not safe, it is silent. Canaried
+   in both directions: removing the refusal reddens, and widening it to any
+   `-J` reddens.
+
+   **What remains open is the capability, not the hazard.** `require` is still
+   verdict-shaped rather than host-shaped, so a store cannot yet say "only
+   accept artifacts produced by host X". That is a real feature and it is not
+   built. It is also no longer the thing standing between the tree and a wrong
+   answer — the refusal is.
+10. **A5:R-BSALC-03 — within-build deduplication. MEASURED 2026-08-04: it
+    already holds, and is now gated.** The row said identical names within one
+    `run!` were "asserted to be one lookup" with "nothing enforcing it yet".
+    Two steps with identical declarations resolve to the same `artifact_id`
+    (`0e72f8f538d18fe6` for both), and the second is SERVED rather than
+    re-solved: **10.57 s then 3.13 s, provenance `marked`**.
+
+    Gated by `test_gs_admission_axes.jl` arm G — same `gs_stage_ref`, second
+    provenance `marked` while the first is unset, energies bit-equal — with a
+    positive control that a declaration which DIFFERS is not deduplicated,
+    without which the arm is satisfied by a cache that serves everything.
+
+    The gate earns its place because the frontier releases up to 64 stages: if
+    dedup stopped, a sweep whose points share a ground state would re-solve it
+    per point and nothing would say so except the wall clock. The corpus has
+    exactly that shape — 59 configs under `runs/klaus_quench/` share one id
+    (§5 item 2).
 
 **Two the design cannot mechanise, or fails outright.**
 
-11. **A3:R-DOC-01 — no LaTeX, with a check that covers inline expressions and
-    macros, not only display math.** Complied with here as an author. But the
-    gate domain is over *code* properties, not prose, so this design supplies no
-    mechanism that would keep a future document honest, and the requirement asks
-    for a check.
-12. **A1:R-ERG-01 — the name budget is violated.** The requirement is that a
-    researcher can run the whole system knowing six names. This design needs
-    eight, plus 33 REASONS tags, 7 dispositions and a `Row` schema. The defence
-    is that the tags are read and never memorised and that the *model* count
-    falls from eleven to one — but a reader who counts nouns will count more
-    nouns than before, and that is a real cost, not a rhetorical one. (33 tags,
-    enumerated at the end of section 3.)
+11. **A3:R-DOC-01 — no LaTeX, with a check covering inline and macros.
+    BUILT 2026-08-04.** The row said the requirement could not be mechanised
+    because "the gate domain is over *code* properties, not prose". That
+    reasoning is wrong, and the counterexamples are in this same tree:
+    `test_docs_live_set.jl`, `test_docs_yaml_against_schema.jl` and
+    `test_doc_run_citations_resolve.jl` are all gates over prose.
+
+    `test/test_design_docs_have_no_latex.jl` is the fourth. It covers all three
+    shapes the requirement names — display `$$`, inline `$…$`, and macros —
+    over this document and `research_spec_and_provenance_architecture.md`, both
+    of which are already clean.
+
+    **Scope is the substance of the gate, not a caveat on it.** It does NOT
+    forbid LaTeX in the repository: `paper3/sign_pattern_lemma1_general_S.md`
+    (242 expressions) is a paper draft and `guides/spgpe.md` (85) is a
+    derivation; both need it, and a gate that failed them would be deleted
+    within a week. It governs the DESIGN documents, where the requirement was
+    that a reader can follow the argument in a terminal.
+
+    The instrument needed two corrections before it could be trusted, both
+    caught by its own positive control rather than by inspection. A first count
+    of 747 inline expressions across the live set was measuring shell
+    variables (a bare dollar-name, and a brace-indexed array reference) and the
+    real figure is 398;
+    requiring a backslash command or a BRACED sub/superscript separates them,
+    where requiring a bare `_` does not. And counting `$$` by byte-indexing
+    threw `StringIndexError` on an em-dash. A prose gate is still a gate: it
+    needs a control that fires and a control that does not.
+12. **A1:R-ERG-01 — the name budget. MEASURED 2026-08-04: the researcher-facing
+    count is FOUR, under the budget of six. The defence was right and was
+    offered without evidence; the row stands corrected in both directions.**
+
+    The requirement is that a researcher can run the whole system knowing six
+    names. Counted over the 479 configs under `runs/` — what people actually
+    wrote, not what the schema permits:
+
+    | | |
+    |---|---|
+    | live top-level names in the schema | 10 |
+    | of those, used by ANY config | 8 |
+    | **used by more than 10 % of configs** | **4** (`pipeline`, `defaults`, `scan`, `mixins`) |
+    | configs mentioning a `REASONS` tag or a disposition | **0** |
+
+    So the 33 tags and 7 dispositions are read and never typed — measured, not
+    argued: they appear in no config at all. The four names a working config
+    actually needs are under budget, and the remaining six top-level keys
+    (`units`, `calibration*`, `target_date`, `accuracy`, `auto_grid`) are
+    opt-in features a researcher meets only when they want them.
+
+    **What the row got right, and keeps.** "A reader who counts nouns will count
+    more nouns than before" is still true of the DOCUMENT, and the count above
+    does not refute it — it measures the config surface, which is the thing the
+    requirement is phrased about ("run the whole system"). Reading the design is
+    a different cost from operating the system, and this measurement only
+    settles the second.
 
 **Stated rather than solved — which is what those requirements ask.** A1:R-NOT-01
 through A1:R-NOT-12, A2:R-DROP-01 through A2:R-DROP-11, A3:R-NOT-01 through

@@ -115,6 +115,32 @@ end
 # read error is reachable. It warns rather than returning a placeholder: a
 # plausible-looking wrong revision is worse than an absent one.
 function _code_rev_or_nothing()
+    # Under `-J <sysimage>` the hash is a LIE and returning `nothing` is the
+    # honest answer. `code_tree_hash` reads the disk; a sysimage runs code
+    # baked at build time, so the two can differ and the hash would name bytes
+    # this process is not executing. That is limit 1 of `code_tree_hash`'s own
+    # docstring, and it is reachable in production: `backends_uge.jl:191` adds
+    # `-J` whenever `SPINORBEC_TSUBAME_SYSIMAGE` is set (`tick.jl:95`).
+    #
+    # A record with no code revision loses a capability. A record with a WRONG
+    # one is worse — it is the shape this whole design exists to remove, and it
+    # would be indistinguishable from a correct one. Absent is absent.
+    # A CUSTOM sysimage, not any sysimage: every julia process carries
+    # `-J <juliaup>/lib/julia/sys.so`, so testing for `-J` alone refuses
+    # everything — measured, this returned `nothing` in an ordinary REPL. What
+    # matters is a sysimage built from THIS package, which by construction
+    # lives outside the Julia installation.
+    _custom_sysimage() = any(Base.julia_cmd().exec) do a
+        startswith(a, "-J") &&
+            !occursin(joinpath("lib", "julia", "sys."), a) &&
+            !isempty(strip(a[3:end]))
+    end
+    if !isempty(get(ENV, "SPINORBEC_TSUBAME_SYSIMAGE", "")) || _custom_sysimage()
+        @warn "running under a sysimage; recording NO code revision because " *
+            "code_tree_hash reads the disk and the process may be executing " *
+            "different bytes" maxlog = 1
+        return nothing
+    end
     try
         code_tree_hash()
     catch err

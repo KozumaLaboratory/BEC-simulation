@@ -16,6 +16,8 @@ const FAST_TESTS = [
     "test_tier_membership.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    # A3:R-DOC-01 asked for a CHECK; the design docs must stay terminal-readable.
+    "test_design_docs_have_no_latex.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
@@ -107,6 +109,8 @@ const FAST_TESTS = [
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
     "model/test_artifact_id.jl",
+    # A revision naming bytes the process is not running is worse than none.
+    "model/test_code_rev_refuses_under_sysimage.jl",
     # Why `artifact_id` had to stop being `content_id(spec)`: prose participates
     # in the latter, so harvesting 302 `metadata:` blocks moved 302 names.
     "model/test_prose_does_not_move_identity.jl",

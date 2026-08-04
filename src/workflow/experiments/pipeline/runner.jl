@@ -270,8 +270,21 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     (psi=psi, grid=grid, atom=atom, results...)
 end
 
-# Inference barrier for the per-step dispatch — see run_pipeline for
-# rationale. `@nospecialize` on `step` is the load-bearing annotation:
+# Inference barrier for the per-step dispatch — see run_pipeline for rationale.
+#
+# MEASURED 2026-08-04 and it does NOT reproduce. `code_typed(run_pipeline, …)`:
+# 13.9 s with both annotations, 14.1 s without `@noinline`, 14.2 s without
+# `@nospecialize`, 14.5 s with neither — against a 0.6 s spread between fresh
+# processes. First-call JIT through `run_pipeline`: 25.9 s vs 25.6 s. The
+# paragraph below describes a hang that was real when it was written; what
+# defused it was removing the `Any`-typed local that reached `make_workspace`,
+# not these annotations. They are kept because they cost nothing and the
+# failure mode can return, but they are not what is holding the line.
+# (`pitfall_pipeline_inference` recorded the same for `@noinline` — 258 s vs
+# 251 s — and was right; this file's claim for `@nospecialize` was the
+# unmeasured half.)
+#
+# Historical rationale, left as written:
 # without it, Julia generates a fresh specialisation of this function
 # (and the rest of the loop body) for each PipelineStep concrete type
 # the YAML mentions, and the binary GP path's return-tuple type hits a

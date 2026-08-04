@@ -785,3 +785,51 @@ end
         end
     end
 end
+
+# --- Arm G: within-build deduplication (A5:R-BSALC-03) -------------------
+#
+# The design listed this as "asserted to be one lookup; nothing enforces it
+# yet". Measured 2026-08-04: it already holds. Two steps with identical
+# declarations inside one build resolve to the same `artifact_id`, and the
+# second is served from the store rather than re-solved — 10.57 s then 3.13 s,
+# provenance `marked`.
+#
+# It is worth a gate rather than a note because the frontier releases up to 64
+# stages: if dedup silently stopped, a sweep whose points share a ground state
+# would re-solve it per point and nothing would say so except the wall clock.
+# The real corpus has that shape — 59 configs under `runs/klaus_quench/` share
+# one `artifact_id`.
+@testset "G. identical declarations inside one build are ONE computation" begin
+    p = ax_base(; n_steps=3)
+    mktempdir() do dir
+        run() = withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_STAGE_DIR" => dir) do
+            _run_step(GroundStateStep(deepcopy(p)), nothing, nothing, nothing, nothing;
+                verbose=false)
+        end
+        (_, _, _, _, r1) = run()
+        (_, _, _, _, r2) = run()
+
+        # Same name...
+        @test r1[:gs_stage_ref] isa AbstractString
+        @test r2[:gs_stage_ref] == r1[:gs_stage_ref]
+        # ...and the second one was SERVED, not recomputed. Provenance is the
+        # discriminator: a fresh solve leaves it unset.
+        @test String(get(r2, :ground_state_provenance, "")) == "marked"
+        @test String(get(r1, :ground_state_provenance, "")) == ""
+        # The energies agree exactly, which is the point of serving it at all.
+        @test r2[:ground_state_energy] == r1[:ground_state_energy]
+    end
+
+    # POSITIVE CONTROL: a declaration that DIFFERS must not be deduplicated,
+    # or the arm above is satisfied by a cache that serves everything.
+    mktempdir() do dir
+        runp(q) = withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_STAGE_DIR" => dir) do
+            _run_step(GroundStateStep(deepcopy(q)), nothing, nothing, nothing, nothing;
+                verbose=false)
+        end
+        (_, _, _, _, a) = runp(ax_base(; n_steps=3))
+        (_, _, _, _, b) = runp(ax_base(; n_steps=4))
+        @test b[:gs_stage_ref] != a[:gs_stage_ref]
+        @test String(get(b, :ground_state_provenance, "")) == ""
+    end
+end
