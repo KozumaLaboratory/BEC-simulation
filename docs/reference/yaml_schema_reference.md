@@ -28,10 +28,21 @@ Conventions:
 | `mixins` | dict {name: param-set} | named param bundles; pulled in via `use:` |
 | `accuracy` | Real | seeds `epsilon:` on rotating_basis steps |
 | `auto_grid` | bool | enable TF-radius grid auto-derivation |
-| `metadata`, `name`, `notes`, `version` | free-form | provenance, ignored at runtime |
 
 Any other top-level key triggers a typo warning (strict-mode error). The
 warning suggests the closest known key via Levenshtein distance.
+
+> **`metadata` / `name` / `notes` / `version` were DELETED 2026-08-04.** This
+> table listed them as "free-form, ignored at runtime" — and "ignored at
+> runtime" was the problem: a slot no code reads cannot be contradicted, so the
+> only thing that can happen to it is that it rots. Across the 302 configs that
+> carried a `metadata:` block there were 59 distinct keys, five of them the
+> wreckage of an unquoted comma, and `generator:` named a script that no longer
+> existed in 156 of them. They were also not free: `_canonical_bytes!` hashes
+> every key of the spec, so rewording a comment renamed the run and orphaned its
+> cache. They are now unknown keys and warn like any typo. Use a YAML comment
+> (`#`), which never reaches the hasher. The 302 blocks are preserved verbatim
+> in `docs/validation/config_metadata_blocks.toml`.
 
 ## Pipeline-step envelope
 

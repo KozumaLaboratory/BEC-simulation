@@ -102,6 +102,41 @@ _dated(text) = occursin(r"^> \*\*FROZEN \d{4}-\d{2}"m, first(text, 600))
         @test offenders == String[]
     end
 
+    @testset "the reference's top-level table IS the schema's key set" begin
+        # yaml_schema_reference.md's "Top-level keys" table is a TRANSCRIPTION
+        # of TOP_LEVEL_KEYS, so it drifts by construction. It listed `metadata`,
+        # `name`, `notes` and `version` as accepted ("free-form, ignored at
+        # runtime") after they were deleted on 2026-08-04 — the exact keys whose
+        # deletion this repository had just committed.
+        ref = joinpath(_REPO, "docs", "reference", "yaml_schema_reference.md")
+        if !isfile(ref)
+            @test_skip "reference not present"
+        else
+            txt = read(ref, String)
+            i = findfirst("## Top-level keys", txt)
+            j = findnext("Any other top-level", txt, last(i))
+            @test i !== nothing && j !== nothing
+            section = txt[last(i):first(j)]
+            documented = Set(
+                String(m.captures[1])
+                for m in eachmatch(r"\|\s*`([a-z_]+)`\s*\|", section)
+            )
+            schema = Set(String.(collect(TOP_LEVEL_KEYS)))
+            extra = sort(collect(setdiff(documented, schema)))
+            missing_keys = sort(collect(setdiff(schema, documented)))
+            isempty(extra) ||
+                println("  reference documents keys the schema rejects: ", join(extra, " "))
+            isempty(missing_keys) ||
+                println("  schema keys the reference omits: ", join(missing_keys, " "))
+            @test extra == String[]
+            @test missing_keys == String[]
+            # The extraction must actually find rows, or both sets are empty and
+            # the comparison is vacuous — which is exactly what my first regex
+            # did (it anchored to line start and matched nothing).
+            @test length(documented) >= 8
+        end
+    end
+
     # POSITIVE CONTROL on the scanner: it must SEE a planted occurrence, or
     # "no offenders" means "the scanner is blind".
     @testset "positive control: the scanner reads yaml fences" begin
