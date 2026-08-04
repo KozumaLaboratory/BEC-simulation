@@ -131,6 +131,53 @@ So the residual is in the transfer, not the loss: the cascade out of m = −6 ru
 faster in the simulation than in the experiment. Same statement, same sign, as
 the Fig. 4B residual.
 
+## 6. The transfer rate: `c1_ratio` is excluded, `q` dominates
+
+Four arms, two points per parameter around their shipped values — a sensitivity
+table, not a scan (`runs/matsui_fit/xfer_*.yaml`, tasks 50–53). rms against the
+experiment in absolute number, 1–40 ms; the number to move is m = −6's 0.0926.
+
+| arm | c₀ / c₁ | m = −6 | m = −5 | m = −4 | m = −3 | m = −2 |
+|---|---|---|---|---|---|---|
+| **baseline** r = 1/36, q = 1 Hz | 1640.5 / 45.57 | **0.0926** | 0.0473 | 0.1497 | 0.0497 | 0.1667 |
+| r = 1/72 | 2187.4 / 30.38 | 0.1408 | 0.0710 | 0.1630 | 0.0573 | 0.0408 |
+| r = 1/9 | 656.2 / 72.91 | 0.1292 | 0.1563 | 0.1462 | 0.0509 | 0.0377 |
+| q = 0 | 1640.5 / 45.57 | **0.0726** | 0.0531 | 0.2238 | 0.0467 | 0.0653 |
+| q = 10 Hz | 1640.5 / 45.57 | 0.3105 | 0.0387 | 0.1916 | 0.1136 | 0.1151 |
+
+`c₀` and `c₁` are not independent — `a_s` fixes both through
+`c₀ + 36c₁ = c_total` — so both are quoted. The `r = −1/36` singularity is far
+from every candidate.
+
+**`c1_ratio` is excluded.** It makes m = −6 worse in *both* directions, by +0.048
+and +0.037 across a factor of 8 in `r`. Their 1/36 is a local optimum for this
+observable, and no value of `c1_ratio` brings m = −6 to the experiment. That is
+consistent with the independent ring-count bound (0.0139 < r ≤ 0.0278) and with
+the earlier finding that `c1_ratio` does not move the Fig. 4B dip either.
+
+**`q` dominates.** 0 → 10 Hz moves m = −6's rms from 0.073 to 0.311 monotonically,
+and the depolarisation runs 1.4–1.8× faster at 10 Hz at every time sampled. Their
+code supplies `ZeemanQ = 1.0 Hz` as a **literal**, where B = 2.6 nT implies
+q/h ~ 10⁻⁶ Hz. That discrepancy was already on the books; this is the first
+measurement of what it costs.
+
+!!! warning "The `q` arms confound rate with detuning"
+    `q` also moves the resonance **position** — q/h = 1 Hz shifts the m = −6 → −5
+    spacing by 11 Hz out of 42.3, i.e. 0.68 nT of resonance position. Held at
+    B = 2.6 nT, these two arms changed the detuning as well as the rate. So
+    *"q is the sensitive knob"* is established and *"the transfer is over-driven
+    because q is wrong"* is not.
+
+    `xfer_q0_b{m,p}` bracket the shift without assuming its sign: q = 0 at
+    B = 1.92 and 3.28 nT. Criterion recorded before launch — the better of the two
+    landing near 0.073 makes the improvement a rate effect, near 0.093 makes it a
+    detuning effect and clears `q`.
+
+    Also recorded there: the effective field comes from the **scan override**
+    `pipeline.1.B.Bz.to`, and the inline pipeline `to:` is overwritten. The first
+    draft of those two configs patched only the inline value, which would have run
+    both arms at 2.6 nT.
+
 ## What is left
 
 
