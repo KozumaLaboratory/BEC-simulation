@@ -1,6 +1,7 @@
 # `runs/matsui_fit/` — Matsui et al. の実験に対するパラメータ探索
 
-**先に読む**: `docs/validation/matsui_experiment_parameters.md`（論文からの一次引用）。
+**先に読む**: `docs/validation/matsui_campaign_report.md`（何が確立し、何が棄却され、
+どこで止まったか）。論文の一次引用は `docs/validation/matsui_experiment_parameters.md`。
 経緯と撤回は [issue #299](https://github.com/KozumaLaboratory/BEC-simulation/issues/299)。
 
 ## 二つの track を混ぜないこと
@@ -124,20 +125,26 @@ m=-6 の残差は転送にあるので、これまで彼らのコードの値に
 
 分解能は効かない: 32/64/128³ で我々の値はほとんど動かない（雲の大きさ 1.4 %、m=−6 は 3 %）。
 
-## 撤回済みの arm（21 本）
+## 撤回済みの arm（21 本、config は削除）
 
-前提が誤っていたもの。**削除せず、何をなぜ測ったかの記録として残しています。**
-各ファイル冒頭に撤回バナーがあります。
+**論文を読む前**に走らせたもの。Results 冒頭と Appendix D・E を読めば一本も
+要りませんでした。config 本体は削除し、記録はこの表に残します — 各ファイルの
+撤回バナーは同じ前提を 21 回繰り返していただけで、情報は行あたり一つでした。
 
-| prefix | 本数 | 誤った前提 |
-|---|---|---|
-| `fit_c1ratio_` | 9 | c1 が唯一の自由パラメータ（実際は 1/36 が決定済みで、dip には効かない）|
-| `fit_expN_` | 3 | N は実験のショット平均 38161（実際は 5e4、熱的成分は negligible）|
-| `fit_k3_` / `fit_k3real_` | 6 | 損失機構が不明（実際は m ≠ −6 が関与するスピン**依存**三体衝突）|
-| `fit_hold_` | 3 | 幅が保持時間の Fourier 限界（実際は双極子場の空間的広がり）|
+| prefix | 本数 | 誤った前提 | 実際 |
+|---|---|---|---|
+| `fit_c1ratio_` | 9 | c1 が唯一の自由パラメータ | 1/36 は空間プロファイルで決定済みで、dip には効かない |
+| `fit_expN_` | 3 | N は実験のショット平均 38161 | 5e4（さらに彼らのコードは 3.5e4）、熱的成分は negligible |
+| `fit_k3_` / `fit_k3real_` | 6 | 損失機構が不明 | m ≠ −6 が関与するスピン**依存**三体衝突 |
+| `fit_hold_` | 3 | 幅が保持時間の Fourier 限界 | 双極子場の空間的広がり |
 
-これらは**論文を読む前**に走らせたものです。Results 冒頭と Appendix D・E を読めば一本も
-要りませんでした。再発防止は CLAUDE.md の「計算する前の 5 つのゲート」。
+再発防止は CLAUDE.md「計算する前の 5 つのゲート」。経緯は
+[issue #299](https://github.com/KozumaLaboratory/BEC-simulation/issues/299)、
+到達した結論は `docs/validation/matsui_campaign_report.md`。
+
+**注意**: `sdloss_*` はこの表に**入りません**。本文に「以前の K3 走査（撤回済み）」と
+*他の* arm を参照する行があるので語で検索すると引っかかりますが、それ自体は
+K3 = 2.6e-28 を出した較正シリーズで、生きています。
 
 ## 実行
 
