@@ -26,7 +26,7 @@ rc=${PIPESTATUS[0]}; echo "### smoke rc=$rc"
 # split by the shell before UGE ever sees it — "Unable to read script file because
 # of error: error opening 40000". Nothing about a space-containing value survives
 # that path, so the config is passed as separate names.
-CFG="${CFG_N:-64} ${CFG_STEPS:-40000} ${CFG_C1:-0.05} ${CFG_LHY:-polar_contact}"
+CFG="${CFG_N:-64} ${CFG_STEPS:-40000} ${CFG_C1:-0.05} ${CFG_LHY:-polar_contact} ${CFG_DT:-0.002}"
 echo; echo "### PRODUCTION n/steps/c1/lhy = ${CFG}"
 $JULIA --project=. bench/itp_fused_chain_accuracy.jl ${CFG} 2>&1 | grep --line-buffered -vE "$CUDA_NOISE"
 echo "ALL DONE $(date)"
