@@ -1,6 +1,13 @@
 > **FROZEN 2026-08-04.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 
+This file is the RAW output of the audit workflow, kept verbatim. It is
+machine output, not prose: the body is fenced so that markdown does not
+reinterpret it and so that the paths quoted inside it — several of which
+are (gone), like `runs/_loop`, retired 2026-06-08 — are read as data
+rather than as this repository citing them.
+
+```json
 {
   "summary": "Harvest every measurement and cause-isolation already performed across the repo into one re-readable ledger, with precision, controls, and what was ruled out",
   "agentCount": 8,
@@ -194,3 +201,4 @@
   "totalTokens": 3050528,
   "totalToolCalls": 426
 }
+```
