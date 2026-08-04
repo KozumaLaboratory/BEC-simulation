@@ -105,6 +105,32 @@ using SpinorBEC: ground_state_preflight, print_preflight, passed
         @test occursin("SHIPPED DEFAULT", r.summary)
     end
 
+    @testset "near the −1/F² pole, a large c₀ is flagged as CANCELLATION" begin
+        # c₀ + 36c₁ is what the scattering data fixes; near the pole c₀ and c₁ blow
+        # up individually while cancelling, and the measured ITP dt limit tracks
+        # the SUBSTEP rather than the physics (7× the combination at fixed c₀ left
+        # the limit unchanged). So a large c₀ of that kind is a numerical trap, not
+        # a strong interaction.
+        c_total, F2 = 4687.3, 36
+        r = -0.024
+        c0 = c_total / (1 + F2 * r)
+        near = ground_state_preflight(;
+            interactions=InteractionParams(Dict(0 => c0, 1 => r * c0)),
+            c_dd=211.0, spinor_lhy=:polar_contact, method=:lbfgs)
+        @test passed(near)                       # a caveat, not a blocker
+        @test occursin("CANCELLATION", near.summary)
+        @test occursin("dt-free", near.summary)
+
+        # And a point with the SAME physics but no cancellation must NOT be
+        # flagged, or the rule is "large c₀ is bad" rather than "cancelling c₀ is
+        # misleading".
+        plain = ground_state_preflight(;
+            interactions=InteractionParams(Dict(0 => c_total, 1 => 0.0)),
+            c_dd=211.0, spinor_lhy=:polar_contact, method=:lbfgs)
+        @test passed(plain)
+        @test !occursin("CANCELLATION", plain.summary)
+    end
+
     @testset "the report states what it does NOT cover" begin
         buf = IOBuffer()
         print_preflight(
