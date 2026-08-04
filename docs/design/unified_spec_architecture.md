@@ -614,14 +614,15 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-04. Seven of the fourteen ids are resolved, across five of the
-twelve items; seven ids remain.**
+**Status, 2026-08-04. Eight of the fourteen ids are resolved, across six of the
+twelve items; six ids remain.**
 
 | item | ids | how |
 |---|---|---|
 | 1 | A2:R-OPEN-03, A5:R-NIX-03B | measured — the document's own "largest single unknown" |
 | 2 | A2:R-OPEN-01 | measured |
 | 3 | A2:R-OPEN-05 | measured — mean 1.24 against a threshold of 3 |
+| 5 | A2:R-ENS-01 | **fixed in code** — plus a second defect found while fixing it |
 | 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
 | 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
 
@@ -740,12 +741,35 @@ this is what promotion looks like.
    way, but S1's severity is still unmeasured. `kill -INT` is verified
    uncatchable in Julia script mode; whether UGE delivers something catchable at
    the `h_rt` boundary is not.
-5. **A2:R-ENS-01 — the TWA ensemble.** `grep -n isfinite src/solvers/twa.jl`
-   returns nothing, and `_welford_update!` is in-place and cumulative, so one
-   diverging member NaNs the mean for every later member. The ledger gives each
-   member a name and the diverging member a refusal — but that requires a change
-   inside `twa.jl` that this document specifies only in shape, not in detail.
-   33 configs under `runs/` use `twa:`.
+5. **A2:R-ENS-01 — the TWA ensemble. FIXED 2026-08-04.** The row said the
+   repair "requires a change inside `twa.jl` that this document specifies only
+   in shape, not in detail". The detail turned out to be small, and the row was
+   right about the defect: `grep isfinite src/solvers/twa.jl` returned nothing,
+   `_welford_update!` is cumulative and in place (`mean[I] += delta / i`), so
+   one diverging member NaNed the mean and the variance for every member after
+   it, with no recovery and no record — a 200-member ensemble returning an
+   all-NaN answer with `n_trajectories` still reading 200. 33 configs use
+   `twa:`.
+
+   `_all_finite(traj_obs)` now refuses a member before it is folded in, and the
+   refusal is recorded: `EnsembleResult.rejected::Vector{Int}`, a vector rather
+   than a count so that "none rejected" and "rejections not tracked" cannot look
+   alike, and so a caller can name the member. Checked at the OBSERVABLE, not at
+   ψ — an ensemble is a statement about its observables, and a trajectory can be
+   finite in ψ while producing a non-finite observable.
+
+   **A second defect, found while fixing the first and quieter than it.** The
+   variance divided M2 by `n_traj`, the number of trajectories REQUESTED. Adding
+   a rejection path without touching that denominator would have inflated the
+   sample count and biased the variance low — a wrong number in place of an
+   obvious NaN. Both the Welford weighting and the denominator now use the
+   contributing count.
+
+   Gated by `test/solvers/test_twa_rejects_diverged_members.jl`. Worth recording
+   about the gate itself: its first version tested the predicate, the weighting
+   and the record, and **stayed green when the rejection branch was disabled
+   outright** — every piece was covered and nothing checked that the loop
+   CONSULTS them. It now asserts that too.
 
 **Two the row proposed to register rather than repair — and neither survived
 that disposition.** One was repaired because a register entry for it would have
