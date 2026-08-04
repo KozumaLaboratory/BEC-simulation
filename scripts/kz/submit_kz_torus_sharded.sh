@@ -28,6 +28,27 @@ NTRAJ="${SBEC_NTRAJ:-1000}"
 NSHARD=16
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia
 echo "[kzprod] host=$(hostname) md=$MD ntraj=$NTRAJ shards=$NSHARD"
+# Refuse a dirty tree. provenance records what the job READ; it cannot know
+# whether that is what the submitter INTENDED. Twice in one day an rsync had not
+# landed — once the remote spgpe.jl matched neither the commit nor what I believed
+# I had sent, once measurement_provenance.jl was a formatter revision behind — and
+# both were caught only by comparing md5s by hand.
+#
+# This is only enforceable because the tree is now synced with
+# scripts/kz/sync_tsubame.sh (git fetch + reset --hard) rather than by rsyncing
+# individual files, which left it permanently dirty. A gate that every run
+# overrides is worse than no gate, so the sync method had to change first.
+git fetch -q origin 2>/dev/null || true
+DIRTY=$(git status --porcelain | wc -l)
+BEHIND=$(git rev-list --count HEAD..origin/HEAD 2>/dev/null || echo 0)
+echo "[kzprod] HEAD=$(git rev-parse --short HEAD) dirty=$DIRTY behind=$BEHIND"
+git status --porcelain | head -20
+if [ "${SBEC_ALLOW_DIRTY:-0}" != "1" ] && [ "$DIRTY" -ne 0 ]; then
+    echo "[kzprod] FAIL: $DIRTY uncommitted change(s). A measurement from an"
+    echo "[kzprod]       unrecorded tree cannot be reproduced. Commit, or set"
+    echo "[kzprod]       SBEC_ALLOW_DIRTY=1 to say the mismatch is deliberate."
+    exit 1
+fi
 echo "[kzprod] md5=$(md5sum docs/guides/figures/kz_toroidal_winding.jl | cut -d' ' -f1)"
 pids=""
 for i in $(seq 1 $NSHARD); do
