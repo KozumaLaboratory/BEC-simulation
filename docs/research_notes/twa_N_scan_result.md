@@ -27,7 +27,7 @@ Auto-derived couplings via `compute_c_total(Eu151; N_atoms, omega_ref=691.15)`:
 
 N=10³  → c_total ≈   93.7,  c_dd ≈   4.22 N=10⁴  → c_total ≈  937.5,  c_dd ≈  42.20    (Eu natural baseline) N=10⁵  → c_total ≈ 9374.5,  c_dd ≈ 422.0
 
-ε_dd = c_dd / c_total ≈ 0.045 stays N-independent (as expected for a species-fixed scan). The scan therefore probes Eu's dipolar collapse threshold through `c_dd × n_peak`, which scales super-linearly in N because `n_peak` itself grows weakly with the coupling.
+c_dd / c_total ≈ 0.045 stays N-independent (as expected for a species-fixed scan). That ratio is **not** ε_dd: the workspace `c_dd` is the per-unit-spin coupling, so the Lima-Pelster parameter is ε_dd = c_dd·F²/(3·g_2F) (`src/workflow/initialization/make_workspace.jl:833`) = 0.045 × 12 ≈ 0.54, i.e. the a_dd/a_s ≈ 0.55 quoted in `twa_eps_dd_scan.md`. The scan therefore probes Eu's dipolar collapse threshold through `c_dd × n_peak`, which scales super-linearly in N because `n_peak` itself grows weakly with the coupling.
 
 ## Finding A: collapse threshold bracketing
 

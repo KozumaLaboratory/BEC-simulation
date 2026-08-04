@@ -63,7 +63,7 @@ Calibration block (`p_mv` + `coil_mode`) auto-converts to a Gauss
 The `B_direction.phi: {rate: X}` form takes a dimensionless rate. Klaus
 226 Hz at ω_ref = 2π·50 Hz is `4.524`, not `226`. Use the Hz string
 form (`"226 Hz"`) if you want the system to do the conversion. The
-dimensionless form silently runs at 36× the intended frequency — this
+dimensionless form silently runs at 50× the intended frequency — this
 costs an evening if you miss it.
 
 ## DDI behaviour in the Klaus regime

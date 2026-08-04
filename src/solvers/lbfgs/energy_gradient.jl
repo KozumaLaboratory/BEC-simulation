@@ -47,9 +47,14 @@ Covered terms: kinetic, trap (incl. centrifugal modification when
 `rotating_frame_omega ≠ 0`), c₀, LHY, c₁ spin, light shift, DDI, and
 the Coriolis `−Ω·L_z·ψ` orbital piece of the rotating-frame functional.
 
-NOT covered: c₂ singlet-pair and tensor-cache higher-rank channels
-(c₄, c₆, …). For those, `find_ground_state_lbfgs` emits a warning and
-the caller should fall back to ITP.
+Covered since 2026-06-09: c₂ singlet-pair and the tensor-cache higher-rank
+channels (c₄, c₆, …). This docstring said they were NOT covered and that
+`find_ground_state_lbfgs` warns and falls back to ITP; both stopped being
+true when this function became registry-only — it iterates
+`build_h_terms_registry` (`:77`, `apply_operator_via_registry!`), so every
+`HamTerm` including `TensorTerm` contributes. FD-gated by
+`test/oracles/test_term_consistency.jl`. CLAUDE.md records the same under
+"Tensor c2/c4 ARE in `energy_gradient!`".
 
 `k_squared_dev` must live on the same device as `psi` (defaults to
 `ws.grid.k_squared`, which only works on CPU). L-BFGS on GPU should

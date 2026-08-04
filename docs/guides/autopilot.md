@@ -345,11 +345,10 @@ without spending GPU·h.
 
 ### Day-1 recipes (`setup_default_recipes!()`)
 
-Four starters at `autonomy_level=:suggest` by default:
+Three starters at `autonomy_level=:suggest` by default:
 
 - `:next_random_in_bounds` — warmup random sampling within `[lo, hi]`
 - `:refine_around_best` — hierarchical ±scale refinement
-- `:twin_with_loss_off` — auto-twin every parent (K3-off control)
 - `:analyze_majorana` — analysis-only pass
 
 ## Observability + watchdog

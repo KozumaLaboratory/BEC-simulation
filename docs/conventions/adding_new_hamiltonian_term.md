@@ -53,10 +53,11 @@ function energy_contribution(term::YourTerm, psi, ws)
     return 0.0
 end
 
-function add_gradient!(grad, term::YourTerm, psi, ws)
-    # Add δE/δψ̄ contribution. NO factor of 2 (energy_gradient! adds it
-    # at the end). Mirror `_grad_*` patterns for spinor matrix
-    # multiplication.
+function apply_operator!(out, term::YourTerm, ws, psi)
+    # ACCUMULATE the δE/δψ̄ contribution: `out .+= H·ψ`. Gate on the
+    # coupling first and return early when inactive; never `fill!` inside
+    # (callers zero `out` for the bare action). NO factor of 2 —
+    # `energy_gradient!` applies the Wirtinger ×2 at the end.
     return nothing
 end
 

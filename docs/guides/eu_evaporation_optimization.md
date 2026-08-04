@@ -14,7 +14,8 @@ Thomas–Fermi condensate; forced evaporation cools the thermal cloud while **th
 $\propto K_3\langle n^2\rangle$ depletes the dense condensate**. Two knobs attack that loss:
 
 - **Dilute** — loosen the trap ($\bar\omega\downarrow$). Peak density $n_0\propto\bar\omega^{6/5}$,
-  so the condensate loss rate $\propto\bar\omega^{3}$ falls fast. But $T_c\propto\bar\omega$ also
+  so the condensate loss rate $\propto\langle n^2\rangle\propto\bar\omega^{12/5}$ falls fast
+  (long-time attractor $N_0\propto\bar\omega^{-3}$). But $T_c\propto\bar\omega$ also
   falls, so over-loosening **melts** the condensate.
 - **Feshbach** — lower the scattering length $a_s$. The three-body coefficient is universal,
   $K_3\propto a_s^4$, so a modest $a_s$ cut collapses the loss.

@@ -116,8 +116,11 @@ $N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as $T\to0$
 the right qualitative melting, with the SGPE points sitting BELOW the analytic
 curve because the classical field is Rayleigh–Jeans over-populated, as expected.
 
-**Cutoff sensitivity**: $N_0$ spread $30\%$ vs thermal $79\%$
-over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
+**Cutoff sensitivity**: over the narrow $k_\mathrm{cut}\in[4.6,8.0]$ window the
+$N_0$ spread is $30\%$ vs thermal $79\%$ — but that window is not convergence.
+See "Honest cutoff limitation" above: on the wider $64^3$/$96^3$ scan $N_0$ falls
+monotonically with $k_\mathrm{cut}$ and does not flatten under grid refinement, so
+the absolute equilibrium $N_0$ is not a converged observable.
 
 **Shape trade-off** (prep SGPE at $T/T_c=0.5$ → closed ramp +
 $K_3$, all at fixed $k_\mathrm{cut}$, four protocols at the model point):

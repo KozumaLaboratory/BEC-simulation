@@ -13,10 +13,15 @@ Every key accepted under a YAML `dynamics:` step. Multiple knobs that return `on
 
 | key                          | type     | default | meaning                                   |
 |------------------------------|----------|---------|-------------------------------------------|
-| `save_every`                 | Int      | 1       | record observables / snapshots every N steps |
-| `save_psi_snapshots`         | Bool     | false   | stream ψ to scratch JLD2 (`frame_NNNNN`)    |
-| `save_snapshot_precision`    | "f32"\|"f64" | "f32" | downcast precision for streamed snapshots  |
-| `save_snapshot_compression`  | Bool     | false   | zlib-compress streamed snapshots            |
+| `save.every`                 | Int      | 1       | record observables / snapshots every N steps |
+| `save.n_snapshots`           | Int      | —       | OR fix the snapshot count instead of the stride |
+| `save.psi`                   | Bool     | false   | stream ψ to scratch JLD2 (`frame_NNNNN`)    |
+| `save.precision`             | "f32"\|"f64" | "f32" | downcast precision for streamed snapshots  |
+| `save.compression`           | Bool     | false   | zlib-compress streamed snapshots            |
+
+All five live inside one `save:` mapping (`SAVE_SCHEMA`). The flat spellings
+`save_every` / `save_psi_snapshots` / `save_snapshot_precision` /
+`save_snapshot_compression` are unknown keys and abort a strict-mode load.
 
 Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set `SPINORBEC_SCRATCH_DIR` to redirect the scratch `.tmp`.
 

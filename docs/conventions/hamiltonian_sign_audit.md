@@ -65,13 +65,22 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 
 ## Sign × path audit table
 
+<!-- The "Sign convention" column states the DIMENSIONLESS coefficient's
+     direction, not the lab field's. Until 2026-08-04 the linear-z row read
+     "+p ⇒ ⟨F_z⟩>0; for g_F>0 that is −Bz, since p ≡ −g_F μ_B B", which is wrong twice over: p ≡ -g_F μ_B B, so +p is
+     NEGATIVE Bz, and the chain then contradicted this file's own text above.
+     The transverse rows are different — there +bx really is physical +Bx, with
+     no g_F factor between them — so the two rows now say so explicitly rather
+     than looking parallel. Decided by test/oracles/test_hamiltonian_sign_oracles.jl:30-45
+     and :60-70, whose comments state exactly this. -->
+
 | Term | Sign convention | Propagator path | Energy CPU | Energy GPU | Gradient | Directional test |
 |---|---|---|---|---|---|---|
 | **Kinetic** `+½k²` | universal | `apply_kinetic_step_batched!` (`split_step_kernels.jl`) | `_kinetic_energy` (`energy.jl:34`) | mirrors CPU (`gpu_energy.jl:110`) | `_grad_kinetic!` (`energy_gradient.jl:100`) | implicit via norm conservation |
 | **Trap** `+V(r)` | universal | inside `_diagonal_step!` (`propagators.jl`) | `_trap_energy` (`energy.jl:35`) | mirrors CPU (`gpu_energy.jl:111`) | `_grad_trap!` (`energy_gradient.jl:144`) | none yet — TODO |
-| **Linear z-Zeeman** `H = -p·F_z` | +p ⇒ +Bz ⇒ ⟨F_z⟩>0 | inside `_diagonal_step!` via `zeeman_diagonal` (`zeeman.jl:9`) | `_zeeman_energy` (`energy.jl:165`) | mirrors CPU (`gpu_energy.jl:113`) | `_grad_zeeman!` (`energy_gradient.jl:152`) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:37` |
+| **Linear z-Zeeman** `H = -p·F_z` | +p ⇒ ⟨F_z⟩>0; physical +Bz ⇒ p<0 ⇒ ⟨F_z⟩<0 | inside `_diagonal_step!` via `zeeman_diagonal` (`zeeman.jl:9`) | `_zeeman_energy` (`energy.jl:165`) | mirrors CPU (`gpu_energy.jl:113`) | `_grad_zeeman!` (`energy_gradient.jl:152`) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:37` |
 | **Quadratic z-Zeeman** `H = +q·F_z²` | +q ⇒ E ~ +m² ⇒ favors m=0 | as linear z | as linear z | as linear z | as linear z | none yet — TODO |
-| **Transverse x-Zeeman** `H = -bx·F_x` | +bx ⇒ +Bx ⇒ ⟨F_x⟩>0 | `_apply_transverse_zeeman_step!` (`split_step.jl:154`) **uses `-bx`** | inside `_zeeman_energy` via `zeeman_at` (`energy.jl:165`) — currently CPU treats bx as part of zeeman vector; sign? **TODO verify** | mirrors CPU via `zeeman_at` (`gpu_energy.jl:112-113`) — **TODO verify** | `_grad_zeeman!` only handles diagonal; **does NOT include transverse — known gap, see notes** | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:64` (post-2026-06-04 fix) |
+| **Transverse x-Zeeman** `H = -bx·F_x` | +bx ⇒ ⟨F_x⟩>0, and here +bx IS physical +Bx | `_apply_transverse_zeeman_step!` (`split_step.jl:154`) **uses `-bx`** | inside `_zeeman_energy` via `zeeman_at` (`energy.jl:165`) — currently CPU treats bx as part of zeeman vector; sign? **TODO verify** | mirrors CPU via `zeeman_at` (`gpu_energy.jl:112-113`) — **TODO verify** | covered — one `ZeemanTerm` carries diagonal + transverse (`terms/zeeman.jl`), and `apply_operator!` branches on `_has_transverse` ([GAP-1] closed 2026-06-04) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:64` (post-2026-06-04 fix) |
 | **Transverse y-Zeeman** `H = -by·F_y` | as x | as x | as x | as x | as x | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:89` |
 | **Coriolis (orbital)** `H = -Ω·L_z` | +Ω ⇒ descent on -L_z ⇒ ⟨L_z⟩>0 (vortex amplification in IT) | `_apply_coriolis_step!` (`split_step_kernels.jl:20`), 3-shear with `(tanh, -sinh, tanh)` / `(tan, -sin, tan)` post-2026-06-03 audit | `E_coriolis = -Ω·⟨L_z⟩` (`energy.jl:98`) | added 2026-06-04 fix (`gpu_energy.jl:170-181`) | `_grad_coriolis!` (`energy_gradient.jl:117`) | **✓** `test/solvers/test_simulation.jl:253` + `test/oracles/test_hamiltonian_sign_oracles.jl:117` |
 | **Barnett (spin)** `H = -Ω·F_z`, via `p_eff = p+Ω` | +Ω ⇒ effective Zeeman stronger ⇒ ⟨F_z⟩>0 | `_shift_zeeman_for_rotating_frame` (`make_workspace.jl:372`) post-2026-06-02 fix | folds into `_zeeman_energy` via shifted p | folds into shifted p | `_grad_zeeman!` via shifted p | **✓** `test/rotating_basis/test_rotating_frame_regression.jl:60` + `test/oracles/test_hamiltonian_sign_oracles.jl:139` |
@@ -79,7 +88,7 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 | **c1 spin** `H = (c1/2)·\|F\|²` | sign of c1 picks polar (>0) or FM (<0) | inside `_apply_spin_mixing_step!` | `_spin_interaction_energy` (`energy.jl:45`) | mirrors CPU (`gpu_energy.jl:121-126`) | `_grad_c1_spin!` (`energy_gradient.jl:183`) | partial: F=1 Rb87 (c1<0) → FM, F=1 Na23 (c1>0) → polar in `test_simulation.jl:6-50` — implicit oracle |
 | **DDI** see CLAUDE.md "Conventions" | `Q_αβ(k=0) = 0`, `Q_αβ = k̂_αk̂_β - δ_αβ/3` | `apply_ddi_step!` (`interactions/ddi/`) | `_ddi_energy` (`energy.jl:50`) | `_ddi_energy_from_gpu` (`gpu_energy.jl:128`) | `_grad_ddi!` (`energy_gradient.jl:229`) | none — TODO add oblate dipole alignment direction |
 | **LHY** `~ +c_lhy·n^(5/2)` | c_lhy>0 (repulsive) | inside `_diagonal_step!` | `_lhy_energy` (`energy.jl:63-69`) | mirrors CPU (`gpu_energy.jl:146-152`) | `_grad_lhy!` (`energy_gradient.jl:172`) | none — TODO repulsion direction |
-| **Tensor (c2, c4, ...)** | per S-channel coupling | `_apply_singlet_pair_step!`, `_apply_tensor_step!` | `_singlet_pair_energy`, `_tensor_interaction_energy` (`energy.jl:71-79`) | mirrors CPU (`gpu_energy.jl:154-162`) | NOT covered in `energy_gradient!` (LBFGS falls back to ITP) | none — TODO |
+| **Tensor (c2, c4, ...)** | per S-channel coupling | `_apply_singlet_pair_step!`, `_apply_tensor_step!` | `_singlet_pair_energy`, `_tensor_interaction_energy` (`energy.jl:71-79`) | mirrors CPU (`gpu_energy.jl:154-162`) | covered — `energy_gradient!` is registry-only since 2026-06-09, so `TensorTerm` contributes like every other slot; FD-gated in `test_term_consistency.jl` | none — TODO |
 | **Raman** depends on Ω_R, detuning δ | per `apply_raman_step!` | `apply_raman_step!` (`raman.jl`) | `_raman_energy` (`energy.jl:81-85`) | mirrors CPU (`gpu_energy.jl:164-168`) | not covered | none |
 | **Light shift** `±ls_amp·\|ψ_m\|²·profile(r)` per m | per `apply_light_shift_step!` | inside `_diagonal_step_with_ls!` (`propagators.jl`) | `_light_shift_energy` (`energy.jl:87-91`) | added 2026-06-04 fix (`gpu_energy.jl:170-174`) | `_grad_light_shift!` (`energy_gradient.jl:206`) | none |
 | **Magnetic gradient** `+g_F·grad·x_axis` to V | direct addition to V | inside `_apply_mg_to_V!` (`split_step.jl:130`) | folds into V_trap | folds into V_trap | folds into trap gradient | none |

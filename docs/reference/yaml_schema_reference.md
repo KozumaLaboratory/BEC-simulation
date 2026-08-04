@@ -107,7 +107,7 @@ a typo warning.
 | `seed_mode` | dict | — | deterministic single-k seed; see block below |
 | `hard_polarize` | Real [-12, 12] | — | force `<F_z>=value` at step start |
 | `noise_seed` | Number | random | RNG seed for thermal / mode noise |
-| `integrator` | strang / yoshida / adaptive / richardson / yoshida4 / yoshida6 / cfet4 | strang | standard path uses first four; rotating_basis uses last four |
+| `integrator` | standard: strang / midpoint / rk4ip — rotating_basis: strang / yoshida4 / yoshida6 / cfet4 | strang | any other value raises `ArgumentError`; `yoshida` / `adaptive` / `richardson` are NOT implemented on the standard path (`_resolve_dynamics_stepper`, `run_step_dynamics.jl:463`) |
 | `backend` | cpu / gpu | inherited | per-step override |
 | `kind` | binary / rotating_basis | inherited | per-step solver override |
 | `B_direction` | dict | — | rotating_basis only |
@@ -336,7 +336,6 @@ Accepts a Number / Bool (scalar shortcut) or a Dict with these keys:
 | `L3_per_m` | Vector | per-component L3 (legacy linear-in-n) |
 | `K3_cubic` | Number | [0, 1e10] — m-independent true 3-body |
 | `K3_per_m_cubic` | Vector | per-component true 3-body (dimless) |
-| `K3_per_m` | Vector | dimless alias of `K3_per_m_cubic` |
 | `K3_per_m_si` | Vector | SI-unit strings (`"3.5e-30 cm^6/s"`) |
 | `evap_energy_cutoff` | Number | [0, 1e10] — single-particle ε cutoff |
 | `evap_rate` | Number | [0, 1e10] — rate coefficient |
@@ -439,13 +438,12 @@ at parse time.
 
 ### `photon_scattering`
 
-Either `Gamma_sc` (canonical) or `gamma_sc` (lowercase alias accepted by
-the parser) is required.
+`Gamma_sc` is required. The lowercase `gamma_sc` alias was removed
+2026-05-24 and now raises `ArgumentError` (`pipeline_callbacks.jl:45`).
 
 | key | type | range |
 |---|---|---|
 | `Gamma_sc` | Number | [0, 1e10] |
-| `gamma_sc` | Number | [0, 1e10] |
 | `seed` | Int | — |
 
 ### `live_monitor`

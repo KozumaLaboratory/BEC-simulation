@@ -59,7 +59,10 @@ nematic, tensor) and threaded through `_dispatch_diagonal_step!` +
 - **Composition-based Yoshida4 (midpoint) recovers order 4** at coarse dt; Yoshida6
   (midpoint) lands at the reference noise floor (~5e-10 from Strang dt=2e-5 ref)
   so its true order can't be read off this bench but is qualitatively high.
-- **Richardson-based MPS-4 (midpoint) stays at order ~1**. Picard converged to
+- **Richardson-based MPS-4 (midpoint) stays at order ~1** — **SUPERSEDED by A2.2
+  below.** The three errors 1.44e-9 / 5.78e-10 / 5.32e-10 sit at this bench's own
+  ~5e-10 reference floor, so o12 = 1.32 is floor-contaminated, not an order; against
+  A2.2's Y6-mid dt=1e-5 reference the same scheme measures order 3.20. Picard converged to
   fixed point by iter 2 (‖p1-p2‖ ≈ 2e-11 at h=4e-3, ‖p2-p3‖ ≈ 2e-15), so the
   failure isn't a predictor accuracy issue: it's structural. S(h) and S(h/2)²
   in MPS-4 evaluate the midpoint MF at different effective time scales which

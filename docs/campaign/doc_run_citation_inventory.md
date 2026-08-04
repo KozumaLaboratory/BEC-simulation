@@ -117,8 +117,11 @@ but they assert no result.
 `fortress_compare` is a fifth citation but the document is a **scope** doc naming
 an output path for work not yet done, so it is a plan like the figure rows.
 
-For these four there is no config to re-run and no output to compare, so the
-decision cannot be made by looking at the run. Each needs a judgement: is the
+For the two that survive the correction — `lhy_mode_ablation` and
+`twa_sinatra` — there is no config to re-run and no output to compare, so the
+decision cannot be made by looking at the run. (`sprint5_M1_multistart_groundstate`
+and `ddi_convention_factorial` are on disk with a committed producer; see the
+correction above.) Each needs a judgement: is the
 claim load-bearing enough to regenerate the run from its inline parameters — §5.2
 does state them — or should the claim be marked as resting on evidence the
 repository does not hold?

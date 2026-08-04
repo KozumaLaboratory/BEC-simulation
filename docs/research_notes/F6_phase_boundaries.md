@@ -39,8 +39,8 @@ P=polar, F=FM, C=cyclic, I=I_h. Rows: g_10, columns: g_12.
 
 Polar does not win anywhere on this slice. The other three phases each take a distinct region:
 
-* **FM** (left half): low g_10 favours the m=+F state; the FM state is insensitive to g_10 / g_12 because its single non-zero pair channel is S = 2F = 12, so its MF energy depends linearly only on g_12.
-* **I_h** (top-right): high g_10 / g_12 region.
+* **FM** (left half): low g_12 favours the m=+F state; the FM state is insensitive to g_10 because its single non-zero pair channel is S = 2F = 12, so its MF energy depends linearly only on g_12. Raising g_10 raises I_h against FM, which is why the F region reaches further right as g_10 grows.
+* **I_h** (top-right): low g_10 / high g_12 region.
 * **cyclic** (narrow middle band): a strip ~5 grid points wide between FM and I_h around (g_10 ≈ 1, g_12 ≈ 1).
 
 ## Linearised boundaries vs numerical scan

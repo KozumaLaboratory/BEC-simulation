@@ -358,7 +358,7 @@ What this does and does not say:
 - **The sign and the scale of the offset reproduce.** The dip is on the negative
   side and it is a couple of nT there — that is the resonant-EdH claim, and an
   independent implementation with independently-declared conventions lands on it.
-- **The two simulations disagree by 0.41 nT in the centre and 15 % in the width**,
+- **The two simulations disagree by 0.41 nT in the centre and 9.6 % in the width**,
   and that is larger than every kernel-convention difference bounded in §0.3.3
   combined (~0.02 nT), so it is not the `k=0` bin or the spherical truncation.
 
@@ -673,7 +673,7 @@ anything to the experiment.
 |---|---|---|---|---|---|
 | 2.1 | Linear Zeeman | `H_Z^lin = -p · F_z` so `(Hψ)_m = -p·m·ψ_m` | _to fill_ | _to fill_ | sign: p > 0 lowers m=+F |
 | 2.2 | Quadratic Zeeman | `H_Z^quad = +q · F_z²` so `(Hψ)_m = +q·m²·ψ_m` | _to fill_ | _to fill_ | sign: q > 0 raises \|m\|=F |
-| 2.3 | p relationship to B | `p = g_F · μ_B · B_z / (ℏ · ω_ref)` (dimensionless) | _to fill_ | _to fill_ | `src/foundation/units.jl` `bfield_to_p`. Sign: same sign as B_z when g_F > 0. |
+| 2.3 | p relationship to B | `p = −g_F · μ_B · B_z / (ℏ · ω_ref)` (dimensionless) | _to fill_ | _to fill_ | `src/workflow/io/units.jl` `Units.bfield_to_p` — the single declaration. Sign: **opposite** to B_z when g_F > 0, because the atomic moment is `μ = −g_F μ_B F` (Kawaguchi-Ueda). With row 2.1's `H_Z = −p·F_z` this gives `H_Z = +g_F μ_B B_z F_z`, so +B_z on a g_F>0 atom makes m=−F the ground state. See §0.3.1. |
 | 2.4 | q relationship to B | Auto-derived from \|B\|² unless explicit. Formula: see source. | _to fill_ | _to fill_ | `src/workflow/experiments/schema/B_block.jl` |
 | 2.5 | g_F sign convention | Per-atom from CODATA tables; Eu151 g_F ≈ +1.163 (positive) | _to fill_ | _to fill_ | `src/workflow/initialization/atoms.jl` |
 | 2.6 | B-field direction | Spherical: \|B\| · (sin θ cos φ, sin θ sin φ, cos θ). θ=0 ⇒ +ẑ | _to fill_ | _to fill_ | `src/workflow/experiments/schema/B_block.jl` |
