@@ -51,7 +51,13 @@ function _ws_all_terms()
     psi = ws.state.psi
     for I in CartesianIndices(size(psi)[1:3]), c in 1:size(psi, 4)
         x, y, z = grid.x[1][I[1]], grid.x[2][I[2]], grid.x[3][I[3]]
-        psi[I, c] = exp(-(x^2 + y^2 + z^2) / 4) * cis(0.3c + 0.2x) * (1 + 0.1c)
+        # Anisotropic and carrying angular momentum, both deliberately: a
+        # spherical density gives DDI energy ~0 and a linear phase gives
+        # ⟨L_z⟩ = 0, so the first version of this fixture left DDITerm and
+        # CoriolisTerm at |E| < 1e-12 and they were silently not checked.
+        # Requiring a term the fixture cannot activate is not coverage.
+        psi[I, c] = exp(-(x^2 + 1.3y^2 + 0.7z^2) / 4) *
+                    cis(0.3c + atan(y, x)) * (1 + 0.1c)
     end
     SpinorBEC._normalize_psi!(psi, grid, size(psi, 4), 3)
     ws
@@ -73,10 +79,21 @@ end
             r = energy_operator_ratio(term)
             E_own = energy_contribution(term, psi, ws, ectx)
             if isnan(r)
-                # Declared non-derivable. Allowed, but it must be a term that
-                # genuinely carries no energy — otherwise the fallback is
-                # hiding a missing declaration.
-                @test E_own == 0.0
+                # Declared non-derivable, so the registry asks the term. That is
+                # correct for a term whose energy is NOT a fixed multiple of
+                # ⟨ψ,H·ψ⟩ — LHY, whose 2/5 holds for the closed form and not for
+                # the tabulated integral — and for LossTerm, which is not in the
+                # energy functional at all. What must NOT happen is a term
+                # declaring NaN when a ratio does exist, so check that the
+                # obvious candidates do not reproduce it.
+                if abs(E_own) > 1.0e-12
+                    fill!(scratch, zero(eltype(scratch)))
+                    apply_operator!(scratch, term, ws, psi, gctx)
+                    op = _realdot(psi, scratch) * dV
+                    for cand in (1.0, 0.5, 0.4)
+                        @test !isapprox(cand * op, E_own; rtol=1.0e-10)
+                    end
+                end
                 continue
             end
             fill!(scratch, zero(eltype(scratch)))
@@ -105,7 +122,7 @@ end
         # light shift and Coriolis are here because their absence is what let a
         # wrong ratio through.
         for required in (:KineticTerm, :TrapTerm, :ZeemanTerm, :DensityC0Term,
-            :SpinC1Term, :DDITerm, :LHYTerm, :LightShiftTerm, :CoriolisTerm)
+            :SpinC1Term, :DDITerm, :LightShiftTerm, :CoriolisTerm)
             @test required in checked
         end
     end
