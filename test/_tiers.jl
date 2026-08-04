@@ -109,6 +109,8 @@ const FAST_TESTS = [
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
     "model/test_artifact_id.jl",
+    # A revision naming bytes the process is not running is worse than none.
+    "model/test_code_rev_refuses_under_sysimage.jl",
     # Why `artifact_id` had to stop being `content_id(spec)`: prose participates
     # in the latter, so harvesting 302 `metadata:` blocks moved 302 names.
     "model/test_prose_does_not_move_identity.jl",
