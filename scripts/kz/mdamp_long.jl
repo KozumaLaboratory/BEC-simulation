@@ -15,6 +15,10 @@ mu, T, c0, L, n = 1.0, 1.026, 0.0139, 200.0, 512
 k_cut = sqrt(2 * (mu + T))
 grid = make_grid(GridConfig((n,), (L,)))
 N_TF = mu * L / c0
+# Print the md5 of the source under test. A previous run of this script started
+# 14 seconds after the file it exercises was rsynced, and which version it loaded
+# could not be established afterwards — so the run has to say.
+@printf("spgpe.jl md5 = %s\n", readchomp(`md5sum src/solvers/spgpe.jl`))
 @printf("N_TF = %.5g   k_cut = %.3f   T = %.3f\n", N_TF, k_cut, T)
 @printf("%-8s %-8s %-10s %s\n", "gamma", "Mbar", "t_total", "N/N_TF at t = 1e3, 1e4, 3e4, 1e5")
 for γ in (0.1,), Md in (0.0, 0.001, 0.01, 0.1)
