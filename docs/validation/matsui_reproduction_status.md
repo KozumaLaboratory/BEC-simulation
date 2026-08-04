@@ -1,5 +1,10 @@
 # Matsui 2026 Eu-151 EdH — reproduction status
 
+> **Campaign verdict: `matsui_campaign_report.md`** — what was established, what
+> was excluded with a number, and why the remaining residual is not resolvable
+> against the published field systematic. Read that first; this file is the
+> reproduction ladder's own history.
+
 **As of 2026-05-26.** Replaces all prior "Matsui-inspired" YAMLs with
 parameter set matching the published paper (Matsui et al., Science
 2026, DOI:10.1126/science.adx2872; arXiv:2504.17357), per anko's

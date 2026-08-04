@@ -112,9 +112,12 @@ function verify_verdict(
         verdict.grad_norm, NaN, "recorded energy is not finite")
 
     Fv = F === nothing ? ws.atom.F : F
-    g = similar(psi)
-    E_new = Float64(energy_gradient!(g, psi, ws))
-    _project_constraints!(g, psi, ws.grid, target_magnetization, Fv)
+    # Audit where the workspace lives. The stored psi is a host `Array` even
+    # when `ws` is a GPU workspace -- `_save_gs_artifact` writes `_to_host`.
+    psi_ws = _is_gpu(ws.state.psi) ? _to_device(ws.backend, psi) : psi
+    g = similar(ws.state.psi)
+    E_new = Float64(energy_gradient!(g, psi_ws, ws))
+    _project_constraints!(g, psi_ws, ws.grid, target_magnetization, Fv)
     gn_new = Float64(sqrt(real(sum(abs2, g)) * cell_volume(ws.grid)))
 
     gn_rec = verdict.grad_norm
