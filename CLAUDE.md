@@ -377,6 +377,18 @@ arms decided nothing.
 residual.** If the published simulation misses the published experiment by the
 same amount you do, the gap is model deficiency and no parameter closes it.
 
+**A normalisation is a measurement choice — state what it removes.** Row-
+normalising Matsui's published Fig. 2C data to "population fractions" divided
+out the atom-number decay the file was carrying, inflating the m = −6
+discrepancy from rms 0.094 to 0.263 and making the best-agreeing component look
+like the worst. Hours went into explaining the artefact. On loading any external
+fixture, print the row sums against the abscissa once: if they vary, the file
+carries a conserved-or-not quantity and dividing by it is a decision, not
+bookkeeping. When a discrepancy concentrates in one component, re-derive it
+under a second normalisation before explaining it. Related: a sum that closes
+"exactly" across a complete set is usually an identity, not a budget — quote the
+per-element breakdown.
+
 ## Cost model + execution discipline
 
 Cost regime is permanent: this codebase pays a JIT cascade because Workspace is heavily-specialized and `make_workspace` is the hot path for every pipeline step.
