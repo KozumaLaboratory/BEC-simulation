@@ -1,0 +1,108 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# 同上、妥当域の K3（3 本）
+#
+# 理由:
+# #   同上。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
+# K3 = 1e-29 cm^6/s  ( = 1e-41 m^6/s ) — arm 2 of 3, at N = 3.5e4.
+#
+# The physically credible range for 151Eu, per the experimentalist: 1e-42 to
+# 1e-40 m^6/s, i.e. 1e-30 to 1e-28 cm^6/s. Miyazawa 2021 sits inside it
+# (1.2e-29 cm^6/s direct, 4.6e-30 from a BEC fit).
+#
+# The earlier K3 points in this campaign were taken at N = 5e4 and are therefore
+# not comparable with the rest of the fit series, which is all at N = 3.5e4.
+# This re-measures the whole credible range on the current baseline instead of
+# rescaling — the two extrapolations attempted in this session (the c1_ratio
+# width slope and the ramp-knot DC-equivalent) were both wrong.
+#
+# WHAT IT IS FOR. The experiment's 5 ms total, after normalising each of the 8
+# concatenated scans by its own mean, carries a 33 % deficit of HWHM ~7 nT with
+# its minimum at B = +0.6 and recovery in BOTH wings. Arms at 100x / 300x /
+# 1000x the published K3 reached 24.8 / 50.4 / 79.0 % but always with the loss
+# maximal at B = +7.0 and minimal at B = -13 — monotonic in B, not peaked, and
+# unchanged in shape even at 79 % depletion. Those values are unphysical anyway.
+# This arm establishes what the CREDIBLE range actually delivers.
+
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_k3real_1em29
+# grid_n: 32
+
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776       # 1/36
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      loss:
+        K3_per_m_si: ["1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s", "1e-29 cm^6/s"]
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}

@@ -1,7 +1,6 @@
 # LOCAL order diagnostic (while TSUBAME queue is stuck): B=0, kappa=1, fine c1
 # bracketing the boundary (~+0.027). Two bare seeds, tight convergence — answers
 # first-order (mF jumps, branches cross) vs continuous (single smooth branch).
-metadata: {owner: anko, project: Eu151 GS — local FM/polar order diagnostic B0 k1}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

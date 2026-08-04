@@ -22,13 +22,6 @@
 #  SPINORBEC_SCAN_ONLY_INDEX (comparison_runs are the inner loop).
 # ─────────────────────────────────────────────────────────────────────
 
-metadata:
-  owner: anko
-  project: Eu151 F=6 ground-state phase diagram (c1 × Bz × κ)
-  note: |
-    3-axis GS phase scan. Full DDI secular=false, LHY none, ITP + 2 seeds.
-    c1 crosses FM/AFM; Bz weak µG field; κ oblate trap ratio (demag).
-
 units: {B: Gauss}
 defaults:
   kind: spinor

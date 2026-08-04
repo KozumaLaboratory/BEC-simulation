@@ -1,0 +1,117 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# スピン非依存の三体損失を 4 桁走査（3 本）
+#
+# 理由:
+# #   論文 Appendix D は損失を「three-body collisions involving atoms NOT in the m = -6
+#   component」と特定している。全 13 成分に同じ K3 を入れるのは物理的に誤りで、
+#   実際に場依存の向きが実験と逆になった。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
+# K3 = 1.2e-27 cm^6/s — UNCONSTRAINED three-body loss, arm 1 of 3, at N = 3.5e4.
+#
+# K3 for 151Eu is NOT measured to better than a factor of a few: Miyazawa 2021
+# gives 1.2e-29 cm^6/s direct and 4.6e-30 from a BEC fit, a 2.6x systematic on
+# its own. So it is treated here as free, not as the published number.
+#
+# WHAT THIS TESTS. The experiment's 5 ms total atom number, after normalising
+# each of the 8 concatenated scans by its own mean, carries a 33 % deficit of
+# HWHM ~7 nT. The campaign's earlier K3 scan (x1, x3, x10 of the published
+# value, at N = 5e4) reached only 1.7 % and had the field dependence pointing
+# the WRONG WAY — most loss at B = +7.5 where transfer is small and the cloud
+# stays dense and polarised, least at B = -11. That argument is only valid in
+# the weak-loss limit: at 33 % the depletion feeds back on the density and the
+# shape need not be preserved.
+#
+# These arms are 100x / 300x / 1000x the published K3, chosen so the top one
+# should overshoot 33 %. Two questions, in order:
+#   1. does any K3 reach a 33 % deficit at 5 ms?
+#   2. if so, does the field dependence flip to peak AT the resonance?
+# A yes/no to (2) is the answer regardless of what (1) costs in K3 — a value
+# 1000x above measurement is not a fit, it is a probe of whether the SHAPE is
+# reachable at all.
+#
+# Loss is applied per-m with the same K3 in all 13 channels: spin-independent
+# three-body loss, which is the shape their L3loss term has (and which they set
+# to zero for the published curves).
+
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_k3_1p2em27
+# grid_n: 32
+
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776       # 1/36
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.027777777777777776
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      loss:
+        K3_per_m_si: ["1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s", "1.2e-27 cm^6/s"]
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}

@@ -40,6 +40,7 @@ function run_simulation!(
     callbacks::Union{Nothing, SimulationCallbacks}=nothing,
     stream_snapshots::Bool=false,
     stepper::Union{Nothing, Function}=nothing,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 ) where {N}
     sp = ws.sim_params
     sys = ws.spin_matrices.system
@@ -74,6 +75,7 @@ function run_simulation!(
             cbs;
             stream_snapshots,
             stepper=(stepper === nothing ? split_step! : stepper),
+            interrupted,
         )
     else
         _run_simulation_leapfrog!(
@@ -87,6 +89,7 @@ function run_simulation!(
             snapshots,
             cbs;
             stream_snapshots,
+            interrupted,
         )
     end
 

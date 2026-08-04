@@ -550,6 +550,62 @@ function growth_efoldings(resv, omega_ratio)
     (; G_rise=seg(1, max(ipk, 2)), G_total=seg(1, length(t)), t_peak_idx=ipk)
 end
 
+"""
+    k3_sensitivity(; k3_factors, f_start) -> Vector
+
+How much does the 0-D three-body systematic over-drop `μ(t)`?
+
+The euv3 window fails on GROWTH because `μ = μ_TF(N₀)` turns over 95 of 1288
+internal units in and falls for the rest — and it falls because the 0-D
+condensate is being eaten by `K₃`. That `K₃ = 1.61×10⁻⁴⁰ m⁶/s` is a ONE-PARAMETER
+fit, and issue #75 records the 0-D absolute `N₀` carrying a systematic: the
+independent estimates differ by ~2.6× (`K₃` 1.2e-41 direct vs 4.6e-42 BEC-fit),
+and the two-component run ends at `N₀ = 1.8×10³` against a **measured**
+`5.02×10⁴` (Miyazawa/Matsui, PRL 129, 223401).
+
+So this scans `K₃` and reports, for each, where `μ` peaks, what the usable
+(rising-phase) growth budget is, and how the final 0-D `N₀` compares to the
+measurement. The question it answers is not "is K₃ wrong" but "does the SPGPE
+verdict survive the range of K₃ that the data allows".
+"""
+function k3_sensitivity(;
+    k3_factors=(1.0, 0.5, 0.25, 0.1, 0.05, 0.02), f_start::Float64=1.05,
+    k3_fit::Float64=1.61e-40, n_measured::Float64=5.02e4, cutoff_n_T::Float64=0.3,
+)
+    @printf("K₃ fit = %.3g m⁶/s; measured final N₀ = %.3g (PRL 129, 223401)\n",
+        k3_fit, n_measured)
+    @printf("need %.2f e-foldings, η = %.2f\n\n", EFOLDINGS_NEEDED, GROWTH_EFFICIENCY)
+    @printf("%-7s %-10s %-9s %-9s %-8s %-8s %-9s\n",
+        "K₃/fit", "N₀ final", "vs meas", "μ peak@", "G_rise", "G_eff", "verdict")
+    out = []
+    for f in k3_factors
+        traj = zero_d_trajectory(; K3=k3_fit * f)
+        local win, resv
+        try
+            win = cfield_window(traj; f_start)
+            resv = spgpe_reservoir(traj.r, traj.trap, traj.ramp;
+                omega_ref=win.omega_ref, a_s=Eu151.a_s, cutoff_n_T, t_start=win.t_start)
+        catch e
+            @printf("%-7.3g  (window unavailable: %s)\n", f, sprint(showerror, e)[1:min(end, 40)])
+            continue
+        end
+        gb = growth_efoldings(resv, resv.omega_bar ./ win.omega_ref)
+        G_eff = GROWTH_EFFICIENCY * gb.G_rise
+        frac_peak = resv.t_internal[gb.t_peak_idx] / resv.t_internal[end]
+        n0f = traj.r.N0_final
+        v = G_eff > 2 * EFOLDINGS_NEEDED ? "FORMS" :
+            G_eff > EFOLDINGS_NEEDED ? "marginal" : "SHORT"
+        @printf("%-7.3g %-10.4g %-9.2f %-9.1f%% %-8.2f %-8.2f %-9s\n",
+            f, n0f, n0f / n_measured, 100 * frac_peak, gb.G_rise, G_eff, v)
+        push!(out, (; k3_factor=f, N0_final=n0f, frac_peak, G_rise=gb.G_rise, G_eff))
+    end
+    println()
+    println("`vs meas` is the 0-D final N₀ over the measured 5.02e4 — 1.0 means the")
+    println("0-D reproduces the experiment. `μ peak@` is how far into the window the")
+    println("reservoir turns over; the condensate can only be built before that.")
+    out
+end
+
 function growth_budget(; n_Ts=(0.5, 0.75, 1.0, 1.5, 2.0), f_start::Float64=1.05)
     traj = zero_d_trajectory()
     win = cfield_window(traj; f_start)
@@ -647,6 +703,8 @@ function main(mode::String="smoke"; backend=CPUBackend())
     elseif mode == "production"
         evap_spgpe(; grid_n=48, n_traj=8, f_start=1.05, n_save=40, cutoff_n_T=0.3,
             backend, tag="spgpe")
+    elseif mode == "k3_sensitivity"
+        k3_sensitivity()
     elseif mode == "growth_budget"
         growth_budget()
     elseif mode == "preflight"

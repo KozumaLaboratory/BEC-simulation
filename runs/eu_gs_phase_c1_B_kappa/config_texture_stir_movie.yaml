@@ -34,7 +34,6 @@
 # — with it on this cell loses 94% of its norm in 20 steps, but the filter is an
 # exact projector, so that number may be measuring the dynamics rather than a
 # bug. Not settled; quote `norm_rel_drift` with anything taken from this run.
-metadata: {owner: anko, project: Eu151 texture rotating-field stir movie (vortex nucleation)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: false}

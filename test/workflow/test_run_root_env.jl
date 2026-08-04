@@ -33,7 +33,7 @@ using SpinorBEC
         # to stay behind.
         mktempdir() do d
             y = joinpath(d, "probe.yaml")
-            write(y, "metadata: {owner: test}\npipeline: []\n")
+            write(y, "pipeline: []\n")
             @test startswith(compute_run_dir(y), root)
             # explicit base_dir still wins over the environment
             @test startswith(compute_run_dir(y; base_dir="elsewhere"), "elsewhere")

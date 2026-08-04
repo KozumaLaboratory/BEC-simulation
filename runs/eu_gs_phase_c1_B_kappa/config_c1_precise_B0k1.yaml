@@ -3,7 +3,6 @@
 # but the FM branch AT the transition was under-converged). Fine c1 step 0.0005,
 # two bare seeds, newton + tol 1e-9, extra ITP steps for the soft near-spinodal
 # FM branch.
-metadata: {owner: anko, project: Eu151 GS — precision c1* (first-order FM/polar, B0 k1)}
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}

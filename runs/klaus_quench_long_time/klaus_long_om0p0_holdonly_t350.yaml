@@ -7,15 +7,6 @@
 #   hold duration         : 350.0 ω_ref⁻¹  ≈ 506.4 ms
 #   Prasad references     : t=100 surface, t=350 vortex entry, t=5000 lattice
 
-metadata:
-  suite: klaus_long_time
-  cell_name: klaus_long_om0p0_holdonly_t350
-  rotation_omega: 0.0
-  t_hold_dim: 350.0
-  protocol_kind: hold_only_long_time
-  lit_anchor: Prasad_2019_arXiv_1906.08664
-  generator: scripts/validation/klaus_long_time_vortex_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

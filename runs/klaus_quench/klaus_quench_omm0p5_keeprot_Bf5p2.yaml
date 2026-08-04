@@ -11,21 +11,6 @@
 #   dt scale              : 1.0
 #   N_atoms               : 10000
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omm0p5_keeprot_Bf5p2
-  rotation_omega: -0.5
-  rot_prep: true
-  rot_quench: true
-  rot_hold: true
-  ddi_on_dynamics: true
-  do_B_quench: true
-  initial_m_sign: -1
-  B_final_nT: 5.2
-  dt_scale: 1.0
-  N_atoms: 10000
-  generator: scripts/validation/klaus_quench_batch3_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

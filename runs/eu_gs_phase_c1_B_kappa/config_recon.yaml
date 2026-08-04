@@ -6,10 +6,6 @@
 # differ. Runs on the LOCAL GPU (audit niche, <2 h). No TSUBAME points spent.
 #
 #   3 (c1) × 8 (Bz) × 5 (κ) = 120 points × 2 seeds = 240 solves @ 32³.
-metadata:
-  owner: anko
-  project: Eu151 F=6 GS phase diagram — Stage A recon (32³, local)
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}   # safe < 5.59 at 32³/box12

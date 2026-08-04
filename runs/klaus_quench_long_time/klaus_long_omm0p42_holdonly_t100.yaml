@@ -4,14 +4,6 @@
 #   hold = 100.0 ω_ref⁻¹  ≈ 144.7 ms
 #   hold-only protocol (no pre-rotation).
 
-metadata:
-  suite: klaus_long_time
-  cell_name: klaus_long_omm0p42_holdonly_t100
-  rotation_omega: -0.42
-  t_hold_dim: 100.0
-  protocol_kind: hold_only_long_time
-  generator: scripts/validation/klaus_long_time_omega_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

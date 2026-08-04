@@ -99,6 +99,12 @@ using SpinorBEC: ACCURACY_KNOBS, ACCURACY_PROFILE_NAMES, accuracy_profile,
         for frac in (1.0e-3, 0.1, 1.0)
             @test accuracy_profile_for_budget(frac).ddi_pad_factor == 2.0
         end
+        # `dt` is the dominant term and its ladder only goes the ACCURATE way —
+        # 1e-3 costs 2× and buys 2.9×, so no budget ≤ 1 may loosen it, and none
+        # can tighten it either since the cheapest admissible rung is the default.
+        for frac in (1.0e-3, 0.1, 1.0)
+            @test accuracy_profile_for_budget(frac).dt == 2.0e-3
+        end
         # …and it IS reachable, so the rejection is about the budget and not about
         # the rung being unreachable.
         @test accuracy_profile_for_budget(10.0).ddi_pad_factor == 1.5

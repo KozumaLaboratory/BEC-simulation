@@ -1,0 +1,115 @@
+# ============================================================================
+# 撤回済み — この arm の前提は誤りです。記録として残しています。
+#
+# c1_ratio を dip に対して走査（9 本）
+#
+# 理由:
+# #   c1_ratio が唯一の自由パラメータだと考えていた。論文 Appendix E は c0 = 2*pi*hbar^2*a12/M,
+#   c1 = (1/18)*pi*hbar^2*a12/M すなわち 1/36 を空間プロファイルから決めたと述べている。
+#   さらに測定の結果、c1 は dip をほとんど動かさない（0 -> 0.30 で中心 0.18 nT）。
+#   判別に使えるのはリング本数であり、dip ではない。
+#
+# 経緯: https://github.com/KozumaLaboratory/BEC-simulation/issues/299
+# 一次情報: docs/validation/matsui_experiment_parameters.md
+# ============================================================================
+
+# c1_ratio = 0.2 — BRACKET arm 2 of 4, fit to the experiment.
+#
+# The first five-arm scan (UGE 8320064) measured, on the matched window:
+#
+#   r        centre [nT]   width [nT]
+#  -1/72       -1.2097      12.7559
+#   0          -2.9948      13.2225
+#   1/144      -2.3577      12.9459
+#   1/36       -2.5099      12.7400     <- current production
+#   4/36       -3.1264      12.3895
+#   EXPERIMENT -3.440+-0.599 11.801+-0.282
+#
+# Above r = 0 the width falls monotonically (slope -4.21 per unit r) and the
+# centre moves negative (-7.39 per unit r). Linear extrapolation off the top two
+# arms puts the experimental width at r = 0.251 +- 0.067 and the experimental
+# centre at r = 0.154 +- 0.081 — consistent at 0.9 sigma, i.e. ONE value of r may
+# satisfy both. These four arms bracket that directly instead of extrapolating.
+#
+# Caveat carried forward: r = 0.25 means 36 c1 = 9 c0, so the spin-dependent part
+# dominates and c0 drops ~10x from its r = 1/36 value. That is far outside the
+# c1/c0 ~ 0.01-0.05 typical of measured spinor species. If the bracket does land
+# there, the number to report is the channel basis g_S, not r, and the result is
+# a statement about which a_S the data prefers — not a claim that it is physical.
+#
+# c1_ratio is set in BOTH the ground_state and dynamics blocks.
+
+# metadata（旧 top-level キー、9e5d7c8c で schema から削除。参照されないためコメント化）:
+# suite: matsui_fig4b
+# ladder_level: 12
+# reference: Matsui_2025_EdH_Zenodo_17303925
+# claim_type: C
+# target: fit_c1ratio_0p2
+# grid_n: 32
+
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: -1.3e-4, to: 9.0e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.2   # BRACKET 2/4
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 3.4558           # 5 ms × 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.2   # BRACKET 2/4
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 108               # divides 3456 exactly, so the last sample IS the end
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f64
+
+  - analyze:
+      - energy_decomposition: {}

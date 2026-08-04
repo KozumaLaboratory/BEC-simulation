@@ -3,11 +3,6 @@
 # because Q_ab is traceless. This catches sign, 4π, k=0, and axis convention mistakes.
 # Expected: DDI energy small and converges toward zero with larger n/box.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: spherical_DDI_traceless_kernel
-  expected: small_DDI_energy
-
 defaults:
   kind: spinor
   backend: gpu

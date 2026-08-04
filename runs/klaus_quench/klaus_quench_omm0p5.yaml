@@ -14,18 +14,6 @@
 #   → B_quench (1.0 ms, B ramp true, Ω=0.0, DDI=true)
 #   → weak_field_hold (10.0 ms, B=2.6e-5 G, Ω=0.0, DDI=true)
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omm0p5
-  rotation_omega: -0.5
-  ddi_on_dynamics: true
-  do_B_quench: true
-  rotation_kept_in_hold: false
-  generator: scripts/validation/klaus_quench_gen.jl
-  protocol_summary: |
-    Rotation preparation at strong B → quench to weak B → free hold.
-    Observable: post-quench spin excitation in m=-5, m=-4 components.
-
 defaults:
   kind: spinor
   backend: cpu

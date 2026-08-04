@@ -1,8 +1,6 @@
 # DIAGNOSTIC: why does the mid-field cell (B=48µG κ=1.6) floor at |∇E|~1?
 # Test whether a CLEAN single-domain seed (m∓F) + Newton-CG polish escapes the
 # m=±6 frustrated domain-wall stall that pin/LBFGS get stuck in. 48³ local.
-metadata: {owner: anko, project: Eu151 GS — mid-field soft convergence diagnostic}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}
