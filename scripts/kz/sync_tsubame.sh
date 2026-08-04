@@ -32,10 +32,26 @@ git push -q origin "HEAD:${REMOTE_BRANCH}"
 SHA=$(git rev-parse HEAD)
 echo "pushed ${SHA:0:12} to ${REMOTE_BRANCH}"
 
+# `reset --hard` leaves UNTRACKED files behind, and this tree accumulates them —
+# ad-hoc job scripts written on the remote side. They are not in history, so a job
+# that reads one is unreproducible for exactly the reason this script exists.
+# `clean -fd` removes them; anything worth keeping belongs in a commit.
 ssh "$HOST" "cd $PROOT && git fetch -q origin && git reset -q --hard $SHA && \
-    git status --porcelain | head -5 && \
-    echo \"remote HEAD=\$(git rev-parse --short HEAD) dirty=\$(git status --porcelain | wc -l)\""
+    git clean -qfd -e 'runs' -e '*.log'"
 
-REMOTE_SHA=$(ssh "$HOST" "cd $PROOT && git rev-parse HEAD")
-[ "$REMOTE_SHA" = "$SHA" ] || { echo "remote HEAD $REMOTE_SHA != $SHA" >&2; exit 1; }
-echo "synced: remote is at ${SHA:0:12}, clean"
+# Verify BOTH, and say what was checked. The first version of this script printed
+# "clean" next to "dirty=6" because it only compared the SHA — the same shape as a
+# job printing a clean commit while running a dirty tree, which is the failure it
+# was written to prevent.
+read -r REMOTE_SHA REMOTE_DIRTY <<<"$(ssh "$HOST" "cd $PROOT && \
+    echo \$(git rev-parse HEAD) \$(git status --porcelain | wc -l)")"
+if [ "$REMOTE_SHA" != "$SHA" ]; then
+    echo "remote HEAD $REMOTE_SHA != pushed $SHA" >&2
+    exit 1
+fi
+if [ "$REMOTE_DIRTY" -ne 0 ]; then
+    echo "remote tree still has $REMOTE_DIRTY modified/untracked file(s):" >&2
+    ssh "$HOST" "cd $PROOT && git status --porcelain | head -20" >&2
+    exit 1
+fi
+echo "synced: remote HEAD=${SHA:0:12}, dirty=0 (both verified)"
