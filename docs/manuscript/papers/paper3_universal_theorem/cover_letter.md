@@ -56,11 +56,17 @@ subgroup, which forces the spin Goldstone mass matrix to be isotropic.
 3. **Sign Pattern Lemma 2** (unique sign change at $S_{\rm bd} = \sqrt{2F(F+1)}$):
    Corollary of Lemma 1.
 
-4. **Refined Universal Theorem v2**: Three exceptions {F=1, F=2, F=5} where
-   the theorem does NOT apply, each with distinct representation-theoretic
-   reasoning:
+4. **Refined Universal Theorem v2**: Three exception CASES — {F=1},
+   {F=2 under T:E_1}, {F=5} — where the theorem does not apply, each with
+   distinct representation-theoretic reasoning. The exceptions are
+   (F, group, irrep) triples, not values of F:
    - F=1: $D^1 \cong T_1$ (irreducible under any polyhedral subgroup)
-   - F=2: T:E_1 is complex 1-dim ("phase-equivariant"), not a Schur singlet
+   - F=2 **under T with the E_1 assignment**: T:E_1 is complex 1-dim
+     ("phase-equivariant"), not a Schur singlet. Note this is NOT F=2 in
+     general — §V.A verifies the theorem for **F=2 cyclic ($T_d$)**, which is
+     one of the six polyhedral phases the paper checks. Written as a bare
+     "F=2" until 2026-08-04, where it read as a blanket exception and
+     contradicted the paper's own headline verification list.
    - F=5: algebraically zero multiplicity of 1-dim real irreps under T/O/I
 
 5. **Comprehensive verification**: F-systematic verifications at F=3, 4, 6, 7,
