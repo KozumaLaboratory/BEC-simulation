@@ -16,6 +16,8 @@ const FAST_TESTS = [
     "test_tier_membership.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    # A3:R-DOC-01 asked for a CHECK; the design docs must stay terminal-readable.
+    "test_design_docs_have_no_latex.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
