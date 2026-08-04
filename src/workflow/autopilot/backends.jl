@@ -76,7 +76,7 @@ SpinorBEC.run_yaml(ARGS[1])
 
 Run jobs in a **detached subprocess** via
 `julia --project=<project_root> -e 'using SpinorBEC; run_yaml(ARGS[1])'
-<spec_path>`. The spawned process writes `summary.json` / `outcome.toml`
+<spec_path>`. The spawned process writes `summary.json` / `_exit_summary.json`
 / `_live_status.json` / `*.jld2` into `entry.run_dir` — the same layout
 the UGE submit script produces — so the dashboard and
 `run_catalog_index` never need to branch on local-vs-remote.

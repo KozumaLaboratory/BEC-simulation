@@ -453,24 +453,30 @@ function job_status(b::UGEBackend, entry::QueueEntry;
         return :failed
     elseif state == "absent"
         # Not in the active listing → scheduler considers it terminal.
-        # Outcome.toml landed by `collect!` is the authoritative
-        # done/failed signal (qacct can lag minutes on TSUBAME and
-        # often returns "not found" for short jobs).
+        # `_exit_summary.json`, collected from the node, is the authoritative
+        # done/failed signal (qacct can lag minutes on TSUBAME and often returns
+        # "not found" for short jobs).
+        #
+        # This read `outcome.toml` and its comment called it "landed by
+        # `collect!`". `collect!` does not write that file and nothing else does
+        # either — the only writer was the dry-run synthetic in `tick.jl`. Since
+        # `run_dir` is content-addressed and the rsync collect carries no
+        # `--delete`, a dry run left `terminal = "done"` where a LATER LIVE run
+        # of the same spec would find it, and any live job that vanished from
+        # `qstat` — crash, OOM, node failure — was returned `:done`. A crashed
+        # job reported as successfully completed, then credited to its recipe's
+        # trust store.
         collect!(b, entry)
-        outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
-        if isfile(outcome_path)
-            d = try
-                TOML.parsefile(outcome_path)
-            catch
-                nothing
-            end
-            if d isa AbstractDict
-                term = String(get(get(d, "outcome", Dict()), "terminal", ""))
-                term == "done" && return :done
-                term in ("killed_data", "killed_bug") && return :failed
+        let d = _read_exit_summary(entry)
+            if d !== nothing
+                get(d, "completed", false) === true && return :done
+                # A summary that exists and says otherwise is a real failure;
+                # its CAUSE is `_classify_terminal_failure`'s job, not this
+                # function's.
+                return :failed
             end
         end
-        # No outcome.toml yet — last resort, try qacct. If still no
+        # No `_exit_summary.json` yet — last resort, try qacct. If still no
         # record, return :unknown (next tick retries).
         return _uge_terminal_state(b, job_id)
     end
@@ -499,7 +505,7 @@ function _uge_extract_job_state_from_listing(listing::AbstractString,
 end
 
 # Last-resort terminal classification via qacct. Used only when the
-# job is no longer in qstat AND outcome.toml hasn't landed yet. qacct
+# job is no longer in qstat AND `_exit_summary.json` has not landed yet. qacct
 # on TSUBAME can lag minutes after job exit and may return
 # "error: job id N not found" for short jobs that didn't make it into
 # accounting (e.g. early script failure with bad directives).
