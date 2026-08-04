@@ -88,7 +88,51 @@ That is the paper's own statement, made quantitative:
     evidence. The evidence is the **breakdown** above: nothing forced the deficit
     to avoid m = −6, and it does.
 
+## 5. The calibrated loss explains m = −4 and m = −2, and not m = −6
+
+`runs/matsui_fit/fig2c_loss.yaml` — the §1 run with `K3 = 2.6e-28 cm^6/s` on the
+twelve m ≠ −6 components, calibrated to the paper's 26 %/40 ms. No free
+parameters. It delivers 20.0 % loss over 40 ms against that 26 % target (the
+calibration was taken at a single field under different conditions); the
+experiment lost 37.2 %.
+
+rms against the experiment, in absolute number, 1–40 ms:
+
+| component | loss-free | with loss | change |
+|---|---|---|---|
+| m = −6 | 0.0926 | 0.0986 | **−6 %** |
+| m = −5 | 0.0473 | 0.0443 | +6 % |
+| m = −4 | 0.1497 | 0.1148 | **+23 %** |
+| m = −3 | 0.0497 | 0.0476 | +4 % |
+| m = −2 | 0.1667 | 0.1153 | **+31 %** |
+| all five | 0.1127 | 0.0899 | +20 % |
+
+That is exactly the paper's split — m = −4 and m = −2 are the components it names
+as loss-free casualties, and they are the two the loss moves. m = −6 gets
+slightly worse.
+
+!!! warning "The pre-recorded criterion was invalidated by §3, not by this run"
+    It read: *pass if m = −6's rms falls below 0.10 while m = −5 and m = −3 stay
+    below 0.08*. All three hold — but m = −6 was **already** at 0.0926 loss-free,
+    so the threshold sits below the starting value and the test cannot fail. It
+    was written when the m = −6 rms was believed to be 0.263. A criterion is only
+    binding against the number the instrument actually reports, and that number
+    changed between writing it and running.
+
+### Why loss cannot close m = −6
+
+In absolute number the experiment holds **more** m = −6 than the loss-free model
+(+0.024 at 40 ms), and removing atoms from m ≠ −6 moves ours the wrong way:
+0.350 → 0.318. Loss raises the m = −6 *fraction* (0.350 → 0.397) but not its
+*count* — atoms leave m = −6 by transfer, and only become vulnerable afterwards.
+A larger `K3` widens the gap rather than closing it.
+
+So the residual is in the transfer, not the loss: the cascade out of m = −6 runs
+faster in the simulation than in the experiment. Same statement, same sign, as
+the Fig. 4B residual.
+
 ## What is left
+
 
 The experiment retains ~7 % more m = −6 (of the initial number) than the
 loss-free simulation, growing with time. Two candidate readings, not yet
@@ -98,11 +142,14 @@ separated:
 - three-body loss depletes the density, weakening the dipolar drive `c_dd·n`
   that pumps the cascade.
 
-The second is testable and is what `runs/matsui_fit/fig2c_loss.yaml` measures:
-the same run with `K3 = 2.6e-28 cm^6/s` on the twelve m ≠ −6 components,
-calibrated to the paper's 26 %/40 ms, no free parameters. A pure
-renormalisation cannot be the whole answer — under uniform removal from m ≠ −6
-the internal ratios of those components would be preserved, and measured against
-the published data they are not (rms 0.178, larger than the raw discrepancy it
-would have to explain). The density-depletion channel is a different mechanism
-and is not excluded by that.
+§5 measures the second and rejects it: the calibrated loss moves our m = −6
+count *away* from the experiment. The first is what remains. Neither a pure
+renormalisation nor a density-weakened drive accounts for it — under uniform
+removal from m ≠ −6 the internal ratios of those components would be preserved,
+and in the published data they are not (rms 0.178, larger than the raw
+discrepancy it would have to explain).
+
+Not yet tested: whether the transfer rate itself is over-driven, i.e. whether
+`c1_ratio`, `q`, or the dipolar drive is set too strong for the experiment. That
+is a different arm from anything run so far — every arm to date fixed those at
+the values their simulation ships.
