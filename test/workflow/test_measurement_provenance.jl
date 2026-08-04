@@ -55,6 +55,31 @@ using SpinorBEC
             require_clean=true)
     end
 
+    @testset "stamped_csv is the single writer" begin
+        # A dozen drivers under docs/guides/figures/ write CSVs by hand. Asking each
+        # to remember two printlns is the convention that already failed four times,
+        # so there is one function that writes the stamp.
+        out = joinpath(dir, "sub", "w.csv")
+        stamped_csv(out, ("Project.toml",); header="a,b") do io
+            println(io, "1,2")
+        end
+        lns = readlines(out)
+        @test startswith(lns[1], "# provenance:")
+        @test lns[2] == "a,b"
+        @test lns[3] == "1,2"
+        @test assert_same_provenance([out]) isa String
+    end
+
+    @testset "unstamped_outputs finds what cannot say what produced it" begin
+        # The coverage question, as opposed to the per-merge refusal: a driver that
+        # writes its own header without the stamp must be discoverable BEFORE a
+        # merge averages two code versions, not after.
+        u = unstamped_outputs(dir)
+        @test any(f -> endswith(f, "bare.csv"), u)
+        @test !any(f -> endswith(f, "a.csv"), u)
+        @test !any(f -> endswith(f, "w.csv"), u)     # recurses into subdirs
+    end
+
     @testset "the header records HEAD, dirtiness and per-source hashes" begin
         h = provenance_header("src/solvers/spgpe.jl", "Project.toml")
         @test startswith(h, "# provenance:")

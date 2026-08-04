@@ -1,4 +1,4 @@
-export provenance_header, assert_same_provenance
+export provenance_header, assert_same_provenance, stamped_csv, unstamped_outputs
 
 """
     provenance_header(sources...) -> String
@@ -95,4 +95,60 @@ function assert_same_provenance(files::AbstractVector{<:AbstractString};
                 "reproduced: $prov"),
         )
     prov
+end
+
+"""
+    stamped_csv(path, sources; header) -> IO-taking function
+
+Open `path` for writing, emit [`provenance_header`](@ref) then `header`, and hand
+the stream to the caller:
+
+```julia
+stamped_csv(csv, ("src/solvers/spgpe.jl",); header="tau_Q,sigma_W") do io
+    for row in rows; println(io, row); end
+end
+```
+
+One place that writes the stamp, so a driver cannot half-adopt the convention. The
+alternative — asking every driver to remember two `println`s — is the convention
+that already failed four times in this repo, and there are a dozen drivers under
+`docs/guides/figures/` writing CSVs by hand.
+"""
+function stamped_csv(f::Function, path::AbstractString,
+    sources::Union{Tuple, AbstractVector}; header::AbstractString="")
+    mkpath(dirname(path))
+    open(path, "w") do io
+        println(io, provenance_header(sources...))
+        isempty(header) || println(io, header)
+        f(io)
+    end
+    path
+end
+
+"""
+    unstamped_outputs(dir; ext=".csv") -> Vector{String}
+
+Every file under `dir` whose first non-blank line is not a `# provenance:` record.
+
+This is the instrument for the coverage question — "which measurements cannot say
+what produced them" — as opposed to the per-file refusal in
+[`assert_same_provenance`](@ref). A driver that writes its own header without the
+stamp shows up here rather than being discovered when a merge silently averages
+two code versions.
+"""
+function unstamped_outputs(dir::AbstractString; ext::AbstractString=".csv")
+    isdir(dir) || return String[]
+    out = String[]
+    for (root, _, files) in walkdir(dir), fn in files
+        endswith(fn, ext) || continue
+        p = joinpath(root, fn)
+        stamped = false
+        for ln in eachline(p)
+            isempty(strip(ln)) && continue
+            stamped = startswith(ln, "# provenance:")
+            break
+        end
+        stamped || push!(out, p)
+    end
+    out
 end
