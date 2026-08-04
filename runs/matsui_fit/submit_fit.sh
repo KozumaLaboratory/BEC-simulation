@@ -35,6 +35,10 @@ for c in $(grep -oE 'runs/matsui_fit/[A-Za-z0-9_.]+\.yaml' "$0"); do
     [ -f "$c" ] || { echo "missing config: $c" >&2; exit 1; }
 done
 
+for f in runs/matsui_fit/*.yaml; do
+    grep -q "CONFIG=$f " "$0" || { echo "config not wired into any task: $f" >&2; exit 1; }
+done
+
 case "${SGE_TASK_ID:-1}" in
     1) CONFIG=runs/matsui_fit/fit_c1ratio_m0139.yaml ;;
     2) CONFIG=runs/matsui_fit/fit_c1ratio_0.yaml ;;
