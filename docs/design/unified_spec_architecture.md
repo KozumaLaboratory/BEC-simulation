@@ -614,13 +614,14 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-04. Six of the fourteen ids are resolved, across four of the
-twelve items; eight ids remain.**
+**Status, 2026-08-04. Seven of the fourteen ids are resolved, across five of the
+twelve items; seven ids remain.**
 
 | item | ids | how |
 |---|---|---|
 | 1 | A2:R-OPEN-03, A5:R-NIX-03B | measured — the document's own "largest single unknown" |
 | 2 | A2:R-OPEN-01 | measured |
+| 3 | A2:R-OPEN-05 | measured — mean 1.24 against a threshold of 3 |
 | 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
 | 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
 
@@ -700,11 +701,37 @@ this is what promotion looks like.
    sharing is real: those 59 runs genuinely want one ground state, which is the
    stage cache's entire purpose. So the concurrent-write path is hot *because
    the design is working*, not because the id is blind to something.
-3. **A2:R-OPEN-05 — write amplification of per-attempt records.** This design
-   commits to an append-only `attempts/` shape without the
-   executions-per-artifact measurement the requirement says must come first. If
-   the mean is 3 or more, the index needs sharding and "rebuildable and safe to
-   delete" has to go.
+3. **A2:R-OPEN-05 — write amplification of per-attempt records. MEASURED
+   2026-08-04: mean 1.24, so the append-only shape stands.** The requirement
+   said the executions-per-artifact mean must be measured first, and that at
+   3 or more the index needs sharding and "rebuildable and safe to delete" has
+   to go.
+
+   | | |
+   |---|---|
+   | run directories under `runs/` | 294 |
+   | content-addressed (`<basename>_<sha>`) | 219 |
+   | distinct config basenames | 176 |
+   | **mean directories per config** | **1.24** |
+   | configs with more than one | 34 |
+   | most re-run | 4 (`L4_eu_matsui_hamiltonian_only_{32,64}`) |
+
+   Well under the threshold. No sharding; the index stays rebuildable and safe
+   to delete.
+
+   **What this measurement is NOT, stated because the difference matters.** It
+   counts DIRECTORIES per config, not executions per artifact. The direct
+   quantity is unmeasurable in this tree: there are **0 completion markers and
+   0 `_exit_summary.json`** anywhere under `runs/`, so every one of those 294
+   directories predates the record-keeping that would have counted executions.
+   A re-run that overwrote its directory in place leaves no trace at all, and
+   the stage cache — the one thing keyed on `artifact_id` rather than on config
+   bytes — is opt-in (`SPINORBEC_STAGE_CACHE`) and has never been populated
+   here. So 1.24 is a LOWER BOUND on write amplification, and the true figure
+   would need the markers this design introduces. It is quoted as a lower bound
+   because the decision it feeds is one-sided: a lower bound of 1.24 against a
+   threshold of 3 is already decisive, and no amount of undercounting reverses
+   that unless the true mean is more than double.
 
 **Two things the register names but does not build.**
 
