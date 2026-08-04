@@ -199,6 +199,7 @@ Recorded because each was expensive and each has a structural preventive now in
 | `matsui_published_state_comparison.md` | `dataset_fig1/F.txt` is their own 5 ms output; how to read it |
 | `matsui_author_query_draft.md` | the questions only the authors can answer |
 | `runs/matsui_fit/README.md` | every arm, live and retracted, with what it measured |
+| `docs/campaign/lessons_2026_08_04.md` | what the campaign established **beyond** the physics: the GPU defect it exposed, the two instrument defects, and the classes of the six corrections |
 
 The 21 pre-reading arms were deleted along with their 9.7 GB of output: their
 configs repeated one wrong premise 21 times and the information is one row per
