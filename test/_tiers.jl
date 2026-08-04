@@ -98,6 +98,8 @@ const FAST_TESTS = [
     "workflow/test_budget_reads_the_save_block.jl",
     # A YAML key a maintained doc teaches must be one the schema accepts.
     "workflow/test_docs_yaml_against_schema.jl",
+    # A schema enum must name what the implementation can actually do.
+    "workflow/test_schema_enum_matches_implementation.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
