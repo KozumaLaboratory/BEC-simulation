@@ -149,6 +149,7 @@ const FAST_TESTS = [
     "dynamics/test_thermal_cfield.jl",
     "dynamics/test_spgpe_equilibrium_number.jl",
     "dynamics/test_spgpe_projector_composition.jl",
+    "workflow/test_measurement_provenance.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",

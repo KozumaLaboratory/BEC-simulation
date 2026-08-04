@@ -331,6 +331,11 @@ function kz_winding_scan(;
     if raw_only
         rawf = joinpath(OUTDIR, "$(tag)_raw.csv")
         open(rawf, "w") do io
+            # First line, so a reader hits it before any data. assert_same_provenance
+            # refuses to merge shards that disagree — which is the guard that was
+            # missing when a merge read 10:49 files as a 13:34 rerun's output.
+            println(io, provenance_header("src/solvers/spgpe.jl",
+                "src/solvers/projected_gp.jl", "docs/guides/figures/kz_toroidal_winding.jl"))
             println(io, "# T=$T eps_cut=$eps_cut gamma=$gamma M_damp=$M_damp dt=$dt " *
                         "M_grid=$M_grid shard=$(shard[1])of$(shard[2])")
             println(io, "tau_Q,W")
@@ -428,7 +433,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         kz_winding_scan(; tau_Qs=τs, n_traj=parse(Int, m[5]),
             M_damp=(m[4] == "full" ? γ : 0.0), gamma=γ, dt=0.05, M_grid=Mg, L=Lr,
             backend, shard=(i, n), raw_only=true,
-            tag="kz_torus_gam$(replace(string(γ), "." => "p"))$(m[4])L$(round(Int, Lr))_s$(i)of$(n)")
+            # SBEC_TAG lets a rerun after a code change write somewhere new. Reusing
+            # the tag once let a merge read 10:49 files as if they were the 13:34
+            # run's output and report the pre-fix numbers as post-fix — the same
+            # shape as leaving a distinguishing variable out of an output name.
+            tag="kz_torus_$(get(ENV, "SBEC_TAG", ""))gam$(replace(string(γ), "." => "p"))$(m[4])L$(round(Int, Lr))_s$(i)of$(n)")
     elseif startswith(mode, "size")
         # Is xi_hat physical or is it the ring? It came out 20-37 at every quench
         # rate on a ring of 200 — L/6, six to eight domains, which is no dynamic
@@ -560,6 +569,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
         files = filter(f -> startswith(f, "kz_torus_$(md)_s") && endswith(f, "_raw.csv"),
             readdir(OUTDIR))
         isempty(files) && error("no raw shards for $md in $OUTDIR")
+        # Refuse rather than average across code versions.
+        prov = assert_same_provenance(joinpath.(OUTDIR, files))
+        println(prov)
         byτ = Dict{Float64, Vector{Float64}}()
         for f in files, ln in eachline(joinpath(OUTDIR, f))
             (isempty(ln) || startswith(ln, "#") || startswith(ln, "tau_Q")) && continue

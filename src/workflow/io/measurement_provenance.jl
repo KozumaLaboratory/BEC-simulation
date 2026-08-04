@@ -1,0 +1,98 @@
+export provenance_header, assert_same_provenance
+
+"""
+    provenance_header(sources...) -> String
+
+A one-line `# provenance: …` record of what produced a measurement file: the git
+`HEAD`, whether the tree was dirty, and the SHA-1 of each source file named in
+`sources` (paths relative to the repo root).
+
+Write it as the first line of every measurement output. [`assert_same_provenance`](@ref)
+reads it back and refuses to aggregate files that disagree.
+
+# Why this exists
+
+`_assert_point_provenance` already refuses to reuse a `run_yaml` point whose
+recorded `env.git_hash` differs from the current one. Figure and measurement
+drivers under `docs/guides/figures/` bypass that entirely, and the same bug class
+came back four times in one session:
+
+  - Six jobs wrote to `gam_\$(MD)_\$(i).log` with the swept rate absent from the
+    name, so three rates overwrote one file per setting.
+  - A merge read CSVs stamped 10:49 as the output of a 13:34 rerun and reported
+    pre-fix numbers as post-fix. Caught only because they agreed to every digit.
+  - A long run started 14 seconds after its source was synced, and which version
+    it loaded could not be established afterwards.
+  - Three "different" initial conditions agreed to 13 digits because they were the
+    same code.
+
+Every one of those is the same failure: a measurement read as evidence about a
+state of the code that did not produce it. Distinguishing filenames is a
+convention and conventions get forgotten; a refusal does not.
+"""
+function provenance_header(sources::AbstractString...)
+    head = try
+        strip(read(`git rev-parse --short HEAD`, String))
+    catch
+        "unknown"
+    end
+    dirty = try
+        !isempty(strip(read(`git status --porcelain`, String)))
+    catch
+        true
+    end
+    hashes = map(sources) do f
+        h = isfile(f) ? bytes2hex(SHA.sha1(read(f)))[1:12] : "missing"
+        "$(basename(f))=$h"
+    end
+    "# provenance: head=$head dirty=$dirty " * join(hashes, " ")
+end
+
+"""
+    assert_same_provenance(files; require_clean=false) -> String
+
+Read the `# provenance:` line from each of `files` and throw unless they all
+agree. Returns the shared provenance string.
+
+Set `require_clean=true` to also refuse a dirty tree — appropriate for a published
+number, not for a working measurement.
+
+Files with no provenance line are an error rather than a skip: a file that does
+not say what produced it is exactly the case this guards against, and treating it
+as "probably fine" is how the mistake happened.
+"""
+function assert_same_provenance(files::AbstractVector{<:AbstractString};
+    require_clean::Bool=false)
+    isempty(files) && throw(ArgumentError("assert_same_provenance: no files"))
+    provs = Dict{String, Vector{String}}()
+    for f in files
+        line = nothing
+        for ln in eachline(f)
+            startswith(ln, "# provenance:") && (line=ln; break)
+            startswith(ln, "#") || break        # past the header block
+        end
+        line === nothing && throw(
+            ArgumentError(
+                "assert_same_provenance: $f has no `# provenance:` line. A file that " *
+                "does not record what produced it cannot be aggregated — write one " *
+                "with provenance_header()."),
+        )
+        push!(get!(provs, line, String[]), f)
+    end
+    if length(provs) > 1
+        msg = join(("  $k\n    " * join(basename.(v), ", ") for (k, v) in provs), "\n")
+        throw(
+            ArgumentError(
+                "assert_same_provenance: these files were produced by different code, " *
+                "so aggregating them would average across versions:\n$msg"),
+        )
+    end
+    prov = first(keys(provs))
+    require_clean && occursin("dirty=true", prov) &&
+        throw(
+            ArgumentError(
+                "assert_same_provenance: produced from a dirty tree, which cannot be " *
+                "reproduced: $prov"),
+        )
+    prov
+end
