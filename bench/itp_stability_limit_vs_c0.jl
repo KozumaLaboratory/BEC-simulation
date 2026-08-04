@@ -47,13 +47,13 @@ const RATIOS = (-0.024, -0.015, -0.005, 0.0, 0.02, 0.05)
 const DTS = (6.4e-2, 3.2e-2, 1.6e-2, 8.0e-3, 4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4,
     2.5e-4, 1.25e-4)
 
-"Does a short ITP at this (c₁ ratio, dt) stay finite? Convergence is not asked."
-function stays_finite(r, dt)
+"Does a short ITP at these couplings stay finite? Convergence is not asked."
+function stays_finite_ip(ip::InteractionParams, dt)
     grid = make_grid(GridConfig(ntuple(_ -> N_GRID, 3), ntuple(_ -> 12.0, 3)))
     psi0 = init_psi(grid, SpinSystem(6); state=:spin_coherent,
         init_theta=π / 4, init_phi=0.3)
     ws = make_workspace(;
-        grid, atom=Eu151, interactions=eu_interaction_params(r),
+        grid, atom=Eu151, interactions=ip,
         zeeman=ZeemanParams(EU_p_weak, 0.0),
         potential=HarmonicTrap((1.0, 1.0, EU_λ_z)),
         sim_params=SimParams(; dt=dt, n_steps=1, imaginary_time=true,
@@ -77,6 +77,9 @@ function stays_finite(r, dt)
     CUDA.synchronize()
     isfinite(SpinorBEC.total_energy(ws))
 end
+
+"The same probe on the production axis, where c₀ and c₁ both follow `c1_ratio`."
+stays_finite(r, dt) = stays_finite_ip(eu_interaction_params(r), dt)
 
 c0_of(r) = EU_c_total / (1 + 36 * r)
 
@@ -141,6 +144,60 @@ else
     interaction energy scale and `c₀·dt < const` is the criterion the preflight
     can carry. A spread of many × means it is not, and the honest gate stays a
     warning.""")
+end
+
+# --- the control that decides WHY -----------------------------------------
+#
+# The rows above hold `c₀ + F²c₁ = c_total` fixed, so the PHYSICS is constant
+# while c₀ varies 20× — consistent with the limit being set by substep magnitude
+# rather than by the interaction, but not a test of it: nothing above varies the
+# physics at fixed c₀, so "the limit tracks c₀" and "the limit tracks whatever
+# else changes along that axis" are not separated.
+#
+# This separates them. Take the most limited point's c₀ and pair it with c₁ = 0,
+# which leaves the substep magnitude identical and makes the physical combination
+# `c₀ + 36c₁` SEVEN TIMES larger:
+#
+#     (a)  c₀ = 34465, c₁ = −827   combination 4689     limit measured above
+#     (b)  c₀ = 34465, c₁ = 0      combination 34465
+#
+# Same limit ⇒ it is the SUBSTEP that binds, i.e. the c₀/c₁ splitting is stiff and
+# the physical interaction is not what sets dt. A different limit ⇒ physics, and
+# the splitting story is wrong.
+println("\n  control: same c₀, different physics")
+let c0 = c0_of(first(RATIOS)), c1 = first(RATIOS) * c0
+    @printf("    %-34s %10s %10s %12s\n", "", "c₀", "c₁", "c₀+36c₁")
+    @printf("    %-34s %10.0f %10.0f %12.0f\n", "(a) production ratio", c0, c1, c0 + 36c1)
+    @printf("    %-34s %10.0f %10.0f %12.0f\n", "(b) same c₀, c₁ = 0", c0, 0.0, c0)
+    ip_b = InteractionParams(Dict(0 => c0, 1 => 0.0))
+    best_b = nothing
+    @printf("    %-34s", "(b) stability:")
+    for dt in DTS
+        ok = try
+            stays_finite_ip(ip_b, dt)
+        catch
+            false
+        end
+        ok && best_b === nothing && (best_b = dt)
+        @printf(" %s", ok ? "ok" : "DIV")
+        flush(stdout)
+        GC.gc(true)
+        CUDA.reclaim()
+    end
+    println()
+    lim_a = limits[1][3]
+    @printf("\n    (a) limit %s     (b) limit %s\n",
+        lim_a === nothing ? "censored" : @sprintf("%.2e", lim_a),
+        best_b === nothing ? "none" : (best_b == first(DTS) ? "≥$(first(DTS))" : @sprintf("%.2e", best_b)))
+    if lim_a !== nothing && best_b !== nothing && best_b != first(DTS)
+        ratio = best_b / lim_a
+        @printf("    ratio (b)/(a) = %.2f — %s\n", ratio,
+            0.5 <= ratio <= 2.0 ?
+            "SAME to within the ladder's factor of 2 ⇒ the SUBSTEP binds, not the physics" :
+            "DIFFERENT ⇒ the physical combination matters and the splitting story is wrong")
+    else
+        println("    one side is censored or unbounded — widen the ladder before concluding")
+    end
 end
 
 println("""
