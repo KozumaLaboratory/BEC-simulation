@@ -614,8 +614,8 @@ Seven tags, each with configs behind it and a gate in `test_corpus_resolves.jl`
 Fourteen requirement ids, across twelve items. Each is stated with the reason,
 because a hidden gap is worse than a stated one.
 
-**Status, 2026-08-04. Eight of the fourteen ids are resolved, across six of the
-twelve items; six ids remain.**
+**Status, 2026-08-04. Nine of the fourteen ids are resolved, across seven of the
+twelve items; five ids remain.**
 
 | item | ids | how |
 |---|---|---|
@@ -623,6 +623,7 @@ twelve items; six ids remain.**
 | 2 | A2:R-OPEN-01 | measured |
 | 3 | A2:R-OPEN-05 | measured — mean 1.24 against a threshold of 3 |
 | 5 | A2:R-ENS-01 | **fixed in code** — plus a second defect found while fixing it |
+| 10 | A5:R-BSALC-03 | measured — already holds; now gated with a positive control |
 | 6 | A2:R-CLASS-01/02 | **fixed in code** (#313), not registered as the row proposed |
 | 7 | A2:R-MIG-01 | withdrawn — it describes a partition cut before the row was written |
 
@@ -856,9 +857,23 @@ read as a known-wrong answer rather than a caveat; the other had no subject.
    host-shaped. The capability is not designed out, but it is not built, and the
    day a stale-sysimage TSUBAME artifact enters a shared store is when it is
    needed.
-10. **A5:R-BSALC-03 — within-build deduplication.** Identical names within one
-    `run!` are asserted to be one lookup; nothing enforces it yet, and the
-    frontier releases up to 64 stages.
+10. **A5:R-BSALC-03 — within-build deduplication. MEASURED 2026-08-04: it
+    already holds, and is now gated.** The row said identical names within one
+    `run!` were "asserted to be one lookup" with "nothing enforcing it yet".
+    Two steps with identical declarations resolve to the same `artifact_id`
+    (`0e72f8f538d18fe6` for both), and the second is SERVED rather than
+    re-solved: **10.57 s then 3.13 s, provenance `marked`**.
+
+    Gated by `test_gs_admission_axes.jl` arm G — same `gs_stage_ref`, second
+    provenance `marked` while the first is unset, energies bit-equal — with a
+    positive control that a declaration which DIFFERS is not deduplicated,
+    without which the arm is satisfied by a cache that serves everything.
+
+    The gate earns its place because the frontier releases up to 64 stages: if
+    dedup stopped, a sweep whose points share a ground state would re-solve it
+    per point and nothing would say so except the wall clock. The corpus has
+    exactly that shape — 59 configs under `runs/klaus_quench/` share one id
+    (§5 item 2).
 
 **Two the design cannot mechanise, or fails outright.**
 
