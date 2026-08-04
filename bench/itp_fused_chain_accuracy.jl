@@ -59,7 +59,11 @@ const C1_RATIO = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : -0.024
 # LHY completely (measured under 2 % in every substep), so `none` exercises the
 # same diag + spin-mixing + DDI chain the fusion changes.
 const LHY = length(ARGS) >= 4 ? Symbol(ARGS[4]) : :polar_contact
-const DT = 0.002
+# dt is an ARGUMENT. At the production ratio r = −0.024 the shipped 2e-3 DIVERGES
+# — c₀ = 34465 there and the stability limit sits between 1e-3 and 2e-3, measured
+# in `bench/itp_stability_limit_vs_c0.jl` — so BOTH arms blew up and the fusion
+# could not be compared at that point at all. 5e-4 converged there in 15400 steps.
+const DT = length(ARGS) >= 5 ? parse(Float64, ARGS[5]) : 0.002
 const TOL = 1.0e-10
 
 function build(dt)
