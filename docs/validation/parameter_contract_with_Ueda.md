@@ -754,7 +754,7 @@ here so the contract covers the full pipeline.
 | 9.1 | Real-time propagator | `exp(-i·dt·H)` (signed: `cis(-dt·H)`) | _to fill_ | _to fill_ | Standard QM time evolution |
 | 9.2 | Imaginary-time propagator (ITP) | `exp(-τ·H)` with normalization renorm after each step | _to fill_ | _to fill_ | `src/solvers/ground_state/itp_loop.jl` |
 | 9.3 | Strang splitting | `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)` | _to fill_ | _to fill_ | `src/hamiltonian/integrator/split_step.jl` |
-| 9.4 | Inner V ordering | `diag SM singlet_pair tensor raman DDI raman tensor singlet_pair SM diag` (symmetric/palindrome) | _to fill_ | _to fill_ | Symmetric to preserve 2nd-order Strang accuracy |
+| 9.4 | Inner V ordering | `diag light_shift_offdiag SM singlet_pair tensor transverse_zeeman raman DDI raman transverse_zeeman tensor singlet_pair light_shift_offdiag SM diag` (symmetric/palindrome). Forward half declared once at `integrator/split_step.jl:542`; this row omitted `light_shift_offdiag` and `transverse_zeeman` until 2026-08-04 | _to fill_ | _to fill_ | Symmetric to preserve 2nd-order Strang accuracy |
 | 9.5 | Default integrator order | Strang (2nd-order). Higher: Yoshida-4, CFET4 opt-in | _to fill_ | _to fill_ | `_YOSHIDA_W0 < 0` is correct (backward middle substep) |
 
 ## 10. Initial state conventions

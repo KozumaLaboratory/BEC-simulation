@@ -127,7 +127,7 @@ Four primitives:
 ## Wavefunction conventions
 
 - **Layout**: `psi[x, y, …, c]`. Spatial dims first, spinor last. `c=1 → m=F`, `c=D → m=−F`.
-- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric: `diag SM singlet_pair tensor raman DDI raman tensor singlet_pair SM diag`. Substeps auto-skip on ≈ 0 coupling.
+- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric: `diag light_shift_offdiag SM singlet_pair tensor transverse_zeeman raman DDI raman transverse_zeeman tensor singlet_pair SM light_shift_offdiag diag` — the forward half is declared once at `integrator/split_step.jl:542`. (This line listed five operators until 2026-08-04, omitting `light_shift_offdiag` and `transverse_zeeman`.). Substeps auto-skip on ≈ 0 coupling.
 - **Two interaction paths**, auto-selected in `make_workspace`:
   - **c₀/c₁ path**: `diagonal(c₀) + spin_mixing(c₁) + singlet_pair(c₂) + tensor(residual c₄, c₆, …)`.
   - **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, `c₀ = c₁ = 0`.
