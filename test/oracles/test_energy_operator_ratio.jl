@@ -3,7 +3,7 @@ using SpinorBEC
 using SpinorBEC: HamTerm, build_h_terms_registry, build_gradient_context,
     build_energy_context, apply_operator!, energy_contribution,
     energy_operator_ratio, operator_and_energy_via_registry!,
-    energy_decomposition, _realdot, H_TERMS_CANONICAL_ORDER
+    energy_decomposition, _realdot, H_TERMS_CANONICAL_ORDER, make_light_shift
 
 # `energy_operator_ratio(term)` asserts that
 #
@@ -20,6 +20,13 @@ using SpinorBEC: HamTerm, build_h_terms_registry, build_gradient_context,
 # commit: a wrong `r` is a wrong energy in every L-BFGS line search on the CPU,
 # and nothing else would notice, because the propagator does not use it.
 
+# The first version of this fixture lit up FIVE terms — kinetic, trap, zeeman,
+# c0, c1 — and the coverage guard was written as a count, which I then lowered
+# from 6 to 5 when it failed instead of widening the fixture. The terms it never
+# touched included LHY, and a wrong LHY ratio moved the total energy by 0.93 %,
+# which a cache-hit verdict check in `test_gs_admission_axes.jl` caught instead
+# of this file. A per-term gate whose fixture activates a third of the terms is
+# a per-term gate for a third of the terms.
 function _ws_all_terms()
     grid = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0)))
     ws = make_workspace(;
@@ -29,6 +36,13 @@ function _ws_all_terms()
         potential=HarmonicTrap((1.0, 1.1, 0.9)),
         sim_params=SimParams(; dt=0.005, n_steps=1),
         enable_ddi=true, c_dd=1.5,
+        spinor_lhy=:polar_contact,
+        light_shift=make_light_shift(; F=1, alpha_vector=0.12, alpha_tensor=0.2,
+            profile=[
+                exp(-(x^2 + y^2 + z^2) / 8) for x in range(-3, 3; length=8),
+                y in range(-3, 3; length=8), z in range(-3, 3; length=8)
+            ]),
+        rotating_frame_omega=0.3,
     )
     # A state with structure in every component, so no term is accidentally
     # evaluated at zero — a ratio checked against 0 == 0 is checked against
@@ -86,10 +100,13 @@ end
         # five, which said nothing about which term was missing; a count is the
         # wrong instrument for a coverage claim.
         @info "terms whose ratio was actually exercised" checked
-        for required in (:KineticTerm, :TrapTerm, :ZeemanTerm, :DensityC0Term)
+        # By NAME, and the list is the fixture's job description. LHY, the
+        # light shift and Coriolis are here because their absence is what let a
+        # wrong ratio through.
+        for required in (:KineticTerm, :TrapTerm, :ZeemanTerm, :DensityC0Term,
+            :SpinC1Term, :DDITerm, :LHYTerm, :LightShiftTerm, :CoriolisTerm)
             @test required in checked
         end
-        @test length(checked) >= 5
     end
 
     @testset "the registry total matches energy_decomposition" begin
