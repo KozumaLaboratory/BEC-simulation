@@ -359,7 +359,16 @@ day of work.
    `c1_ratio` against the dip could not have worked.
 3. **Systematic errors before residuals.** State the systematic on every axis
    first. A statistical bootstrap that omits a quoted systematic reports a σ that
-   is a fiction. No parameter can be constrained below the systematic.
+   is a fiction. No parameter can be constrained below the systematic. This binds
+   the axes you hold **fixed**, not only the one you scan: a parameter effect
+   measured at one point on an axis carrying a large systematic is not a
+   measurement of that parameter. Measured 2026-08-04 — `q`'s effect on the
+   m = −6 time series was 0.0200, while moving the field 1.36 nT at fixed `q`
+   moved it 0.0416, and the published field offset error is ±10 nT. Six GPU arms
+   established that nothing there was resolvable. Compare every parameter effect
+   against the observable's variation across the held-fixed axis's systematic
+   before interpreting it; prefer an observable that is invariant under the
+   systematic (a dip *width* survives a field offset, a dip *centre* does not).
 4. **Rejection criterion written into the config before launch.** "Centre within
    0.005 nT; not worth taking beyond 0.01" made the DDI-padding verdict
    automatic. Without it, a run finishes and the interpretation is chosen

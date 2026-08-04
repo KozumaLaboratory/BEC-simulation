@@ -178,6 +178,41 @@ measurement of what it costs.
     draft of those two configs patched only the inline value, which would have run
     both arms at 2.6 nT.
 
+## 7. And none of it is resolvable — the field systematic dominates
+
+`xfer_q0_b{m,p}` bracket q = 0 across ±0.68 nT, the shift q/h = 1 Hz imparts to
+the resonance. m = −6's rms, over 1.36 nT of field at fixed q = 0:
+
+| B [nT] | 1.92 | 2.60 | 3.28 |
+|---|---|---|---|
+| m = −6 rms | 0.1142 | **0.0726** | 0.1080 |
+
+The observable moves **0.0416 over 1.36 nT**. The effect of `q` that this arm set
+out to interpret — 0.0926 at their 1 Hz vs 0.0726 at 0 — is **0.0200, i.e. 48 % of
+that**. And the paper quotes up to **10 nT of offset error** on the field axis
+(Fig. 4 caption), 7.4× the range just scanned.
+
+So the pre-recorded criterion resolves, but not to either branch it anticipated:
+the better bracket point is 0.1080, neither the 0.073 that would have made the
+improvement a rate effect nor the 0.093 that would have made it detuning. The
+reading is the third possibility — **a single-field time series cannot constrain
+any of these parameters**, because the observable's dependence on the field
+within the quoted systematic exceeds every parameter effect measured.
+
+That is gate 3 of `CLAUDE.md` arriving one step late: the systematic was written
+down for the Fig. 4B *dip* comparison, where it is handled correctly (a dip
+*width* is invariant under an offset; a dip *centre* is not, which is why the
+centre was never quoted as agreement). A single-field cut through that dip
+inherits the offset with nothing to average it out.
+
+**What this closes and what it does not.** The transfer-rate line of attack is
+closed at this observable: `c1_ratio` is excluded on its own merits (worse in
+both directions, §6), and `q` cannot be assessed here at all. What remains sound
+is the dip-shape comparison, which is offset-invariant: our width and theirs
+agree to 0.10 %, and both miss the experiment's by 14–15σ with the two residual
+patterns correlated at 0.9705. That is a statement about their model against
+their experiment, and no parameter of ours enters it.
+
 ## What is left
 
 
