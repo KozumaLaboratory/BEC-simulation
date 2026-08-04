@@ -1,6 +1,13 @@
 > **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 
+> **Vintage.** The numbers here — including `|Ω| / ω_⊥ = 0.468`, quoted to three
+> significant figures — predate `bce2068f` (2026-07-29), which reverted the field
+> sign across 211 Eu configs, and have not been re-derived since. The sheet that
+> carries the full argument is `docs/manuscript/klaus_protocol_sheet.md`; the 11x
+> quadratic-Zeeman correction is measured NOT to apply in this nT band
+> (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
+
 <!-- promoted from agent memory `klaus_quench_protocol_pivot_2026_05_26.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- Eu spinor rotation+quench protocol — 2-phase rotation-prep+weak-field-quench scan. Load-bearing observable is post-quench m=-5,-4 excitation, not bare ⟨F_z⟩. Previously called "Klaus protocol" based on a confabulated paper attribution; the protocol design is original to this project. -->
 

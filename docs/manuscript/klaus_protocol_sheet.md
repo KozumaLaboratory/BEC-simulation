@@ -3,6 +3,26 @@
 > **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 
+> ## Vintage — read before using any number on this sheet
+>
+> Every number here was produced **before 2026-07-29**, when `bce2068f`
+> ("211 Eu configs pinned m=-F under a field that prefers m=+F") reverted the
+> field sign across the Eu config corpus. The prescriptions below — including
+> `|Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT`, quoted to three significant
+> figures — have **not** been re-derived since. Treat them as the best estimate
+> of 2026-05-26, not as a current recommendation, and re-run before setting a
+> knob in the lab.
+>
+> What does **not** apply, measured rather than assumed: the 11x
+> quadratic-Zeeman geometry-factor correction (`q_geometry` 35/144 → 455/20592)
+> cannot move this sheet. At 2.6 nT, `q/h = 9.6e-7 Hz` against `p/h = 42.3 Hz`
+> — a ratio of 2.3e-8, so an 11x error on it is still 1e-5 Hz (`ed3be749`,
+> 2026-07-30). That correction disqualifies the gauss-band scans, not this one.
+>
+> "Publication-grade, all 6 acceptance gates PASS" below is a statement about
+> **2026-05-26's gates and 2026-05-26's field convention**. It is left as
+> written because it is what the record said; it is not a claim about today.
+
 **Status (2026-05-26):** publication-grade.  All 6 acceptance gates
 PASS; mechanism (Fig K10) verified to be Jz-conservation-driven
 orbital mode selection under H − ΩL_z.  See
