@@ -10,7 +10,11 @@ using SpinorBEC
 using SpinorBEC: ground_state_preflight, print_preflight, passed
 
 @testset "ground state preflight" begin
-    ok_ip = InteractionParams(Dict(0 => 4687.3, 1 => -100.0))   # c₀ > 0, c₁ < 0
+    # c₀ > 0 with c₁ < 0 and NO material cancellation: c₀ + 36c₁ = 3967, i.e. 85 %
+    # of c₀. The first version used c₁ = −100, which puts the combination at 23 %
+    # of c₀ — inside the stiff near-pole band — so the "clean setup" fixture was
+    # itself a point the cancellation rule correctly flags, and the control failed.
+    ok_ip = InteractionParams(Dict(0 => 4687.3, 1 => -20.0))
     bad_ip = InteractionParams(Dict(0 => -5859.1, 1 => 293.0))  # c₀ < 0: past −1/36
 
     @testset "a clean production setup PASSES" begin
@@ -103,6 +107,32 @@ using SpinorBEC: ground_state_preflight, print_preflight, passed
             method=:lbfgs)
         @test passed(r)
         @test occursin("SHIPPED DEFAULT", r.summary)
+    end
+
+    @testset "near the −1/F² pole, a large c₀ is flagged as CANCELLATION" begin
+        # c₀ + 36c₁ is what the scattering data fixes; near the pole c₀ and c₁ blow
+        # up individually while cancelling, and the measured ITP dt limit tracks
+        # the SUBSTEP rather than the physics (7× the combination at fixed c₀ left
+        # the limit unchanged). So a large c₀ of that kind is a numerical trap, not
+        # a strong interaction.
+        c_total, F2 = 4687.3, 36
+        r = -0.024
+        c0 = c_total / (1 + F2 * r)
+        near = ground_state_preflight(;
+            interactions=InteractionParams(Dict(0 => c0, 1 => r * c0)),
+            c_dd=211.0, spinor_lhy=:polar_contact, method=:lbfgs)
+        @test passed(near)                       # a caveat, not a blocker
+        @test occursin("CANCELLATION", near.summary)
+        @test occursin("dt-free", near.summary)
+
+        # And a point with the SAME physics but no cancellation must NOT be
+        # flagged, or the rule is "large c₀ is bad" rather than "cancelling c₀ is
+        # misleading".
+        plain = ground_state_preflight(;
+            interactions=InteractionParams(Dict(0 => c_total, 1 => 0.0)),
+            c_dd=211.0, spinor_lhy=:polar_contact, method=:lbfgs)
+        @test passed(plain)
+        @test !occursin("CANCELLATION", plain.summary)
     end
 
     @testset "the report states what it does NOT cover" begin

@@ -38,4 +38,12 @@ fi
 # Filter CUDA's library-path box by CONTENT. Never by the box glyphs alone: they
 # are what Julia's own @warn uses, and matching on them once deleted the single
 # line explaining two failed measurement rounds.
+# Cell-timing sink, exported HERE so a new submit script cannot forget it. Three
+# benches in a row had their per-cell instrumentation land in a node-local
+# `tempdir()` because the script did not export this, and each time the result was
+# a run with no visibility into where its time went.
+export SPINORBEC_GAP_CACHE="${SPINORBEC_GAP_CACHE:-/gs/fs/tga-kozuma-kouhi/uk07267/gap_cache}"
+export SPINORBEC_CELL_TIMING="${SPINORBEC_CELL_TIMING:-$SPINORBEC_GAP_CACHE/cell_timing.log}"
+mkdir -p "$SPINORBEC_GAP_CACHE"
+
 CUDA_NOISE='loaded from a system path|This may cause errors|If you.re running under a profiler|ensure that your library path|In any other case, please file an issue|^│ *$|^└ @ CUDA|^┌ Warning: CUDA runtime library'
