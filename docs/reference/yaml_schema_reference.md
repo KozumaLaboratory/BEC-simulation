@@ -233,7 +233,11 @@ either of those triggers an `ArgumentError` with a migration hint.
 
 The Zeeman Hamiltonian has two mathematically independent contributions:
 
-    H_Zeeman = -(g_F μ_B B · F) + q F_z²
+    H_Zeeman = -p·F_z + q·F_z²          # operator form (Kawaguchi-Ueda)
+             = +(g_F μ_B B · F) + q F_z²   # in lab field, since p ≡ -g_F μ_B B
+    # Read `-(g_F μ_B B · F)` until 2026-08-04 — the lab-field sign was inverted
+    # here and in docs/conventions/hamiltonian_sign_audit.md. +Bz on a g_F>0 atom
+    # (Eu, Cr, He*) gives ground state m = -F. Declared once in Units.bfield_to_p.
                ↑ vector (chooses coord system)   ↑ scalar (orthogonal)
 
 The vector term `B · F` accepts three input coord systems, auto-detected

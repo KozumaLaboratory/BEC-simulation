@@ -114,11 +114,13 @@ Applied **once** at the start of the dynamics phase, after ψ is copied from the
 - dynamics:
     duration: 30.0
     dt: 0.005
-    save_every: 100
-    save_psi_snapshots: true
-    save_snapshot_precision: "f32"
+    save: {every: 100, psi: true, precision: f32}
     interactions: {omega_ref: 691.15}
-    zeeman: {p: {from: 1.0, to: 0.39}, q: 0.0}
+    B:                                          # NOT `zeeman:` — see below
+      Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}
+      theta: 0.0
+      phi: 0.0
+      q: 0.00909116
     sgpe:              {gamma: 0.05, T: 0.1, every: 1, seed: 42}
     photon_scattering: {Gamma_sc: 0.01, seed: 42}
     loss:              {gamma_dr: 0.02}
@@ -128,3 +130,21 @@ Applied **once** at the start of the dynamics phase, after ψ is copied from the
 ```
 
 The runner builds `cb_sgpe`, `cb_pgp`, `cb_photon`, `cb_live` and pipes them through `_compose_callbacks` into a single `on_step`.
+
+> **Two dead keys were removed from this example on 2026-08-04**, both verified
+> against the live schema by feeding the block itself to `inspect_config_string`.
+>
+> **`save:`, not three flat keys.** `save_every` / `save_psi_snapshots` /
+> `save_snapshot_precision` were folded into one `save:` block
+> (`every` / `psi` / `precision` / `n_snapshots` / `compression`, per
+> `SAVE_SCHEMA`). The flat spellings are rejected as unknown keys.
+>
+> **`B:`, not `zeeman:`.** This example carried `zeeman: {p: …, q: …}` until
+> 2026-08-04. A step-level `zeeman:` key is refused by the schema outright —
+> `step has step-level \`zeeman:\` key — not a valid user-facing field. Magnetic
+> field belongs in the unified \`B:\` block` — so anyone who copied this block
+> into a config got an error at load. The form above is taken from a config that
+> runs (`runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.yaml:115-122`), and it ramps
+> the FIELD rather than `p`: magnitude (`Bz` / `B_mag` / `p_mv`) plus direction
+> (`theta` / `phi`), with `q` auto-derived from |B|² unless given. The `p ≡ -g_F
+> μ_B B` conversion lives once in `Units.bfield_to_p`.

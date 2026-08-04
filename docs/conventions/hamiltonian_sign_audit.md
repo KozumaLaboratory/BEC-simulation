@@ -36,8 +36,19 @@ The single canonical Hamiltonian spec:
 H_total = H_kinetic + H_trap + H_Zeeman + H_interaction
         + H_DDI + H_rotating_frame + H_drive + H_loss
 
-H_Zeeman = -(g_F μ_B B · F) + q F_z²
-           = -p·F_z - bx·F_x - by·F_y + q·F_z²
+H_Zeeman = -p·F_z - bx·F_x - by·F_y + q·F_z²          # the OPERATOR form
+         = +(g_F μ_B B · F) + q F_z²                   # what that is, in lab field
+
+The second line read `-(g_F μ_B B · F)` until 2026-08-04, i.e. this file — which
+CLAUDE.md names as the physics convention authority and says "every other Zeeman
+reference derives from" — had the lab-field sign INVERTED. The operator form was
+right; the conversion to a field was not.
+
+The single declaration is `Units.bfield_to_p` (`src/workflow/io/units.jl`):
+`p ≡ -g_F μ_B B`, because the atomic moment is `μ = -g_F μ_B F` (Kawaguchi-Ueda).
+Substituting into `-p·F_z` gives `+g_F μ_B B·F_z`, not minus. The directional
+consequence, which is what a reader is here for: **+Bz on a g_F > 0 atom (Eu, Cr,
+He*) gives a ground state at m = -F.** Same statement as CLAUDE.md:153.
 
 H_rotating_frame = -Ω·(L_z + F_z)
                   ≡ Coriolis (-Ω·L_z) + Barnett (-Ω·F_z, via p_eff = p+Ω)
