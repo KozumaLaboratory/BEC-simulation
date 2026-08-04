@@ -1,5 +1,9 @@
 # What limits L-BFGS on Eu-151 F=6 +DDI
 
+> **FROZEN 2026-08-04.** A measurement report for the tree as of this date, not a
+> maintained description of the code. Live sources: `CLAUDE.md`, and
+> `src/solvers/lbfgs/` itself.
+
 Scope: `find_ground_state_lbfgs` (`src/solvers/lbfgs/`), measured 2026-07-29 to
 2026-08-04. Supersedes the per-iteration half of
 [`lbfgs_iteration_cost.md`](lbfgs_iteration_cost.md), which is frozen at
