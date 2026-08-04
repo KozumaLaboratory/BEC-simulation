@@ -93,6 +93,11 @@ function _magnetic_gradient_energy(psi, ws, ndim, n_pts, dV)
     return coeff * E * dV
 end
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body scalar tilt.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::MagneticGradientTerm) = 1.0
+
 function energy_contribution(::MagneticGradientTerm, psi::AbstractArray{<:Complex}, ws)
     N = ndims(psi) - 1
     n_pts = ntuple(d -> size(psi, d), Val(N))
