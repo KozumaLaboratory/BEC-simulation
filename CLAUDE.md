@@ -407,13 +407,23 @@ Cost regime is permanent: this codebase pays a JIT cascade because Workspace is 
 - **30-min hang regime**: `Dict{Symbol,Any}` or closure escape into Workspace path. Silent inference explosion.
 - **GPU split**: WSL2 consumer card for audits / dashboard / smoke (< 2 h). TSUBAME (`UGEBackend`) for multi-cell sweeps, dynamics 128³+, seed × cell arrays (`docs/guides/tsubame.md`).
 - **Smoke-test discipline**: before any > 10 min launch, render with `--smoke` (low ITP step count, every code path, ≤ 2 min on GPU). CPU success ⇏ GPU works. Verify state symbols + kwargs by grep first.
-- **Background long jobs**:
+- **Background long jobs**, and make them record their own exit status — a PID
+  disappearing says nothing about success, and that is the shape of an OOM kill:
   ```
-  setsid nohup bash -c 'julia ...' > logs/x.log 2>&1 < /dev/null &
+  setsid nohup bash -c 'julia ... > logs/x.log 2>&1; echo $? > logs/x.rc' < /dev/null &
   disown
   ```
   Verify: `ps -o pid,ppid,sid,cmd -C julia` — `PID == SID` = session leader, survives Claude close.
 - **Don't idle while a long-running task is in flight.** Background with `run_in_background: true` and start next independent task. Completion notifications are the signal; polling is wasted time.
+- **Never say "I'll report when it's done" without leaving a process that exits when
+  it is.** There is no clock here: a promise to report later is empty unless some
+  backgrounded process's *exit* supplies the turn. Polling inside one turn dies
+  with the turn. Use `scripts/watch_until_done.sh {gh-run|tsubame-job|local-pid} <id>`
+  with `run_in_background: true`; it exits 0 GREEN / 1 RED / 2 TIMEOUT / 3 UNKNOWN,
+  names the failing units, and **never folds absence or a deadline into green**.
+  `--canary` proves RED and UNKNOWN are reachable before a GREEN from it is worth
+  anything — five incidents in this project shipped monitors that could only
+  return the verdict being hoped for.
 
 ## Memory ↔ CLAUDE.md split
 
@@ -424,7 +434,16 @@ Cost regime is permanent: this codebase pays a JIT cascade because Workspace is 
   - `gotcha_*.md` — sharp edges (B_mag spherical form, `ip[n] ≠ g_S`, FG Wick rotation sign, TWA chaos, autopilot timer + JIT WSL crash, …).
   - `project_*.md` — active arc context (Eu phase diagram North Star, validation pivot, …). Decay fast.
   - `reference_*.md` — external systems pointers (TSUBAME 4, web stack, WSL2 networking, Caddy admin socket, dashboard auth boundary, …).
-- **`MEMORY.md` index** is the always-loaded TOC.
+- **`MEMORY.md` index** is the always-loaded TOC — and it has a hard **24.4 KB load
+  limit**. On 2026-08-04 it was 43 % over, so 55 of its 133 lines (41 %) had not
+  been loaded in any session, which is silent: the warning names the file, not the
+  entries that fell off the end. Keep it under the limit — one line per memory,
+  under ~200 chars — and when a section outgrows that, move the entries
+  **verbatim** into a `memory_index_*.md` sub-index and leave a pointer. Before
+  and after any such move, check both directions: no index item may vanish from
+  the union of index + sub-indexes, and the reachable/total file count must not
+  drop. A rule that only lives in memory may therefore not be loaded at all —
+  anything that must fire every session belongs **here**.
 
 When CLAUDE.md and a memory file disagree: **CLAUDE.md wins for structural questions** (conventions, architecture); memory wins for per-incident lessons (what specifically went wrong, what to verify). Cross-link with `[[name]]` from memory files when a new mistake should crystallise into CLAUDE.md.
 
