@@ -1,5 +1,8 @@
 # Paper #3 v3 (Comprehensive): Universal Structure Theorem for Lee-Huang-Yang Corrections in Spinor Bose-Einstein Condensates
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Tentative title**: "A representation-theoretic universal structure for Lee-Huang-Yang
 corrections in symmetric spinor Bose-Einstein condensates"
 

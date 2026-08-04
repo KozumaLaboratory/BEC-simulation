@@ -1,5 +1,8 @@
 # Matsui 2026 Eu-151 EdH — reproduction status
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **As of 2026-05-26.** Replaces all prior "Matsui-inspired" YAMLs with
 parameter set matching the published paper (Matsui et al., Science
 2026, DOI:10.1126/science.adx2872; arXiv:2504.17357), per anko's

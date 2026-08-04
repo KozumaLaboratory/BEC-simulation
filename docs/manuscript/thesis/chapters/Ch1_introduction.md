@@ -1,5 +1,8 @@
 # 修論 Chapter 1: 序論
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、本研究の motivation、background、および thesis structure を提示する。
 具体的には:
 

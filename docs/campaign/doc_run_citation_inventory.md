@@ -1,5 +1,8 @@
 # Which cited run directories are missing, and which of them back a claim
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Closes the gap `docs/campaign/CAMPAIGN.md` §1 leaves open — "a guard written to
 scan only `runs/` on main would miss ~251 files. Worth pinning down before S-G0
 writes the pre-flight check."

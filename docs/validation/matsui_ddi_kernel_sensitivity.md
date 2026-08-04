@@ -1,5 +1,8 @@
 # The Fig. 4B dip centre is set by the DDI kernel treatment, not by the couplings
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Session S-A6 follow-up, 2026-07-31. Producing commit `34040527`, UGE 8307517
 task 9, exit 0, 100 points. Type A (code-to-code sensitivity) except where
 marked.

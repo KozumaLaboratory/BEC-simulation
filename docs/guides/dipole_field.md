@@ -1,5 +1,8 @@
 # Dipolar magnetic field radiated by a cloud
 
+> **FROZEN 2026-06-10.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The field a spin-polarised condensate radiates is the magnetostatic analogue
 of the DDI mean-field potential: the same k-space convolution with the dipole
 kernel `Q_αβ = k̂_α k̂_β − δ_αβ/3`, only the prefactor differs (μ₀·moment for a

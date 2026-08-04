@@ -1,5 +1,8 @@
 # TWA N scan: Eu post-quench coupling-strength scan
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: 3 ensembles complete 2026-05-07 16:00; runtime ~107 min on RTX 5070 Ti. Three production findings + one methodological note. **Code path**: `runs/N{1000,10000,100000}_<hash>/result.jld2` (example), analysed by `scripts/twa/twa_N_scan_analyze.jl`.
 
 **σ/μ interpretation note**: σ/μ in this regime measures chaotic trajectory divergence in the dipolar instability, not Wigner noise; see `docs/theory/sinatra_criterion_F6.md` "Caveat" + `twa_pinned_16g_result.md`. Finding B below (σ/μ peaks at marginal collapse) survives as a chaos-onset diagnostic; mean-field findings (Finding A, FWHM) are unaffected.

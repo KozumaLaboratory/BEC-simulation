@@ -1,3 +1,6 @@
+> **FROZEN 2026-08-04.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 {
   "summary": "Harvest every measurement and cause-isolation already performed across the repo into one re-readable ledger, with precision, controls, and what was ruled out",
   "agentCount": 8,

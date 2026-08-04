@@ -1,5 +1,8 @@
 # TWA on Eu post-quench EdH — what we learned
 
+> **FROZEN 2026-06-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Synthesis of 4 ensemble scans + 1 theory check. Raw data records of each scan live in the per-run files in this directory; this page is the place to read for "what does TWA tell us about Eu F=6 dipolar collapse".
 
 ## The setup

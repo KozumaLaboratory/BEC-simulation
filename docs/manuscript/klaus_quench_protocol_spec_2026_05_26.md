@@ -1,5 +1,8 @@
 # Klaus 2-phase quench protocol — spec & 10-cell scan
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 ## Matsui K_3 calibration (2026-05-27, 5-cell fine bracket)
 
 GPU dispatch of K3 ∈ {5, 10, 15, 20, 25} × K_3,proxy at the Matsui

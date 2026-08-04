@@ -1,5 +1,8 @@
 # 修論 Chapter 5: TWA + Chaotic Dipolar Dynamics in F=6 ¹⁵¹Eu
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、F=6 Eu スピノル BEC の post-quench dipolar instability dynamics に対する
 truncated Wigner approximation (TWA) ベースの beyond-mean-field treatment を扱う。
 中心結果は、Eu 平均場 collapse 境界における **σ/μ ≈ 0.4-0.8 の signal が leading-order

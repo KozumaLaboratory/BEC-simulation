@@ -1,5 +1,8 @@
 # F=6 icosahedral (I_h) Lee–Huang–Yang correction — closed form
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Stage**: D (parallel-session derivation 2026-05-07; verified numerically in this codebase via `test_icosahedral_lhy.jl`, 113 tests).
 
 ## Ground state

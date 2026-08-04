@@ -1,5 +1,8 @@
 # F=6 mean-field phase boundary scan in (g_10, g_12)
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: scan complete 2026-05-07. Full data at `runs/F6_phase_diagram/result.json` (321 KB), reproduced via `compute_F6_phase_diagram() |> dump_F6_phase_diagram_json` (see `src/analysis/phases/F6_phase_diagram.jl`).
 
 ## Setup

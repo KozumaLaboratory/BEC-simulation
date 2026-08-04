@@ -1,5 +1,8 @@
 # Hamiltonian sign convention audit
 
+> **FROZEN 2026-06-04.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Source of truth for every Hamiltonian term used in `SpinorBEC.jl`,
 the convention for each, the implementation paths that must agree, and
 the directional sign test that pins each.

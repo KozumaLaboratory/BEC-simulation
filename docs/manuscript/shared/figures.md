@@ -1,5 +1,8 @@
 # Figure inventory across papers and thesis
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Refinement-round-1 list. Each entry has:
 
   * a stable label (e.g. `paper3_FIG-2`) used as the placeholder in

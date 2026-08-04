@@ -1,5 +1,8 @@
 # ¹⁵¹Eu finite-temperature trap-shape optimization
 
+> **FROZEN 2026-07-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The definitive, finite-temperature version of the $T=0$ trap-shape study
 (`eu_shape_optimization.md`). At $T>0$ the shape optimum is governed by a
 competition the $T=0$ Gross–Pitaevskii picture cannot see, so we evolve the

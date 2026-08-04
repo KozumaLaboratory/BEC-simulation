@@ -1,5 +1,8 @@
 # Sinatra criterion for TWA validity in F=6 spinor BECs
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Stage**: validation infrastructure shipped 2026-05-07; awaiting GPU runs to fill in the empirical verdict (`docs/research_notes/twa_sinatra_validation.md`).
 
 ## TWA validity condition

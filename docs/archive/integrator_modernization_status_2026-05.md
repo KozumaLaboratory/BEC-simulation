@@ -1,3 +1,6 @@
+> **FROZEN 2026-05.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 <!-- promoted from agent memory `integrator_modernization_status.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- Current state, gates, and decisions for the higher-order-integrator effort on the lab path -->
 

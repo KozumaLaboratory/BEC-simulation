@@ -1,5 +1,8 @@
 # Measurement Campaign — Phase 2 (修論 deadline 直前)
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Purpose**: R32-R39 で実装した optimization / continuation インフラの ROI 数値を **実 Eu real-physics config で取得** する。Phase 1 の合成 検証は完了済み。Phase 2 は TSUBAME 1 週間の burst で全数値を揃える。
 
 **Owner**: anko (修論) **Reviewer**: TBD **Deadline**: 修論提出 (date TBD) **Compute**: TSUBAME 4.0 H100 (job array, f_node, T3TMPDIR scratch)

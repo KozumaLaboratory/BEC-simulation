@@ -1,5 +1,8 @@
 # Weak-field ¹⁵¹Eu ground-state library (reuse guide)
 
+> **FROZEN 2026-07-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The pinned B-scan (`scripts/eu_bscan_pinned_continuation.jl`) produces a
 **reusable dataset of converged ground states** ψ(B) across 0–90 µG, not just
 animation frames. Each `frame_NNN/psi.jld2` is a self-describing state that

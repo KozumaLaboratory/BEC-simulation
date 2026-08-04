@@ -1,5 +1,8 @@
 # Evaporative-cooling model (¹⁵¹Eu → BEC)
 
+> **FROZEN 2026-06-16.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 A 0-D truncated-Boltzmann model of evaporative cooling in the crossed optical
 dipole trap (FORT), for **simulating and optimizing the BEC-preparation ramp**.
 

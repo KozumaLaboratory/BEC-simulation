@@ -14,6 +14,8 @@ const FAST_TESTS = [
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
+    "test_docs_live_set.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",

@@ -1,5 +1,8 @@
 # Eu evaporation optimization (issue #75)
 
+> **FROZEN 2026-07-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Optimize the ¹⁵¹Eu forced-evaporation → BEC sequence over the physically-available control
 axes, maximizing the final condensate number $N_0$ subject to the real constraints (don't
 melt the condensate, keep it pure, hold it against gravity). This guide is the current-best
