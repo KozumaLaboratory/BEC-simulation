@@ -116,26 +116,49 @@ function main()
     end
 
     println()
-    if moved
-        println("  => NOT SETTLED. Eigenvalues move with the block size, so the")
-        println("     ladder is not the spectrum and no gap can be claimed.")
-    elseif !(res.converged[1] && res.converged[2])
-        println("  => NOT CONVERGED (modes 1-2). No gap claim.")
+    # The verdict is ASYMMETRIC, because every λ here is an upper bound that
+    # falls as the iteration proceeds. The first version demanded that λ₂
+    # converge, which is stricter than the question needs and made it report
+    # NOT SETTLED on data that already answered it:
+    #
+    #   gap ≤ 3 from upper bounds, with λ₁ settled  ⇒ CLUSTER, established.
+    #     λ₂ can only fall, so the gap can only shrink. Nothing further to learn.
+    #   gap > 3 from upper bounds                   ⇒ NOT established.
+    #     λ₂ falling would close the gap, so this needs λ₂ converged.
+    #
+    # "λ₁ settled" is the block-size control, not the residual: an eigenvalue
+    # that moves when the block grows was not converged whatever its residual
+    # said. That failure is the one three earlier verdicts on this task shared.
+    λ1_settled = abs(res2.λ[1] - res.λ[1]) / max(abs(res.λ[1]), eps()) <= 0.05
+    gap_ub = res2.λ[2] / res2.λ[1]
+    @printf("  λ₁ settled across block sizes: %s   gap upper bound λ₂/λ₁ ≤ %.2f\n",
+        λ1_settled, gap_ub)
+    if !λ1_settled
+        println("  => NOT SETTLED. λ₁ itself moves with the block size, so neither")
+        println("     the bound nor the gap means anything yet.")
+    elseif gap_ub <= 3
+        κ1 = MU_MAX / res2.λ[1]
+        κ2 = MU_MAX / res2.λ[2]
+        println("  => a CLUSTER, and this is established rather than suspected:")
+        println("     λ₂ is an upper bound, so the gap can only shrink from here.")
+        @printf("     Rank-1 deflation moves κ from %.2e to at best %.2e,\n", κ1, κ2)
+        @printf("     i.e. n from %.0f to at best %.0f — %.0f %%, not a factor.\n",
+            n_iters_for(κ1), n_iters_for(κ2),
+            100 * (1 - n_iters_for(κ2) / n_iters_for(κ1)))
+        k = findfirst(i -> res2.λ[i] / res2.λ[1] > 3, eachindex(res2.λ))
+        k === nothing ?
+        @printf("     No gap above 3 anywhere in this block, so the rank needed is > %d and unbounded here.\n",
+            length(res2.λ)) :
+        println("     The first gap above 3 is past mode $(k - 1), so that is the rank needed.")
+    elseif res.converged[2]
+        @printf("  gap λ₂/λ₁ = %.2f\n", gap_ub)
+        κ1 = MU_MAX / res2.λ[1]
+        κ2 = MU_MAX / res2.λ[2]
+        @printf("  => ISOLATED. Rank-1 deflation moves κ from %.2e to %.2e, n from %.0f to %.0f.\n",
+            κ1, κ2, n_iters_for(κ1), n_iters_for(κ2))
     else
-        gap = res.λ[2] / res.λ[1]
-        @printf("  gap λ₂/λ₁ = %.2f\n", gap)
-        if gap > 3
-            @printf("  => ISOLATED. Rank-1 deflation takes κ from %.2e to %.2e,\n",
-                MU_MAX / res.λ[1], MU_MAX / res.λ[2])
-            @printf("     i.e. n from %.0f to %.0f.\n",
-                n_iters_for(MU_MAX / res.λ[1]), n_iters_for(MU_MAX / res.λ[2]))
-        else
-            k = findfirst(i -> res.λ[i] / res.λ[1] > 3, eachindex(res.λ))
-            println("  => a CLUSTER. Rank 1 buys almost nothing.")
-            k === nothing ?
-            println("     No gap within this block; the rank needed is above $(length(res.λ)).") :
-            println("     The first real gap is above mode $(k - 1), so that is the rank needed.")
-        end
+        println("  => a gap above 3 from UPPER bounds, which is not enough: λ₂ falling")
+        println("     would close it. Needs λ₂ converged before any claim.")
     end
 end
 
