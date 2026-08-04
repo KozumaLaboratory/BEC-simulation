@@ -1,5 +1,8 @@
 # 修論 Chapter 4: Universal Structure Theorem for Polyhedral LHY Corrections
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本章では、Chapter 3 で確立した F=2 cyclic phase の Lee-Huang-Yang (LHY) 閉形式
 (式 (3.1)) を一般化し、polyhedral 残存対称性を持つ任意のスピノル BEC inert phase
 に対する **Universal Structure Theorem** を確立する。本章は本研究の表現論的 core

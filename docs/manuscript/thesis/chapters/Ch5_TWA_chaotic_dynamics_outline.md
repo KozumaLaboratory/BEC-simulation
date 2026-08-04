@@ -1,5 +1,8 @@
 # 修論 Chapter 5: TWA + Chaotic Dipolar Dynamics in F=6 ¹⁵¹Eu (outline)
 
+> **FROZEN 2026-05-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: outline draft 2026-05-08, framing revision after May-7/8
 GPU run sequence. Replaces / supersedes the earlier "TWA quantum
 fluctuations" framing once the chaotic-instability interpretation

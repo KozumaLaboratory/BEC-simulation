@@ -1,5 +1,8 @@
 # Perf / Accuracy Scorecard
 
+> **FROZEN 2026-07-22.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 _Generated 2026-07-21T22:20:01.351 from `observability/history.jsonl` (8 records). No composite score, no arbitrary targets — ratchet metrics track best-so-far vs a physical/hardware bound._
 
 ## Ratchet metrics (optimise forever · env_class = tsubame_h100_node_q)

@@ -7,7 +7,7 @@
 #$ -N matsui_fit
 #$ -l gpu_1=1
 #$ -l h_rt=2:00:00
-#$ -t 1-47
+#$ -t 1-55
 #$ -j n
 
 set -euo pipefail
@@ -35,28 +35,11 @@ for c in $(grep -oE 'runs/matsui_fit/[A-Za-z0-9_.]+\.yaml' "$0"); do
     [ -f "$c" ] || { echo "missing config: $c" >&2; exit 1; }
 done
 
+for f in runs/matsui_fit/*.yaml; do
+    grep -q "CONFIG=$f " "$0" || { echo "config not wired into any task: $f" >&2; exit 1; }
+done
+
 case "${SGE_TASK_ID:-1}" in
-    1) CONFIG=runs/matsui_fit/fit_c1ratio_m0139.yaml ;;
-    2) CONFIG=runs/matsui_fit/fit_c1ratio_0.yaml ;;
-    3) CONFIG=runs/matsui_fit/fit_c1ratio_00069.yaml ;;
-    4) CONFIG=runs/matsui_fit/fit_c1ratio_00278.yaml ;;
-    5) CONFIG=runs/matsui_fit/fit_c1ratio_01111.yaml ;;
-    6) CONFIG=runs/matsui_fit/fit_c1ratio_0p15.yaml ;;
-    7) CONFIG=runs/matsui_fit/fit_c1ratio_0p2.yaml ;;
-    8) CONFIG=runs/matsui_fit/fit_c1ratio_0p25.yaml ;;
-    9) CONFIG=runs/matsui_fit/fit_c1ratio_0p3.yaml ;;
-    10) CONFIG=runs/matsui_fit/fit_expN_r036.yaml ;;
-    11) CONFIG=runs/matsui_fit/fit_expN_r015.yaml ;;
-    12) CONFIG=runs/matsui_fit/fit_expN_r030.yaml ;;
-    13) CONFIG=runs/matsui_fit/fit_k3_1p2em27.yaml ;;
-    14) CONFIG=runs/matsui_fit/fit_k3_3p6em27.yaml ;;
-    15) CONFIG=runs/matsui_fit/fit_k3_1p2em26.yaml ;;
-    16) CONFIG=runs/matsui_fit/fit_k3real_1em30.yaml ;;
-    17) CONFIG=runs/matsui_fit/fit_k3real_1em29.yaml ;;
-    18) CONFIG=runs/matsui_fit/fit_k3real_1em28.yaml ;;
-    19) CONFIG=runs/matsui_fit/fit_hold_T52.yaml ;;
-    20) CONFIG=runs/matsui_fit/fit_hold_T54.yaml ;;
-    21) CONFIG=runs/matsui_fit/fit_hold_T52r200.yaml ;;
     22) CONFIG=runs/matsui_fit/fit_paperN_r036.yaml ;;
     23) CONFIG=runs/matsui_fit/fit_paperN_r018.yaml ;;
     24) CONFIG=runs/matsui_fit/fit_paperN_r009.yaml ;;
@@ -82,6 +65,14 @@ case "${SGE_TASK_ID:-1}" in
     45) CONFIG=runs/matsui_fit/sdloss_5em40.yaml ;;
     46) CONFIG=runs/matsui_fit/sdloss_2em39.yaml ;;
     47) CONFIG=runs/matsui_fit/sdloss_dip.yaml ;;
+    48) CONFIG=runs/matsui_fit/fig2c_n35k.yaml ;;
+    49) CONFIG=runs/matsui_fit/fig2c_loss.yaml ;;
+    50) CONFIG=runs/matsui_fit/xfer_c1_low.yaml ;;
+    51) CONFIG=runs/matsui_fit/xfer_c1_high.yaml ;;
+    52) CONFIG=runs/matsui_fit/xfer_q_zero.yaml ;;
+    53) CONFIG=runs/matsui_fit/xfer_q_high.yaml ;;
+    54) CONFIG=runs/matsui_fit/xfer_q0_bm.yaml ;;
+    55) CONFIG=runs/matsui_fit/xfer_q0_bp.yaml ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 

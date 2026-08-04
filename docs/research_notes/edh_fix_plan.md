@@ -1,5 +1,8 @@
 # EdH Simulation Fix Plan
 
+> **FROZEN 2026-05-13.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 ## Root Cause
 `temperature_ratio: 0.1` (T/Tc=10%) is far too large. Paper says "negligible thermal component".
 White noise × 12 spin components × all k-modes → DDI amplifies everything → patternless dispersion.

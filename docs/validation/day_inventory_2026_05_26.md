@@ -1,5 +1,8 @@
 # Day inventory — 2026-05-26
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 > **Vintage note.** The `runs/` results this document cites predate every
 > physics correction merged after 2026-06-02 — including a quadratic Zeeman
 > that was 11× too large for Eu until 2026-07-08. See

@@ -1,5 +1,8 @@
 # Cover Letter — Paper #1 (F=2 cyclic LHY)
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Target journal**: Physical Review A (PRA Rapid Communications or Regular Article)
 
 **Title**: Analytic Lee-Huang-Yang correction for the cyclic phase of an F=2 spinor Bose-Einstein condensate

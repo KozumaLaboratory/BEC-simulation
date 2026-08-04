@@ -1,5 +1,8 @@
 # Integrator Architecture Completion — Master Plan (2026-05-12)
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Scope**: A1–A4 sub-phase program to bring the SpinorBEC.jl integrator
 suite from "Y4-midpoint baseline + Track C v3.1 lab-path FG + Step 1c
 direct-commutator v4 prototype" to production-grade Full Force-Gradient (spinor + DDI)

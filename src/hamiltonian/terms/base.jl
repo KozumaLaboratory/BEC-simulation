@@ -75,6 +75,32 @@ is the single source of truth.
 function apply_operator! end
 
 """
+    energy_operator_ratio(term::HamTerm) -> Float64
+
+The constant `r` in `energy_contribution(term, ψ, ws) == r · Re⟨ψ, H_term·ψ⟩ · dV`.
+
+This is not new physics — it is the trinity convention two paragraphs up, made
+callable. Every GP term's energy is a fixed rational multiple of the operator
+expectation the gradient traversal already forms: `1` for the one-body terms,
+`1/2` for the density-quadratic mean-field ones, `2/5` for LHY, where
+`V = dε/dn` and `ε ∝ n^(5/2)` so `n·V = (5/2)ε`.
+
+Writing it down lets `operator_and_energy_via_registry!` return the total energy
+from the SAME pass that builds `H·ψ`, instead of the CPU L-BFGS iteration paying
+a second full traversal for it — measured at 6.6 ms of a ~30 ms iteration.
+
+`NaN` means "not derivable this way"; the caller then falls back to that term's
+own `energy_contribution`. That is the default, so a new term costs correctness
+nothing by omitting it — only speed.
+
+This is a SECOND statement of each term's energy, which is exactly what the
+architecture forbids ungated. It is gated per term, from its first commit, by
+`test/oracles/test_energy_operator_ratio.jl`, which compares the derived value
+against `energy_contribution` for every registered term.
+"""
+energy_operator_ratio(::HamTerm) = NaN
+
+"""
     energy_contribution(term::HamTerm, psi, ws) -> Float64
 
 Return this term's contribution to total energy `⟨ψ|H_term|ψ⟩`.

@@ -1,5 +1,8 @@
 # Paper #4 Reframing: From "TWA Quantum Fluctuation" to "Chaotic Dipolar Instability"
 
+> **FROZEN 2026-05-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: Round 5 GPU 結果 (16³ box=10 pinned 1/N) で σ/μ scaling が 1/√N 完全破綻、
 TWA leading-order quantum fluctuation interpretation 否定。Paper #4 候補を 
 **Chaotic Dipolar Instability study** として reframing。

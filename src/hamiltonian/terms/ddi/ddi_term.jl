@@ -165,6 +165,11 @@ function _grad_ddi_accumulate!(grad, psi, phi_x, phi_y, phi_z, F, n_pts, D, ::Va
     nothing
 end
 
+"""Energy is `0.5 · Re⟨ψ, H·ψ⟩ · dV` for this term — mean field: E = ½∫nΦ while H·ψ = Φψ.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::DDITerm) = 0.5
+
 function energy_contribution(::DDITerm, psi::AbstractArray{<:Complex}, ws)
     ws.ddi === nothing && return 0.0
     N = ndims(psi) - 1

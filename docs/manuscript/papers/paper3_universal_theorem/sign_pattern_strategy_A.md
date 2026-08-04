@@ -1,5 +1,8 @@
 # Sign Pattern Systematic — Strategy A (Wigner-Eckart 6j) derivation
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Status**: structural decomposition complete + Lemma 1 (β_0) rigorously proved;
 single-sign-change property deferred to numerical 6j sign analysis (= follow-up).

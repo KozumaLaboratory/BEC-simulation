@@ -1,5 +1,8 @@
 # M1 sweep — gate (1) ground-state-ness audit (2026-06-08)
 
+> **FROZEN 2026-06-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 > **訂正 (2026-08-02): sweep は在る。** 2026-07-31 の版はここに「どの commit にも
 > 存在せず、下記の数値は再チェックできない」「入力の 30 セルが無い」と書いていた。
 > **誤り。** `runs/sprint5_M1_multistart_groundstate/` (untracked) は 30 セル

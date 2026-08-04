@@ -14,6 +14,8 @@ const FAST_TESTS = [
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
+    "test_docs_live_set.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
@@ -93,6 +95,14 @@ const FAST_TESTS = [
     "workflow/test_live_status_reaches_the_detector.jl",
     # A name the autopilot reads must be a name something writes.
     "workflow/test_terminal_record_has_a_producer.jl",
+    # The budget read the pre-2026 flat save_* keys the schema now rejects.
+    "workflow/test_budget_reads_the_save_block.jl",
+    # A YAML key a maintained doc teaches must be one the schema accepts.
+    "workflow/test_docs_yaml_against_schema.jl",
+    # A schema enum must name what the implementation can actually do.
+    "workflow/test_schema_enum_matches_implementation.jl",
+    # One diverging TWA member used to NaN the mean for every member after it.
+    "solvers/test_twa_rejects_diverged_members.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
     "model/test_model_toml_roundtrip.jl",
@@ -482,6 +492,7 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    "oracles/test_energy_operator_ratio.jl",
     # The coverage claim `test_term_consistency.jl` makes in its header and does
     # not keep: `apply_operator!` differenced against `energy_contribution` for
     # EVERY slot of H_TERMS_CANONICAL_ORDER, with the coverage itself asserted so
@@ -677,6 +688,14 @@ const FULL_EXTRA = [
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_lhy_term_faces.jl",
+    # Same bug class again, this time in the dispatch itself: `energy_gradient!`
+    # chose CPU vs GPU from `psi`, while computing on `ws.state.psi` and writing
+    # `grad`. A ground state read back from jld2 is a host Array whatever wrote
+    # it, so the GS stage-cache audit — host ψ, GPU workspace — took the CPU
+    # branch and scalar-indexed. Needs a cache HIT to appear: the run that fills
+    # the cache never loads from it, so only the SECOND GPU run of a given
+    # ground state dies.
+    "gpu/test_gpu_energy_gradient_host_psi.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     # The OTHER pair of realizations on the device: the warp-cooperative fused
     # Euler kernels vs the one-thread-per-voxel ones. Replaces
