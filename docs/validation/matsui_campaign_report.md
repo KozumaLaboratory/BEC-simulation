@@ -200,6 +200,11 @@ Recorded because each was expensive and each has a structural preventive now in
 | `matsui_author_query_draft.md` | the questions only the authors can answer |
 | `runs/matsui_fit/README.md` | every arm, live and retracted, with what it measured |
 
+The 21 pre-reading arms were deleted along with their 9.7 GB of output: their
+configs repeated one wrong premise 21 times and the information is one row per
+prefix, which the README keeps. Nothing cites them — checked by run-directory
+name across `docs/ test/ scripts/ src/ .github/`, not only by config path.
+
 ## 9. What would move this forward
 
 Not runs. The two things that would are:
