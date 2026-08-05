@@ -339,6 +339,11 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # spurious "not valid" rejections of yoshida/adaptive/richardson on
     # the standard path.
     "integrator" => FieldSpec(; type=Union{String, Dict}),
+    # How the V half-step realizes its spin rotations. "sequential" (default)
+    # is SM · DDI · SM; "combined" merges them into one rotation — same order,
+    # different splitting, ~2.8× faster per step on H100 at 128³ × D=13.
+    # See `_parse_spin_step` in pipeline/run_step_dynamics.jl.
+    "spin_step" => FieldSpec(; type=String, enum=["sequential", "combined"]),
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
     "absorbing_boundary" => FieldSpec(; type=Dict, schema=ABSORBING_SCHEMA),

@@ -319,10 +319,20 @@ function _run_step(
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
-    result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
-        ws, save_psi_snap, save_compress, snap_precision_cf;
-        extra_on_step=extra_cb,
-    )
+    # `spin_step:` picks how the V half-step realizes its spin rotations.
+    # Scoped to this step and restored afterwards, so one dynamics phase
+    # choosing `combined` cannot leak the splitting into the next phase or into
+    # another config sharing the session (same discipline as `dealias:`).
+    spin_step_prev = COMBINED_SPIN_STEP_ENABLED[]
+    COMBINED_SPIN_STEP_ENABLED[] = _parse_spin_step(get(p, "spin_step", nothing))
+    result, snap_tmp_path, snap_count = try
+        _run_dynamics_with_optional_streaming!(
+            ws, save_psi_snap, save_compress, snap_precision_cf;
+            extra_on_step=extra_cb,
+        )
+    finally
+        COMBINED_SPIN_STEP_ENABLED[] = spin_step_prev
+    end
 
     if verbose
         println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
@@ -399,4 +409,33 @@ function _run_dynamics_with_optional_streaming!(
     end
 
     return (result, snap_tmp, frame_count[])
+end
+
+"""
+    _parse_spin_step(v) -> Bool
+
+`dynamics.spin_step:` — how the V half-step realizes its spin rotations.
+
+    "sequential"  (default)  SM(dt/4) · DDI(dt/2) · SM(dt/4), three rotations
+    "combined"               exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂), one rotation
+
+Both are O(dt²) and share a continuum limit; they differ at O(dt³) because the
+combined form carries no [SM,[SM,DDI]] commutator error. `combined` measured
+2.84× faster per step on H100 at 128³ × D=13 with DDI (bench/rtp_gpu_ab.jl).
+
+It is not the default because the difference is real: a run switching to it
+will not reproduce a previous run's numbers bitwise. The selector silently
+keeps `sequential` for any workspace the combined form cannot represent
+(c₂ ≠ 0, tensor channels, Raman, light shift, spatial or tilted field, padded
+or absent DDI) — see `_rtp_use_combined_step`.
+"""
+function _parse_spin_step(v)
+    v === nothing && return false
+    s = lowercase(String(v))
+    s == "sequential" && return false
+    s == "combined" && return true
+    throw(
+        ArgumentError(
+            "dynamics.spin_step must be \"sequential\" or \"combined\"; got $(repr(v))"),
+    )
 end
