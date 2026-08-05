@@ -18,6 +18,10 @@ using SpinorBEC
 # partition is honest, so a file cannot quietly be both.
 
 const LIVE_DOCS = [
+    # GENERATED, and gated against the code by
+    # `test_state_doc_is_current.jl` — the only LIVE doc whose
+    # correctness is machine-checked rather than merely asserted.
+    "docs/STATE.md",
     "docs/architecture/rotating_basis.md",
     "docs/archive/README.md",
     "docs/campaign/CAMPAIGN.md",

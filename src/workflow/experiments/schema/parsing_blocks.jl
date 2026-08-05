@@ -93,7 +93,7 @@ Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
     loss: {gamma_dr: 0.02, K3_per_m_cubic: [0.01, 0.02, ...]}  # dimensionless rates
-    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # alias, dimensionless
+    # (`K3_per_m` was REMOVED 2026-05-24 and now throws — see the check below.)
 
 SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
 the dimensionless conversion factor):
@@ -108,7 +108,7 @@ with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
 Routing:
 - `L3` / `L3_per_m`        → 2-body-shape `LossParams.L3` / `L3_per_m`
                               (dn_m/dt = -γ n n_m, linear in n)
-- `K3_cubic` / `K3_per_m_cubic` / `K3_per_m` / `K3_per_m_si`
+- `K3_cubic` / `K3_per_m_cubic` / `K3_per_m_si`  (bare `K3_per_m` throws)
                             → physically correct 3-body `K3_per_m_cubic`
                               (dn_m/dt = -K_3 n² n_m, quadratic in n)
 """

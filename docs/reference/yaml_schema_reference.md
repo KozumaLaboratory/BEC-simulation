@@ -351,9 +351,11 @@ Accepts a Number / Bool (scalar shortcut) or a Dict with these keys:
 | `evap_energy_cutoff` | Number | [0, 1e10] — single-particle ε cutoff |
 | `evap_rate` | Number | [0, 1e10] — rate coefficient |
 
-Routing footgun caught 2026-05-13: `K3_per_m` / `K3_per_m_si` now route to
+Routing footgun caught 2026-05-13: `K3_per_m_cubic` / `K3_per_m_si` route to
 `LossParams.K3_per_m_cubic` (quadratic-in-n true 3-body), NOT the legacy
-linear-in-n field. Pre-fix runs need re-verification (see memory).
+linear-in-n field. Pre-fix runs need re-verification (see memory). The bare
+`K3_per_m` alias named here until 2026-08-05 was **removed 2026-05-24** and now
+throws (`parsing_blocks.jl:143`) — see the migration table at the end of this file.
 
 ### `save` (dynamics output sub-block)
 

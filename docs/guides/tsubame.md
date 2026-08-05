@@ -178,7 +178,7 @@ only needed for ad-hoc one-offs outside the queue.
 pipeline:
   - ground_state:
       grid: {n: [128, 128, 128], box: [20.0, 20.0, 20.0]}
-      backend: cuda
+      backend: gpu
   - dynamics:
       duration: 107.6
       dt: 1.0e-4

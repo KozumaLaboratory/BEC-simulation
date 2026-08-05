@@ -97,7 +97,7 @@ Routing summary:
 | YAML key                                 | LossParams field    | Application form              |
 |------------------------------------------|---------------------|-------------------------------|
 | `L3`, `L3_per_m`                         | `L3` / `L3_per_m`   | `exp(-γ n dt / 2)`   (linear) |
-| `K3_cubic`, `K3_per_m_cubic`, `K3_per_m` | `K3_per_m_cubic`    | `exp(-K_3 n² dt / 2)` (true 3-body) |
+| `K3_cubic`, `K3_per_m_cubic` | `K3_per_m_cubic`    | `exp(-K_3 n² dt / 2)` (true 3-body) |
 | `K3_per_m_si`                            | `K3_per_m_cubic` (via `n0²/ω_ref`) | same as above |
 
 Pre-2026-05-13 the SI input was mis-routed into `L3_per_m` (linear-in-n);
