@@ -329,6 +329,7 @@ function apply_spgpe_step!(
         apply_energy_damping_step!(
             ws, r.M, r.T, dt_f;
             seed=seed === nothing ? nothing : seed + 7_919, noise=noise,
+            k_cut=r.k_cut,
         )
     end
     # Projection last, so both noises are projected within the same step — the
@@ -381,10 +382,12 @@ Three things make this cheap and exact where it matters:
 — one Laplacian per component rather than `N` gradients plus a divergence.
 
 **Both terms are a real phase.** `dψ = iψ(dU − V_M dt/ℏ)` with `V_M`, `dU` real,
-so the sub-step is `ψ ← ψ·exp(i(dU − V_M dt))`. This is the exact Stratonovich
-solution of `dX = iX∘dU` (not an `O(dt)` approximation of it), and it conserves
-`∫|ψ|²` to machine precision — the defining property of the scattering reservoir,
-and a bit-level test rather than a tolerance.
+so the sub-step is `ψ ← ψ·exp(i(dU − V_M dt))` — exactly norm-preserving BEFORE
+projection. In the projected scheme number conservation is only approximate
+(Rooney, Blakie & Bradley PRE 89, 013302), because the product of two
+band-limited fields reaches 2`k_cut` and the caller projects the state. Keeping
+that bite small is why the kernel and the noise are band-limited to the C region,
+Eq. (15) — see step 4 for what happens when they are not.
 
 **The noise is coloured by the same kernel.** `⟨dU dU⟩ = 2Tε(r−r')dt` is drawn as
 white noise filtered by `√(2TℳdT/|k|)`; the filter is real and even in `k`, so
@@ -401,7 +404,7 @@ energy decreases monotonically. That sign is the oracle for this term.
 """
 function apply_energy_damping_step!(
     ws::Workspace{N}, M::Real, T::Real, dt::Real;
-    seed::Union{Nothing, Int}=nothing, noise::Bool=true,
+    seed::Union{Nothing, Int}=nothing, noise::Bool=true, k_cut::Real=Inf,
 ) where {N}
     M_f = Float64(M)
     M_f > 0 || return nothing
@@ -414,7 +417,7 @@ function apply_energy_damping_step!(
     buf = ws.state.fft_buf
     RT = real(eltype(psi))
 
-    divj, phase_k, ksq, kinv = _energy_damping_buffers(ws, n_pts)
+    divj, phase_k, ksq, kinv = _energy_damping_buffers(ws, n_pts, Float64(k_cut))
 
     # 1. ∇·j = Σ_c Im(ψ_c* ∇²ψ_c)
     fill!(divj, 0)
@@ -446,7 +449,34 @@ function apply_energy_damping_step!(
         @. phase_k += amp * sqrt(kinv) * buf
     end
 
-    # 4. ψ ← ψ·exp(i·phase). Exact Stratonovich; norm-preserving to machine precision.
+    # 4. ψ ← ψ·exp(i·phase), with the phase BAND-LIMITED to the C region.
+    #
+    # The band limit is the load-bearing part, and it was missing. Rooney et al.
+    # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the
+    # noise it colours both live below the cutoff. With 1/|k| left unrestricted the
+    # phase had out-of-band structure, multiplying it into ψ scattered weight past
+    # k_cut, and the caller's projector removed that weight every step: measured at
+    # μ = −1, T = 1.026, k_cut = 2.01, dt = 0.05, the loss was 0.05 % of the norm
+    # per step at ℳ̄ = 0.01 and 0.53 % at ℳ̄ = 0.1, taking N from 56.4 to 1.6e-3 and
+    # to 1.2e-44 over 20000 steps. The same term with no projector in the path held
+    # N to the last bit, which is why the unit test — which calls this function
+    # directly — passed throughout. The full SPGPE equilibrated at 55 % of
+    # Thomas-Fermi as a result, and every full-SPGPE number on this branch was
+    # retracted.
+    #
+    # Nor is it a discretisation error: the loss per step goes as the phase
+    # variance and hence as dt, while the step count goes as 1/dt, so the loss per
+    # unit TIME does not depend on dt.
+    #
+    # Two increment forms were tried before reading the numerical-method paper and
+    # both are worse. `ψ + iψφ` has modulus √(1+φ²) > 1 and, with φ_rms ≈ 0.3 per
+    # step at ℳ̄ = 0.1, overflows. `ψ(1 + iφ − φ²/2)` is stable but still loses:
+    # the product of two band-limited fields extends to 2k_cut, so P{ψφ} is not
+    # ψφ and the Itō correction no longer cancels. Rooney, Blakie & Bradley
+    # PRE 89, 013302 are explicit that number conservation in the projected scheme
+    # is approximate, so the honest statement is a phase that is exactly
+    # norm-preserving before projection, with the projector's bite made small by
+    # band-limiting rather than argued away.
     plans.inverse * phase_k
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
@@ -464,9 +494,11 @@ Cached device buffers + k-space kernels for the energy-damping step. `kinv` is
 `ksq` is `ws.grid.k_squared` resident on the device, which the per-call
 `_to_device` in `apply_projected_gp!` would otherwise re-upload every step.
 """
-function _energy_damping_buffers(ws::Workspace, n_pts::NTuple{N, Int}) where {N}
+function _energy_damping_buffers(
+    ws::Workspace, n_pts::NTuple{N, Int}, k_cut::Float64=Inf
+) where {N}
     psi = ws.state.psi
-    key = (typeof(psi), n_pts)
+    key = (typeof(psi), n_pts, k_cut)
     divj = scratch_get!(:ed_divj, key) do
         _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
     end
@@ -476,9 +508,17 @@ function _energy_damping_buffers(ws::Workspace, n_pts::NTuple{N, Int}) where {N}
     ksq = scratch_get!(:ed_ksq, key) do
         _to_device(ws.backend, convert(Array{real(eltype(psi))}, ws.grid.k_squared))
     end
+    # Band-limited to the C region, Rooney et al. Eq. (15): the correlator carries
+    # δ_C(k,−k'), so both the kernel and the noise it colours live BELOW the
+    # cutoff. Leaving 1/|k| unrestricted put out-of-band structure into a phase
+    # that multiplies the field, and the product was then removed by the caller's
+    # projector — 0.05 % of the norm per step at ℳ̄ = 0.01 and 0.53 % at ℳ̄ = 0.1,
+    # which over 20000 steps took N from 56.4 to 1.6e-3 and 1.2e-44.
     kinv = scratch_get!(:ed_kinv, key) do
+        kc2 = k_cut^2
         host = map(ws.grid.k_squared) do k2
-            k2 > 0 ? real(eltype(psi))(1 / sqrt(k2)) : zero(real(eltype(psi)))
+            (k2 > 0 && k2 <= kc2) ? real(eltype(psi))(1 / sqrt(k2)) :
+            zero(real(eltype(psi)))
         end
         _to_device(ws.backend, host)
     end

@@ -127,6 +127,15 @@ const ALLOWED = Dict{Tuple{String, String}, String}(
     ("src/workflow/autopilot/breakers.jl", "_DEFAULT_BREAKER_THRESHOLDS") => "circuit-breaker thresholds; scheduler policy, no physics",
     ("src/workflow/autopilot/monitor.jl", "_DIVERGENCE_THRESHOLDS") => "divergence-reap thresholds; decides whether a run is KILLED, not what it computes",
     ("src/workflow/monitoring/notifications.jl", "_SLACK_HTTP_HINT_SHOWN") => "print-once latch for a Slack hint",
+    ("src/workflow/io/measurement_provenance.jl", "_SRC_FINGERPRINT") => "SHA-1 of src/ captured in __init__ so a measurement file records what the PROCESS is \
+                                                                 running, not what is on disk when it writes. It cannot be a const: precompile time is \
+                                                                 not load time, and the failure this closes is a sync landing mid-run — 16 shards once \
+                                                                 stamped the post-sync commit while executing pre-sync code. Read only by \
+                                                                 provenance_header, never by a kernel",
+    ("src/workflow/io/measurement_provenance.jl", "_LOAD_ENV") => "julia version, thread count, hostname and whether the module came off a precompiled \
+                                                         cache, captured alongside the fingerprint and for the same reason. cached= is the \
+                                                         one field that makes a stale-cache run distinguishable, since a matching source \
+                                                         fingerprint does not prove the executed code came from those sources",
 )
 
 @testset "no unpinned module-level Ref under src/ and ext/" begin
