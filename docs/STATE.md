@@ -72,6 +72,35 @@ whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
 
+## Artifact identity: every key the digest covers
+
+`artifact_id` (`src/model/identity.jl`) folds **7** keys:
+`backend`, `code_rev`, `from`, `kind`, `method`, `model`, `params`.
+
+That set is exactly `fieldnames(Stage)` plus `code_rev`, asserted as an
+EQUALITY in both directions — a missing key means a `Stage` input silently
+left the identity, an extra one means something undeclared entered it. Set
+equality proves no *field* is selected out; it does NOT prove content
+completeness (`model_toml_dict` deliberately omits non-required slots equal
+to their own default), and that qualification is judgement, not derived.
+
+## Ground-state knob defaults, by entry path
+
+| knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |
+|---|---|---|---|
+| `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
+| `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 (schema `1.0e-8`) |
+| `m_lbfgs` | 20 | 20 | 10 (schema `10`) |
+
+**`m_lbfgs` is the live trap.** Both Julia entries default to 20 and
+`ground_state.jl` carries a `# keep in sync with find_ground_state_lbfgs
+default` comment; 20 is the MEASURED value (~9× lower grad_norm floor, ~30 %
+fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The YAML path
+defaults to 10, so every production run that omits the key gets the worse
+one. The sync obligation was written for the two Julia entries and never
+extended to the path most runs take. Whether to change it is a decision, so
+this section reports the disagreement and does not assert it away.
+
 ## Sizes and vocabularies, by introspection
 
 Read from the loaded module. Every row below was stated by hand in `CLAUDE.md`
@@ -172,8 +201,8 @@ as complete.
 | subtree | files cited | of |
 |---|---|---|
 | `src/hamiltonian/` | 13 | 63 |
+| `src/model/` | 2 | 14 |
 | `src/validation/` | 1 | 8 |
-| `src/model/` | 1 | 14 |
 | `src/manuscript/` | 1 | 15 |
 | `src/foundation/` | 1 | 40 |
 | `src/analysis/` | 1 | 46 |

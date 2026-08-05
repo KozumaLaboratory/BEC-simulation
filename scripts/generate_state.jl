@@ -283,6 +283,75 @@ end
 
 
 """
+Every key `artifact_id` folds into the digest, against `fieldnames(Stage)`.
+
+Asserted as SET EQUALITY, both directions, not as a lower bound. A missing key
+means a `Stage` input silently left the identity — the `_gs_cache_key` defect,
+where a hand-listed dict was blind to inputs the same function passed to the
+solver. An extra key means something not declared by `Stage` entered it. Both
+are findings, and equality is self-defending: a key form this extractor misses
+shows up as MISSING and refuses generation rather than passing quietly.
+"""
+function identity_keys()
+    body = funcbody("src/model/identity.jl", "artifact_id")
+    keys = String[]
+    for l in body
+        m = match(r"^\s*\"([a-z_]+)\"\s*=>", l)
+        m === nothing || push!(keys, m.captures[1])
+    end
+    (sort(unique(keys)), sort(string.(collect(fieldnames(SpinorBEC.Stage)))))
+end
+
+"""
+The ground-state knobs whose default differs by entry path.
+
+The sharpest live trap this document carries: `m_lbfgs` is 20 in BOTH Julia
+entries — `ground_state.jl` even holds a `# keep in sync with
+find_ground_state_lbfgs default` comment — and 20 is the measured value (~9x
+lower grad_norm floor, ~30 % fewer line-search backtracks vs 10 on Eu F=6+DDI
+16^3). The YAML path defaults to **10**, so every production run that omits the
+key gets the worse value. The sync obligation was written for the two Julia
+entries and never extended to the path most runs take.
+"""
+function gs_knob_defaults()
+    rows = Tuple{String, String, String, String}[]
+    function sigdefault(rel, fname, key)
+        body = funcbody(rel, fname)
+        for l in body
+            m = match(Regex("^\\s+" * key * "(::[^=]+)?=([^,]+),"), l)
+            m === nothing || return strip(m.captures[2])
+        end
+        "—"
+    end
+    function yamlfallback(key)
+        out = String[]
+        for (root, _, fs) in walkdir(joinpath(ROOT, "src", "workflow", "experiments", "pipeline"))
+            for f in fs
+                endswith(f, ".jl") || continue
+                for l in eachline(joinpath(root, f))
+                    m = match(Regex("get\\(p, \\\"" * key * "\\\", ([^)]+)\\)"), l)
+                    m === nothing || push!(out, strip(m.captures[1]))
+                end
+            end
+        end
+        isempty(out) ? "—" : join(unique(out), " / ")
+    end
+    function specdefault(key)
+        spec = get(SpinorBEC.GS_SCHEMA, key, nothing)
+        spec === nothing && return "—"
+        d = spec.default
+        d === nothing ? "—" : string(d)
+    end
+    for key in ("n_steps", "tol", "m_lbfgs")
+        push!(rows, (key,
+            sigdefault("src/solvers/ground_state.jl", "find_ground_state", key),
+            sigdefault("src/solvers/lbfgs/driver.jl", "find_ground_state_lbfgs", key),
+            yamlfallback(key) * " (schema `" * specdefault(key) * "`)"))
+    end
+    rows
+end
+
+"""
 Sizes and vocabularies obtained by INTROSPECTION, not by counting source text.
 
 Every entry here was stated by hand in CLAUDE.md and every one was wrong on
@@ -460,6 +529,49 @@ function render()
     p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
     p("sign for two months because eight test files checked the VALUE and none checked")
     p("that there was only one of them.")
+    p()
+
+    idk, stagef = identity_keys()
+    idk_s = join(idk, ", ")
+    stagef_s = join(stagef, ", ")
+    assert_nondegenerate("artifact identity",
+        Set(idk) == union(Set(stagef), Set(["code_rev"])) && length(idk) >= 7,
+        "artifact_id folds [$idk_s]; fieldnames(Stage) = [$stagef_s]. " *
+        "These must be equal up to `code_rev`.")
+    p("## Artifact identity: every key the digest covers")
+    p()
+    p("`artifact_id` (`src/model/identity.jl`) folds **$(length(idk))** keys:")
+    p(join("`" .* idk .* "`", ", ") * ".")
+    p()
+    p("That set is exactly `fieldnames(Stage)` plus `code_rev`, asserted as an")
+    p("EQUALITY in both directions — a missing key means a `Stage` input silently")
+    p("left the identity, an extra one means something undeclared entered it. Set")
+    p("equality proves no *field* is selected out; it does NOT prove content")
+    p("completeness (`model_toml_dict` deliberately omits non-required slots equal")
+    p("to their own default), and that qualification is judgement, not derived.")
+    p()
+
+    knobs = gs_knob_defaults()
+    rowdesc = join([join(r, "|") for r in knobs], "  ;  ")
+    assert_nondegenerate("gs knob defaults",
+        length(knobs) == 3 && all(r -> r[2] != "—" && r[3] != "—", knobs),
+        "resolved $(length(knobs)) knobs; rows " * rowdesc)
+    p("## Ground-state knob defaults, by entry path")
+    p()
+    p("| knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |")
+    p("|---|---|---|---|")
+    for (k, a, b, c) in knobs
+        p("| `$k` | $a | $b | $c |")
+    end
+    p()
+    p("**`m_lbfgs` is the live trap.** Both Julia entries default to 20 and")
+    p("`ground_state.jl` carries a `# keep in sync with find_ground_state_lbfgs")
+    p("default` comment; 20 is the MEASURED value (~9× lower grad_norm floor, ~30 %")
+    p("fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The YAML path")
+    p("defaults to 10, so every production run that omits the key gets the worse")
+    p("one. The sync obligation was written for the two Julia entries and never")
+    p("extended to the path most runs take. Whether to change it is a decision, so")
+    p("this section reports the disagreement and does not assert it away.")
     p()
 
     intro = introspected()

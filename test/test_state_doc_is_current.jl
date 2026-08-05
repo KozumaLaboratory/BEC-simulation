@@ -63,6 +63,11 @@ end
         # derived list cannot rot but only describes; the gate refuses.
         @test occursin("Declared **once**", derived)
         @test occursin("test_bfield_sign_declared_once.jl", derived)
+        # the two sections whose value is an equality / a disagreement, not a list
+        @test occursin("## Artifact identity", derived)
+        @test occursin("`fieldnames(Stage)` plus `code_rev`", derived)
+        @test occursin("## Ground-state knob defaults", derived)
+        @test occursin("`m_lbfgs` is the live trap", derived)
         @test occursin("## What this document does NOT cover", derived)
         @test occursin("| subtree | files cited | of |", derived)
         # per-FILE, not per-subtree: a boolean would read as full coverage
