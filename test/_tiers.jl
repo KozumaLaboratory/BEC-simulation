@@ -996,6 +996,7 @@ const _COST = Dict{String, Float64}(
     "analysis/test_vorticity_berry.jl" => 8.4,
     "analysis/test_physics_level1.jl" => 7.8,
     "workflow/test_inspect_config.jl" => 7.7,
+    "workflow/test_vortex_density_movie.jl" => 6.0,
     "analysis/test_observables.jl" => 7.7,
     "oracles/test_physics_aware_sign_oracles.jl" => 7.6,
     "workflow/test_catalog_index.jl" => 7.4,
