@@ -1,6 +1,6 @@
 using Test
 using SpinorBEC
-using SpinorBEC: PULSE_EVENT_SCHEMA, PULSE_TARGETS, GS_SCHEMA, LHY_SCHEMA
+using SpinorBEC: PULSE_EVENT_SCHEMA, PULSE_TARGETS, GS_SCHEMA, LHY_SCHEMA, LHY_KINDS
 
 # A schema enum must name what the implementation can actually do.
 #
@@ -42,6 +42,31 @@ using SpinorBEC: PULSE_EVENT_SCHEMA, PULSE_TARGETS, GS_SCHEMA, LHY_SCHEMA
         # Every declared kind must be constructible; the enum is what users are
         # told they may write.
         kinds = LHY_SCHEMA["kind"].enum
+
+        # THE SET, both directions. `LHY_KINDS` (`src/model/specs.jl`) and this
+        # enum are two independent statements of one vocabulary, and until
+        # 2026-08-05 nothing compared them — they agreed by discipline, which is
+        # the state every duplicate is in right up until it is not. A kind in
+        # `LHY_KINDS` and not the enum is unreachable from YAML; a kind in the
+        # enum and not `LHY_KINDS` is accepted by the schema and then fails to
+        # dispatch. Both are silent.
+        #
+        # Set equality, not `issubset` and not a count: a count of 11 survives a
+        # rename plus an unrelated addition, and one-way containment is exactly
+        # how CLAUDE.md came to list ten of the eleven (omitting `spatial`, the
+        # kind its own design-boundaries section recommends).
+        enum_syms = Set(Symbol.(kinds))
+        declared = Set(LHY_KINDS)
+        if enum_syms != declared
+            println("  lhy.kind enum and LHY_KINDS disagree:")
+            println("    enum only     : ", sort(collect(setdiff(enum_syms, declared))))
+            println("    LHY_KINDS only: ", sort(collect(setdiff(declared, enum_syms))))
+        end
+        @test enum_syms == declared
+        # Population floor: an extractor returning an empty set would satisfy the
+        # equality above against another empty set.
+        @test length(declared) >= 10
+
         @test "none" in kinds
         @test "polar_two_channel" in kinds
         # `two_channel` was the spelling a live @warn recommended until

@@ -72,6 +72,24 @@ whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
 
+## Sizes and vocabularies, by introspection
+
+Read from the loaded module. Every row below was stated by hand in `CLAUDE.md`
+and every one was wrong on 2026-08-05 — each correct when written, none ever
+re-derived. **Do not restate these anywhere.**
+
+| what | value | read from |
+|---|---|---|
+| `Workspace` type parameters | 20 | `length(Base.unwrap_unionall(Workspace).parameters)` |
+| `AbstractPotential` subtypes | 16 | `length(subtypes(AbstractPotential))` |
+| named `init_psi_*` builders | 26 | exported names of `SpinorBEC` |
+| `H_TERMS_CANONICAL_ORDER` | 14 | the registry constant |
+| `LHY_KINDS` | 11 | `src/model/specs.jl` |
+| `RunResult` fields | path, psi, hpsi, grid, atom, interactions, dynamics, e_decomp, metadata | `fieldnames(RunResult)` |
+| `docs/` subdirectories | 17 | `readdir("docs")` |
+
+`LHY_KINDS`: `none`, `scalar`, `quasi_2d`, `polar_two_channel`, `full_bdg`, `polar_contact`, `polar_dipolar`, `fm_contact`, `fm_dipolar`, `icosahedral`, `spatial`
+
 ## YAML surface
 
 **Top-level keys (10):** `accuracy`, `auto_grid`, `calibration`, `calibration_history`, `defaults`, `mixins`, `pipeline`, `scan`, `target_date`, `units`
@@ -155,11 +173,11 @@ as complete.
 |---|---|---|
 | `src/hamiltonian/` | 13 | 63 |
 | `src/validation/` | 1 | 8 |
+| `src/model/` | 1 | 14 |
 | `src/manuscript/` | 1 | 15 |
 | `src/foundation/` | 1 | 40 |
 | `src/analysis/` | 1 | 46 |
 | `src/workflow/` | 2 | 169 |
-| `src/model/` | 0 | 14 |
 | `src/solvers/` | 0 | 44 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem

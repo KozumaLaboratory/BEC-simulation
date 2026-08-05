@@ -51,6 +51,7 @@
 
 using SpinorBEC
 using SpinorBEC: H_TERMS_CANONICAL_ORDER
+using InteractiveUtils
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
 const OUT = joinpath(ROOT, "docs", "STATE.md")
@@ -282,6 +283,39 @@ end
 
 
 """
+Sizes and vocabularies obtained by INTROSPECTION, not by counting source text.
+
+Every entry here was stated by hand in CLAUDE.md and every one was wrong on
+2026-08-05 — `Workspace` "23+" parameters against 20, `AbstractPotential`
+"12 subtypes" against 16, "22 named builders" against 26, `lhy.kind` listing 10
+of 11 (omitting `spatial`, which the same file recommends elsewhere), the term
+registry enumerated as 13 of 14, `RunResult` missing its first field. Each was
+correct when written. None was ever re-derived.
+
+Read from the loaded module, so they cannot disagree with the code.
+"""
+function introspected()
+    P = Base.unwrap_unionall(SpinorBEC.Workspace).parameters
+    pots = InteractiveUtils.subtypes(SpinorBEC.AbstractPotential)
+    zoo = filter(n -> startswith(string(n), "init_psi_"), names(SpinorBEC))
+    docs = filter(d -> isdir(joinpath(ROOT, "docs", d)), readdir(joinpath(ROOT, "docs")))
+    [
+        ("`Workspace` type parameters", string(length(P)),
+         "`length(Base.unwrap_unionall(Workspace).parameters)`"),
+        ("`AbstractPotential` subtypes", string(length(pots)),
+         "`length(subtypes(AbstractPotential))`"),
+        ("named `init_psi_*` builders", string(length(zoo)),
+         "exported names of `SpinorBEC`"),
+        ("`H_TERMS_CANONICAL_ORDER`", string(length(SpinorBEC.H_TERMS_CANONICAL_ORDER)),
+         "the registry constant"),
+        ("`LHY_KINDS`", string(length(SpinorBEC.LHY_KINDS)), "`src/model/specs.jl`"),
+        ("`RunResult` fields", join(string.(fieldnames(SpinorBEC.RunResult)), ", "),
+         "`fieldnames(RunResult)`"),
+        ("`docs/` subdirectories", string(length(docs)), "`readdir(\"docs\")`"),
+    ]
+end
+
+"""
 How much of each `src/` subtree this document actually cites.
 
 Reported as CITED FILES over TOTAL, not as a boolean. The first version asked
@@ -426,6 +460,26 @@ function render()
     p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
     p("sign for two months because eight test files checked the VALUE and none checked")
     p("that there was only one of them.")
+    p()
+
+    intro = introspected()
+    assert_nondegenerate("introspected sizes", length(intro) >= 7 &&
+        all(r -> !isempty(r[2]) && r[2] != "0", intro),
+        "read $(length(intro)) introspected facts; values " *
+        join([r[2] for r in intro], " / "))
+    p("## Sizes and vocabularies, by introspection")
+    p()
+    p("Read from the loaded module. Every row below was stated by hand in `CLAUDE.md`")
+    p("and every one was wrong on 2026-08-05 — each correct when written, none ever")
+    p("re-derived. **Do not restate these anywhere.**")
+    p()
+    p("| what | value | read from |")
+    p("|---|---|---|")
+    for (what, val, how) in intro
+        p("| $what | $val | $how |")
+    end
+    p()
+    p("`LHY_KINDS`: " * join("`" .* string.(SpinorBEC.LHY_KINDS) .* "`", ", "))
     p()
 
     top, steps = schema_surface()
