@@ -42,14 +42,18 @@ fi
 # and answered OK for a mode with no implementation behind it: a check written in a
 # different vocabulary from the thing it checks cannot see that thing missing.
 SMOKE_MODE="spin11of${NSHARD}:${C1}:${MD}:1:${W}"
+# One rate, so the smoke costs minutes. It proves the branch RUNS; it does not prove
+# the slowest rate fits the wall clock.
+export SBEC_MAX_RATES=1
 echo "[kzspin1] smoking the dispatch: $SMOKE_MODE"
-if ! SPINORBEC_FIGS_ROOT="$OUT/_smoke" timeout 3600 "$JULIA" --project=. \
+if ! SPINORBEC_FIGS_ROOT="$OUT/_smoke" timeout 1800 "$JULIA" --project=. \
         docs/guides/figures/kz_toroidal_winding.jl "$SMOKE_MODE" > "$OUT/_smoke.log" 2>&1; then
     echo "[kzspin1] FAIL: the dispatch could not run $SMOKE_MODE"
     tail -25 "$OUT/_smoke.log"
     exit 1
 fi
 echo "[kzspin1] dispatch OK"
+unset SBEC_MAX_RATES
 
 pids=""
 for i in $(seq 1 $NSHARD); do

@@ -729,7 +729,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         local c1v = parse(Float64, m[3])
         local g1v = 0.1
         local which = m[6] == "m" ? :auto : Symbol(m[6])
-        kz_winding_scan(; tau_Qs=(1 / g1v) .* [1e2, 3e2, 1e3, 3e3, 1e4],
+        # SBEC_MAX_RATES truncates the list for the pre-flight smoke. The smoke then
+        # exercises THIS branch — its regex, its parsing, its kwargs, a real
+        # trajectory — and only the rate list differs, which is declared rather than
+        # a second code path. What it does NOT establish is that the slowest rate
+        # fits the wall clock; that is a separate claim and is not being made.
+        local nrates = parse(Int, get(ENV, "SBEC_MAX_RATES", "5"))
+        local rates = ((1 / g1v) .* [1e2, 3e2, 1e3, 3e3, 1e4])[1:min(nrates, 5)]
+        kz_winding_scan(; tau_Qs=rates,
             n_traj=parse(Int, m[5]), M_damp=(m[4] == "full" ? g1v : 0.0), gamma=g1v,
             dt=0.05, M_grid=1024, L=800.0, spinor=true, c1=c1v, atom=Rb87,
             which_W=which, backend, shard=(i1, n1), raw_only=true,
