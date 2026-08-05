@@ -861,6 +861,12 @@ const _COST = Dict{String, Float64}(
     # machine-dependent and the ordering it buys is not — nothing else in
     # any tier is within a factor of four of it.
     "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
+    # Measured, not guessed. An unregistered file is handed out as 3.0, not as
+    # "probably small", and the 1266 s entry above exists because a heavy file
+    # carrying a 3.0 estimate went out last and blew the 15-minute job.
+    "dynamics/test_spgpe_projector_composition.jl" => 12.8,
+    "dynamics/test_thermal_cfield.jl" => 2.4,
+    "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
