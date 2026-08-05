@@ -8,6 +8,7 @@
 # spherical harmonics).
 
 # Type definitions (must come first; Workspace depends on everything above).
+include("foundation/real_dot.jl")             # _realdot: blocked Re⟨a,b⟩, used by lbfgs AND the term registry
 include("foundation/waveform.jl")
 include("foundation/noise_waveform.jl")           # seeded analytic field-noise waveform
 include("foundation/types/grid.jl")              # AbstractBackend, GridConfig, Grid
@@ -29,6 +30,9 @@ include("foundation/grid.jl")
 include("foundation/fft_utils.jl")
 include("foundation/backend.jl")
 include("foundation/scratch.jl")
+include("foundation/voxel_index.jl")   # _voxel_index: contiguous vs zero-padded-corner field access
+include("foundation/fft_planning.jl")   # default_fft_flags: MEASURE is not reproducible
+include("foundation/elapsed.jl")   # elapsed_s: durations come from the MONOTONIC clock
 include("foundation/thresholds.jl")
 include("foundation/spin_matrices.jl")
 include("foundation/spinor_utils.jl")

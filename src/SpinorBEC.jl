@@ -30,6 +30,7 @@ const TIMER = TimerOutput()
 
 include("foundation.jl")    # types + math primitives + backends
 include("hamiltonian.jl")   # interactions + potentials + integrators
+include("model.jl")         # Model: resolved physics as ONE concrete value (additive; nothing uses it yet)
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
@@ -45,9 +46,12 @@ include("workflow/experiments/euv3_coils.jl")  # euv3 lab coil/field calibration
 include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
 include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
 include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
+include("analysis/coherence_length.jl")  # g1(r) + coherence length (KZ observable)
 include("solvers/projected_gp.jl")
 include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
+include("solvers/thermal_cfield.jl")  # classical-field HF equilibrium + thermal seed
+include("solvers/spgpe.jl")   # full SPGPE: growth + energy-damping reservoirs (Rooney PRA 86 053634)
 # Klaus-regime rotating-basis + scalar-eGPE used to live as a vertical
 # slice at src/rotating_basis/; 2026-06-02 dispersed into proper layers
 # (foundation/, hamiltonian/integrator/, analysis/, solvers/,
@@ -172,14 +176,19 @@ reset_tracing!() = TimerOutputs.reset_timer!(TIMER)
 function plot_density end
 function plot_spinor end
 function plot_spin_texture end
+function plot_dipole_field end
 function animate_dynamics end
 function plot_sweep end
-export plot_density, plot_spinor, plot_spin_texture, animate_dynamics, plot_sweep
+export plot_density, plot_spinor, plot_spin_texture, plot_dipole_field
+export animate_dynamics, plot_sweep
 
 include("precompile.jl")
 
 function __init__()
     __init_templates__()
+    # Fingerprint the source tree at LOAD, so a measurement written later stamps
+    # what the process is running rather than what is on disk at write time.
+    _capture_provenance!()
 end
 
 end # module

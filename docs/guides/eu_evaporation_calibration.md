@@ -1,5 +1,8 @@
 # ¹⁵¹Eu evaporation — calibration data by epoch
 
+> **FROZEN 2026-06-19.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The trap has **changed across epochs**, so calibration values must not be mixed.
 Mixing the 2022 paper's trap *frequencies* with the 2023 notebook's *depth* produced a
 spurious 5.6× polarizability conflict during model development. **Rule: pick one epoch.**

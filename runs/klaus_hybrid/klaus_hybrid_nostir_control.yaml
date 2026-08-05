@@ -2,13 +2,6 @@
 # GS → tilt-up → tilted hold (no φ rotation) → B quench → weak-field EdH readout.
 # Pairs with Cell B (with magnetostir) for delta-comparison.
 
-metadata:
-  suite: klaus_hybrid
-  cell_name: klaus_hybrid_nostir_control
-  rotation_omega: 0.0
-  protocol_kind: hybrid_nostir
-  generator: scripts/validation/klaus_hybrid_magnetostir_edh_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

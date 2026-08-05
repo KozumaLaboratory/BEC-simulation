@@ -6,13 +6,6 @@
 # the random one, the noise spectrum/pattern is the convergence culprit. If
 # they STILL diverge, the DDI kernel discretisation is the culprit.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_Hamiltonian_only_det_seed_128
-  expected: grid_convergence_diagnostic
-  seed_kind: deterministic_single_mode
-
 defaults:
   kind: spinor
   backend: gpu
@@ -29,7 +22,7 @@ pipeline:
         c1_ratio: -0.005
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

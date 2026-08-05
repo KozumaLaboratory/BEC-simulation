@@ -7,15 +7,6 @@
 #   hold duration         : 350.0 ω_ref⁻¹  ≈ 506.4 ms
 #   Prasad references     : t=100 surface, t=350 vortex entry, t=5000 lattice
 
-metadata:
-  suite: klaus_long_time
-  cell_name: klaus_long_om0p0_holdonly_t350
-  rotation_omega: 0.0
-  t_hold_dim: 350.0
-  protocol_kind: hold_only_long_time
-  lit_anchor: Prasad_2019_arXiv_1906.08664
-  generator: scripts/validation/klaus_long_time_vortex_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu
@@ -32,7 +23,7 @@ pipeline:
         c1_ratio: 0.02778
       ddi: {enabled: true, secular: true}
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -44,7 +35,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.0
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       seed_amplitude: 1.0e-6
@@ -58,7 +49,7 @@ pipeline:
       duration: 0.69115
       dt: 0.001
       rotating_frame_omega: 0.0
-      B: {Bz: {from: -0.01, to: -2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      B: {Bz: {from: 0.01, to: 2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:
@@ -70,7 +61,7 @@ pipeline:
       duration: 350.0
       dt: 0.005
       rotating_frame_omega: 0.0
-      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "2.6e-5 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:

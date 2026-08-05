@@ -1,5 +1,8 @@
 # Multi-user Gateway — identity, quota, authorization over a shared CAS
 
+> **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: design. Phase 3 of `compute_gateway_design.md`. Turn the
 single-operator autopilot into a few-user shared service without losing the CAS
 dedup that makes a shared base worth having.

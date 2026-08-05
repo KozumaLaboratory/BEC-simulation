@@ -1,4 +1,4 @@
-export superfluid_fraction, plane_averaged_density
+export superfluid_fraction, plane_averaged_density, spin_direction_spread
 
 # Translational superfluid fraction from the phase-twist free energy.
 #
@@ -85,6 +85,14 @@ phase cannot represent correlated backflow. That gap is where the long-standing
 solid-⁴He discrepancy lives — the Leggett bound gives ~20 % where experiment
 found ~1 %.
 
+For a **spinor** input this answers only the mass-flow question: the spinor is
+reduced to its total density, so a spin texture is invisible to it. That is exact
+when the local spin *direction* is uniform (measured: density-only and true
+mass-twist `f_s` agree to 4 digits across polar, ferro and `c1 = 0`), and wrong by
+a factor that reaches ~20 once the direction winds. A warning fires above a
+direction spread of 0.05; pass `warn_texture=false` to silence it, and see
+`spin_direction_spread`.
+
 The twist is only meaningful when the cloud connects to itself across the
 periodic box. A trapped cloud surrounded by vacuum has no phase rigidity along
 the flow axis and gives `f_s ≈ 0`; that is the correct answer to the question
@@ -103,12 +111,31 @@ function superfluid_fraction(
     direction::Int=1,
     method::Symbol=:leggett,
     warn_vacuum::Bool=true,
+    warn_texture::Bool=true,
     rtol::Float64=1e-10,
     maxiter::Int=0,
 ) where {N}
+    warn_texture && _warn_spin_direction_texture(psi)
     superfluid_fraction(
         total_density(_to_host(psi), N), grid; direction, method, warn_vacuum, rtol, maxiter
     )
+end
+
+function _warn_spin_direction_texture(psi::AbstractArray{<:Complex})
+    spread = spin_direction_spread(psi)
+    spread <= _FS_DIRECTION_WARN && return nothing
+    @warn "superfluid_fraction reduces the spinor to its total density, so it \
+           answers only the MASS-flow question — and this state's spin direction \
+           is textured (spread ≈ $(round(spread; digits=3))), which the density \
+           alone cannot see. Measured on a 1D spin-1 GP against a direct \
+           twisted-boundary-condition minimisation, the density-only value \
+           overestimates the true mass-flow f_s by ~1.16× at spread 0.18 and by \
+           ~20× at spread 0.8. Treat this number as an upper bound of unknown \
+           tightness. A spin-flow f_s is not available: a textured state carries \
+           a spin current, so E(0) is not the twist parabola's vertex and the \
+           usual formula diverges. See docs/validation/\
+           superfluidity_knowledge_state.md §1." maxlog = 1
+    nothing
 end
 
 function superfluid_fraction(
@@ -153,6 +180,66 @@ function _superfluid_fraction_leggett(nbar::Vector{Float64})
     npt = length(nbar)
     npt^2 / (sum(nbar) * sum(inv, nbar))
 end
+
+# --- Spin-direction texture guard ---
+
+"""
+    spin_direction_spread(psi) -> Float64
+
+How much the local spin *direction* varies across the cloud, as the
+rotation-invariant `1 - |⟨n̂⟩|` with `n̂ = ⟨F⟩/|⟨F⟩|` averaged under density
+weight. `0` for a spinor whose direction is uniform (however its magnitude or
+density varies); `→ 1` for a fully wound texture. Returns `0` for a
+single-component field, which has no direction.
+
+Not the same quantity as `_lhy_texture_spread` in `make_workspace`, which
+measures the spread in the *magnitude* `|⟨F⟩|/F`. The two guards are
+complementary and point opposite ways: for LHY a direction texture is free and
+only the magnitude matters, while for `superfluid_fraction` the magnitude is
+irrelevant and the direction is what breaks the density-only formula.
+"""
+function spin_direction_spread(psi::AbstractArray{<:Complex, M}) where {M}
+    N = M - 1
+    D = size(psi, M)
+    D > 1 || return 0.0
+    isodd(D) || return 0.0                      # D = 2F+1 ⇒ D must be odd
+    F = (D - 1) ÷ 2
+    p = _to_host(psi)
+    n_pts = ntuple(d -> size(p, d), N)
+    fx, fy, fz = spin_density_vector(p, spin_matrices(F), N)
+    n = total_density(p, N)
+
+    acc = zeros(3)
+    w = 0.0
+    cut = 1e-6 * maximum(n)
+    @inbounds for I in CartesianIndices(n_pts)
+        n[I] > cut || continue
+        fmag = sqrt(fx[I]^2 + fy[I]^2 + fz[I]^2)
+        fmag > 1e-12 || continue                # unpolarised voxel: no direction
+        acc[1] += n[I] * fx[I] / fmag
+        acc[2] += n[I] * fy[I] / fmag
+        acc[3] += n[I] * fz[I] / fmag
+        w += n[I]
+    end
+    w > 0 || return 0.0
+    max(0.0, 1 - sqrt(acc[1]^2 + acc[2]^2 + acc[3]^2) / w)
+end
+
+# Above this direction spread the density-only f_s is worth flagging.
+#
+# Calibrated, not guessed. Measured on a 1D spin-1 GP by comparing the
+# density-only value against the true mass-twist f_s (a symmetric second
+# difference of E(±q), so immune to any spin current), with the spin direction
+# swept on a cone B = (b⊥cos kx, b⊥sin kx, b_z):
+#
+#   spread   0.0000  0.0039  0.0153  0.0573  0.1835   0.798
+#   dens/true 1.000   1.003   1.010   1.040   1.161   19.9
+#
+# The error tracks ≈0.7·spread while the texture is gentle and then runs away
+# once the direction fully winds — a factor of TWENTY at spread 0.8, not a few
+# per cent. 0.05 keeps the silent regime under ~4 %, matching the tolerance the
+# LHY texture guard settles for.
+const _FS_DIRECTION_WARN = 0.05
 
 # --- Variational branch: ∇·(n(ê_d + ∇u)) = 0 on the periodic grid ---
 

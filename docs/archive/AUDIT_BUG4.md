@@ -1,5 +1,8 @@
 # AUDIT — Bug-4 (ITP merged-loop DDI half-rate)
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: bug fixed 2026-05-02 in `src/solvers/ground_state/itp_loop.jl`. **Scope**: every ITP ground state computed with `kind: spinor` and DDI on where `save_every > 1` ran with effective DDI integrated at less than its nominal value.
 
 ## What was wrong

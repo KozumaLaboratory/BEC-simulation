@@ -138,8 +138,15 @@ _uge_jobname(cid::AbstractString) = "sb_" * String(cid)
                        cuda_module, jobname, compute_group) -> String
 
 Render the full UGE submission script. The body cd's into `project_root`,
-optionally `module load`s CUDA, and invokes `julia run_yaml <config_path>`
-— same shape as the LocalBackend subprocess invocation, for byte-for-byte run-artifact parity.
+optionally `module load`s CUDA, sets `JULIA_NUM_THREADS` from the slot count
+the profile asked for, and invokes `julia run_yaml <config_path>` — same shape
+as the LocalBackend subprocess invocation, for byte-for-byte run-artifact
+parity.
+
+The script is the job's ENTIRE environment: `_uge_qsub_cmd` passes neither
+`-V` nor `-v`, so anything the run needs from the environment has to be
+exported here. `qsub -v JULIA_NUM_THREADS=<n>` still wins, because the export
+defaults through it.
 """
 function render_uge_script(profile::AbstractString, config_path::AbstractString;
     project_root::AbstractString,
@@ -202,6 +209,17 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     # with "Package X is required but does not seem to be installed".
     # Point at the lab's shared depot installed once on the login node.
     $(depot_line)
+
+    # This script IS the whole environment the job gets: `_uge_qsub_cmd`
+    # passes no `-V` and no `-v`, so nothing is inherited from the submitting
+    # shell. Without this line every autopilot-dispatched run executed Julia
+    # at its default of ONE thread, on a profile that had asked for 48 cores —
+    # and the CPU hot paths are threaded (spin density, spin mixing,
+    # singlet-pair, tensor, the DDI k-space contraction, the Euler spin
+    # rotation, the Bogoliubov scan). UGE exports NSLOTS = the slot count the
+    # profile requested; the `:-4` fallback matches scripts/tsubame_setup.sh
+    # for the case where the rendered script is run by hand outside UGE.
+    export JULIA_NUM_THREADS="\${JULIA_NUM_THREADS:-\${NSLOTS:-4}}"
 
     # Same snippet shape as LocalBackend's _LOCAL_RUN_SNIPPET so local
     # and remote dispatch produce byte-for-byte identical artefacts.
@@ -435,24 +453,30 @@ function job_status(b::UGEBackend, entry::QueueEntry;
         return :failed
     elseif state == "absent"
         # Not in the active listing → scheduler considers it terminal.
-        # Outcome.toml landed by `collect!` is the authoritative
-        # done/failed signal (qacct can lag minutes on TSUBAME and
-        # often returns "not found" for short jobs).
+        # `_exit_summary.json`, collected from the node, is the authoritative
+        # done/failed signal (qacct can lag minutes on TSUBAME and often returns
+        # "not found" for short jobs).
+        #
+        # This read `outcome.toml` and its comment called it "landed by
+        # `collect!`". `collect!` does not write that file and nothing else does
+        # either — the only writer was the dry-run synthetic in `tick.jl`. Since
+        # `run_dir` is content-addressed and the rsync collect carries no
+        # `--delete`, a dry run left `terminal = "done"` where a LATER LIVE run
+        # of the same spec would find it, and any live job that vanished from
+        # `qstat` — crash, OOM, node failure — was returned `:done`. A crashed
+        # job reported as successfully completed, then credited to its recipe's
+        # trust store.
         collect!(b, entry)
-        outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
-        if isfile(outcome_path)
-            d = try
-                TOML.parsefile(outcome_path)
-            catch
-                nothing
-            end
-            if d isa AbstractDict
-                term = String(get(get(d, "outcome", Dict()), "terminal", ""))
-                term == "done" && return :done
-                term in ("killed_data", "killed_bug") && return :failed
+        let d = _read_exit_summary(entry)
+            if d !== nothing
+                get(d, "completed", false) === true && return :done
+                # A summary that exists and says otherwise is a real failure;
+                # its CAUSE is `_classify_terminal_failure`'s job, not this
+                # function's.
+                return :failed
             end
         end
-        # No outcome.toml yet — last resort, try qacct. If still no
+        # No `_exit_summary.json` yet — last resort, try qacct. If still no
         # record, return :unknown (next tick retries).
         return _uge_terminal_state(b, job_id)
     end
@@ -481,7 +505,7 @@ function _uge_extract_job_state_from_listing(listing::AbstractString,
 end
 
 # Last-resort terminal classification via qacct. Used only when the
-# job is no longer in qstat AND outcome.toml hasn't landed yet. qacct
+# job is no longer in qstat AND `_exit_summary.json` has not landed yet. qacct
 # on TSUBAME can lag minutes after job exit and may return
 # "error: job id N not found" for short jobs that didn't make it into
 # accounting (e.g. early script failure with bad directives).

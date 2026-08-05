@@ -167,9 +167,43 @@ verify_outputs/
 # Loop Engineering runtime sentinels (tick/done counters)
 .loop/
 
+# ── Per-run research outputs (2026-07-23 cleanup) ──────────────────────
+# EdH / flower-protocol runs drop figures, movies, tomography data, notes and
+# logs under runs/**/. These are reproducible from the tracked *.yaml configs,
+# so ignore the generated artefacts but keep configs / scripts / *.md notes.
+# NOTE: *.png is deliberately NOT ignored — figures are the deliverable and
+# the rule above keeps them; only regenerable data/logs are dropped.
+runs/**/*.mp4
+runs/**/*.gif
+runs/**/*.h5
+runs/**/*.csv
+runs/**/*.log
+runs/**/*.json
+runs/**/*.pdf
+runs/**/*.aux
+runs/**/*.txt
+
+# macOS Finder metadata + Python bytecode caches (never source-of-truth)
+.DS_Store
+__pycache__/
+# Local personal document — submitted thesis PDF, not part of the codebase
+/修士論文_後藤_提出版.pdf
+# LaTeX build artifacts (the .tex sources are tracked, the build products are not)
+*.out
+*.aux
+*.toc
+# result CSVs are regenerable (extract from jld2); keep figures (png), not data
+runs/**/*.csv
+
 # figure data lives on TSUBAME (runs/eu_shape_optimization/data/); repo keeps figures+code
 docs/guides/figures/*.csv
 docs/guides/figures/__pycache__/
 
 # figs/ raw trajectory data archived on TSUBAME (runs/eu_evaporation_optimization/data/); repo keeps result PNGs + summaries
 figs/**/*.csv
+
+# phase-gap bench cell cache (see bench/phase_gap_report.jl)
+.gap_cache/
+
+# Mutation-harness output (test/mutation/run.jl)
+mutation_out/

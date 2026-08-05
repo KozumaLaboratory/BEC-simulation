@@ -1,5 +1,8 @@
 # Rank-2 Cross-Channel Vanishing — Analytical Proof Sketch
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Status**: PROOF SKETCH — rigorous proof for $A_1$-irrep polyhedral inert states
 using Wigner-Eckart + polyhedral harmonic decomposition. Closes Lemma 1

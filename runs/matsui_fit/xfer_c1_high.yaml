@@ -1,0 +1,94 @@
+# 転送レートの sensitivity table — xfer_c1_high
+#
+# c1_ratio を 4 倍に (1/9)。c0 は 1640 -> 656。c1 は構造的上限の 80 %
+#
+# 問い: m = -6 のカスケード転送が実験より速いのは、どのノブで動くか。
+#
+# なぜこの arm 群が必要か: 本キャンペーンのこれまでの全 arm は c1_ratio と q を
+# 「彼らのコードが出荷する値」に固定していた。損失は m=-4 / m=-2 を 23 / 31 %
+# 改善したが m=-6 は 6 % 悪化させた（docs/validation/matsui_fig2c_absolute_numbers.md
+# §5）— 原子は転送で m=-6 を出てから初めて失われるので、損失は原理的に m=-6 の
+# 個数を増やせない。残差は転送そのものにある。
+#
+# 派生量（c_total = 3281.1 は a_s と N で固定、c0 + 36 c1 = c_total）:
+#   c1_ratio = 0.111111  =>  c0 = 656.2, c1 = 72.91 （c1 は上限 91.1 の 80 %）
+#   基準 (1/36) は c0 = 1640.5, c1 = 45.57
+# c0 と c1 は独立でない — a_s が両方を決める。両方を報告すること。特異点
+# r = -1/36 からは全候補が遠い（全て正）。
+#
+# 判定（起動前に記録）。基準となる残差は m=-6 の rms 0.0926（初期原子数比、1-40 ms、
+# 損失なし。損失を入れると 0.0986 に悪化する）:
+#   感度あり : このノブが m=-6 の rms を 0.02 以上動かす（残差の 20 % 以上）
+#              => そのノブが候補。改めて掃引する価値がある
+#   感度なし : 0.02 未満しか動かない => 転送レートはこのノブから触れない。
+#              m=-6 の残差は c1/q の外（想定: 撮像後の変換、あるいはモデル外の物理）
+#   候補確定 : rms が 0.05 未満に落ちる => そのノブの値が実験と食い違っている
+#
+# 観測量は m = -6 の**絶対量**（初期原子数比）。生存原子で規格化した分率では
+# 測らない — それは原子数の減衰を割り算で消す（同 doc §2）。
+
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 35000, omega_ref: 691.1504}
+
+scan:
+  zip:
+    pipeline.1.B.Bz.to: {from: 2.6e-5, to: 2.6e-5, step: 5.0e-6}   # Gauss; -13 … +9 nT, 0.5 nT step (45 pts)
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [32, 32, 32], box: [16.0, 16.0, 16.0]}   # dx = 0.5 a_ho; R_TF ≈ 5.1 a_ho
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 35000                       # their shipped Ntot
+        omega_ref: 691.1504
+        c1_ratio: 0.1111111111111111
+      ddi:
+        enabled: true
+        secular: true            # spin frozen at m=-6 during their ITP (calcDD_3D_pol)
+        padded: true
+        pad_factor: 2
+      lhy: {kind: none}          # their model has no beyond-mean-field term
+      B:
+        Bz: "0.0104 Gauss"       # 10.4 mG = 1.04 µT, their Bfield_ini
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116            # 2π·1 Hz / ω_ref — their ZeemanQ = 1.0 Hz
+      gauge_fix: false
+      initial_state: m_minus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 4000
+      tol: 1.0e-10
+
+  - dynamics:
+      duration: 27.646016        # 40 ms x 691.1504
+      dt: 0.001                  # their time_step, in the same 1/ω_ref units
+      B:
+        Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}  # 150 µs ≈ 3τ linear stand-in for their exp(-t/50 µs)
+        theta: 0.0
+        phi: 0.0
+        q: 0.00909116
+      ddi:
+        enabled: true
+        secular: false           # full MDDI: the off-diagonal INT1 is what drives EdH
+        padded: true
+        pad_factor: 2
+      interactions:
+        N_atoms: 35000                       # explicit, so defaults cannot inject 5e4
+        omega_ref: 691.1504
+        c1_ratio: 0.1111111111111111
+      lhy: {kind: none}
+      # NO loss block — their Fig. 2/4 theory curves are loss-free.
+      seed_amplitude: 0.0        # their noise_amp is declared and never used; the
+                                 # m=-6 → -5 transfer is DRIVEN by DDI, not seeded
+      save:
+        every: 100
+                                 # of the hold — point_001's saved psi cannot be trusted
+        psi: false
+        precision: f32
+
+  - analyze:
+      - energy_decomposition: {}

@@ -1,5 +1,8 @@
 # Analytical accounting of frozen-MF Yoshida composition order degradation
 
+> **FROZEN 2026-05-13.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: draft skeleton, 2026-05-13. Empirical anchor from B-1 + B-2
 diagnostic suite (commit `dbc6522`). Target chapter: D 論 Ch.4 (Magnus
 expansion) — methods-paper candidate.

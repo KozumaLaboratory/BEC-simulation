@@ -132,7 +132,11 @@ function build_energy_context(psi_host::Array{<:Complex, ND_psi}, ws) where {ND_
         :energy_context, (eltype(psi_host), n_pts)
     ) do
         (
-            zeros(ComplexF64, n_pts), zeros(Float64, n_pts),
+            # `eltype(psi_host)`, not ComplexF64: the scratch key already
+            # discriminates on it, and `ws.fft_plans` follows ψ's precision —
+            # a mismatched buffer turns the in-place FFT into an out-of-place
+            # one and the k-space reduction reads real-space ψ.
+            zeros(eltype(psi_host), n_pts), zeros(Float64, n_pts),
             zeros(Float64, n_pts), zeros(Float64, n_pts), zeros(Float64, n_pts),
         )
     end
@@ -149,9 +153,13 @@ function build_gradient_context(psi, ws)
     n_pts = ntuple(d -> size(psi, d), Val(N))
     D = ws.spin_matrices.system.n_components
     fft_buf, fx_scratch, fy_scratch, fz_scratch, deriv_buf = _energy_gradient_scratch(psi, n_pts)
-    # Scratch-backed density on CPU (P1: total_density allocated a
-    # grid-sized array per LBFGS gradient call); the GPU branch keeps
-    # the device-aware allocating helper until P2.
+    # Scratch-backed density. `_total_density!` is the broadcast form and is
+    # GPU-safe, so the device branch no longer needs the allocating
+    # `total_density` — that was a fresh device array per gradient AND per
+    # GPU energy evaluation (the GPU energy path builds this same context),
+    # i.e. several device allocations per L-BFGS iteration. The two branches
+    # differ only in the buffer's eltype, which each side already had:
+    # Float64 on the host, `real(eltype(psi))` on the device.
     n_density = if psi isa Array
         buf = scratch_get!(:gradient_n_density, (eltype(psi), n_pts)) do
             zeros(Float64, n_pts)
@@ -159,7 +167,11 @@ function build_gradient_context(psi, ws)
         _total_density!(buf, psi, D, N, n_pts)
         buf
     else
-        total_density(psi, N)
+        buf = scratch_get!(:gradient_n_density_dev, (typeof(psi), n_pts)) do
+            similar(psi, real(eltype(psi)), n_pts)
+        end
+        _total_density!(buf, psi, D, N, n_pts)
+        buf
     end
     _compute_spin_density!(
         fx_scratch, fy_scratch, fz_scratch, psi, ws.spin_matrices,
@@ -196,6 +208,58 @@ function apply_operator_via_registry!(grad, ws)
         apply_operator!(grad, term, ws, psi, ctx)
     end
     return grad
+end
+
+"""
+    operator_and_energy_via_registry!(grad, ws, dV) → (grad, E)
+
+`apply_operator_via_registry!` plus the total energy, from the SAME pass.
+
+`grad` accumulates term by term, so `Re⟨ψ, grad⟩` after term `k` minus the same
+after term `k-1` is `Re⟨ψ, H_k·ψ⟩` — one extra reduction per term, no extra
+buffer and no extra write. Each term's energy is then
+`energy_operator_ratio(term)` times that (see `terms/base.jl`), and a term
+that declares `NaN` falls back to its own `energy_contribution`.
+
+Why bother: on the CPU `energy_gradient!` runs the registry TWICE, once for the
+gradient and once for `energy_decomposition` — measured 12.80 ms against 6.11
+for the gradient alone at 24³ D=13, in a ~30 ms L-BFGS iteration. The extra
+reductions here cost 0.076 ms per term (measured; `bench/probe_inline_energy_accumulation.jl`),
+so ~0.6 ms buys back ~6.6.
+
+The differences are taken between cumulative sums of the same magnitude as the
+total, so each term's value carries ~1e-16 absolute error. The energy is
+consumed by an Armijo comparison whose own floor is ~1e-7, five orders coarser.
+
+NOT bit-identical to `energy_decomposition(ws).total`: the summation order
+differs, and the reductions are `_realdot`'s blocked form rather than each
+term's own. Callers that need the decomposition, or that compare energies
+across revisions, must keep using `energy_decomposition`.
+"""
+function operator_and_energy_via_registry!(grad, ws, dV::Float64)
+    fill!(grad, zero(eltype(grad)))
+    psi = ws.state.psi
+    ctx = build_gradient_context(psi, ws)
+    registry = build_h_terms_registry(ws)
+    E = 0.0
+    cum_prev = 0.0
+    for term in registry
+        apply_operator!(grad, term, ws, psi, ctx)
+        r = energy_operator_ratio(term)
+        if isnan(r)
+            # Not derivable from the operator (LossTerm): ask the term. The
+            # 3-arg form, not the ctx one — `ctx` here is a GradientContext and
+            # the ctx-aware `energy_contribution` takes an EnergyContext.
+            E += energy_contribution(term, psi, ws)
+            # ...and re-anchor, since this term may still have written to grad.
+            cum_prev = _realdot(psi, grad)
+        else
+            cum = _realdot(psi, grad)
+            E += r * (cum - cum_prev) * dV
+            cum_prev = cum
+        end
+    end
+    return grad, E
 end
 
 # Default fallback: terms that have not opted into ctx-aware dispatch

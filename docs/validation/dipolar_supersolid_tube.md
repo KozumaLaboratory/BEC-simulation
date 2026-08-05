@@ -1,5 +1,8 @@
 # Dipolar supersolid in a periodic tube — type-C reproduction
 
+> **FROZEN 2026-07-29.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Verification type: **C (model fidelity)** — comparison against published
 numerical results, not against this code's own statements.
 
@@ -85,6 +88,34 @@ Agreement with the paper's Fig. 2 (upper panel):
   contrast 0.999 (density minimum essentially zero), i.e. droplets that are
   individually superfluid but mutually disconnected — the case the paper
   singles out as having no supersolid character.
+
+### The droplet array is the minimum in both period and shape
+
+Two checks beyond the seeded comparison, both at $\epsilon_{dd} = 1.45$.
+
+**Period.** Imposing $d = L/n_d$ for $n_d = 8\ldots14$ and converging each
+separately puts the minimum at $n_d = 11$ ($+1.2\times10^{-3}$ at 10,
+$+3.3\times10^{-3}$ at 12). Repeating at $\epsilon_{dd} = 1.55$ moves it to
+$n_d = 9$, so the preferred count drops as the droplets isolate — the paper's 11
+is specific to the 1.45 it quotes it at.
+See `figs/dipolar_supersolid/period_scan.png`.
+
+**Shape.** The period scan fixes the *shape*, so six deliberately broken seeds
+were run as well:
+
+| seed | $E$ | $\Delta E$ vs even array | peaks | peak-height spread |
+|---|---|---|---|---|
+| even 11-droplet | 4.541833 | — | 11 | 0.011 |
+| alternating amplitude | 4.541833 | $5.5\times10^{-9}$ | 11 | 0.011 |
+| dimerised | 4.541833 | $1.4\times10^{-7}$ | 11 | 0.011 |
+| one droplet suppressed | 4.541835 | $1.8\times10^{-6}$ | 11 | 0.013 |
+| uneven spacing | 4.542068 | $2.4\times10^{-4}$ | 11 | 0.029 |
+| broadband noise | 4.541833 | $2.7\times10^{-9}$ | 11 | 0.011 |
+
+All relax to the *same* even array. The uneven-spacing seed stops
+$2.4\times10^{-4}$ short and at higher peak-height spread, i.e. not fully
+relaxed rather than a competing state. No unequal, dimerised or defected
+modulation is competitive here.
 
 ### Droplet count is a prediction, not an input
 

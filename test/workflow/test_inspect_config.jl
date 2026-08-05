@@ -152,12 +152,16 @@ using SpinorBEC
               B: {Bz: "0.01 Gauss"}
         """
         ins = SpinorBEC.inspect_config_string(src)
-        # Structural kind: feature_incompat; :block severity (run-aborter).
+        # Structural kind: feature_incompat, :warn severity. This was a :block
+        # until 2026-07-28. The underlying crash — `_apply_1d_shear_batch!`
+        # scalar-indexing GPU arrays in the Coriolis step — was fixed 2026-06-02
+        # (the shear now dispatches on `psi isa Array`), so blocking the run was
+        # advising users away from a path that works.
         ws = filter(w -> w.kind === :feature_incompat &&
                          occursin("rotating_frame_omega", w.title),
             ins.warnings)
         @test length(ws) == 1
-        @test ws[1].severity === :block
+        @test ws[1].severity === :warn
         @test ws[1].step_index == 2
     end
 
@@ -205,11 +209,83 @@ using SpinorBEC
             ins.warnings)
     end
 
-    # --- run_yaml audit hook (W4 + opt-out) -----------------------------
+    @testset "runner-consumed top-level blocks are not schema errors" begin
+        # `dealias:` and `units:` are real top-level blocks that the RUNNER pops
+        # before validation — `dealias` onto global Refs, `units` after lab-unit
+        # conversion. Inspect used to validate the raw dict, so it reported a
+        # schema ERROR for ~20 configs that run fine, several already run on
+        # TSUBAME. A preflight that fails valid configs is worse than none:
+        # this severity feeds the autopilot gate.
+        src = """
+        units: {B: Gauss}
+        dealias: {enabled: true, k_cut: 5.0}
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              interactions: {N_atoms: 1000, omega_ref: 691.1504}
+              lhy: {kind: full_bdg}
+              B: {Bz: "0.01 Gauss"}
+              n_steps: 10
+              tol: 1.0e-6
+        """
+        ins = SpinorBEC.inspect_config_string(src)
+        @test !any(w -> w.kind === :normalize_failed, ins.warnings)
+        @test !any(w -> w.kind === :input_resolved_drop &&
+                        occursin("units", w.title), ins.warnings)
+        # ...and inspecting must not leak the dealias Refs into the session.
+        @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
+
+        # `kind: full_bdg` is no longer flagged. The ~3000× offset that rule
+        # warned about was a UV counterterm bug, fixed 2026-07-27; full_bdg is
+        # the general-spinor path and matches the closed forms to ~1e-4.
+        @test !any(w -> w.kind === :full_bdg_f6_polar, ins.warnings)
+    end
+
+    @testset "a malformed dealias block is still an error" begin
+        # Popping it must not mean ignoring it — the runner throws on this.
+        src = """
+        dealias: {enabled: true, no_such_key: 1}
+        pipeline:
+          - ground_state:
+              atom: Eu151
+              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+              interactions: {N_atoms: 1000, omega_ref: 691.1504}
+              n_steps: 10
+              tol: 1.0e-6
+        """
+        ins = SpinorBEC.inspect_config_string(src)
+        @test any(w -> w.kind === :dealias_block_invalid && w.severity === :error,
+            ins.warnings)
+    end
+
+    # --- run_yaml audit hook (:block aborts + opt-out) -------------------
     #
     # The hook lives in `_run_yaml_impl`; we exercise it via run_yaml with
     # `dry_run=true` so no simulator work happens. Each test writes a YAML
     # to a tempdir, then asserts on whether run_yaml threw and on what.
+    #
+    # The abort path used to be driven by W4 (rotating_frame_omega + GPU),
+    # which was downgraded to :warn on 2026-07-28 once the underlying GPU
+    # shear bug was confirmed fixed. `n_steps: 0` is used instead — it is a
+    # boundary rule with `zero_meaning = :error`, hence a genuine :block, so
+    # the abort coverage survives the downgrade. (`duration ≤ 0` would NOT
+    # work: it is `:degenerate` and only emits a :warn.)
+    _BLOCK_YAML = """
+    defaults: {kind: spinor, backend: cpu}
+    pipeline:
+      - ground_state:
+          atom: Eu151
+          grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
+          potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+          interactions: {N_atoms: 1000, omega_ref: 691.1504}
+          B: {Bz: "0.01 Gauss"}
+          dt: 0.01
+          n_steps: 0
+          tol: 1.0e-6
+    """
 
     _W4_YAML = """
     defaults: {kind: spinor, backend: gpu}
@@ -232,10 +308,10 @@ using SpinorBEC
           B: {Bz: "0.01 Gauss"}
     """
 
-    @testset "audit hook: W4 aborts run_yaml" begin
+    @testset "audit hook: a :block finding aborts run_yaml" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
-            write(p, _W4_YAML)
+            p = joinpath(tmp, "block.yaml")
+            write(p, _BLOCK_YAML)
             err = nothing
             try
                 run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
@@ -244,7 +320,21 @@ using SpinorBEC
             end
             @test err isa ArgumentError
             @test occursin("audit blocked", err.msg)
-            @test occursin("rotating_frame_omega", err.msg)
+            @test occursin("n_steps", err.msg)
+        end
+    end
+
+    @testset "audit hook: W4 is a warning and does NOT abort" begin
+        mktempdir() do tmp
+            p = joinpath(tmp, "w4.yaml")
+            write(p, _W4_YAML)
+            ok = try
+                run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
+                true
+            catch
+                false
+            end
+            @test ok
         end
     end
 

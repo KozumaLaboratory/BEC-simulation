@@ -14,6 +14,7 @@
 # running on the same device against the same input.
 
 using Test
+using Random
 using LinearAlgebra: norm
 import CUDA
 using SpinorBEC
@@ -25,15 +26,15 @@ else
 
     # exp(z·v·F) via each realization, same input.
     function _rotate(taylor::Bool, sm, psi0, vx, vy, vz, dt, it)
-        old = Ext._SPIN_TAYLOR_ENABLED[]
-        Ext._SPIN_TAYLOR_ENABLED[] = taylor
+        old = SpinorBEC.SPIN_TAYLOR_ENABLED[]
+        SpinorBEC.SPIN_TAYLOR_ENABLED[] = taylor
         try
             p = copy(psi0)
             SpinorBEC._apply_ddi_rotation!(p, vx, vy, vz, sm, dt, 3; imaginary_time=it)
             CUDA.synchronize()
             return p
         finally
-            Ext._SPIN_TAYLOR_ENABLED[] = old
+            SpinorBEC.SPIN_TAYLOR_ENABLED[] = old
         end
     end
 
@@ -71,15 +72,15 @@ else
         psi0 = CUDA.CuArray(randn(ComplexF64, n, n, n, D) ./ 10)
         for it in (false, true), c1 in (0.5, -0.5)
             outs = map((false, true)) do taylor
-                old = Ext._SPIN_TAYLOR_ENABLED[]
-                Ext._SPIN_TAYLOR_ENABLED[] = taylor
+                old = SpinorBEC.SPIN_TAYLOR_ENABLED[]
+                SpinorBEC.SPIN_TAYLOR_ENABLED[] = taylor
                 try
                     p = copy(psi0)
                     apply_spin_mixing_step!(p, sm, c1, 0.01, 3; imaginary_time=it)
                     CUDA.synchronize()
                     Array(p)
                 finally
-                    Ext._SPIN_TAYLOR_ENABLED[] = old
+                    SpinorBEC.SPIN_TAYLOR_ENABLED[] = old
                 end
             end
             @test norm(outs[2] .- outs[1]) / norm(outs[1]) < 1e-10
@@ -87,16 +88,78 @@ else
         end
     end
 
+    # The Horner degree is picked PER VOXEL from that voxel's own |v|, so a
+    # field with a wide dynamic range is the case that separates it from the
+    # global-max degree: the centre keeps every term while the tails stop after
+    # two. The flat random fields above cannot see a defect there — every voxel
+    # would agree on the degree. This is a trapped-cloud field (peak-to-tail
+    # ~1e14) at the largest R the Taylor branch accepts, so the centre needs the
+    # full degree while most of the box needs the minimum.
+    @testset "per-voxel Taylor degree: wide-dynamic-range field" begin
+        sm = spin_matrices(6)
+        n = 24
+        ax = range(-3.0, 3.0; length=n)
+        env = [exp(-(ax[i]^2 + ax[j]^2 + ax[k]^2)) for i in 1:n, j in 1:n, k in 1:n]
+        psi0 = CUDA.CuArray(randn(ComplexF64, n, n, n, 13))
+        for scale in (6.0, 30.0), it in (false, true)
+            f() = CUDA.CuArray(scale .* env .* randn(Float64, n, n, n))
+            vx, vy, vz = f(), f(), f()
+            eul = _rotate(false, sm, psi0, vx, vy, vz, 0.005, it)
+            tay = _rotate(true, sm, psi0, vx, vy, vz, 0.005, it)
+            @test norm(Array(tay) .- Array(eul)) / norm(Array(eul)) < 1e-10
+            # Dynamic range is really present: without it this test is the flat
+            # case again and proves nothing about per-voxel selection.
+            m = Array(vx) .^ 2 .+ Array(vy) .^ 2 .+ Array(vz) .^ 2
+            @test maximum(m) / max(minimum(m), 1e-300) > 1e10
+        end
+    end
+
+    # Above `SPIN_TAYLOR_RSAFE` a voxel halves its angle and applies the
+    # rotation 2^s times. Production R is 0.01-0.2 so that branch never fires
+    # there; it is what makes the Taylor path valid at ANY R, which is in turn
+    # what lets the degree be chosen on the device with no max|v| read-back.
+    # Round-off accumulates over the 2^s repetitions, hence the looser bound.
+    @testset "angle halving holds at R far past the production range" begin
+        sm = spin_matrices(6)
+        n = 4096
+        psi0 = CUDA.CuArray(randn(ComplexF64, n, 1, 1, 13))
+        for scale in (200.0, 1000.0), it in (false, true)
+            v() = CUDA.CuArray(scale .* randn(Float64, n, 1, 1))
+            vx, vy, vz = v(), v(), v()
+            R = 0.005 * sqrt(maximum(Array(vx) .^ 2 .+ Array(vy) .^ 2 .+
+                                     Array(vz) .^ 2)) * 6
+            @test R > 20                       # the halving branch really fires
+            eul = _rotate(false, sm, psi0, vx, vy, vz, 0.005, it)
+            tay = _rotate(true, sm, psi0, vx, vy, vz, 0.005, it)
+            @test norm(Array(tay) .- Array(eul)) / norm(Array(eul)) < 1e-8
+        end
+    end
+
     # A rotation is unitary; the Taylor truncation must not leak norm at the
     # production angle. (The imaginary-time arm is deliberately not unitary.)
+    #
+    # This is also the gate on `SPIN_TAYLOR_TOL`. Since the degree is chosen
+    # PER VOXEL, that tolerance is binding rather than slack — at 1e-9 the drift
+    # here is 9.6e-13, at 1e-13 it is 2.2e-16 — so the bound below is set at
+    # machine precision on purpose: loosening the tolerance turns it red instead
+    # of quietly costing four orders of accuracy. Seeded, because an unseeded
+    # draw put the old 1e-12 bound within a factor 1.05 of the measured value
+    # and the test flickered.
     @testset "Taylor rotation preserves norm (real time)" begin
         sm = spin_matrices(6)
+        Random.seed!(20260729)
         psi0 = CUDA.CuArray(randn(ComplexF64, 4096, 1, 1, 13))
         n0 = sum(abs2, psi0)
         v() = CUDA.CuArray(6.0 .* randn(Float64, 4096, 1, 1))
+        vx, vy, vz = v(), v(), v()
+        # The angle is in the range where the degree really varies across the
+        # box, so a per-voxel degree that was too small would show up here.
+        R = 0.005 * sqrt(maximum(Array(vx) .^ 2 .+ Array(vy) .^ 2 .+
+                                 Array(vz) .^ 2)) * 6
+        @test 0.3 < R < 1.5
         p = copy(psi0)
-        SpinorBEC._apply_ddi_rotation!(p, v(), v(), v(), sm, 0.005, 3)
+        SpinorBEC._apply_ddi_rotation!(p, vx, vy, vz, sm, 0.005, 3)
         CUDA.synchronize()
-        @test abs(sum(abs2, p) / n0 - 1) < 1e-12
+        @test abs(sum(abs2, p) / n0 - 1) < 1e-14
     end
 end

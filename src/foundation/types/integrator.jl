@@ -93,7 +93,14 @@ struct EnsembleResult
     times::Vector{Float64}
     mean::Dict{Symbol, Vector{<:AbstractArray}}
     var::Dict{Symbol, Vector{<:AbstractArray}}
+    # Trajectories that CONTRIBUTED, i.e. `n_traj - length(rejected)`. The mean
+    # and variance are over this many samples, not over the number requested.
     n_trajectories::Int
+    # Indices of trajectories excluded for producing a non-finite observable.
+    # Empty in the overwhelmingly common case. Recorded rather than counted so
+    # a caller can say WHICH member diverged, and so that "none rejected" and
+    # "rejections not tracked" cannot look alike.
+    rejected::Vector{Int}
     trajectory_results::Union{Nothing, Vector{SimulationResult}}
     # Last trajectory's full SimulationResult (with psi_snapshots). Always
     # retained so the dashboard auto-save can stream dynamics frames even
@@ -105,6 +112,13 @@ struct EnsembleResult
     # *every* trajectory and is opt-in.
     last_trajectory::Union{Nothing, SimulationResult}
 end
+# Back-compat: callers that predate `rejected` get an empty vector, which reads
+# as "none rejected" — true for every such caller, since the rejection path did
+# not exist when they were written.
 EnsembleResult(times, mean, var, n_trajectories, trajectory_results) = EnsembleResult(
-    times, mean, var, n_trajectories, trajectory_results, nothing
+    times, mean, var, n_trajectories, Int[], trajectory_results, nothing
+)
+EnsembleResult(times, mean, var, n_trajectories, rejected::Vector{Int},
+    trajectory_results) = EnsembleResult(
+    times, mean, var, n_trajectories, rejected, trajectory_results, nothing
 )

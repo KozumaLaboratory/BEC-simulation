@@ -1,0 +1,58 @@
+# GENTLE landing — the slow end of the three-protocol comparison.
+#
+#   pure quench        : 10 mG -> 26 uG in   5.8 ms   (Matsui-style, broadband kick)
+#   quench + parabola  : 10 mG -> 500 uG then parabola to 26 uG over 28.4 ms
+#   THIS (gentle)      : one parabola all the way, 10 mG -> 26 uG over 130 ms
+#
+# Same parabolic shape as the others, B(t) = B_end + (B0-B_end)*(1-t/T)^2, i.e.
+# decelerating at the low-field end; only the duration differs. Everything else
+# (atom, grid, trap, c1_ratio=1/36, K3, seed, secular:false, GS cache) is identical,
+# so the three runs differ ONLY in how the field is brought down.
+# Hold 80 w^-1 = 116 ms, matching the pure-quench run.
+# psi snapshots ON: <Lz>(t) is computed from the wavefunction.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_64.jld2
+# --- single slow parabola: 10 mG -> 26 uG over 90 w^-1 (130 ms) ---
+- dynamics:
+    duration: 90.0
+    dt: 0.002
+    B:
+      Bz:
+        piecewise:
+          times: [0.0, 5.625, 11.25, 16.875, 22.5, 28.125, 33.75, 39.375, 45.0, 50.625, 56.25, 61.875, 67.5, 73.125, 78.75, 84.375, 90.0]
+          values: [0.01, 0.00879221094, 0.00766234375, 0.00661039844, 0.005636375, 0.00474027344, 0.00392209375, 0.00318183594, 0.0025195, 0.00193508594, 0.00142859375, 0.00100002344, 0.000649375, 0.000376648437, 0.00018184375, 6.49609375e-05, 2.6e-05]
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 500, psi: true, precision: f32}
+# --- hold at 26 uG + seed ---
+- dynamics:
+    duration: 80.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: true, precision: f32}

@@ -66,7 +66,7 @@ end
 """
     recipe_refine_around_best(entry, params) -> Vector{Experiment}
 
-Compare every completed sibling's metric (read from outcome.toml) and
+Compare every completed sibling's metric (read from summary.json) and
 propose a new run at `(best_param ± shrink * range)` halfway toward
 the best. Pure greedy exploitation — wrap in a trust gate before any
 unattended dispatch.
@@ -86,7 +86,7 @@ function recipe_refine_around_best(entry, params::AbstractDict)
     shrink = Float64(get(params, "shrink", 0.5))
 
     # Walk every :done entry in this queue and find the one whose
-    # outcome.toml metric is best (we minimise by default; flip with
+    # summary.json metric is best (we minimise by default; flip with
     # `lower_is_better = false`).
     lower_is_better = Bool(get(params, "lower_is_better", true))
     best_val = nothing
@@ -207,14 +207,20 @@ function _load_spec(entry)
 end
 
 function _outcome_metric(entry, metric_path)
-    p = joinpath(entry.run_dir, OUTCOME_FILENAME)
+    # `summary.json`, not the producerless `outcome.toml` this read until
+    # 2026-08-04. Scalars a recipe would rank on are what `write_run_summary`
+    # emits (`workflow/validation/scalar_summary.jl`); `outcome.toml`'s
+    # `[metrics]` table was written empty even by the one writer it had, so
+    # every `refine`-family recipe that ranks on a metric got `nothing` here and
+    # returned no descendants at all.
+    p = joinpath(entry.run_dir, "summary.json")
     isfile(p) || return nothing
     d = try
-        TOML.parsefile(p)
+        JSON.parsefile(p)
     catch
-        ;
         return nothing
     end
+    d isa AbstractDict || return nothing
     return _get_path(d, _split_path(metric_path))
 end
 

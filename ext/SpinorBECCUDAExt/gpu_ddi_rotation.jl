@@ -6,9 +6,10 @@
 #  * Adaptive tridiagonal Taylor-Horner (default) — the shared
 #    `_apply_spin_rotation_taylor!` in gpu_spin_rotation_taylor.jl, which the
 #    spin-mixing substep also uses (same operator, different v).
-#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — used when R exceeds
-#    `_SPIN_TAYLOR_RMAX[]` (never reached in production). Machine precision at
-#    all R, and the reference the Taylor path is parity-gated against.
+#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — reached only when
+#    the Taylor path is switched off or the spinor is wider than the warp
+#    layout (D > 16). Machine precision at all R, and the reference the Taylor
+#    path is parity-gated against.
 
 # --- Euler fallback eigenvector cache (Fy diagonalization) ---
 mutable struct GPUDDIRotCache{D, T <: AbstractFloat}
@@ -44,10 +45,32 @@ function _get_gpu_ddi_rot_cache(
 end
 
 # Crop a (possibly padded) dipolar field to the spatial corner and flatten to
-# (N,). Unpadded (size == n_pts, every production run) is a zero-copy reshape.
+# (N,). Unpadded is a zero-copy reshape; the padded arm MATERIALISES a cropped
+# copy (a device allocation plus a gather kernel, per component), so it is used
+# only by the exact-Euler fallback, whose kernel indexes the field linearly. The
+# Taylor path — which is what every D ≤ 16 run takes, and since
+# `DDI_PADDED_DEFAULT` flipped to `true` (9c117c05) that is every production run
+# — reads the padded buffer in place through `src_idx` instead.
 @inline function _gpu_phi_vec(phi::CuArray, n_pts::NTuple{M, Int}, N::Int) where {M}
     size(phi) == n_pts && return reshape(phi, N)
     reshape(phi[CartesianIndices(n_pts)], N)
+end
+
+# Taylor path, both field layouts. Two call sites rather than one with a
+# Union-typed field/map tuple, so each launches a concretely-typed kernel.
+@inline function _ddi_rotate_taylor!(
+    P, phi_x, phi_y, phi_z, coef, scale::T, ::Val{D}, n_pts, N, imaginary_time, F,
+) where {T, D}
+    if size(phi_x) == n_pts
+        _apply_spin_rotation_taylor!(
+            P, reshape(phi_x, N), reshape(phi_y, N), reshape(phi_z, N),
+            coef, scale, Val(D); imaginary_time, F, src_idx=nothing)
+    else
+        _apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, coef, scale, Val(D);
+            imaginary_time, F, src_idx=CartesianIndices(n_pts))
+    end
+    nothing
 end
 
 # --- Dispatcher: Taylor (adaptive) with exact-Euler fallback ---
@@ -64,18 +87,20 @@ function SpinorBEC._apply_ddi_rotation!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
     P = reshape(psi, N, D)
-    px = _gpu_phi_vec(phi_x, n_pts, N)
-    py = _gpu_phi_vec(phi_y, n_pts, N)
-    pz = _gpu_phi_vec(phi_z, n_pts, N)
 
-    plan = _spin_taylor_plan(psi, sm, px, py, pz, T(dt_frac), imaginary_time)
+    plan = _spin_taylor_plan(psi, sm)
     if plan !== nothing
-        coef, z, K = plan
-        _apply_spin_rotation_taylor!(P, px, py, pz, coef, z, K, Val(D))
+        coef, F = plan
+        _ddi_rotate_taylor!(
+            P, phi_x, phi_y, phi_z, coef, T(dt_frac), Val(D), n_pts, N,
+            imaginary_time, F)
         return nothing
     end
 
     # Fallback: exact Euler 5-stage (large/unknown R).
+    px = _gpu_phi_vec(phi_x, n_pts, N)
+    py = _gpu_phi_vec(phi_y, n_pts, N)
+    pz = _gpu_phi_vec(phi_z, n_pts, N)
     cache = _get_gpu_ddi_rot_cache(psi, sm, ndim)
     apply_ddi_euler_fused_kernel!(
         P, px, py, pz, cache.m_row, cache.λ_row, cache.V, cache.conj_V, dt_frac;

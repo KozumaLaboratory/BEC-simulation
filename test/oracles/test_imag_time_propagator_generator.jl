@@ -127,11 +127,12 @@ end
         _check(SpatialZeemanTerm, ws, _textured_state(ws))
     end
 
-    @testset "Raman propagator: gate vs INDEPENDENT dumb RHS (gradient face is nil)" begin
-        # RamanTerm.apply_operator! is a declared no-op, so _check (which targets
-        # apply_operator!) cannot gate the propagator. The Raman direction (δ, Ω,
-        # ±k phase, F₊↔F₋) was only pinned on the energy face. Gate the PROPAGATOR
-        # generator against the independent dumb Raman RHS H_R·ψ instead.
+    @testset "Raman propagator: gate vs INDEPENDENT dumb RHS" begin
+        # Kept pointed at the dumb RHS rather than switched to `_check` when the
+        # production gradient landed (2026-07-31): comparing the propagator
+        # generator against an INDEPENDENT statement of H_R·ψ is the stronger
+        # gate, and it is what pins the Raman direction (δ, Ω, ±k phase, F₊↔F₋)
+        # on the propagator face.
         raman = RamanCoupling{3}(1.3, -0.7, (0.6, -0.3, 0.9))
         ws = make_workspace(; grid, atom=Eu151,
             interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),

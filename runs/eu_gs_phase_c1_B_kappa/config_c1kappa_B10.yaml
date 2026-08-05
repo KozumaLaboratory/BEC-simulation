@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────
+#  ¹⁵¹Eu (F=6) GS phase map — c1 × κ plane at B = 0 µG.
+#
+#  Motivation: c1 for Eu is NOT pinned by data (7 unknown channels; the
+#  +1/36 "Matsui AFM" value is a dynamics best-fit). So treat c1 as an
+#  UNCERTAIN axis spanning FM (c1<0) → AFM (c1>0), and cross the trap
+#  geometry from cigar (κ<1, DDI head-to-tail) to pancake (κ>1, DDI
+#  side-by-side). This weak-field slice: q≈0, Zeeman just tilts the soft manifold.
+#
+#  Axes:  c1_ratio ∈ [−0.024, +0.048]  (13 pts; stays > singularity −1/36)
+#         κ = ω_z/ω_r ∈ [0.3, 2.2]     (15 pts; cigar → pancake)
+#  Taller z-box [.,.,24] holds the cigar cloud (a_z=1/√0.3≈1.83× at κ=0.3).
+#  Weak field ⇒ soft manifold ⇒ pin (transverse ε-continuation) certifies
+#  the ε→0 flower/flux-closure GS. Two seeds (m_plus_F, polar); min-E = GS.
+#  195 (c1×κ) tasks × 2 seeds. Post-process → eu_phase_fingerprint → contour.
+# ─────────────────────────────────────────────────────────────────────
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "1.0e-5 Gauss", theta: 0.0, phi: 0.0}
+      pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}
+      n_steps: 1000
+      tol: 1.0e-8
+
+  - analyze:
+      - phase_classify_distance: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: -0.024, to: 0.048, n: 13}
+    pipeline.0.potential.omega.2:     {from: 0.3,    to: 2.2,   n: 15}
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

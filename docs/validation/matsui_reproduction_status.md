@@ -1,9 +1,46 @@
 # Matsui 2026 Eu-151 EdH — reproduction status
 
+> **Campaign verdict: `matsui_campaign_report.md`** — what was established, what
+> was excluded with a number, and why the remaining residual is not resolvable
+> against the published field systematic. Read that first; this file is the
+> reproduction ladder's own history.
+
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **As of 2026-05-26.** Replaces all prior "Matsui-inspired" YAMLs with
 parameter set matching the published paper (Matsui et al., Science
 2026, DOI:10.1126/science.adx2872; arXiv:2504.17357), per anko's
 2026-05-26 audit.
+
+> ## 2026-07-30 — this page's parameter table is incomplete, and its results are disqualified
+>
+> Their code and data were published on Zenodo (record 17303925, CC-BY-4.0) and
+> read line by line in session S-A6;
+> `docs/validation/parameter_contract_with_Ueda.md` §0.3 carries the full
+> convention diff. Three things below are now known to be wrong or missing.
+>
+> 1. **`ZeemanQ = 1.0 Hz` is a literal input in their code**, not derived from
+>    |B|². The table below has no `q` row and none of `runs/matsui_baseline/*.yaml`
+>    sets `q:`, so they auto-derive `q/h = 9.6×10⁻⁷ Hz` at 2.6 nT — six orders too
+>    small. At F=6 that is not decoration: `q/h = 1 Hz` moves the m=−6 → −5
+>    spacing by 11 Hz out of 42.3, i.e. **0.68 nT of resonance position**.
+> 2. **`N = 5×10⁴` is right, but their shipped `setup_parameters` says 3.5×10⁴**,
+>    and `initial.f90` builds its ground state with `cc0_eff = 1, cc1_eff = 0`
+>    against `time.f90`'s `0.5 / 50` — twice the contact repulsion. "Their ground
+>    state" is therefore ambiguous by a factor 2 in c₀, worth 15 % in R_TF and
+>    34 % in peak density. Contract §0.3.5.
+> 3. **The 2026-05-26 results below are not campaign evidence.** The stored runs
+>    are stamped `2f81f4f7…-dirty` (charter guard 2 ⇒ `:block`), they predate the
+>    2026-06 integrator corrections and the 2026-07-08 q fix, and they used a
+>    **negative** `Bz` — reversed on 2026-07-29 because under current code
+>    negative Bz selects m=+F. Read them as a record of what was believed, not as
+>    measurements.
+>
+> The "need Matsui Fig 2C digitised data to compare" caveat is **resolved**: the
+> published sheets are committed at `test/fixtures/matsui2025/` (see its README),
+> and `runs/matsui_fig4b/fig2c_populations_n32.yaml` is the clean-tree
+> reproduction against them.
 
 ## Parameter set (Matsui simulation reproduction target)
 
@@ -47,7 +84,7 @@ loss-off baseline.
 | 2 | Early-time EdH selection rule | m=−6 decreasing, m=−5 growing first, m=−5 has `(z·e^{-iφ})` ring node | t < 5ms |
 | 3 | 5 ms morphology | m=−5 two-ring, m=−4 three-ring structure | `matsui_5ms_morphology_n{32,64}.yaml` |
 | 4 | 0–40 ms population dynamics | N_m(t) matches Fig 2C (loss-free) | `matsui_40ms_dynamics_n64.yaml` |
-| 5 | Imaging reproduction | TOF + Stern-Gerlach 42 mT/m + column density | not started; needs imaging pipeline |
+| 5 | Imaging reproduction | TOF + Stern-Gerlach 42 mT/m + column density | not started; the pipeline EXISTS — `simulate_rf_sg_tof` / `simulate_tof_with_gradient` / `simulate_tof_scaling` (`analysis/tof{,_multiframe}.jl`) + PSF / saturation / shot noise / binning (`analysis/imaging.jl`). Blocker is the Fig-2C source data, not the code |
 
 ## Configs generated 2026-05-26
 

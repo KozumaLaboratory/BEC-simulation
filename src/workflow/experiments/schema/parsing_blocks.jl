@@ -246,7 +246,19 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     inter isa Dict || return nothing
     N_raw = get(inter, "N_atoms", nothing)
     ω_raw = get(inter, "omega_ref", nothing)
-    (N_raw === nothing || ω_raw === nothing) && return nothing
+    if N_raw === nothing || ω_raw === nothing
+        # Everything below derives from (N_atoms, omega_ref) and cannot run —
+        # but the `lhy:` block does NOT. A tabulated kind needs only `kind`,
+        # and this function is the ONLY caller of `_resolve_lhy_block!`, which
+        # writes the internal `lhy_kind` slot the ground-state and dynamics
+        # steps read. Returning here without it meant a config written with the
+        # direct `interactions: {c0, c1}` form silently ran with no LHY at all.
+        # No committed config is currently affected (0 of 360 lhy-bearing
+        # configs omit N_atoms/omega_ref), so this closes a latent footgun
+        # rather than fixing live data.
+        _resolve_lhy_block!(p, inter, atom, NaN, 0.0, 0, NaN)
+        return nothing
+    end
 
     N_atoms = Int(N_raw)
     omega_ref = Float64(ω_raw)
@@ -321,20 +333,38 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
 
     kind = String(get(lhy_block, "kind", "none"))
     # Auto-derive c_lhy for scalar / quasi_2d when user omitted it.
+    #
+    # Guarded on `c_dd_val > 0` until 2026-07-29, which made
+    # `lhy: {kind: scalar}` a SILENT no-op on every non-dipolar config: the
+    # coefficient stayed 0, nothing warned, and the run reported an LHY mode it
+    # was not using. Scalar LHY is the plain Lee-Huang-Yang correction of a
+    # contact gas — it is *most* meaningful without DDI. The dipolar factor
+    # `Q₅(ε_dd)` is the DDI ENHANCEMENT of it, so ε_dd enters only when the DDI
+    # is actually in the Hamiltonian; `eps_dd` as passed here is the atom's
+    # intrinsic a_dd/a_s and is non-zero even for a run with DDI switched off.
+    # Dimensionless scalar LHY coefficient for the repo's per-particle
+    # convention (∫|ψ|²dV = 1, E_LHY/N = (2/5)·c_lhy·∫n^{5/2}dV,
+    # c₀ = 4π(a_s/a_ho)N). Fixed by SI alone — no convention freedom:
+    #
+    #   γ_QF = (32/3)·g·√(a_s³/π),  g = 4πℏ²a_s/m
+    #        = (128√π/3)(ℏ²/m)·a_s^{5/2}
+    #   ⇒ c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+    #
+    # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces the
+    # textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
+    # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
     if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
-        if !isnan(c_dd_val) && c_dd_val > 0
-            # Dimensionless scalar LHY coefficient for the repo's per-particle
-            # convention (∫|ψ|²dV = 1, E_LHY/N = (2/5)·c_lhy·∫n^{5/2}dV,
-            # c₀ = 4π(a_s/a_ho)N). Fixed by SI alone — no convention freedom:
-            #
-            #   γ_QF = (32/3)·g·√(a_s³/π),  g = 4πℏ²a_s/m
-            #        = (128√π/3)(ℏ²/m)·a_s^{5/2}
-            #   ⇒ c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
-            #
-            # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces
-            # the textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
-            # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
-            lhy_block["c_lhy"] = scalar_lhy_coefficient(atom.a_s / a_ho, N_atoms; eps_dd)
+        ddi_active = !isnan(c_dd_val) && c_dd_val > 0
+        if N_atoms > 0 && isfinite(a_ho) && a_ho > 0
+            lhy_block["c_lhy"] = scalar_lhy_coefficient(
+                atom.a_s / a_ho, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
+            )
+        else
+            # Cannot derive without N and a_ho. Must not be silent — that is the
+            # same failure mode the `c_dd > 0` guard caused.
+            @warn "lhy: {kind: $kind}: c_lhy cannot be derived without " *
+                "interactions.N_atoms and interactions.omega_ref. Pass " *
+                "lhy.c_lhy explicitly; the LHY term is OFF for this step."
         end
     end
     # Normalise to internal fields for downstream consumers.
@@ -344,6 +374,19 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     if haskey(lhy_block, "c_lhy")
         inter["c_lhy"] = lhy_block["c_lhy"]
     end
+    # Table-resolution knobs. `n_max` / `n_points` were in LHY_SCHEMA from the
+    # start but normalised nowhere, so `_build_spinor_lhy` never saw them and a
+    # user's `n_points: 4000` silently stayed 200. They ride in one internal
+    # slot as an `LHYTableOpts`, which is what `make_workspace` takes.
+    # `n_atoms` is NOT a table knob — it is the unit conversion. The closed
+    # forms are ε = (8/15π²)(g n)^(5/2) in physical units; here n is normalised
+    # to ∫|ψ|²dV = 1 and c₀ = 4π(a_s/a_ho)N already carries N, so the tabulated
+    # energy needs a 1/N or it comes out exactly N times too large.
+    p["lhy_opts"] = LHYTableOpts(;
+        n_max=haskey(lhy_block, "n_max") ? Float64(lhy_block["n_max"]) : NaN,
+        n_points=Int(get(lhy_block, "n_points", 200)),
+        n_bins=Int(get(lhy_block, "n_bins", 12)),
+        n_atoms=max(1, Int(get(get(p, "interactions", Dict()), "N_atoms", 1))))
     return nothing
 end
 
@@ -377,6 +420,14 @@ function _parse_gs_interactions(inter::Dict, atom)
     end
 end
 
+# Single declaration of the DDI image-handling defaults. Both the ground_state
+# parser and the dynamics step read these — the two used to carry independent
+# literals and disagreed, which is how a padded GS could feed bare-kernel
+# dynamics. `FieldSpec.default` in schema.jl is documentation only (nothing
+# reads that field), so these constants are the behaviour.
+const DDI_TRUNC_RADIUS_DEFAULT = -1.0   # make_workspace sentinel: ≤ 0 ⇒ auto
+const DDI_PADDED_DEFAULT = true
+
 """
     _parse_gs_ddi(ddi_d, inter, atom)
         -> (enabled, c_dd, secular, quasi_2d, l_z, trunc_radius, padded, pad_factor)
@@ -389,10 +440,20 @@ or pass an explicit user value here. Opt-outs: `ddi: false` or
 be derived, so DDI ends up off too.
 
 `trunc_radius` (Ronen spherical-cutoff radius) is a `Float64` sentinel for
-`make_workspace`: `NaN` = off (default), `≤ 0` = auto, `> 0` = explicit R.
-`padded` (Bool) enables the zero-padded, image-free convolution (Tier B);
-`pad_factor` (a number or per-axis vector) sets the zero-pad multiple
-(default `2`; smaller on thin axes for anisotropic padding).
+`make_workspace`: `≤ 0` = auto (default), `> 0` = explicit R, `NaN` = off
+(`trunc_radius: none`). `padded` (Bool, default `true`) enables the
+zero-padded, image-free convolution (Tier B); `pad_factor` (a number or
+per-axis vector) sets the zero-pad multiple (default `2`; smaller on thin
+axes for anisotropic padding).
+
+Cutoff and padding both default ON as of 2026-07-29. They are not
+independent knobs: the cutoff alone fixes rotation covariance by ~1000x
+(J_z violation 1.9e-2 → 1.7e-5) while leaving the field magnitude
+essentially untouched (2.1e-2 → 2.0e-2), because the periodic images are
+still there. It is the PADDING that removes them. Cost at D=13 is 1.2–1.4x
+per DDI step (the step is dominated by the spin density and the Euler
+rotation on the unpadded grid, not by the 6 FFTs) plus the padded context:
+~290 MB at 64³, ~975 MB at 96³.
 """
 function _parse_gs_ddi(ddi_d, inter, atom)
     if ddi_d === false || (ddi_d isa Dict && get(ddi_d, "enabled", true) === false)
@@ -416,7 +477,7 @@ function _parse_gs_ddi(ddi_d, inter, atom)
     q2d = Bool(get(ddi_d, "quasi_2d", false))
     lz = Float64(get(ddi_d, "l_z", 0.0))
     trunc = _parse_ddi_trunc_radius(get(ddi_d, "trunc_radius", nothing))
-    padded = Bool(get(ddi_d, "padded", false))
+    padded = Bool(get(ddi_d, "padded", DDI_PADDED_DEFAULT))
     pad_factor = _parse_ddi_pad_factor(get(ddi_d, "pad_factor", nothing))
     (enabled, c_dd, secular, q2d, lz, trunc, padded, pad_factor)
 end
@@ -425,15 +486,27 @@ end
     _parse_ddi_trunc_radius(raw) -> Float64
 
 Map a YAML `ddi.trunc_radius` value to the `make_workspace` sentinel:
-`nothing` ⇒ `NaN` (off); `"auto"`/`"box_half"` ⇒ `-1.0` (auto); a number ⇒
-that value.
+absent ⇒ `-1.0` (auto); `"auto"`/`"box_half"` ⇒ `-1.0`; `"none"`/`"off"` ⇒
+`NaN` (the bare periodic kernel); a number ⇒ that value.
+
+Absent used to mean OFF. Measured 2026-07-29 (`scripts/ddi_cutoff_geometry_jz_probe.jl`):
+the bare periodic kernel carries a 2.1e-2 … 4.7e-2 dipolar field error against
+free space, and the error is FLAT in resolution — 1.91e-2 at 32³, 48³ and 64³
+alike — so no amount of grid refinement touches it. `"none"` keeps the old
+behaviour for anyone who needs to reproduce a pre-flip run.
 """
 function _parse_ddi_trunc_radius(raw)
-    raw === nothing && return NaN
+    raw === nothing && return DDI_TRUNC_RADIUS_DEFAULT
     if raw isa AbstractString
         s = lowercase(strip(raw))
         (s == "auto" || s == "box_half") && return -1.0
-        throw(ArgumentError("ddi.trunc_radius string must be \"auto\"/\"box_half\", got \"$raw\""))
+        (s == "none" || s == "off") && return NaN
+        throw(
+            ArgumentError(
+                "ddi.trunc_radius string must be " *
+                "\"auto\"/\"box_half\"/\"none\"/\"off\", got \"$raw\"",
+            ),
+        )
     end
     Float64(raw)
 end
@@ -443,10 +516,22 @@ end
 
 Map a YAML `ddi.pad_factor` value to `make_workspace`'s `ddi_pad_factor`:
 `nothing` ⇒ `2.0` (default); a number ⇒ scalar factor; a vector ⇒ per-axis
-factors (anisotropic padding).
+factors (anisotropic padding); `"auto"` ⇒ `-1.0`, the sentinel `make_workspace`
+resolves via `auto_ddi_pad_factor(box)` once the box is known.
+
+`"auto"` matters only on an ANISOTROPIC box. A single sphere has one radius, so
+at a flat 2x pad the cutoff is capped at `min(box)` while covering every
+separation needs `max(box)`; the auto factors lift that cap. On the aspect-2
+cigar that takes the field error from 1.8e-3 to 0, for 2.25x the padded volume.
+Isotropic boxes resolve to exactly 2 on every axis, so nothing changes for them —
+which is why the default stays 2.0 rather than auto.
 """
 function _parse_ddi_pad_factor(raw)
     raw === nothing && return 2.0
+    if raw isa AbstractString
+        lowercase(strip(raw)) == "auto" && return -1.0
+        throw(ArgumentError("ddi.pad_factor string must be \"auto\", got \"$raw\""))
+    end
     # Return an NTuple (not a Vector) so it satisfies the `Union{Real, NTuple}`
     # kwarg type on make_workspace / the solver entry points.
     raw isa AbstractVector && return Tuple(Float64.(raw))

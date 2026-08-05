@@ -1,5 +1,13 @@
 # Thesis / manuscript 4-figure spec — 2026-05-26
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md) before quoting a number from here.
+
 Companion to `docs/validation/weekly_presentation_outline.md` (which
 specifies the **6-slide presentation** view).  This document specifies
 the **manuscript / thesis** view of the same body of work: a 4-figure
@@ -92,6 +100,120 @@ reproduces", with loss-on as bracket evidence not headline claim.
 | (c)   | Long-time stability table 50 / 100 / 200 ms at K3=0      | from `day_inventory_2026_05_26.md` drift table |
 
 **Final caption (publication-ready):**
+
+> ## ⚠️ Figure 2 does not reproduce — re-derived 2026-07-29
+>
+> **Its premise is gone.** The caption below turns on some arms *collapsing*
+> (`delay`) and the LHY closures *arresting* them (`stable_arrest`). Re-running the
+> K₃=0 factorial on current `main`, **all four arms are `stable_arrest`** — there
+> is no collapse left for the LHY closure to determine:
+>
+> | arm | ratio now | class now | ratio 2026-05 | class 2026-05 |
+> |---|---:|---|---:|---|
+> | off | **1.0502** | stable_arrest | 2.3339 | delay |
+> | scalar | **1.1839** | stable_arrest | 2.3599 | delay |
+> | polar_contact | **1.3883** | stable_arrest | 1.6294 | stable_arrest |
+> | icosahedral | **1.2801** | stable_arrest | 1.5991 | stable_arrest |
+>
+> ## Settled — re-measured on fixed code, both field signs
+>
+> After #174 (the dynamics phase never resolved its own `lhy:` block, so tabulated
+> tables ran exactly `N_atoms` too strong and scalar LHY was absent entirely), all
+> four arms re-run cleanly:
+>
+> | arm | ratio | E drift | `lhy` / `total` | class |
+> |---|---:|---:|---:|---|
+> | scalar | 1.0363 | 6.4e-09 | +0.157 / +2.406 | stable_arrest |
+> | off | 1.0502 | 6.4e-10 | 0 / +2.244 | stable_arrest |
+> | polar_contact | 1.0921 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
+> | icosahedral | 1.0923 | 4.9e-09 | +0.1146 / +2.359 | stable_arrest |
+>
+> **The two closed forms land 0.16 % apart, and that is real, not a bug.**
+> `polar_contact` and `icosahedral` give `lhy` = +0.11457 vs +0.11458 and ratios
+> 1.0921 vs 1.0923. Comparing the tables directly, `V_polar/V_icosa = 0.9983870`
+> at *every* density — a constant, because both closed forms are `ε = C·n^(5/2)`
+> and only `C` differs. Eu's g_S ladder is flat enough (2681…3957, a 32 % spread)
+> that the polar and icosahedral channel structures give nearly the same zero-point
+> sum. The code does discriminate: `fm_contact`, which uses only `g_{2F}`, sits
+> 46 % below both.
+>
+> This is an independent reason the figure's claim cannot hold here — two of the
+> three closures it contrasts are 0.16 % apart, so "the outcome is determined by
+> the LHY closure" has nothing to vary.
+>
+> Energy now conserves to ~1e-9 in every arm (was 135 % peak excursion for the closed forms), and
+> LHY is 5–7 % of the total rather than 97 %. The signs are physical: the LHY arms
+> have a *lower* initial peak than `off` (0.00432–0.00434 vs 0.00463) because a
+> repulsive correction broadens the ground state.
+>
+> **And the field sign is not the cause.** Re-running `off` at the old
+> `Bz: "-0.01 Gauss"` on fixed code gives **ratio 1.0479** — within 0.2 % of the
+> `+0.01 Gauss` value of 1.0502, both `stable_arrest`, drift 4e-10. So the
+> like-for-like objection below was real but numerically irrelevant here: the
+> `off` arm's 2.3339 → 1.05 **is** a code change, not the config flip. (Consistent
+> with the state staying 100 % in m=−6 either way — the linear Zeeman is a constant
+> offset for a single component, and 20 time units at `seed_amplitude: 1e-6` is not
+> enough for the instability to grow.)
+>
+> **Conclusion: Figure 2 as specified cannot be produced.** No arm collapses on
+> correct code at either field sign; the spread across all four LHY treatments is
+> 1.04–1.09. The stored `delay` at 2.33/2.36 and the "capped at 1.63/1.60" are both
+> unreproducible, so the figure's claim — that the F=6 collapse-arrest outcome is
+> *determined by the LHY closure* — has no phenomenon behind it in this regime. The
+> underlying physics question stays open; a new configuration that actually
+> collapses would be needed to ask it.
+>
+> Run output: `~/spinorbec-runs/fig2_k3zero_v3` and `…/fig2_oldsign`.
+>
+> **Correction (same day): the comparison above is not like-for-like.** The stored
+> 2026-05 numbers were produced with `B: {Bz: "-0.01 Gauss"}`; the configs were
+> corrected to `+0.01 Gauss` in `bce2068f` ("211 Eu configs pinned m=-F under a
+> field that prefers m=+F"), so the re-run used a *different config*, not just
+> different code. That commit's own reasoning applies directly here: m=−F is a
+> Zeeman eigenstate, so ITP holds it either way and nothing errors, but under the
+> old negative field m=−F is the *highest* Zeeman state and "the dynamics then
+> proceed in a field whose sign is opposite to the intent".
+>
+> That is a plausible mechanism for `delay` → `stable_arrest` on its own — a
+> spin-mixing-unstable initial state depolarises and collapses differently from a
+> stable one — so the `off` arm's 2.3339 → 1.0502 must **not** be attributed to
+> the code changes listed below until the two are separated. An `off` arm at the
+> old field sign on current code is running to do exactly that.
+>
+> The verdict on the figure is unchanged and if anything firmer: its stored
+> numbers are **not reproducible from anything now in the repo**, because the
+> config that produced them was wrong in the field sign and has been fixed.
+>
+> **Only the first two rows are usable.** `off` and `scalar` conserve energy to
+> 2e-8 / 7e-8. The two closed-form arms drift **135 %** peak excursion / 45 % endpoint (E: 3123 → 1694; `energy_rel_drift` is `max|E(t)−E(0)|/|E(0)|`, not the endpoint difference) and their
+> `energy_decomposition` puts **97 % of the total energy in the LHY term alone**
+> (`lhy = +1653` / `+1664` against a whole mean field of ≈ +2.2 in the other two
+> arms). Their ratios are not evidence of anything and are shown only to document
+> that the stored 1.63 / 1.60 were not reproduced. Do not read "the closures
+> arrest least" out of this table.
+>
+> What survives is enough to void the figure: **`off` does not collapse.** Its
+> ratio fell 2.3339 → 1.0502 with clean energy conservation, and `scalar` — also
+> clean — sits at 1.1839, so "scalar is indistinguishable from no LHY" is gone
+> too. The caption needs `off` to collapse so that the closures can be seen to
+> arrest it. It does not.
+>
+> The two dedicated gates for the tabulated path both pass at this commit
+> (`test_lhy_energy_convention.jl` 17/17, `test_tabulated_lhy_propagator_parity.jl`
+> 42/42), so the drift is **not** an energy/propagator/gradient inconsistency.
+> It is the table's magnitude in this particular Eu F=6 configuration — tracked
+> separately; not diagnosed here.
+>
+> Cause of the `off` change is not the LHY work: this run predates the Eu
+> quadratic-Zeeman fix (11× too large until 2026-07-08), the DDI integrator-order
+> fixes and the ITP density-bias fix — see
+> [`stored_results_vintage_audit.md`](../validation/stored_results_vintage_audit.md).
+>
+> **Do not use Figure 2 as specified.** The physics question it asks (what sets
+> F=6 collapse arrest) is still open; this figure's answer rested on a collapse
+> that current code does not produce.
+>
+> Run output: `/gs/bs/work/7/uk07267/spinorbec-runs/fig2_k3zero_v2`.
 
 > **Figure 2.** F=6 collapse arrest in the cigar stress regime
 > (N = 30 000, ω_z = 0.25 ω_⊥, simulated window t = 30 ms in panels
@@ -270,7 +392,17 @@ Fig 1 (d)    :  runs/matsui_baseline/matsui_5ms_n64_density_slice.json
 Fig 1 inset  :  runs/matsui_baseline/{matsui_40ms_lossy_medium,strong}.yaml
                   → analysis to extract N(t)/N(0) ratio for inset
 Fig 2 (a, b) :  runs/eu_k3_lhy_control/factorial_2x4.json
+                  regen: scripts/eu_k3_lhy_factorial_regen.jl (8 cells, one revision)
+                  plot:  scripts/eu_k3_lhy_factorial_figure.py
+                  NOTE the panel now shows the OPPOSITE of the original reading:
+                  within each K3 row the LHY model does not change the outcome.
+                  !! 2026-07-29: every LHY-enabled cell ran under #125 / #158 /
+                  !! #174. The scalar rows had no dynamics LHY at all; the
+                  !! polar/icosa rows had it 30000x too strong, which is where
+                  !! the `stable_arrest` classification comes from. Being
+                  !! re-measured -- do not draw this panel from the current json.
 Fig 2 (c)    :  runs/eu_lhy_longtime/{polar,icosa}_{50,100,200}ms .jld2
+                  !! same three defects; re-running on TSUBAME.
                   → extract peak(t), N(t), Fz(t) trajectories
 Fig 3 (a, b) :  runs/eu_k3_sweep/summary.json + runs/eu_k3_sweep_96/summary.json
 Fig 4        :  runs/barnett_eu_window/summary.json

@@ -106,8 +106,10 @@ function SpinorBEC.apply_spin_mixing_step!(
         fp_svec = SpinorBEC.fp_ladder_coeffs(T, sm.system.F, Val(D))
         thr = min(N, 256)
         blk = cld(N, thr)
+        # `nothing` = contiguous destination: the spin-mixing field buffers are
+        # its own, never a zero-padded DDI corner.
         CUDA.@cuda threads = thr blocks = blk _spin_density_kernel!(
-            fx, fy, fz, psi_mf_2d, m_svec, fp_svec, Val(D))
+            fx, fy, fz, psi_mf_2d, m_svec, fp_svec, Val(D), nothing)
     end
 
     # --- Rotation: exp(-i·c₁·dt·(⟨F⟩·F)) ---
@@ -116,10 +118,11 @@ function SpinorBEC.apply_spin_mixing_step!(
     # second realization. That path also skips the α/β/θ trigonometry below —
     # it needs only the raw vector field. Measured 64³ Eu151 D=13: 10.3 ms →
     # 2.85 ms per call, and this substep runs 8× per RTP step.
-    plan = _spin_taylor_plan(psi, sm, fx, fy, fz, c1_t * dt_t, imaginary_time)
+    plan = _spin_taylor_plan(psi, sm)
     if plan !== nothing
-        coef, z, K = plan
-        _apply_spin_rotation_taylor!(psi_2d, fx, fy, fz, coef, z, K, Val(D))
+        coef, F = plan
+        _apply_spin_rotation_taylor!(
+            psi_2d, fx, fy, fz, coef, c1_t * dt_t, Val(D); imaginary_time, F)
         return nothing
     end
 

@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Spinor-dependent LHY" begin
     @testset "two_channel: basic construction" begin
         table = compute_spinor_lhy_polar_two_channel(;

@@ -15,8 +15,14 @@ using SpinorBEC: KineticTerm, TrapTerm, apply_step!, energy_contribution
 @testset "Harmonic ground state virial ⟨T⟩=⟨V⟩ (ITP)" begin
     grid = make_grid(GridConfig((24, 24, 24), (12.0, 12.0, 12.0)))
     ωs = (1.0, 1.0, 1.0)
+    # `backend` is NOT optional here even though this is a CPU test: with no
+    # explicit backend `_resolve_backend` auto-selects CUDA for a 3D grid of
+    # 24³ or larger whenever `cuda_functional()` — which depends on whether
+    # some EARLIER file in the same parallel-worker session happened to
+    # `import CUDA`. The ψ below is a host Array, so the auto-selected GPU
+    # `potential_values` would scalar-index and throw. Pin it.
     ws = make_workspace(;
-        grid, atom=Rb87,
+        grid, atom=Rb87, backend=CPUBackend(),
         interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
         zeeman=ZeemanParams(0.0, 0.0), potential=HarmonicTrap(ωs),
         sim_params=SimParams(; dt=0.02, n_steps=1, imaginary_time=true),

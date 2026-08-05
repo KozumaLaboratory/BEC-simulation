@@ -1,0 +1,39 @@
+# SMOKE — exercise every code path of the seed_from promotion in ≤2 min on the
+# local GPU (CPU success ⇏ GPU works). 48³ (even, > 32 so upsample fires),
+# tiny polish budget, physical-Eu c1 at two Bz (checks override bites → E varies)
+# × 2 seeds (checks seed matching + min-E). NOT a physics result.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 8.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [48, 48, 48], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      seed_from: {run: runs/config_recon_335a2216, upsample: true}
+      n_steps: 40
+      tol: 1.0e-6
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: [0.0277777778]
+    pipeline.0.B.Bz: ["0.0 Gauss", "5.5e-5 Gauss"]
+    pipeline.0.potential.omega.2: [1.0]
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}

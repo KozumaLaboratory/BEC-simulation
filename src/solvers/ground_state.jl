@@ -100,6 +100,7 @@ const _LBFGS_FORWARD_KWARGS = (
     :ddi_padding, :ddi_pad_factor,
     :target_magnetization, :backend, :m_lbfgs, :verbose, :light_shift,
     :dtype, :sobolev_alpha, :rotating_frame_omega,
+    :spinor_lhy, :lhy_opts,
 )
 
 function find_ground_state(;
@@ -111,6 +112,7 @@ function find_ground_state(;
     dt=0.001,
     n_steps=10000,
     tol=1e-10,
+    tol_drho::Float64=0.0,   # extra gate: per-(save_every) max|Δρ|/max|ρ| (density-based, gauge-invariant)
     save_every::Int=max(1, n_steps ÷ 100),  # unified observation cadence
     initial_state=:polar,
     init_state_params::Dict{Symbol, Float64}=Dict{Symbol, Float64}(),
@@ -123,7 +125,7 @@ function find_ground_state(;
     ddi_pad_factor::Union{Real, NTuple}=2,
     adaptive_dt::Bool=false,
     dt_max::Float64=10.0 * dt,
-    fft_flags=FFTW.MEASURE,
+    fft_flags=default_fft_flags(),
     target_magnetization::Union{Nothing, Float64}=nothing,
     rotating_frame_omega::Float64=0.0,
     target_Jz::Union{Nothing, Float64}=nothing,
@@ -150,6 +152,7 @@ function find_ground_state(;
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
+    lhy_opts::LHYTableOpts=LHYTableOpts(),
     method::Symbol=:strang,
     m_lbfgs::Int=20,   # keep in sync with find_ground_state_lbfgs default
     sobolev_alpha::Union{Float64, Symbol}=:auto,
@@ -157,11 +160,13 @@ function find_ground_state(;
 )
     # KEEP IN SYNC: `_LBFGS_FORWARD_KWARGS` below lists every kwarg this
     # dispatcher forwards to `find_ground_state_lbfgs`. The pinning test
-    # `test_lbfgs_forward_coverage` (test/solvers/) walks both kwarg sets
-    # and fails if a kwarg present on `find_ground_state_lbfgs` is missing
-    # from this forward — the same class of bug that hid
-    # `rotating_frame_omega` from LBFGS pre-2026-06-02. See
-    # `feedback_never_patch_when_root_fix_is_available`.
+    # `test/solvers/test_lbfgs_forward_coverage.jl` walks both kwarg sets and
+    # fails if a kwarg present on `find_ground_state_lbfgs` is missing from this
+    # forward, AND if a name in the list is absent from the call below — the
+    # class of bug that hid `rotating_frame_omega` from LBFGS pre-2026-06-02,
+    # and then hid `spinor_lhy` / `lhy_opts` from it after #179, because that
+    # gate had been deleted in an orphan sweep as "plumbing, not physics". A
+    # dropped kwarg IS physics when it is a Hamiltonian term.
     if method === :lbfgs
         return find_ground_state_lbfgs(;
             grid, atom, interactions, zeeman, potential,
@@ -170,6 +175,7 @@ function find_ground_state(;
             ddi_padding, ddi_pad_factor,
             target_magnetization, backend, m_lbfgs, verbose, light_shift,
             dtype, sobolev_alpha, rotating_frame_omega,
+            spinor_lhy, lhy_opts,
         )
     end
     method === :strang || throw(
@@ -246,6 +252,8 @@ function find_ground_state(;
             grid,
             atom,
             interactions,
+            spinor_lhy,
+            lhy_opts,
             zeeman,
             potential,
             dt,
@@ -304,6 +312,7 @@ function find_ground_state(;
         light_shift,
         dtype=dtype,
         spinor_lhy,
+        lhy_opts,
     )
 
     n_comp = ws.spin_matrices.system.n_components
@@ -323,6 +332,7 @@ function find_ground_state(;
     ckpt_dir = checkpoint_dir !== nothing ? checkpoint_dir : _checkpoint_dir
 
     _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
+        tol_drho=tol_drho,
         start_step=_start_step,
         checkpoint_dir=ckpt_dir,
         checkpoint=checkpoint,

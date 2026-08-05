@@ -1,5 +1,8 @@
 # ¹⁵¹Eu finite-temperature trap-shape optimization
 
+> **FROZEN 2026-07-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The definitive, finite-temperature version of the $T=0$ trap-shape study
 (`eu_shape_optimization.md`). At $T>0$ the shape optimum is governed by a
 competition the $T=0$ Gross–Pitaevskii picture cannot see, so we evolve the
@@ -116,8 +119,11 @@ $N_0$ melts $9502\to3100$ across $T/T_c=0.1\to0.9$ and $N_0/N\to0.95$ as $T\to0$
 the right qualitative melting, with the SGPE points sitting BELOW the analytic
 curve because the classical field is Rayleigh–Jeans over-populated, as expected.
 
-**Cutoff sensitivity**: $N_0$ spread $30\%$ vs thermal $79\%$
-over the $k_\mathrm{cut}$ range — the condensate is the robust observable.
+**Cutoff sensitivity**: over the narrow $k_\mathrm{cut}\in[4.6,8.0]$ window the
+$N_0$ spread is $30\%$ vs thermal $79\%$ — but that window is not convergence.
+See "Honest cutoff limitation" above: on the wider $64^3$/$96^3$ scan $N_0$ falls
+monotonically with $k_\mathrm{cut}$ and does not flatten under grid refinement, so
+the absolute equilibrium $N_0$ is not a converged observable.
 
 **Shape trade-off** (prep SGPE at $T/T_c=0.5$ → closed ramp +
 $K_3$, all at fixed $k_\mathrm{cut}$, four protocols at the model point):
@@ -260,13 +266,13 @@ thesis lifetime conditions — a conditions difference, not a discrepancy.) So t
 to the formation **dynamics**, not the loss law — an independent confirmation of the
 issue-#75 diagnosis.
 
-Honest limits: the **evaporation timescale is not physical** — the ms-scale SGPE cannot
-run the s-scale evaporation ramp (the run above is $\sim60\times$ too fast), so the
-number-conserving SGPE is an arbiter for the **fast physics** (three-body decay, the
-$N_0^{9/5}$ law) and only *illustrative* for the slow evaporation itself. Additionally
-the c-field is cutoff-dependent; and this is not the full SPGPE (it omits the growth + energy-damping scattering reservoir
-of Rooney/Blakie/Bradley, arXiv:1210.0952). It is a more principled arbiter than the 0-D
-model on the loss law, not a calibrated absolute-number evaporation.
+Honest limits **of this closed-field run**: the evaporation timescale is not physical
+— it is $\sim60\times$ too fast — so this number-conserving SGPE is an arbiter for the
+**fast physics** (three-body decay, the $N_0^{9/5}$ law) and only *illustrative* for the
+slow evaporation itself. The c-field is also cutoff-dependent. The s-scale ramp is
+now reachable with the full SPGPE (growth + energy-damping reservoirs,
+Rooney/Blakie/Bradley arXiv:1210.0952) — see the section below and
+[spgpe.md](spgpe.md).
 
 **Finite-depth FORT spill** (`eu_ft_evap_fort.png`, driver mode `evap_fort`): the
 radial energy-knife is replaced by a physical finite-depth Gaussian FORT
@@ -276,8 +282,24 @@ boundary — a physical spill, not an ad-hoc threshold. 48³/D=3 GPU: budget exa
 ($\Delta\sim10^{-13}$), condensate fraction $0.44\to0.97$, $N_0$ $50\text{k}\to62\text{k}$
 (the thermal cloud condenses as it is spilled). Same timescale caveat as above.
 
+## Superseded for the evaporation ramp: the full SPGPE
+
+The timescale limit above was a **cost** limit, not a physics one, and it has been
+removed — see [spgpe.md](spgpe.md). Two changes:
+
+- The dissipative sub-step drew every random number on the host and copied it over
+  PCIe, which was 88 % of its cost (18.5 ms of a 21.1 ms step at $48^3$/D=3).
+  Drawing on the device cuts the step to 2.4 ms *while also* adding the
+  energy-damping term. A 1.5 s ramp is now ~0.5 h per trajectory.
+- With the growth reservoir there is no knife to sweep. The thermal cloud is not
+  simulated — it is the I region, supplied by the 0-D model at $(T(t),\mu(t))$ on
+  the experimental timescale — so the condensate forms because the reservoir got
+  cold, at the physical rate.
+
+The $\sim60\times$-too-fast caveat on `eu_ft_evap_sgpe_cal.png` stands for **that
+figure**; it is not a limit of the method. The $K_3$-law arbiter is unaffected
+either way (ms-scale physics, physical window).
+
 ## Next
 The $64^3$–$96^3$ cutoff-convergence study of the evaporation SGPE is running on
-TSUBAME; an adiabatic (ramped) box if a box trap becomes available; and the full
-SPGPE energy-damping scattering reservoir (Rooney/Blakie/Bradley) for the reservoir
-coupling the closed field omits.
+TSUBAME; an adiabatic (ramped) box if a box trap becomes available.

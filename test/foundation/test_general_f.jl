@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "General-F interactions" begin
     @testset "AtomSpecies backward compatibility" begin
         a = AtomSpecies("test", 1.0, 1, 0.1, 0.2)

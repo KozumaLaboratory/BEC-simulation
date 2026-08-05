@@ -16,6 +16,7 @@
 # Limitation: Julia's clebsch_gordan returns Float64. For rational exact values,
 # need to bypass Float64 path or use rational CG implementation.
 
+using Test
 using SpinorBEC
 using LinearAlgebra
 using Printf

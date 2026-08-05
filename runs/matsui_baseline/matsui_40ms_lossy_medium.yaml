@@ -8,21 +8,6 @@
 # Matsui geometry is near-isotropic so loss strength will be different
 # from cigar — this is the medium probe; pair with _strong variant.
 
-metadata:
-  suite: matsui_baseline
-  variant: loss_on_medium
-  ladder_level: 12
-  reference: Matsui_2026_Science_arxiv_2504_17357
-  target: 40ms_dynamics_lossy_medium
-  grid_n: 64
-  K3_factor: 30.0
-  K3_per_m_si_value: 3.0e-40
-  caveat: |
-    Phenomenological K3 only — no γ_dr, no LHY. Goal: bracket the
-    experimental ~40% atom loss at 40 ms (Matsui Fig 2C population
-    integral). Bridge between Matsui's simulation (loss-free) and
-    Matsui's experiment (lossy).
-
 defaults:
   kind: spinor
   backend: gpu
@@ -47,7 +32,7 @@ pipeline:
         enabled: true
         secular: true
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -59,7 +44,7 @@ pipeline:
       duration: 27.646
       dt: 0.005
       B:
-        Bz: {from: -0.01, to: -2.6e-5, duration: 0.0}
+        Bz: {from: 0.01, to: 2.6e-5, duration: 0.0}
         theta: 0.0
         phi: 0.0
       ddi:

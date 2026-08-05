@@ -1,5 +1,8 @@
 # 修論 Chapter 6: Polyhedral Spinor Phases — 6 多角体 Universal Theorem 検証 (Round 6 final)
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Round-6 update**: §6.1-6.5 inlined from `master_thesis_Ch6_icosahedral.md` v1.
 v2 §6.6 onwards (F=4 cube, F=10 dodec, F=3 octa NEW, F=8 octa NEW, sign pattern,
 master summary) preserved as authoritative.

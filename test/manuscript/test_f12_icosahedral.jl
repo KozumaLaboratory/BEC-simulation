@@ -15,6 +15,7 @@
 #
 # Run: julia --project=. scripts/manuscript/f12_icosahedral_verification.jl
 
+using Test
 using SpinorBEC
 using LinearAlgebra
 using Printf

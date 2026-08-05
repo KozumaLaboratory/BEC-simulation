@@ -1,5 +1,8 @@
 # Dashboard performance notes
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The 2D scrubber pipeline is currently bottlenecked by the display refresh rate (60 Hz / 16.67 ms per frame). The remaining latency sources below are all on the cold-start / startup-latency side; none of them affect the steady-state scrub experience.
 
 ## Opt-in: bsz=1 atlas compression for slow links
@@ -56,7 +59,7 @@ The atlas worker already transfers the `Float32Array` buffers zero-copy via `pos
 
 ## Disk-cache layout
 
-Atlases are persisted to `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`. Stale check: if the source `.jld2` mtime is newer than the cache file, the cache is silently rebuilt. To wipe everything, `rm -rf runs/_dashboard_cache`.
+Atlases are persisted to `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Stale check: if the source `.jld2` mtime is newer than the cache file, the cache is silently rebuilt. To wipe everything, `rm -rf runs/_dashboard_cache` (example).
 
 ## Bench targets (Klaus F=8, 64×64×32, 157 snaps)
 

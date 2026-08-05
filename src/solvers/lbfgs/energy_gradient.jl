@@ -22,11 +22,14 @@ using Printf
 function _energy_gradient_scratch(psi, n_pts)
     scratch_get!(:energy_gradient, (typeof(psi), n_pts)) do
         (
-            similar(psi, ComplexF64, n_pts),  # fft_buf
-            similar(psi, Float64, n_pts),     # fx scratch
-            similar(psi, Float64, n_pts),     # fy scratch
-            similar(psi, Float64, n_pts),     # fz scratch
-            similar(psi, ComplexF64, n_pts),  # Coriolis derivative scratch
+            # eltype(psi), not ComplexF64 — `ws.fft_plans` follows ψ's
+            # precision and an in-place plan on a mismatched buffer degrades
+            # to out-of-place, so the k-space work silently reads real-space ψ.
+            similar(psi, eltype(psi), n_pts),  # fft_buf
+            similar(psi, Float64, n_pts),      # fx scratch
+            similar(psi, Float64, n_pts),      # fy scratch
+            similar(psi, Float64, n_pts),      # fz scratch
+            similar(psi, eltype(psi), n_pts),  # Coriolis derivative scratch
         )
     end
 end
@@ -44,9 +47,14 @@ Covered terms: kinetic, trap (incl. centrifugal modification when
 `rotating_frame_omega ≠ 0`), c₀, LHY, c₁ spin, light shift, DDI, and
 the Coriolis `−Ω·L_z·ψ` orbital piece of the rotating-frame functional.
 
-NOT covered: c₂ singlet-pair and tensor-cache higher-rank channels
-(c₄, c₆, …). For those, `find_ground_state_lbfgs` emits a warning and
-the caller should fall back to ITP.
+Covered since 2026-06-09: c₂ singlet-pair and the tensor-cache higher-rank
+channels (c₄, c₆, …). This docstring said they were NOT covered and that
+`find_ground_state_lbfgs` warns and falls back to ITP; both stopped being
+true when this function became registry-only — it iterates
+`build_h_terms_registry` (`:77`, `apply_operator_via_registry!`), so every
+`HamTerm` including `TensorTerm` contributes. FD-gated by
+`test/oracles/test_term_consistency.jl`. CLAUDE.md records the same under
+"Tensor c2/c4 ARE in `energy_gradient!`".
 
 `k_squared_dev` must live on the same device as `psi` (defaults to
 `ws.grid.k_squared`, which only works on CPU). L-BFGS on GPU should
@@ -63,7 +71,19 @@ function energy_gradient!(
     # The ctx pre-builds shared scratch (fft_buf, fx/fy/fz, n_density)
     # so each term's hot-path skips per-call alloc.
     copyto!(ws.state.psi, psi)
-    if _is_gpu(psi)
+    # The branch keys on `ws.state.psi`, NOT on `psi`. Everything below the
+    # copyto! reads the workspace and writes `grad`; `psi` is only the source
+    # of that copy, and may legitimately be host-resident for a GPU workspace
+    # -- a ground state loaded back from jld2 always is. Keying on `psi` sent
+    # exactly that case down the CPU branch, where the registry's device
+    # buffers met a host `grad` and every accumulate scalar-indexed. The GS
+    # stage-cache audit could therefore never run on GPU.
+    _is_gpu(grad) == _is_gpu(ws.state.psi) || throw(
+        ArgumentError(
+            "energy_gradient!: `grad` must be resident where the workspace is " *
+            "($(typeof(grad)) vs $(typeof(ws.state.psi)))"),
+    )
+    if _is_gpu(ws.state.psi)
         # Fused GPU path: fill grad with Σ_term H_term·ψ AND return total energy
         # in ONE per-term apply_operator! pass (the FFT-heavy kinetic/DDI faces
         # run once, not once for grad + once for energy_decomposition). Bit-
@@ -71,13 +91,58 @@ function energy_gradient!(
         # oracle + a grad/energy-consistency test.
         E = _energy_and_gradient_gpu!(grad, ws)
     else
-        apply_operator_via_registry!(grad, ws)
-        E = energy_decomposition(ws).total
+        # ONE registry traversal, not two. `energy_decomposition` here was a
+        # second full pass over every term for a number this pass can produce:
+        # each term's energy is `energy_operator_ratio(term)` times the
+        # operator expectation `grad` is already accumulating (see
+        # `terms/base.jl`). Measured 12.80 ms against 6.11 for the gradient
+        # alone at 24³ D=13, in a ~30 ms iteration; the extra reductions cost
+        # 0.076 ms per term.
+        _, E = operator_and_energy_via_registry!(grad, ws, cell_volume(ws.grid))
     end
     # Wirtinger scaling: δE = 2·Re⟨δE/δψ̄, δψ⟩ ⇒ grad_R = 2·δE/δψ̄
     # makes δE = Re⟨grad_R, δψ⟩ (standard real inner product).
     grad .*= 2
     return E
+end
+
+"""
+    gradient_only!(grad, psi, ws) → grad
+
+`δE/δψ*` at `psi` with the same Wirtinger scaling as `energy_gradient!`, but
+without evaluating the total energy.
+
+On the CPU that is a real saving: `energy_gradient!` runs the registry twice
+(`apply_operator_via_registry!` for the gradient, then `energy_decomposition`
+for the energy), so the whole FFT-heavy energy pass is skipped when the caller
+already knows `E` at this `psi`. On the GPU the energy comes out of the same
+fused pass for free, so this is `energy_gradient!` with the return dropped.
+"""
+function gradient_only!(
+    grad::AbstractArray{<:Complex},
+    psi::AbstractArray{<:Complex},
+    ws::Workspace{N},
+) where {N}
+    copyto!(ws.state.psi, psi)
+    # The branch keys on `ws.state.psi`, NOT on `psi`. Everything below the
+    # copyto! reads the workspace and writes `grad`; `psi` is only the source
+    # of that copy, and may legitimately be host-resident for a GPU workspace
+    # -- a ground state loaded back from jld2 always is. Keying on `psi` sent
+    # exactly that case down the CPU branch, where the registry's device
+    # buffers met a host `grad` and every accumulate scalar-indexed. The GS
+    # stage-cache audit could therefore never run on GPU.
+    _is_gpu(grad) == _is_gpu(ws.state.psi) || throw(
+        ArgumentError(
+            "gradient_only!: `grad` must be resident where the workspace is " *
+            "($(typeof(grad)) vs $(typeof(ws.state.psi)))"),
+    )
+    if _is_gpu(ws.state.psi)
+        _energy_and_gradient_gpu!(grad, ws)
+    else
+        apply_operator_via_registry!(grad, ws)
+    end
+    grad .*= 2
+    return grad
 end
 
 # GPU fused energy+gradient — implemented in the CUDA extension (gpu_energy.jl).
@@ -114,9 +179,11 @@ function _project_constraints!(
     D = 2F + 1
 
     # 1. Remove ψ-direction: grad -= Re⟨ψ|grad⟩ × ψ
-    #    (chemical potential projection). `dot(a, b) = sum(conj(a)*b)`,
-    #    no `conj.(psi)` and no broadcast-product temporary.
-    μ_real = real(dot(psi, grad)) * dV
+    #    (chemical potential projection). `_realdot` rather than `real(dot(...))`:
+    #    `dot` on ComplexF64 goes to OpenBLAS `zdotc`, whose thread team is sized
+    #    from the machine, and on a few-MB array that call is nearly all team
+    #    overhead. This one runs twice per gradient. See `_realdot`.
+    μ_real = _realdot(psi, grad) * dV
     grad .-= μ_real .* psi
 
     # 2. Magnetization conservation
@@ -152,7 +219,10 @@ constraint manifold {‖ψ‖²=1}.
 # Hamiltonian coverage
 
 The gradient implementation (`energy_gradient!`) covers:
-kinetic, trap, Zeeman, c0 (density), c_lhy, c1 (spin), light_shift, DDI.
+kinetic, trap, Zeeman, c0 (density), LHY (every mode — `_grad_lhy!` applies
+`V_LHY(n)·ψ` from the same `_lhy_V` the propagator uses, plus, for the
+spatially-varying table, the polarisation piece `δε/δp · δp/δψ̄` that the
+diagonal propagator step cannot carry), c1 (spin), light_shift, DDI.
 
 It does **NOT** cover:
 - c2 (the S=0 singlet-pair channel — `apply_singlet_pair_step!`)

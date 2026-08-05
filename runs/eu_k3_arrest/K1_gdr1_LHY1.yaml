@@ -4,15 +4,6 @@
 #         at this baseline (peak doubles at t=4.0 dimless per collapse
 #         search). This factorial tests whether K3/γ_dr/LHY arrest it.
 
-metadata:
-  suite: eu_k3_arrest
-  ladder_level: 12
-  parent_search: eu_collapse_search/N30000_omz0p25
-  K3_on: true
-  gdr_on: true
-  LHY_on: true
-  generator: scripts/validation/eu_k3_arrest_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu
@@ -31,7 +22,7 @@ pipeline:
         enabled: true
         secular: false
       lhy: {kind: scalar}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

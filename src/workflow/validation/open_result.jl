@@ -190,14 +190,32 @@ function _extract_interactions(data::Dict, atom::AtomSpecies)
     end
 
     # Fallback: derive from units/* metadata via compute_interaction_params.
+    #
+    # This is a GUESS, not the run's couplings, and it is not a small one: for a
+    # 2026-05 Eu run it returns c₀ ≈ 9.7e-47 where the run used a dimensionless
+    # c₀ of order 10. Rebuilding a workspace from that gives a Hamiltonian with
+    # essentially no interactions — a recomputed E_LHY of 1e-121 against a
+    # stored 1301, which reads as a catastrophic physics failure rather than as
+    # missing metadata. It used to happen silently.
+    #
+    # Files written after `_save_interactions_metadata!` landed carry
+    # `interactions_*` and never reach here.
     N_atoms = Int(get(data, "units/N_atoms", 1))
     omega_ref = Float64(get(data, "units/omega_ref_rad_s", 1.0))
     if N_atoms > 0 && omega_ref > 0
         try
-            return compute_interaction_params(atom; N_atoms, dims=3)
-        catch
-            # silent: empty Dict is a safe default
+            ip = compute_interaction_params(atom; N_atoms, dims=3)
+            @warn "result has no `interactions_*`; couplings GUESSED from units/* " *
+                "metadata. They are not the ones the run used — do not rebuild a " *
+                "workspace from this and compare energies." c0_guess=ip[0] maxlog=1
+            return ip
+        catch err
+            @warn "result has no `interactions_*` and the units/* fallback failed; " *
+                "interactions are EMPTY" exception=err maxlog=1
         end
+    else
+        @warn "result has no `interactions_*` and no units/* metadata; " *
+            "interactions are EMPTY" maxlog=1
     end
     InteractionParams(Dict{Int, Float64}())
 end
@@ -237,7 +255,13 @@ function _extract_metadata(data::Dict)
         if startswith(k, "env/") || startswith(k, "units/")
             meta[k] = v
         elseif k in ("converged", "energy", "duration_seconds",
-            "started_at", "finished_at", "run_name", "scan_index")
+            "started_at", "finished_at", "run_name", "scan_index",
+            # Provenance. Whitelisted, or the ids the writers record would be
+            # silently dropped here and never reach `summary.json` — "every new
+            # run records a complete id" has to survive the reader, not just the
+            # writer. `artifact_id` was spelled `gs_cache_key` until cutover
+            # step 3 deleted the function that produced it.
+            "code_rev", "artifact_id")
             meta[k] = v
         elseif k == "conventions"
             meta["conventions"] = v

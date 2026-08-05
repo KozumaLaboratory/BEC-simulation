@@ -69,6 +69,11 @@ end
 # Energy face: ⟨ψ|H(r)|ψ⟩
 # ---------------------------------------------------------------------------
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body B(r)·F.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::SpatialZeemanTerm) = 1.0
+
 function energy_contribution(::SpatialZeemanTerm, psi::AbstractArray{<:Complex}, ws)
     field = _spatial_zeeman(ws)
     field === nothing && return 0.0

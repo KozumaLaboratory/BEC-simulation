@@ -1,0 +1,54 @@
+# PURE QUENCH to 26 uG — the Matsui-style protocol, for direct comparison against
+# our quench+parabola (ramp_quench500_par.yaml).
+#
+#   GS (m=-6, 10 mG, q=0)  ->  quench 10 mG -> 26 uG (4 w^-1 = 5.8 ms)  ->  hold 26 uG (80 w^-1 = 116 ms)
+#
+# Everything else is identical to ramp_quench500_par.yaml: same atom, grid, trap,
+# c1_ratio = 1/36, K3, seed, secular:false, and the SAME ground-state cache (so the GS
+# is loaded instantly). Total sequence 121 ms, matching the quench+parabola run, so the
+# two can be overlaid on a common time axis.
+#
+# psi snapshots ON: <Lz>(t) has to be computed from the wavefunction.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid: {n: [64, 64, 64], box: [18, 18, 18]}
+    potential: {type: harmonic, omega: [1.0, 1.0, 1.182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_64.jld2
+# --- phase A: full quench 10 mG -> 26 uG (no intermediate parabola at all) ---
+- dynamics:
+    duration: 4.0
+    dt: 0.002
+    B:
+      Bz: {from: 0.01, to: 2.6e-5, duration: 4.0}
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 500, psi: true, precision: f32}
+# --- phase B: hold at 26 uG + symmetry-breaking seed (same seed as the comparison run) ---
+- dynamics:
+    duration: 80.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    ddi: {secular: false}
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: true, precision: f32}

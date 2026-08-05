@@ -13,12 +13,6 @@
 #   - Energy decomposition: E_ddi == 0
 # This is the mechanism test that PRECEDES K3 discussion.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 4
-  reference: Matsui_Science_2026_DDI_off_control
-  expected: no_EdH_signature_without_DDI
-
 defaults:
   kind: spinor
   backend: gpu
@@ -35,7 +29,7 @@ pipeline:
         c1_ratio: -0.005
       ddi: {enabled: false}                 # ← ONLY DIFFERENCE FROM L4 DDI-on
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

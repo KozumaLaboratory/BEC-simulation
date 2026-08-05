@@ -1,0 +1,18 @@
+defaults: {kind: spinor, backend: gpu, interactions: {N_atoms: 50000, omega_ref: 691.1504}}
+mixins:
+  eu151_repro:
+    atom: Eu151
+    grid: {n: [48,48,48], box: [16,16,16]}
+    potential: {type: harmonic, omega: [1.0,1.0,1.1818182]}
+    interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.027777777777777776}
+pipeline:
+  - ground_state:
+      use: [eu151_repro]
+      method: lbfgs
+      initial_state: spin_coherent
+      init_state_params: {init_theta: 3.141592653589793, init_phi: 0.0}
+      B: {Bz: 0.01 Gauss}
+      n_steps: 3000
+      tol: 1.0e-11
+      ddi: {enabled: true, secular: false, padded: true, pad_factor: 2.0}
+      cache: runs/edh_repro_gstight/gs.jld2

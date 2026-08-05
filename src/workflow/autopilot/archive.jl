@@ -4,7 +4,7 @@
 # dir scan that backs `list_queue` stays in millisecond territory at
 # O(10³) entries but past that the per-tick walk hurts. This module
 # moves terminal entries older than a threshold into `<qr.path>/_archive/`,
-# preserving state.toml + outcome.toml + any small summary blobs and
+# preserving state.toml + _exit_summary.json + any small summary blobs and
 # optionally compressing or dropping large psi.jld2 artefacts.
 #
 # Run periodically (monthly cron, or as part of the daily tick when

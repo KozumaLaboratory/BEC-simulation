@@ -1,6 +1,7 @@
 using Test
 using SpinorBEC
 using LinearAlgebra
+using FFTW
 
 @testset "Angular Momentum & Current" begin
     @testset "probability_current: stationary state has zero current" begin
@@ -293,5 +294,49 @@ using LinearAlgebra
         j = probability_current(psi, grid, plans)
         @test length(j) == 1
         @test maximum(abs, j[1]) < 1e-12
+    end
+
+    @testset "orbital_angular_momentum: FFT plans are cached by shape" begin
+        # The observable is polled once per save inside the rotating_basis
+        # dynamics loop, where rebuilding the FFTW plans dominated its cost.
+        # Two claims: repeated calls at one shape add ONE cache entry, and the
+        # cached plans give bit-identical answers (a stale/aliased plan would
+        # not).
+        N = 32
+        L = 12.0
+        grid = make_grid(GridConfig{2}((N, N), (L, L)))
+        plans = make_fft_plans(grid.config.n_points)
+
+        psi = zeros(ComplexF64, N, N, 1)
+        for j in 1:N, i in 1:N
+            x, y = grid.x[1][i], grid.x[2][j]
+            psi[i, j, 1] = (x + im * y) * exp(-(x^2 + y^2) / 8)
+        end
+        psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
+
+        # Cold: a plan is built. Warm: the cached one is reused. The
+        # load-bearing claim is that they are BIT-IDENTICAL — a stale or
+        # wrong-shape cached plan is exactly the failure a cache introduces,
+        # and it would not show up in the analytic winding tests above.
+        empty!(SpinorBEC._ORBITAL_CPU_PLAN_CACHE)
+        Lz_cold = orbital_angular_momentum(psi, grid, plans)
+        @test length(SpinorBEC._ORBITAL_CPU_PLAN_CACHE) == 1
+
+        for _ in 1:5
+            @test orbital_angular_momentum(psi, grid, plans) === Lz_cold
+        end
+        @test length(SpinorBEC._ORBITAL_CPU_PLAN_CACHE) == 1   # no growth
+
+        # Sanity only — winding 1 tends to ⟨L_z⟩ = 1 in the continuum; at
+        # 32²/L=12 the discretisation leaves ~5e-4. The tight analytic gate
+        # lives in the winding-1 / winding-2 testsets above.
+        @test abs(Lz_cold - 1.0) < 0.05
+
+        # A second shape gets its own entry rather than reusing the first.
+        grid2 = make_grid(GridConfig{2}((16, 16), (L, L)))
+        psi2 = zeros(ComplexF64, 16, 16, 1)
+        psi2[1, 1, 1] = 1.0
+        orbital_angular_momentum(psi2, grid2, plans)
+        @test length(SpinorBEC._ORBITAL_CPU_PLAN_CACHE) == 2
     end
 end

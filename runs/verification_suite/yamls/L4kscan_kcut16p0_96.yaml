@@ -6,13 +6,6 @@
 #   (c) seed_amplitude noise spectrum interacts with grid resolution → 96 differs
 # This run distinguishes (a) from (c) by adding one more grid resolution.
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 6
-  reference: Matsui_Science_2026_Hamiltonian_only_96grid
-  expected: convergence_test_after_anomalous_32_48_plateau
-  noise_convention: rms_rescale_2026_05_22
-
 defaults:
   kind: spinor
   backend: gpu
@@ -31,7 +24,7 @@ pipeline:
         enabled: true
         secular: false
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

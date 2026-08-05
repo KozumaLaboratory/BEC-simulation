@@ -75,6 +75,32 @@ is the single source of truth.
 function apply_operator! end
 
 """
+    energy_operator_ratio(term::HamTerm) -> Float64
+
+The constant `r` in `energy_contribution(term, ψ, ws) == r · Re⟨ψ, H_term·ψ⟩ · dV`.
+
+This is not new physics — it is the trinity convention two paragraphs up, made
+callable. Every GP term's energy is a fixed rational multiple of the operator
+expectation the gradient traversal already forms: `1` for the one-body terms,
+`1/2` for the density-quadratic mean-field ones, `2/5` for LHY, where
+`V = dε/dn` and `ε ∝ n^(5/2)` so `n·V = (5/2)ε`.
+
+Writing it down lets `operator_and_energy_via_registry!` return the total energy
+from the SAME pass that builds `H·ψ`, instead of the CPU L-BFGS iteration paying
+a second full traversal for it — measured at 6.6 ms of a ~30 ms iteration.
+
+`NaN` means "not derivable this way"; the caller then falls back to that term's
+own `energy_contribution`. That is the default, so a new term costs correctness
+nothing by omitting it — only speed.
+
+This is a SECOND statement of each term's energy, which is exactly what the
+architecture forbids ungated. It is gated per term, from its first commit, by
+`test/oracles/test_energy_operator_ratio.jl`, which compares the derived value
+against `energy_contribution` for every registered term.
+"""
+energy_operator_ratio(::HamTerm) = NaN
+
+"""
     energy_contribution(term::HamTerm, psi, ws) -> Float64
 
 Return this term's contribution to total energy `⟨ψ|H_term|ψ⟩`.
@@ -108,7 +134,7 @@ spatial-spin density (`fx, fy, fz`) so DensityC0Term, SpinC1Term,
 LHYTerm, ZeemanTerm, CoriolisTerm and others do not
 duplicate that work.
 """
-struct EnergyContext{ND, PsiT, FFTPlan, SM, NRho, NF}
+struct EnergyContext{ND, PsiT, FFTEltT, FFTPlan, SM, DensityT, SpinFieldT}
     # NOTE: the original definition typed psi_host as Array{ComplexF64, ND}
     # while n_pts/fft_buf are ND-dimensional SPATIAL objects — ψ has ND+1
     # dims, so the constructor could never be called. It had zero callers
@@ -116,13 +142,24 @@ struct EnergyContext{ND, PsiT, FFTPlan, SM, NRho, NF}
     # when the latent mismatch surfaced (dead scaffolding cannot be wrong
     # in a detectable way until something consumes it).
     psi_host::PsiT
-    fft_buf::Array{ComplexF64, ND}
+    # The ELEMENT type of the buffer, parameterised rather than hard-coded to
+    # ComplexF64: `plans` follows ψ's precision, and an in-place FFTW plan
+    # applied to a buffer of a DIFFERENT eltype silently falls back to the
+    # out-of-place `*`, leaving `fft_buf` untransformed. The k-space reduction
+    # then sums k²|ψ(r)|² over real space and returns a finite, wrong number —
+    # measured 0.115 against an exact 0.500 for the kinetic energy of a Float32
+    # workspace.
+    #
+    # Named for what it is, not `CT`. It is not the same object as
+    # `GradientContext`'s `TC`, which is the whole ARRAY type — two parameters
+    # one letter apart meaning different things is how they get swapped.
+    fft_buf::Array{FFTEltT, ND}
     plans::FFTPlan
     spin_matrices::SM
-    n_density::NRho
-    fx::NF
-    fy::NF
-    fz::NF
+    n_density::DensityT
+    fx::SpinFieldT
+    fy::SpinFieldT
+    fz::SpinFieldT
     dV::Float64
     n_pts::NTuple{ND, Int}
 end
@@ -136,12 +173,16 @@ density, FFT buffer, and a `deriv_buf` scratch so the registry path
 matches the legacy `_grad_*` helpers' allocation pattern (no extra
 allocs vs the hand-written sum in `energy_gradient!`).
 """
-struct GradientContext{N, TF, TC, TD}
-    fft_buf::TC
-    deriv_buf::TC
-    fx::TF
-    fy::TF
-    fz::TF
-    n_density::TD
-    n_pts::NTuple{N, Int}
+struct GradientContext{ND, ComplexBufT, DensityT, SpinFieldT}
+    # These are the SAME objects `EnergyContext` carries, so they carry the same
+    # names. They used to be `TF`, `TC`, `TD` here and `NF`, `NRho` there —
+    # one struct's `TC` was the whole ARRAY type while the other's `CT` was an
+    # ELEMENT type, which is a swap waiting to happen.
+    fft_buf::ComplexBufT
+    deriv_buf::ComplexBufT
+    fx::SpinFieldT
+    fy::SpinFieldT
+    fz::SpinFieldT
+    n_density::DensityT
+    n_pts::NTuple{ND, Int}
 end

@@ -3,11 +3,6 @@
 # Expected: N and Mz conserved; component populations oscillate after a small seed.
 # This is a qualitative/SMA-conservation test, not a strict period test unless post-fit to SMA ODE.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Ueda_spin1_spin_mixing_SMA
-  expected: spin_exchange_with_Mz_conservation
-
 defaults:
   kind: spinor
   backend: cpu

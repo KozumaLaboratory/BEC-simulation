@@ -56,10 +56,12 @@ const LHY_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String, default="none",
         enum=["none", "scalar", "quasi_2d", "polar_two_channel", "full_bdg",
             "polar_contact", "polar_dipolar", "fm_contact", "fm_dipolar",
-            "icosahedral"]),
+            "icosahedral", "spatial"]),
     "c_lhy" => FieldSpec(; type=Number),       # scalar/quasi_2d explicit override
     "n_max" => FieldSpec(; type=Number),       # null → 3 × max(|psi_init|²)
     "n_points" => FieldSpec(; type=Integer, default=200, range=(3, 10000)),
+    # `spatial` only: |⟨F⟩|/F bins, one BdG solve per OCCUPIED bin. A cost knob.
+    "n_bins" => FieldSpec(; type=Integer, default=12, range=(2, 64)),
 )
 
 # Unified `B:` Zeeman block (replaces the legacy step-level `zeeman:` /
@@ -209,8 +211,13 @@ const LIVE_MONITOR_SCHEMA = Dict{String, FieldSpec}(
 # but at least enforce the `t` / `apply` envelope.
 const PULSE_EVENT_SCHEMA = Dict{String, FieldSpec}(
     "t" => FieldSpec(; required=true, type=Number, range=(0.0, 1e6)),
+    # NOT "trap". `PULSE_TARGETS` (`runtime/pulse_sequence.jl:19`) is the set
+    # `compile_pulse_sequence` actually compiles, and its own docstring records
+    # that `apply: trap` was "documented in yaml_schema_reference.md but never
+    # implemented" — it parsed, grouped, and compiled to NOTHING. Admitting it
+    # here made that silent no-op reachable from a config that validates.
     "apply" => FieldSpec(; required=true, type=String,
-        enum=["B", "raman", "interactions", "trap"]),
+        enum=["B", "raman", "interactions"]),
     "duration" => FieldSpec(; type=Number, range=(0.0, 1e6)),
     # Per-target params (left permissive; `_apply_pulse_sequence` validates):
     "p" => FieldSpec(), "q" => FieldSpec(), "bx" => FieldSpec(), "by" => FieldSpec(),
@@ -234,12 +241,15 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
     "secular" => FieldSpec(; type=Bool, default=false),
     "quasi_2d" => FieldSpec(; type=Bool, default=false),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
-    # Ronen spherical-truncation radius (Tier A): a number (physical R), or
-    # "auto"/"box_half" for half the smallest box extent.
+    # Ronen spherical-truncation radius (Tier A): a number (physical R),
+    # "auto"/"box_half" for the largest radius the padding admits, or
+    # "none"/"off" for the bare periodic kernel. Defaults to auto.
     "trunc_radius" => FieldSpec(; type=Union{Number, String}),
     # Tier B: zero-padded, image-free convolution + optional anisotropic pad.
-    "padded" => FieldSpec(; type=Bool, default=false),
-    "pad_factor" => FieldSpec(; type=Union{Number, Vector}),
+    "padded" => FieldSpec(; type=Bool, default=true),   # was false, flipped 2026-07-29
+    # A number, a per-axis vector, or "auto" (size the padding so the cutoff can
+    # reach max(box) instead of being capped by the short axis).
+    "pad_factor" => FieldSpec(; type=Union{Number, Vector, String}),
 )
 
 # `kind` selects the solver path:
@@ -272,12 +282,17 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "dt" => FieldSpec(; type=Number, default=0.001, range=(1e-8, 1.0)),
     "n_steps" => FieldSpec(; type=Number, default=100000, range=(0.0, 1e9)),
     "tol" => FieldSpec(; type=Number, default=1e-8, range=(1e-16, 1.0)),
+    "tol_drho" => FieldSpec(; type=Number, default=0.0, range=(0.0, 1.0)),
     "m_lbfgs" => FieldSpec(; type=Number, default=10, range=(1.0, 100.0)),
     # Append a 2nd-order Newton-CG trust-region pass after LBFGS to drive the
     # stationarity residual below the first-order √eps gradient floor. Needed
     # when ∇E (not just E) must be tight — Hessian λ_min / Bogoliubov near
     # instabilities require a genuinely stationary ψ. lbfgs-only.
     "newton_polish" => FieldSpec(; type=Bool, default=false),
+    # eigenvector-residual final polish (order-4 HvP) that breaks the √eps
+    # first-order gradient floor (1e-7 → 1e-12); use when the fine GS ordering
+    # (near-degenerate phases) needs a genuinely converged ψ. lbfgs-only.
+    "residual_polish" => FieldSpec(; type=Bool, default=false),
     "initial_state" => FieldSpec(; type=String, default="polar",
         enum=["polar", "m_plus_F", "m_minus_F",
             "uniform", "antiferromagnetic", "random",
@@ -298,6 +313,17 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "temperature_ratio" => FieldSpec(; type=Number, range=(0.0, 1.0)),
     "lhy" => FieldSpec(; type=Dict, schema=LHY_SCHEMA),
     "init_state_params" => FieldSpec(; type=Dict),
+    # `seed_from: {run: <dir of point_*.jld2>, upsample: true}` — warm-start this
+    # GS solve from a prior run's converged ψ, matched by the resolved cell
+    # signature (c1/Bz/κ/initial_state) and spectrally upsampled to this grid.
+    # Cost-compressed continuation (docs/design/eu_phase_diagram_adaptive_mapping.md).
+    "seed_from" => FieldSpec(; type=Dict),
+    # `pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}`
+    # — lbfgs-only. Adds a symmetry-breaking transverse field b_x=ε, warm-ramps
+    # ε→0, and reports the ε→0-extrapolated energy. Lifts the weak-field
+    # soft-manifold Goldstone floor (|∇E|~0.05 un-pinned → ~1e-5). See
+    # src/solvers/ground_state/pinned.jl + the phase-diagram design doc.
+    "pin" => FieldSpec(; type=Dict),
     "cache" => FieldSpec(; type=String),
     "quasi_2d" => FieldSpec(; type=Bool),
     "l_z" => FieldSpec(; type=Number, range=(0.0, 100.0)),
@@ -383,10 +409,24 @@ const TOP_LEVEL_KEYS = Set([
     "mixins",            # named parameter sets pulled into the config
     "accuracy",          # ε accuracy budget — seeds rotating_basis epsilon
     "auto_grid",         # bool — enable TF-radius grid auto-derivation
-    "metadata",          # free-form provenance, ignored at runtime
-    "name",              # human-readable label for the scenario
-    "notes",             # free-form notes
-    "version",           # YAML schema version stamp
+    # `metadata` was here until the step-6 cutover. A structured slot with no
+    # readers is a name nothing looks up: 59 keys across 302 configs, and the
+    # only thing that can happen to a field nothing reads is that it rots —
+    # `generator:` named a script that does not exist in 156 of them, each
+    # under a header reading "auto-generated, do not hand-edit", and five of
+    # the 59 "keys" were the wreckage of an unquoted comma in a flow mapping.
+    # The blocks are preserved verbatim in
+    # `docs/validation/config_metadata_blocks.toml`. Do not re-add: the point
+    # is that provenance lives where it is READ (refs/*.toml via `ref`, the
+    # A/B/C taxonomy via `Claim`), not in a slot that cannot be wrong.
+    #
+    # `name`, `notes` and `version` left with it, for the same reason and at no
+    # cost: measured 2026-08-03, they have zero readers under `src/` and zero
+    # occurrences across the 302 configs in `runs/`. They were three more slots
+    # that could be written and never contradicted — and, because
+    # `_canonical_bytes!` hashes every key it is handed, three more ways for a
+    # label to move `content_id` and orphan a cached run. A comment does the
+    # same job: `#` never reaches the hasher.
 ])
 
 """
