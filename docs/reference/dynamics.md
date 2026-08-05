@@ -30,6 +30,14 @@ Measured on one H100, ¹⁵¹Eu F=6 (D=13), F64, DDI + c₀ + c₁, midpoint on
 | 64³  |  4.40 ms/step | 2.58 ms/step | 1.70× |
 | 128³ | 29.99 ms/step | 17.51 ms/step | 1.71× |
 
+The `sequential` column is the shipping default, i.e. with the shared
+Taylor-Horner rotation (`_SPIN_TAYLOR_ENABLED` defaults to `true`), so these
+ratios are what choosing `combined` actually buys you. The bench prints a third
+arm and two speedup columns of its own, both against the 5-stage Euler kernel —
+at 128³ its `sp(comb)` reads 2.84×. Do not quote that against `spin_step:`:
+Euler is not selectable through this key, and the extra factor is the Taylor
+rotation, which `sequential` already has.
+
 `combined` is **not** the default: switching a run to it changes its numbers at
 $O(dt^3)$, so an existing result will not reproduce bitwise. Pick it
 deliberately, and do not mix it with `sequential` across phases of one study.

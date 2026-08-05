@@ -420,8 +420,14 @@ end
     "combined"               exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂), one rotation
 
 Both are O(dt²) and share a continuum limit; they differ at O(dt³) because the
-combined form carries no [SM,[SM,DDI]] commutator error. `combined` measured
-2.84× faster per step on H100 at 128³ × D=13 with DDI (bench/rtp_gpu_ab.jl).
+combined form carries no [SM,[SM,DDI]] commutator error. Against `sequential`
+`combined` measured 1.71× faster per step on H100 at 128³ × D=13 with DDI —
+29.99 → 17.51 ms/step (bench/rtp_gpu_ab.jl; table in
+docs/reference/dynamics.md). That bench's own `sp(comb)` column reads 2.84×
+because every column there is against the 5-stage Euler kernel, which this
+knob cannot select: `sequential` already uses the shared Taylor-Horner
+rotation (`_SPIN_TAYLOR_ENABLED` defaults to true), so 2.84× would credit
+this knob with a win `sequential` has too.
 
 It is not the default because the difference is real: a run switching to it
 will not reproduce a previous run's numbers bitwise. The selector silently
