@@ -1,5 +1,8 @@
 # Two-component (binary) Gross-Pitaevskii — design note
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: **scaffold / deferred** (Phase 4.7, Scenario #51).
 
 The full two-component coupled GP solver is multi-session work (~500 lines across types, propagators, energy, solvers, YAML). This note pins down the interface and key decisions so the next session can pick up cleanly.

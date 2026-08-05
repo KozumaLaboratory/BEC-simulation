@@ -1,6 +1,6 @@
 # ── Retry classification ──────────────────────────────────────────────
 #
-# When a job lands in killed_bug, the retry pass consults outcome.toml
+# When a job lands in killed_bug, the retry pass consults _exit_summary.json
 # (or the backend's post-mortem reason) and decides:
 #
 #   TRANSIENT             → re-enqueue with attempt+1, same profile
@@ -21,7 +21,7 @@ export retry_failed!, RetryClassification, classify_failure
     classify_failure(outcome::AbstractDict, backend_reason::AbstractString="")
         -> RetryClassification
 
-Pure predicate. `outcome` is the parsed outcome.toml's `[outcome]` table
+Pure predicate. `outcome` is the parsed `_exit_summary.json`
 (or empty). `backend_reason` is the scheduler post-mortem string.
 """
 function classify_failure(outcome::AbstractDict, backend_reason::AbstractString="")
@@ -37,8 +37,20 @@ function classify_failure(outcome::AbstractDict, backend_reason::AbstractString=
         return PERMANENT
     end
 
-    # Free-text `reason` field — OOM/TIMEOUT may be reported by run_yaml
-    # itself when it catches a sigkill / wall-time event.
+    # `oom_killed` FIRST, and as a Bool. `run_pipeline` sets it from the actual
+    # exception (`runner.jl:238`, `_is_oom_error`), so this arm needs no string
+    # matching at all — which is what made the free-text arm below unreachable
+    # on the production backend. `backend_failure_reason(::UGEBackend)` emits
+    # qacct's vocabulary (`failed=… exit_status=…`) while the regexes below are
+    # SLURM's (`OUT_OF_MEMORY` / `TIMEOUT`); the two sets do not intersect and
+    # nothing normalises between them, so RESOURCE_PERMANENT was unreachable on
+    # TSUBAME and an OOM'd job re-queued at the same memory class until its
+    # retry budget ran out.
+    get(outcome, "oom_killed", false) === true && return RESOURCE_PERMANENT
+
+    # Free-text `reason` field — kept for LocalBackend and for any backend whose
+    # reason string does speak this vocabulary. It is now a fallback behind a
+    # Boolean rather than the only route.
     outcome_reason = get(outcome, "reason", "")
     combined = String(outcome_reason) * " | " * String(backend_reason)
     if occursin(r"OUT_OF_MEMORY|OOM_KILLED|OOM\b"i, combined)
@@ -107,16 +119,8 @@ function retry_failed!(;
 end
 
 function _load_outcome(entry::QueueEntry)
-    p = joinpath(entry.run_dir, OUTCOME_FILENAME)
-    isfile(p) || return Dict{String, Any}()
-    d = try
-        TOML.parsefile(p)
-    catch
-        ;
-        nothing
-    end
-    d isa AbstractDict || return Dict{String, Any}()
-    return Dict{String, Any}(get(d, "outcome", Dict()))
+    d = _read_exit_summary(entry)
+    d === nothing ? Dict{String, Any}() : d
 end
 
 function _backend_reason(entry::QueueEntry, backend::AutopilotBackend)

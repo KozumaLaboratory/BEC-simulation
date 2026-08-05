@@ -6,7 +6,7 @@ Day-to-day workflow + scaling knobs for TSUBAME 4.0 (Altair Grid Engine / UGE + 
 
 ```bash
 ssh tsubame
-cd $T4_GROUP/work     # NOT $HOME — only 30 GB quota there
+cd $T4_GROUP/work     # NOT $HOME — only 25 GB quota there
 git clone git@github.com:anko9801/BEC-simulation.git
 cd BEC-simulation
 
@@ -141,7 +141,7 @@ use a per-job script of the form:
 
 . /etc/profile.d/modules.sh
 source scripts/tsubame_setup.sh
-export SPINORBEC_SCRATCH_DIR=$T3TMPDIR
+# SPINORBEC_SCRATCH_DIR is already exported by tsubame_setup.sh ($T4_TMPDIR/spinorbec_snaps)
 
 # Name the binary. There is NO julia modulefile on TSUBAME 4 — `module load
 # julia` fails and `tsubame_setup.sh` swallows it, so a bare `julia` in a UGE
@@ -182,7 +182,8 @@ pipeline:
   - dynamics:
       duration: 107.6
       dt: 1.0e-4
-      save_every: 7000         # → 154 snapshots
+      save: {every: 7000}      # → 154 snapshots. NOT `save_every:`: the flat
+                               # spellings were folded into `save:` and are rejected.
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 

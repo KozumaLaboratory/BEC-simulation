@@ -1,5 +1,8 @@
 # Paper #2: Lee-Huang-Yang correction for the F=6 icosahedral phase of a spinor Bose-Einstein condensate
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Target journal**: PRA (Physical Review A) or PRR (Physical Review Research)
 
 **Estimated length**: 8-10 pages (full paper)

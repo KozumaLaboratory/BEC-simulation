@@ -3,7 +3,7 @@
 # When a job lands in :killed_data / :killed_bug the operator wants
 # "what broke?" in one sentence — not 5000 lines of Julia stacktrace.
 # `analyze_failure` walks the per-run artefacts in order of authority
-# (outcome.toml > _exit_summary.json > stderr.log tail > backend reason
+# (_exit_summary.json > stderr.log tail > backend reason
 # > kill_reason) and returns a structured summary the dashboard can
 # render as a compact badge with a hover-title for the full trail.
 #
@@ -41,32 +41,20 @@ end
     analyze_failure(entry::QueueEntry) -> FailureAnalysis
 
 Classify a terminal-failed entry. Walks artefacts under
-`entry.run_dir` (outcome.toml / _exit_summary.json / stderr.log) plus
+`entry.run_dir` (_exit_summary.json / stderr.log) plus
 `entry.kill_reason`, returns the most informative categorisation.
 
 Cheap (≤ 1 stderr file read, bounded to last 8 KB). Safe to call
 from the dashboard `/api/queue/why` route on demand.
 """
 function analyze_failure(entry::QueueEntry)
-    # 1. outcome.toml — `run_yaml` writes a structured terminal record.
-    outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
-    if isfile(outcome_path)
-        d = try
-            TOML.parsefile(outcome_path)
-        catch
-            nothing
-        end
-        if d isa AbstractDict
-            outcome = get(d, "outcome", Dict())
-            reason = strip(String(get(outcome, "reason", "")))
-            if !isempty(reason) && reason != "no reason"
-                cat = _category_from_reason(reason)
-                return FailureAnalysis(cat, reason, "outcome.toml: $(reason)")
-            end
-        end
-    end
+    # The `outcome.toml` block that stood here until 2026-08-04 is DELETED, not
+    # repointed. It looked for a nested `outcome.reason` table that only that
+    # file ever had, and that file has no producer — so this branch never fired
+    # and step 2 below, which opens `_exit_summary.json` correctly, was doing
+    # all the work already.
 
-    # 2. _exit_summary.json — `run_yaml`'s atexit hook stamps this with
+    # `_exit_summary.json` — `run_yaml`'s atexit hook stamps this with
     #    exception_type / nan_encountered / oom_killed flags.
     exit_path = joinpath(entry.run_dir, "_exit_summary.json")
     if isfile(exit_path)
@@ -118,7 +106,7 @@ function analyze_failure(entry::QueueEntry)
 
     return FailureAnalysis(:unknown,
         "No recognisable failure signal in artefacts",
-        "checked outcome.toml / _exit_summary.json / stderr.log / kill_reason")
+        "checked _exit_summary.json / stderr.log / kill_reason")
 end
 
 # ── classifier rules ────────────────────────────────────────────────

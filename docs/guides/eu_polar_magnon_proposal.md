@@ -1,5 +1,8 @@
 # Eu polar-magnon spectroscopy proposal — Kozuma/Matsui group
 
+> **FROZEN 2026-06-01.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Companion to `eu_sbi_handoff.md`. This document is a measurement
 proposal addressed to the experimental group, summarising what the
 simulator predicts and what the lab would need to do to extract the

@@ -172,6 +172,11 @@ end
 # Derived: energy from the single source.
 # ============================================================================
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body −Ω·L_z.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::CoriolisTerm) = 1.0
+
 function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
     # Linear: E = Re⟨ψ, H·ψ⟩ · dV = -Ω · ⟨L_z⟩.
     # NOTE: orbital_angular_momentum returns ⟨L_z⟩ already integrated (× dV

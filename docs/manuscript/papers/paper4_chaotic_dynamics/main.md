@@ -1,5 +1,8 @@
 # Paper #4: Chaotic dipolar instability in post-quench F=6 spinor Bose-Einstein condensate: trajectory divergence and species universality
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status (2026-05-12)**: Draft skeleton extracted from `paper4_raw.md` reframing
 notes. Sections fully written: Abstract, I (Intro), II (Framework), III (Results).
 TBD: §IV (Methodology Discussion), §V (Conclusions). All numerical claims

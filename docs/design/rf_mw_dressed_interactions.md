@@ -1,5 +1,8 @@
 # RF/MW-dressed interactions — where the physics lands in the code
 
+> **FROZEN 2026-07-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: **design only, no implementation.** Written to answer one question before
 any code is added: *does an effective $a_S(\text{RF})$ fit into
 `TimeDependentInteractions`, or does it need a new `HamTerm`?*

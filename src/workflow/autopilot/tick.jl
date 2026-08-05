@@ -267,10 +267,10 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
             _collect_safe!(backend, entry)
             _maybe_fire_on_complete!(entry, config, stats)
         elseif status === :failed
-            # Backend said failed. Look at outcome.toml + backend-side reason to decide
+            # Backend said failed. Look at _exit_summary.json + backend-side reason to decide
             # killed_data vs killed_bug (OOM is resource-permanent and
             # classified as killed_bug; divergence is killed_data).
-            # Collect first so the classifier can read outcome.toml even
+            # Collect first so the classifier can read _exit_summary.json even
             # when the producer was a remote backend.
             _collect_safe!(backend, entry)
             terminal, reason = _classify_terminal_failure(entry, backend)
@@ -538,22 +538,20 @@ end
 # Classify backend "failed" → killed_bug (resource-permanent / NaN) or
 # killed_data (divergence detected post-run by the runtime itself).
 function _classify_terminal_failure(entry::QueueEntry, backend::AutopilotBackend)
-    # First: outcome.toml (written by run_yaml at exit) — most informative.
-    outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
-    if isfile(outcome_path)
-        d = try
-            TOML.parsefile(outcome_path)
-        catch
-            ;
-            nothing
-        end
-        if d isa AbstractDict
-            term = String(get(get(d, "outcome", Dict()), "terminal", ""))
-            reason = String(get(get(d, "outcome", Dict()), "reason", "no reason"))
-            if term == "killed_data"
-                return :killed_data, reason
-            elseif term == "killed_bug"
-                return :killed_bug, reason
+    # First: `_exit_summary.json`, the record `run_pipeline` actually writes.
+    # The `terminal` string this used to read lived only in `outcome.toml`,
+    # which had no producer — so neither branch below has ever been taken.
+    # The two Booleans here are set from the real exception (`runner.jl:237-238`)
+    # and carry the same distinction: a NaN cascade is the run's own physics
+    # going bad (`:killed_data`), an OOM is the job being wrong for its
+    # resources (`:killed_bug`).
+    let d = _read_exit_summary(entry)
+        if d !== nothing
+            step = get(d, "last_step", "?")
+            if get(d, "nan_encountered", false) === true
+                return :killed_data, "NaN encountered at step $(step)"
+            elseif get(d, "oom_killed", false) === true
+                return :killed_bug, "OOM-killed at step $(step)"
             end
         end
     end
@@ -580,7 +578,7 @@ end
 _divergence_metric(entry::QueueEntry) = "norm/Fz drift"
 
 # Dry-run: simulate one full dispatch cycle on a single entry. Logs the
-# command we WOULD have run, writes a synthetic outcome.toml, advances
+# command we WOULD have run, writes NO run artefact at all, advances
 # state to :done, AND fires the on_complete chain so recipe-driven
 # fan-out is exercised end-to-end during the observation lap. Without
 # the explicit on_complete call here, dry-run silently masks recipe
@@ -604,27 +602,13 @@ function _dry_run_dispatch!(entry::QueueEntry,
     entry.cluster_started_at = t
     entry.cluster_state = :running
     save_entry!(entry)
-    # Synthetic outcome.toml — marks the run as "completed by dry-run"
-    # so retry / on_complete / archival downstream can see something
-    # structured. Real runs overwrite this file at process exit.
-    outcome_path = joinpath(entry.run_dir, OUTCOME_FILENAME)
-    try
-        open(outcome_path, "w") do io
-            TOML.print(
-                io,
-                Dict{String, Any}(
-                    "outcome" => Dict{String, Any}(
-                        "terminal" => "done",
-                        "reason" => "dry-run synthetic",
-                        "completed" => true,
-                    ),
-                    "metrics" => Dict{String, Any}(),
-                ),
-            )
-        end
-    catch err
-        @warn "_dry_run_dispatch! failed to write outcome.toml" exception=err
-    end
+    # The synthetic `outcome.toml` written here until 2026-08-04 is deleted, not
+    # repointed. It claimed "Real runs overwrite this file at process exit",
+    # which was false, and `run_dir` is content-addressed — so the file it left
+    # behind was read by a LATER live run of the same spec and reported that
+    # run `:done`. A dry run must leave no artefact a live run can mistake for
+    # its own. `_terminal_classify!` below already stamps everything the
+    # dashboard and the journal need.
     # Route through _terminal_classify! so dry-run entries get
     # terminal_at stamped + the same @info "terminal" line that real
     # runs produce. Without this, dashboard ETA / journal-replay

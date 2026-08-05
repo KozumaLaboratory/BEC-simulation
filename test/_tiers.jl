@@ -6,10 +6,18 @@
 
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
+    # Pins that SPIN_TAYLOR_TOL is a control at the angles production runs
+    # at. Three src comments said it was inert there, from an R three orders
+    # too small; nothing checked them.
+    "hamiltonian/test_taylor_tolerance_binds.jl",
     "test_quality.jl",
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
+    "test_docs_live_set.jl",
+    # A3:R-DOC-01 asked for a CHECK; the design docs must stay terminal-readable.
+    "test_design_docs_have_no_latex.jl",
     "test_level1_scalar_exact.jl",
     "test_level2_strang_convergence.jl",
     "test_level3_zeeman_only.jl",
@@ -26,6 +34,7 @@ const FAST_TESTS = [
     "analysis/test_spinor_fingerprint.jl",
     "analysis/test_larmor_adiabaticity.jl",
     "analysis/test_dipole_field.jl",
+    "analysis/test_resonance_dip_nonuniform.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
@@ -39,6 +48,7 @@ const FAST_TESTS = [
     "workflow/test_gs_cache_hit_physics.jl",
     "solvers/test_lbfgs_forward_coverage.jl",
     "solvers/test_precond_default_is_off.jl",
+    "bench/test_ab_report.jl",
     "oracles/test_lhy_table_path_coverage.jl",
     "workflow/test_lhy_texture_warning.jl",
     "workflow/test_lhy_block_wiring.jl",
@@ -72,6 +82,7 @@ const FAST_TESTS = [
     # names the per-run knobs it does NOT set.
     "workflow/validation/test_accuracy_knobs.jl",
     "workflow/validation/test_accuracy_profiles.jl",
+    "workflow/validation/test_ground_state_preflight.jl",
     "workflow/validation/test_save_operator_rhs.jl",
     "workflow/validation/test_show.jl",
     "workflow/validation/test_twin_audit.jl",
@@ -80,6 +91,91 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
+    # Does what a run WRITES reach what the reaper READS? The autopilot suite
+    # drives `is_divergent_status` with dicts it builds itself, so it passed
+    # while the writer and the reader shared no keys at all.
+    "workflow/test_live_status_reaches_the_detector.jl",
+    # A name the autopilot reads must be a name something writes.
+    "workflow/test_terminal_record_has_a_producer.jl",
+    # The budget read the pre-2026 flat save_* keys the schema now rejects.
+    "workflow/test_budget_reads_the_save_block.jl",
+    # A YAML key a maintained doc teaches must be one the schema accepts.
+    "workflow/test_docs_yaml_against_schema.jl",
+    # A schema enum must name what the implementation can actually do.
+    "workflow/test_schema_enum_matches_implementation.jl",
+    # One diverging TWA member used to NaN the mean for every member after it.
+    "solvers/test_twa_rejects_diverged_members.jl",
+    # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
+    "model/test_model_shape.jl",
+    "model/test_model_toml_roundtrip.jl",
+    "model/test_artifact_id.jl",
+    # A revision naming bytes the process is not running is worse than none.
+    "model/test_code_rev_refuses_under_sysimage.jl",
+    # Why `artifact_id` had to stop being `content_id(spec)`: prose participates
+    # in the latter, so harvesting 302 `metadata:` blocks moved 302 names.
+    "model/test_prose_does_not_move_identity.jl",
+    # Step 1b. `yaml_to_model` is the resolver from raw YAML to a `Model`;
+    # `test_resolve_gs_is_shared.jl` is what keeps it and `_run_step` from
+    # becoming two parsers of the same physics; `test_ddi_trunc_radius…` gates
+    # the three-state union that unblocks the corpus.
+    "model/test_yaml_to_model.jl",
+    "model/test_resolve_gs_is_shared.jl",
+    "model/test_ddi_trunc_radius_three_states.jl",
+    # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
+    # EVERY config under `runs/`, with the ones it cannot resolve listed by name
+    # and reason so the list only shrinks deliberately.
+    "model/test_corpus_resolves.jl",
+    "model/test_admission_requires_marker.jl",
+    "model/test_record_provenance.jl",
+    "model/test_completion_marker.jl",
+    # W2: the marker carries the solve's verdict and admission can require it.
+    # W3: the grandfather arm is bounded by a dated cutoff.
+    "model/test_marker_verdict.jl",
+    # …and the arm none of the three marker files has: does the verdict
+    # describe the payload it is attached to?
+    "model/test_verdict_truth.jl",
+    # …and what that gate FOUND: the step returned three descriptions of its
+    # answer — saved psi, analysed workspace, reported energy — and with a
+    # rotating frame they were three different states.
+    "model/test_gs_step_returns_one_state.jl",
+    "model/test_marker_cutoff.jl",
+    # W4: the cache's fail-safes reach a file, not only a log line.
+    "model/test_cache_stats_reported.jl",
+    # Step 3. The GS stage cache admits on `artifact_id`; `_gs_cache_key` and
+    # `_hashable` are deleted. 31 knobs, ONE assertion each — a single bundled
+    # assertion is how a 19-key list rots into a 17-key list — plus the
+    # partition of `GS_SCHEMA` that makes a new key red until it is classified,
+    # and the fail-safe (a config with no `Model` has no id and never hits).
+    "model/test_gs_admission_axes.jl",
+    # Step 4. Ambient module-level `Ref`s are the one input class `artifact_id`
+    # cannot see: not in the declaration, not in `code_tree_hash`. A pure file
+    # scan over `src/` + `ext/` against a PINNED set, so a new one is red until
+    # someone writes down why it may be ambient.
+    "model/test_no_ambient_module_refs.jl",
+    # Step 4's one KEPT ambient Ref: the Horner degree clamp is the positive
+    # control test_taylor_tolerance_criterion.jl needs, so it cannot be frozen —
+    # but it moves psi by 5.9e-2 at cap 0 and is in no Stage, so `run_pipeline`
+    # refuses to run while it is clamped.
+    "model/test_taylor_degree_cap_guard.jl",
+    # Step 4's measurement, one assertion per ambient Ref: does flipping it move
+    # `artifact_id`? `:moves` for the dealias pair (pinning them INTO the id),
+    # `:blind` for the rest, each with the reason it is still open — so closing
+    # one is a visible diff here. Also covers the `dealias_k_cut` half, which
+    # `test_gs_admission_axes.jl` arm C29 does not: unhooking only that half from
+    # `GridSpec` leaves C29 green at 124/124 (measured).
+    "model/test_ambient_refs_vs_artifact_id.jl",
+    # THE gate cutover step 2 exists for: interrupt a real solve mid-flight and
+    # assert the next run recomputes instead of serving the partial output.
+    # Nothing else in the suite exercises the swallowed `InterruptException`.
+    # Two files because there are two swallowing loops — the ITP and the two
+    # RTP loops — and forcing the RTP half to report "not interrupted" left the
+    # ITP file green (canary B6, 2026-08-01).
+    "model/test_interrupted_run_recomputes.jl",
+    "model/test_interrupted_dynamics_recomputes.jl",
+    # The writer / admission sites a YAML SCAN and `Experiment` actually use.
+    # Four independent canaries (D1 / D2 / D3b / D4b) passed against the suite
+    # without it, which is step 1's finding M10 in the scan path.
+    "model/test_scan_path_admission.jl",
     "manuscript/test_lemma1_general_S.jl",
     "manuscript/test_f5_f7_polyhedral.jl",
     "manuscript/test_f9_f11_polyhedral.jl",
@@ -139,6 +235,15 @@ const FAST_TESTS = [
     "foundation/test_unitful.jl",
     "analysis/test_texture_observables.jl",
     "analysis/test_vorticity_berry.jl",
+    # Instrument gate for the vortex counter: n imprinted -> n counted, ZERO on a
+    # vortex-free field (a KZ defect count sits on a thermal background), and
+    # threshold-independent.
+    "analysis/test_vortex_counter_control.jl",
+    # g1(r) + coherence length: the KZ observable that replaced defect counting.
+    # Gated on a coherent field (no decay), white noise (decay within a cell), and
+    # recovery of an IMPOSED correlation length as it is scaled.
+    "analysis/test_coherence_length.jl",
+    "dynamics/test_thermal_cfield.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
@@ -152,7 +257,7 @@ const FAST_TESTS = [
     "hamiltonian/test_ddi_gradient_padding_parity.jl",
     "hamiltonian/test_ddi_padded_zero_pad_invariant.jl",
     # Taylor-Horner spin rotation on the CPU, against the exact Euler 5-stage it
-    # replaces. Reads the same SPIN_TAYLOR_TOL[] as the CUDA gate, so relaxing
+    # replaces. Reads the same SPIN_TAYLOR_TOL as the CUDA gate, so relaxing
     # the accuracy contract turns both red.
     "hamiltonian/test_cpu_spin_rotation_taylor_parity.jl",
     # RK4IP must be MEASURED at order 4, with the DDI-off control: composition
@@ -275,6 +380,21 @@ const CI_EXTRA = [
     # so the type-C target cannot drift when the fixture or the metric changes.
     # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
     "validation/test_matsui_fig4_dip.jl",
+    # `refs/matsui2025.toml` + `ref` + `Claim`. Same fixture, one level up: that
+    # file gates the METRIC against the fixture, this one gates the REFERENCE
+    # FILE against both — every measured row is re-measured rather than read,
+    # and the three constructor refusals that are the whole enforceable content
+    # of the A/B/C taxonomy each get one assertion. Resolves one production
+    # config, hence ci.
+    "validation/test_matsui2025_ref.jl",
+    # Cutover step 6: the harvest of what lived in run-config prose. Set
+    # equality over 300 item ids with every count pinned as a literal, so the
+    # inventory of migrated knowledge cannot silently shrink — plus the arm
+    # asserting the verbatim `metadata:` dump covers every config that still
+    # carries a block, which is what makes the deletion safe by construction
+    # rather than by how carefully the sampling was done. Pure TOML + a
+    # `walkdir` over `runs/`, no solve.
+    "validation/test_config_prose_harvest.jl",
     "hamiltonian/test_split_step.jl",
     "solvers/test_simulation.jl",
     "solvers/test_ground_state.jl",
@@ -376,6 +496,7 @@ const CI_EXTRA = [
     "oracles/test_raman_analytic.jl",
     "oracles/test_term_legacy_equivalence.jl",
     "oracles/test_term_consistency.jl",
+    "oracles/test_energy_operator_ratio.jl",
     # The coverage claim `test_term_consistency.jl` makes in its header and does
     # not keep: `apply_operator!` differenced against `energy_contribution` for
     # EVERY slot of H_TERMS_CANONICAL_ORDER, with the coverage itself asserted so
@@ -521,6 +642,16 @@ const CI_EXTRA = [
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
 const FULL_EXTRA = [
+    # 1266 s on its own — three independent SPGPE equilibrium solves at
+    # n = 48, each run to steady state from both directions. It was in
+    # FAST_TESTS, where the job budget is 15 min: no worker count can help,
+    # because a parallel makespan is bounded below by the slowest single
+    # file. Three per-PR runs died at 15m18s / 15m21s / 15m20s against
+    # `timeout-minutes: 15`, and the identical seconds are what gave it away
+    # as a budget rather than a race. `full` (30 min) is the only tier it
+    # fits, and it eats two thirds of that — worth making cheaper at the
+    # source rather than leaving here.
+    "dynamics/test_spgpe_equilibrium_number.jl",
     "solvers/test_3d.jl",
     "solvers/test_adaptive_dt.jl",
     "analysis/test_analytic_ground_states.jl",
@@ -561,7 +692,21 @@ const FULL_EXTRA = [
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
     "gpu/test_gpu_lhy_term_faces.jl",
+    # Same bug class again, this time in the dispatch itself: `energy_gradient!`
+    # chose CPU vs GPU from `psi`, while computing on `ws.state.psi` and writing
+    # `grad`. A ground state read back from jld2 is a host Array whatever wrote
+    # it, so the GS stage-cache audit — host ψ, GPU workspace — took the CPU
+    # branch and scalar-indexed. Needs a cache HIT to appear: the run that fills
+    # the cache never loads from it, so only the SECOND GPU run of a given
+    # ground state dies.
+    "gpu/test_gpu_energy_gradient_host_psi.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
+    # The OTHER pair of realizations on the device: the warp-cooperative fused
+    # Euler kernels vs the one-thread-per-voxel ones. Replaces
+    # `bench/verify_euler_warp.jl`, which flipped `_DDI_EULER_WARP[]` and then
+    # called a path that takes Taylor first for D ≤ 16 — it compared the Taylor
+    # kernel against itself and printed OK. `_SM_EULER_WARP` had no coverage.
+    "gpu/test_gpu_euler_warp_parity.jl",
     "gpu/test_lbfgs_stall_fixed_point.jl",   # floor stop gives up nothing, on device
     # Bit-identity of the zero-padded DDI layout against the contiguous one, for
     # both the fused spin-density corner write and the rotation's in-place read
@@ -703,6 +848,13 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
+    # against the 3.0 s default it had been taking. The default made it the
+    # LAST file handed out, which is the worst possible order for the one
+    # file that sets the makespan on its own. The absolute number is
+    # machine-dependent and the ordering it buys is not — nothing else in
+    # any tier is within a factor of four of it.
+    "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
@@ -719,6 +871,67 @@ const _COST = Dict{String, Float64}(
     "hamiltonian/test_ddi.jl" => 33.6,
     "dynamics/test_tdhfb_f1_validation.jl" => 30.3,
     "oracles/test_bdg_fd_hessian.jl" => 23.8,
+    # Five real (tiny) ITP solves plus one interrupted 2e6-step solve: the cache
+    # MISS arms have to actually solve, or the positive controls that arm the
+    # whole gate are not there.
+    "model/test_admission_requires_marker.jl" => 29.0,
+    # One `run_yaml` interrupted mid-ITP + one full recomputation of the same
+    # cell (2e6-step budget, 64 points, 1-D, CPU).
+    #
+    # These five, like every other entry here, are SERIAL measurements. Under
+    # `SPINORBEC_TEST_WORKERS=auto` (10 workers on this box) the first three took
+    # 110.3 / 62.3 / 3.2 s — roughly 2.2× on the two that solve, and ~1× on the
+    # one that only touches the filesystem. `_COST` is only the hand-out order,
+    # so what has to be right is the ranking, not the absolute number.
+    "model/test_interrupted_run_recomputes.jl" => 50.0,
+    "model/test_completion_marker.jl" => 3.0,
+    # Filesystem-only, like `test_completion_marker.jl`: no solve runs in either.
+    "model/test_marker_verdict.jl" => 3.0,
+    "model/test_marker_cutoff.jl" => 3.0,
+    # Filesystem-only arms are ~2 s; the end-to-end arm runs the same two-point
+    # scan twice (once cold, once fully cached) and is the other 33 s.
+    "model/test_cache_stats_reported.jl" => 35.0,
+    # Two RTP loops driven directly (5.9 s) + one `run_yaml` interrupted
+    # mid-dynamics and recomputed in full, 1e6 steps (48.8 s).
+    "model/test_interrupted_dynamics_recomputes.jl" => 55.0,
+    # Six 2-point `run_yaml` scans (47.8 s) + a scan with a dynamics step
+    # (4.7 s) + filesystem-only `Experiment` admission arms (0.6 s).
+    "model/test_scan_path_admission.jl" => 53.0,
+    # Two real `run_yaml` round trips (1-D, 16 points, 20 ITP steps) — the
+    # two `run_registry.jl` writer sites cannot be reached any other way.
+    "model/test_record_provenance.jl" => 46.0,
+    "model/test_model_toml_roundtrip.jl" => 9.0,
+    # 380 assertions. ~3 s of TOML + fixture measurement (the whole reference
+    # file is re-measured several times over, including four break-and-restore
+    # canaries), ~10 s for the one `yaml_to_model` on the production Fig. 4B
+    # config that makes the type-A claim's evidence a real Stage.
+    "validation/test_matsui2025_ref.jl" => 24.0,
+    # Two TOML parses (~5 MB total) plus one `walkdir` over the 429 configs
+    # under `runs/` reading each first line-block. No SpinorBEC call at all.
+    "validation/test_config_prose_harvest.jl" => 5.0,
+    # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
+    "model/test_yaml_to_model.jl" => 12.0,
+    # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to
+    # actually run, or arm C observes only one of the two consumers.
+    "model/test_resolve_gs_is_shared.jl" => 20.0,
+    # Three 16³ Q-tensor builds plus pure value work.
+    "model/test_ddi_trunc_radius_three_states.jl" => 6.0,
+    # ~40 resolve-only id computations (no solve) plus six real tiny solves:
+    # the site-by-value arm, the fail-safe pair, its positive control and the
+    # `seed_from` refusal + its control all have to run `_run_step` for real.
+    # Measured 38.2 s serial, 123 assertions.
+    "model/test_gs_admission_axes.jl" => 40.0,
+    # 429 configs resolved, 351 of them also round-tripped through TOML and
+    # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
+    # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
+    "model/test_corpus_resolves.jl" => 22.0,
+    # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
+    "model/test_no_ambient_module_refs.jl" => 1.0,
+    # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
+    # a throw-before-solve arm; measured 25.5 s, dominated by first-call JIT.
+    "model/test_taylor_degree_cap_guard.jl" => 26.0,
+    # Seven resolve-only id computations, two per Ref. No solve; measured 5.8 s.
+    "model/test_ambient_refs_vs_artifact_id.jl" => 6.0,
     # F=6 propagator comparisons × 6 LHY types × 2 time directions, plus a
     # SpatialLHY table build (BdG solves) — measured 22.2s.
     "hamiltonian/test_tabulated_lhy_propagator_parity.jl" => 22.0,
@@ -728,6 +941,7 @@ const _COST = Dict{String, Float64}(
     "workflow/test_dynamics_lhy_normalisation.jl" => 3.0,
     "solvers/test_lbfgs_forward_coverage.jl" => 2.0,
     "solvers/test_precond_default_is_off.jl" => 4.0,
+    "bench/test_ab_report.jl" => 2.0,
     "oracles/test_lhy_table_path_coverage.jl" => 2.0,
     "analysis/test_diagnostics.jl" => 21.3,
     "oracles/test_zeeman_diagonal_analytic.jl" => 19.9,

@@ -1,5 +1,8 @@
 # Self-contained validation report
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 > **Vintage note.** The `runs/` results this document cites predate every
 > physics correction merged after 2026-06-02 — including a quadratic Zeeman
 > that was 11× too large for Eu until 2026-07-08. See
@@ -216,9 +219,26 @@ auditable control.
 These are intentional design boundaries documented in CLAUDE.md.
 They affect interpretation, not correctness.
 
-1. **PolarTwoChannelLHY at F=6** off by 30–70% (`memory:full_bdg_F6_polar_broken`).
-   Use `PolarContactLHY` / `IcosahedralLHY` for F=6 polar; FullBdGLHY at
-   F=6 polar emits `@warn` (~3000× spurious offset).
+1. **PolarTwoChannelLHY at F=6** off by 30–70% (that part stands; pinned by
+   `test_spinor_lhy.jl`). Use `PolarContactLHY` / `IcosahedralLHY` for F=6
+   polar.
+
+   > **RETRACTED 2026-07-27, corrected here 2026-08-04.** This item continued:
+   > "FullBdGLHY at F=6 polar emits `@warn` (~3000× spurious offset)". There is
+   > no such offset. The 3000× was a UV counterterm subtracting ε_k twice —
+   > divergent at EVERY F and in every phase, not an F=6 polar defect — and it
+   > was fixed on 2026-07-27. `FullBdGLHY` is the general-spinor path, correct
+   > for any F and any spinor, gated against `polar_contact` / `fm_contact` /
+   > the scalar limit to ~1e-4 by
+   > `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`. It warns only when
+   > the mean field is DYNAMICALLY unstable
+   > (`terms/lhy/full_bdg.jl:120`), where ε_LHY is scheme-dependent for closed
+   > forms too. Prefer the closed forms when the state matches their ansatz —
+   > ~100× cheaper — not because `full_bdg` is wrong.
+   >
+   > A dated header says a document describes a past state; it does not license
+   > a number that was withdrawn, and this one was still being read as a reason
+   > to avoid a working code path.
 2. **Spinor LHY for F ≥ 3 is research-open**: no closed-form
    Lima-Pelster generalisation exists. The scalar approximation +
    `@warn` is the honest signal.

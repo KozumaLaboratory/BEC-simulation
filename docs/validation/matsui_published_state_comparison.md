@@ -1,5 +1,8 @@
 # Their published 5 ms state is in the deposit, and our cloud has the same shape
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 2026-07-31. Found while looking for the run parameters that `setup_parameters`
 does not carry. Type A (code-to-code) unless marked.
 

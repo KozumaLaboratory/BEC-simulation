@@ -1,5 +1,8 @@
 # Where the Fig. 4B campaign's wall-clock actually goes
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Measured 2026-08-02, H100. Ablation (`scripts/validation/step_cost_ablation_gpu.jl`,
 UGE 8318420) plus the campaign's own per-point records. Type A.
 

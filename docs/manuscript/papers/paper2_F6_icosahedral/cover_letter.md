@@ -1,5 +1,8 @@
 # Cover Letter — Paper #2 (F=6 icosahedral LHY)
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Target journal**: Physical Review A (PRA Regular Article) or Physical Review Research (PRR)
 
 **Title**: Lee-Huang-Yang correction for the F=6 icosahedral phase of a spinor Bose-Einstein condensate
@@ -43,10 +46,23 @@ comparison** between theory and experiment for the F=6 icosahedral phase.
 
 2. **Closed-form spin-stiffness identity**: All three spin Goldstone modes are
    degenerate with stiffness
-   $$\lambda_{\rm spin}^{(I_h, F=6)} = \frac{121}{1075}g_6 + \frac{49}{200}g_{10} + \frac{980}{32265}g_{12} - \frac{8}{75}g_0$$
+   $$\lambda_{\rm spin}^{(I_h, F=6)} = -\frac{1}{13}g_0 - \frac{121}{646}g_6 + \frac{91}{782}g_{10} + \frac{840}{5681}g_{12}$$
+   $$c_0^{(I_h, F=6)} = \frac{1}{13}g_0 + \frac{121}{323}g_6 + \frac{147}{391}g_{10} + \frac{980}{5681}g_{12}$$
    This is the channel-coupling combination that we verify equals a specific
    linear combination of (c_0 + spin-channel) couplings consistent with the
    Universal Structure Theorem (companion Paper #3).
+
+   > **Corrected 2026-08-04 against the implementation.** This letter carried
+   > $\frac{121}{1075}g_6 + \frac{49}{200}g_{10} + \frac{980}{32265}g_{12} -
+   > \frac{8}{75}g_0$ — every coefficient different, and **the sign on $g_6$
+   > reversed**. The authority is `compute_c0_lambda_F6_Ih`
+   > (`src/hamiltonian/terms/lhy/icosahedral.jl:86-87`), which is what the
+   > closed form is gated against
+   > (`test/oracles/test_lhy_full_bdg_closed_form_parity.jl`). `main.md` states
+   > only that the coefficients are "explicit rational" and never writes them,
+   > so this letter was the sole place the numbers appeared in prose — and
+   > nothing compared them to the code. An externally-facing document was the
+   > one copy nobody checked.
 
 3. **¹⁵¹Eu numerical predictions**: Using best-available scattering-length
    estimates ($a_s \approx 110 a_0$, channel-coupling constraint

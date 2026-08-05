@@ -11,21 +11,6 @@
 #   dt scale              : 1.0
 #   N_atoms               : 50000
 
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_om0p0_N50k
-  rotation_omega: 0.0
-  rot_prep: true
-  rot_quench: true
-  rot_hold: false
-  ddi_on_dynamics: true
-  do_B_quench: true
-  initial_m_sign: -1
-  B_final_nT: 2.6
-  dt_scale: 1.0
-  N_atoms: 50000
-  generator: scripts/validation/klaus_quench_batch3_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

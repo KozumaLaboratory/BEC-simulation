@@ -1,11 +1,6 @@
 # Step 5 v2 — 48³ × secular=false (second convergence step)
 # See _template.yaml.md for full design rationale.
 
-metadata:
-  suite: eu_ham_only_conservation
-  variant: 48_nonsec
-  origin: post_interaction_params_refactor_2026_05_25_audit
-
 defaults:
   kind: spinor
   backend: cpu

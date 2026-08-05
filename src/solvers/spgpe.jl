@@ -190,7 +190,7 @@ function SPGPEReservoir(;
     T, mu, a_s::Real, k_cut,
     eps_cut=nothing,
     number_damping::Bool=true, energy_damping::Bool=true,
-    gamma=nothing, M=nothing,
+    gamma=nothing, M=nothing, allow_unphysical_rates::Bool=false,
 )
     kw = _as_waveform(k_cut)
     if k_cut isa Number
@@ -199,6 +199,8 @@ function SPGPEReservoir(;
     end
     derive = eps_cut === nothing
     ec = derive ? ConstantWaveform(NaN) : _as_waveform(eps_cut)
+    allow_unphysical_rates ||
+        _check_rate_against_derived(gamma, M, _as_waveform(T), _as_waveform(mu), kw, a_s)
     SPGPEReservoir(
         _as_waveform(T), _as_waveform(mu), ec, kw, derive, Float64(a_s),
         number_damping, energy_damping,
@@ -516,4 +518,49 @@ function spgpe_callback(
         on_rates === nothing || on_rates(ws.state.t, r)
         nothing
     end
+end
+
+# γ and ℳ̄ are not dials: Rooney Eq. 19 and Eq. 26 fix them from (μ, T, ϵ_cut, a_s),
+# and `spgpe_growth_rate` / `spgpe_scattering_rate` evaluate them. Passing a number
+# instead is a fit, and a fit here is invisible — it breaks no conservation law, no
+# GPU/CPU parity, no oracle, so every gate stays green while the dynamics are set by
+# a made-up constant.
+#
+# It happened: a Kibble–Zurek scan ran at γ = 0.002 and 0.02 against a physical
+# 8.2e-4 (T=30) to 5.4e-5 (T=2), i.e. 2.4-370× too fast, which put 1/(2γμ) = 40-622
+# outside every τ_Q = 2-32 in the scan. The field never condensed, ξ̂ came out flat
+# in τ_Q, and the reported exponent was counting phase noise in an uncondensed
+# field. The driver printed "γ=0.002 (FIXED)" in its own header throughout.
+#
+# So: a pinned rate must agree with the derived one to within a factor of 2, at the
+# hot and cold ends of the ramp. `allow_unphysical_rates=true` is the escape hatch
+# for deliberate parameter studies — the point is that it has to be typed.
+const _RATE_TOL = 2.0
+
+function _check_rate_against_derived(gamma, M, Tw, muw, kw, a_s)
+    (gamma === nothing && M === nothing) && return nothing
+    for t in (0.0, 1.0)                       # ramp endpoints, in waveform time
+        T = evaluate(Tw, t)
+        mu = evaluate(muw, t)
+        kc = evaluate(kw, t)
+        (isfinite(T) && isfinite(mu) && isfinite(kc) && T > 0) || continue
+        ec = kc^2 / 2
+        ec > mu || continue                   # cutoff below μ: nothing to compare
+        for (name, given, f) in (
+            ("gamma", gamma, spgpe_growth_rate), ("M", M, spgpe_scattering_rate))
+            given === nothing && continue
+            d = f(; T, mu, eps_cut=ec, a_s)
+            (isfinite(d) && d > 0) || continue
+            r = Float64(given) / d
+            (r > _RATE_TOL || r < 1 / _RATE_TOL) && throw(
+                ArgumentError(
+                    "SPGPEReservoir: $name = $given is $(round(r; sigdigits=3))× the value " *
+                    "derived from (μ=$mu, T=$T, ϵ_cut=$(round(ec; digits=2)), a_s=$a_s), " *
+                    "which is $(round(d; sigdigits=3)). $name is fixed by Rooney Eq. 19/26, " *
+                    "not free — omit it to derive it, or pass " *
+                    "allow_unphysical_rates=true if the mismatch is the point."),
+            )
+        end
+    end
+    nothing
 end

@@ -16,10 +16,6 @@
 #  UGE array: -t 1-120, SPINORBEC_SCAN_ONLY_INDEX per task (2 seeds inner).
 # ─────────────────────────────────────────────────────────────────────
 
-metadata:
-  owner: anko
-  project: Eu151 F=6 GS phase diagram — Stage B promotion (128³, seed+polish)
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 20.0, auto_dt: true, dt_safety: 10.0}

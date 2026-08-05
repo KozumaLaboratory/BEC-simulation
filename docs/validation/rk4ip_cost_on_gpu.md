@@ -1,5 +1,8 @@
 # RK4IP on GPU: correct to round-off, and worth taking only below ~1e-5
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Measured 2026-08-02 on an H100 (UGE 8316108 / 8316433 / 8316492) and a local
 RTX 5070 Ti. Commits `e6084559` … `9af38974`, clean `src`. Type A.
 

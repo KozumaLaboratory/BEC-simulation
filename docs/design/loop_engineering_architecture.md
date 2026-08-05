@@ -1,5 +1,8 @@
 # Loop Engineering: a verifier-centric, three-valued loop architecture
 
+> **FROZEN 2026-06-22.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: design note. Records the recommended architecture for driving an
 agentic research loop on top of this project's **strong physics verifier**, and
 the evidence behind each choice. Sources from a deep-research pass (2026-06-22),

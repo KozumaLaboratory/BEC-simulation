@@ -122,6 +122,34 @@ _is_oom_error(err) =
     err isa OutOfMemoryError ||
     (err isa ErrorException && occursin(r"out of memory|OOM"i, err.msg))
 
+# W4. The cache's fail-safes were `@warn` and nothing else: no `Record`, no
+# `_exit_summary.json`, no `run_summary`. That is sccache's documented real-world
+# failure — workspaces that stopped caching entirely because `CARGO_INCREMENTAL`
+# was set, discoverable only through `--show-stats`. ccache's answer is a
+# persisted per-reason counter (28 named uncacheable reasons behind
+# `--show-stats -v`), and this is that, in the file the autopilot already reads.
+#
+# Two things a person reading a finished run needs and could not get:
+#
+#   `no_id_reasons`  which configs could never be served a cached ground state,
+#                    by REASON — the string names the slot that did not resolve.
+#   `admission`      how many payloads were served with a verified marker
+#                    (`marked`), served WITHOUT one (`unmarked`, i.e. arm (b)),
+#                    thrown away (`rejected`), or simply not there (`absent`).
+#
+# `scope` is stated in the file because both are PROCESS-cumulative: a scan calls
+# `run_pipeline` once per point into the same run directory, so the last write
+# wins and it carries the totals for the whole process — which is the useful
+# reading, and a wrong one if a reader assumes per-point.
+function _cache_stats_payload()
+    Dict{String, Any}(
+        "scope" => "process-cumulative",
+        "no_id_reasons" => no_artifact_id_reasons(),
+        "admission" => Dict{String, Any}(
+            String(k) => v for (k, v) in admission_counts()),
+    )
+end
+
 function _write_exit_summary(path::Union{Nothing, String};
     completed::Bool, exception_type::Union{Nothing, AbstractString},
     last_step::Int, runtime_seconds::Real,
@@ -136,6 +164,9 @@ function _write_exit_summary(path::Union{Nothing, String};
         "nan_encountered" => nan_encountered,
         "oom_killed" => oom_killed,
         "written_at" => string(now()),
+        # Stamped on BOTH the success and the failure path: a run that threw is
+        # exactly the one whose cache behaviour someone will want to reconstruct.
+        "cache" => _cache_stats_payload(),
     )
     try
         open(path, "w") do io
@@ -151,6 +182,11 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     psi_init=nothing,
     checkpoint_dir::Union{Nothing, String}=nothing,
     live_status_path::Union{Nothing, String}=nothing)
+    # Cutover step 4. The one ambient `Ref` left on a kernel path that can move
+    # a number, and it is not in any `Stage` because no run sets it — so a
+    # leaked assignment would file an artifact under an id describing a
+    # different computation. One integer comparison per pipeline.
+    _assert_taylor_degree_cap_unclamped()
     psi = psi_init
     grid = nothing
     atom = nothing
@@ -234,8 +270,21 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     (psi=psi, grid=grid, atom=atom, results...)
 end
 
-# Inference barrier for the per-step dispatch — see run_pipeline for
-# rationale. `@nospecialize` on `step` is the load-bearing annotation:
+# Inference barrier for the per-step dispatch — see run_pipeline for rationale.
+#
+# MEASURED 2026-08-04 and it does NOT reproduce. `code_typed(run_pipeline, …)`:
+# 13.9 s with both annotations, 14.1 s without `@noinline`, 14.2 s without
+# `@nospecialize`, 14.5 s with neither — against a 0.6 s spread between fresh
+# processes. First-call JIT through `run_pipeline`: 25.9 s vs 25.6 s. The
+# paragraph below describes a hang that was real when it was written; what
+# defused it was removing the `Any`-typed local that reached `make_workspace`,
+# not these annotations. They are kept because they cost nothing and the
+# failure mode can return, but they are not what is holding the line.
+# (`pitfall_pipeline_inference` recorded the same for `@noinline` — 258 s vs
+# 251 s — and was right; this file's claim for `@nospecialize` was the
+# unmeasured half.)
+#
+# Historical rationale, left as written:
 # without it, Julia generates a fresh specialisation of this function
 # (and the rest of the loop body) for each PipelineStep concrete type
 # the YAML mentions, and the binary GP path's return-tuple type hits a
@@ -310,7 +359,17 @@ end
             end
             results[:rotating_basis_history] = rb_history
         end
+        # `:interrupted` is the ONE key that must survive `merge!` (cutover step
+        # 2, invariant 4). Plain `merge!` is last-writer-wins, so a GS step that
+        # was killed followed by a dynamics step that ran to completion would
+        # end with `:interrupted => false` and the run would be marked complete
+        # on a half-relaxed ψ. Accumulate with `|`. Gated by the second testset
+        # in `test/model/test_interrupted_run_recomputes.jl`, which interrupts
+        # the GS of a two-step pipeline and lets the dynamics step finish.
+        was = get(results, :interrupted, false) === true
         merge!(results, step_result)
+        now_ = get(step_result, :interrupted, false) === true
+        results[:interrupted] = was || now_
     end
     return (psi_out, grid_out, atom_out, workspace_out)
 end

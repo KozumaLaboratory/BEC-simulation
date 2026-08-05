@@ -1,7 +1,9 @@
 # --- Pipeline dispatch helpers: small parsers shared across run-step branches ---
 #
 # Helpers that don't fit the parsing/builders/runtime split — they're called
-# only from `_run_step` branches in pipeline_runner.jl. Kept type-stable
+# only from `_run_step` branches in `pipeline/runner.jl` (this said
+# `pipeline_runner.jl`, a path that has not existed since the pipeline/ split).
+# Kept type-stable
 # (each function returns a concrete type) so extracting them out of the
 # main run-step body doesn't introduce a `Dict{Symbol,Any}` inference
 # fence (see CLAUDE.md "Type stability boundaries").

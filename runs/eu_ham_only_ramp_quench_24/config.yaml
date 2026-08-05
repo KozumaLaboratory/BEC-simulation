@@ -12,11 +12,6 @@
 #
 # Pass = norm conserved < 1e-6, energy stable, ⟨F_z⟩+⟨L_z⟩ drift small at short time.
 
-metadata:
-  suite: step5_eu_hamiltonian_only_sanity
-  origin: post_interaction_params_refactor_2026_05_25
-  purpose: validation_ladder_level_5_sanity
-
 defaults:
   kind: spinor
   backend: cpu

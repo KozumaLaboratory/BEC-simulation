@@ -64,10 +64,28 @@ function resonance_dip(
     x_min = float(x[i])
 
     # Parabolic vertex through (i-1, i, i+1). Guarded against a flat triple.
+    #
+    # The first derivative must be the Lagrange one, NOT the symmetric
+    # difference. Writing h1 = xc-xl, h2 = xr-xc, a = (yc-yl)/h1, b = (yr-yc)/h2:
+    # the symmetric difference (yr-yl)/(xr-xl) equals (a*h1 + b*h2)/(h1+h2),
+    # whose weights are SWAPPED relative to the quadratic's derivative at xc,
+    # (a*h2 + b*h1)/(h1+h2). The two agree only when h1 == h2.
+    #
+    # The error is exactly (h1 - h2)/2 in `center`, independent of the data,
+    # because the swap contributes (b-a)(h1-h2)/(h1+h2) and d2 is 2(b-a)/(h1+h2).
+    # That is not academic here: the fixture this metric arbitrates Matsui
+    # Fig. 4B against, test/fixtures/matsui2025/dataset_fig4_theo.csv, is
+    # NON-UNIFORM — 40 spacings of 0.5 nT and 20 of 1.0 nT — so a minimum
+    # landing on a 1.0/0.5 boundary was biased by 0.25 nT, which is 61 % of the
+    # 0.41 nT centre discrepancy that arc exists to explain. Today's stored
+    # targets are unaffected because that dip sits at h1 == h2 == 0.5, but the
+    # same metric is applied to our own runs, whose grids need not be uniform.
     xl, xc, xr = float(x[i - 1]), x_min, float(x[i + 1])
     yl, yc, yr = float(y[i - 1]), y_min, float(y[i + 1])
-    d1 = (yr - yl) / (xr - xl)
-    d2 = 2 * ((yr - yc) / (xr - xc) - (yc - yl) / (xc - xl)) / (xr - xl)
+    h1, h2 = xc - xl, xr - xc
+    a, b = (yc - yl) / h1, (yr - yc) / h2
+    d1 = (a * h2 + b * h1) / (h1 + h2)
+    d2 = 2 * (b - a) / (h1 + h2)
     center = d2 > 0 ? xc - d1 / d2 : xc
 
     base_left = endpoint_baseline ? float(y[begin]) : float(maximum(@view y[begin:i]))

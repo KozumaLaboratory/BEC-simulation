@@ -35,14 +35,6 @@
 # Compare to eu_k3_lhy/LHY_full_bdg.yaml (same LHY, K3=200) to isolate
 # LHY-alone vs LHY+K3 effects.
 
-metadata:
-  suite: eu_k3_lhy_control
-  ladder_level: 12
-  parent_regime: cigar_N30k_omz0p25
-  K3_factor: 0
-  LHY_kind: full_bdg
-  generator: scripts/validation/eu_k3_lhy_control_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

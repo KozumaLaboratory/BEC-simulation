@@ -1,7 +1,5 @@
 # SMOKE: exercises every code path of config.yaml at low res in ≤ ~2 min.
 # 24³ grid, 2×2×2 scan, short ITP. NOT physics — path validation only.
-metadata: {owner: anko, project: Eu GS phase diagram SMOKE}
-
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
 dealias: {enabled: true, k_cut: 4.0, auto_dt: true, dt_safety: 10.0}

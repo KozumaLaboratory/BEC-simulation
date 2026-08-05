@@ -1,5 +1,8 @@
 # TWA ε_dd species scan — dipolar collapse universality
 
+> **FROZEN 2026-05-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: 4 ensembles complete 2026-05-07 (16:00–17:56), runtime ~125 min on RTX 5070 Ti. Eu (ε_dd = 0.55) used as natural baseline; the other three sweep `c_dd` to mimic Cr / Er / Dy at the same Eu N=10⁴ trap geometry. **Code path**: `runs/{Cr,Eu,Er,Dy}_eps*_<hash>/result.jld2`, analysed by `scripts/twa/twa_eps_dd_scan_analyze.jl`.
 
 ## σ/μ interpretation note

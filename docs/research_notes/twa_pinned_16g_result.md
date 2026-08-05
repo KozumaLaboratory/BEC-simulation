@@ -1,5 +1,8 @@
 # Sinatra-clean 1/N TWA validity test on 16³ × box=10 — pinned coupling
 
+> **FROZEN 2026-05-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: 3 ensembles complete 2026-05-08 04:55, runtime ~72 min. Resolution dx = 10/16 = 0.625 a_ho preserved against the 32³ × box=20 baseline; Sinatra ratio swept 53 → 5.3 → 0.53 across the three N values at fixed mean-field physics (c_total = 937.453, c_dd = 42.204).
 
 **Verdict**: the σ/μ ≈ 0.4 observed at the Eu marginal-collapse point is **REAL physics — chaotic-dipolar-instability noise**, NOT Sinatra contamination as the prior `twa_sinatra_validation.md` (May 7) verdict claimed. The previous verdict conflated the Sinatra effect with a ground-state-resolution effect from the 16³ × box=20 setup, which had a qualitatively different GS profile (smooth Gaussian vs filament). The Sinatra-clean N=10⁵ point at 16³ × box=10 (ratio 0.53) gives σ/μ = 0.82 — *higher* than the 32³ contaminated baseline 0.42, which rules out classical thermalisation as the dominant source of the σ/μ signal.

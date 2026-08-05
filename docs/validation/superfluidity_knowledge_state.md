@@ -1,5 +1,8 @@
 # Superfluidity & dipolar supersolidity — what we know, what we don't
 
+> **FROZEN 2026-07-29.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **As of 2026-07-29.** Revised twice since first written; six open questions closed, two corrections to earlier numbers. Knowledge-state map for one domain: measures of
 superfluidity in this simulator (`superfluid_fraction`) and the dipolar
 supersolid physics they are used on. Organised by *claim*, each with the

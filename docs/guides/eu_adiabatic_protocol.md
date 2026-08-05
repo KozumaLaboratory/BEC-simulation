@@ -1,5 +1,8 @@
 # Preparing the weak-field ¹⁵¹Eu chiral ground state
 
+> **FROZEN 2026-07-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 The Einstein–de Haas measurement was a quench; this asks the ground-state question.
 Can the chiral/flower phase be *prepared*? Three protocol classes were built and
 measured at 32³: a $B_z$ ramp, a trap-shaping (κ) ramp, and a rotating transverse

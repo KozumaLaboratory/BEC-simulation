@@ -1,5 +1,8 @@
 # F=9 / F=11 odd-F polyhedral verification result
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Script**: `test/manuscript/test_f9_f11_polyhedral.jl`
 **Status**: 4 of 5 cases pass machine precision; F=9 T:A multiplicity 2 case has

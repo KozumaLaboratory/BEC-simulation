@@ -4,13 +4,6 @@
 # Target: identify a parameter regime where Hamiltonian-only Eu
 # collapses, so that K3-arrest can be tested.
 
-metadata:
-  suite: eu_collapse_search
-  ladder_level: 12
-  N_atoms: 30000
-  omega_z: 0.25
-  generator: scripts/validation/eu_collapse_search_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu

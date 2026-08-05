@@ -1,5 +1,8 @@
 # Appendix B: SpinorBEC.jl API reference + reproducibility chain
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 appendix では、SpinorBEC.jl の主要 API + runs/ configuration inventory + テスト
 infrastructure を整理する。修論本体の全 numerical results を reviewer が独立 reproduce
 するための full guide.

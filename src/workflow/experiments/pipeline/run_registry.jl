@@ -203,9 +203,26 @@ docs-only commit and the wrong one for anything else.
 """
 function _assert_point_provenance(psi_file::String, env::Dict{String, Any}; verbose::Bool=true)
     get(ENV, "SPINORBEC_ALLOW_STALE_POINTS", "0") == "1" && return nothing
+    # Materialise the two values INSIDE the `do` block. `d["env"]` is a
+    # `JLD2.Group` — a lazy handle into the open file — and `jldopen(…) do`
+    # closes the file when the block returns, so reading a key off it afterwards
+    # throws `ArgumentError: file is closed`. Since `env` is written as a group
+    # (`f["env/$k"] = v`, :684 and :870), that was every call: this function
+    # threw the moment it was actually reached, and the `catch` above is on the
+    # OPEN, not on the reads, so it did not absorb it either.
+    #
+    # It went unnoticed because the only caller was behind `isfile(psi_file)` on
+    # a path no test exercised with a real env group. Composing it with
+    # `admit_payload` (this branch) put it on the live cache-hit path and six
+    # suites went red with `ArgumentError: file is closed`.
     stored = try
         JLD2.jldopen(psi_file, "r") do d
-            haskey(d, "env") ? d["env"] : nothing
+            haskey(d, "env") || return nothing
+            g = d["env"]
+            Dict{String, Any}(
+                "git_hash" => get(g, "git_hash", "unknown"),
+                "git_dirty" => get(g, "git_dirty", true),
+            )
         end
     catch
         nothing
@@ -498,8 +515,34 @@ end
         end
     end
 
+    # W4. `_exit_summary.json` is written by `run_pipeline`, and a run whose
+    # every point is a cache HIT never enters it — so the run that exercised the
+    # cache HARDEST was the one that reported nothing about it. Stamped here, at
+    # the end of `run_yaml`, so the counts exist whether zero points ran or all
+    # of them did. Merged rather than overwritten: the last point's `completed` /
+    # `runtime_seconds` / `exception_type` are `run_pipeline`'s to state.
+    _stamp_cache_stats(joinpath(run_dir, "_exit_summary.json"))
+
     verbose && println("Done: $run_dir")
     run_dir
+end
+
+# Rewrites only the `cache` key. Creates the file when a fully-cached run means
+# `run_pipeline` never wrote one — in that case `completed` is absent rather than
+# invented, because nothing here knows whether the ORIGINAL run completed and a
+# `true` would be a claim this function cannot make.
+function _stamp_cache_stats(path::AbstractString)
+    try
+        d = isfile(path) ? JSON.parsefile(path) : Dict{String, Any}()
+        d = Dict{String, Any}(String(k) => v for (k, v) in d)
+        d["cache"] = _cache_stats_payload()
+        d["cache_written_at"] = string(now())
+        open(io -> JSON.print(io, d, 2), path, "w")
+    catch e
+        # A finished run must not acquire a new way to fail over a statistic.
+        @warn "failed to stamp cache stats into _exit_summary.json" path exception = e
+    end
+    nothing
 end
 
 function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=true)
@@ -536,9 +579,29 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
         for (run_name, cmp_override) in runs
             psi_file = joinpath(run_dir, _point_filename(i, run_name))
 
-            if isfile(psi_file)
+            # Two independent questions, both asked. `admit_payload` (cutover
+            # step 2, invariant 4) asks whether the PAYLOAD is complete — a
+            # marker written last, naming bytes that are all present.
+            # `_assert_point_provenance` (#--) asks whether the CODE that
+            # produced it is this code. Neither implies the other: a payload can
+            # be whole and stale, or current and truncated.
+            #
+            # This is the worst of the three point admissions: under
+            # `scan.continuation` the admitted ψ SEEDS point i+1, so one
+            # truncated or half-relaxed point silently poisons every point
+            # downstream of it while each of them looks complete.
+            #
+            # They do overlap — `_assert_point_provenance` compares `git_hash`
+            # while the marker records `code_rev` (`code_tree_hash` over src/ +
+            # ext/), and the design doc argues the latter is the sounder of the
+            # two because the autopilot rsyncs to TSUBAME with `--exclude=.git/`
+            # so no repository exists on the compute node. Collapsing them into
+            # one is a design decision, not a merge resolution; left for a
+            # follow-up rather than settled here by deleting one side.
+            adm = admit_payload(psi_file)
+            if adm.hit
                 _assert_point_provenance(psi_file, env; verbose)
-                verbose && println("  ✓ $(basename(psi_file)) (cached)")
+                verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
                 if scan.continuation
                     d = JLD2.load(psi_file)
                     psi_c =
@@ -621,6 +684,16 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     f["converged"] = converged
                     f["grad_norm"] = grad_norm
                     f["mz_actual"] = mz_actual
+                    # Provenance. `gs_ref` already carries this value but only
+                    # under SPINORBEC_LIGHT_POINTS, and there it MEANS "psi lives
+                    # elsewhere" — `open_result` throws when the artifact is
+                    # missing. A separate key so the id is recorded on every
+                    # point without claiming anything about psi. Spelled
+                    # `gs_cache_key` until cutover step 3, when the function that
+                    # produced the value was deleted.
+                    gs_ref === nothing || (f["artifact_id"] = gs_ref)
+                    code_rev = _code_rev_or_nothing()
+                    code_rev === nothing || (f["code_rev"] = code_rev)
                     # Embed grid geometry — see single-run path for rationale.
                     f["grid_box_size"] = collect(Float64, grid.config.box_size)
                     f["grid_n_points"] = collect(Int, grid.config.n_points)
@@ -647,8 +720,13 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 @warn "run summary emit failed (non-fatal)" run_dir exception=err
             end
 
-            # Clean up checkpoint (point completed successfully)
-            isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
+            _cleanup_checkpoint!(ckpt_dir, result)
+
+            # LAST — see `_finish_point!`. `result.jld2` is deliberately NOT
+            # named here: `run_pipeline` rewrites it once per scan point, so a
+            # marker recording point 1's size would disagree with the tree the
+            # moment point 2 lands, and point 1 would be rejected forever.
+            _finish_point!(psi_file, result, psi_host, gs_ref; light_point, verbose)
 
             if scan.continuation
                 chain_state[run_name] = (psi=psi_host, mz_actual=mz_actual)
@@ -750,9 +828,11 @@ end
 function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
-    if isfile(psi_file)
+    # Both questions — see the scan path above for why neither implies the other.
+    adm = admit_payload(psi_file)
+    if adm.hit
         _assert_point_provenance(psi_file, env; verbose)
-        verbose && println("  ✓ $(basename(psi_file)) (cached)")
+        verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
         return nothing
     end
 
@@ -787,6 +867,12 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             f["duration_seconds"] = duration
             f["energy"] = energy
             f["converged"] = converged
+            # Provenance — see the scan path for why this is a separate key from
+            # `gs_ref`, and for the step-3 rename.
+            gs_artifact_id = get(result, :gs_stage_ref, nothing)
+            gs_artifact_id === nothing || (f["artifact_id"] = gs_artifact_id)
+            code_rev = _code_rev_or_nothing()
+            code_rev === nothing || (f["code_rev"] = code_rev)
             # Embed grid geometry so dashboard endpoints (vector3d_bin,
             # vorticity3d_bin, …) can reconstruct the spatial mesh without
             # re-parsing config.yaml — the YAML fallback misses
@@ -817,8 +903,114 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         @warn "run summary emit failed (non-fatal)" run_dir exception=err
     end
 
-    isdir(ckpt_dir) && rm(ckpt_dir; recursive=true, force=true)
+    _cleanup_checkpoint!(ckpt_dir, result)
+
+    # LAST. After the payload is at its final path, after the derived summary,
+    # after the checkpoint cleanup — so anything that can still fail fails
+    # before the run claims to be complete. `result.jld2` gets its own marker
+    # inside `save_rotating_basis_result!`, which owns it.
+    _finish_point!(psi_file, result, psi_host, get(result, :gs_stage_ref, nothing);
+        light_point=false, verbose)
+
     verbose && @printf("    E=%.4f conv=%s\n", energy, converged)
+end
+
+"""
+    _cleanup_checkpoint!(ckpt_dir, result)
+
+Delete the point's checkpoint directory — unless the run was interrupted, in
+which case it is the only thing left that says so.
+
+`_run_itp_loop!:235` writes `itp_checkpoint.jld2` on the interrupt path, and
+before cutover step 2 this line deleted it again on the very same pass, under
+the comment "point completed successfully". It had not. That erased both the
+resume artifact and the last forensic trace, which is why an interrupted run was
+indistinguishable from a finished one on disk.
+"""
+function _cleanup_checkpoint!(ckpt_dir::AbstractString, result)
+    isdir(ckpt_dir) || return nothing
+    if get(result, :interrupted, false) === true
+        @warn "run was interrupted — KEEPING its checkpoint (resume artifact + " *
+            "forensic record)" ckpt_dir
+        return nothing
+    end
+    rm(ckpt_dir; recursive=true, force=true)
+    nothing
+end
+
+"""
+    _finish_point!(psi_file, result, psi_host, stage_ref; light_point, verbose)
+
+Write the point's completion marker — or refuse to, and say why.
+
+Three ways a run reaches this line without having produced a usable answer, and
+only the first is visible in the payload itself:
+
+  1. **Interrupted.** Both the ITP and the two RTP loops CATCH
+     `InterruptException` and return normally, so the pipeline runs on and
+     `_exit_summary.json` records `completed = true`. Measured before this
+     cutover: a 32³ ITP killed at step 5323/100000 wrote a full 1.58 MB point
+     file whose energy was 0.64 % off, and the next `run_yaml` served it in
+     0.01 s. `:interrupted` is accumulated across steps in `_step_dispatch!`.
+  2. **Diverged.** A non-finite ψ is a completed run whose answer is NaN.
+     Nothing else in the pipeline stops it from being cached.
+  3. **Threw.** Needs no check: the marker is written after the payload, so an
+     exception anywhere upstream leaves the payload unmarked by construction.
+
+A refusal writes a TOMBSTONE (`<payload>.incomplete.toml`) rather than merely
+omitting the marker. Omitting it is not enough: "payload present, no marker" is
+byte-for-byte what the 671 pre-cutover artifacts look like, so arm (b) of
+`admit_payload` would serve the killed run anyway and the next run would NOT
+recompute. The payload itself stays on disk as the forensic record — the
+tombstone rejects it, and `write_complete_marker` clears the tombstone once a
+later run succeeds over it.
+"""
+function _finish_point!(psi_file::AbstractString, result, psi_host,
+    stage_ref::Union{Nothing, AbstractString};
+    light_point::Bool=false, verbose::Bool=true)
+    reason = if get(result, :interrupted, false) === true
+        "the run was INTERRUPTED mid-solve"
+    elseif !all(isfinite, psi_host)
+        "psi is not finite (the run diverged)"
+    else
+        nothing
+    end
+    if reason !== nothing
+        @warn "$reason — writing a TOMBSTONE instead of a completion marker; the " *
+            "next run will recompute this point rather than serve a partial answer" point = basename(
+            psi_file
+        )
+        try
+            write_incomplete_marker(psi_file, String[String(psi_file)];
+                kind="point", reason=reason, artifact_id=stage_ref)
+        catch err
+            @warn "tombstone write failed; this partial payload will be admitted " *
+                "as :unmarked" psi_file exception = err
+        end
+        return nothing
+    end
+    payloads = String[String(psi_file)]
+    # A light point stores `gs_ref` INSTEAD of ψ, so its bytes are not all in
+    # its own file. Naming the stage artifact turns "someone pruned the shared
+    # ψ" from a throw inside `_load_stage_psi` into an ordinary miss.
+    if light_point && stage_ref !== nothing
+        push!(payloads, joinpath(_gs_stage_dir(), stage_ref * ".jld2"))
+    end
+    try
+        # The ground-state verdict rides along when the pipeline had a GS step;
+        # a dynamics-only point legitimately has none and `gs_verdict` returns
+        # `nothing` rather than inventing one. `admit_payload(…;
+        # require_converged=true)` is what reads it back.
+        write_complete_marker(psi_file, payloads; kind="point", artifact_id=stage_ref,
+            verdict=gs_verdict(result))
+        verbose && println("    ✓ complete.toml ($(length(payloads)) file(s))")
+    catch err
+        # A completed multi-hour run must not acquire a new way to fail. The
+        # degraded outcome is an unmarked payload, i.e. exactly arm (b).
+        @warn "completion marker write failed (non-fatal); this artifact will be " *
+            "admitted as :unmarked" psi_file exception = err
+    end
+    nothing
 end
 
 """

@@ -1,5 +1,8 @@
 # Operator-RHS export manifest
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Generated: 2026-05-26T02:42:10.753
 Wall-time: 180.89 s
 

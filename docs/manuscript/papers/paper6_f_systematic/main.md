@@ -1,5 +1,8 @@
 # Paper #6: F-Systematic Completion of Polyhedral Inert States for Spinor BEC LHY Theorem
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Target journal**: PRR (Physical Review Research)
 
 **Estimated length**: 12-14 pages (full paper)

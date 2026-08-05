@@ -18,4 +18,9 @@ echo "load_rc=$?"
 # exit code: `$?` after a pipe is the TAIL's status, so a failing gate reported 0.
 $JULIA --project=. -e 'using Test; using SpinorBEC; include("test/workflow/validation/test_accuracy_knobs.jl")' 2>&1
 echo "test_rc=$?"
+# The preflight gate belongs here rather than only in the tier: it is CPU-only and
+# under a second, and it sits in front of every ground state — a cheap gate nobody
+# runs before submitting is the same as no gate.
+$JULIA --project=. -e 'using Test; using SpinorBEC; include("test/workflow/validation/test_ground_state_preflight.jl")' 2>&1
+echo "preflight_rc=$?"
 echo "ALL DONE $(date)"

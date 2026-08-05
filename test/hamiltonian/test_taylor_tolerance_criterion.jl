@@ -7,7 +7,8 @@
 # control is structurally mandatory: a control that fails to breach makes the
 # verdict `:indeterminate`, never a green pass.
 #
-# Measured at production scale (bench/taylor_tolerance_sweep.jl, Eu F=6, 32³,
+# Measured at production scale (bench/taylor_tolerance_sweep.jl — retired in
+# cutover step 4 when SPIN_TAYLOR_TOL was frozen; see its docstring — Eu F=6, 32³,
 # dt = 0.002): baseline |E(dt) − E(dt/2)| = 7.6e-3, truncation 2.4e-13 — a ratio
 # of 3e-11.
 #

@@ -45,7 +45,10 @@ struct DropRule
 end
 
 const DROP_ALLOWLIST = DropRule[
-    DropRule("metadata", nothing, "purely informational, popped by schema"),
+    # `metadata` had a rule here until the step-6 cutover, permitting the drop
+    # of a key nothing read in the first place. The key is gone; so is the
+    # permission, so a `metadata:` reappearing in a config now surfaces as an
+    # unknown-key warning instead of being waved through.
     DropRule("defaults", nothing, "seeded into each step, then removed"),
     DropRule("calibration", nothing, "popped after applying to lab units"),
     DropRule("calibration_history", nothing, "popped after interpolation"),

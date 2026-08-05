@@ -1,5 +1,8 @@
 # Which cited run directories are missing, and which of them back a claim
 
+> **FROZEN 2026-08-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Closes the gap `docs/campaign/CAMPAIGN.md` §1 leaves open — "a guard written to
 scan only `runs/` on main would miss ~251 files. Worth pinning down before S-G0
 writes the pre-flight check."
@@ -117,8 +120,11 @@ but they assert no result.
 `fortress_compare` is a fifth citation but the document is a **scope** doc naming
 an output path for work not yet done, so it is a plan like the figure rows.
 
-For these four there is no config to re-run and no output to compare, so the
-decision cannot be made by looking at the run. Each needs a judgement: is the
+For the two that survive the correction — `lhy_mode_ablation` and
+`twa_sinatra` — there is no config to re-run and no output to compare, so the
+decision cannot be made by looking at the run. (`sprint5_M1_multistart_groundstate`
+and `ddi_convention_factorial` are on disk with a committed producer; see the
+correction above.) Each needs a judgement: is the
 claim load-bearing enough to regenerate the run from its inline parameters — §5.2
 does state them — or should the claim be marked as resting on evidence the
 repository does not hold?

@@ -67,7 +67,8 @@ end
     @test maximum(abs, a .- psi0) > 1e-8 * scale
 
     @testset "quiet full SPGPE step agrees too" begin
-        res = SPGPEReservoir(; T=0.0, mu=5.0, a_s=0.01, k_cut=4.0, gamma=0.05, M=2e-2)
+        res = SPGPEReservoir(; T=0.0, mu=5.0, a_s=0.01, k_cut=4.0, gamma=0.05, M=2e-2,
+            allow_unphysical_rates=true)
         copyto!(ws_cpu.state.psi, psi0)
         copyto!(ws_gpu.state.psi, psi0)
         for _ in 1:5
