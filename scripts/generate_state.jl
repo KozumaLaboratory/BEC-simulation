@@ -283,6 +283,47 @@ end
 
 
 """
+The cache-admission taxonomy and what audits it.
+
+The reader's question is "when a cache hit is served, what actually checked it?"
+and the answer is a RATIO, not a list: four sites admit a cached payload and one
+re-derives its verdict. Neither number is stated anywhere else in the tree.
+
+The provenance set is cross-checked against `admission_counts()`. That pair is
+the load-bearing assertion: `_count_admission!` mints a key at runtime for an
+unknown provenance instead of erroring, while the counter's initializer
+hardcodes four — two lists maintained seventy lines apart, and agreeing IS the
+check. Deterministic to read: a fresh `using SpinorBEC` never calls
+`admit_payload`, so what comes back is the initializer.
+"""
+function admission_facts()
+    body = readlines(joinpath(ROOT, "src", "model", "complete.jl"))
+    prov = Tuple{String, String, Int}[]
+    for (n, l) in enumerate(body)
+        m = match(r"Admission\(\s*(true|false)\s*,\s*:([a-z_]+)", l)
+        m === nothing && continue
+        push!(prov, (m.captures[2], m.captures[1], n))
+    end
+    function callsites(fname)
+        out = String[]
+        for (root, _, fs) in walkdir(joinpath(ROOT, "src"))
+            occursin(joinpath("src", "model"), root) && continue
+            for f in fs
+                endswith(f, ".jl") || continue
+                path = joinpath(root, f)
+                for (n, l) in enumerate(eachline(path))
+                    startswith(strip(l), "#") && continue
+                    occursin(Regex("\\b" * fname * "\\("), l) || continue
+                    push!(out, relpath(path, ROOT) * ":" * string(n))
+                end
+            end
+        end
+        out
+    end
+    (prov, callsites("admit_payload"), callsites("verify_verdict"))
+end
+
+"""
 Every key `artifact_id` folds into the digest, against `fieldnames(Stage)`.
 
 Asserted as SET EQUALITY, both directions, not as a lower bound. A missing key
@@ -529,6 +570,45 @@ function render()
     p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
     p("sign for two months because eight test files checked the VALUE and none checked")
     p("that there was only one of them.")
+    p()
+
+    prov, adm_sites, ver_sites = admission_facts()
+    prov_names = sort([x[1] for x in prov])
+    counter_keys = sort(string.(collect(keys(SpinorBEC.admission_counts()))))
+    hits = count(x -> x[2] == "true", prov)
+    assert_nondegenerate("cache admission",
+        prov_names == counter_keys && length(prov) >= 4 &&
+            1 <= hits < length(prov) &&
+            length(adm_sites) >= 4 && 1 <= length(ver_sites) <= length(adm_sites),
+        "provenances [" * join(prov_names, ", ") * "] vs counter keys [" *
+        join(counter_keys, ", ") * "]; $hits of $(length(prov)) are hits; " *
+        "$(length(adm_sites)) admit sites, $(length(ver_sites)) verify sites")
+    p("## Cache admission: what is served, and what verified it")
+    p()
+    p("| provenance | served as a hit | declared at |")
+    p("|---|---|---|")
+    for (name, hit, ln) in prov
+        p("| `:$name` | $(hit == "true" ? "**yes**" : "no") | `src/model/complete.jl:$ln` |")
+    end
+    p()
+    p("The provenance set is asserted EQUAL to `keys(admission_counts())`, both")
+    p("directions. `_count_admission!` mints a key at runtime for an unknown")
+    p("provenance rather than erroring, and the counter's initializer hardcodes the")
+    p("four — two lists seventy lines apart, and their agreement is the only thing")
+    p("checking either.")
+    p()
+    p("**$(length(adm_sites)) sites admit a cached payload; $(length(ver_sites)) re-derives its verdict.**")
+    p()
+    for site in adm_sites
+        p("- admits: `$site`")
+    end
+    for site in ver_sites
+        p("- **verifies**: `$site`")
+    end
+    p()
+    p("Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated")
+    p("migration allowance argued at `src/model/complete.jl`, not an oversight — so")
+    p("this section reports the counts and does not grade them.")
     p()
 
     idk, stagef = identity_keys()

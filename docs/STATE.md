@@ -72,6 +72,33 @@ whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
 
+## Cache admission: what is served, and what verified it
+
+| provenance | served as a hit | declared at |
+|---|---|---|
+| `:absent` | no | `src/model/complete.jl:684` |
+| `:unmarked` | **yes** | `src/model/complete.jl:717` |
+| `:marked` | **yes** | `src/model/complete.jl:745` |
+| `:rejected` | no | `src/model/complete.jl:751` |
+
+The provenance set is asserted EQUAL to `keys(admission_counts())`, both
+directions. `_count_admission!` mints a key at runtime for an unknown
+provenance rather than erroring, and the counter's initializer hardcodes the
+four — two lists seventy lines apart, and their agreement is the only thing
+checking either.
+
+**4 sites admit a cached payload; 1 re-derives its verdict.**
+
+- admits: `src/workflow/experiment.jl:253`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:832`
+- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:477`
+- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:541`
+
+Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated
+migration allowance argued at `src/model/complete.jl`, not an oversight — so
+this section reports the counts and does not grade them.
+
 ## Artifact identity: every key the digest covers
 
 `artifact_id` (`src/model/identity.jl`) folds **7** keys:
@@ -200,13 +227,13 @@ as complete.
 
 | subtree | files cited | of |
 |---|---|---|
+| `src/model/` | 3 | 14 |
 | `src/hamiltonian/` | 13 | 63 |
-| `src/model/` | 2 | 14 |
 | `src/validation/` | 1 | 8 |
 | `src/manuscript/` | 1 | 15 |
+| `src/workflow/` | 5 | 169 |
 | `src/foundation/` | 1 | 40 |
 | `src/analysis/` | 1 | 46 |
-| `src/workflow/` | 2 | 169 |
 | `src/solvers/` | 0 | 44 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem

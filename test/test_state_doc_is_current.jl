@@ -64,6 +64,11 @@ end
         @test occursin("Declared **once**", derived)
         @test occursin("test_bfield_sign_declared_once.jl", derived)
         # the two sections whose value is an equality / a disagreement, not a list
+        @test occursin("## Cache admission", derived)
+        # the RATIO is the fact; a list of sites without it says nothing
+        @test occursin(r"\*\*\d+ sites admit a cached payload; \d+ re-derives", derived)
+        # a comment mentioning the call must not be counted as a call site
+        @test !occursin("run_registry.jl:1002", derived)
         @test occursin("## Artifact identity", derived)
         @test occursin("`fieldnames(Stage)` plus `code_rev`", derived)
         @test occursin("## Ground-state knob defaults", derived)
