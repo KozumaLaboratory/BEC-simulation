@@ -539,14 +539,26 @@ end
 # operator → both paths pick it up automatically.
 #
 # Canonical order (forward):
-#   diag → light_shift_offdiag → spin_mixing → singlet_pair → tensor → transverse_zeeman → raman
+#   diag → light_shift_offdiag → spin_mixing → spatial_lhy_spin → singlet_pair
+#        → tensor → transverse_zeeman → spatial_zeeman → raman
 # Backward direction reverses this for the symmetric Strang sandwich.
+#
+# This comment is a HAND-MAINTAINED COPY of the body of `_outer_operators_fwd!`
+# below, and it has already rotted once: it listed seven of these nine from
+# 2026-06-02 until 2026-08-05, omitting `spatial_lhy_spin` and `spatial_zeeman`,
+# and CLAUDE.md:130 faithfully copied the short list from here. If you add a
+# substep to the function, add it here — or better, read the function. The
+# authority is the code twenty lines down, not this list.
 #
 # History: pre-2026-06-02 ITP and RTP had divergent chains — RTP added the
 # transverse Zeeman step but ITP did not, silently dropping bx_wf/by_wf in
 # ground-state finding. See
 # `mistake_frame_transformation_half_term_silent_cancellation` for context;
-# the regression test in `test/integrator/test_outer_operator_equivalence.jl`
+# a dedicated regression test (there was one under `test/hamiltonian/`; it was
+# cited at the wrong path by the commit that created it, ran in no tier, and
+# was deleted by `e3151c9a`. **No live gate pins ITP/RTP outer-chain
+# equivalence today** — the per-term registry gates cover each operator, not
+# the claim that both callers issue the same sequence.)
 # pins ITP and RTP to identical output for the non-DDI chain.
 
 """

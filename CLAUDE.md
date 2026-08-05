@@ -8,7 +8,7 @@ Anchors:
 
 - `README.md` / `docs/index.md` — project description + documentation map.
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
-- `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit,adding_new_hamiltonian_term}.md` — physics convention authority + 14-term sign × path audit.
+- `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit}.md` — physics convention authority + 14-term sign × path audit. (Both FROZEN 2026-08-04: dated, not maintained. `adding_new_hamiltonian_term.md` was reduced to a pointer BACK to this file — the protocol below is the original, not a summary of it.)
 - `docs/conventions/testing_strategy.md` — what a test may claim when there is no experiment: the five grounding methods (exact / order / invariant / metamorphic / differential) vs the two that are not grounding (pin / api), the claim × path coverage model, and the two instruments (`test/_inventory.jl`, `test/mutation/`).
 - `docs/campaign/CAMPAIGN.md` — active campaign charter: correction fix-list (ancestor gate), per-job guards, lane/gate order. Its §3 lists doc claims measured against the code; a row still marked OPEN overrides this file until the source doc is fixed. Four of the original five discharged within three days and none announced itself — check the row before trusting it.
 - Memory at `/home/suzume/.claude/projects/-home-suzume-workspace-BEC-simulation/memory/` — `feedback_*` (user norms), `mistake_*` (errors + prevention), `gotcha_*` (sharp edges), `project_*` (active arcs), `reference_*` (external systems).
@@ -104,7 +104,7 @@ Four primitives:
 | Subsystem | Role | Discipline |
 |---|---|---|
 | **foundation/types/** | Primary home for cross-cutting structs (`Grid`, `Workspace`, `AbstractPotential` + 12 subtypes, spin / atom / Zeeman / Raman / FFT / DDI / Loss / LightShift / TensorCache / Integrator config / SimulationResult / TWA / TOF / BdG / scan / checkpoint / TDHFBState …). Subsystem-local structs (waveform, backend, pipeline steps, validation specs, calibration, …) co-locate with their machinery — `types/` is the default, not an invariant. | Cross-cutting structs go here first. Workspace type params are derived. `Val(N)` from type parameter, not `Val(ndim::Int)`. |
-| **hamiltonian/terms/<term>/** (merged 2026-06-06; was interactions/ + potentials/) | Per-term face + engine cohesion: contact/ (c0/c1 + singlet_pair + tensor) + ddi/ (k-space 6-FFT convolution + secular option + zero-padded variant) + lhy/ (closed forms + φ₁-reg + Modes-round-45 + Sigma-Delta dispatch + Lima-Pelster Q5) + zeeman/ (accessors + builders) + raman/ + light_shift/ + loss/ + trap/ (evaluators). Shared machinery is EXPLICIT: `hamiltonian/coefficients.jl` (c↔g algebra — shared with TDHFB + Bogoliubov), `hamiltonian/shared/` (Euler rotation cache: DDI + spin_mixing; uniform spin rotation: Zeeman transverse + Raman + rotating_basis), `hamiltonian/optics/` (beam/config builders), absorbing_boundary in integrator/. | Two interaction paths auto-selected in `make_workspace` (c₀/c₁ vs scattering-lengths). Unified `B:` block; Zeeman operator `H = -p·F_z + q·F_z²` (Kawaguchi-Ueda) with `p ≡ -g_F μ_B B` ⇒ physically `+(g_F μ_B B · F)`; the B→p sign lives in `Units.bfield_to_p` (see `experiments/runtime/b_block_builders.jl`). |
+| **hamiltonian/terms/<term>/** (merged 2026-06-06; was interactions/ + potentials/) | Per-term face + engine cohesion: contact/ (c0/c1 + singlet_pair + tensor) + ddi/ (k-space 6-FFT convolution + secular option + zero-padded variant) + lhy/ (closed forms + φ₁-reg + Modes-round-45 + Sigma-Delta dispatch + Lima-Pelster Q5) + zeeman/ (accessors + builders) + raman/ + light_shift/ + loss/ + trap/ (evaluators). Shared machinery is EXPLICIT: `hamiltonian/coefficients.jl` (c↔g algebra — shared with TDHFB + Bogoliubov), `terms/ddi/rotation.jl` (Euler rotation cache — DDI owns it, spin_mixing borrows), `foundation/spinor_utils/uniform_rotation.jl` (uniform spin rotation: Zeeman transverse + Raman + rotating_basis), `foundation/optics.jl` + `terms/trap/{laser_potential,optical_trap}.jl` (beam/config builders), absorbing_boundary in integrator/. (`hamiltonian/{shared,optics}/` were relocated to these homes by `5355e455`, 2026-06-21; this line still named them until 2026-08-05.) | Two interaction paths auto-selected in `make_workspace` (c₀/c₁ vs scattering-lengths). Unified `B:` block; Zeeman operator `H = -p·F_z + q·F_z²` (Kawaguchi-Ueda) with `p ≡ -g_F μ_B B` ⇒ physically `+(g_F μ_B B · F)`; the B→p sign lives in `Units.bfield_to_p` (see `experiments/runtime/b_block_builders.jl`). |
 | **hamiltonian/terms/** | **HamTerm protocol.** Each term — Kinetic, Trap, Zeeman (linear `-(b·F)` + quadratic `q F_z²`, diagonal + transverse in ONE term), DensityC0, SpinC1, DDI, LHY, Tensor, Raman, LightShift, Coriolis, MagneticGradient (spin-independent tilt, NOT a Zeeman), Loss — declares its sign in ONE coefficient function; `apply_step!` / `energy_contribution` / `apply_operator!` (ACCUMULATES `out .+= H·ψ`; gate-first; the gradient face) / `sign_oracle` derive from it. `build_h_terms_registry(ws) → NTuple{N, HamTerm}` is type-stable and unrolled. | New H terms go here. Registry pattern is load-bearing for bug-class elimination — do NOT bypass for new physics; do NOT introduce parallel sign declarations. |
 | **hamiltonian/integrator/** | Split-step + adaptive Yoshida + Coriolis 3-shear + Yoshida/Suzuki/Blanes-Moan composers + force_gradient + combined_spin_step + spin_chain (fused V half-step) + dealias + adaptive-dt + rotating-basis propagators/integrators. | `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)` Strang sandwich. `_YOSHIDA_W0 < 0` correct (backward middle substep). `spin_chain.jl` is a FUSION not a splitting — bit-identical, and `_spin_chain_reason` is the one list of what would otherwise be silently dropped; **add an operator to the outer chain ⇒ add it there**. |
 | **hamiltonian/tdhfb/** | Time-Dependent HFB local-approximation engine — voxel-local BdG Strang step (channel kernel + HF self-energy + Δ from φφ + κ) + Y4-midpoint Picard wrapper + total-energy functional conserved by step. | Engine **parallel to GP**; YAML pipeline integration deferred. Do NOT wire `dynamics.tdhfb` into `run_yaml` without explicit ask. |
@@ -120,14 +120,14 @@ Four primitives:
 | **workflow/experiments/calibration.jl** | `module Calibration`. CoilCalibration + FORTCalibration + RabiCalibration + CalibrationHistory (CSV + week-to-week interpolate) + drift sampling. | Lab fields like `B: {p_mv: 2.5, coil_mode: strong}` resolve via calibration table to Gauss **before** downstream parsing. |
 | **workflow/initialization + state_zoo** | atoms + `init_psi` dispatch + 22 named `init_psi_<name>` wrappers + Thomas-Fermi + heuristic thermal seed + TWA vacuum noise. | Wrap, don't fork: every named state is `init_psi(state=:..., init_state_params=...)` under the hood. For `:transverse_x` use `init_psi_spin_coherent(grid, sys; theta=π/2, phi=0)`. True thermal init uses SGPE callback. |
 | **manuscript.jl + manuscript/figures/** | Figure registry keyed by (paper, FIG-N). Emitters: CSV / Python / TikZ. CLI via `scripts/cli.jl figure --paper <p> --fig <n>` or `--list`. | Paper #1 = F-generic LHY closed forms; Paper #2 = F6 phase diagram; Paper #3 = Sign Pattern Lemma 1 + Universal Theorem; thesis Ch.1-7 in `docs/manuscript/thesis/`. |
-| **validation/reference_rhs/** | Independent term-by-term `reference_<term>_apply!` and `reference_<term>_energy` with same numeric prefactor as production. Diff oracle. | Holds self-contained validation claim. External Ueda is `BLOCKED_EXTERNAL` — see `docs/validation/ueda_status.md`. |
+| **validation/reference_rhs/** | Independent term-by-term `reference_<term>_apply!` and `reference_<term>_energy` with same numeric prefactor as production. Diff oracle. | Holds self-contained validation claim. External Ueda **moved OUT of `BLOCKED_EXTERNAL` on 2026-07-30** — see `docs/validation/ueda_status.md:112`, which had disclaimed the token for six days while this line still asserted it. |
 | **autonomous research** (external) | Successor to the retired loop: the gated harness at `/home/suzume/workspace/spinorbec-autoresearch/` (OUTER project; this repo is its inner `repo/` worktree on `autoresearch/base`). Own `.claude/` (solver/verifier + require-evidence hook), `spec/` (INVARIANTS/DECISIONS/MATHCODE_MAP), `gate.sh` (independent re-run L0–L4; never trusts Solver metrics). | Lives outside this repo. See `/home/suzume/workspace/spinorbec-autoresearch/CLAUDE.md`. |
 | **`.claude/` loop** (RETIRED 2026-06-08) | First autonomous research loop. `loop.sh` guarded (exits RETIRED). Machinery (≈30 scripts + 6 agents + run-loop.md + design docs) moved to `…/BEC-simulation-archive/loop_machinery_2026_06_08/`; record to `…/loop_record_2026_06_08/`. Both OUTSIDE the repo. | Root `.claude/` keeps only shared/CC-internal: `settings.json`, the 2 referenced hooks (`hook_pre_bash` API-key guard, `hook_post_write`), `cache/` `logs/` `projects/` `worktrees/`. |
 
 ## Wavefunction conventions
 
 - **Layout**: `psi[x, y, …, c]`. Spatial dims first, spinor last. `c=1 → m=F`, `c=D → m=−F`.
-- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric: `diag light_shift_offdiag SM singlet_pair tensor transverse_zeeman raman DDI raman transverse_zeeman tensor singlet_pair SM light_shift_offdiag diag` — the forward half is declared once at `integrator/split_step.jl:542`. (This line listed five operators until 2026-08-04, omitting `light_shift_offdiag` and `transverse_zeeman`.). Substeps auto-skip on ≈ 0 coupling.
+- **Split-step**: `V(dt/2) Coriolis(dt/2) K(dt) Coriolis(dt/2) V(dt/2)`. Inner V symmetric, forward half `diag light_shift_offdiag SM spatial_lhy_spin singlet_pair tensor transverse_zeeman spatial_zeeman raman`, then `DDI`, then the reverse. **Read `_outer_operators_fwd!` (`integrator/split_step.jl:596`) — not the prose list above it.** That list is a hand-maintained copy and has rotted twice: five operators until 2026-08-04 (missing `light_shift_offdiag`, `transverse_zeeman`), then seven until 2026-08-05 (missing `spatial_lhy_spin`, `spatial_zeeman`), and the second correction was copied from the code comment at `:541`, which was short by the same two. Substeps auto-skip on ≈ 0 coupling.
 - **Two interaction paths**, auto-selected in `make_workspace`:
   - **c₀/c₁ path**: `diagonal(c₀) + spin_mixing(c₁) + singlet_pair(c₂) + tensor(residual c₄, c₆, …)`.
   - **Scattering-lengths path** (Cr52 etc.): tensor handles ALL channels, `c₀ = c₁ = 0`.
@@ -150,7 +150,7 @@ The historical pattern: same physics in N hand-duplicated locations; one drift, 
 - **Inactive terms short-circuit at top of each method.** Registry is `NTuple{N, HamTerm}` (type-stable, compiler-unrolled); zero per-call cost for inactive terms.
 - **Shared scratch via `EnergyContext` / `GradientContext`.** Context-aware overloads reuse pre-built density / spin density / FFT buffer across terms in one pass. New terms benefiting from shared scratch should provide the `ctx`-aware specialization.
 
-**Source of truth**: operator `H = -p·F_z + q·F_z²` (Kawaguchi-Ueda spinor-BEC form). The lab field enters via `p ≡ -g_F μ_B B` (atomic moment `μ = -g_F μ_B F`), so physically `H = +(g_F μ_B B · F) + q F_z²`; +Bz on a g_F>0 atom (Eu, Cr, He*) gives ground state m=-F. The B→p sign is declared **once** in `Units.bfield_to_p` (`src/workflow/io/units.jl`); the 3 sibling converters delegate to it. The operator-form spec is documented at `b_block_builders.jl:27`. Every other Zeeman reference derives from these.
+**Source of truth**: operator `H = -p·F_z + q·F_z²` (Kawaguchi-Ueda spinor-BEC form). The lab field enters via `p ≡ -g_F μ_B B` (atomic moment `μ = -g_F μ_B F`), so physically `H = +(g_F μ_B B · F) + q F_z²`; +Bz on a g_F>0 atom (Eu, Cr, He*) gives ground state m=-F. The B→p sign is declared **once** in `Units.bfield_to_p` (`src/workflow/io/units.jl`); every other converter delegates to it — `coefficients.jl:377`, `b_block_builders.jl:106/:110/:132`, `parsing_units.jl:33/:39`, `preset.jl:66`, in four files. **Do not restate the count here**: it said "3" from before `linear_zeeman_p` was rewired until 2026-08-05, and a stale enumeration is how a wrong-sign converter survived two months. Grep `bfield_to_p` instead; exactly one line computes the sign (`units.jl:73`). The operator-form spec is documented at `b_block_builders.jl:27`. Every other Zeeman reference derives from these.
 
 **Adding a new HamTerm — protocol**:
 
@@ -167,7 +167,7 @@ The historical pattern: same physics in N hand-duplicated locations; one drift, 
    - `test_registry_{energy_decomposition,gradient,strang_step}_parity.jl` (registry vs hand-written bit-identity).
    - `test_magnetic_gradient_gap.jl` style: per-term audit gate when term has a non-obvious path (transverse, off-diagonal, propagator that mutates V).
 
-Full procedure: `docs/conventions/adding_new_hamiltonian_term.md`. Audit table: `docs/conventions/hamiltonian_sign_audit.md`.
+Full procedure: the seven steps above — `docs/conventions/adding_new_hamiltonian_term.md` is a pointer back here (its restated copy rotted, which is the argument for one location). Audit table: `docs/conventions/hamiltonian_sign_audit.md`.
 
 ## Test taxonomy + oracle gates
 
@@ -434,16 +434,50 @@ Cost regime is permanent: this codebase pays a JIT cascade because Workspace is 
   - `gotcha_*.md` — sharp edges (B_mag spherical form, `ip[n] ≠ g_S`, FG Wick rotation sign, TWA chaos, autopilot timer + JIT WSL crash, …).
   - `project_*.md` — active arc context (Eu phase diagram North Star, validation pivot, …). Decay fast.
   - `reference_*.md` — external systems pointers (TSUBAME 4, web stack, WSL2 networking, Caddy admin socket, dashboard auth boundary, …).
-- **`MEMORY.md` index** is the always-loaded TOC — and it has a hard **24.4 KB load
-  limit**. On 2026-08-04 it was 43 % over, so 55 of its 133 lines (41 %) had not
-  been loaded in any session, which is silent: the warning names the file, not the
-  entries that fell off the end. Keep it under the limit — one line per memory,
-  under ~200 chars — and when a section outgrows that, move the entries
-  **verbatim** into a `memory_index_*.md` sub-index and leave a pointer. Before
-  and after any such move, check both directions: no index item may vanish from
-  the union of index + sub-indexes, and the reachable/total file count must not
-  drop. A rule that only lives in memory may therefore not be loaded at all —
-  anything that must fire every session belongs **here**.
+- **`MEMORY.md` index** is the always-loaded TOC, and it has a load limit that
+  **this tree asserts twice with values 46 % apart**: `17100 B` in
+  `scripts/audit_memory.py` (in use since 2026-07-27) against `24.4 KB / 24986 B`
+  here, in three memory files and in `docs/campaign/lessons_2026_08_04.md`.
+  **Neither cites the mechanism that truncates**, so neither is authority. Work
+  to the smaller one — the costs are asymmetric: too small moves a few lines into
+  a sub-index one hop away, too large means the tail silently never loads and the
+  warning names the FILE, not the entries that fell off it. Do not raise it
+  without a citation to the observed behaviour. On 2026-08-04 the file was 43 %
+  over the larger figure, so 55 of its 133 lines (41 %) had not been loaded in
+  any session. On 2026-08-05 it was 21803 B — comfortably "under" by the larger
+  number and 4703 B over by the smaller, and it had been reported as fine all
+  session. `python3 scripts/audit_memory.py` gates it (and reachability, and
+  link drift); run it after any session that adds or renames memories.
+  Keep entries to one line per memory, under ~200 chars, and when a section
+  outgrows that move them **verbatim** into a `memory_index_*.md` sub-index with
+  a pointer left behind. Before and after any such move check both directions:
+  no index item may vanish from the union of index + sub-indexes, and the
+  reachable/total file count must not drop. A rule that only lives in memory may
+  therefore not be loaded at all — anything that must fire every session belongs
+  **here**.
+
+**A memory is maintained by resolvability, not by judged value.** Nobody can
+judge 280 files for worth — the sessions that wrote them are gone — but every
+path and symbol in them resolves or does not in three seconds:
+`python3 scripts/audit_memory.py --repo .`. It splits dead references four
+ways, and only one is a defect: **ORPHAN** (named, never existed — the memory is
+wrong), **ELSEWHERE** (exists on another ref only — *the dangerous class*: a
+present-tense "Fix: `src/…`" that lives on a branch reads as landed in one
+worktree and as junk in another, so anchor a landed-fix claim to a **ref**, not
+a date), **SYMBOL** (the API moved under a still-correct lesson), **HISTORICAL**
+(deleted in this tree's history — old, not wrong; wants a date, not a deletion).
+Measured 2026-08-04: 40 of the 142 code-citing memories had a dead reference —
+45 unique dead paths, of which **9 (20 %) were relocations** the tree had moved
+under a stationary reference. `--fix-relocations` repairs exactly those, under a
+rule needing no judgement: rewrite only when the basename resolves to exactly
+one file. The other 80 % are genuine deletions, and most of *those* are
+HISTORICAL and want a date rather than a fix. State the ratio per **unique
+path**, not per (memory, path) instance — the two differ by 5.7× here and the
+instance count flatters the repair.
+
+The scan refuses to report a count unless two known-live probes are found and a
+fabricated name is not — an uncalibrated pass over this same store reported 52
+unreachable memories when the true number was 0.
 
 When CLAUDE.md and a memory file disagree: **CLAUDE.md wins for structural questions** (conventions, architecture); memory wins for per-incident lessons (what specifically went wrong, what to verify). Cross-link with `[[name]]` from memory files when a new mistake should crystallise into CLAUDE.md.
 

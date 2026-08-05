@@ -13,7 +13,10 @@
 #   e   = load_gs("figs/eu_bscan_pin_tight"; B_uG=50)  # nearest-B: e.psi, e.meta
 #   # seed a run/dynamics from it:
 #   find_ground_state_lbfgs(; grid=g, atom=a, ..., psi_init=e.psi)   # same grid
-#   # or upsample first if the target grid differs (scripts/upsample_spinor.jl).
+#   # or upsample first if the target grid differs — `upsample_spinor` in
+#   # `src/workflow/initialization/upsample.jl`, or `seed_from: {upsample: true}`
+#   # in YAML. (The one-off `scripts/upsample_spinor.jl` was folded into src by
+#   # `40c329a5`.)
 #
 # `load_state(e.meta.path)` also works directly on new-schema files.
 

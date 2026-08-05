@@ -327,7 +327,7 @@ end
         throw(
             ArgumentError(
                 "Unknown PipelineStep subtype $(typeof(step)) in _step_dispatch!. " *
-                "Add an explicit branch in _step_dispatch! (pipeline_runner.jl:123) " *
+                "Add an explicit branch in _step_dispatch! (this file, ~line 293) " *
                 "and a matching _run_step(::$(typeof(step)), ...) method.",
             ),
         )
