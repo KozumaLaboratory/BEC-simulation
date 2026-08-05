@@ -1,0 +1,35 @@
+# SMOKE for the c1×κ phase-diagram slices: 2 c1 × 2 κ at B=10µG with pin.
+# Tiny grid / few steps — validates schema (pin + c1/κ product + taller z-box +
+# multi-seed) and that both FM (c1<0) and AFM (c1>0) cells converge. NOT physics.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [24, 24, 40], box: [10.0, 10.0, 18.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "1.0e-5 Gauss", theta: 0.0, phi: 0.0}
+      pin: {kind: transverse, epsilon_ramp: [2.0e-3, 5.0e-4]}
+      n_steps: 300
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify_distance: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: [-0.02, 0.03]
+    pipeline.0.potential.omega.2: [0.5, 1.5]
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

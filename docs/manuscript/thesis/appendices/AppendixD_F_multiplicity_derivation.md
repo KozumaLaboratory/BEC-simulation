@@ -1,5 +1,8 @@
 # Appendix D: F-multiplicity Table II derivation
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 appendix では、Chapter 4 §4.6 Table II ($F = 0, 1, \ldots, 12$ における polyhedral
 inert state multiplicity 表) を character orthogonality で系統導出する。
 

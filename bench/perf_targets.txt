@@ -64,3 +64,273 @@ apply_ddi_step_rotating!  kernel/apply_ddi_step_rotating_eu151_16cubed  Eu151 16
 #
 # _get_spinor             bench/get_spinor_d13      CLAUDE.md: 352 B/call alloc, D=13 known issue
 # rotating_norm           bench/rotating_norm       reduction with abs2; check fusion
+
+# === Round 8 (2026-07-28, RTP on TSUBAME H100) ===
+# Target was the RTP step for Eu151 F=6 (D=13) F64 with DDI — the production
+# TSUBAME shape. Profile of one step at 64³ showed `_euler_5stage_warp_kernel`
+# at 80% of GPU-busy time (8 calls, 82.7 of 102.8 ms) purely because
+# spin-mixing had not been routed to the Taylor-Horner rotation kernel the DDI
+# substep already used.
+#
+# done 2026-07-28: apply_spin_mixing_step! (GPU)  →  shared
+#   `_apply_spin_rotation_taylor!`. H100 whole-step: 6.60→4.39 ms at 64³
+#   (1.51×), 49.7→30.0 ms at 128³ (1.66×). Parity vs the exact Euler kernel
+#   4.9e-13 after 10 steps.
+#
+# rejected(H100 slower: 30.0→42.5 ms at 128³, 4.39→6.20 at 64³) 2026-07-28:
+#   thread-per-voxel addressing for the Taylor rotation kernel. ψ is
+#   (N_spatial, D) column-major, so the warp layout (one spin COMPONENT per
+#   lane) reads 13 addresses N·16 B apart and issues 32-byte transactions
+#   where the coalesced diagonal kernel issues 128-byte lines — measured
+#   0.93 TB/s vs 2.2 TB/s on the same array, which looked like a clean 2×.
+#   It is not: one voxel per thread needs the whole spinor live (ψ₀ and w,
+#   2·D complex = 104 32-bit registers at D=13) and the spill costs more than
+#   the coalescing saves. Do not retry without first fixing the register
+#   pressure (e.g. shared-memory staging of w, or F32).
+#
+# NEXT: `split_step_combined!` already merges spin-mixing + DDI + transverse
+#   Zeeman into ONE rotation per half-V (12 rotations/step → 4) and is tested
+#   + order-2 validated, but no production path calls it. Wiring it into the
+#   RTP loop is worth more than any further kernel tuning.
+#
+# === The RTP arc so far, end to end (2026-07-29) ===
+# All six numbers from ONE H100 (TSUBAME gpu_1), the SAME instrument
+# (bench/profile_rtp.jl — which had to be copied into the pre-#142 tree, since
+# that file was itself added by #142), Eu151 F=6 (D=13) F64 + DDI + midpoint.
+#
+#   checkpoint                          64³            128³
+#   pre-#142   035275b6              6.009 ms      43.721 ms
+#   post-#142  2de5f947              4.364          29.795      1.38× / 1.47×
+#   post-#148  (main)                2.043          14.556      2.14× / 2.05×
+#   ------------------------------------------------------------------
+#   cumulative                                                  2.94× / 3.00×
+#
+# GPU-busy over the same span: 5.52 → 1.91 ms at 64³, 42.79 → 14.50 at 128³.
+# At 128³ the GPU is now busy 98 % of wall (saturated); at 64³ only 56 %, so
+# that size is partly launch-bound and has little kernel headroom left.
+#
+# Note for whoever compares against the Round-8 entry below: its post-#142
+# numbers reproduce here (4.39 vs 4.364, 30.0 vs 29.795) but its pre-#142 ones
+# are 10-14 % higher than measured here (6.60 vs 6.009, 49.7 vs 43.721), so it
+# credits #142 with 1.51×/1.66× where this run says 1.38×/1.47×. The table
+# above is the one measured in a single job on a single GPU; prefer it.
+#
+# === Round 9 (2026-07-29, RTP on an RTX 5070 Ti, 64³ Eu151 D=13 F64 + DDI) ===
+# Measured with bench/profile_rtp.jl (knob decomposition + CUDA kernel table)
+# and bench/micro_spin_taylor.jl (new — sweeps the Horner degree so the
+# compute-vs-memory regime is measured, not assumed).
+#
+# H100 (TSUBAME gpu_1, job 8290268 — both trees back to back on the SAME GPU):
+#
+#   64³   4.394 → 2.028 ms/step   2.17×      GPU busy 3.87 → 1.87 ms
+#   128³ 29.755 → 14.224 ms/step  2.09×      GPU busy 29.2 → 14.19 ms
+#
+# and after tightening _SPIN_TAYLOR_TOL to 1e-13 (which the per-voxel degree
+# made binding — see gpu_spin_rotation_taylor.jl), 128³ is 14.566 ms/step, i.e.
+# 2.04× for machine-precision rotations. The tolerance costs 1.024× there and
+# 1.088× on the consumer card.
+#
+# The fused half-step alone, in-process A/B (bench/rtp_fusion_ab.jl):
+#   64³  3.585 → 2.024 ms/step  1.77×
+#   128³ 26.145 → 14.252       1.83×
+# i.e. it is worth 1.8× on the H100 against 1.17× on the consumer card, because
+# there the step is memory-bound and locally it is FP64-compute-bound. Read the
+# per-item numbers below with that in mind: the local ranking is not the
+# production ranking, and only the end-to-end figures above are H100-measured.
+#
+# Side effect worth knowing: the midpoint predictor-corrector used to cost 46 %
+# of the step at 128³ and now costs ~1 %, because both of its passes share one
+# mean-field evaluation. The 2nd-order mean-field treatment is now nearly free.
+# (The knob's "no midpoint" arm is UNFUSED — psi_mf is what enables the fusion —
+# so that percentage compares two different paths and is not a clean isolate.)
+#
+# done 2026-07-29 (1): `z / T(k)` in the Horner body was two FP64 divisions per
+#   degree per lane. Tabulated as the REAL `scale/k` with the ∓i folded in as a
+#   component swap — bit-identical. K=8: 6.80 → 1.69 ms.
+#
+# done 2026-07-29 (2): the degree came from a HOST reduction over max|v|, which
+#   drained the stream 12×/step (46 % of the step, GPU idle) AND paid the peak's
+#   degree in the dilute tails. Now decided per voxel in-kernel, with angle
+#   halving so the Taylor path is exact at any R and the Euler fallback is no
+#   longer a dispatch decision. 51.6 → 30.8 ms/step; GPU busy 34 % → 82 %.
+#
+# done 2026-07-29 (3): `diag · SM · DDI · SM · diag` is the WHOLE V half-step in
+#   the Eu production shape, and under the midpoint corrector its mean field is
+#   frozen — so all three rotations want the same ⟨F⟩ and both diagonal halves
+#   the same voxel phase (a rotation is unitary; it cannot move the density).
+#   One kernel: 8 ψ passes → 3, 3 spin-density passes → 1, 5 launches → 2, per
+#   half-step. Bit-identical, gated as such
+#   (test/oracles/test_spin_chain_fusion_parity.jl — which caught a 1-ulp
+#   multiply-association slip a tolerance would have passed).
+#
+# rejected(measured on BOTH architectures) 2026-07-29: staging ψ through shared
+#   memory to coalesce the rotation kernel's load/store — the fix Round 8 named
+#   as the untried option after thread-per-voxel failed on register pressure.
+#     5070 Ti (compute-bound there): 5-15 % SLOWER at 64³ D=13; `CUDA.registers`
+#       = 48 with no spill, so not access-pattern- or occupancy-limited either.
+#     H100 (purely memory-bound there — t(16)/t(4) = 1.00): the ISOLATED kernel
+#       gains only 890 → 929 GB/s at 64³ and 996 → 1050 GB/s at 128³ (1.04-1.05×),
+#       and the whole RTP step gets 2 % SLOWER (2.016 → 2.045 ms at 64³,
+#       14.210 → 14.527 at 128³) because the two `sync_threads` cost more than
+#       the coalescing saves.
+#   The lesson for the next attempt: the ~900 GB/s ceiling is NOT the 32-byte
+#   transactions. Those carry full 32-byte sectors already (two voxels of a
+#   warp are adjacent), so byte efficiency was never the problem. The limit is
+#   memory-level parallelism — one warp has only 2 voxels in flight — and/or
+#   the serial shfl dependency chain in the Horner. Attack THOSE, not the
+#   addressing. Deleted rather than left behind a toggle: it is off on every
+#   machine measured.
+#
+# done 2026-07-29 (4): the Horner coefficient table is cached by SCALE and the
+#   Zeeman phase vector by value, so a fixed-dt run stops relaunching a
+#   40-thread fill kernel and re-uploading 13 numbers 8×/step. Measured below
+#   this machine's ~1.5 ms spread, so no win claimed — kept because an EMPTY
+#   kernel launch costs 32-190 µs here (measured), which is the real reason a
+#   105-launch step leaves the GPU idle ~30 % of the time under WSL2. Native
+#   Linux is ~5 µs/launch, so this is much less of an issue on TSUBAME.
+#
+# rejected(measured, 3 % for a Workspace-adjacent type change) 2026-07-29:
+#   batching the DDI convolution's 6 rFFTs (3 forward + 3 backward) into 2
+#   batched transforms. It needs Fx_r/Fy_r/Fz_r to be slices of one
+#   (n_pts..., 3) array, i.e. a DDIBuffers field-type change, which propagates
+#   into the Workspace type parameters — the #1 entry on the guardrails' do-not
+#   list. The 6 rFFTs measure 0.544 ms of the 0.709 ms convolution, i.e.
+#   2.18 ms of a ~31 ms step; halving them would buy ~3 %. Not worth it.
+#
+# NEXT: at 64³ on this card the fused half-step kernel is ~74 % of FP64 peak in
+#   the Horner body, so there is no local headroom left in it. The open
+#   questions are both H100-only and UNMEASURED here: (a) whether the fused
+#   kernel is memory-bound there, where the (N,D) column layout's 32-byte
+#   transactions cost 2.4× (Round 8 measured that for the single-rotation
+#   kernel); (b) whether 105 launches/step matters at ~5 µs each. Get a TSUBAME
+#   profile before optimizing either.
+
+# === Round 10 (2026-07-29, RTP on TSUBAME H100) ===
+#
+# Round 9's two open questions, answered on the card it said to ask:
+#
+#   (a) IS the rotation kernel memory-bound on an H100? YES, flatly.
+#       bench/micro_spin_taylor.jl 128 13 cloud, full H100:
+#         K       1     2     4     8    16    24
+#         ms  0.864 0.865 0.865 0.864 0.864 0.864
+#       t(16)/t(4) = 1.00 against 4.0 for pure compute, ceiling 938.6 GB/s.
+#       So the lever on this machine is ψ TRAFFIC, not the Horner op count —
+#       the opposite of the consumer card, where Round 9 measured ~74 % of FP64
+#       peak in the same body. Both of the cuts below are traffic cuts.
+#   (b) launches: at 128³ the GPU is busy 97.9 % of wall, so the ~105 launches
+#       per step are already hidden. Not a target.
+#
+# BUT FIRST, a defect that mattered more than either. `9c117c05` set
+# `DDI_PADDED_DEFAULT = true`, and `_spin_chain_reason` carried
+# `ws.ddi_padded === nothing || return "..."` — so from that commit no
+# `run_yaml` RTP run took the fused V half-step at all. `bench/profile_rtp.jl`
+# cannot see this: it calls `make_workspace` directly, where `ddi_padding`
+# defaults FALSE. The benchmark went on measuring a path production had left.
+# A bench that bypasses the config parser cannot see a parser default flip.
+#
+# `bench/rtp_padding_ab.jl` (new) prints `_spin_chain_reason`'s verdict beside
+# each timing, so which path ran is read off the run rather than inferred, and
+# it reports BOTH shapes per invocation. Baseline is 634e0234 (post-#183, which
+# had already fixed the ITP-side padded fast paths).
+#
+#   one H100, alternating arms, repeats agreed to < 0.5 %:
+#
+#                  bare (what the bench builds)   padded (what run_yaml builds)
+#                    BASE    FIX    PERF            BASE     FIX    PERF
+#    64³            2.066  2.060   1.79            4.824   3.309   3.05
+#    96³            6.454  6.478   5.69           17.057  12.126  11.37
+#   128³           14.573 14.536  12.79           40.270  28.688  26.95
+#
+#   production shape, BASE → PERF:  1.58× / 1.50× / 1.49×
+#     of which the FIX (re-fusing the padded path) is 1.46× / 1.40× / 1.41×
+#     and the two traffic cuts add                     1.09× / 1.07× / 1.06×
+#
+# The traffic cuts are worth 1.14-1.15× on the bare shape but only 1.06-1.09×
+# on the padded one, because padding runs the convolution on a 2× grid per axis
+# and those FFTs dilute a ψ-traffic saving. Quote the padded column: it is the
+# one production pays.
+#
+# ACCURACY (bench/rtp_order_padded.jl, new). Order had never been measured on
+# the combination production actually runs — GPU + zero-padded + `split_step!`
+# + the fused kernel. `bench/conv_order.jl` is CPU, N=12, unpadded, and calls
+# the half-potential helpers directly. Self-convergence at 24³, Eu151 D=13 F64:
+#
+#   padded, fused ON    dt 2e-4 → 1e-4 → 5e-5 : order 2.000, 2.000
+#   padded, fused OFF                          : order 2.000, 2.000
+#   bare,   fused ON                           : order 2.000, 2.000
+#   and fused ≡ unfused at EVERY dt, bit for bit.
+#
+# Strang is 2 and stays 2. The mean field is what puts that at risk — evaluated
+# at each substep's entry it collapses to ~1 with DDI on — so this is the
+# measurement that would catch a fused half-step that had quietly become a
+# different splitting. An order table alone cannot distinguish "same splitting"
+# from "different splitting of the same order", which is why the bit-identity
+# line is printed next to it.
+#
+# done 2026-07-29 (1): the Picard midpoint opened every iterate with a full-ψ
+#   `copyto!(psi_mid_curr, psi_orig)` — two per step for a plain `split_step!`
+#   (n_picard = 1), four for the composers (n_picard = 2), 436 MB each way at
+#   128³ D=13 F64. The fused kernel reads each (voxel, component) once before
+#   writing it, so it takes a separate source array for free: `psi_in` hands it
+#   ψ_orig and the copy disappears rather than moving. The generic chain, which
+#   is in-place throughout, materialises the request as the copy it would have
+#   paid anyway, so nothing off the fused path changes.
+#
+#   Sanity-check the mechanism against the measurement before believing it: the
+#   saving at 128³ bare is 0.84 ms for 2 × 872 MB = 2.07 TB/s, which an H100 can
+#   do. The same arithmetic is how the first draft of this note — which claimed
+#   SIX copies per step — was caught: six would have needed 6.2 TB/s, above
+#   HBM3 peak. `_half_potential!` passes `n_picard=1`; only the composers use 2.
+#
+# done 2026-07-29 (2): `_spin_density_kernel!` and `_diag_phase_kernel!` are
+#   both per-voxel reductions over the same D components of the same ψ_mf,
+#   launched back to back with the same geometry — the second re-read 436 MB for
+#   a sum the first had in registers (Σ_c|ψ_c|² is a term of both). Fused; each
+#   accumulator keeps its own kernel's terms and order, so bit-identical. Needed
+#   `_convolve_ddi!` / `_convolve_ddi_padded!` (the k-space halves) split out of
+#   the two `_compute_and_convolve_*` wrappers, which now share them.
+#
+# NOT a lever, contrary to the first draft of this note: `n_picard`. The RTP
+#   dispatcher already passes 1 (`_half_potential!`), so a plain step is four
+#   fused half-steps, not six. 2 is reached only by `split_step_midpoint!` and
+#   the MPS/Yoshida composers, where the docstring ties it to Richardson order
+#   recovery. There is no free 1.5× hiding there.
+#
+# rejected(measured — it is an accuracy trade, not a free win) 2026-07-29:
+#   lowering `ddi_pad_factor` below 2. At 128³ the padded step is 26.95 ms
+#   against 12.79 bare, so the open-boundary convolution — six rFFTs on a 256³
+#   grid — is the largest single item left, and the pad factor sets that volume
+#   as pad³. Nobody had measured what the error buys, only what NOT padding
+#   costs (9c117c05: 2.1e-2 to 4.7e-2 against free space). `bench/
+#   ddi_pad_factor_accuracy.jl` (new) sweeps it, referencing pad_factor 3 —
+#   the question is how much Φ still moves as the box grows, which needs no
+#   second implementation to be trusted. H100, Eu151 D=13, box 12, IDENTICAL at
+#   48³ and 64³ (so this is geometry, not resolution — as that commit also found):
+#
+#     pad_factor   rel. Φ error   ms/step (64³)   FFT voxels
+#       none         1.27e-1         1.815          1.00×
+#       1.25         4.58e-2         2.079          1.95×
+#       1.50         1.92e-2         2.385          3.38×
+#       1.75         8.82e-3         2.703          5.36×
+#       2.00         4.29e-3         3.054          8.00×
+#       2.50         9.87e-4         4.535         15.62×
+#
+#   pad 1.5 would be 1.28× faster than the default and still removes 85 % of the
+#   image error — but the 1.9e-2 it leaves is the same size as the error
+#   9c117c05 introduced the padding to remove. So the knob is real and the curve
+#   is steep, and the answer is still no without a physics decision.
+#
+#   Read the `none` row with care: 1.27e-1 here against that commit's 2.1e-2 to
+#   4.7e-2. Same phenomenon, different meters — theirs is a free-space reference
+#   on a field-magnitude measure, this is an L2 ratio over the whole grid against
+#   pad 3. It confirms the meter SEES the images and that they fall steeply, but
+#   it does not reproduce their number and should not be quoted as if it did.
+#   The pad 2.5 row is also near this meter's own floor (its residual against a
+#   true free-space limit is of the same order), so only rows ≤ 2.0 are solid.
+#
+# NEXT: the convolution, without touching its physics. Whether cuFFT does better
+#   on one batched 3-field plan than on three separate ones is unmeasured, and
+#   for the PADDED context it needs only a DDIPaddedContext field-type change,
+#   not a Workspace one — the objection that killed the same idea for the
+#   unpadded buffers in Round 9. Measure on an H100: the FFT-vs-rest balance
+#   moves with the FP64 rate, and the local card will rank it wrong.

@@ -2,14 +2,6 @@
 # Source: scripts/validation/klaus_long_omega_large_gen.jl
 #   Ω/ω_⊥ = -1.0  (near centrifugal limit Ω/ω_⊥ = 1)
 
-metadata:
-  suite: klaus_long_time
-  cell_name: klaus_long_omm1p0_holdonly_t100
-  rotation_omega: -1.0
-  t_hold_dim: 100.0
-  protocol_kind: hold_only_long_time_large_omega
-  generator: scripts/validation/klaus_long_omega_large_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu
@@ -26,7 +18,7 @@ pipeline:
         c1_ratio: 0.02778
       ddi: {enabled: true, secular: true}
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -38,7 +30,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.0
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       seed_amplitude: 1.0e-6
@@ -49,7 +41,7 @@ pipeline:
       duration: 0.69115
       dt: 0.001
       rotating_frame_omega: 0.0
-      B: {Bz: {from: -0.01, to: -2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      B: {Bz: {from: 0.01, to: 2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save: {every: 50, psi: true, precision: f64}
@@ -58,7 +50,7 @@ pipeline:
       duration: 100.0
       dt: 0.005
       rotating_frame_omega: -1.0
-      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "2.6e-5 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save: {every: 1000, psi: true, precision: f64}

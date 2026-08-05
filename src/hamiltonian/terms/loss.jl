@@ -223,6 +223,11 @@ end
 # Hermitian operator to expose via apply_operator!. Explicitly nil to make
 # the trinity-skipping intent structural rather than accidental.
 apply_operator!(out, ::LossTerm, ws, psi) = out
+"""Loss is not a term in the energy functional — it is a non-Hermitian
+channel — so there is no ratio to declare and the derived path must fall
+back to `energy_contribution` (which returns 0) rather than guess."""
+energy_operator_ratio(::LossTerm) = NaN
+
 energy_contribution(::LossTerm, psi, ws) = 0.0
 
 sign_oracle(::Type{LossTerm}) = (

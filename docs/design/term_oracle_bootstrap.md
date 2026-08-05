@@ -1,5 +1,8 @@
 # Term property oracles — derivative bootstrap, symmetry declarations, canary harness
 
+> **FROZEN 2026-06-05.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Status: **adopted 2026-06-05**. Companion to
 `docs/design/hamiltonian_layered_architecture.md`: this executes Stage 0
 items 1–3 and pulls two pieces of Stage 1 forward to day-0 — the symmetry

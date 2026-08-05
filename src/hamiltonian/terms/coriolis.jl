@@ -159,8 +159,8 @@ function apply_operator!(out::AbstractArray, term::CoriolisTerm, ws, psi::Abstra
     (N >= 2 && is_active(term.Ω, ROTATION_TOL)) || return out
     D = ws.spin_matrices.system.n_components
     n_pts = ntuple(d -> size(psi, d), Val(N))
-    fft_buf = similar(psi, ComplexF64, n_pts...)
-    deriv_buf = similar(psi, ComplexF64, n_pts...)
+    fft_buf = similar(psi, n_pts...)
+    deriv_buf = similar(psi, n_pts...)
     Ω_save = ws.sim_params.rotating_frame_omega
     @assert isapprox(Ω_save, term.Ω; atol=1e-12) ||
         isapprox(Ω_save, 0.0; atol=1e-12) "CoriolisTerm Ω mismatch with workspace"
@@ -171,6 +171,11 @@ end
 # ============================================================================
 # Derived: energy from the single source.
 # ============================================================================
+
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body −Ω·L_z.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::CoriolisTerm) = 1.0
 
 function energy_contribution(term::CoriolisTerm, psi::AbstractArray{<:Complex}, ws)
     # Linear: E = Re⟨ψ, H·ψ⟩ · dV = -Ω · ⟨L_z⟩.

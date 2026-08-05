@@ -1,0 +1,59 @@
+# BOUNDARY EXTENSION — close B_c(κ) at high oblateness. At κ=1.9, 2.2 the
+# cyclic→FM transition is above the 96µG window of config_boundary_64, so probe
+# B = 105–145 µG there. Same machinery: explicit (Bz, κ) points via zip,
+# seed_from nearest off the coarse 64³ map + pin. 10 points × 2 seeds = 20 solves.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      seed_from: {run: runs/config_promote_64_6221dc7f, upsample: false, nearest: true}
+      pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}
+      n_steps: 800
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+scan:
+  zip:
+    pipeline.0.B.Bz:
+      - "1.05e-4 Gauss"
+      - "1.15e-4 Gauss"
+      - "1.25e-4 Gauss"
+      - "1.35e-4 Gauss"
+      - "1.45e-4 Gauss"
+      - "1.05e-4 Gauss"
+      - "1.15e-4 Gauss"
+      - "1.25e-4 Gauss"
+      - "1.35e-4 Gauss"
+      - "1.45e-4 Gauss"
+    pipeline.0.potential.omega.2:
+      - 1.9
+      - 1.9
+      - 1.9
+      - 1.9
+      - 1.9
+      - 2.2
+      - 2.2
+      - 2.2
+      - 2.2
+      - 2.2
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}

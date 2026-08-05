@@ -3,30 +3,125 @@ name: CI
 on:
   push:
     branches: [main]
-    # Docs/markdown-only changes touch no Julia code, so skip the whole
-    # workflow (test + oracles + format + bench). ~30 % of commits are
-    # markdown-only (README / docs / CLAUDE.md / memory notes). `main` is not
-    # branch-protected, so there are no required status checks to leave hanging
-    # in "expected". A commit touching any non-`.md` file (incl. this workflow,
-    # any `.jl`, Project/Manifest) still runs everything — paths-ignore only
-    # skips when EVERY changed file matches.
-    paths-ignore: ["**/*.md"]
   pull_request:
     branches: [main]
-    paths-ignore: ["**/*.md"]
 
+# One concurrency group per `main` commit, one per PR branch.
+#
+# `cancel-in-progress: false` protects the run that is already EXECUTING, but
+# GitHub keeps only the newest PENDING run in a group and cancels the older
+# ones. So dropping cancellation for pushes was not enough: measured on
+# 2026-07-31, `2206b49a` (queued 09:49:39, behind `78010e82` which was still
+# running) was cancelled at 09:54:05 — the instant `d1d10e8f` queued. The
+# middle commit of any three merged inside one CI cycle still went unverified.
+#
+# Putting the SHA in the group for pushes makes every `main` commit its own
+# group, so nothing queues behind anything and nothing is superseded. Runs go
+# wide instead of deep; at the measured merge rate (5 in 3 h) that is a few
+# concurrent runs, not a stampede.
+#
+# PRs keep the shared per-ref group and keep cancelling, which is right there:
+# pushing a fixup should not leave the previous commit's run burning a runner,
+# and only the head commit of a PR needs a verdict.
+#
+# Why this matters at all: a PR's checks run against the base it was cut from,
+# not the base it lands on, so the post-merge run on `main` is the only thing
+# that ever sees the merged tree. Cancelling it discards the only evidence.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'shared' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Opt into Node.js 24 ahead of the September 2026 forced migration so we
 # don't carry deprecation warnings on every run.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# Markdown-only changes touch no Julia code, so the expensive test tiers are
+# worth skipping (~30 % of commits are markdown-only: README / docs / CLAUDE.md
+# / memory notes). This used to be a workflow-level `paths-ignore: ["**/*.md"]`.
+#
+# The exception is the oracle job: one of those gates takes `docs/**.md` as its
+# INPUT, so for it a markdown change is the change that can break it. See the
+# `docs` output on the `changes` job.
+#
+# That broke once `main` gained branch protection with three required checks.
+# `paths-ignore` stops the workflow from being CREATED at all, so the three
+# required contexts never appear and sit "expected" forever — a docs-only PR
+# becomes permanently unmergeable. Observed on #123: 0 check-runs on the head
+# SHA, combined status `pending`, `mergeable=MERGEABLE`,
+# `mergeStateStatus=BLOCKED`, and `gh pr merge --admin` refused.
+#
+# So the jobs now always run and always report their context; only the costly
+# STEPS are gated on the `changes` outputs — `code` for the tiers that test code,
+# `code || docs` for the two that contain a gate whose INPUT is `docs/**.md`
+# (fast, via `test_docs_live_set.jl`; oracles, via the citation resolver).
+# Step-level rather than
+# job-level gating on purpose: a job skipped by a job-level `if` reports the
+# conclusion "skipped", and whether that satisfies a required check is a
+# GitHub-side semantic we would rather not depend on. A job that runs and
+# succeeds needs no such assumption. The price is one runner start (~15 s) per
+# job per docs-only commit, against a full test run saved.
 jobs:
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      # Markdown is not inert here: `test/oracles/test_doc_run_citations_resolve.jl`
+      # reads `docs/**.md` and fails on a document citing a `runs/` path that does
+      # not exist. Treating .md as "no code changed" made that gate unreachable
+      # from the change that can break it — main went red on 2026-07-31 when a
+      # docs-only PR imported two documents carrying seven such citations and
+      # merged with three green checks, none of which had run.
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          # A new branch or a force-push can leave `before` as the null SHA.
+          # Run everything rather than guess: the failure mode of guessing is a
+          # silent green on untested code.
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "base $base unavailable - running everything"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$base" "$head")
+          echo "changed files:"
+          echo "$files"
+          # Documentation is an input to a gate, not just prose — see the `docs`
+          # output above. Reported separately from `code` so a markdown-only
+          # change pays for the oracle job (~5 min) and not the test tiers.
+          if printf '%s\n' "$files" | grep -q '^docs/.*\.md$'; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          fi
+          # Any file not ending in .md means code. An empty diff also lands
+          # here (the empty line does not end in .md), which is the safe way
+          # round.
+          if printf '%s\n' "$files" | grep -qv '\.md$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "markdown only - skipping the expensive steps"
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: Test (Julia 1.12, tier=fast)
+    needs: changes
     runs-on: ubuntu-latest
     # FAST tier parallelised across the runner's cores (SPINORBEC_TEST_WORKERS
     # =auto): the files are split into one independent julia process per CPU
@@ -36,6 +131,15 @@ jobs:
     # not CI flake.
     timeout-minutes: 15
     env:
+      # The steps below honour `docs` as well as `code`, because the FAST tier
+      # contains `test_docs_live_set.jl`, whose INPUT is `docs/**.md`. Gating it
+      # on `code` alone made it unreachable from the only change that can break
+      # it. That hole was closed for the oracles tier on 2026-07-31 and
+      # reopened one tier over when this gate was added to FAST: main went red
+      # on 2026-08-04 when a docs-only PR added a document with neither a LIVE
+      # entry nor a FROZEN header, and merged with four green checks of which
+      # two were 8- and 10-second skips. A docs-only PR now pays this job.
+      #
       # Per-push CI runs the `fast` tier: unit tests only, no
       # ITP/RTP integration. The `ci` (fast + integration) and `full`
       # (everything) tiers — both ~30-45 min — run in the nightly
@@ -47,9 +151,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Share ONE depot cache across the per-PR `test` + `oracles` jobs: same
           # Project/Manifest/Julia/OS ⇒ byte-identical depot. The action's
@@ -64,7 +170,9 @@ jobs:
           # depot.
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - uses: julia-actions/julia-runtest@v1
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Coverage instrumentation forces re-precompile of every package
           # because the precompile cache is keyed on compile flags. We don't
@@ -74,6 +182,7 @@ jobs:
 
   oracles:
     name: Oracle gates (tier=oracles)
+    needs: changes
     runs-on: ubuntu-latest
     # The sign-bug-proof / validation oracle gates live in the `ci` tier, which
     # only runs nightly — so a PR could break one and merge green. It happened:
@@ -89,27 +198,75 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           version: "1.12"
       - uses: julia-actions/cache@v2
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
           # Shared with the `test` job — see the rationale on that job's cache step.
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - uses: julia-actions/julia-runtest@v1
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
+        with:
+          coverage: false
+
+  integration:
+    name: Integration gates (tier=integration)
+    needs: changes
+    runs-on: ubuntu-latest
+    # The other half of the hole the `oracles` job was cut to close. `fast`
+    # gates FAST_TESTS and `oracles` gates every `test/oracles/` file, which
+    # left exactly CI_EXTRA's non-oracle files — ITP/RTP integration, ground
+    # state, split-step, config/experiment plumbing — running only in the
+    # nightly `full` job. A PR could break `solvers/test_ground_state.jl` and
+    # merge with three green checks.
+    #
+    # This runs JUST those files (tier=integration, derived from CI_EXTRA in
+    # test/_tiers.jl), so `fast` + `oracles` + `integration` between them cover
+    # the whole `ci` tier per PR without any single job paying ~30-45 min for
+    # it serially. test_tier_membership.jl reads the tiers back out of this
+    # file and fails if the three stop covering `ci`.
+    #
+    # These are integration tests, not unit tests: budget above the 15 min the
+    # sibling jobs use until a measured runtime says otherwise.
+    timeout-minutes: 30
+    env:
+      SPINORBEC_TEST_TIER: integration
+      SPINORBEC_TEST_WORKERS: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        if: needs.changes.outputs.code == 'true'
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+        if: needs.changes.outputs.code == 'true'
+        with:
+          # Shared with the `test` job — see the rationale on that job's cache step.
+          cache-name: julia-cache;workflow=${{ github.workflow }}
+      - uses: julia-actions/julia-buildpkg@v1
+        if: needs.changes.outputs.code == 'true'
+      - uses: julia-actions/julia-runtest@v1
+        if: needs.changes.outputs.code == 'true'
         with:
           coverage: false
 
   format:
     name: JuliaFormatter check
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
+        if: needs.changes.outputs.code == 'true'
         with:
           version: "1.12"
       - name: Install JuliaFormatter
+        if: needs.changes.outputs.code == 'true'
         # Pin the version so CI and the .githooks/pre-commit check agree.
         # An unpinned add floats to whatever is newest and silently reflows
         # the repo when JuliaFormatter changes its blue style between
@@ -117,6 +274,7 @@ jobs:
         # + `format("test/")` reformat (devs must run the same version).
         run: julia -e 'using Pkg; Pkg.add(name="JuliaFormatter", version="2.5.0")'
       - name: Check formatting
+        if: needs.changes.outputs.code == 'true'
         run: |
           julia -e '
             using JuliaFormatter
@@ -132,7 +290,11 @@ jobs:
   bench:
     name: Benchmark
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true'
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2

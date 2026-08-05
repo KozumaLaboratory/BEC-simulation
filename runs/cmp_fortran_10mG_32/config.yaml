@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  JULIA (SpinorBEC.jl) vs FORTRAN (Eu-Fortran) quantitative cross-check.
+#  IDENTICAL run to config/cmp_jl_10mG_32.nml on the Fortran side:
+#    - Ground state at Bz = 10 mG (0.01 G), fully polarized m=-6.
+#    - Sudden quench to Bz = 26 uG (2.6e-5 G) at t=0, hold, evolve 40 ms
+#      (internal duration = 40e-3 * omega_ref[691.15] = 27.646).
+#    - 32^3 / box 18 / trap (1,1,1.182) / Eu151 / N=5e4 / a_s=110 / c1=1/36.
+#    - DDI: zero-padded (fully aperiodic), pad_factor 2 -- matches Fortran.
+#    - No symmetry-breaking seed (DDI itself couples m=-6 -> m=-5), matching the
+#      unseeded Fortran run, for an apples-to-apples numerical comparison.
+#    - Save psi every 100 steps in f64, so analysis/standard.py sees identical
+#      frame cadence.  NOT touching any SpinorBEC.jl source -- config only.
+# ─────────────────────────────────────────────────────────────────────────
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions:
+    N_atoms: 50000
+    omega_ref: 691.15
+
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n: [32, 32, 32]
+      box: [18, 18, 18]
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]
+    interactions:
+      N_atoms: 50000
+      omega_ref: 691.15
+      c1_ratio: 0.027777777777777776
+
+pipeline:
+  # --- Ground state at 10 mG (fully polarized m=-6) ---
+  - ground_state:
+      use: [eu151_edh_phys]
+      method: lbfgs
+      initial_state: spin_coherent
+      init_state_params:
+        init_theta: 3.141592653589793
+        init_phi: 0.0
+      B:
+        Bz: 0.01 Gauss
+      n_steps: 400
+      tol: 1.0e-09
+      ddi:
+        enabled: true
+        secular: false
+        padded: true
+        pad_factor: 2.0
+      cache: runs/cmp_fortran_10mG_32/cache/gs_10mG_32.jld2
+
+  # --- Sudden quench to 26 uG, hold, evolve 40 ms ---
+  - dynamics:
+      duration: 27.646
+      dt: 0.001
+      B:
+        Bz: 2.6e-5 Gauss
+      ddi:
+        enabled: true
+        secular: false
+        padded: true
+        pad_factor: 2.0
+      seed_amplitude: 0.0
+      save:
+        every: 100
+        psi: true
+        precision: f64

@@ -104,21 +104,15 @@ t_diag = gtime(() -> SpinorBEC._dispatch_diagonal_step!(ws, Val(3), zd, 0.00125,
 let Ext = Base.get_extension(SpinorBEC, :SpinorBECCUDAExt)
     pm = sqrt(maximum(bufs.Phi_x.^2 .+ bufs.Phi_y.^2 .+ bufs.Phi_z.^2))
     R = 0.0025 * pm * Float64(sm.system.F)
-    K = Ext._taylor_degree(R, 1e-13)
-    use0 = Ext._DDI_USE_TAYLOR[]
-    rmax0 = Ext._DDI_TAYLOR_RMAX[]
-    @printf("\nDDI rotation: R = dt·max|Φ|·F = %.4f  ->  production default = %s\n", R,
-        use0 && R <= rmax0 ? "Taylor K=$K" : "Euler")
-    # Force Taylor (raise RMAX) so we time it regardless of this config's R.
-    Ext._DDI_TAYLOR_RMAX[] = Inf
-    Ext._DDI_USE_TAYLOR[] = true
+    use0 = SpinorBEC.SPIN_TAYLOR_ENABLED[]
+    @printf("\nDDI rotation: peak R = dt·max|Φ|·F = %.4f (the kernel sizes each voxel from its own R)\n", R)
+    SpinorBEC.SPIN_TAYLOR_ENABLED[] = true
     t_rot_tay = gtime(() -> SpinorBEC._apply_ddi_rotation!(psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, 0.0025, 3))
-    Ext._DDI_USE_TAYLOR[] = false
+    SpinorBEC.SPIN_TAYLOR_ENABLED[] = false
     t_rot_eul = gtime(() -> SpinorBEC._apply_ddi_rotation!(psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, sm, 0.0025, 3))
-    Ext._DDI_TAYLOR_RMAX[] = rmax0
-    Ext._DDI_USE_TAYLOR[] = use0          # restore the real default
-    @printf("  ddi_rotation  Taylor(K=%d) %8.1f μs   Euler %8.1f μs   (Euler/Taylor=%.2fx)\n",
-        K, t_rot_tay, t_rot_eul, t_rot_eul / t_rot_tay)
+    SpinorBEC.SPIN_TAYLOR_ENABLED[] = use0          # restore the real default
+    @printf("  ddi_rotation  Taylor %8.1f μs   Euler %8.1f μs   (Euler/Taylor=%.2fx)\n",
+        t_rot_tay, t_rot_eul, t_rot_eul / t_rot_tay)
 end
 
 println("\n=== Per-kernel min (μs), isolated CUDA.@sync ===")

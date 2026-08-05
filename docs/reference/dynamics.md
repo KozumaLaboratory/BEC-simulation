@@ -13,10 +13,15 @@ Every key accepted under a YAML `dynamics:` step. Multiple knobs that return `on
 
 | key                          | type     | default | meaning                                   |
 |------------------------------|----------|---------|-------------------------------------------|
-| `save_every`                 | Int      | 1       | record observables / snapshots every N steps |
-| `save_psi_snapshots`         | Bool     | false   | stream ψ to scratch JLD2 (`frame_NNNNN`)    |
-| `save_snapshot_precision`    | "f32"\|"f64" | "f32" | downcast precision for streamed snapshots  |
-| `save_snapshot_compression`  | Bool     | false   | zlib-compress streamed snapshots            |
+| `save.every`                 | Int      | 1       | record observables / snapshots every N steps |
+| `save.n_snapshots`           | Int      | —       | OR fix the snapshot count instead of the stride |
+| `save.psi`                   | Bool     | false   | stream ψ to scratch JLD2 (`frame_NNNNN`)    |
+| `save.precision`             | "f32"\|"f64" | "f32" | downcast precision for streamed snapshots  |
+| `save.compression`           | Bool     | false   | zlib-compress streamed snapshots            |
+
+All five live inside one `save:` mapping (`SAVE_SCHEMA`). The flat spellings
+`save_every` / `save_psi_snapshots` / `save_snapshot_precision` /
+`save_snapshot_compression` are unknown keys and abort a strict-mode load.
 
 Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set `SPINORBEC_SCRATCH_DIR` to redirect the scratch `.tmp`.
 
@@ -24,7 +29,10 @@ Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set `SPINORBEC_
 
 Each of these falls back to the previous step's value if omitted:
 
-- `interactions:` — `c0` / `c1` / `c1_ratio` / `N_atoms` / `omega_ref` / per-channel `c_extra` / `c_lhy`. Time-dependent `c0` / `c1` produce `TimeDependentInteractions`.
+- `interactions:` — `c0` / `c1` / `c1_ratio` / `N_atoms` / `omega_ref` / `c_total` / per-channel `cN` (N = 2…12).
+  Time-dependent `c0` / `c1` produce `TimeDependentInteractions`.
+  **Not `c_lhy`** — it moved to the `lhy:` block (`lhy: {kind: …, c_lhy: …}`) and
+  `interactions.c_lhy` is now rejected as an unknown key. Listed here until 2026-08-04.
 - `B:` — unified Zeeman block. Three coord systems auto-detected from keys: `:dimless` (`p`/`q`/`bx`/`by`), `:cartesian` (`Bx`/`By`/`Bz`, Gauss or `"X Gauss"` strings), `:spherical` (`B_mag`/`theta_deg`/`phi_deg`). Mixing coord systems in one block raises `ArgumentError`. `q` is coord-orthogonal and may be combined with any. Ramps via `{from: …, to: …}` expand to a `TimeDependentZeeman`. The legacy step-level `zeeman:` / `B_hat:` keys are rejected.
 - `ddi:` — `enabled`, `c_dd` (with optional `{from, to}` ramp), `secular`, `quasi_2d`, `l_z`.
 - `potential:` — single dict or list (composite). Same syntax as the ground-state block.
@@ -38,6 +46,7 @@ These return `on_step` closures and compose freely:
 | knob                | fields                                  | semantics                                            |
 |---------------------|------------------------------------------|------------------------------------------------------|
 | `sgpe:`             | `gamma`, `T`, `mu`, `k_cut`, `every`, `seed` | stochastic projected GPE (finite-T relaxation)        |
+| *(SPGPE)*           | Julia-only: `SPGPEReservoir` + `spgpe_callback` | **full** SPGPE — growth AND energy-damping reservoirs, γ/ℳ̄ derived from (μ, T, ε_cut); accepts ramped `T(t)`, `μ(t)`. See [spgpe.md](../guides/spgpe.md). No YAML key yet. |
 | `projected_gp:`     | `k_cut`, `smooth`, `every`               | hard truncated-projected GP                          |
 | `photon_scattering:`| `Gamma_sc`, `seed`                       | spontaneous-emission heating (Lindblad jumps)         |
 | `loss:`             | `gamma_dr` and/or `K3_per_m_si: ["1.5e-30 m^6/s", …] × D` | one-body + spin-dependent three-body loss             |
@@ -113,11 +122,13 @@ Applied **once** at the start of the dynamics phase, after ψ is copied from the
 - dynamics:
     duration: 30.0
     dt: 0.005
-    save_every: 100
-    save_psi_snapshots: true
-    save_snapshot_precision: "f32"
+    save: {every: 100, psi: true, precision: f32}
     interactions: {omega_ref: 691.15}
-    zeeman: {p: {from: 1.0, to: 0.39}, q: 0.0}
+    B:                                          # NOT `zeeman:` — see below
+      Bz: {from: 0.0104, to: -2.0e-4, duration: 0.1037}
+      theta: 0.0
+      phi: 0.0
+      q: 0.00909116
     sgpe:              {gamma: 0.05, T: 0.1, every: 1, seed: 42}
     photon_scattering: {Gamma_sc: 0.01, seed: 42}
     loss:              {gamma_dr: 0.02}
@@ -127,3 +138,21 @@ Applied **once** at the start of the dynamics phase, after ψ is copied from the
 ```
 
 The runner builds `cb_sgpe`, `cb_pgp`, `cb_photon`, `cb_live` and pipes them through `_compose_callbacks` into a single `on_step`.
+
+> **Two dead keys were removed from this example on 2026-08-04**, both verified
+> against the live schema by feeding the block itself to `inspect_config_string`.
+>
+> **`save:`, not three flat keys.** `save_every` / `save_psi_snapshots` /
+> `save_snapshot_precision` were folded into one `save:` block
+> (`every` / `psi` / `precision` / `n_snapshots` / `compression`, per
+> `SAVE_SCHEMA`). The flat spellings are rejected as unknown keys.
+>
+> **`B:`, not `zeeman:`.** This example carried `zeeman: {p: …, q: …}` until
+> 2026-08-04. A step-level `zeeman:` key is refused by the schema outright —
+> `step has step-level \`zeeman:\` key — not a valid user-facing field. Magnetic
+> field belongs in the unified \`B:\` block` — so anyone who copied this block
+> into a config got an error at load. The form above is taken from a config that
+> runs (`runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.yaml:115-122`), and it ramps
+> the FIELD rather than `p`: magnitude (`Bz` / `B_mag` / `p_mv`) plus direction
+> (`theta` / `phi`), with `q` auto-derived from |B|² unless given. The `p ≡ -g_F
+> μ_B B` conversion lives once in `Units.bfield_to_p`.

@@ -1,5 +1,8 @@
 # TWA Sinatra criterion validation — superseded
 
+> **FROZEN 2026-05-07.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: VERDICT REVISED 2026-05-08; this scan's analysis is no longer the load-bearing reading. See **`twa_pinned_16g_result.md`** for the correct interpretation. This file is kept only for the raw measurement record (3 ensembles, RTX 5070 Ti, 2026-05-07 19:18, ~75 min runtime).
 
 ## What was measured

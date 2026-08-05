@@ -1,5 +1,8 @@
 # Sweep view — architecture
 
+> **FROZEN 2026-06-02.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status (2026-06-02):** data contract + golden gating live (this commit).
 `to_viewspec` resolver + Vega-Lite renderer + VSUP composition are
 scheduled, schema slots reserved.

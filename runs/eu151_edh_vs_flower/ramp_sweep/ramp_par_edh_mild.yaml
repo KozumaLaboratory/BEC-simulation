@@ -1,0 +1,77 @@
+# Mild parabolic EdH ramp — Goto difference-imaging checkerboard-inversion probe.
+#
+# Designed 2026-07-23. Goal: a parabolic Bz ramp gentler than the flower-forming
+# one (ramp_par_flower120 = parabola -> 120 uG + seed => adiabatic flower texture,
+# symmetric difference image, NO checkerboard). Here the same parabolic SHAPE ends
+# at the mild 26 uG endpoint (proven from ramp_par_T90), keeping the cloud in the
+# EdH regime, then HOLDS at 26 uG long enough — finely sampled — to watch the Goto
+# difference-image checkerboard (transverse <Fx> texture) Larmor-precess and INVERT.
+#
+# Physics sizing: at 26 uG the transverse-spin Larmor rate p = gF*uB*B/(hbar*w_ref)
+# ~ 0.385 per w^-1  =>  precession period ~16 w^-1, checkerboard sign-flip every
+# ~8 w^-1 (half period). The 60 w^-1 hold sampled every 1.0 w^-1 (every 500 steps)
+# therefore captures ~3-4 full inversions with ~16 points/period.
+#
+# Discriminator: EdH  => difference image (dif_col, odd-in-theta) shows an
+# alternating (checkerboard) sign pattern that INVERTS in time  =>  asym < 0.
+#          flower => sum-in-theta (<Fz>) dominates, symmetric, no inversion => asym > 0.
+defaults:
+  kind: spinor
+  backend: gpu
+  interactions: {N_atoms: 50000, omega_ref: 691.15}
+mixins:
+  eu151_edh_phys:
+    atom: Eu151
+    grid:
+      n: [64, 64, 64]
+      box: [18, 18, 18]
+    potential:
+      type: harmonic
+      omega: [1.0, 1.0, 1.182]
+    interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.027777777777777776}
+pipeline:
+# EdH starts from a FULLY POLARIZED m=−6 stretched state. The GS field carries
+# q=0 (explicit) so the linear Zeeman alone makes m=−6 the ground state — without
+# this the auto-derived quadratic Zeeman q(∝|B|²) at 10 mG dominates and the
+# default initial_state=:polar (m=0) gets stuck at m=0 (Fz|0⟩=0 ⇒ no gradient).
+# initial_state=:m_minus_F seeds the stretched state directly. Dynamics keep the
+# physical auto-q.
+- ground_state:
+    use: [eu151_edh_phys]
+    method: lbfgs
+    initial_state: m_minus_F
+    B: {Bz: 0.01 Gauss, q: 0.0}
+    n_steps: 800
+    tol: 1.0e-08
+    cache: runs/eu151_edh_vs_flower/cache/gs_10mG_polm6_64.jld2
+# --- parabolic ramp: 10 mG -> 26 uG over 90 w^-1 (decelerating at the low-field
+#     end; identical profile to the proven ramp_par_T90) ---
+- dynamics:
+    duration: 90.0
+    dt: 0.002
+    B:
+      Bz:
+        piecewise:
+          times: [0.0, 5.625, 11.25, 16.875, 22.5, 28.125, 33.75, 39.375, 45.0, 50.625,
+            56.25, 61.875, 67.5, 73.125, 78.75, 84.375, 90.0]
+          values: [0.01, 0.0087922109375, 0.00766234375, 0.0066103984375, 0.005636375,
+            0.0047402734375, 0.00392209375, 0.0031818359375, 0.0025195, 0.0019350859375,
+            0.00142859375, 0.0010000234375, 0.000649375, 0.0003766484375, 0.00018184375,
+            6.49609375e-05, 2.6e-05]
+    loss:
+      K3_per_m_si: &id001 [2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s,
+        2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s, 2.1e-41 m^6/s]
+    save: {every: 1125, psi: true, precision: f32}
+# --- HOLD at 26 uG, finely sampled (every 1.0 w^-1) to resolve the checkerboard
+#     inversion over ~3-4 Larmor periods ---
+- dynamics:
+    duration: 60.0
+    dt: 0.002
+    B: {Bz: 2.6e-5 Gauss}
+    seed_amplitude: 1.0e-08
+    seed_k_cut: 2.5
+    noise_seed: 42
+    loss:
+      K3_per_m_si: *id001
+    save: {every: 500, psi: true, precision: f32}

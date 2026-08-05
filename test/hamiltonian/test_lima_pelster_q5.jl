@@ -23,21 +23,28 @@ using SpinorBEC
 end
 
 @testset "γ_LHY dimensional sanity" begin
+    # `scalar_lhy_coefficient` is the single declaration point for the scalar LHY
+    # coefficient. This testset used to call a rotating-basis-local
+    # `compute_gamma_lhy`, which the engine retirement deleted (leaving the name
+    # undefined and this file red) and which carried the pre-PR#108 formula with
+    # BOTH exponents low — so the scaling assertions below already contradicted it.
+    scalar_lhy = SpinorBEC.scalar_lhy_coefficient
+
     # Dy164 Klaus regime: γ_LHY ratio to c0 should be O(1) (LHY substantial)
     a0 = 5.291772109e-11
-    γ_dy = SpinorBEC.compute_gamma_lhy(92*a0/1.11e-6, 1.42, 60000)
+    γ_dy = scalar_lhy(92*a0/1.11e-6, 60000; eps_dd=1.42)
     @test γ_dy > 0
     @test γ_dy < 1e5         # not absurdly large
     @test γ_dy / 3306 > 0.5  # ratio to c0 is sensible (γ/c0 ≈ 1.8 expected)
     @test γ_dy / 3306 < 5.0
 
     # γ_LHY scales as N^(3/2)
-    γ_n1 = SpinorBEC.compute_gamma_lhy(0.001, 1.0, 1000)
-    γ_n2 = SpinorBEC.compute_gamma_lhy(0.001, 1.0, 8000)   # 8× atoms
+    γ_n1 = scalar_lhy(0.001, 1000; eps_dd=1.0)
+    γ_n2 = scalar_lhy(0.001, 8000; eps_dd=1.0)   # 8× atoms
     @test γ_n2 / γ_n1 ≈ 8.0^1.5 atol=1e-6                    # √8³ = 22.63
 
     # γ_LHY scales as (a_s/a_ho)^(5/2)
-    γ_a1 = SpinorBEC.compute_gamma_lhy(1e-3, 1.0, 1000)
-    γ_a2 = SpinorBEC.compute_gamma_lhy(2e-3, 1.0, 1000)   # 2× scattering length
+    γ_a1 = scalar_lhy(1e-3, 1000; eps_dd=1.0)
+    γ_a2 = scalar_lhy(2e-3, 1000; eps_dd=1.0)   # 2× scattering length
     @test γ_a2 / γ_a1 ≈ 2.0^2.5 atol=1e-6
 end

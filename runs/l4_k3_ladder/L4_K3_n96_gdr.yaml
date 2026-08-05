@@ -3,16 +3,6 @@
 # Grid: 96³, scenario: gdr, t_evolution: 20.0 dimless
 # Pass criteria: see runs/l4_k3_ladder/README.md
 
-metadata:
-  suite: l4_k3_collapse_arrest_ladder
-  ladder_level: 12
-  grid_n: 96
-  scenario: gdr
-  K3_on: false
-  gdr_on: true
-  LHY_on: false
-  generator: scripts/validation/l4_k3_ladder_gen.jl
-
 defaults:
   kind: spinor
   backend: gpu
@@ -37,7 +27,7 @@ pipeline:
         enabled: true
         secular: false
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

@@ -9,22 +9,10 @@
 #   rotation kept in hold : false
 #
 # Pipeline:
-#   GS (Ω=0, B=-0.01 G, DDI on)
-#   → rotation_prep (10.0 ms, B=-0.01 G, Ω=-0.5, DDI=false)
+#   GS (Ω=0, B=0.01 G, DDI on)
+#   → rotation_prep (10.0 ms, B=0.01 G, Ω=-0.5, DDI=false)
 #   → B_quench (1.0 ms, B ramp true, Ω=0.0, DDI=false)
-#   → weak_field_hold (10.0 ms, B=-2.6e-5 G, Ω=0.0, DDI=false)
-
-metadata:
-  suite: klaus_quench
-  cell_name: klaus_quench_omm0p5_DDIoff
-  rotation_omega: -0.5
-  ddi_on_dynamics: false
-  do_B_quench: true
-  rotation_kept_in_hold: false
-  generator: scripts/validation/klaus_quench_gen.jl
-  protocol_summary: |
-    Rotation preparation at strong B → quench to weak B → free hold.
-    Observable: post-quench spin excitation in m=-5, m=-4 components.
+#   → weak_field_hold (10.0 ms, B=2.6e-5 G, Ω=0.0, DDI=false)
 
 defaults:
   kind: spinor
@@ -42,7 +30,7 @@ pipeline:
         c1_ratio: 0.02778
       ddi: {enabled: true, secular: true}
       lhy: {kind: none}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5
@@ -54,7 +42,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: -0.5
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: false, secular: false}
       lhy: {kind: none}
       seed_amplitude: 1.0e-6
@@ -68,7 +56,7 @@ pipeline:
       duration: 0.69115
       dt: 0.001
       rotating_frame_omega: 0.0
-      B: {Bz: {from: -0.01, to: -2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      B: {Bz: {from: 0.01, to: 2.6e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
       ddi: {enabled: false, secular: false}
       lhy: {kind: none}
       save:
@@ -80,7 +68,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.0
-      B: {Bz: "-2.6e-5 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "2.6e-5 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: false, secular: false}
       lhy: {kind: none}
       save:

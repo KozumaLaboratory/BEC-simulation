@@ -6,7 +6,7 @@ Day-to-day workflow + scaling knobs for TSUBAME 4.0 (Altair Grid Engine / UGE + 
 
 ```bash
 ssh tsubame
-cd $T4_GROUP/work     # NOT $HOME — only 30 GB quota there
+cd $T4_GROUP/work     # NOT $HOME — only 25 GB quota there
 git clone git@github.com:anko9801/BEC-simulation.git
 cd BEC-simulation
 
@@ -47,11 +47,23 @@ Throughput on H100 at 128³ × D=13:
 
 128³ × 107.6 ω⁻¹ at dt=1e-4 ≈ 2.5 h walltime. 256³ ≈ 15 h.
 
+## Pre-flight
+
+```bash
+source scripts/tsubame/preflight.sh          # or --gpu for a CUDA job
+```
+
+Four environment requirements have each cost a whole job batch, and all four were
+already documented — two of them in this file. Reading them did not prevent it, so
+they are now asserted at second zero with the fix in the message: BLAS threads
+pinned, project root off `$HOME`, group-volume headroom, `runs/` present, and (for
+`--gpu`) the `import CUDA` ordering. The script says why for each.
+
 ## Filesystem layout
 
 | path                   | type                | use                        |
 |------------------------|---------------------|----------------------------|
-| `$HOME`                | Lustre, 30 GB quota | tiny (no project dirs)     |
+| `$HOME`                | Lustre, **25 GB** quota | tiny (no project dirs) — measured 2026-08-01 with `t4-user-info disk home`; the 30 GB here was wrong and a batch died on it |
 | `$T4_GROUP`            | Lustre, TB-scale    | code + finalised results   |
 | `$T4_LOCAL`/`$T4_TMPDIR` | node-local NVMe   | depots, scratch snapshots  |
 | `/scratch`             | per-node, ephemeral | cleared at job end         |
@@ -108,7 +120,7 @@ julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
 For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the rendered
 script — extend `UGE_PROFILE_DIRECTIVES` with a new `"scan_array"`
 profile carrying the array directive, or pipe `render_uge_script`
-output through `sed`. Each task writes `runs/foo/point_NNN.jld2`;
+output through `sed`. Each task writes `runs/foo/point_NNN.jld2` (example);
 resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
 env var inside `_run_yaml_scan`).
 
@@ -129,14 +141,27 @@ use a per-job script of the form:
 
 . /etc/profile.d/modules.sh
 source scripts/tsubame_setup.sh
-export SPINORBEC_SCRATCH_DIR=$T3TMPDIR
+# SPINORBEC_SCRATCH_DIR is already exported by tsubame_setup.sh ($T4_TMPDIR/spinorbec_snaps)
+
+# Name the binary. There is NO julia modulefile on TSUBAME 4 — `module load
+# julia` fails and `tsubame_setup.sh` swallows it, so a bare `julia` in a UGE
+# job dies with "command not found". A login shell only works because the
+# lab profile puts the shared juliaup on PATH, which qsub does not inherit.
+JULIA=${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}
 
 # Sysimage support (optional):
 SYSIMAGE_FLAG=""
 [ -f "spinor_sysimage.so" ] && SYSIMAGE_FLAG="--sysimage=spinor_sysimage.so"
 
-julia --project=. $SYSIMAGE_FLAG scripts/cli.jl launch <run_name>
+"$JULIA" --project=. $SYSIMAGE_FLAG scripts/cli.jl launch <run_name>
 ```
+
+For a project tree synced fresh (a new `$HOME/<name>` rather than an
+established one), also point the depot at the warm shared one —
+`export JULIA_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.julia` **before**
+sourcing `tsubame_setup.sh`, which otherwise defaults it to node-local NVMe and
+precompiles SpinorBEC from an empty cache. `tsubame_setup.sh` only sets the
+depot when it is unset, so the export wins.
 
 Add `#$ -t 1-N` + `#$ -tc K` for array jobs; `mapfile -t CONFIGS < <(ls -d runs/<batch>/*/ | sort)`
 then `RUN_NAME="${CONFIGS[$((SGE_TASK_ID - 1))]}"` to pick the per-task
@@ -157,7 +182,8 @@ pipeline:
   - dynamics:
       duration: 107.6
       dt: 1.0e-4
-      save_every: 7000         # → 154 snapshots
+      save: {every: 7000}      # → 154 snapshots. NOT `save_every:`: the flat
+                               # spellings were folded into `save:` and are rejected.
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 
@@ -201,14 +227,14 @@ Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png ht
 `run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
 For multi-attempt mixes of crashes + preemption: enqueue via
-`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml`
+`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` (example)
 and let the autopilot's `retry_failed!` (called per-tick by the systemd
 timer) handle re-dispatch with profile escalation on OOM/TIMEOUT.
 
-## High-res scan inventory (target table for `runs/tsubame_scan/`)
+## High-res scan inventory (target table for `runs/tsubame_scan/` (example))
 
 Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
-on `runs/klaus_eu151_v2_full/config.yaml` as the template:
+on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
 
 ### Dy164 (3 configs)
 | name | grid | duration | est. wall (H100) |
@@ -275,4 +301,4 @@ julia --project=. -e '
 | Job killed at exact wall-clock limit | job not rerunnable | re-submit (or `#$ -r y`); resumes from checkpoint |
 | Phase-diagram scan progresses one-at-a-time | not using array job | switch to a `scan_array` profile with `#$ -t 1-N -tc K` |
 | GC pressure on big ψ across many scan points | implicit retention | `GC.gc()` between phases; `CUDA.memory_status()` to inspect |
-| FFTW wisdom replanning on each new node | wisdom not shared | bake wisdom into `runs/shared/fftw.wisdom` if hopping CPU generations |
+| FFTW wisdom replanning on each new node | wisdom not shared | bake wisdom into `runs/shared/fftw.wisdom` (example) if hopping CPU generations |

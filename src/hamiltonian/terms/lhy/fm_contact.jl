@@ -1,10 +1,3 @@
-# NOT GENERALIZABLE: FM-contact LHY accepts F=6 only via sigma_delta_fm_F6 table.
-# Reason: math, performance
-# Why: σ_m/δ_m lookup is keyed by F and we only ship the F=6 sympy-derived
-#   rationals. The single-mode collapse (Watanabe-Brauner Type-B Goldstone) is
-#   general for any F, but per-m coefficients still require offline CG work.
-# See: src/hamiltonian/terms/lhy/sigma_delta_fm_F6.jl, Paper #3 §V.E
-#
 # fm_contact_lhy.jl
 # =================================================================
 # Closed-form contact LHY for spinor BECs in the FM phase
@@ -36,15 +29,13 @@
 # Lima-Pelster (no DDI): (8/15π²) (c_0 n)^(5/2). The mode adds value
 # only when g_S vary across S (realistic Eu/Er/Dy a_S, or non-zero c_1).
 #
-# DDI extension (FM + Q_5-like angular average, "Stage C" in the paper-#2
-# roadmap) is NOT yet implemented — it requires the Q_5(ε_dd^F) reduction
-# with rank-2 spherical tensor coupling to m=+F-1 and m=+F-2 (parallel
-# session future deliverable).
+# Valid for any F: `sigma_fm` / `delta_fm` are closed forms in F, and the
+# single-mode result is gated against `full_bdg` (no ansatz) at F = 1..8.
 
 export FMLHYCoefs, build_fm_lhy_coefs, lhy_energy_fm
 export sigma_fm, delta_fm
 
-include("sigma_delta_fm_F6.jl")
+include("sigma_delta_fm.jl")
 
 """
     FMLHYCoefs(F, sigma, delta)
@@ -92,6 +83,18 @@ function lhy_energy_fm(n::Float64, coefs::FMLHYCoefs;
     M_mass::Float64=1.0, hbar::Float64=1.0)::Float64
     prefactor = (8.0 * sqrt(M_mass^3)) / (15.0 * π^2 * hbar^3)
     kappa = coefs.delta_F
-    kappa < 1e-12 && return 0.0
+    # `kappa < 1e-12 && return 0.0` conflated two different things. "Negligible"
+    # and "negative" are not the same answer: κ = g_{2F} is the FM branch's own
+    # stiffness, so κ < 0 means the ansatz this closed form is built on has a
+    # negative stiffness, and returning 0.0 there reported NO LHY for a state
+    # whose LHY is undefined. Reachable at F=6 whenever c₁/c₀ < −1/36 = −0.0278,
+    # since g_{2F} = c₀ + 36 c₁ — measured ε_fm = 0.0 at c₁/c₀ = −0.0278 and
+    # −0.05, against 10.4048 at −0.005.
+    #
+    # NaN is how the closed forms decline (cf. `epsilon_LHY_F6_Ih`); `_tabulate_lhy`
+    # turns it into an ArgumentError naming the regime. A silent zero is worse
+    # than either, and is the same shape as the six paths that dropped `ws.lhy`.
+    kappa < -1e-12 && return NaN
+    kappa < 1e-12 && return 0.0      # genuinely negligible coupling
     return prefactor * (n * kappa)^2.5    # ν=1, t=0, φ_1^reg(0)=1
 end

@@ -11,12 +11,6 @@
 # If DDI-off run STILL shows EdH-like behavior, the mechanism is misidentified
 # (e.g., contact-c1 spin mixing alone is producing the transfer).
 
-metadata:
-  suite: spinorbec_physics_verification
-  ladder_level: 3
-  reference: Kawaguchi_Ueda_review_EdH_canonical
-  expected: no_spin_to_orbital_transfer_without_DDI
-
 defaults:
   kind: spinor
   backend: gpu

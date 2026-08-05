@@ -1,3 +1,6 @@
+using Test
+using SpinorBEC
+
 @testset "Quasi-2D dimensional reduction" begin
     @testset "parsing quasi_2d + l_z in pipeline" begin
         yaml_str = """

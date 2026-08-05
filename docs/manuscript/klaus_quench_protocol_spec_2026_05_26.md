@@ -1,5 +1,15 @@
 # Klaus 2-phase quench protocol — spec & 10-cell scan
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
+> **Vintage.** The numbers here — including `|Ω| / ω_⊥ = 0.468`, quoted to three
+> significant figures — predate `bce2068f` (2026-07-29), which reverted the field
+> sign across 211 Eu configs, and have not been re-derived since. The sheet that
+> carries the full argument is `docs/manuscript/klaus_protocol_sheet.md`; the 11x
+> quadratic-Zeeman correction is measured NOT to apply in this nT band
+> (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
+
 ## Matsui K_3 calibration (2026-05-27, 5-cell fine bracket)
 
 GPU dispatch of K3 ∈ {5, 10, 15, 20, 25} × K_3,proxy at the Matsui
@@ -119,7 +129,7 @@ optimum within ~6%.  See `docs/manuscript/figures/klaus_quench_fig_k14_omega_ref
 ## Klaus-II adiabatic result (2026-05-27): still null
 
 A 7-stage adiabatic Klaus-II prototype
-(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5/`) was
+(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.yaml`) was
 dispatched to test whether the sudden-tilt null result was just
 an adiabaticity artifact.  Result:
 

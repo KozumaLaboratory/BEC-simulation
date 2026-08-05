@@ -1,5 +1,8 @@
 # TDHFB GPU port — design document (Phase 5)
 
+> **FROZEN 2026-05-12.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-12
 **Status**: design — implementation post-修論 / D-thesis Year 1 Q3 candidate.
 **Predecessors**:

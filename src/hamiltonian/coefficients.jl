@@ -343,10 +343,38 @@ end
 """
     linear_zeeman_p(atom, B, omega_ref)
 
-Dimensionless linear Zeeman shift: p = g_F × μ_B × B / (ℏ × omega_ref).
+Dimensionless linear Zeeman shift, `p = -g_F μ_B B / (ℏ ω_ref)`, delegating to
+[`Units.bfield_to_p`]. `B` is in TESLA.
+
+This computed `+g_F μ_B B / (ℏ ω_ref)` and delegated to nothing until
+2026-08-04 — the OPPOSITE sign, measured: at B = 2.6 nT on Eu151 it returned
++0.3847 where `Units.bfield_to_p` returns −0.3847 for the same field and the
+same g_F > 0 atom. Both `Units.bfield_to_p`'s own docstring and CLAUDE.md:153
+asserted that the sign "is declared once" and that every sibling converter
+delegates; this was the counterexample to both, and it was exported.
+
+The sign is physical, not a convention choice: the atomic moment is
+`μ = -g_F μ_B F`, so `H = -μ·B = +g_F μ_B B·F_z = -p·F_z` requires
+`p = -g_F μ_B B`. +Bz on a g_F>0 atom (Eu, Cr, He*) puts the ground state at
+m = -F. The same defect was fixed in `Units.bfield_to_p` on 2026-06-10
+(`mistake_zeeman_groundstate_direction_inverted_2026_06_10`); this copy
+survived because nothing compared the two.
 """
 function linear_zeeman_p(atom::AtomSpecies, B::Float64, omega_ref::Float64)
-    atom.g_F * Units.BOHR_MAGNETON * B / (Units.HBAR * omega_ref)
+    # Delegates — the sign is NOT restated here. This file is included before
+    # `Units`, but the call resolves at run time, not at parse time.
+    #
+    # `u"T"` is load-bearing: `bfield_to_p(::Real, …)` reads a bare number as
+    # GAUSS, and `B` here is TESLA, so delegating without the unit would be
+    # wrong by 1e4 — a second, quieter bug than the sign this call fixes.
+    # `B` is TESLA here (this function's own signature); the project's bare-number
+    # convention is GAUSS, so the 1e4 is a real conversion, not a fudge. Calling
+    # the suffixed name makes the unit visible at the call site — the un-suffixed
+    # `bfield_to_p(::Real, …)` also reads Gauss, but silently.
+    #
+    # `Units.u"T"` cannot be used instead: `u_str` is a macro and resolves at
+    # PARSE time, while this file is included before the Units submodule exists.
+    Units.bfield_to_p_gauss(B * 1.0e4, atom.g_F, omega_ref)
 end
 
 # --- Quasi-2D LHY ---
@@ -354,13 +382,31 @@ end
 """
     compute_lhy_2d_params(c0_2d, l_z) → Quasi2DLHY
 
-Quasi-2D LHY correction: ε_LHY ∝ n² ln(n a²_2d).
-Ref: Petrov & Astrakharchik, PRL 117, 100401 (2016).
+Quasi-2D LHY correction, as the ENERGY DENSITY coefficient:
+
+    ε_LHY = c_lhy_2d · n² · (ln(n a²_2d) + log_const)
+    V_LHY = dε/dn = c_lhy_2d · n · (2(ln(n a²_2d) + log_const) + 1)
+
+`c_lhy_2d = c₀²/(8π)` is the prefactor of the beyond-mean-field term in
+Petrov & Astrakharchik, PRL **117**, 100401 (2016) [arXiv:1605.07535],
+Eq. (5) — `(1/8π)(g̃↑↑n↑ + g̃↓↓n↓)² ln[(g̃↑↑n↑+g̃↓↓n↓)√e/Δ]` — read here in
+the single-component reduction.
+
+It was `c₀²/(4π)` with a compensating `0.5` written into the energy face
+(twice: `_lhy_energy` and the CUDA `gpu_energy.jl`) and NOT into `_lhy_V`, so
+**the propagator applied exactly twice the correct quasi-2D LHY potential**
+while the reported energy was right. Two statements of one coefficient, which
+is the bug class the HamTerm protocol exists to remove; the factor now lives
+here once and both faces derive from it. `dE/dn == V` is gated by
+`oracles/test_lhy_mode_face_coverage.jl`, which is what caught it.
+
+No committed config under `runs/` selects `kind: quasi_2d`, so no stored
+result is affected.
 """
 function compute_lhy_2d_params(c0_2d::Float64, l_z::Float64)
     γ_E = 0.5772156649015329
     log_const = 2.0 * γ_E - 1.0 - log(2.0)
-    c_lhy_2d = c0_2d^2 / (4.0 * Float64(π))
+    c_lhy_2d = c0_2d^2 / (8.0 * Float64(π))
     a_2d_sq = l_z^2
     Quasi2DLHY(c_lhy_2d, a_2d_sq, log_const)
 end
@@ -413,7 +459,7 @@ function _gauss_legendre(n::Int, a::Float64, b::Float64)
     (nodes, weights)
 end
 
-export lima_pelster_Q5, compute_c_lhy_with_ddi
+export lima_pelster_Q5, compute_c_lhy_with_ddi, scalar_lhy_coefficient
 
 """
     lima_pelster_Q5(eps_dd) → Float64
@@ -449,4 +495,30 @@ Apply the Lima-Pelster DDI correction to a scalar LHY coefficient:
 """
 function compute_c_lhy_with_ddi(c_lhy_scalar::Float64, eps_dd::Float64)
     c_lhy_scalar * lima_pelster_Q5(eps_dd)
+end
+
+"""
+    scalar_lhy_coefficient(a_s_over_a_ho, N_atoms; eps_dd=0.0) → Float64
+
+Dimensionless scalar (Lee-Huang-Yang / quantum-fluctuation) coefficient in this
+repo's per-particle convention: with `∫|ψ|² dV = 1` and `c₀ = 4π(a_s/a_ho)N`,
+
+    E_LHY/N = (2/5)·c_lhy·∫n^{5/2} dV,     μ_LHY = c_lhy·n^{3/2}
+
+Derived from `γ_QF = (32/3)·g·√(a_s³/π)` with `g = 4πℏ²a_s/m`, i.e.
+`γ_QF = (128√π/3)(ℏ²/m)a_s^{5/2}`, which in these units is
+
+    c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(ε_dd)
+
+Equivalently `c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π)`, which reproduces the SI
+ratio `μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π)` — the statement with no
+convention freedom, gated by `test/oracles/test_scalar_lhy_si_roundtrip.jl`.
+
+Single declaration point: the YAML `lhy: {kind: scalar}` auto-derivation and
+the scalar-eGPE `gamma_lhy` both read it, so the two paths cannot drift.
+"""
+function scalar_lhy_coefficient(a_s_over_a_ho::Real, N_atoms::Real; eps_dd::Real=0.0)
+    ah = abs(Float64(a_s_over_a_ho))
+    n = Float64(N_atoms)
+    (128.0 * sqrt(π) / 3.0) * ah^2.5 * n^1.5 * lima_pelster_Q5(Float64(eps_dd))
 end

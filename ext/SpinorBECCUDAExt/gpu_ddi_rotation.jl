@@ -1,23 +1,15 @@
 # GPU DDI spin rotation: exp(z·Φ·F) per voxel, z = -i·dt (RT) / -dt (IT).
 #
-# Two exact realizations of the SAME operator, selected by the per-step
-# rotation angle R = dt·max|Φ|·F:
+# Two exact realizations of the SAME operator, selected by the per-step rotation
+# angle R = dt·max|Φ|·F:
 #
-#  * Adaptive tridiagonal Taylor–Horner (default). The generator A = Φ·F is
-#    Hermitian tridiagonal in the F_z basis (F_z diagonal, F_x/F_y ladder
-#    bands), built directly from `sm.Fx/Fy/Fz` (single physics declaration).
-#    `exp(zA)ψ` is evaluated as w←ψ; for k=K..1: w←ψ+(z/k)(A·w), where A·w is a
-#    nearest-neighbour shfl matvec (warp-cooperative, one component per lane —
-#    no local-memory spill, no Fy-eigenvector matrices, no atan/acos). The
-#    degree K is chosen per step from the backward-error bound
-#    R^{K+1}/(K+1)! ≤ tol; in the Eu EdH regime (R≈0.03–0.2) K≈5–9 reaches
-#    machine precision. Imaginary time uses real z=-dt → genuine exp(-dt Φ·F)
-#    weight, no overflow shift needed.
-#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — used as a fallback
-#    when R exceeds `_DDI_TAYLOR_RMAX[]` (never reached in production). Machine
-#    precision at all R.
-
-using StaticArrays: SVector
+#  * Adaptive tridiagonal Taylor-Horner (default) — the shared
+#    `_apply_spin_rotation_taylor!` in gpu_spin_rotation_taylor.jl, which the
+#    spin-mixing substep also uses (same operator, different v).
+#  * Exact Euler 5-stage (`apply_ddi_euler_fused_kernel!`) — reached only when
+#    the Taylor path is switched off or the spinor is wider than the warp
+#    layout (D > 16). Machine precision at all R, and the reference the Taylor
+#    path is parity-gated against.
 
 # --- Euler fallback eigenvector cache (Fy diagonalization) ---
 mutable struct GPUDDIRotCache{D, T <: AbstractFloat}
@@ -52,143 +44,32 @@ function _get_gpu_ddi_rot_cache(
     cache
 end
 
-# --- Taylor tridiagonal-generator coefficients (DEVICE arrays) ---
-# Held as small CuArrays, NOT by-value SVectors: each lane loads only its own
-# (mz_c, sxu_c, syu_c) via a cached global read. A by-value SVector indexed by
-# the lane-dependent component would stage all D entries into per-thread local
-# memory and was measured ~4× slower (gotcha_warp_kernel_byvalue_svector…).
-struct GPUDDITaylorCoef{T}
-    mz::CuArray{T, 1}               # F_z diagonal m_c
-    sxu::CuArray{Complex{T}, 1}     # F_x super-diagonal [c,c+1] (0 at c=D)
-    syu::CuArray{Complex{T}, 1}     # F_y super-diagonal [c,c+1] (0 at c=D)
-end
-
-const _GPU_DDI_TAYLOR_CACHE = Dict{UInt64, Any}()
-
-function _get_taylor_coef(
-    ::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
-) where {D, T <: AbstractFloat}
-    key = hash((objectid(sm), D, T))
-    c = get(_GPU_DDI_TAYLOR_CACHE, key, nothing)
-    c !== nothing && return c::GPUDDITaylorCoef{T}
-    Fx = sm.Fx
-    Fy = sm.Fy
-    Fz = sm.Fz
-    mz = T[T(real(Fz[i, i])) for i in 1:D]
-    sxu = Complex{T}[i < D ? Complex{T}(Fx[i, i + 1]) : zero(Complex{T}) for i in 1:D]
-    syu = Complex{T}[i < D ? Complex{T}(Fy[i, i + 1]) : zero(Complex{T}) for i in 1:D]
-    coef = GPUDDITaylorCoef{T}(CuArray(mz), CuArray(sxu), CuArray(syu))
-    _GPU_DDI_TAYLOR_CACHE[key] = coef
-    coef
-end
-
 # Crop a (possibly padded) dipolar field to the spatial corner and flatten to
-# (N,). Unpadded (size == n_pts, every production run) is a zero-copy reshape.
+# (N,). Unpadded is a zero-copy reshape; the padded arm MATERIALISES a cropped
+# copy (a device allocation plus a gather kernel, per component), so it is used
+# only by the exact-Euler fallback, whose kernel indexes the field linearly. The
+# Taylor path — which is what every D ≤ 16 run takes, and since
+# `DDI_PADDED_DEFAULT` flipped to `true` (9c117c05) that is every production run
+# — reads the padded buffer in place through `src_idx` instead.
 @inline function _gpu_phi_vec(phi::CuArray, n_pts::NTuple{M, Int}, N::Int) where {M}
     size(phi) == n_pts && return reshape(phi, N)
     reshape(phi[CartesianIndices(n_pts)], N)
 end
 
-# --- Adaptive degree selection ---
-# Adaptive tridiagonal Taylor–Horner DDI rotation. With the band coefficients in
-# device memory (not by-value SVector) it measured ~2× FASTER than the warp
-# Euler at production R≈0.012 (K=6) on H100, matching Euler to ~1e-15. Euler is
-# the exact-to-roundoff fallback (R > _DDI_TAYLOR_RMAX[]). Set false to force it.
-const _DDI_USE_TAYLOR = Ref(true)
-const _DDI_TAYLOR_RMAX = Ref(1.0)     # R above which we fall back to Euler
-const _DDI_TAYLOR_TOL = Ref(1.0e-9)   # backward-error target: 1e-11 measured
-# parity 3.5e-13 (≈300× margin under the 1e-10 gate), so relax further to 1e-9 —
-# K drops another ~1 (5→4 at R≈0.012), first-omitted term ~2e-12/rotation ⇒
-# accumulated parity ~2e-11, still under gate. Round-2 comment below still applies.
-# 1e-11 drops the
-# Taylor degree K by ~1 across the production R range (fewer Horner iterations)
-# while the ACTUAL truncation (first omitted term R^{K+1}/(K+1)!) stays ~1e-14 —
-# machine precision, and 3-4 orders below the split-step O(dt²)~1e-5 error. The
-# GPU=CPU parity gate (vs the CPU Euler-EXACT rotation, tol 1e-10) is the safety
-# net: relax too far and parity exceeds 1e-10 → the round is rejected.
-const _DDI_R_OVERRIDE = Ref(NaN)      # set to skip the max|Φ| reduction
-
-# smallest K with R^K/K! ≤ tol (⇒ omitted term R^{K+1}/(K+1)! < tol), K ≥ 2.
-function _taylor_degree(R::Real, tol::Real)
-    t = 1.0
-    k = 0
-    while k < 40
-        k += 1
-        t *= R / k
-        t <= tol && return max(k, 2)
-    end
-    return 40
-end
-
-# Reused scratch for the |Φ|² max-reduction, keyed by (length, T). Avoids the
-# ~N·8 B temporary that `maximum(px.*px .+ …)` allocates on every rotation call
-# (16.7 MB × 2/step at 128³). R is bit-identical → K unchanged → gates trivially
-# pass; this only removes transient allocation (gpu_allocs_bytes ratchet).
-const _DDI_R_SCRATCH = Dict{Tuple{Int, DataType}, Any}()
-
-function _ddi_spectral_R(px, py, pz, dt::T, F::T) where {T <: AbstractFloat}
-    s = get!(() -> similar(px, T, length(px)), _DDI_R_SCRATCH, (length(px), T))
-    s .= px .* px .+ py .* py .+ pz .* pz   # in-place into reused scratch, no temp
-    pm2 = maximum(s)
-    dt * sqrt(pm2) * F
-end
-
-# --- Taylor–Horner warp kernel (one spin component per lane) ---
-@inline function _ddi_taylor_warp_kernel!(
-    P, px, py, pz, mz, sxu, syu, z::Complex{T}, K::Int32, ::Val{D},
+# Taylor path, both field layouts. Two call sites rather than one with a
+# Union-typed field/map tuple, so each launches a concretely-typed kernel.
+@inline function _ddi_rotate_taylor!(
+    P, phi_x, phi_y, phi_z, coef, scale::T, ::Val{D}, n_pts, N, imaginary_time, F,
 ) where {T, D}
-    CT = Complex{T}
-    W = 16
-    tib = CUDA.threadIdx().x
-    lane0 = (tib - 1) & 31
-    sg = lane0 >> 4
-    sl = lane0 & 15
-    warp_in_block = (tib - 1) >> 5
-    gwarp = (CUDA.blockIdx().x - 1) * (CUDA.blockDim().x >> 5) + warp_in_block
-    vox = gwarp * 2 + sg + 1
-    N = size(P, 1)
-    active = sl < D
-    in_range = vox <= N
-    c = active ? sl + 1 : 1
-
-    Px = in_range ? (@inbounds px[vox]) : zero(T)
-    Py = in_range ? (@inbounds py[vox]) : zero(T)
-    Pz = in_range ? (@inbounds pz[vox]) : zero(T)
-
-    diag_c = Pz * (@inbounds mz[c])                       # real F_z diagonal
-    b_c = Px * (@inbounds sxu[c]) + Py * (@inbounds syu[c])  # A[c,c+1]
-    # lower coupling conj(A[c-1,c]) = conj(b_{c-1}); b_{c-1} from lane c-1
-    cdn = c > 1 ? c - 1 : 1
-    bm_raw = _shfl_c(b_c, cdn, Val(W))
-    bm = c > 1 ? bm_raw : zero(CT)
-
-    psi0 = (active && in_range) ? (@inbounds P[vox, c]) : zero(CT)
-    w = psi0
-    k = K
-    while k >= one(Int32)
-        wup = _shfl_c(w, c + 1, Val(W))                  # w_{c+1} (idle→0 at c=D)
-        wdn_raw = _shfl_c(w, cdn, Val(W))
-        wdn = c > 1 ? wdn_raw : zero(CT)
-        Aw = diag_c * w + b_c * wup + conj(bm) * wdn
-        w = psi0 + (z / T(k)) * Aw
-        k -= one(Int32)
+    if size(phi_x) == n_pts
+        _apply_spin_rotation_taylor!(
+            P, reshape(phi_x, N), reshape(phi_y, N), reshape(phi_z, N),
+            coef, scale, Val(D); imaginary_time, F, src_idx=nothing)
+    else
+        _apply_spin_rotation_taylor!(
+            P, phi_x, phi_y, phi_z, coef, scale, Val(D);
+            imaginary_time, F, src_idx=CartesianIndices(n_pts))
     end
-
-    if active && in_range
-        @inbounds P[vox, c] = w
-    end
-    nothing
-end
-
-function _apply_ddi_taylor!(
-    P, px, py, pz, coef::GPUDDITaylorCoef{T}, z::Complex{T}, K::Integer, ::Val{D},
-) where {T, D}
-    N = size(P, 1)
-    voxels_per_block = 16
-    threads = 256
-    blocks = cld(N, voxels_per_block)
-    CUDA.@cuda threads = threads blocks = blocks _ddi_taylor_warp_kernel!(
-        P, px, py, pz, coef.mz, coef.sxu, coef.syu, z, Int32(K), Val(D))
     nothing
 end
 
@@ -206,25 +87,20 @@ function SpinorBEC._apply_ddi_rotation!(
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
     P = reshape(psi, N, D)
-    px = _gpu_phi_vec(phi_x, n_pts, N)
-    py = _gpu_phi_vec(phi_y, n_pts, N)
-    pz = _gpu_phi_vec(phi_z, n_pts, N)
 
-    if _DDI_USE_TAYLOR[]
-        F = T(sm.system.F)
-        R = isnan(_DDI_R_OVERRIDE[]) ?
-            _ddi_spectral_R(px, py, pz, T(dt_frac), F) : T(_DDI_R_OVERRIDE[])
-        if R <= T(_DDI_TAYLOR_RMAX[])
-            K = _taylor_degree(R, _DDI_TAYLOR_TOL[])
-            coef = _get_taylor_coef(psi, sm)
-            z = imaginary_time ? Complex{T}(-T(dt_frac), zero(T)) :
-                Complex{T}(zero(T), -T(dt_frac))
-            _apply_ddi_taylor!(P, px, py, pz, coef, z, K, Val(D))
-            return nothing
-        end
+    plan = _spin_taylor_plan(psi, sm)
+    if plan !== nothing
+        coef, F = plan
+        _ddi_rotate_taylor!(
+            P, phi_x, phi_y, phi_z, coef, T(dt_frac), Val(D), n_pts, N,
+            imaginary_time, F)
+        return nothing
     end
 
     # Fallback: exact Euler 5-stage (large/unknown R).
+    px = _gpu_phi_vec(phi_x, n_pts, N)
+    py = _gpu_phi_vec(phi_y, n_pts, N)
+    pz = _gpu_phi_vec(phi_z, n_pts, N)
     cache = _get_gpu_ddi_rot_cache(psi, sm, ndim)
     apply_ddi_euler_fused_kernel!(
         P, px, py, pz, cache.m_row, cache.λ_row, cache.V, cache.conj_V, dt_frac;

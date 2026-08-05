@@ -15,6 +15,7 @@
 #
 # Run: julia --project=. scripts/manuscript/f9_f11_polyhedral_verification.jl
 
+using Test
 using SpinorBEC
 using LinearAlgebra
 using Printf

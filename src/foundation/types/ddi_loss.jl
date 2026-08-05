@@ -22,6 +22,11 @@ mutable struct DDIParams{N, AQ <: AbstractArray{<:AbstractFloat, N}}
     Q_yy::AQ
     Q_yz::AQ
     Q_zz::AQ
+    # Real-space box length per axis. Q_αβ = k̂_α k̂_β − δ_αβ/3 is scale-free,
+    # so the box cannot be recovered from the tensors — it is carried here
+    # because the Orszag F-filter's physical `DEALIAS_K_CUTOFF[]` is
+    # meaningless without it (see `_get_orszag_mask`).
+    box_size::NTuple{N, Float64}
 end
 
 struct DDIBuffers{N, RP, IRP, AR <: AbstractArray, AC <: AbstractArray}

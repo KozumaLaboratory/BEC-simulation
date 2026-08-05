@@ -8,6 +8,8 @@
 #       spin observables, ensemble stat helpers
 #   energy/currents/vorticity     — energy decomposition, probability
 #       current, superfluid velocity/vorticity
+#   superfluid_fraction            — phase-twist f_s (Leggett plane-average
+#       bound + full variational relaxation)
 #   vortex_extraction              — per-m vortex line tracing (3D)
 #   diagnostics                    — Zeeman/healing-length/TF radius helpers
 #   sinatra_diagnostics/grid_resolution — TWA-validity (Sinatra) per-knob
@@ -27,6 +29,7 @@ include("analysis/ensemble.jl")
 include("analysis/energy.jl")
 include("analysis/currents.jl")
 include("analysis/vorticity.jl")
+include("analysis/superfluid_fraction.jl")  # phase-twist f_s (Leggett bound + relaxed)
 include("analysis/vortex_extraction.jl")
 include("analysis/diagnostics.jl")
 include("analysis/sinatra_diagnostics.jl")  # TWA-validity (Sinatra) per-knob helpers
@@ -43,7 +46,9 @@ include("analysis/topology.jl")
 include("analysis/synthetic_dimension.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
+include("analysis/dipole_field.jl")  # dipolar magnetic field radiated by a (spin-polarised) cloud
 include("analysis/larmor_adiabaticity.jl")  # local-field tilt + Larmor vs rotation rate
+include("analysis/resonance_dip.jl")  # dip centre + half-depth width of a scanned resonance
 
 # Phase exploration (needs experiments for ScanExperiment).
 include("analysis/phases/phase_classification.jl")

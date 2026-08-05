@@ -3,7 +3,7 @@
 # Universal claims (any F ≥ 1, c_extra = 0):
 #   c₁ > 0 → polar/nematic class is the GS (|⟨F⟩| = 0)
 #   c₁ < 0 → ferromagnetic class is the GS (|⟨F⟩| = max within constraint)
-#   E_FM_up - E_polar = (c₁/2)·F²·∫n²·dV
+#   E_FM_up - E_polar = E_GP(c₁F²+c₀) - E_GP(c₀); to first order (c₁/2)·F²·∫n²·dV
 #   Bogoliubov polar:  stable at c₁>0,  unstable at c₁<0 (spin mode)
 #
 # F-specific (with c_extra = 0):
@@ -76,46 +76,97 @@ const F_CASES = [
         @test info_f.spin_order > 0.99
     end
 
-    @testset "Analytic gap (c₁/2)·F²·∫n²·dV at F=$Fval" for (Fval, atom, label) in F_CASES
+    # The FM/polar gap, stated EXACTLY rather than to first order.
+    #
+    # Polar (m=0 only) has ⟨F⟩ = 0 and FM-up (m=+F) has |⟨F⟩| = F·n, so with
+    # c_extra = 0 BOTH are single-component GP problems that differ only in
+    # their coupling:
+    #
+    #     polar : g = c₀              FM-up : g = c₀ + c₁F²
+    #
+    # Hence  E_FM − E_polar = E_GP(c₀ + c₁F²) − E_GP(c₀)  identically, with no
+    # small parameter anywhere.
+    #
+    # The familiar closed form (c₁/2)·F²·∫n²·dV is the FIRST-ORDER
+    # (Hellmann–Feynman, dE/dg = ½∫n²) term of that difference, so its accuracy
+    # is controlled by c₁F²/c₀ — NOT by F. This file used to hold c₁ = ±0.2
+    # fixed while sweeping F, which drives c₁F²/c₀ from 0.04 (F=1) to 2.56
+    # (F=8); at F=6, c₀ + c₁F² = −2.2 actually changes sign. The resulting
+    # 15–47% drift was then absorbed into an F-dependent rtol fitted to the
+    # failure, which is how a first-order formula got mistaken for an F-scaling
+    # law. Measured errors of the old one-endpoint form: 0.9% (F=1), 4.5%
+    # (F=3), 24% (F=6), 47% (F=8).
+    #
+    # Both claims are now pinned separately and tightly.
+    @testset "FM/polar gap is exactly E_GP(c₀+c₁F²) − E_GP(c₀) at F=$Fval" for (
+            Fval, atom, label
+        ) in
+                                                                               F_CASES
+
         grid = make_grid(GridConfig{1}((16,), (8.0,)))
 
-        function _itp(c1, seed)
-            find_ground_state(;
-                grid, atom,
-                interactions=InteractionParams(Dict(0 => 5.0, 1 => c1)),
-                potential=HarmonicTrap((1.0,)),
-                n_steps=400, dt=0.005, tol=1e-8,
-                initial_state=seed,
-            )
-        end
+        _itp(c0, c1, seed) = find_ground_state(;
+            grid, atom,
+            interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
+            potential=HarmonicTrap((1.0,)),
+            n_steps=400, dt=0.005, tol=1e-8,
+            initial_state=seed,
+        )
 
-        # Density profile from polar (m=0 only — least perturbed by c₁).
-        r_polar = _itp(0.2, :polar)
-        psi_polar = Array(r_polar.workspace.state.psi)
-        n_dens = dropdims(sum(abs2, psi_polar; dims=2); dims=2)
-        n_sq_int = sum(n_dens .^ 2) * cell_volume(grid)
-
-        # The two seeds yield slightly different density profiles
-        # (FM-up at high F shifts the cloud width because c₁·F² is
-        # a non-negligible energy). For F=6: 36× spin-energy → ~10%
-        # density-profile shift. Use F-dependent tolerance.
-        rtol_gap = Fval <= 2 ? 0.05 : 0.15
-
+        c0 = 5.0
         for c1 in (0.2, -0.2)
-            r_polar = _itp(c1, :polar)
-            r_fm = _itp(c1, :m_plus_F)
-            psi_polar = Array(r_polar.workspace.state.psi)
-            n_dens = dropdims(sum(abs2, psi_polar; dims=2); dims=2)
-            n_sq_int = sum(n_dens .^ 2) * cell_volume(grid)
+            g_eff = c0 + c1 * Fval^2
 
-            gap_predicted = (c1 / 2) * Fval^2 * n_sq_int
-            gap_measured = r_fm.energy - r_polar.energy
+            gap_measured = _itp(c0, c1, :m_plus_F).energy - _itp(c0, c1, :polar).energy
+            gap_exact = _itp(g_eff, 0.0, :polar).energy - _itp(c0, 0.0, :polar).energy
 
-            # Sign must match exactly.
-            @test sign(gap_predicted) == sign(gap_measured)
-            # Magnitude within F-dependent tolerance.
-            @test isapprox(gap_predicted, gap_measured;
-                rtol=rtol_gap, atol=1e-3)
+            @test sign(gap_measured) == sign(c1)
+            # Exact identity — the only slack is ITP convergence (observed
+            # ≤ 1.5e-4 across F = 1…8, including the g_eff < 0 cases).
+            @test isapprox(gap_measured, gap_exact; rtol=1e-3, atol=1e-6)
+        end
+    end
+
+    @testset "Universal F² scaling: gap is F-independent at fixed c₁F²" begin
+        # The actual F-scaling claim, isolated. Holding the expansion parameter
+        # c₁F² fixed makes the whole problem F-independent, so BOTH the closed
+        # form and the measured gap must be the same number at every F — the
+        # code has to get the F² in the spin energy exactly right to reproduce
+        # it from c₁ = 0.2 (F=1) through c₁ = 0.003125 (F=8), a 64× spread.
+        # Any error in the F² power shows up immediately, with no tolerance
+        # fitting and no density-profile back-reaction to hide behind.
+        grid = make_grid(GridConfig{1}((16,), (8.0,)))
+        c0 = 5.0
+
+        for c1_F2 in (0.2, -0.2)
+            gaps = Float64[]
+            for (Fval, atom, label) in F_CASES
+                c1 = c1_F2 / Fval^2
+                _itp(seed) = find_ground_state(;
+                    grid, atom,
+                    interactions=InteractionParams(Dict(0 => c0, 1 => c1)),
+                    potential=HarmonicTrap((1.0,)),
+                    n_steps=400, dt=0.005, tol=1e-8,
+                    initial_state=seed,
+                )
+                r_polar = _itp(:polar)
+                r_fm = _itp(:m_plus_F)
+
+                psi_polar = Array(r_polar.workspace.state.psi)
+                n_dens = dropdims(sum(abs2, psi_polar; dims=2); dims=2)
+                n_sq_int = sum(n_dens .^ 2) * cell_volume(grid)
+
+                gap_predicted = (c1 / 2) * Fval^2 * n_sq_int
+                gap_measured = r_fm.energy - r_polar.energy
+                push!(gaps, gap_measured)
+
+                @test sign(gap_predicted) == sign(gap_measured)
+                # ONE tolerance for every F — the expansion parameter is now
+                # fixed at 0.04, where the first-order form is good to ~1%.
+                @test isapprox(gap_predicted, gap_measured; rtol=0.02, atol=1e-6)
+            end
+            # F-independence itself: same physics ⇒ same number.
+            @test maximum(abs, gaps .- gaps[1]) < 1e-6 * abs(gaps[1]) + 1e-9
         end
     end
 

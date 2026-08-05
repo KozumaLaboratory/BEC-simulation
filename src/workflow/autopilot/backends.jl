@@ -76,7 +76,7 @@ SpinorBEC.run_yaml(ARGS[1])
 
 Run jobs in a **detached subprocess** via
 `julia --project=<project_root> -e 'using SpinorBEC; run_yaml(ARGS[1])'
-<spec_path>`. The spawned process writes `summary.json` / `outcome.toml`
+<spec_path>`. The spawned process writes `summary.json` / `_exit_summary.json`
 / `_live_status.json` / `*.jld2` into `entry.run_dir` — the same layout
 the UGE submit script produces — so the dashboard and
 `run_catalog_index` never need to branch on local-vs-remote.
@@ -85,6 +85,17 @@ the UGE submit script produces — so the dashboard and
 kills the subprocess (was a no-op under the old `Threads.@spawn` model).
 `LD_LIBRARY_PATH=/usr/lib/wsl/lib` is set automatically when not already
 present — required for WSL2 GPU runs, harmless otherwise.
+
+Thread count is **inherited from the parent** (`env = copy(ENV)`), so a
+`JULIA_NUM_THREADS=1` shell gives single-threaded runs and the CPU hot paths
+(spin density, spin mixing, singlet-pair, tensor, the DDI k-space contraction,
+the Euler spin rotation, the Bogoliubov scan) all fall back to their
+sequential branches. Raise it per-backend with
+`extra_env=["JULIA_NUM_THREADS" => "8"]`. Inheriting rather than defaulting is
+deliberate here: this backend runs on a shared workstation, where deciding the
+oversubscription policy for the user would be the wrong call.
+`UGEBackend` is the opposite case — its rendered script gets no environment at
+all, so it sets the variable itself from `NSLOTS`.
 
 `entry.job_id` is set to the subprocess's OS pid (string). `_running`
 keys on `content_id` so `find_job_by_name(content_id)` reconciles a

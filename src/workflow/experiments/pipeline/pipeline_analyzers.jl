@@ -15,7 +15,7 @@ using JSON
 #   analyzers/topology.jl      ← winding_map, winding_field, monopole_charge,
 #                                 vortex_detect, skyrmion_density, non_abelian_homotopy
 #   analyzers/spectroscopy.jl  ← bragg_spectroscopy, droplet_profile,
-#                                 correlation_length, defect_density,
+#                                 correlation_length, superfluid_fraction, defect_density,
 #                                 kibble_zurek_stats, domain_analysis
 #   analyzers/stability.jl     ← stability, bogoliubov, bogoliubov_dispersion,
 #                                 _run_bogoliubov_analyzer
@@ -69,6 +69,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         return _analyze_vortex_detect(psi, grid, atom, params, ws_prev)
     elseif name == :correlation_length
         return _analyze_correlation_length(psi, grid, atom, params, ws_prev)
+    elseif name == :superfluid_fraction
+        return _analyze_superfluid_fraction(psi, grid, atom, params, ws_prev)
     elseif name == :defect_density
         return _analyze_defect_density(psi, grid, atom, params, ws_prev)
     elseif name == :kibble_zurek_stats
@@ -98,6 +100,9 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
     elseif name == :column_density_movie
         return _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
             pipeline_results)
+    elseif name == :vortex_density_movie
+        return _analyze_vortex_density_movie(psi, grid, atom, params, ws_prev,
+            pipeline_results)
     elseif name == :hpsi_export
         return _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     elseif name == :trap_population
@@ -114,10 +119,11 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         "winding_map, absorption_image, sg_tof, forward_image, " *
         "domain_analysis, skyrmion_density, " *
         "phase_contrast_image, momentum_distribution, vortex_detect, " *
-        "correlation_length, defect_density, kibble_zurek_stats, " *
+        "correlation_length, superfluid_fraction, defect_density, kibble_zurek_stats, " *
         "bragg_spectroscopy, droplet_profile, bogoliubov_dispersion, " *
         "bogoliubov_mode, skyrmion_detect, synthetic_dim, non_abelian_homotopy, " *
         "monopole_charge, majorana_order, winding_field, rosensweig_pattern, " *
-        "column_density_movie, hpsi_export, trap_population, cloud_shape, summary_json"
+        "column_density_movie, vortex_density_movie, hpsi_export, trap_population, " *
+        "cloud_shape, summary_json"
     throw(ArgumentError("Unknown analyzer: $name. Supported: $_known"))
 end

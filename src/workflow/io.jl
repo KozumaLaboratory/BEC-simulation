@@ -19,6 +19,7 @@ include("io/io.jl")
 include("io/unitful_support.jl")
 include("io/save_rotating_result.jl")
 include("io/vtk_export.jl")
+include("io/measurement_provenance.jl")  # provenance stamp + refusal for measurement outputs
 include("io/run_summary.jl")
 include("io/html_report.jl")
 include("io/budget.jl")

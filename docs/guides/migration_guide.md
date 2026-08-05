@@ -1,5 +1,8 @@
 # Migration guide — when conventions change
 
+> **FROZEN 2026-05-25.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 This codebase has accumulated several scattering / Zeeman / DDI conventions over time. When upgrading from an older snapshot, these are the spots to audit.
 
 ## Scattering interactions

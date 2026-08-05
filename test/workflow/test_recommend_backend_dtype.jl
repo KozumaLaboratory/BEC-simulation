@@ -1,3 +1,4 @@
+using SpinorBEC
 using Test, SpinorBEC
 
 @testset "recommend_backend_dtype" begin

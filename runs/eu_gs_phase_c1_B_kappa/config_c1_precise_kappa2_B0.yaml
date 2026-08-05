@@ -1,0 +1,36 @@
+# Extend the c1*(κ) first-order line to MORE OBLATE traps (κ=ω_z ∈ {2.0, 2.5}) to
+# test whether the order-parameter jump Δm_F keeps shrinking to 0 — i.e. whether a
+# TRICRITICAL POINT κ_tc sits above 1.5, where the c1-driven FM->polar transition
+# turns continuous. κ=0.5/1.0/1.5 already gave Δm_F = 0.684/0.628/0.576 (shrinking)
+# with c1* = 0.0262/0.0278/0.0288 (rising, decelerating). c1 window [0.026,0.034]
+# brackets the extrapolated c1*≈0.029-0.030 for both κ with margin and captures the
+# pre-jump softening. 0.0005 step, two bare seeds, newton_polish + tol 1e-9. Grid/box
+# match the other precise runs (box_z=24 >> the compressed z-cloud; if E/mF come out
+# jagged the tighter trap is under-resolved and this needs a finer grid). 17 c1 × 2 κ.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.030}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 2500
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.026, to: 0.034, n: 17}
+    pipeline.0.potential.omega.2:     [2.0, 2.5]
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

@@ -1,0 +1,86 @@
+# ─────────────────────────────────────────────────────────────────────
+#  BOUNDARY REFINEMENT — resolve the cyclic↔FM line B_c(κ) at physical Eu
+#  (c1 = +1/36). Instead of a dense 2D fill, we search ONLY the transition
+#  bracket per κ (from the coarse 64³ map), as explicit (Bz, κ) points via
+#  `zip` — no Cartesian waste. Each point warm-starts (seed_from nearest) off
+#  the closest coarse 64³ winner and pins, so the fine B points that have no
+#  exact coarse seed still converge cheaply.
+#
+#  18 boundary points × 2 seeds = 36 solves @ 64³ (vs 400 for a dense grid).
+# ─────────────────────────────────────────────────────────────────────
+
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 10.0, auto_dt: true, dt_safety: 10.0}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      # nearest: warm-start each fine boundary point off the closest coarse
+      # 64³ winner (same c1 + seed, nearest in Bz/κ). Same grid ⇒ no upsample.
+      seed_from: {run: runs/config_promote_64_6221dc7f, upsample: false, nearest: true}
+      pin: {kind: transverse, epsilon_ramp: [4.0e-3, 2.0e-3, 1.0e-3, 5.0e-4]}
+      n_steps: 800
+      tol: 1.0e-7
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+# Explicit boundary points: parallel (Bz, κ) arrays — each column is one cell,
+# concentrated inside each κ's cyclic→FM bracket read off the coarse map.
+scan:
+  zip:
+    pipeline.0.B.Bz:
+      - "4.2e-5 Gauss"   # κ=1.0 bracket 40–48
+      - "4.4e-5 Gauss"
+      - "4.6e-5 Gauss"
+      - "6.4e-5 Gauss"   # κ=1.3 bracket 62–75
+      - "6.7e-5 Gauss"
+      - "7.0e-5 Gauss"
+      - "7.3e-5 Gauss"
+      - "8.0e-5 Gauss"   # κ=1.6 bracket 75–100
+      - "8.5e-5 Gauss"
+      - "9.0e-5 Gauss"
+      - "9.5e-5 Gauss"
+      - "7.8e-5 Gauss"   # κ=1.9 probe
+      - "8.4e-5 Gauss"
+      - "9.0e-5 Gauss"
+      - "9.6e-5 Gauss"
+      - "8.4e-5 Gauss"   # κ=2.2 probe
+      - "9.0e-5 Gauss"
+      - "9.6e-5 Gauss"
+    pipeline.0.potential.omega.2:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.3
+      - 1.3
+      - 1.3
+      - 1.3
+      - 1.6
+      - 1.6
+      - 1.6
+      - 1.6
+      - 1.9
+      - 1.9
+      - 1.9
+      - 1.9
+      - 2.2
+      - 2.2
+      - 2.2
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}

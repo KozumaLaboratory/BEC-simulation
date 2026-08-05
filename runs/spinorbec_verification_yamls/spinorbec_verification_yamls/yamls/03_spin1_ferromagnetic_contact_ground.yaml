@@ -2,11 +2,6 @@
 # Physics: E_spin=(c1/2)|F|^2. For c1<0, maximal spin order is favored.
 # Expected: phase_classify -> ferromagnetic-like, spin_order ~ 1.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Ueda_spin1_ferro_c1_negative
-  expected_phase: ferromagnetic
-
 defaults:
   kind: spinor
   backend: cpu

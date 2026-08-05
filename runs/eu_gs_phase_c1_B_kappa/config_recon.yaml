@@ -1,0 +1,58 @@
+# STAGE A — LOCAL 32³ multi-seed reconnaissance of the (c1 × Bz × κ) diagram.
+#
+# Which-phase is resolution-robust (docs/design/eu_phase_diagram_adaptive_mapping.md),
+# so the coarse map + boundary detection happen at the cheapest resolution.
+# Same axes as config.yaml (the 128³ promotion target); only grid + ITP budget
+# differ. Runs on the LOCAL GPU (audit niche, <2 h). No TSUBAME points spent.
+#
+#   3 (c1) × 8 (Bz) × 5 (κ) = 120 points × 2 seeds = 240 solves @ 32³.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}   # safe < 5.59 at 32³/box12
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [32, 32, 32], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: itp
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      noise: {seed: 20260722, initial: {thermal: 0.40}}
+      dt: 0.002
+      n_steps: 3000     # recon: which-phase is resolution/convergence-robust; boundaries refined at 128³
+      tol: 1.0e-6
+
+  - analyze:
+      - phase_classify_distance: {}
+      - multipole_order: {}
+      - majorana_order: {}
+      - energy_decomposition: {}
+
+# override paths OMIT `.ground_state` (auto-unwrapped single-key pipeline step).
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio:
+      - -0.015
+      -  0.0
+      -  0.0277777778
+    pipeline.0.B.Bz:
+      - "0.0 Gauss"
+      - "2.5e-5 Gauss"
+      - "4.0e-5 Gauss"
+      - "4.8e-5 Gauss"
+      - "5.5e-5 Gauss"
+      - "6.2e-5 Gauss"
+      - "7.5e-5 Gauss"
+      - "1.0e-4 Gauss"
+    pipeline.0.potential.omega.2:
+      from: 1.0
+      to:   2.2
+      n:    5
+  comparison_runs:
+    - name: stretched
+      override: {pipeline.0.initial_state: m_plus_F}
+    - name: polar
+      override: {pipeline.0.initial_state: polar}

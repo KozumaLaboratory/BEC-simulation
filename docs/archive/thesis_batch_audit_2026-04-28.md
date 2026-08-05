@@ -1,5 +1,8 @@
 # 12h Thesis Batch Audit — 2026-04-28
 
+> **FROZEN 2026-04-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 24 production runs + 6 audit follow-up runs. Conservation laws, anomaly investigation, and a thesis-affecting numerical finding.
 
 ## Conservation laws — all clean

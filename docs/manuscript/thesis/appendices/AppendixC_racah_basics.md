@@ -1,5 +1,8 @@
 # Appendix C: Wigner D / Clebsch-Gordan / 6j-symbol Racah basics
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 本 appendix では、Chapter 4 (Universal Theorem 証明) + Chapter 6 (polyhedral
 verifications) + Sign Pattern Anomalous Identity で用いる representation-theoretic
 tools の technical primer を提供する。SpinorBEC.jl の `wigner_3j`,

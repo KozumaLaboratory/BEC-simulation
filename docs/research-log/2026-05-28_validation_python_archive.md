@@ -1,5 +1,8 @@
 # scripts/validation/ + scripts/manuscript/ Python figure scripts — 2026-05-28
 
+> **FROZEN 2026-05-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 8 standalone Python figure renderers retired. Each was a research-log
 artefact tied to a specific JSON summary from a specific scan campaign
 — bespoke matplotlib for a single weekly presentation, thesis figure,

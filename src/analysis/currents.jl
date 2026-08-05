@@ -1,6 +1,11 @@
 export probability_current, orbital_angular_momentum, superfluid_velocity
 export total_angular_momentum, spin_texture_charge, circulation
 
+# CPU FFT plans keyed by spatial shape. `orbital_angular_momentum` is polled
+# once per save inside the rotating_basis dynamics loop, where rebuilding the
+# plans on every call is the dominant cost of the observable.
+const _ORBITAL_CPU_PLAN_CACHE = Dict{Tuple, Any}()
+
 """
 Probability current density j(r) = Σ_c Im(ψ_c* ∇ψ_c).
 Returns NTuple{N, Array{Float64,N}} of current components.
@@ -25,8 +30,15 @@ function probability_current(
         plans.forward * psi_k
 
         for d in 1:N
+            # Null the Nyquist mode of the first derivative: for even N the
+            # k=±N/2 coefficient is real/aliased and has no well-defined odd
+            # derivative, so `ik·ψ_k` there is pure roundoff that shows up as a
+            # checkerboard when the true current is ≈0. Zeroing it is the
+            # standard spectral-differentiation convention.
+            nyq = iseven(n_pts[d]) ? n_pts[d] ÷ 2 + 1 : 0
             @inbounds for I in CartesianIndices(n_pts)
-                dpsi[I] = im * grid.k[d][I[d]] * psi_k[I]
+                dpsi[I] = I[d] == nyq ? zero(ComplexF64) :
+                          im * grid.k[d][I[d]] * psi_k[I]
             end
             plans.inverse * dpsi
             @inbounds for I in CartesianIndices(n_pts)
@@ -49,6 +61,10 @@ function orbital_angular_momentum(
 ) where {N}
     N >= 2 || return 0.0
 
+    # The body below runs CPU FFTs and loops over voxels, so a device array
+    # would scalar-index element by element. Bring it host-side once.
+    psi = psi isa Array ? psi : Array(psi)
+
     n_comp = size(psi, N + 1)
     n_pts = ntuple(d -> size(psi, d), N)
     dV = cell_volume(grid)
@@ -62,7 +78,10 @@ function orbital_angular_momentum(
     # When called with `ws.fft_plans` from a GPU workspace, those are
     # CUFFT plans and applying them to a CPU array triggers massive
     # implicit transfers (saw 30 GB RSS spike at 24³ × D=13 before fix).
-    local_plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+    # Cached by shape — see `_ORBITAL_CPU_PLAN_CACHE`.
+    local_plans = get!(_ORBITAL_CPU_PLAN_CACHE, n_pts) do
+        make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+    end
 
     Lz = 0.0
 
@@ -73,6 +92,12 @@ function orbital_angular_momentum(
         psi_k .= psi_c
         local_plans.forward * psi_k
 
+        # NOTE: do NOT Nyquist-null here. ⟨L_z⟩ enters the Coriolis energy
+        # (energy_contribution(::CoriolisTerm) calls this), which must stay
+        # bit-consistent with the Coriolis apply_operator! / dumb-reference
+        # (un-nulled) for the energy↔operator + master oracles. Nyquist junk is
+        # removed at the SOURCE instead (_null_nyquist_modes! on the GS ψ), so
+        # real states have no Nyquist content for this to matter.
         @inbounds for I in CartesianIndices(n_pts)
             dpsi_x[I] = im * grid.k[1][I[1]] * psi_k[I]
             dpsi_y[I] = im * grid.k[2][I[2]] * psi_k[I]

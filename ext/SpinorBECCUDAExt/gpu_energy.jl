@@ -12,7 +12,7 @@
 # shift, magnetic gradient), 1/2 for the density mean-field terms
 # (c0, c1, DDI). LHY is a density mapreduce (kind-specific power). The two
 # gradient-blind terms — Tensor (scalar-loop singlet + tensor-cache accumulate)
-# and Raman (apply_operator! is a declared no-op) — keep the host helpers,
+# and Raman (per-voxel ladder loop, host fallback) — keep the host helpers,
 # behind a single ψ→host copy taken only when either is active.
 #
 # The terms are drawn from `build_h_terms_registry(ws)` so the RF-corrected
@@ -54,7 +54,7 @@ function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
         E = sum(n) do ni
             ni < 1e-30 ? zero(ni) : ni * ni * (log(ni * a2) + lc)
         end
-        return 0.5 * lhy.c_lhy_2d * E * dV
+        return lhy.c_lhy_2d * E * dV
     else
         # Tabulated / spinor LHY kinds: host body (single copy).
         psi_h = _gpu_energy_psi_host(psi, ws)
@@ -76,7 +76,13 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     accumulate = grad !== nothing
 
     ctx = SpinorBEC.build_gradient_context(psi, ws)
-    out = similar(psi)
+    # Scratch-backed per-term buffer. `similar(psi)` here was a fresh CuArray
+    # per call — and this function is BOTH the GPU energy_decomposition and the
+    # LBFGS fused energy+gradient, so it ran once per line-search trial as well
+    # as once per gradient (~3 device allocations per LBFGS iteration).
+    out = SpinorBEC.scratch_get!(:gpu_energy_out, (typeof(psi), size(psi))) do
+        similar(psi)
+    end
     accumulate && fill!(grad, zero(eltype(grad)))
 
     # E_term = factor · Re⟨ψ, H_term·ψ⟩ · dV via the gated device gradient face.
@@ -96,9 +102,9 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     end
 
     (
-        kin_t, trap_t, zee_t, c0_t, c1_t, ddi_t, lhy_t, tensor_t, raman_t,
-        ls_t, cor_t, mg_t, sz_t, loss_t,
-    ) = SpinorBEC.build_h_terms_registry(ws)
+    kin_t, trap_t, zee_t, c0_t, c1_t, ddi_t, lhy_t, tensor_t, raman_t,
+    ls_t, cor_t, mg_t, sz_t, loss_t
+) = SpinorBEC.build_h_terms_registry(ws)
 
     # Inactive linear/mean-field terms are skipped: their apply_operator!
     # contributes exactly 0 to the gradient (gate-first), so skipping the
@@ -183,9 +189,12 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     E_coriolis =
         (SpinorBEC.is_active(Ω, SpinorBEC.ROTATION_TOL) && N >= 2) ?
         op_energy(cor_t, 1.0) : 0.0
-    E_mg = op_energy(mg_t, 1.0)
+    # Gated like every other optional term: `op_energy` costs a fill, a full
+    # apply, a dot and an accumulate even when the term's own gate-first check
+    # makes it a no-op, and magnetic_gradient is absent in most configs.
+    E_mg = ws.magnetic_gradient !== nothing ? op_energy(mg_t, 1.0) : 0.0
 
-    # Gradient-blind terms — Tensor (scalar-loop) + Raman (no-op grad):
+    # Scalar-loop terms — Tensor + Raman, both host-side:
     # host helpers behind a single ψ→host copy, only when active.
     F = ws.spin_matrices.system.F
     c2 = SpinorBEC.get_cn(ws.interactions, 2)
@@ -199,9 +208,11 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
             SpinorBEC.is_active(c2) &&
                 (E_tensor += SpinorBEC._singlet_pair_energy(psi_h, F, c2, N, n_pts, dV))
             ws.tensor_cache !== nothing &&
-                (E_tensor += SpinorBEC._tensor_interaction_energy(
-                    psi_h, ws.tensor_cache, N, n_pts, dV
-                ))
+                (
+                    E_tensor += SpinorBEC._tensor_interaction_energy(
+                        psi_h, ws.tensor_cache, N, n_pts, dV
+                    )
+                )
         end
         if need_raman
             E_raman = SpinorBEC._raman_energy(
@@ -210,8 +221,8 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
             )
         end
     end
-    # Gradient faces for the gradient-blind terms (Tensor gate-first host
-    # fallback; Raman/Loss no-op; SpatialZeeman inactive on GPU) — accumulate
+    # Gradient faces for the scalar-loop terms (Tensor and Raman gate-first
+    # host fallbacks; Loss no-op; SpatialZeeman inactive on GPU) — accumulate
     # into grad to match apply_operator_via_registry! exactly.
     accum_grad(tensor_t)
     accum_grad(raman_t)

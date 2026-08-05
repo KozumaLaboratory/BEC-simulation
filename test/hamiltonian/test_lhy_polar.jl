@@ -7,6 +7,11 @@ using SpinorBEC: phi_1_reg, T_KNOTS, VAL_KNOTS, DERIV_KNOTS,
 using SpinorBEC: lima_pelster_Q5
 using Test
 using LinearAlgebra: norm
+# `_build_spinor_lhy` takes the Zeeman field as a required trailing argument
+# since 2026-07-30: `:full_bdg` and `:spatial` solve a BdG problem and need it,
+# and it is deliberately NOT defaulted — a default is how every table came to be
+# built at zero field in the first place.
+const _ZF = SpinorBEC._to_zeeman_field(ZeemanParams(0.0, 0.0), nothing)
 
 # =================================================================
 # PhiOneReg
@@ -224,32 +229,130 @@ end
 # FM contact LHY — uniform g_S reduces to scalar Lima-Pelster
 # =================================================================
 
-@testset "FM contact LHY: structure" begin
-    # δ_m non-zero only at m=+F
-    g_user = Dict(S => 100.0 + 5.0 * S for S in (0, 2, 4, 6, 8, 10, 12))
-    @test delta_fm(6, 6, g_user) ≈ g_user[12]
-    for m in -6:5
-        @test delta_fm(6, m, g_user) == 0.0
+@testset "FM contact LHY: structure at every F" begin
+    # δ_m non-zero only at m=+F, for any F — not a property of one table.
+    for F in 1:8
+        g = Dict(S => 100.0 + 5.0 * S for S in 0:2:(2F))
+        @test delta_fm(F, F, g) ≈ g[2F]
+        for m in (-F):(F - 1)
+            @test delta_fm(F, m, g) == 0.0
+        end
+        # Goldstone identities: σ_+F = δ_+F (U(1) phonon),
+        # 2σ_+(F-1) = σ_+F (F₋ magnon, type-B, ω ∝ k²).
+        @test isapprox(sigma_fm(F, F, g), delta_fm(F, F, g); rtol=1e-12)
+        @test isapprox(2 * sigma_fm(F, F - 1, g), sigma_fm(F, F, g); rtol=1e-12)
     end
-
-    # Goldstone identities: σ_+F = δ_+F, 2σ_+(F-1) = σ_+F
-    @test isapprox(sigma_fm(6, 6, g_user), delta_fm(6, 6, g_user); atol=1e-10)
-    @test isapprox(2 * sigma_fm(6, 5, g_user), sigma_fm(6, 6, g_user); atol=1e-10)
+    @test_throws ArgumentError sigma_fm(6, 7, Dict(0 => 1.0))
 end
 
-@testset "FM contact LHY: σ_m coefficients ≡ Clebsch-Gordan (magic-number gate)" begin
-    # The hand-entered SIGMA_TABLE_FM coefficients are the CG weights
-    #   coef(m, S) = |⟨F,m; F,+F | S, m+F⟩|²   (even S; condensate at +F).
-    # Recompute every one from clebsch_gordan and compare against what the
-    # accessor returns (one-hot g_S isolates a single coefficient). This gates
-    # the transcribed table against an independent derivation — the same guard
-    # that would have caught the 35/144 quadratic-Zeeman error at commit time.
+# The 49 sympy-derived rationals that used to BE the implementation (a hand-
+# entered F=6 lookup table, with `error()` for every other F). They are pinned
+# here instead, as the oracle for the general-F closed form that replaced it.
+#
+# This has to be a literal table, not a call to `clebsch_gordan`: the
+# implementation now IS a Clebsch-Gordan sum, so recomputing it that way would
+# be a self-comparison. These numbers come from an independent sympy derivation
+# at 50-digit precision (parallel session 2026-05-07, Paper #3 §V.E).
+const _FM_SIGMA_F6_SYMPY = Dict{Int, Dict{Int, Float64}}(
+    -6 => Dict(
+        0 => 1.0/13.0,
+        2 => 22.0/91.0,
+        4 => 891.0/6188.0,
+        6 => 11.0/323.0,
+        8 => 11.0/3458.0,
+        10 => 9.0/96577.0,
+        12 => 1.0/2704156.0,
+    ),
+    -5 => Dict(
+        2 => 11.0/91.0,
+        4 => 1485.0/6188.0,
+        6 => 77.0/646.0,
+        8 => 33.0/1729.0,
+        10 => 165.0/193154.0,
+        12 => 1.0/208012.0,
+    ),
+    -4 => Dict(
+        2 => 2.0/91.0,
+        4 => 1215.0/6188.0,
+        6 => 70.0/323.0,
+        8 => 15.0/247.0,
+        10 => 405.0/96577.0,
+        12 => 1.0/29716.0,
+    ),
+    -3 => Dict(
+        4 => 81.0/884.0, 6 => 84.0/323.0, 8 => 33.0/247.0, 10 => 108.0/7429.0, 12 => 5.0/29716.0
+    ),
+    -2 => Dict(
+        4 => 9.0/442.0, 6 => 70.0/323.0, 8 => 55.0/247.0, 10 => 294.0/7429.0, 12 => 5.0/7429.0
+    ),
+    -1 => Dict(6 => 77.0/646.0, 8 => 11.0/38.0, 10 => 1323.0/14858.0, 12 => 1.0/437.0),
+    +0 => Dict(6 => 11.0/323.0, 8 => 11.0/38.0, 10 => 1260.0/7429.0, 12 => 3.0/437.0),
+    +1 => Dict(8 => 55.0/266.0, 10 => 120.0/437.0, 12 => 3.0/161.0),
+    +2 => Dict(8 => 11.0/133.0, 10 => 162.0/437.0, 12 => 15.0/322.0),
+    +3 => Dict(10 => 9.0/23.0, 12 => 5.0/46.0),
+    +4 => Dict(10 => 6.0/23.0, 12 => 11.0/46.0),
+    +5 => Dict(12 => 1.0/2.0),
+    +6 => Dict(12 => 1.0),
+)
+
+@testset "FM σ_m closed form ↔ the F=6 sympy rationals" begin
     F = 6
-    for m in (-F):F, S in 0:2:(2F)
-        onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
-        got = sigma_fm(F, m, onehot)                     # coefficient of g_S in σ_m
-        want = clebsch_gordan(F, m, F, F, S, m + F)^2
-        @test isapprox(got, want; atol=1e-12)
+    for (m, want) in _FM_SIGMA_F6_SYMPY
+        for S in 0:2:(2F)
+            onehot = Dict(s => (s == S ? 1.0 : 0.0) for s in 0:2:(2F))
+            # one-hot g_S isolates the single coefficient of g_S in σ_m
+            @test isapprox(sigma_fm(F, m, onehot), get(want, S, 0.0); atol=1e-12)
+        end
+    end
+    # Every non-zero rational is actually exercised above, and the fixture has
+    # not silently lost rows. 49 non-zero coefficients over 13 m-values × 7
+    # even-S channels = 91 comparisons; the count is asserted because a fixture
+    # that quietly shrinks turns this oracle into a weaker one that still
+    # passes. (It earned its place immediately: the first version of this line
+    # said 62, having counted the outer `m => Dict(...)` arrows as well.)
+    @test sum(length, values(_FM_SIGMA_F6_SYMPY)) == 49
+    @test length(_FM_SIGMA_F6_SYMPY) == 13
+end
+
+@testset "FM dipolar reduces to FM contact at eps_dd = 0, at every F" begin
+    # The FM+DDI closed form dresses the same single mode with Lima-Pelster
+    # Q_5(eps_dd), so eps_dd = 0 must return the contact result EXACTLY at any F
+    # — Q_5(0) = 1. Was only ever checked at F=6, which is what let the F=6
+    # lookup table look load-bearing on this path too.
+    #
+    # Deliberately NOT compared to full_bdg: this closed form drops the S=2F-2
+    # channel coupling (documented, suppressed by Δa/a_s << 1), so it is a
+    # different physical model rather than a different computation of the same
+    # one. Asserting equality would be pinning an approximation to an exact
+    # result.
+    for F in 1:8
+        g = Dict(S => 100.0 + 5.0 * S for S in 0:2:(2F))
+        for n in (0.5, 1.0, 3.0)
+            @test lhy_energy_fm_dipolar(n, F, g, 0.0) ≈ lhy_energy_fm(n, F, g) rtol = 1e-13
+        end
+        # and monotone in eps_dd over the stable range (Q_5 grows with eps_dd)
+        vals = [lhy_energy_fm_dipolar(1.0, F, g, et) for et in (0.0, 0.2, 0.5, 0.8)]
+        @test issorted(vals)
+    end
+end
+
+@testset "FM single-mode collapse holds at every F (vs full_bdg)" begin
+    # The closed form needs only g_{2F}, on the argument that every mode other
+    # than m=+F is free (κ_m = 0) and cancels against its own counterterm.
+    # `full_bdg` diagonalises the coupled problem with no ansatz, so it is an
+    # independent statement of the same number — and it is what shows the
+    # F=6-only restriction was never a physics limit.
+    pref = 8 / (15 * π^2)
+    for F in 1:8, c1 in (-0.02, -0.1)
+        g = SpinorBEC._c0c1_to_gS(F, 10.0, c1)
+        all(>(0), values(g)) || continue
+        spinor = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:(2F + 1)]   # m = +F
+        closed = lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))
+        @test closed ≈ pref * g[2F]^2.5 rtol = 1e-12
+        bdg = SpinorBEC._lhy_bdg_energy_density(spinor, 1.0, F,
+            InteractionParams(Dict(0 => 10.0, 1 => c1)), ZeemanParams(), 0.0,
+            nothing, nothing, nothing; rtol=1e-5)
+        @test bdg ≈ closed rtol = 1e-5
     end
 end
 
@@ -340,7 +443,7 @@ end
     g_uniform = Dict(S => c0 for S in (0, 2, 4, 6, 8, 10, 12))
 
     table = SpinorBEC._build_spinor_lhy(
-        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true)
+        Val(:fm_dipolar), Eu151, ws, nothing, c_dd_per_spin, true, LHYTableOpts(), _ZF)
     expected = compute_spinor_lhy_fm_dipolar(;
         F=6, g_dict=g_uniform, eps_dd=expected_eps)
 
@@ -368,4 +471,50 @@ end
         n_max=10.0, n_points=50)
     @test table_contact.densities ≈ table_dipolar.densities
     @test maximum(abs.(table_contact.potential_values .- table_dipolar.potential_values)) < 1e-8
+end
+
+@testset "polar_contact REFUSES at c₀ < 0 instead of dying in `^`" begin
+    # A negative c₀ drives the density Goldstone stiffness σ₀ negative, and the
+    # closed form then evaluated `(n·σ₀)^2.5` and threw a bare DomainError twelve
+    # frames deep — "Exponentiation yielding a complex result requires a complex
+    # argument" — naming no coupling and suggesting no fix. `epsilon_LHY_F6_Ih`
+    # already refuses the SAME case (`c_0 < 0 && return NaN`, "I_h not the GS");
+    # polar_contact simply never got that treatment.
+    #
+    # How it was found is worth recording, because the first version of this test
+    # was wrong: it passed `(c₀ = 10, c₁ = −0.5)` on the assumption that a
+    # negative c₁ is what triggers it, and that builds fine. The real trigger came
+    # from `c₀ + F²c₁ = c_total` with `c₁ = r·c₀`, i.e. `c₀ = c_total/(1 + 36r)`,
+    # which flips c₀ NEGATIVE for `r < −1/36`. So the couplings are constructed
+    # here the way that constraint constructs them, rather than guessed.
+    F = 6
+    c_total = 4687.3
+    r_bad = -0.05                    # past the −1/36 singularity ⇒ c₀ < 0
+    c0_bad = c_total / (1 + F^2 * r_bad)
+    @test c0_bad < 0                 # the premise, asserted rather than assumed
+    err = try
+        SpinorBEC.compute_spinor_lhy_polar_contact(;
+            F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_bad, r_bad * c0_bad),
+            n_max=2.0, n_points=8)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("not applicable", err.msg)
+    @test occursin("full_bdg", err.msg)
+
+    # POSITIVE CONTROL at a REAL production point. `runs/eu_gs_phase_c1_B_kappa`
+    # scans r ∈ [−0.024, +0.048] and says in its header that it "stays >
+    # singularity −1/36" — so r = −0.024 has c₀ > 0 with c₁ < 0, which is the
+    # combination production actually uses, and it must still build. Without this
+    # the test would pass on a form that refuses everything.
+    r_ok = -0.024
+    c0_ok = c_total / (1 + F^2 * r_ok)
+    @test c0_ok > 0 && r_ok * c0_ok < 0        # c₀ > 0 AND c₁ < 0
+    tbl = SpinorBEC.compute_spinor_lhy_polar_contact(;
+        F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_ok, r_ok * c0_ok),
+        n_max=2.0, n_points=8)
+    @test tbl isa SpinorBEC.PolarContactLHY
+    @test all(isfinite, tbl.potential_values)
 end

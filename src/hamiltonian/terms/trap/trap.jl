@@ -26,6 +26,11 @@ end
 # Derived: energy + gradient + propagator from the single source.
 # ============================================================================
 
+"""Energy is `1.0 · Re⟨ψ, H·ψ⟩ · dV` for this term — one-body V(x).
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::TrapTerm) = 1.0
+
 function energy_contribution(term::TrapTerm, psi::AbstractArray{<:Complex}, ws)
     # Linear term: E = Re⟨ψ, V·ψ⟩ · dV (no outer 1/2). Device-generic
     # derived body; the Array specialization below is the zero-alloc

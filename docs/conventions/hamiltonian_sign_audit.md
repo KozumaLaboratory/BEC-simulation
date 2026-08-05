@@ -1,5 +1,8 @@
 # Hamiltonian sign convention audit
 
+> **FROZEN 2026-06-04.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Source of truth for every Hamiltonian term used in `SpinorBEC.jl`,
 the convention for each, the implementation paths that must agree, and
 the directional sign test that pins each.
@@ -36,8 +39,19 @@ The single canonical Hamiltonian spec:
 H_total = H_kinetic + H_trap + H_Zeeman + H_interaction
         + H_DDI + H_rotating_frame + H_drive + H_loss
 
-H_Zeeman = -(g_F μ_B B · F) + q F_z²
-           = -p·F_z - bx·F_x - by·F_y + q·F_z²
+H_Zeeman = -p·F_z - bx·F_x - by·F_y + q·F_z²          # the OPERATOR form
+         = +(g_F μ_B B · F) + q F_z²                   # what that is, in lab field
+
+The second line read `-(g_F μ_B B · F)` until 2026-08-04, i.e. this file — which
+CLAUDE.md names as the physics convention authority and says "every other Zeeman
+reference derives from" — had the lab-field sign INVERTED. The operator form was
+right; the conversion to a field was not.
+
+The single declaration is `Units.bfield_to_p` (`src/workflow/io/units.jl`):
+`p ≡ -g_F μ_B B`, because the atomic moment is `μ = -g_F μ_B F` (Kawaguchi-Ueda).
+Substituting into `-p·F_z` gives `+g_F μ_B B·F_z`, not minus. The directional
+consequence, which is what a reader is here for: **+Bz on a g_F > 0 atom (Eu, Cr,
+He*) gives a ground state at m = -F.** Same statement as CLAUDE.md:153.
 
 H_rotating_frame = -Ω·(L_z + F_z)
                   ≡ Coriolis (-Ω·L_z) + Barnett (-Ω·F_z, via p_eff = p+Ω)
@@ -54,13 +68,22 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 
 ## Sign × path audit table
 
+<!-- The "Sign convention" column states the DIMENSIONLESS coefficient's
+     direction, not the lab field's. Until 2026-08-04 the linear-z row read
+     "+p ⇒ ⟨F_z⟩>0; for g_F>0 that is −Bz, since p ≡ −g_F μ_B B", which is wrong twice over: p ≡ -g_F μ_B B, so +p is
+     NEGATIVE Bz, and the chain then contradicted this file's own text above.
+     The transverse rows are different — there +bx really is physical +Bx, with
+     no g_F factor between them — so the two rows now say so explicitly rather
+     than looking parallel. Decided by test/oracles/test_hamiltonian_sign_oracles.jl:30-45
+     and :60-70, whose comments state exactly this. -->
+
 | Term | Sign convention | Propagator path | Energy CPU | Energy GPU | Gradient | Directional test |
 |---|---|---|---|---|---|---|
 | **Kinetic** `+½k²` | universal | `apply_kinetic_step_batched!` (`split_step_kernels.jl`) | `_kinetic_energy` (`energy.jl:34`) | mirrors CPU (`gpu_energy.jl:110`) | `_grad_kinetic!` (`energy_gradient.jl:100`) | implicit via norm conservation |
 | **Trap** `+V(r)` | universal | inside `_diagonal_step!` (`propagators.jl`) | `_trap_energy` (`energy.jl:35`) | mirrors CPU (`gpu_energy.jl:111`) | `_grad_trap!` (`energy_gradient.jl:144`) | none yet — TODO |
-| **Linear z-Zeeman** `H = -p·F_z` | +p ⇒ +Bz ⇒ ⟨F_z⟩>0 | inside `_diagonal_step!` via `zeeman_diagonal` (`zeeman.jl:9`) | `_zeeman_energy` (`energy.jl:165`) | mirrors CPU (`gpu_energy.jl:113`) | `_grad_zeeman!` (`energy_gradient.jl:152`) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:37` |
+| **Linear z-Zeeman** `H = -p·F_z` | +p ⇒ ⟨F_z⟩>0; physical +Bz ⇒ p<0 ⇒ ⟨F_z⟩<0 | inside `_diagonal_step!` via `zeeman_diagonal` (`zeeman.jl:9`) | `_zeeman_energy` (`energy.jl:165`) | mirrors CPU (`gpu_energy.jl:113`) | `_grad_zeeman!` (`energy_gradient.jl:152`) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:37` |
 | **Quadratic z-Zeeman** `H = +q·F_z²` | +q ⇒ E ~ +m² ⇒ favors m=0 | as linear z | as linear z | as linear z | as linear z | none yet — TODO |
-| **Transverse x-Zeeman** `H = -bx·F_x` | +bx ⇒ +Bx ⇒ ⟨F_x⟩>0 | `_apply_transverse_zeeman_step!` (`split_step.jl:154`) **uses `-bx`** | inside `_zeeman_energy` via `zeeman_at` (`energy.jl:165`) — currently CPU treats bx as part of zeeman vector; sign? **TODO verify** | mirrors CPU via `zeeman_at` (`gpu_energy.jl:112-113`) — **TODO verify** | `_grad_zeeman!` only handles diagonal; **does NOT include transverse — known gap, see notes** | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:64` (post-2026-06-04 fix) |
+| **Transverse x-Zeeman** `H = -bx·F_x` | +bx ⇒ ⟨F_x⟩>0, and here +bx IS physical +Bx | `_apply_transverse_zeeman_step!` (`split_step.jl:154`) **uses `-bx`** | inside `_zeeman_energy` via `zeeman_at` (`energy.jl:165`) — currently CPU treats bx as part of zeeman vector; sign? **TODO verify** | mirrors CPU via `zeeman_at` (`gpu_energy.jl:112-113`) — **TODO verify** | covered — one `ZeemanTerm` carries diagonal + transverse (`terms/zeeman.jl`), and `apply_operator!` branches on `_has_transverse` ([GAP-1] closed 2026-06-04) | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:64` (post-2026-06-04 fix) |
 | **Transverse y-Zeeman** `H = -by·F_y` | as x | as x | as x | as x | as x | **✓** `test/oracles/test_hamiltonian_sign_oracles.jl:89` |
 | **Coriolis (orbital)** `H = -Ω·L_z` | +Ω ⇒ descent on -L_z ⇒ ⟨L_z⟩>0 (vortex amplification in IT) | `_apply_coriolis_step!` (`split_step_kernels.jl:20`), 3-shear with `(tanh, -sinh, tanh)` / `(tan, -sin, tan)` post-2026-06-03 audit | `E_coriolis = -Ω·⟨L_z⟩` (`energy.jl:98`) | added 2026-06-04 fix (`gpu_energy.jl:170-181`) | `_grad_coriolis!` (`energy_gradient.jl:117`) | **✓** `test/solvers/test_simulation.jl:253` + `test/oracles/test_hamiltonian_sign_oracles.jl:117` |
 | **Barnett (spin)** `H = -Ω·F_z`, via `p_eff = p+Ω` | +Ω ⇒ effective Zeeman stronger ⇒ ⟨F_z⟩>0 | `_shift_zeeman_for_rotating_frame` (`make_workspace.jl:372`) post-2026-06-02 fix | folds into `_zeeman_energy` via shifted p | folds into shifted p | `_grad_zeeman!` via shifted p | **✓** `test/rotating_basis/test_rotating_frame_regression.jl:60` + `test/oracles/test_hamiltonian_sign_oracles.jl:139` |
@@ -68,7 +91,7 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 | **c1 spin** `H = (c1/2)·\|F\|²` | sign of c1 picks polar (>0) or FM (<0) | inside `_apply_spin_mixing_step!` | `_spin_interaction_energy` (`energy.jl:45`) | mirrors CPU (`gpu_energy.jl:121-126`) | `_grad_c1_spin!` (`energy_gradient.jl:183`) | partial: F=1 Rb87 (c1<0) → FM, F=1 Na23 (c1>0) → polar in `test_simulation.jl:6-50` — implicit oracle |
 | **DDI** see CLAUDE.md "Conventions" | `Q_αβ(k=0) = 0`, `Q_αβ = k̂_αk̂_β - δ_αβ/3` | `apply_ddi_step!` (`interactions/ddi/`) | `_ddi_energy` (`energy.jl:50`) | `_ddi_energy_from_gpu` (`gpu_energy.jl:128`) | `_grad_ddi!` (`energy_gradient.jl:229`) | none — TODO add oblate dipole alignment direction |
 | **LHY** `~ +c_lhy·n^(5/2)` | c_lhy>0 (repulsive) | inside `_diagonal_step!` | `_lhy_energy` (`energy.jl:63-69`) | mirrors CPU (`gpu_energy.jl:146-152`) | `_grad_lhy!` (`energy_gradient.jl:172`) | none — TODO repulsion direction |
-| **Tensor (c2, c4, ...)** | per S-channel coupling | `_apply_singlet_pair_step!`, `_apply_tensor_step!` | `_singlet_pair_energy`, `_tensor_interaction_energy` (`energy.jl:71-79`) | mirrors CPU (`gpu_energy.jl:154-162`) | NOT covered in `energy_gradient!` (LBFGS falls back to ITP) | none — TODO |
+| **Tensor (c2, c4, ...)** | per S-channel coupling | `_apply_singlet_pair_step!`, `_apply_tensor_step!` | `_singlet_pair_energy`, `_tensor_interaction_energy` (`energy.jl:71-79`) | mirrors CPU (`gpu_energy.jl:154-162`) | covered — `energy_gradient!` is registry-only since 2026-06-09, so `TensorTerm` contributes like every other slot; FD-gated in `test_term_consistency.jl` | none — TODO |
 | **Raman** depends on Ω_R, detuning δ | per `apply_raman_step!` | `apply_raman_step!` (`raman.jl`) | `_raman_energy` (`energy.jl:81-85`) | mirrors CPU (`gpu_energy.jl:164-168`) | not covered | none |
 | **Light shift** `±ls_amp·\|ψ_m\|²·profile(r)` per m | per `apply_light_shift_step!` | inside `_diagonal_step_with_ls!` (`propagators.jl`) | `_light_shift_energy` (`energy.jl:87-91`) | added 2026-06-04 fix (`gpu_energy.jl:170-174`) | `_grad_light_shift!` (`energy_gradient.jl:206`) | none |
 | **Magnetic gradient** `+g_F·grad·x_axis` to V | direct addition to V | inside `_apply_mg_to_V!` (`split_step.jl:130`) | folds into V_trap | folds into V_trap | folds into trap gradient | none |
@@ -76,23 +99,44 @@ CLAUDE.md "Conventions (do NOT 'fix')".)
 
 ---
 
-## Coverage scoreboard (as of 2026-06-04)
+## Coverage scoreboard (re-measured 2026-08-04)
 
-- **Directional test present**: 5 / 16 terms
-  - Linear z-Zeeman ✓
-  - Transverse x-Zeeman ✓ (new, post-2026-06-04)
-  - Transverse y-Zeeman ✓ (new)
-  - Coriolis orbital ✓
-  - Barnett spin ✓
+**14 terms, 14 `sign_oracle` methods.** `H_TERMS_CANONICAL_ORDER` has 14 entries
+and `methods(sign_oracle)` returns 14 concrete methods — every registry slot
+declares one. Measured, not counted by hand:
+
+```julia
+length(SpinorBEC.H_TERMS_CANONICAL_ORDER)   # 14
+length(methods(SpinorBEC.sign_oracle))      # 14
+```
+
+This section said "5 / 16" present and "11 / 16 missing" as of 2026-06-04. Both
+the numerator and the denominator were wrong by the time the HamTerm protocol
+landed: the registry is 14, not 16, and step 4 of the protocol
+(CLAUDE.md, "Adding a new HamTerm") makes a `sign_oracle` mandatory, so a new
+term cannot be added without one. Do not restate the count here — derive it, as
+above, or read `test/oracles/test_hamiltonian_sign_oracles.jl` and
+`test_term_fd_registry_coverage.jl`, which assert the coverage rather than
+describe it.
+
+**What a `sign_oracle` existing does NOT mean.** The protocol warns that a
+predicate returning `true` regardless is a placeholder, and that a term whose
+energy has the tautological shape `sign(E) = sign(c)·X²` needs a second,
+physics-anchored oracle in `test_physics_aware_sign_oracles.jl`. Presence is
+gated; strength is a judgement.
+
 - **Cross-path consistency verified** (CPU=GPU energy, gradient = ∂energy):
   - Linear z-Zeeman ✓
-  - Transverse x/y-Zeeman: **partial** — propagator fixed, gradient gap remains (`_grad_zeeman!` only diagonal — `energy_gradient!` is wrong at non-zero bx/by). Marker `[GAP-1]`.
+  - Transverse x/y-Zeeman: **partial** — propagator fixed, gradient gap remains
+    (`_grad_zeeman!` only diagonal — `energy_gradient!` is wrong at non-zero
+    bx/by). Marker `[GAP-1]`.
   - Coriolis orbital ✓ (per-cell FD audit)
   - Barnett spin ✓ (per-cell FD audit)
   - c0 / c1 / DDI / LHY ✓ (per-cell FD audit, post-fix)
-  - Tensor (c2, c4): **not covered** by `energy_gradient!` by design — LBFGS warns and falls back. Marker `[KNOWN-LIMIT]`.
-- **Directional test missing**: 11 / 16 terms (trap, q, c0, c1 directly, DDI, LHY, tensor, raman, light_shift, mag-grad, loss).
-  Each is a future-bug opportunity if the term gets refactored.
+  - Tensor (c2, c4) ✓ since 2026-06-09 — the anomalous gradient face is
+    implemented and `energy_gradient!` is registry-only, so tensor-active
+    configurations are optimised, not bounced to ITP. FD-gated in
+    `test_term_consistency.jl`. (Was `[KNOWN-LIMIT]`.)
 
 ### Known gaps requiring follow-up
 

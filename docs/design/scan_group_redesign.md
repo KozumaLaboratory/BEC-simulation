@@ -1,5 +1,8 @@
 # Scan group redesign — 2026-04-29
 
+> **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 Pain point identified by anko: 70+ `runs/<...>/config.yaml` files, many of which are 1-parameter sweeps (8 phi_omega, 6 Berry, 24 thesis batch). Currently:
 
 - Each sweep point lives as its own dir with its own config.yaml.
@@ -22,7 +25,7 @@ scan:
       override: {...}
 ```
 
-`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired into `run_yaml`. Used in `runs/eu151_mz_scan/`, `runs/eu151_phase_pq/` etc — those each have ONE `config.yaml` with a `scan:` block.
+`scan_continuation`, `comparison_runs`, `auto_rotate_psi` are wired into `run_yaml`. Used in `runs/eu151_mz_scan/` (gone), `runs/eu151_phase_pq/` (gone) etc — those each have ONE `config.yaml` with a `scan:` block.
 
 Today's new scans (phi_omega, Berry crossover, thesis_batch) bypassed this and instead generated N separate dirs via Julia generator scripts. Cause: launching N parallel runs across 3-GPU chunks is easier when each run is its own shell call. But the result is duplicated YAML and orphan analyzers.
 

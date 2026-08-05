@@ -20,7 +20,13 @@ using SpinorBEC
 using Test
 using Aqua
 using ExplicitImports
-using JET
+
+# JET stays unloaded unless the opt-in below is on: the typo check is
+# default-skipped, so `using JET` was ~1 s of load on every CI run buying
+# nothing. Loaded here at top level (not inside the testset) so the later
+# `JET.test_package` reference resolves in a fresh world age.
+const RUN_JET = lowercase(get(ENV, "SPINORBEC_JET", "false")) == "true"
+RUN_JET && @eval using JET
 
 @testset "Aqua quality checks" begin
     # Method ambiguities: skipped pending Workspace 23-type-param triage.
@@ -71,7 +77,17 @@ end
     # No `using X: name` where `name` is never referenced. This is the
     # actively-tracked rot signal: when a function is renamed or deleted,
     # the stale `using X: old_name` survives this test.
-    @test check_no_stale_explicit_imports(SpinorBEC) === nothing
+    #
+    # `ignore` is for names the checker cannot see because they appear only
+    # AFTER macro expansion. `CUDA.@captured` expands to code that names
+    # `CuGraphExec` unqualified (CUDA.jl lib/cudadrv/graph.jl:190), so the
+    # import in SpinorBECCUDAExt is load-bearing: removing it makes the whole
+    # extension fail with `UndefVarError: CuGraphExec`. Verified 2026-07-29 by
+    # deleting it and watching the extension stop loading — do not "clean" these
+    # on the checker's word alone.
+    @test check_no_stale_explicit_imports(
+        SpinorBEC; ignore=(:CuGraph, :CuGraphExec, Symbol("@captured"))
+    ) === nothing
 end
 
 @testset "JET typo smoke" begin
@@ -80,7 +96,7 @@ end
     # in `make_workspace` blows up the work the analyzer has to do).
     # Default-skip; opt in via SPINORBEC_JET=true when explicitly
     # auditing a regression.
-    if lowercase(get(ENV, "SPINORBEC_JET", "false")) == "true"
+    if RUN_JET
         JET.test_package(SpinorBEC; mode=:typo, target_defined_modules=true)
     else
         @test_skip false

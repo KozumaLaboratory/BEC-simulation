@@ -28,10 +28,21 @@ Conventions:
 | `mixins` | dict {name: param-set} | named param bundles; pulled in via `use:` |
 | `accuracy` | Real | seeds `epsilon:` on rotating_basis steps |
 | `auto_grid` | bool | enable TF-radius grid auto-derivation |
-| `metadata`, `name`, `notes`, `version` | free-form | provenance, ignored at runtime |
 
 Any other top-level key triggers a typo warning (strict-mode error). The
 warning suggests the closest known key via Levenshtein distance.
+
+> **`metadata` / `name` / `notes` / `version` were DELETED 2026-08-04.** This
+> table listed them as "free-form, ignored at runtime" — and "ignored at
+> runtime" was the problem: a slot no code reads cannot be contradicted, so the
+> only thing that can happen to it is that it rots. Across the 302 configs that
+> carried a `metadata:` block there were 59 distinct keys, five of them the
+> wreckage of an unquoted comma, and `generator:` named a script that no longer
+> existed in 156 of them. They were also not free: `_canonical_bytes!` hashes
+> every key of the spec, so rewording a comment renamed the run and orphaned its
+> cache. They are now unknown keys and warn like any typo. Use a YAML comment
+> (`#`), which never reaches the hasher. The 302 blocks are preserved verbatim
+> in `docs/validation/config_metadata_blocks.toml`.
 
 ## Pipeline-step envelope
 
@@ -107,7 +118,7 @@ a typo warning.
 | `seed_mode` | dict | — | deterministic single-k seed; see block below |
 | `hard_polarize` | Real [-12, 12] | — | force `<F_z>=value` at step start |
 | `noise_seed` | Number | random | RNG seed for thermal / mode noise |
-| `integrator` | strang / yoshida / adaptive / richardson / yoshida4 / yoshida6 / cfet4 | strang | standard path uses first four; rotating_basis uses last four |
+| `integrator` | standard: strang / midpoint / rk4ip — rotating_basis: strang / yoshida4 / yoshida6 / cfet4 | strang | any other value raises `ArgumentError`; `yoshida` / `adaptive` / `richardson` are NOT implemented on the standard path (`_resolve_dynamics_stepper`, `run_step_dynamics.jl:463`) |
 | `backend` | cpu / gpu | inherited | per-step override |
 | `kind` | binary / rotating_basis | inherited | per-step solver override |
 | `B_direction` | dict | — | rotating_basis only |
@@ -162,19 +173,50 @@ Semantic details + interactions live in `docs/reference/dynamics.md`.
 | `secular` | Bool | false |
 | `quasi_2d` | Bool | false |
 | `l_z` | Real [0, 100] | — |
-| `trunc_radius` | Number or `"auto"`/`"box_half"` | off |
-| `padded` | Bool | false |
-| `pad_factor` | Number or per-axis Vector | 2 |
+| `trunc_radius` | Number or `"auto"`/`"box_half"`/`"none"`/`"off"` | `"auto"` |
+| `padded` | Bool | true |
+| `pad_factor` | Number, per-axis Vector, or `"auto"` | 2 |
+
+Both image-handling knobs default **on** as of 2026-07-29 (they were both off
+before). The bare periodic kernel they replace carries a $2 \times 10^{-2}$ to
+$5 \times 10^{-2}$ dipolar field error against free space, and that error is
+*flat in resolution* — $1.91 \times 10^{-2}$ at $32^3$, $48^3$ and $64^3$ alike —
+so refining the grid does not touch it. Set `padded: false` and
+`trunc_radius: none` to reproduce a pre-flip run. Measured by
+`scripts/ddi_cutoff_geometry_jz_probe.jl`.
+
+The two are **not independent knobs**. The cutoff alone fixes rotation
+covariance by ~1000× (the $J_z = L_z + \langle F_z\rangle$ violation rate drops
+$1.9\times10^{-2} \to 1.7\times10^{-5}$) while leaving the field *magnitude*
+essentially untouched ($2.1\times10^{-2} \to 2.0\times10^{-2}$), because the
+periodic images are still there. It is the padding that removes them.
+
+Because a dynamics step rebuilds the DDI kernel rather than inheriting it (the
+truncation and padding are baked into the kernel, not carried on `DDIParams`),
+an explicit opt-out written only in `ground_state` does **not** propagate — repeat
+it in the `dynamics` step too.
 
 **`padded`** (Tier B) enables the zero-padded, image-free convolution
 (Vico–Greengard): combined with `trunc_radius: auto` it removes the periodic
 images *exactly* (not just suppresses them), giving near-machine accuracy at
-fixed resolution. Cost: ~`prod(pad_factor)`× the grid FFT work + memory (≈8× at
-the default 2× pad in 3D). **`pad_factor`** sets the zero-pad multiple — a scalar
-or a per-axis vector. Use a smaller factor on thin axes for **anisotropic
-padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to cut memory; the
-auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis to stay
-wrap-around-free. Only meaningful with `padded: true`.
+fixed resolution. Cost is far below the naive `prod(pad_factor)`: at $D = 13$ the
+DDI step is dominated by the spin density and the Euler rotation on the unpadded
+grid rather than by the 6 FFTs, measuring **1.2–1.4×** per step. Memory is the
+real constraint — the padded context is ~290 MB at $64^3$ and ~975 MB at $96^3$.
+**`pad_factor`** sets the zero-pad multiple — a scalar,
+a per-axis vector, or `"auto"`. Use a smaller factor on thin axes for
+**anisotropic padding** (e.g. `pad_factor: [2.73, 2.73, 1.5]` for a pancake) to
+cut memory; the auto `trunc_radius` caps R at `(pad_factor_d − 1)·L_d` per axis
+to stay wrap-around-free. Only meaningful with `padded: true`.
+
+`pad_factor: auto` matters only on an **anisotropic** box. A single sphere has
+one radius, so at a flat $2\times$ pad the cutoff is capped at $\min(L_d)$ while
+covering every separation in the box needs $\max(L_d)$ — the SHORT axis binds.
+Auto solves $(f_d - 1)L_d \ge \max(L_d)$ per axis, giving
+$f_d = 1 + \max(L_d)/L_d$. On the aspect-2 cigar that is $(3, 3, 2)$ and takes
+the field error from $1.8\times10^{-3}$ to $0$, for $2.25\times$ the padded
+volume. Isotropic boxes resolve to exactly 2 on every axis, so nothing changes
+for them — which is why the default stays `2` rather than `auto`.
 
 **`trunc_radius`** applies the spherically-truncated DDI kernel
 (Ronen–Bortolotti–Bohn cutoff; Vico–Greengard–Ferrando spectral form). Every
@@ -186,11 +228,14 @@ un-padded convolution — with spectral accuracy at *fixed* resolution, rather t
 trying to converge it away by refining the grid. `h(0)=0` keeps the `Q(k=0)=0`
 spherical-cavity convention (no contact / −δ term is introduced); `h(x)→1` for
 `|k|R ≫ 1` leaves the bulk physics intact. A number sets `R` (in `a_ho` units);
-`"auto"`/`"box_half"` uses half the smallest box extent (the largest cutoff that
-avoids wrap-around in the periodic convolution). The quasi-2D kernel is the
-analytically z-integrated form and is already smooth, so `trunc_radius` does not
-apply there. Off by default (backward-compatible). Diagnostic:
-`scripts/ddi_truncation_isotropy_probe.jl`.
+`"auto"`/`"box_half"` picks the largest wrap-around-free cutoff: half the
+smallest box extent when unpadded, or `min(box diagonal, min_d (pad_factor_d −
+1)·L_d)` when padded. `"none"`/`"off"` restores the bare periodic kernel. The
+quasi-2D kernel is the analytically z-integrated form and is already smooth, so
+`trunc_radius` does not apply there. Diagnostics:
+`scripts/ddi_truncation_isotropy_probe.jl` (field isotropy),
+`scripts/ddi_cutoff_geometry_jz_probe.jl` (field error + $J_z$ violation vs a
+free-space reference, with a corrupted-kernel positive control).
 
 ### `B` — unified Zeeman block
 
@@ -199,7 +244,11 @@ either of those triggers an `ArgumentError` with a migration hint.
 
 The Zeeman Hamiltonian has two mathematically independent contributions:
 
-    H_Zeeman = -(g_F μ_B B · F) + q F_z²
+    H_Zeeman = -p·F_z + q·F_z²          # operator form (Kawaguchi-Ueda)
+             = +(g_F μ_B B · F) + q F_z²   # in lab field, since p ≡ -g_F μ_B B
+    # Read `-(g_F μ_B B · F)` until 2026-08-04 — the lab-field sign was inverted
+    # here and in docs/conventions/hamiltonian_sign_audit.md. +Bz on a g_F>0 atom
+    # (Eu, Cr, He*) gives ground state m = -F. Declared once in Units.bfield_to_p.
                ↑ vector (chooses coord system)   ↑ scalar (orthogonal)
 
 The vector term `B · F` accepts three input coord systems, auto-detected
@@ -252,10 +301,40 @@ the top of the aggregated waveform.
 
 | key | type / enum | default | notes |
 |---|---|---|---|
-| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` | none | — |
+| `kind` | `none` / `scalar` / `quasi_2d` / `polar_two_channel` / `full_bdg` / `polar_contact` / `polar_dipolar` / `fm_contact` / `fm_dipolar` / `icosahedral` / `spatial` | none | — |
 | `c_lhy` | Number | auto | `scalar` / `quasi_2d` Lima-Pelster auto-derivation |
 | `n_max` | Number | `3 × max(\|ψ_init\|²)` | LHY table density-cap |
 | `n_points` | Int [3, 10000] | 200 | tabulation resolution |
+| `n_bins` | Int [2, 64] | 12 | `spatial` only — $|\langle F\rangle|/F$ bins |
+
+Every kind other than `spatial` builds ONE table for ONE spinor and applies it
+at every voxel — exact for a uniform cloud, measured at ~5% on converged
+weak-field Eu textures, with a sign that flips along a B-scan. `make_workspace`
+warns above a $|\langle F\rangle|/F$ spread of 0.3.
+
+`kind: spatial` is the answer to that warning: it tabulates $e_1(p)$ against the
+local polarisation $p = |\langle F\rangle|/F$, from the spinors actually present
+in `psi_init`, at one BdG solve per **occupied** bin (so `n_bins` is a cost knob
+and the cost is independent of grid size). When the cloud turns out uniform
+enough that a single-spinor table is already right, it falls back to `full_bdg`
+rather than returning nothing.
+
+Two caveats for `spatial`:
+
+- The polarisation piece of $\delta E/\delta\bar\psi$ is a spin operator, which
+  a diagonal split-step cannot carry. It is applied as its own substep
+  (`apply_spatial_lhy_spin_step!`, a per-voxel rotation about the local
+  $\langle F\rangle$ axis), so the propagator and the LBFGS gradient agree. Runs
+  predating issue #131 had ITP minimising a functional 2.3% away from the one
+  LBFGS minimised.
+- Expect `full_bdg`'s dynamic-instability warning. A bin's representative
+  spinor is lifted out of the cloud and is not a solution of the *uniform*
+  mean-field problem at its own density; the warning is about that fictitious
+  uniform system, not about your state.
+
+`n_max` and `n_points` reached nothing before 2026-07-28 — they were declared
+here and normalised by no one, so `n_points: 4000` silently stayed 200. Any
+config predating that fix ran at the defaults regardless of what it asked for.
 
 ### `loss` — three- / two-body loss, evaporation
 
@@ -268,7 +347,6 @@ Accepts a Number / Bool (scalar shortcut) or a Dict with these keys:
 | `L3_per_m` | Vector | per-component L3 (legacy linear-in-n) |
 | `K3_cubic` | Number | [0, 1e10] — m-independent true 3-body |
 | `K3_per_m_cubic` | Vector | per-component true 3-body (dimless) |
-| `K3_per_m` | Vector | dimless alias of `K3_per_m_cubic` |
 | `K3_per_m_si` | Vector | SI-unit strings (`"3.5e-30 cm^6/s"`) |
 | `evap_energy_cutoff` | Number | [0, 1e10] — single-particle ε cutoff |
 | `evap_rate` | Number | [0, 1e10] — rate coefficient |
@@ -371,13 +449,12 @@ at parse time.
 
 ### `photon_scattering`
 
-Either `Gamma_sc` (canonical) or `gamma_sc` (lowercase alias accepted by
-the parser) is required.
+`Gamma_sc` is required. The lowercase `gamma_sc` alias was removed
+2026-05-24 and now raises `ArgumentError` (`pipeline_callbacks.jl:45`).
 
 | key | type | range |
 |---|---|---|
 | `Gamma_sc` | Number | [0, 1e10] |
-| `gamma_sc` | Number | [0, 1e10] |
 | `seed` | Int | — |
 
 ### `live_monitor`
@@ -394,7 +471,7 @@ snapshot every `every` steps to the run dir.
 | key | type | required |
 |---|---|---|
 | `t` | Number [0, 1e6] | yes |
-| `apply` | "B" / "raman" / "interactions" / "trap" | yes |
+| `apply` | "B" / "raman" / "interactions" | yes |
 | `duration` | Number [0, 1e6] | — |
 
 Per-target params (left permissive; `_apply_pulse_sequence` validates):
@@ -404,7 +481,10 @@ Per-target params (left permissive; `_apply_pulse_sequence` validates):
 | `B` | `p`, `q`, `bx`, `by` |
 | `raman` | `Omega`, `delta`, `k_eff` |
 | `interactions` | `c0`, `c1` |
-| `trap` | `omega`, `center` |
+
+`trap` was listed here until 2026-07-29 and has never been compiled:
+`compile_pulse_sequence` has no branch for it, so the event was silently
+dropped. `parse_pulse_sequence` now rejects any target it cannot compile.
 
 ### `potential`
 
@@ -438,12 +518,94 @@ Used by every field that accepts time dependence (`B.{Bx, By, Bz, ...}`,
 | `{piecewise: {times, values}}` | piecewise-linear |
 | `{interpolated: {times, values}}` | smooth interpolation |
 | `{csv: <path>}` | load from file |
+| `{noise: {...}}` | seeded field noise (below) |
+| `{sum: [<spec>, ...]}` | additive composition of any of the above |
 | existing `Waveform` | passthrough |
 
 **`frequency` convention** (Klaus-2022 footgun, memory
 `gotcha_waveform_frequency_convention.md`): for `sinusoidal`, YAML
 `frequency` is `f_phys / (2π · f_ref)`, not `f_phys / f_ref`. Pass
 `"X Hz"` (string with units) for unambiguous lab-unit input.
+
+### `noise:` — laboratory field noise
+
+Adds a seeded, reproducible noise realisation to any waveform-valued field.
+Combine it with the intended waveform via `sum:`; nothing in the `B` block
+needs to know about it.
+
+```yaml
+B:
+  Bz:
+    sum:
+      - {from: 6.0e-5, to: 3.0e-5}          # the intended ramp, in Gauss
+      - noise:
+          seed: 7
+          lines:                             # mains pickup and harmonics
+            - {frequency: "50 Hz",  rms: 3.0e-7}
+            - {frequency: "150 Hz", rms: 1.0e-7}
+          broadband:
+            shape: pink                      # none | white | pink | brown | lorentzian
+            rms: 2.0e-7                      # TOTAL rms over [f_lo, f_hi]
+            f_lo: "1 Hz"
+            f_hi: "500 Hz"
+            f_corner: "10 Hz"                # knee; 1/f and 1/f² need it > 0
+          n_components: 256
+```
+
+| key | meaning |
+|---|---|
+| `seed` | RNG seed. Fixes the realisation; vary it to build an ensemble. |
+| `lines` | list of `{frequency, rms}` discrete tones |
+| `broadband.shape` | `none`, `white`, `pink` (1/f), `brown` (1/f²), `lorentzian` |
+| `broadband.rms` | total rms over the band — **not** a spectral density |
+| `broadband.{f_lo, f_hi, f_corner}` | band edges and the 1/f knee |
+| `n_components` | tones used to represent the broadband part (default 256) |
+
+**A static field error is not noise — it is a different field.** Set it in the
+field value (`Bz: 6.1e-5`, or a bare number in the `sum:`) and, since it is one
+scalar, sweep it as an explicit axis to get the response function directly.
+Sampling it randomly would give a smeared average you then have to deconvolve.
+Randomisation earns its place for the AC phases, a few hundred dimensions that
+cannot be scanned; it does not earn it for one number.
+
+The distinction matters physically: a constant offset shifts the field AXIS, so
+both legs of a hysteresis scan move together and the loop keeps its width while
+the absolute jump field is biased. Time-varying error smears the transition
+instead. Scanning the offset separates the two failure modes; folding it into a
+"noise" rms conflates them.
+
+`rms` is in the units of the host field (Gauss for `Bx`/`By`/`Bz`,
+dimensionless for `p`/`bx`/`by`); frequencies follow the `frequency`
+convention above and accept `"X Hz"` strings.
+
+Two things worth knowing:
+
+- **The realisation is analytic in `t`, not a sampled trace.** Randomness
+  enters only through the phases, at construction. That is required, not a
+  stylistic choice: a waveform is evaluated several times per step (Strang
+  sub-steps, rejected adaptive-`dt` trials), and an RNG inside `evaluate`
+  would hand the propagator a different field at the same instant.
+- **`dt` still has to resolve the noise.** The waveform has no sampling grid,
+  but the integrator does; a `dt` coarser than the fastest component aliases
+  it to some other frequency rather than averaging it out. Keep
+  `dt ≲ 1/(10·f_max)` or narrow `f_hi`.
+
+Across seeds the per-shot rms is fixed by construction — only the realisation
+changes — so an ensemble scan measures the response to a stated noise budget
+without the budget itself fluctuating.
+
+Order-of-magnitude anchors for a magnetic field:
+
+| regime | dominant term | figures |
+|---|---|---|
+| coils, no shield | AC mains | ≈ 1.3 mG peak-to-peak at 50 Hz |
+| coils + active stabilisation | AC mains | ≈ 0.01 mG at 50 Hz, ≈ 0.05 mG at 150 Hz; broadband ≈ 10 µG/√Hz over 0–1 kHz |
+| permalloy shield + AC degauss | **static residual** | ≈ 10 µG offset; AC terms well below it |
+
+Convert a spectral density to `rms` with `rms ≈ density · √(f_hi − f_lo)`. In
+the shielded regime the AC entries here are nearly irrelevant and the limiting
+error is the static residual — which is a field VALUE, so it goes in the scan,
+not in this block.
 
 ## `scan` block
 
@@ -500,6 +662,7 @@ A list of analyzers, each `{<name>: <params>}`. Names include:
 - `population_history`
 - `trap_population` (radius, center) — inside-vs-outside-trap norm split; tracks atoms spilling toward the absorbing boundary
 - `cloud_shape` — center of mass, per-axis RMS widths, principal-axis widths, aspect ratio, in-plane tilt; quantifies cloud deformation across a snapshot series
+- `superfluid_fraction` (directions, method) — per-axis $f_s$ from the phase-twist free energy: `leggett` (plane-average bound), `relaxed` (full variational minimum), or `both` (default). Rigid-density, so both are upper bounds; a cloud that does not span the periodic box legitimately reports ≈ 0
 
 Full list in `src/workflow/experiments/analyzers/`.
 

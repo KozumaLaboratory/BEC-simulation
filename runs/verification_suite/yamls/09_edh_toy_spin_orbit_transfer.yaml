@@ -2,11 +2,6 @@
 # Physics: DDI couples spin and orbital angular momentum. In a closed system, Jz=Lz+Sz should be approximately conserved.
 # Expected: small spin depolarization and nonzero orbital/winding signal; not a quantitative Matsui reproduction.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Saito_Ueda_EdH_toy
-  expected: qualitative_spin_orbit_transfer
-
 defaults:
   kind: spinor
   backend: gpu

@@ -7,14 +7,6 @@
 #   gdr_on = true
 #   LHY_on = true
 
-metadata:
-  suite: spinorbec_eu_robust_factorial
-  ladder_level: 12
-  K3_on: true
-  gdr_on: true
-  LHY_on: true
-  generator: scripts/validation/eu_robust_factorial_gen.jl
-
 defaults:
   kind: spinor
   backend: cpu                       # CPU at 32³ avoids the per-environment
@@ -35,7 +27,7 @@ pipeline:
         enabled: true
         secular: false
       lhy: {kind: scalar}
-      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_minus_F
       init_sigma: 1.5

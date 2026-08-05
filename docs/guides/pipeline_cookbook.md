@@ -1,6 +1,6 @@
 # Pipeline cookbook
 
-Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` and `runs/eu151_*/config.yaml`.
+Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` (example) and `runs/eu151_*/config.yaml`.
 
 ## Basic ground state
 
@@ -11,7 +11,7 @@ pipeline:
       grid: {n: [64, 64, 64], box: [20.0, 20.0, 20.0]}
       interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.028}
       ddi: {enabled: true}
-      zeeman: {p: 1.0, q: 0.1}
+      B: {p: 1.0, q: 0.1}
       potential: {type: harmonic, omega: [1.0, 1.0, 1.1818]}
       dt: 0.005
       n_steps: 10000

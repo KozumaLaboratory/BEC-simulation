@@ -1,5 +1,8 @@
 # TDHFB pilot — design document for SpinorBEC.jl
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Date**: 2026-05-11
 **Status**: design document; implementation post-修論 (D-thesis Year 2 candidate).
 **Bridge**: Chapter 5 §5.8 → D-thesis Ch.4 (beyond-mean-field methods) primary candidate.

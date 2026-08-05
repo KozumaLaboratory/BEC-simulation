@@ -30,6 +30,49 @@ end
     return TimeDependentInteractions(c0_wf, c1_wf)
 end
 
+"""
+    _resolve_dyn_lhy!(p, atom, c_dd_val) -> Bool
+
+Resolve a `dynamics:` step's own `lhy:` block, in place, exactly as the
+ground_state step does.
+
+`_resolve_lhy_block!` — which derives `interactions.c_lhy` for the scalar modes
+and writes the `lhy_opts` carrying `n_atoms` for the tabulated ones — runs inside
+`_resolve_derived_params!`, and the only caller of that is
+`run_step_ground_state.jl`. So a `dynamics: {lhy: …}` block reached
+`make_workspace` with **neither**:
+
+  * scalar / quasi_2d modes: `interactions.c_lhy` stayed 0, because the dynamics
+    `interactions` dict is re-parsed by `_parse_gs_interactions` and the GS
+    resolver only ever wrote `c_lhy` onto the *ground_state* block's dict. The
+    dynamics phase then ran with **no LHY at all** while `lhy: {kind: scalar}`
+    sat in the YAML — and, being absent rather than wrong, it conserved energy
+    perfectly and reported `lhy = +0`.
+  * tabulated modes: `lhy_opts` was missing, so the fallback
+    `LHYTableOpts()` supplied `n_atoms = 1`. That factor is the unit conversion,
+    not a table knob (see `_resolve_lhy_block!`): `n` is normalised to
+    `∫|ψ|²dV = 1` while `c₀` already carries `N`, so `n_atoms = 1` makes the
+    table **exactly `N_atoms` times too strong — in the propagator as well as
+    the energy.** At Eu F=6 / N=30000 that put 97 % of the total energy in the
+    LHY term and drifted the run by 46 %.
+
+Returns whether the block was resolved, so the caller can warn rather than
+silently keep the old behaviour when the interaction block is in the `c_total`
+form (no `N_atoms` to normalise by).
+"""
+@noinline function _resolve_dyn_lhy!(p::Dict{String, Any}, atom, c_dd_val::Float64)
+    get(p, "lhy", nothing) isa Dict || return true
+    inter_d = get(p, "interactions", nothing)
+    inter_d isa Dict || return false
+    n_atoms = Int(get(inter_d, "N_atoms", 0))
+    omega_ref = Float64(get(inter_d, "omega_ref", 0.0))
+    (n_atoms > 0 && omega_ref > 0) || return false
+    a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
+    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    _resolve_lhy_block!(p, inter_d, atom, c_dd_val, eps_dd, n_atoms, a_ho)
+    return true
+end
+
 @noinline function _resolve_dyn_magnetic_gradient(
     p::Dict{String, Any}, ndim::Int, duration::Float64
 )
@@ -84,16 +127,22 @@ function _run_step(
     else
         prev_c_dd
     end
-    # DDI truncation / padding (Tier A/B). Like `secular`, these are not carried
-    # on the inherited `DDIParams` (the kernel bakes them in), so dynamics only
-    # applies them when an explicit dynamics `ddi:` block requests it; otherwise
-    # the bare kernel is rebuilt.
+    # DDI truncation / padding (Tier A/B). Like `secular`, these are NOT carried
+    # on the inherited `DDIParams` (the kernel bakes them in), so the dynamics
+    # kernel is rebuilt from these values rather than inherited from ws_prev.
+    # They therefore default the same way the ground_state block does — before
+    # 2026-07-29 they defaulted OFF here while a config could turn them ON in
+    # `ground_state`, which silently gave a padded GS feeding bare-kernel
+    # dynamics. A config that explicitly opts OUT in `ground_state` still has to
+    # repeat that opt-out here; the inherited DDIParams cannot carry it.
     ddi_trunc = if ddi_raw isa Dict
         _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
     else
-        NaN
+        DDI_TRUNC_RADIUS_DEFAULT
     end
-    ddi_padded_b = ddi_raw isa Dict ? Bool(get(ddi_raw, "padded", false)) : false
+    ddi_padded_b =
+        ddi_raw isa Dict ?
+        Bool(get(ddi_raw, "padded", DDI_PADDED_DEFAULT)) : DDI_PADDED_DEFAULT
     ddi_pf = ddi_raw isa Dict ? _parse_ddi_pad_factor(get(ddi_raw, "pad_factor", nothing)) : 2.0
 
     # Match the GS path: route the inner B dict through
@@ -125,6 +174,16 @@ function _run_step(
     sp = SimParams(; dt, n_steps, save_every,
         rotating_frame_omega=rf_omega,
         spin_rotating_frame_omega=spin_rf_omega)
+
+    # Must run BEFORE `_parse_gs_interactions`, which is what reads the
+    # `c_lhy` this writes.
+    if !_resolve_dyn_lhy!(p, atom, c_dd_val)
+        @warn """dynamics `lhy:` block cannot be normalised: its `interactions:` \
+gives no (N_atoms, omega_ref), so the LHY tables have no atom number to divide \
+by and scalar `c_lhy` cannot be derived. The dynamics phase will run without \
+LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (the \
+`c_total` form is not enough).""" maxlog = 1
+    end
 
     inter = get(p, "interactions", nothing)
     interactions = inter !== nothing ? _parse_gs_interactions(inter, atom) : prev_interactions
@@ -187,6 +246,7 @@ function _run_step(
         time_dep_interactions,
         magnetic_gradient,
         spinor_lhy=spinor_lhy_mode,
+        lhy_opts=get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts,
     )
 
     if temp_ratio !== nothing
@@ -319,9 +379,19 @@ function _run_step(
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
+    # Cutover step 2, invariant 4: the RTP loops swallow `InterruptException`
+    # exactly as the ITP does (`simulation/run_loops.jl:51`, `:207`) — they
+    # record a final snapshot, print, and return normally, so a killed dynamics
+    # run is otherwise INDISTINGUISHABLE from a finished one. `converged` cannot
+    # cover it either: there is no GS step in a dynamics-only pipeline, so
+    # `run_registry.jl` records `converged = true` unconditionally. This Ref is
+    # the only signal, and it is what withholds the completion marker.
+    rtp_interrupted = Ref(false)
     result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
         ws, save_psi_snap, save_compress, snap_precision_cf;
         extra_on_step=extra_cb,
+        stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
+        interrupted=rtp_interrupted,
     )
 
     if verbose
@@ -338,8 +408,77 @@ function _run_step(
         :save_snapshot_compression => save_compress,
         :snapshot_tmp_path => snap_tmp_path,
         :snapshot_count => snap_count,
+        :interrupted => rtp_interrupted[],
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+"""
+    _resolve_dynamics_stepper(spec) -> Union{Nothing, Function}
+
+Map the `integrator:` key of a standard `dynamics:` step onto a per-step
+propagator. `nothing` keeps the historical leapfrog loop (merged V blocks).
+
+`integrator:` used to be accepted by `DYNAMICS_SCHEMA` and then never read —
+`run_simulation!` always took the leapfrog branch, so `integrator: yoshida` on a
+standard dynamics step was a silent no-op. Silently ignoring an accuracy knob is
+worse than not offering it, so unsupported values now raise.
+
+`midpoint` buys less than this docstring used to claim. `split_step!` ALREADY
+dispatches to `_half_potential_step_midpoint!` whenever DDI is active
+(`MEANFIELD_MIDPOINT_ENABLED`), so the default is 2nd order on the dipolar path —
+measured 2.00 at `c_dd` = 0 and 147.7, 1.93 at 1477. The "plain `split_step!` is
+1st order when `c_dd > 0`" warning describes the LEGACY path with that toggle
+off. Selecting `midpoint` explicitly lowers the error ~1.7× at fixed `dt`, i.e.
+~1.3× the step, for 1.49× the per-step cost. Close to a wash.
+
+`rk4ip` is 4th order, and whether that is worth taking is a question about the
+required TOLERANCE, not about the order. Full measurement:
+`docs/validation/rk4ip_cost_on_gpu.md`.
+
+At the same `dt` it is more accurate and dearer — H100 64³, `dt` = 7.81e-4:
+**7090x the accuracy at 3.28x the cost per step**. At the same accuracy, time to
+solution (measured at 64³):
+
+    budget    rk4ip dt    split dt    TIME RATIO
+     1e-3     4.23e-2     2.62e-2       0.49x
+     1e-4     2.34e-2     8.29e-3       0.86x
+     1e-5     1.31e-2     2.62e-3       1.53x
+     1e-6     7.38e-3     8.29e-4       2.71x
+
+**Break-even is between 1e-4 and 1e-5**, and production sits near 1e-4 — so at
+default tolerances this is slower for the same answer. Select it when the
+tolerance is tight, or on CPU, where it is cheaper per step outright (2.61 ms
+against `split_step!`'s 3.00 at 12³; on the H100 it is 2.87x at 128³, 3.28x at
+64³, 7.44x at 32³, because it applies `e^{K dt/2}` four times per step where
+Strang applies `e^{K dt}` once and the GPU is FFT-bound). Memory is the other
+constraint: five full-state scratch buffers, measured 12.9 GiB allocator
+high-water for one 128³ step on the H100 and 4.8 GiB of a 15.9 GiB consumer
+card. Two more things to know. It is not
+norm-conserving — the drift is a free error monitor, and `normalize_every` is not
+honoured. And its failure mode is a wall rather than a slope: measured on an
+Eu-like 12³ DDI config it holds ~1e-1 relative error at `dt` = 2.5e-2 and returns
+4e40 at 5e-2, where a unitary split-step merely degrades. Real time only.
+"""
+function _resolve_dynamics_stepper(spec)
+    spec === nothing && return nothing
+    name = lowercase(strip(string(spec isa AbstractDict ? get(spec, "name", "") : spec)))
+    isempty(name) && return nothing
+    if name in ("strang", "leapfrog", "default")
+        return nothing
+    elseif name == "midpoint"
+        return split_step_midpoint!
+    elseif name == "rk4ip"
+        return rk4ip_step!
+    else
+        throw(
+            ArgumentError(
+                "dynamics integrator \"$name\" is not implemented on the standard " *
+                "path. Supported: \"strang\" (default leapfrog), \"midpoint\" " *
+                "(2nd-order, explicit) or \"rk4ip\" (4th order, cheaper per step than " *
+                "the default, real time only). The rotating_basis path has its own set."),
+        )
+    end
 end
 
 """
@@ -357,11 +496,13 @@ function _run_dynamics_with_optional_streaming!(
     ws, save_psi::Bool, compress::Bool,
     snap_type::Type{<:Complex}=ComplexF32;
     extra_on_step::Union{Nothing, Function}=nothing,
+    stepper::Union{Nothing, Function}=nothing,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 )
     if !save_psi
         cb = extra_on_step === nothing ? nothing :
              SimulationCallbacks(; on_step=extra_on_step)
-        return (run_simulation!(ws; callbacks=cb), nothing, 0)
+        return (run_simulation!(ws; callbacks=cb, stepper, interrupted), nothing, 0)
     end
 
     snap_tmp = _dynamics_scratch_path()
@@ -392,6 +533,8 @@ function _run_dynamics_with_optional_streaming!(
                 on_step=extra_on_step,
             ),
             stream_snapshots=true,
+            stepper,
+            interrupted,
         )
     finally
         snap_file["n_snapshots"] = frame_count[]

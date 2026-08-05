@@ -1,5 +1,8 @@
 # 修士論文 Chapter 5 v3: Eu Post-quench Chaotic Dipolar Dynamics — TWA による Numerical Characterization
 
+> **FROZEN 2026-05-08.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Major reframing** (May 8, 2026): 当初の "TWA で量子ゆらぎ評価" framing を、 
 **Chaotic dipolar instability の trajectory divergence study** に転換。
 理由: Round 5 GPU 結果 (Sinatra-clean 16³×box=10 pinned 1/N) で σ/μ が 1/√N scaling

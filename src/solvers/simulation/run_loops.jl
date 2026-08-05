@@ -3,6 +3,37 @@
 #   _run_simulation_leapfrog! — merges adjacent V(dt/2) blocks between
 #                                non-checkpoint steps for real-time dynamics
 
+"""
+    _trim_interrupted_traces!(times, energies, norms, mags, snapshots, keep_psi) -> Int
+
+Drop a half-written observation row, so the trace an interrupted run hands back
+is rectangular.
+
+`_record_snapshot!` pushes `times`, then `energies`, then `norms`, then `mags`,
+then (optionally) `snapshots`. A scheduler-delivered `InterruptException` can
+land BETWEEN those pushes — measured on the leapfrog loop, 2026-08-01:
+`times = 6` while `energies = norms = mags = snapshots = 5`. Every consumer
+indexes the four together (`_concat_dynamics_phases`, `save_rotating_result.jl`,
+which reads `dr.norms[k]` for `k in eachindex(dr.times)`), so the ragged tail
+raised a `BoundsError` inside the pipeline's dynamics auto-save. That auto-save
+is wrapped in `try`/`@warn`, so the visible effect was an interrupted dynamics
+run writing NO `result.jld2` at all — losing both the forensic record and the
+tombstone that marks it as not-to-be-served.
+
+Truncating from the END is the correct repair, not a heuristic: the only row
+that can be partial is the one being written when the exception arrived.
+"""
+function _trim_interrupted_traces!(times, energies, norms, mags, snapshots,
+    keep_psi::Bool)
+    n = min(length(times), length(energies), length(norms), length(mags))
+    keep_psi && (n = min(n, length(snapshots)))
+    for v in (times, energies, norms, mags)
+        length(v) > n && resize!(v, n)
+    end
+    keep_psi && length(snapshots) > n && resize!(snapshots, n)
+    n
+end
+
 function _run_simulation_standard!(
     ws::Workspace{N},
     sp,
@@ -14,11 +45,13 @@ function _run_simulation_standard!(
     snapshots,
     callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
-) where {N}
-    t_start = time()
+    stepper::S=(split_step!),
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
+) where {N, S}
+    t_start = time_ns()
     try
         for step in 1:(sp.n_steps)
-            split_step!(ws)
+            stepper(ws)
 
             if callbacks.on_step !== nothing
                 callbacks.on_step(ws, step, times, energies)
@@ -30,7 +63,7 @@ function _run_simulation_standard!(
                     keep_psi=(!stream_snapshots),
                 )
 
-                elapsed = time() - t_start
+                elapsed = elapsed_s(t_start)
                 frac = step / sp.n_steps
                 eta = frac > 0 ? elapsed / frac * (1 - frac) : NaN
                 println(
@@ -48,6 +81,11 @@ function _run_simulation_standard!(
         end
     catch e
         if e isa InterruptException
+            # Record the interrupt BEFORE the snapshot, so a failure inside
+            # `_record_snapshot!` cannot leave the run looking complete.
+            interrupted === nothing || (interrupted[] = true)
+            _trim_interrupted_traces!(
+                times, energies, norms, mags, snapshots, !stream_snapshots)
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;
                 keep_psi=(!stream_snapshots),
@@ -63,6 +101,22 @@ function _run_simulation_standard!(
             rethrow(e)
         end
     end
+end
+
+# Branch on a Bool, not on a function-valued local: the two half-V realizations
+# have different types, so a `half_V! = cond ? a : b` local would make every
+# call site a small-union dispatch inside the hot loop. Both arms here are
+# concrete calls.
+@inline function _rtp_half_V!(
+    combined::Bool, ws::Workspace{N}, dt_half, n_comp, ndim;
+    t_eval::Float64, t_start::Float64,
+) where {N}
+    if combined
+        _half_potential_combined!(ws, dt_half, n_comp, ndim, false; t_eval, t_start)
+    else
+        _half_potential!(ws, dt_half, n_comp, ndim, false; t_eval, t_start)
+    end
+    nothing
 end
 
 """
@@ -85,6 +139,7 @@ function _run_simulation_leapfrog!(
     snapshots,
     callbacks::SimulationCallbacks;
     stream_snapshots::Bool=false,
+    interrupted::Union{Nothing, Ref{Bool}}=nothing,
 ) where {N}
     dt = sp.dt
     n_comp = sys.n_components
@@ -92,18 +147,33 @@ function _run_simulation_leapfrog!(
     omega = sp.rotating_frame_omega
     cc = ws.coriolis_cache
 
+    # Which V half-step realization this run uses. Decided ONCE here, not per
+    # call, so a run cannot switch splittings halfway through (a t-dependent
+    # `transverse_b` in `_rtp_use_combined_step` could otherwise flip it mid-run
+    # and silently mix two integrators in one trajectory).
+    #
+    # Sequential  — diag · SM · DDI · SM · diag, 3 spin rotations per half-V.
+    # Combined    — diag · exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂) · diag, 1 rotation.
+    #
+    # Both are O(dt²) and converge to the same continuum limit; they differ at
+    # O(dt³) because the combined form has no [SM,[SM,DDI]] commutator error.
+    # See `combined_spin_step.jl` and `test_combined_spin_step.jl`.
+    combined_V = _rtp_use_combined_step(ws)
+
     if DEALIAS_2_3_ENABLED[]
-        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+        apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+            ws.grid.config.box_size)
     end
 
-    _half_potential!(
-        ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+    _rtp_half_V!(
+        combined_V, ws, dt / 2, n_comp, N; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
     )
 
     try
         for step in 1:(sp.n_steps)
             if DEALIAS_2_3_ENABLED[]
-                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N)
+                apply_orszag_2_3_filter!(ws.state.psi, ws.fft_plans, n_comp, N,
+                    ws.grid.config.box_size)
             end
 
             apply_step!(CoriolisTerm(omega), ws.state.psi, dt / 2, false, ws)
@@ -132,8 +202,9 @@ function _run_simulation_leapfrog!(
             # fix in itp_loop.jl: drop the merge, always do close +
             # reopen so DDI is substepped. Cost: 2× _half_potential_step!
             # calls per step instead of 1 in the previously-merged path.
-            _half_potential!(
-                ws, dt / 2, n_comp, N, false; t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2
+            _rtp_half_V!(
+                combined_V, ws, dt / 2, n_comp, N;
+                t_eval=t_now + 3dt / 4, t_start=t_now + dt / 2,
             )
 
             apply_rt_dissipation!(ws, dt, n_comp, N)
@@ -160,16 +231,21 @@ function _run_simulation_leapfrog!(
             # Reopen V(dt/2) for the next K-step. Skipped on the final
             # step since there's no further K to chain into.
             if !is_last
-                _half_potential!(
-                    ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+                _rtp_half_V!(
+                    combined_V, ws, dt / 2, n_comp, N;
+                    t_eval=(ws.state.t + dt / 4), t_start=ws.state.t,
                 )
             end
         end
     catch e
         if e isa InterruptException
+            interrupted === nothing || (interrupted[] = true)
+            _trim_interrupted_traces!(
+                times, energies, norms, mags, snapshots, !stream_snapshots)
             # Close the open half-step so psi is in a valid Strang-split state
-            _half_potential!(
-                ws, dt / 2, n_comp, N, false; t_eval=(ws.state.t + dt / 4), t_start=ws.state.t
+            _rtp_half_V!(
+                combined_V, ws, dt / 2, n_comp, N;
+                t_eval=(ws.state.t + dt / 4), t_start=ws.state.t,
             )
             _record_snapshot!(
                 times, energies, norms, mags, snapshots, ws, sys;

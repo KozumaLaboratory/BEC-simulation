@@ -1,0 +1,31 @@
+# Precision c1 scan to PIN c1* and the jump size of the first-order FM->polar
+# transition at B=0, kappa=1 (local diagnostic found c1*~+0.029, mF jump 0.68->0
+# but the FM branch AT the transition was under-converged). Fine c1 step 0.0005,
+# two bare seeds, newton + tol 1e-9, extra ITP steps for the soft near-spinodal
+# FM branch.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.029}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 2500
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.026, to: 0.032, n: 13}
+  comparison_runs:
+    - {name: stretched, override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,     override: {pipeline.0.initial_state: polar}}

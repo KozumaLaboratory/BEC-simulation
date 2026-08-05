@@ -3,11 +3,6 @@
 # For c1>0 and c2>0, the cyclic state minimizes both spin and singlet-pair amplitudes.
 # Expected: phase_classify -> cyclic-like; spin_order ~ 0; singlet-pair amplitude ~ 0 if reported.
 
-metadata:
-  suite: spinorbec_physics_verification
-  reference: Kawaguchi_Ueda_spin2_cyclic_c1_c2_positive
-  expected_phase: cyclic
-
 defaults:
   kind: spinor
   backend: gpu

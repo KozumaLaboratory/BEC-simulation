@@ -18,13 +18,14 @@
 
 import JSON
 
-export run_scalar_summary, write_run_summary,
+export run_scalar_summary,
+    write_run_summary, summary_provenance,
     RUN_SUMMARY_FILENAME, RUN_SUMMARY_EXTRACTOR_VERSION
 
 const RUN_SUMMARY_FILENAME = "summary.json"
 # Bump when extraction logic changes so stale summaries (older extractor)
 # can be targeted for re-backfill via `_extractor_version`.
-const RUN_SUMMARY_EXTRACTOR_VERSION = "1"
+const RUN_SUMMARY_EXTRACTOR_VERSION = "3"  # v3: + per-axis f_s (Leggett)
 
 # Run `f()`; on exception record "field: reason" in `errs` and return
 # `missing`. A `nothing` / non-finite result is treated as legitimately
@@ -41,6 +42,41 @@ function _try_field(errs::Vector{String}, field::AbstractString, f)
     end
 end
 
+# Commit that produced a summary, so staleness is queryable rather than guessed.
+#
+# The need was measured, not anticipated: re-running eu_k3_lhy_control in current
+# code gave peak_max 0.005775 where the stored May row said 0.007487, and the
+# classification moved `delay` → `marginal_arrest`. That reads as a dramatic
+# effect of the c_lhy fix (#108) and is not one — an A/B in identical code showed
+# the coefficient accounts for 2 % of it and the rest is accumulated code change.
+# Without a recorded commit there is no way to ask which stored verdicts predate
+# which fix, so the only options were re-run everything or trust nothing.
+#
+# Best-effort by design: a summary must still be written when git is unavailable
+# (a tarball, a container, a compute node with no .git). `nothing` then, and the
+# key is simply absent — the same "absent ≠ errored" contract as every other
+# field here.
+function _repo_commit()
+    try
+        root = pkgdir(@__MODULE__)
+        root === nothing && return nothing
+        # `git -C` walks UP until it finds a repository, so a wrong `root` does
+        # not fail — it silently answers for an ANCESTOR repo. That is how the
+        # first version of this function stamped the parent checkout's HEAD when
+        # run from a worktree under `.claude/worktrees/` (path arithmetic was one
+        # `dirname` too deep, and CI, whose checkout has no git ancestor, was what
+        # exposed it). So verify the repo we reached is the package's own.
+        top = readchomp(Cmd(`git -C $root rev-parse --show-toplevel`; ignorestatus=true))
+        isdir(top) && realpath(top) == realpath(root) || return nothing
+        out = readchomp(Cmd(`git -C $root rev-parse HEAD`; ignorestatus=true))
+        occursin(r"^[0-9a-f]{40}$", out) || return nothing
+        dirty = !isempty(readchomp(Cmd(`git -C $root status --porcelain`; ignorestatus=true)))
+        dirty ? out * "-dirty" : out
+    catch
+        nothing
+    end
+end
+
 """
     run_scalar_summary(r::RunResult) -> Dict{String, Any}
 
@@ -51,8 +87,14 @@ wavefunction + metadata. Never throws. Keys appear only when extractable:
   energy, converged          — ground-state metadata / e_decomp / dynamics
   norm, Mz                   — computed from psi (deterministic)
   populations                — per-component |c_m|² fractions (Vector)
+  f_s_leggett                — per-axis superfluid fraction (Vector); present
+                               only when the cloud spans the periodic box
   norm_rel_drift,
   energy_rel_drift, Fz_drift — dynamics runs only
+
+The writer additionally stamps `_extractor_version`, `_source`, `_extracted_at`
+and `_repo_commit` (absent when git is unavailable; `-dirty`-suffixed when the
+working tree differs from HEAD).
 
 Always includes `extraction_error` (Vector{String}, empty when clean), so
 extraction failure is a first-class, queryable facet rather than a silent
@@ -95,6 +137,62 @@ function run_scalar_summary(r::RunResult)
         tot = sum(Nm)
         tot > 0 ? Nm ./ tot : Nm
     end)
+    # Rotation-invariant order parameter mF = |⟨F⟩|/F of the peak-density (bulk)
+    # spinor. Unlike Mz (=⟨F_z⟩), this stays correct when the FM state lies in the
+    # xy-plane (B=0 DDI soft manifold) — the FM↔polar order variable. Carrying it
+    # here lets a phase scan read the order parameter straight from summary.json,
+    # never loading the heavy psi (Stage 1 / "graphs are the deliverable").
+    bag["mF"] = _try_field(
+        errs,
+        "mF",
+        () -> begin
+            F = r.atom.F
+            D = 2F + 1
+            sdim = ndims(r.psi)
+            dens = dropdims(sum(abs2, r.psi; dims=sdim); dims=sdim)
+            z = ComplexF64[r.psi[argmax(dens), c] for c in 1:D]
+            nz = norm(z)
+            nz > 0 || return missing
+            z ./= nz
+            sm = spin_matrices(F)
+            sqrt(
+                real(dot(z, sm.Fx * z))^2 + real(dot(z, sm.Fy * z))^2 +
+                real(dot(z, sm.Fz * z))^2,
+            ) / F
+        end,
+    )
+
+    # Per-axis superfluid fraction, Leggett branch only: it is a closed form
+    # costing milliseconds, whereas the `:relaxed` solve is ~1.8 s at 128³ per
+    # axis — too heavy for a projection meant to be cheap enough to backfill
+    # over hundreds of runs.
+    #
+    # Present ONLY when the cloud spans the box along every axis. A trapped
+    # cloud surrounded by vacuum has no phase rigidity across the box, so its
+    # f_s ≈ 0 is geometry rather than a property of the state; writing that into
+    # every summary would put a column of zeros in front of a scan that could
+    # read them as signal. Absent is the honest value, and this file already
+    # keeps "absent" distinct from "errored".
+    bag["f_s_leggett"] = _try_field(
+        errs,
+        "f_s_leggett",
+        () -> begin
+            ndim = ndims(r.psi) - 1
+            n = total_density(r.psi, ndim)
+            vals = Float64[]
+            for d in 1:ndim
+                nbar = plane_averaged_density(n, d)
+                n_mean = sum(nbar) / length(nbar)
+                n_mean > 0 || return missing
+                minimum(nbar) > 1e-3 * n_mean || return missing
+                push!(
+                    vals,
+                    superfluid_fraction(n, r.grid; direction=d, warn_vacuum=false),
+                )
+            end
+            vals
+        end,
+    )
 
     # Dynamics-only drift metrics (getproperty throws without a series).
     if r.dynamics !== nothing
@@ -155,6 +253,12 @@ function write_run_summary(run_dir::AbstractString, jld2_path::AbstractString;
     bag["_extractor_version"] = RUN_SUMMARY_EXTRACTOR_VERSION
     bag["_source"] = String(source)
     bag["_extracted_at"] = string(now())
+    # `-dirty` suffix when the working tree differs from HEAD: a summary produced
+    # from uncommitted code is not reproducible from the hash alone, and saying so
+    # is more useful than a hash that lies.
+    let c = _repo_commit()
+        c === nothing || (bag["_repo_commit"] = c)
+    end
 
     isdir(run_dir) || mkpath(run_dir)
     path = joinpath(run_dir, RUN_SUMMARY_FILENAME)
@@ -162,4 +266,41 @@ function write_run_summary(run_dir::AbstractString, jld2_path::AbstractString;
         JSON.print(io, bag, 2)
     end
     return path
+end
+
+"""
+    summary_provenance(run_dir) -> NamedTuple
+
+`(commit, dirty, extractor_version, extracted_at, stamped)` for a run's
+`summary.json`. `stamped == false` means the summary predates commit stamping —
+which is *not* the same as "current": it means the question cannot be answered
+from the file and the run has to be re-run to know.
+
+Use it to triage a stored suite before quoting it:
+
+```julia
+for d in readdir("runs"; join=true)
+    p = summary_provenance(d)
+    p.stamped || println("unknown vintage: ", d)
+end
+```
+"""
+function summary_provenance(run_dir::AbstractString)
+    path = joinpath(run_dir, RUN_SUMMARY_FILENAME)
+    absent = (commit=nothing, dirty=false, extractor_version=nothing,
+        extracted_at=nothing, stamped=false)
+    isfile(path) || return absent
+    d = try
+        JSON.parsefile(path)
+    catch
+        return absent
+    end
+    c = get(d, "_repo_commit", nothing)
+    c isa AbstractString || return (commit=nothing, dirty=false,
+        extractor_version=get(d, "_extractor_version", nothing),
+        extracted_at=get(d, "_extracted_at", nothing), stamped=false)
+    dirty = endswith(c, "-dirty")
+    (commit=dirty ? c[1:(end - 6)] : c, dirty=dirty,
+        extractor_version=get(d, "_extractor_version", nothing),
+        extracted_at=get(d, "_extracted_at", nothing), stamped=true)
 end

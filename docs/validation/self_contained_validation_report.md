@@ -1,5 +1,13 @@
 # Self-contained validation report
 
+> **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
+> **Vintage note.** The `runs/` results this document cites predate every
+> physics correction merged after 2026-06-02 — including a quadratic Zeeman
+> that was 11× too large for Eu until 2026-07-08. See
+> [`stored_results_vintage_audit.md`](stored_results_vintage_audit.md) before quoting a number from here.
+
 **As of 2026-05-26.** Replaces the Ueda-comparison-gated framing
 documented in `validation_ladder_2026_05_22.md` (Level 10). See
 `docs/validation/ueda_status.md` for the BLOCKED_EXTERNAL declaration.
@@ -99,7 +107,7 @@ Coverage gaps (intentional, deferred):
 | Grid n=16/24/32 at fixed box | Width converges to ≤ 1% | `test/test_level11_convergence_sweep.jl` |
 | Box L=6/8/12 at fixed dx≈0.4 | ≥ 10× boundary-density tightening per L-doubling | `test/test_level11_convergence_sweep.jl` |
 | Seed reproducibility | Bit-identical | `test/test_level11_convergence_sweep.jl` |
-| **Eu F=6 Ham-only, cross-grid** | `ΔF_z = 0.00886` at N=64/96/128 (5-digit agreement) at `dt=0.005, k_cut=16.0, dealias enabled` | `runs/verification_suite/L4_eu_matsui_hamiltonian_only_{64,96,128}` (2026-05-24); discussed in `memory:validation_ladder_2026_05_22` |
+| **Eu F=6 Ham-only, cross-grid** | `ΔF_z = 0.00886` at N=64/96/128 (5-digit agreement) at `dt=0.005, k_cut=16.0, dealias enabled` | `runs/L4_eu_matsui_hamiltonian_only_{64,96,128}_*` (untracked) (2026-05-24); discussed in `memory:validation_ladder_2026_05_22` |
 
 The Eu F=6 cross-grid result is **the canonical Hamiltonian-only
 prediction** of this codebase. Reported as `ΔF_z(t = T_evolution)`
@@ -108,8 +116,27 @@ production runs.
 
 ### Layer F — DDI convention factorial
 
-Script: `test/hamiltonian/test_ddi_convention_factorial.jl`.
-Output: `runs/ddi_convention_factorial/results.jld2`.
+Script: `test/hamiltonian/test_ddi_convention_factorial.jl` — **in `FAST_TESTS`,
+so it runs on every PR.** Output: `runs/ddi_convention_factorial/results.jld2` (untracked).
+
+> **Correction (2026-08-02): the output is on disk.** The 2026-07-31 version of
+> this box said `runs/ddi_convention_factorial/` (untracked) "has never existed in any commit,
+> so the numeric rows below cannot be re-checked", and struck the output line
+> through. Half right and wrongly concluded: **no commit contains it — and
+> `results.jld2` is 10 885 bytes in the main checkout, dated 2026-05-26.** It is
+> untracked, not gone, so it is invisible from a clone, from CI and from a
+> worktree, and the rows below *can* be re-checked here.
+>
+> The mistake was reading "untracked" as "absent" — the same conflation the
+> disposal manifest made across 474 directories, and the reason the citation gate
+> now carries an `(untracked)` marker
+> ([`stored_run_disposal.md`](../campaign/stored_run_disposal.md)).
+>
+> **The authority here is still the test, not the table.** What the test asserts
+> is the *relations* — spherical → 0 (traceless Q), prolate along B → E_DDI < 0
+> (head-to-tail attractive), oblate ⊥ B → E_DDI > 0, and invariance under the axis
+> flip — and those are gated on every push, which no stored number is. Quote the
+> relations, or re-run the test and quote its output.
 
 Factors: cloud shape ∈ {spherical, prolate, oblate}; B-axis ∈ {z, x};
 secular ∈ {false, true}; grid n ∈ {16, 24}. 24 rows total.
@@ -192,9 +219,26 @@ auditable control.
 These are intentional design boundaries documented in CLAUDE.md.
 They affect interpretation, not correctness.
 
-1. **PolarTwoChannelLHY at F=6** off by 30–70% (`memory:full_bdg_F6_polar_broken`).
-   Use `PolarContactLHY` / `IcosahedralLHY` for F=6 polar; FullBdGLHY at
-   F=6 polar emits `@warn` (~3000× spurious offset).
+1. **PolarTwoChannelLHY at F=6** off by 30–70% (that part stands; pinned by
+   `test_spinor_lhy.jl`). Use `PolarContactLHY` / `IcosahedralLHY` for F=6
+   polar.
+
+   > **RETRACTED 2026-07-27, corrected here 2026-08-04.** This item continued:
+   > "FullBdGLHY at F=6 polar emits `@warn` (~3000× spurious offset)". There is
+   > no such offset. The 3000× was a UV counterterm subtracting ε_k twice —
+   > divergent at EVERY F and in every phase, not an F=6 polar defect — and it
+   > was fixed on 2026-07-27. `FullBdGLHY` is the general-spinor path, correct
+   > for any F and any spinor, gated against `polar_contact` / `fm_contact` /
+   > the scalar limit to ~1e-4 by
+   > `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`. It warns only when
+   > the mean field is DYNAMICALLY unstable
+   > (`terms/lhy/full_bdg.jl:120`), where ε_LHY is scheme-dependent for closed
+   > forms too. Prefer the closed forms when the state matches their ansatz —
+   > ~100× cheaper — not because `full_bdg` is wrong.
+   >
+   > A dated header says a document describes a past state; it does not license
+   > a number that was withdrawn, and this one was still being read as a reason
+   > to avoid a working code path.
 2. **Spinor LHY for F ≥ 3 is research-open**: no closed-form
    Lima-Pelster generalisation exists. The scalar approximation +
    `@warn` is the honest signal.
@@ -313,6 +357,18 @@ K1_gdr0_LHY1     on  off on   -2.6923     0.9973           5.106e-3
 K1_gdr1_LHY0     on  on  off  -2.6911     0.9971           5.132e-3
 K1_gdr1_LHY1     on  on  on   -2.6926     0.9971           5.106e-3
 ```
+
+> **2026-07-29 — the four `LHY1` cells did not have LHY on during dynamics.**
+> `_resolve_lhy_block!` ran only for the ground_state step (#174), so a
+> `dynamics: {lhy: {kind: scalar}}` block reached `make_workspace` unresolved
+> and `interactions.c_lhy` stayed 0. The GS-phase LHY was applied; the dynamics
+> phase was not. So `LHY0` vs `LHY1` here compares *ground states*, not
+> trajectories, and the ⟨F_z⟩/N spread of 0.05% between them is the residual of
+> that, not a demonstration that the dynamics is insensitive to LHY.
+>
+> The **EdH transfer conclusion itself is unaffected** — it is invariant across
+> K3 and gdr as well, and those knobs were live. What cannot be claimed from
+> this table is robustness *to LHY* during the dynamics. Being re-measured.
 
 **Robust conclusions (invariant across all 8 cells):**
 

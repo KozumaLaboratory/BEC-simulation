@@ -1,5 +1,8 @@
 # SpinorBEC.jl Architecture
 
+> **FROZEN 2026-05-11.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 ## Overview
 
 SpinorBEC.jl is a Julia package for simulating spinor Bose-Einstein condensates (BECs) using the split-step Fourier method. It solves the spin-F Gross-Pitaevskii equation (GPE) in 1D, 2D, or 3D, supporting contact interactions, Zeeman effects, dipole-dipole interactions (DDI), and various external potentials.
@@ -154,7 +157,7 @@ The kinetic energy is computed in momentum space: `E_kin = 0.5 * integral(k^2 * 
 
 ### `make_workspace`
 
-Constructs the `Workspace` struct, which bundles all simulation state and parameters. Accepts keyword arguments for grid, atom, interactions, Zeeman, potential, simulation parameters, and optional DDI configuration. If no initial wavefunction is provided, `init_psi` generates a Gaussian in one of three configurations: `:polar` (m=0 only), `:ferromagnetic` (m=+F only), or `:uniform` (equal population).
+Constructs the `Workspace` struct, which bundles all simulation state and parameters. Accepts keyword arguments for grid, atom, interactions, Zeeman, potential, simulation parameters, and optional DDI configuration. If no initial wavefunction is provided, `init_psi` generates a Gaussian in one of three configurations: `:polar` (m=0 only), `:m_plus_F` / `:m_minus_F` (single stretched component), or `:uniform` (equal population) — 22 named states in all, dispatched in `workflow/initialization/state_dispatch.jl`; `:ferromagnetic` was renamed and is no longer accepted.
 
 ### `find_ground_state`
 
@@ -166,7 +169,7 @@ Runs real-time evolution for `n_steps` steps, recording observables (time, energ
 
 ## Experiment System (`workflow/experiments/`)
 
-The experiment system is YAML-driven. Top-level entry points live in `run_registry.jl`; per-step dispatch lives in `pipeline_runner.jl`.
+The experiment system is YAML-driven. Top-level entry points live in `run_registry.jl`; per-step dispatch lives in `pipeline/runner.jl`.
 
 ### Pipeline shape
 
@@ -198,7 +201,7 @@ For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_
 | `/api/lab/list?run=…`           | lab images uploaded for `<run>`                |
 | `/api/lab/image` (POST)         | upload a `.png` lab image into a run dir       |
 
-Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin`. Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
+Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
 
 ## I/O (`workflow/io/`)
 

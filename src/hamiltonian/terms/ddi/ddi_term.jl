@@ -76,7 +76,7 @@ function _ddi_energy_from_gpu(psi_host, sm::SpinMatrices{D}, ddi_gpu, ddi_bufs_g
 
     ddi_host = DDIParams(ddi_gpu.C_dd, _to_host(ddi_gpu.Q_xx), _to_host(ddi_gpu.Q_xy),
         _to_host(ddi_gpu.Q_xz), _to_host(ddi_gpu.Q_yy), _to_host(ddi_gpu.Q_yz),
-        _to_host(ddi_gpu.Q_zz))
+        _to_host(ddi_gpu.Q_zz), ddi_gpu.box_size)
     rfft_plans = make_rfft_plans(n_pts)
     Fx_rk = rfft_plans.forward * Fx_r
     Fy_rk = similar(Fx_rk);
@@ -111,37 +111,64 @@ Computes spin density + DDI potential first, then accumulates.
 function _grad_ddi!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
     ws.ddi !== nothing || return nothing
     sm = ws.spin_matrices
-    F = ws.atom.F
-    bufs = ws.ddi_bufs
-    _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
-    compute_ddi_potential!(ws.ddi, bufs)
-    phi_x, phi_y, phi_z = bufs.Phi_x, bufs.Phi_y, bufs.Phi_z
-    # Fz part (diagonal) — whole-array broadcast: m-vector (over components) ×
-    # phi_z (over space). One GPU kernel instead of D per-component launches.
-    # Bit-identical; zero-alloc on CPU.
-    mvec = _to_device(
-        ws.backend, reshape(Float64[F - (c - 1) for c in 1:D], ntuple(_ -> 1, Val(N))..., D)
-    )
-    phiz_bc = reshape(phi_z, size(phi_z)..., 1)
-    grad .+= mvec .* phiz_bc .* psi
-    # F± parts (tridiagonal) — two shifted whole-array broadcasts over the D-1
-    # component slice (fp-vector over components), replacing 2·(D-1) per-component
-    # launches. Equal to the loop up to add-reordering (~1e-16).
-    sl = ntuple(_ -> Colon(), Val(N))
-    phix_bc = reshape(phi_x, size(phi_x)..., 1)
-    phiy_bc = reshape(phi_y, size(phi_y)..., 1)
-    fpvec = _to_device(
-        ws.backend,
-        reshape(
-            Float64[fp_ladder_coeff(F, F - c + 1) for c in 2:D], ntuple(_ -> 1, Val(N))..., D - 1
-        ),
-    )
-    view(grad, sl..., 1:(D - 1)) .+=
-        0.5 .* fpvec .* (phix_bc .- im .* phiy_bc) .* view(psi, sl..., 2:D)
-    view(grad, sl..., 2:D) .+=
-        0.5 .* fpvec .* (phix_bc .+ im .* phiy_bc) .* view(psi, sl..., 1:(D - 1))
+    # Branch on padding exactly as `_ddi_energy` does. Until 2026-07-30 this
+    # function did not, so with `ddi_padding` on — the YAML default since
+    # 2026-07-29 — the gradient came from the bare periodic kernel while the
+    # energy came from the padded one, and L-BFGS/Newton descended one operator
+    # toward the minimum of a different one. The two differ by the periodic-image
+    # field error padding exists to remove (2-5 %).
+    #
+    # Both branches now call the SAME convolution the energy face calls, so the
+    # pair cannot drift again by construction rather than by agreement.
+    ddi_padded = ws.ddi_padded
+    if ddi_padded === nothing
+        bufs = ws.ddi_bufs
+        _compute_spin_density!(bufs.Fx_r, bufs.Fy_r, bufs.Fz_r, psi, sm, Val(D), N, n_pts)
+        compute_ddi_potential!(ws.ddi, bufs)
+        _grad_ddi_accumulate!(
+            grad, psi, bufs.Phi_x, bufs.Phi_y, bufs.Phi_z, ws.atom.F, n_pts, D, Val(N))
+    else
+        _compute_and_convolve_ddi_padded!(psi, sm, ws.ddi, ddi_padded, Val(D), N, n_pts)
+        # `Phi_*_pad` are padded-shaped; the physical field is the `[1:n...]`
+        # CORNER. Cartesian views, not linear indexing — the first `prod(n_pts)`
+        # linear elements walk full padded columns into the pad region for
+        # ndim >= 2 (App. A defect 9).
+        corner = ntuple(d -> 1:n_pts[d], Val(N))
+        _grad_ddi_accumulate!(
+            grad, psi,
+            view(ddi_padded.Phi_x_pad, corner...),
+            view(ddi_padded.Phi_y_pad, corner...),
+            view(ddi_padded.Phi_z_pad, corner...),
+            ws.atom.F, n_pts, D, Val(N))
+    end
     nothing
 end
+
+# Function barrier: the two branches above hand in differently-typed `phi_*`
+# (a plain array vs a strided corner view), so the accumulation is split out to
+# be specialised on each rather than letting the union leak into the broadcasts.
+function _grad_ddi_accumulate!(grad, psi, phi_x, phi_y, phi_z, F, n_pts, D, ::Val{N}) where {N}
+    # Fz part (diagonal)
+    for c in 1:D
+        idx = _component_slice(N, n_pts, c)
+        m = Float64(F - (c - 1))
+        view(grad, idx...) .+= m .* phi_z .* view(psi, idx...)
+    end
+    # F+/F− parts (tridiagonal)
+    for c in 2:D
+        idx_c = _component_slice(N, n_pts, c)
+        idx_cm1 = _component_slice(N, n_pts, c - 1)
+        fp = fp_ladder_coeff(F, F - c + 1)
+        view(grad, idx_cm1...) .+= 0.5 .* fp .* (phi_x .- im .* phi_y) .* view(psi, idx_c...)
+        view(grad, idx_c...) .+= 0.5 .* fp .* (phi_x .+ im .* phi_y) .* view(psi, idx_cm1...)
+    end
+    nothing
+end
+
+"""Energy is `0.5 · Re⟨ψ, H·ψ⟩ · dV` for this term — mean field: E = ½∫nΦ while H·ψ = Φψ.
+See the trinity convention in `terms/base.jl`; gated per term by
+`test/oracles/test_energy_operator_ratio.jl`."""
+energy_operator_ratio(::DDITerm) = 0.5
 
 function energy_contribution(::DDITerm, psi::AbstractArray{<:Complex}, ws)
     ws.ddi === nothing && return 0.0

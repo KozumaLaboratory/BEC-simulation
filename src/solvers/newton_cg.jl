@@ -36,19 +36,9 @@ export newton_cg_ground_state, residual_newton_refine
 # (which divides → M⁻¹); needed for the M-norm trust region.
 function _sobolev_metric!(v::AbstractArray{<:Complex}, ws, k2, α::Float64)
     α > 0 || return v
-    N = ndims(ws.grid.k_squared)
-    n_pts = ntuple(d -> size(v, d), N)
-    n_comp = ws.spin_matrices.system.n_components
-    buf = ws.state.fft_buf
-    @inbounds for c in 1:n_comp
-        idx = _component_slice(N, n_pts, c)
-        buf .= view(v, idx...)
-        ws.fft_plans.forward * buf
-        buf .*= (1 .+ α .* k2)
-        ws.fft_plans.inverse * buf
-        view(v, idx...) .= buf
-    end
-    v
+    a = real(eltype(k2))(α)
+    filt = cached_kspace_filter(k2, :sobolev_metric, α, k2v -> one(a) + a * k2v)
+    return batched_kspace_filter!(v, ws, filt)
 end
 
 """
@@ -78,7 +68,7 @@ function newton_cg_ground_state(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)
@@ -98,7 +88,7 @@ function newton_cg_ground_state(
     converged = false
     gnorm = Inf
     iters = 0
-    t0 = time()
+    t0 = time_ns()
 
     for outer in 1:max_outer
         iters = outer
@@ -110,7 +100,7 @@ function newton_cg_ground_state(
         gnorm = sqrt(ipR(gp, gp))
         if verbose
             @printf("  NCG %2d/%d | E=%.8g |∇E|=%.3e Δ=%.2g μ=%.4f | %.1fs\n",
-                outer, max_outer, E, gnorm, Δ, prm.μ, time() - t0)
+                outer, max_outer, E, gnorm, Δ, prm.μ, elapsed_s(t0))
             flush(stdout)
         end
         if gnorm < tol
@@ -258,7 +248,7 @@ function residual_newton_refine(
     verbose::Bool=false,
 )
     ψ = copy(ψ0)
-    k2 = _to_device(ws.backend, ws.grid.k_squared)
+    k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     dV = cell_volume(ws.grid)
     ipR(a, b) = real(sum(conj.(a) .* b)) * dV
     n2_init = ipR(ψ, ψ)
@@ -279,7 +269,7 @@ function residual_newton_refine(
     gnorm = Inf
     converged = false
     iters = 0
-    t0 = time()
+    t0 = time_ns()
 
     # ‖gp‖ at the current ψ, reusing the constrained_hessian_params gradient.
     function residual_norm(prm)
@@ -293,7 +283,7 @@ function residual_newton_refine(
         gnorm, gp = residual_norm(prm)
         if verbose
             @printf("  rNCG %2d/%d | ‖gp‖=%.3e μ=%.5f | %.1fs\n",
-                outer, max_outer, gnorm, prm.μ, time() - t0)
+                outer, max_outer, gnorm, prm.μ, elapsed_s(t0))
             flush(stdout)
         end
         gnorm < tol && (converged=true; break)

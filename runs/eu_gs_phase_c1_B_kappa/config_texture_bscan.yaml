@@ -1,0 +1,33 @@
+# Texture B-scan across the ~60µG crossover: find where the flux-closure textures
+# (flower/CSV/PCV) diverge from a uniform axial FM. FM-region c1, κ=1, 5 competing
+# seeds per cell (min-E = the phase). Below the crossover the spin is in-plane
+# (soft manifold); above it pins axial. The texture window (if any) is just above.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "6.0e-5 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 1500
+      tol: 1.0e-8
+  - analyze:
+      - phase_classify_distance: {}
+scan:
+  product:
+    pipeline.0.B.Bz: ["5.0e-5 Gauss", "6.0e-5 Gauss", "7.0e-5 Gauss", "8.0e-5 Gauss"]
+    pipeline.0.interactions.c1_ratio: [0.0, 0.018]
+  comparison_runs:
+    - {name: flower, override: {pipeline.0.initial_state: flower}}
+    - {name: csv,    override: {pipeline.0.initial_state: chiral_spin_vortex}}
+    - {name: pcv,    override: {pipeline.0.initial_state: polar_core_vortex}}
+    - {name: fm,     override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar,  override: {pipeline.0.initial_state: polar}}

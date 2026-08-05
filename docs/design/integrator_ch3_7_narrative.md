@@ -1,5 +1,8 @@
 # §3.7 State-averaging fails generically across frameworks — narrative draft
 
+> **FROZEN 2026-05-23.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: draft, 2026-05-11. Consolidates §3.3.2 + Force-Gradient v3
 state-avg midpoint negative + parallels with MPS-4 multi-scale failure.
 

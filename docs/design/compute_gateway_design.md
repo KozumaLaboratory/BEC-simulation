@@ -1,5 +1,8 @@
 # Compute Gateway — multi-target AI research infrastructure
 
+> **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 **Status**: design. Phase 1 substrate already live; this doc fixes the scope to
 the genuinely new work (UMS, DAG, multi-user). Supersedes the inline plan; the
 ground-truth audit it is reconciled against lives in

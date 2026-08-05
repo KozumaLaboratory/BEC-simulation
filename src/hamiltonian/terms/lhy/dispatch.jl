@@ -1,4 +1,4 @@
-export compute_spinor_lhy_polar_two_channel, compute_spinor_lhy_table
+export compute_spinor_lhy_polar_two_channel
 export compute_spinor_lhy_polar_contact, compute_spinor_lhy_polar_dipolar
 export compute_spinor_lhy_fm_contact, compute_spinor_lhy_fm_dipolar
 export compute_spinor_lhy_icosahedral
@@ -64,6 +64,7 @@ function compute_spinor_lhy_polar_two_channel(;
     c_dd::Float64=0.0,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     F >= 1 || throw(ArgumentError("F must be ≥ 1 (got F=$F)"))
 
@@ -73,157 +74,9 @@ function compute_spinor_lhy_polar_two_channel(;
     density_coef = is_active(c0) ? abs(c0)^(5 / 2) * Q5 : 0.0
     spin_coef = is_active(c1) ? 2.0 * F * abs(c1)^(5 / 2) : 0.0
 
-    _tabulate_lhy(PolarTwoChannelLHY; n_max, n_points) do n
+    _tabulate_lhy(PolarTwoChannelLHY; n_max, n_points, n_atoms) do n
         prefactor * (density_coef + spin_coef) * n^2 * sqrt(n)
     end
-end
-
-"""
-    compute_spinor_lhy_table(; spinor, F, interactions, zeeman, c_dd,
-                               n_max, n_points, k_max, n_k) → FullBdGLHY
-
-Full BdG-based spinor LHY: at each density, compute zero-point energy from
-the Bogoliubov spectrum and tabulate V_LHY = dε_LHY/dn.
-"""
-function compute_spinor_lhy_table(;
-    spinor::Vector{ComplexF64},
-    F::Int,
-    interactions::InteractionParams,
-    zeeman::ZeemanParams=ZeemanParams(),
-    c_dd::Float64=0.0,
-    n_max::Float64=100.0,
-    n_points::Int=100,
-    k_max::Float64=20.0,
-    n_k::Int=200,
-)
-    D = 2F + 1
-    length(spinor) == D ||
-        throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
-
-    # NOT GENERALIZABLE: FullBdG LHY produces a spurious 3000× offset for F=6 polar.
-    # Reason: physics
-    # Why: BdG diagonalisation of F=6 polar mean field produces λ<0 modes that
-    #   break Petrov's UV regularisation (negative-eigenvalue branch picks up
-    #   unphysical phase in zero-point integral). FullBdG remains correct for
-    #   other phases; only F=6 + ζ_α = δ_{α,0} is broken.
-    # See: memory/full_bdg_F6_polar_broken.md
-    if F == 6 && _is_polar_spinor(spinor)
-        @warn "FullBdG LHY (compute_spinor_lhy_table) is known to produce a ~3000× " *
-            "spurious energy offset for F=6 polar (ζ_α = δ_{α,0}) initial states " *
-            "due to λ<0 BdG modes breaking Petrov regularization. Use " *
-            "compute_spinor_lhy_polar_contact (or compute_spinor_lhy_polar_dipolar " *
-            "with DDI) for F=6 polar; FullBdG remains valid for other phases." maxlog=1
-    end
-
-    _tabulate_lhy(FullBdGLHY; n_max, n_points) do n0
-        _compute_lhy_at_density(spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k)
-    end
-end
-
-# Detect "polar" spinor: m=0 channel dominates (purity > 99%).
-function _is_polar_spinor(spinor::Vector{ComplexF64}; purity_threshold::Float64=0.99)
-    D = length(spinor)
-    D % 2 == 1 || return false
-    F = (D - 1) ÷ 2
-    isapprox(sum(abs2, spinor), 0.0; atol=1e-12) && return false
-    total = sum(abs2, spinor)
-    abs2(spinor[F + 1]) / total >= purity_threshold
-end
-
-"""
-Compute BdG zero-point energy at a single density:
-ε_LHY(n) = (1/2) × (1/2π²) ∫ dk k² Σ_b [ω_b(k) - ε_k - μ_b + μ²_b/(2ε_k)]
-"""
-function _compute_lhy_at_density(
-    spinor, n0, F, interactions, zeeman, c_dd, k_max, n_k;
-    n_dir::Int=32,
-)
-    D = 2F + 1
-    h_mf, M_anom, zee, _ = _bdg_contact_matrices(spinor, F, interactions, zeeman)
-
-    if is_active(c_dd)
-        # The LHY zero-point integral inherits the DDI's k̂-anisotropy via
-        # `_q_tensor_direction(k̂)` — the spherical average of the per-mode
-        # ω_b(k) is anisotropic, so direction sampling matters. The earlier
-        # 6-axis octahedron is exact only for `ℓ ≤ 3`; the DDI Q-tensor
-        # mixes `ℓ = 0, 2` and BdG correction adds `ℓ ≤ 4`. Switch to a
-        # quasi-uniform Fibonacci-spiral grid (default 32 = 64 antipodal
-        # samples) so the integration error stops dominating the absolute
-        # LHY shift. Caller can tune `n_dir` for tight budget.
-        sm = spin_matrices(F)
-        dirs = fibonacci_sphere_directions(n_dir)
-        n_dir = length(dirs)
-    else
-        n_dir = 1
-        dirs = [(0.0, 0.0, 1.0)]
-        sm = nothing
-    end
-
-    # μ = ⟨ψ|(Z + n0 h_mf)|ψ⟩ — the diagonal-only `sum(...|ψ_c|²)` form
-    # was correct only for single-m states. Mirrors the matching fix in
-    # phases/bogoliubov.jl (2026-04-26).
-    H_mu_lhy = Diagonal(zee) .+ n0 .* h_mf
-    mu = real(dot(spinor, H_mu_lhy * spinor))
-
-    k_values = collect(range(1e-6, k_max; length=n_k))
-    dk = k_values[2] - k_values[1]
-
-    E_total = 0.0
-    for dir in dirs
-        h_total = copy(h_mf)
-        M_total = copy(M_anom)
-
-        if is_active(c_dd)
-            k_hat = collect(dir)
-            k_norm = norm(k_hat)
-            k_norm > 0 && (k_hat ./= k_norm)
-            Q_ab = _q_tensor_direction(k_hat)
-            h_ddi, M_ddi = _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
-            h_total .+= h_ddi
-            M_total .+= M_ddi
-        end
-
-        for k in k_values
-            ek = k^2 / 2
-
-            L = 2n0 .* h_total
-            for i in 1:D
-                L[i, i] += ek - mu + zee[i]
-            end
-            M_sc = n0 .* M_total
-
-            H_bdg = zeros(ComplexF64, 2D, 2D)
-            H_bdg[1:D, 1:D] .= L
-            H_bdg[1:D, (D + 1):2D] .= M_sc
-            H_bdg[(D + 1):2D, 1:D] .= .-conj.(M_sc)
-            H_bdg[(D + 1):2D, (D + 1):2D] .= .-conj.(L)
-
-            # mu_b is the per-branch large-k asymptote subtracted to make
-            # the LHY k-integrand convergent. For each ω-branch we find
-            # the dominant spinor component c* of the BdG eigenvector and
-            # use the matching diagonal entry — was hard-coded to c=1
-            # (m=+F), which only holds for a fully polarized GS along +z.
-            evals_full = eigen(H_bdg)
-            evals = evals_full.values
-            evecs = evals_full.vectors
-            zpe = 0.0
-            for (eb, ev) in enumerate(evals)
-                omega = real(ev)
-                omega > 1e-10 || continue
-                # particle-branch lives in the upper D rows; pick the
-                # dominant component there to label the asymptote
-                u_part = view(evecs, 1:D, eb)
-                c_star = argmax(abs2.(u_part))
-                mu_b = ek + n0 * real(h_total[c_star, c_star]) - mu + zee[c_star]
-                correction = omega - ek - mu_b + mu_b^2 / (2.0 * max(ek, 1e-30))
-                zpe += 0.5 * correction
-            end
-
-            E_total += k^2 * zpe * dk / (2.0 * Float64(π)^2)
-        end
-    end
-
-    E_total / n_dir
 end
 
 # =================================================================
@@ -251,9 +104,10 @@ function compute_spinor_lhy_polar_contact(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_polar_lhy_coefs(F, g_dict)
-    _tabulate_lhy(n -> lhy_energy_polar(n, coefs), PolarContactLHY; n_max, n_points)
+    _tabulate_lhy(n -> lhy_energy_polar(n, coefs), PolarContactLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -270,10 +124,11 @@ function compute_spinor_lhy_polar_dipolar(;
     eps_tilde_dd::Float64,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_polar_lhy_coefs(F, g_dict)
     _tabulate_lhy(n -> lhy_energy_polar_dipolar(n, coefs, eps_tilde_dd),
-        PolarDipolarLHY; n_max, n_points)
+        PolarDipolarLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -290,16 +145,18 @@ function compute_spinor_lhy_fm_dipolar(;
     eps_dd::Real,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_fm_lhy_coefs(F, g_dict)
     _tabulate_lhy(n -> lhy_energy_fm_dipolar(n, coefs, eps_dd),
-        FMDipolarLHY; n_max, n_points)
+        FMDipolarLHY; n_max, n_points, n_atoms)
 end
 
 """
     compute_spinor_lhy_fm_contact(; F, g_dict, n_max, n_points) → FMContactLHY
 
-F-FM contact LHY closed form (paper #2 contact-only piece, F=6 for now).
+F-FM contact LHY closed form (paper #2 contact-only piece). Any F: the
+single-mode collapse is gated against `full_bdg` at F = 1..8.
 For an FM-polarised condensate (ζ_α = δ_{α,+F}), the closed form collapses
 to a single mode at m=+F: ε = (8/15π²) (g_{2F} n)^(5/2). For uniform
 g_S = c_0 this is identical to scalar Lima-Pelster (no DDI). The mode
@@ -311,9 +168,10 @@ function compute_spinor_lhy_fm_contact(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     coefs = build_fm_lhy_coefs(F, g_dict)
-    _tabulate_lhy(n -> lhy_energy_fm(n, coefs), FMContactLHY; n_max, n_points)
+    _tabulate_lhy(n -> lhy_energy_fm(n, coefs), FMContactLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -333,13 +191,14 @@ function compute_spinor_lhy_icosahedral(;
     g_dict,
     n_max::Float64=100.0,
     n_points::Int=200,
+    n_atoms::Int=1,
 )
     F == 6 || throw(
         ArgumentError(
             "compute_spinor_lhy_icosahedral is F=6 only (got F=$F); the I_h closed " *
             "form is specific to the F=6 even-S channel structure"),
     )
-    _tabulate_lhy(n -> epsilon_LHY_F6_Ih(n, g_dict), IcosahedralLHY; n_max, n_points)
+    _tabulate_lhy(n -> epsilon_LHY_F6_Ih(n, g_dict), IcosahedralLHY; n_max, n_points, n_atoms)
 end
 
 """
@@ -415,15 +274,49 @@ end
 # loop. Keeping the derivative path in ONE place means a future change to
 # the finite-difference scheme can't silently drift between modes.
 function _tabulate_lhy(energy_fn, ::Type{ResultT};
-    n_max::Float64, n_points::Int) where {ResultT}
+    n_max::Float64, n_points::Int, n_atoms::Int=1) where {ResultT}
     n_points >= 3 || throw(ArgumentError("n_points must be >= 3"))
     n_max > 0 || throw(ArgumentError("n_max must be positive"))
+    n_atoms >= 1 || throw(ArgumentError("n_atoms must be >= 1"))
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
         n < 1e-30 && continue
-        energy[i] = energy_fn(n)
+        # The closed forms are ε = (8/15π²)(g n)^(5/2) with `n` the PHYSICAL
+        # density and `g` the SI coupling. Here `n = |ψ|²` is normalised to
+        # ∫|ψ|²dV = 1 and `g` comes from the dimensionless `c₀ = 4π(a_s/a_ho)N`,
+        # which already carries N. Carrying it twice at the 5/2 power leaves the
+        # tabulated energy a factor **N too large**:
+        #
+        #     (2/5)·c_lhy = (8/15π²)·c₀^(5/2) / N      [scalar Lima-Pelster]
+        #
+        # Measured in the uniform-g_S limit, `fm/scalar` and `polar/scalar` were
+        # EXACTLY N for N = 1e3, 3e4, 1e5. On a 2026-05 Eu run that made E_LHY
+        # 96% of the total energy — impossible for a beyond-mean-field term; the
+        # SI-anchored scalar path gives 0.05% for the same state.
+        #
+        # V = dε/dn, so dividing ε here divides the tabulated V too.
+        energy[i] = energy_fn(n) / n_atoms
     end
+    # A closed form that refuses to answer returns NaN (see epsilon_LHY_F6_Ih:
+    # c_0 < 0, λ_spin < 0). Without this check the NaN propagates through
+    # _numerical_derivative into every table entry and then into ψ, so the run
+    # reports NaN dynamics far from the parameter choice that caused it. Fail
+    # where the cause is visible instead.
+    bad = findfirst(!isfinite, energy)
+    bad === nothing || throw(
+        ArgumentError(
+            "$(nameof(ResultT)): the closed form is not applicable at these couplings " *
+            "— ε is $(energy[bad]) at n = $(densities[bad]). This is the closed form " *
+            "refusing to extrapolate (I_h: c_0 < 0 means the state is not the ground " *
+            "state; λ_spin < 0 means its spin-Goldstone branch is dynamically " *
+            "unstable. polar_contact: σ₀ < 0 is the same thing for the density " *
+            "Goldstone branch, and it is what c₁ < 0 gives — the sign Eu F=6 " *
+            "production uses). ε_LHY is scheme-dependent in all of them. Use " *
+            "`kind: full_bdg`, which diagonalises instead of assuming the branch " *
+            "structure — but check `lhy_mean_field_max_growth` first, since with " *
+            "an active dipole that has no stable point either."),
+    )
     ResultT(densities, _numerical_derivative(densities, energy))
 end
 

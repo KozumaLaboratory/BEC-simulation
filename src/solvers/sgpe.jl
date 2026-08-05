@@ -5,16 +5,27 @@ export apply_sgpe_step!, sgpe_callback
 # Finite-temperature classical-field formulation. The full Hamiltonian step
 # is already provided by the unitary split-step; SGPE adds
 #
-#   (a) γ-damping of the coherent part:  ψ̂(k) → exp(-γ (ε(k) - μ) dt) ψ̂(k)
+#   (a) γ-damping of the coherent part, in one of two forms:
+#       - simple-growth (Bradley-Gardiner): ψ̂(k) → exp(-γ (ε(k) - μ) dt) ψ̂(k)
+#         damps only the kinetic dispersion ε(k)=½k². Cheap, exact in k, but
+#         the equilibrium ignores the interaction (Hartree-Fock) μ-shift.
+#       - full-Hamiltonian (Stoof):        ψ(x) → ψ - γ (Ĥ[ψ] - μ) ψ dt
+#         damps the FULL GP residual Ĥ[ψ]ψ (kinetic + trap + c₀ + c₁ + DDI +
+#         LHY), assembled by `apply_operator_via_registry!`. The asymptotic
+#         equilibrium is then the correct interacting thermal state — this is
+#         what strongly-interacting / dipolar regimes (Eu) need.
 #   (b) Gaussian white noise:             ψ(x) → ψ(x) + √(2γT dt / dV) · ξ(x)
 #
 # where ξ(x) ~ 𝒩_ℂ(0, 1) independent per grid point and per spin component,
-# and T is the dimensionless temperature T · k_B / (ℏ ω_ref).
+# and T is the dimensionless temperature T · k_B / (ℏ ω_ref). The
+# fluctuation-dissipation noise (b) is identical for both damping forms; only
+# the deterministic drift (a) differs.
 #
 # Optionally high-k projection (PGP) can be applied per step; set `k_cut` to
 # a finite value to truncate. Noise is injected in position space *after*
 # the damping and projection so fluctuations above the cutoff are immediately
-# removed.
+# removed. For the Stoof form a finite `k_cut` is recommended: it bounds the
+# kinetic stiffness so the explicit (Euler) full-H drift stays stable.
 #
 # Intended use: call `apply_sgpe_step!` from an `on_step` callback (or pair
 # with `sgpe_callback`) so the standard unitary split-step stays untouched.
@@ -57,8 +68,12 @@ back-react on γ. Consequences:
   Treat asymptotic SGPE temperatures as a *control parameter*, not the true
   thermodynamic temperature.
 
-For full-Hamiltonian damping (Stoof-form SGPE) the kernel needs the local
-GP residual, not just ε(k); not implemented.
+Full-Hamiltonian damping (Stoof-form SGPE) is available via
+`full_hamiltonian=true`: the kinetic-only exp-damp is replaced by the explicit
+full GP-residual drift `ψ ← ψ - γ(Ĥ[ψ]-μ)ψ dt`, which removes the interaction
+bias above (the asymptotic equilibrium becomes the correct interacting state).
+Recommended with a finite `k_cut` for stability. `false` (default) keeps the
+cheap simple-growth form and all its existing behaviour.
 
 Per-component noise is independent across spinor components. For F=6 dipolar
 regimes where spin-coherent thermal correlations matter, this *under*-couples
@@ -68,6 +83,7 @@ function apply_sgpe_step!(
     ws::Workspace{N}, γ::Real, T::Real, dt::Real;
     μ::Real=0.0, mu::Real=μ,            # both spellings
     k_cut::Real=Inf,
+    full_hamiltonian::Bool=false,
     seed::Union{Nothing, Int}=nothing,
 ) where {N}
     γ_f = Float64(γ);
@@ -76,8 +92,14 @@ function apply_sgpe_step!(
     μ_f = Float64(mu)
     γ_f <= 0 && T_f <= 0 && return nothing
 
-    # 1. Coherent γ-damping on kinetic modes.
-    γ_f > 0 && _sgpe_damp_kinetic!(ws, γ_f, μ_f, dt_f)
+    # 1. Coherent γ-damping: full GP residual (Stoof) or kinetic-only (simple-growth).
+    if γ_f > 0
+        if full_hamiltonian
+            _sgpe_damp_full_hamiltonian!(ws, γ_f, μ_f, dt_f)
+        else
+            _sgpe_damp_kinetic!(ws, γ_f, μ_f, dt_f)
+        end
+    end
 
     # 2. High-k projection (classical-field support).
     isfinite(k_cut) && apply_projected_gp!(ws, Float64(k_cut))
@@ -120,6 +142,36 @@ function _sgpe_damp_kinetic!(ws::Workspace{N}, γ::Float64, μ::Float64, dt::Flo
 end
 
 """
+    _sgpe_damp_full_hamiltonian!(ws, γ, μ, dt)
+
+Stoof-form dissipative drift: `ψ ← ψ − γ·(Ĥ[ψ] − μ)·ψ·dt`, where `Ĥ[ψ]ψ` is
+the FULL GP operator action (kinetic + trap + c₀ + c₁ + DDI + LHY) assembled by
+`apply_operator_via_registry!` — the same single-source operator the LBFGS
+gradient and the energy decomposition use. Unlike the kinetic-only
+`_sgpe_damp_kinetic!`, the damping target is the interacting GP fixed point
+`Ĥ[ψ]ψ = μψ`, so the asymptotic thermal equilibrium carries the correct
+Hartree-Fock + dipolar μ-shift.
+
+Explicit (Euler) in the residual; a finite `k_cut` projection (applied by the
+caller after this drift) bounds the kinetic stiffness ½k² and keeps the step
+stable for `γ·dt·½k_cut² ≲ 1`. In the free limit (c₀=c₁=0, no DDI/LHY) this
+reduces to the simple-growth kinetic drift (to first order in dt), so the
+free-field Rayleigh-Jeans FDR is recovered.
+"""
+function _sgpe_damp_full_hamiltonian!(
+    ws::Workspace{N}, γ::Float64, μ::Float64, dt::Float64
+) where {N}
+    psi = ws.state.psi
+    hpsi = ws.state.psi_scratch            # full-size scratch (same shape/device as psi)
+    apply_operator_via_registry!(hpsi, ws) # hpsi = Ĥ[ψ]ψ  (zeroes hpsi, then accumulates)
+    T = real(eltype(psi))
+    a = T(γ * dt);
+    μT = T(μ)
+    @. psi -= a * (hpsi - μT * psi)
+    nothing
+end
+
+"""
     _sgpe_add_noise!(ws, γ, T, dt; seed)
 
 ψ(x) ← ψ(x) + σ · ξ(x) with σ = √(2γT·dt/dV), ξ ~ 𝒩_ℂ(0,1) independent per
@@ -138,18 +190,39 @@ function _sgpe_add_noise!(
     σ <= 0 && return nothing
 
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    re, im_ = _noise_buffers(ws, n_pts)
+    a = real(eltype(psi))(σ / sqrt(2.0))
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
         # Independent real + imaginary parts, each 𝒩(0, σ²/2) so that the
         # complex sum has variance σ² — matches |ξ|² expectation 1·σ².
-        re_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
-        im_host = randn(rng, Float64, n_pts) .* (σ / sqrt(2.0))
-        noise_host = complex.(re_host, im_host)
-        noise_dev = _to_device(ws.backend, noise_host)
-        psi_c .+= noise_dev
+        # `randn!` consumes `rng` in the same order as `randn(rng, Float64, n_pts)`,
+        # so CPU streams are bit-identical to the pre-2026-07-28 host path; the GPU
+        # path fills in place via CURAND (see `_randn_fill!`).
+        _randn_fill!(ws.backend, re, rng)
+        _randn_fill!(ws.backend, im_, rng)
+        @. psi_c += a * complex(re, im_)
     end
     nothing
+end
+
+"""
+    _noise_buffers(ws, n_pts) -> (re, im)
+
+Two cached real spatial buffers on `ws`'s device, for drawing complex Gaussian
+noise without allocating per step. Float64 regardless of `eltype(psi)` so the
+CPU RNG stream is independent of mixed-precision settings.
+"""
+function _noise_buffers(ws::Workspace, n_pts::NTuple{N, Int}) where {N}
+    key = (typeof(ws.state.psi), n_pts)
+    re = scratch_get!(:sgpe_noise_re, key) do
+        _similar(ws.backend, ws.state.psi, Float64, n_pts...)
+    end
+    im_ = scratch_get!(:sgpe_noise_im, key) do
+        _similar(ws.backend, ws.state.psi, Float64, n_pts...)
+    end
+    (re, im_)
 end
 
 """
@@ -161,6 +234,7 @@ and auto-increments the RNG seed so step-to-step draws are independent.
 function sgpe_callback(
     γ::Real, T::Real, dt::Real;
     μ::Real=0.0, k_cut::Real=Inf,
+    full_hamiltonian::Bool=false,
     seed::Union{Nothing, Int}=nothing,
     every::Int=1,
 )
@@ -171,7 +245,7 @@ function sgpe_callback(
     function (ws, step, args...)
         step % every == 0 || return nothing
         apply_sgpe_step!(ws, γ, T, dt;
-            μ=μ, k_cut=k_cut,
+            μ=μ, k_cut=k_cut, full_hamiltonian=full_hamiltonian,
             seed=seed === nothing ? nothing : seed + step)
         nothing
     end

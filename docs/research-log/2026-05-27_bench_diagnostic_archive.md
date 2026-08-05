@@ -1,5 +1,8 @@
 # bench/ + diagnostic/ archive — 2026-05-27
 
+> **FROZEN 2026-05-27.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
 `scripts/bench/` and `scripts/diagnostic/` are retired. Each file there
 was a one-shot research probe — printed measurements + findings to
 stdout, no `@test` blocks, no regression contract. Per the architectural
@@ -48,11 +51,11 @@ commit is `04d9c9a` (bench/) / `df1afa2` (diagnostic/).
 | `T_sweep_alpha0.jl` | Falsifier: phase accumulation slope at α=0 | `docs/design/integrator_order_mechanism_tdhfb.md` |
 | `asymmetry_probe.jl` | B-3 substep generator asymmetry probe | same |
 | `intermediate_delta_sweep.jl` | B-3 intermediate-Δ falsifier | same |
-| `klaus_bch_leak_verification.jl` | T57 Klaus BCH-leak verification | `runs/_loop/judge/turn_57.json` |
-| `matsui_edh_t82_analyze.jl` | T82 Matsui EdH analyzer | `runs/_loop/judge/turn_82.json` |
+| `klaus_bch_leak_verification.jl` | T57 Klaus BCH-leak verification | `runs/_loop/judge/turn_57.json` (archived) |
+| `matsui_edh_t82_analyze.jl` | T82 Matsui EdH analyzer | `runs/_loop/judge/turn_82.json` (archived) |
 | `order_ladder_full_matrix.jl` | B-2 extended 4×3 order ladder | `docs/design/integrator_order_mechanism_tdhfb.md` |
 | `palindrome_residual_probe.jl` | B-1 palindrome residual probe | same |
-| `tdhfb_f1_bogoliubov_cross_check.jl` | T100 TDHFB F1/F2/F3 falsifiers + F4 advisory | `runs/_loop/regression/turn_100.expected.json` |
+| `tdhfb_f1_bogoliubov_cross_check.jl` | T100 TDHFB F1/F2/F3 falsifiers + F4 advisory | `runs/_loop/regression/turn_100.expected.json` (archived) |
 | `tdhfb_palindromic_gate.jl` | TDHFB Y4 palindromic-gate diagnostic (#86 Option B) | `docs/design/tdhfb_y4_palindromic_substep_design.md` |
 | `tdhfb_per_term_audit.jl` | Per-term FD audit (δE_piece / δφ*) | `docs/manuscript/thesis/chapters/ch5_v3_raw.md` |
 
