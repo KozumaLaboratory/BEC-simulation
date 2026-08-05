@@ -101,10 +101,12 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 237 files
-- `CI_EXTRA` — 90 files
-- `FULL_EXTRA` — 33 files
+- `FAST_TESTS` — 236 files
+- `CI_EXTRA` — 113 files
+- `FULL_EXTRA` — 71 files
 - `PHYSICS_TESTS` — 7 files
+- `ORACLE_TESTS` — 75 files
+- `INTEGRATION_TESTS` — 44 files
 
 ## Validation ladder — instruments present on disk
 
@@ -140,16 +142,26 @@ it until 2026-08-04).
 
 ## What this document does NOT cover
 
-Derived by asking which `src/` subtrees any section above cites. A directory
-in the second list is not a defect — it is this document stating plainly that
-it is silent about that subsystem, so its absence above is not evidence of
-absence in the code. **What would be a defect is this list vanishing**: a
-generated document whose gaps are invisible reads as complete.
+Cited FILES over total, per `src/` subtree — not a boolean. A first version
+asked only whether the directory name appeared anywhere, so one citation
+would have flipped a whole subtree to "covered" and the gap report would
+have overstated itself the moment any section landed. A low ratio is not a
+defect: it is this document saying how little it knows about that area, so
+silence here is not read as absence in the code. **What would be a defect is
+this table vanishing** — a generated document whose gaps are invisible reads
+as complete.
 
-**Covered:** `src/analysis/`, `src/foundation/`, `src/hamiltonian/`, `src/manuscript/`, `src/validation/`, `src/workflow/`
+| subtree | files cited | of |
+|---|---|---|
+| `src/hamiltonian/` | 13 | 63 |
+| `src/validation/` | 1 | 8 |
+| `src/manuscript/` | 1 | 15 |
+| `src/foundation/` | 1 | 40 |
+| `src/analysis/` | 1 | 46 |
+| `src/workflow/` | 2 | 169 |
+| `src/model/` | 0 | 14 |
+| `src/solvers/` | 0 | 44 |
 
-**Not covered:** `src/model/`, `src/solvers/`
-
-For anything in the second list the code is the only authority; `CLAUDE.md`'s
-subsystem catalog is a curated summary and carries no staleness gate.
+Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem
+catalog is a curated summary and carries no staleness gate.
 

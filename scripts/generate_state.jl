@@ -206,17 +206,29 @@ function retired_keys()
     (rel, rows)
 end
 
-"Test-file counts per tier list, read out of `_tiers.jl`."
+"""
+Test-file counts per tier list, obtained by EVALUATING `_tiers.jl`.
+
+The first version scraped the source with `const NAME = [(.*?)]` and was wrong on
+three of four lists — `CI_EXTRA` 90 against a true 113, `FULL_EXTRA` 33 against
+71 — because the non-greedy match stops at the first `]` CHARACTER, and one sits
+inside a comment in the list. `assert_nondegenerate` did not catch it: a floor
+catches COLLAPSE, not CORRUPTION, and 90 is a perfectly healthy-looking number.
+
+**A regex over source is a second implementation of the language's grammar** —
+the same duplication this document exists to remove, one level down. Evaluate
+instead: include the file into a private module and take `length`. That also
+makes `ORACLE_TESTS` and `INTEGRATION_TESTS` derivable, which no text scan could
+count because they are `filter(...)` expressions.
+"""
 function tier_counts()
     rel = "test/_tiers.jl"
-    src = readsrc(rel)
-    rows = Tuple{String, Int}[]
-    for name in ("FAST_TESTS", "CI_EXTRA", "FULL_EXTRA", "PHYSICS_TESTS")
-        m = match(Regex("const\\s+$name\\s*=\\s*\\[(.*?)\\]", "s"), src)
-        m === nothing && continue
-        push!(rows, (name, count(c -> c == '"', m.captures[1]) ÷ 2))
-    end
-    (rel, rows)
+    m = Module(:TiersProbe)
+    Core.eval(m, :(using SpinorBEC))
+    Base.include(m, joinpath(ROOT, rel))
+    names = (:FAST_TESTS, :CI_EXTRA, :FULL_EXTRA, :PHYSICS_TESTS,
+             :ORACLE_TESTS, :INTEGRATION_TESTS)
+    (rel, [(string(n), length(getfield(m, n))) for n in names if isdefined(m, n)])
 end
 
 """
@@ -270,22 +282,34 @@ end
 
 
 """
-Which parts of `src/` this document says anything about, and which it does not.
+How much of each `src/` subtree this document actually cites.
 
-The staleness gate cannot see the second way a generated document goes wrong: a
-new subsystem appears, nobody teaches the generator to derive it, and STATE.md
-stays green while being INCOMPLETE about a file titled "what this system is".
-Incompleteness that is invisible reads as absence — "STATE.md does not mention
-it, so it must not exist".
+Reported as CITED FILES over TOTAL, not as a boolean. The first version asked
+`occursin("src/\$d/", rendered)`, so a single citation of one file flipped all 14
+files of `src/model/` from "not covered" to "covered" — a coverage report that
+overstates itself the moment any section lands, which is worse than no report:
+the section's whole purpose is that gaps stay visible.
 
-So the gap is derived too. A directory listed as not-covered is not a bug; it is
-an honest statement that this document is silent about it, and the place to look
-is the code. What would be a bug is the list disappearing.
+A subtree with few cited files is not a defect. It is this document saying
+plainly how little it knows about that area, so a reader does not read silence
+as absence.
 """
 function coverage(rendered)
-    dirs = sort([d for d in readdir(joinpath(ROOT, "src"))
-                 if isdir(joinpath(ROOT, "src", d))])
-    [(d, occursin("src/$d/", rendered)) for d in dirs]
+    rows = Tuple{String, Int, Int}[]
+    for d in sort(readdir(joinpath(ROOT, "src")))
+        isdir(joinpath(ROOT, "src", d)) || continue
+        total, cited = 0, 0
+        for (root, _, fs) in walkdir(joinpath(ROOT, "src", d))
+            for f in fs
+                endswith(f, ".jl") || continue
+                total += 1
+                rel = relpath(joinpath(root, f), ROOT)
+                occursin(rel, rendered) && (cited += 1)
+            end
+        end
+        push!(rows, (d, cited, total))
+    end
+    rows
 end
 
 # ---------------------------------------------------------------- self-checks
@@ -431,9 +455,18 @@ function render()
     p()
 
     trel, tiers = tier_counts()
-    assert_nondegenerate("test tiers", length(tiers) == 4 && all(t -> t[2] > 0, tiers),
-        "parsed $(length(tiers)) of 4 tier lists from $trel; counts " *
-        join(string.(last.(tiers)), "/"))
+    # Floors per list, not a blanket `> 0`. The scraping bug produced 90/33 for
+    # lists that really hold 113/71 — non-zero, plausible, and wrong. A floor
+    # only catches corruption when it is set near the true value.
+    want = Dict("FAST_TESTS" => 200, "CI_EXTRA" => 100, "FULL_EXTRA" => 50,
+                "PHYSICS_TESTS" => 5, "ORACLE_TESTS" => 50, "INTEGRATION_TESTS" => 40)
+    short = [t for t in tiers if t[2] < get(want, t[1], 1)]
+    assert_nondegenerate("test tiers",
+        length(tiers) >= 6 && isempty(short),
+        "read $(length(tiers)) tier lists from $trel (expect >= 6); " *
+        (isempty(short) ? "" : "below floor: " *
+         join(["$(t[1])=$(t[2])" for t in short], ", ")) *
+        "; all counts " * join(["$(t[1])=$(t[2])" for t in tiers], " "))
     p("## Test tiers")
     p()
     p("File counts from `$trel`. Membership is explicit — no auto-discovery.")
@@ -483,18 +516,23 @@ function render()
     q(s="") = println(io2, s)
     q("## What this document does NOT cover")
     q()
-    q("Derived by asking which `src/` subtrees any section above cites. A directory")
-    q("in the second list is not a defect — it is this document stating plainly that")
-    q("it is silent about that subsystem, so its absence above is not evidence of")
-    q("absence in the code. **What would be a defect is this list vanishing**: a")
-    q("generated document whose gaps are invisible reads as complete.")
+    q("Cited FILES over total, per `src/` subtree — not a boolean. A first version")
+    q("asked only whether the directory name appeared anywhere, so one citation")
+    q("would have flipped a whole subtree to \"covered\" and the gap report would")
+    q("have overstated itself the moment any section landed. A low ratio is not a")
+    q("defect: it is this document saying how little it knows about that area, so")
+    q("silence here is not read as absence in the code. **What would be a defect is")
+    q("this table vanishing** — a generated document whose gaps are invisible reads")
+    q("as complete.")
     q()
-    q("**Covered:** " * join(("`src/" .* first.(filter(c -> c[2], cov)) .* "/`"), ", "))
+    q("| subtree | files cited | of |")
+    q("|---|---|---|")
+    for (d, cited, total) in sort(cov; by = r -> (-r[2] / max(r[3], 1), r[1]))
+        q("| `src/$d/` | $cited | $total |")
+    end
     q()
-    q("**Not covered:** " * join(("`src/" .* first.(filter(c -> !c[2], cov)) .* "/`"), ", "))
-    q()
-    q("For anything in the second list the code is the only authority; `CLAUDE.md`'s")
-    q("subsystem catalog is a curated summary and carries no staleness gate.")
+    q("Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem")
+    q("catalog is a curated summary and carries no staleness gate.")
     q()
     String(take!(io2))
 end

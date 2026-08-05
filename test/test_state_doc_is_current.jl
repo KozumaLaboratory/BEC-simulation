@@ -64,8 +64,10 @@ end
         @test occursin("Declared **once**", derived)
         @test occursin("test_bfield_sign_declared_once.jl", derived)
         @test occursin("## What this document does NOT cover", derived)
-        @test occursin("**Covered:**", derived)
-        @test occursin("**Not covered:**", derived)
+        @test occursin("| subtree | files cited | of |", derived)
+        # per-FILE, not per-subtree: a boolean would read as full coverage
+        # from a single citation
+        @test occursin(r"\| `src/\w+/` \| \d+ \| \d+ \|", derived)
     end
 
     committed = read(STATE, String)
