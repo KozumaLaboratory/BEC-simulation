@@ -35,15 +35,21 @@ const _EUV3_WAISTS = [31e-6, 42e-6, 42e-6]   # H, V, S(unused)
 # light-shift / trap-freq + power pair is logged.
 const _EUV3_ALPHA = 5.88e-37
 const _EUV3_N0 = 3.5e6
-const _EUV3_T0 = 50e-6
+# T₀ = 18 µK: the loaded temperature of the 2023-11-06 notebook — the SAME epoch the ramp
+# (`euv3_evaporation_ramp`) comes from. Pairing it with the 2022 PRL T₀=50 µK was epoch-mixing:
+# it drove η_start = U/(k_B·50µK) ≈ 2.1 (docs claimed 4.5) and inflated the fitted K₃ to
+# compensate. At 18 µK η_start ≈ 5.7, physical (real ODTs load at η ~ 5–10).
+const _EUV3_T0 = 18e-6
 const _EUV3_TAU_BG = 15.0                    # not in the paper; typical lanthanide ODT
-# K3 ≈ 1.6e-40 m⁶/s: a single-parameter FIT, not a measurement — Eu's 3-body rate is
-# unmeasured. With α/τ_bg fixed and the evaporation ramp starting from the loaded
-# crossed trap (adiabatic-compression heating included), K3=1.61e-40 brings the
-# predicted endpoint to N_BEC ≈ 5.02e4 (matches the measured 5.02e4 @ 349 nK).
-# 3-body loss limits N at the high density near BEC (K3=0 over-predicts N by ~20×).
-# In the lanthanide range (Dy/Er ~1e-41…1e-40). Refit once Eu K3 / current data exist.
-const _EUV3_K3 = 1.6107615346177146e-40
+# K₃ = 1×10⁻⁴¹ m⁶/s (= 1×10⁻²⁹ cm⁶/s): an AB-INITIO estimate, NOT a fit. Eu's 3-body rate is
+# unmeasured, so we use the universal van-der-Waals law K₃ = 3C ℏa⁴/m (Braaten–Hammer), C∈[0,67]
+# log-periodic. For a=110a₀, ℏa⁴/m = 4.83×10⁻³¹ cm⁶/s, so K₃ = 1.5×10⁻³⁰·C cm⁶/s; a typical
+# non-resonant C≈7 gives 1×10⁻²⁹ cm⁶/s. Band 10⁻³⁰…10⁻²⁸ cm⁶/s = 10⁻⁴²…10⁻⁴⁰ m⁶/s (Eu is only
+# marginally universal, a/r_vdW≈1.3, so order-of-magnitude). Convention: dN = −3K₃⟨n²⟩N. The model
+# now PREDICTS N_BEC across this band; sweep it with `robustness_scenarios(...; K3_hi_factor=…)`.
+# (The old default 1.6×10⁻⁴⁰ m⁶/s = 1.6×10⁻²⁸ cm⁶/s was a fit at the Efimov-max top of the band,
+# inflated to absorb the epoch-mixed T₀=50 µK — see `_EUV3_T0`.)
+const _EUV3_K3 = 1e-41
 
 hfort_volts(P_W::Real) = (P_W + 0.0010) / 0.6198
 vfort_volts(P_W::Real) = (P_W + 0.0027) / 0.5739
@@ -118,9 +124,9 @@ end
 
 One-call evaporation of the euv3 ramp: build the trap from `waists`/`alpha`
 (+ optional geometry overrides), then `run_evaporation` over `euv3_evaporation_ramp`
-from `(N0, T0)`. All default to `euv3_defaults()`; with those defaults the predicted
-endpoint (N_BEC ≈ 4.9e4 @ 0.53 µK) matches the measured 5.0e4 @ 349 nK (the K3=1e-40
-default is fitted to that — see `_EUV3_K3`).
+from `(N0, T0)`. All default to `euv3_defaults()`. With the ab-initio `K₃` (`_EUV3_K3`,
+NOT a fit) the endpoint is a **prediction** to compare against the measured 5.02×10⁴ @ 349 nK,
+not a tuned match — sweep the `K₃` uncertainty band to bracket it.
 """
 function run_euv3_evaporation(; waists=_EUV3_WAISTS, alpha::Real=_EUV3_ALPHA,
     N0::Real=_EUV3_N0, T0::Real=_EUV3_T0,
@@ -161,9 +167,9 @@ euv3_defaults() = (
     waists=copy(_EUV3_WAISTS),             # H 31 µm, V 42 µm (S unused)
     alpha=_EUV3_ALPHA,                     # 5.88e-37, anchored to PRL depth (350µK@10W) ⊃ freqs@0.18W
     N0=_EUV3_N0,                           # 3.5e6 atoms at start of evaporation
-    T0=_EUV3_T0,                           # 50 µK
+    T0=_EUV3_T0,                           # 18 µK loaded (2023 epoch, matches the ramp)
     tau_bg=_EUV3_TAU_BG,                   # 15 s estimate (not in paper)
-    K3=_EUV3_K3,                           # 1e-40 m⁶/s FIT to reproduce N_BEC — NOT measured
+    K3=_EUV3_K3,                           # 1e-41 m⁶/s AB-INITIO (universal vdW, C≈7) — NOT a fit
     a_s=Eu151.a_s,                         # 110 a₀
     measured_N_BEC=5.02e4,                 # validation target
     measured_T_BEC=349e-9,                 # 349 nK

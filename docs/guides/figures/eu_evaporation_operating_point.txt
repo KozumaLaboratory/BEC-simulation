@@ -1,0 +1,14 @@
+=== CONFIRMED OPERATING POINT (realizable monotone ramp; max N0 s.t. T<=50nK) ===
+predicted: N0=2.576e+05  T_final=49.9 nK  cond_frac=0.977  duration=4.72 s
+inputs: heating=0.050/s K3=1.0e-42 tau_bg=15s (MEASURE heating & K3 to firm up)
+
+ramp schedule (time[s], HFORT[W], VFORT[W]) — monotone, 9 breakpoints:
+  0.000   10.0000    6.0000
+  0.132   10.0000    0.5539
+  0.456    6.0642    0.5138
+  0.941    4.3341    0.3836
+  1.573    2.8770    0.3451
+  2.342    1.7322    0.3153
+  3.244    0.8884    0.2538
+  3.950    0.6072    0.1306
+  4.718    0.0200    0.0500

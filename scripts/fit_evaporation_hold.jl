@@ -2,7 +2,7 @@ using SpinorBEC, DelimitedFiles
 using SpinorBEC: evap_rhs, EvapParams, Units
 const kB=Units.KB; const aB=5.29177e-11; const m=150.919857*1.66053906660e-27
 function holdsim(U_uK, fbar, τ, N0, T0, tgrid)
-  U=U_uK*1e-6*kB; ω̄=2π*fbar; p=EvapParams(; a_s=110*aB, tau_bg=τ, K3=0.0, evap_scale=1.0)
+  U=U_uK*1e-6*kB; ω̄=2π*fbar; p=EvapParams(; a_s=110*aB, tau_bg=τ, K3=0.0)
   N=N0; T=T0; ts=Float64[]; Ns=Float64[]; Ts=Float64[]
   dt=0.002; t=0.0; gi=1; push!(ts,0.0);push!(Ns,N);push!(Ts,T)
   while t<tgrid[end]+dt && N>1 && T>1e-9

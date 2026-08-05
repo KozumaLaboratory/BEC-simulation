@@ -61,20 +61,14 @@ _euv3_ramp() = FortRamp(
         @test phase_space_density(N, T, ω̄) ≈ N * (Units.HBAR * ω̄ / (Units.KB * T))^3
     end
 
-    @testset "collision rate is theory-determined (evap_scale = 1)" begin
-        # at the Eu BEC loading point (PRL 129,223401: N=3.5e6, 50µK, ω̄=2π·432 Hz) the
-        # peak density and PSD match the measured values ⇒ γ_el = n₀σv̄/√2 is fixed, no
-        # free prefactor: evap_scale's physical value is 1.
+    @testset "peak density matches the measured Eu loading point (no free prefactor)" begin
+        # at the Eu BEC loading point (PRL 129,223401: N=3.5e6, 50µK, ω̄=2π·432 Hz) the peak
+        # density and PSD match the measured values ⇒ the LRW rate γ_el = n₀σv̄ is fully fixed
+        # (n₀ = n_pk/P(3,η), σ = 8πa², v̄ = √(8k_BT/πm)) — there is no free prefactor to tune.
         N, T, ω̄ = 3.5e6, 50e-6, 2π * (30 * 1500 * 1800)^(1 / 3)
         n0 = thermal_peak_density(N, T, ω̄, _m)
         @test n0 / 1e6 ≈ 3.3e13 rtol = 0.1                 # paper: 3.3×10¹³ cm⁻³
         @test phase_space_density(N, T, ω̄) ≈ 2.7e-4 rtol = 0.1  # paper: 2.7×10⁻⁴
-        @test EvapParams(; a_s=_as, tau_bg=1.0).evap_scale == 1.0   # default = theory
-        # evap_scale multiplies the rate linearly (it is a prefactor, not a knob to tune)
-        ω, U = 2π * 200, 8.0 * Units.KB * 30e-6
-        p1 = EvapParams(; a_s=_as, tau_bg=Inf, evap_scale=1.0)
-        p2 = EvapParams(; a_s=_as, tau_bg=Inf, evap_scale=2.0)
-        @test evap_rhs(1e6, 30e-6, U, ω, p2, _m)[1] ≈ 2 * evap_rhs(1e6, 30e-6, U, ω, p1, _m)[1]
     end
 
     @testset "s-wave unitarity cross section σ(T) lowers the hot-cloud rate" begin
@@ -89,7 +83,7 @@ _euv3_ramp() = FortRamp(
             n0 = thermal_peak_density(N, T, ω̄, _m)
             v̄ = sqrt(8 * Units.KB * T / (π * _m))
             f, _ = evap_volume_factor(η)
-            -dN / (N * n0 * v̄ / sqrt(2) * f)            # = σ(T)
+            -dN / (N * n0 * v̄ * f)                      # LRW rate = N n_pk σ v̄ f (no /√2) ⇒ σ(T)
         end
         σ0 = 8π * _as^2
         for (T, η) in ((5e-6, 5.0), (30e-6, 6.0), (60e-6, 8.0))
@@ -111,17 +105,13 @@ _euv3_ramp() = FortRamp(
         _, L = evap_volume_factor(η)
         @test (dT / dN) * (N / T) ≈ L rtol = 1e-10
         @test 0 < L                                    # net cooling at η=8
-        # all-η Luiten form: still evaporates below η=4 (spilling), faster than at η=8
+        # all-η LRW form: still evaporates below η=4, faster than at η=8 (no hard floor)
         dN_low, _ = evap_rhs(N, T, 3.0 * Units.KB * T, ω̄, p, _m)   # η = 3
         @test dN_low < 0                                # active (not inert)
         @test dN_low < dN                               # lower η ⇒ stronger loss
         # very deep trap ⇒ evaporation exponentially suppressed
         dN_deep, _ = evap_rhs(N, T, 20.0 * Units.KB * T, ω̄, p, _m)  # η = 20
         @test abs(dN_deep) < abs(dN) * 1e-3
-        # evap_scale linearly scales the rate
-        ps = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0, evap_scale=0.5)
-        dN_s, _ = evap_rhs(N, T, U, ω̄, ps, _m)
-        @test dN_s ≈ 0.5 * dN rtol = 1e-12
     end
 
     @testset "evap_rhs robust to RK4 overshoot (non-positive N or T)" begin
@@ -152,22 +142,33 @@ _euv3_ramp() = FortRamp(
         @test EvapParams(; a_s=_as, tau_bg=1.0).heating_rate == 0.0   # default off
     end
 
-    @testset "evap_volume_factor: 3D Luiten form, no free parameter" begin
-        # 3D harmonic (a=3, P3/P4) recovers the textbook (η−4)e^{−η}; a 2-D mistake
-        # (P2/P3) would give (η−3)e^{−η}.
+    @testset "evap_volume_factor: exact LRW truncated-Boltzmann form" begin
+        # eject factor → textbook (η−4)e^{−η} at large η (a=3, P3/P4 = 3-D harmonic; a 2-D
+        # mistake P2/P3 would give (η−3)e^{−η}). The exact form e^{−η}(ηP3−4P4)/P3² stays
+        # POSITIVE at low η where the crude (η−4)e^{−η} goes negative (η<4).
         for η in (8.0, 10.0, 12.0)
             @test evap_volume_factor(η)[1] ≈ (η - 4) * exp(-η) rtol = 0.05
         end
-        # L = dlnT/dlnN = (ε̄−3)/3 → (η−2)/3 (O'Hara) at large η, gently → 0 at low η.
+        @test evap_volume_factor(3.0)[1] > 0                            # exact form > 0 where (η−4)<0
+        @test evap_volume_factor(15.0)[1] < evap_volume_factor(6.0)[1]  # suppressed at high η
+        # L = dlnT/dlnN, the EXACT energy-balance law (ε_ev−c)/(c−η dc/dη) → (η−2)/3 (O'Hara) at
+        # large η. Slow 1/η convergence, so check rtol at large η only.
         for η in (20.0, 30.0, 50.0)
             @test evap_volume_factor(η)[2] ≈ (η - 2) / 3 rtol = 0.02
         end
-        # L is monotone increasing and gentle at low η (validated: 7 W hold dlnT/dlnN≈0.8 at η≈4)
-        @test evap_volume_factor(3.0)[2] < evap_volume_factor(6.0)[2] < evap_volume_factor(12.0)[2]
-        @test 0 < evap_volume_factor(4.0)[2] < 1.0                      # L(η=4) ≈ 0.82 (matches hold)
-        @test evap_volume_factor(2.0)[2] < 0.5                          # gentle at low η (no runaway)
-        @test evap_volume_factor(3.0)[1] > 0                            # spilling at low η
-        @test evap_volume_factor(15.0)[1] < evap_volume_factor(6.0)[1] # suppressed at high η
+        # L is NON-monotonic: high at low η (a truncated cloud's reduced heat capacity cools it
+        # far more per atom lost), dips near η≈6, then rises to (η−2)/3. Pins the exact values.
+        @test evap_volume_factor(4.0)[2] ≈ 2.638 rtol = 0.01           # exact truncated-cloud value
+        @test evap_volume_factor(6.0)[2] ≈ 2.231 rtol = 0.01
+        @test evap_volume_factor(3.0)[2] > evap_volume_factor(6.0)[2]  # low-η truncation enhancement
+        @test evap_volume_factor(12.0)[2] > evap_volume_factor(6.0)[2] # large-η rise (dip near η≈6)
+        # mean energy per atom c(η) = 3 P4/P3 → 3 (equipartition) at large η, < 3 when truncated
+        let η = 20.0
+            eη = exp(-η)
+            P3 = 1 - eη * (1 + η + η^2 / 2)
+            P4 = 1 - eη * (1 + η + η^2 / 2 + η^3 / 6)
+            @test 3 * P4 / P3 ≈ 3.0 rtol = 1e-3
+        end
     end
 
     @testset "adiabatic trap change ⇒ T ∝ ω̄, ρ invariant" begin
@@ -203,23 +204,22 @@ _euv3_ramp() = FortRamp(
         @test !res.reached_bec
     end
 
-    @testset "η<1 soft spilling: trap cannot hold a cloud hotter than its depth" begin
-        # a gravity-marginal trap (low power → shallow) loaded above its depth spills DOWN toward
-        # T≈U/k_B (smooth −3γ_el(1−η) relaxation, not a hard cap). Validated: the 1.1 W ¹⁵¹Eu hold
-        # cools 1.86→1.0µK ≈ its ~1µK downward barrier.
+    @testset "low-η LRW cooling replaces the ad-hoc spilling patch" begin
+        # The hand-tuned η<1 `−3γ_el(1−η)` spilling term is GONE. Efficient low-η cooling now
+        # falls out of the exact energy-balance L (a truncated cloud's reduced heat capacity), so a
+        # moderately-truncated cloud still evaporates and cools — with no patch. The model makes no
+        # claim below its validity (η≲3, kT≳U); it must simply stay finite there.
         trap = _eu_trap()
-        ramp = FortRamp([0.0, 4.0], [0.06 0.06; 0.0 0.0; 0.0 0.0])    # very shallow single beam
-        U = trap_at(trap, [0.06, 0.0, 0.0])[1]
-        @test U / (Units.KB * 5e-6) < 1                               # loaded hotter than the depth
-        res = run_evaporation(trap, ramp, EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0);
-            N0=1e5, T0=5e-6, dt=1e-3)
-        @test res.T[end] < 5e-6                                       # cooled below the loaded T
-        @test res.T[end] < U / Units.KB * 1.3                         # relaxed toward the depth
-        @test all(diff(res.T) .<= 1e-12)                              # monotone (smooth, not a jump)
-        # a deep trap (η≫1) is untouched by the spilling term — T stays high
+        p = EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0)
+        ramp = FortRamp([0.0, 2.0], [0.5 0.08; 0.0 0.0; 0.0 0.0])     # shallow, lowered ⇒ low-ish η
+        res = run_evaporation(trap, ramp, p; N0=1e5, T0=8e-6, dt=1e-3)
+        @test res.N[end] < res.N[1]                                  # atoms leave (evaporation active)
+        @test res.T[end] < res.T[1]                                  # and the cloud cools
+        @test all(isfinite, res.T) && all(isfinite, res.N)           # finite through the validity edge
+        # a deep trap (η≫1) evaporates negligibly — T stays put (no spurious spilling term)
         deep = run_evaporation(trap, FortRamp([0.0, 4.0], [50.0 50.0; 0.0 0.0; 0.0 0.0]),
-            EvapParams(; a_s=_as, tau_bg=Inf, K3=0.0); N0=1e5, T0=5e-6, dt=1e-3)
-        @test deep.T[end] ≈ 5e-6 rtol = 0.1                           # no spill (T ≪ depth)
+            p; N0=1e5, T0=5e-6, dt=1e-3)
+        @test deep.T[end] ≈ 5e-6 rtol = 0.1
     end
 
     @testset "background loss alone decays N exponentially" begin
@@ -389,16 +389,21 @@ _euv3_ramp() = FortRamp(
         @test s.peak_psd >= 1.202                      # crossed BEC onset
     end
 
-    @testset "euv3 researched defaults reach BEC" begin
+    @testset "euv3 parameter-free model brackets the measured BEC (prediction, type C)" begin
         d = euv3_defaults()
         @test d.wavelength == 1550e-9
         @test length(d.waists) == 3
-        # no-arg run uses the researched defaults (1550 nm, 31/42 µm, calibrated α,
-        # N₀=3.5e6 @ 50 µK, K3 fitted) and reproduces the measured BEC endpoint within ~3×.
-        res = run_euv3_evaporation()
-        @test res.reached_bec
-        @test 0.3 < res.N_BEC / d.measured_N_BEC < 3.0   # ≈ measured 5.0e4
-        @test 0.3 < res.T_BEC / d.measured_T_BEC < 3.0   # ≈ measured 349 nK
+        # The endpoint is now a PREDICTION (ab-initio K₃, no fit). Across the universal-vdW K₃ band
+        # [1e-42, 1e-40] m⁶/s the predicted N_BEC spans ~5×10⁴…10⁶ and BRACKETS the measured
+        # 5.02×10⁴, which sits at the high-loss/high-K₃ edge (Eu marginally universal, a/r_vdW≈1.3).
+        hi = run_euv3_evaporation(; K3=1e-40)            # more 3-body ⇒ fewer atoms (band top)
+        lo = run_euv3_evaporation(; K3=1e-42)            # less 3-body ⇒ more atoms (band bottom)
+        @test hi.reached_bec && lo.reached_bec
+        @test hi.N_BEC < lo.N_BEC                                # monotone in K₃
+        @test 0.3 < hi.N_BEC / d.measured_N_BEC < 3.0           # band-edge prediction ≈ measured (3×)
+        @test d.measured_N_BEC < lo.N_BEC                        # low-K₃ end over-predicts ⇒ loss-limited
+        # η_start is physical at the re-anchored T₀=18 µK (was ≈2.1 under the epoch-mixed 50 µK)
+        @test evaporation_summary(run_euv3_evaporation()).eta_start > 4
         # α calibration is self-consistent: build a beam at α, measure ω_r, recover α
         b = GaussianBeam(d.wavelength, 1.2, 42e-6, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
         ωr, _ = beam_frequencies(b, d.alpha, Eu151.mass)

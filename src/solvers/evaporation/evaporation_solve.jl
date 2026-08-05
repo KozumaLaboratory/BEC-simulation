@@ -134,7 +134,7 @@ function run_evaporation(
     function record!(U, ω̄)
         η = U / (Units.KB * T)
         n0 = thermal_peak_density(N, T, ω̄, m)
-        γel = n0 * (8π * p.a_s^2) * sqrt(8 * Units.KB * T / (π * m)) / sqrt(2)
+        γel = n0 * (8π * p.a_s^2) * sqrt(8 * Units.KB * T / (π * m))   # LRW n_pk σ v̄ (no /√2)
         push!(ts, t)
         push!(Ns, N)
         push!(Ts, T)
@@ -164,7 +164,6 @@ function run_evaporation(
         T_new = T + h / 6 * (k1T + 2k2T + 2k3T + k4T)
         N_new = max(N_new, 1.0)
         T_new = max(T_new, 1e-12)
-        # (the η<1 spilling that bounds T at the trap depth is a smooth −γ_el(1−η) term in the RHS)
 
         # BEC-onset crossing on the post-step trap
         ρ_old = phase_space_density(N, T, ω2)

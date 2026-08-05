@@ -8,7 +8,8 @@ using SpinorBEC: Eu151, EvapTrap, EvapParams, FortRamp, run_evaporation,
     optimize_evaporation_ramp, scan_ramp_param, scan_ramp_2d, fit_euv3_K3,
     optimize_euv3_evaporation, run_euv3_evaporation,
     ramp_scale_powers, optimize_ramp_coordinate, optimize_ramp_monotone,
-    param_uncertainty_ensemble
+    param_uncertainty_ensemble,
+    EvapScenario, robustness_scenarios, optimize_ramp_robust, robustness_report
 
 const _as_t = Eu151.a_s
 
@@ -161,6 +162,66 @@ _euv3_ramp_t() = FortRamp(
         for (t, pp) in ens
             @test run_evaporation(t, out.ramp, pp; N0=2e6, T0=40e-6).reached_bec
         end
+    end
+
+    @testset "robustness_scenarios builds the operational-error set" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40)
+        scs = robustness_scenarios(trap, p; N0=2e6, T0=40e-6,
+            power_frac=0.1, imbalance_frac=0.05, T0_frac=0.1, N0_frac=0.1,
+            time_frac=0.05, K3_hi_factor=2.0)
+        @test all(s -> s isa EvapScenario, scs)
+        # power/α −10% ⇒ a shallower trap (lower α); adverse T0 is HOTTER, adverse N0 FEWER
+        pw = only(filter(s -> occursin("power", s.label), scs))
+        @test pw.trap.alpha ≈ trap.alpha * 0.9
+        t0 = only(filter(s -> occursin("T₀", s.label), scs))
+        @test t0.T0 ≈ 40e-6 * 1.1
+        n0 = only(filter(s -> occursin("N₀", s.label), scs))
+        @test n0.N0 ≈ 2e6 * 0.9
+        # imbalance is opposite-signed per beam (aspect-ratio extremes)
+        imb = filter(s -> occursin("imbalance", s.label), scs)
+        @test length(imb) == 2
+        @test imb[1].beam_factor[1] ≈ 1.05 && imb[1].beam_factor[2] ≈ 0.95
+        # enabling nothing ⇒ empty set (nominal is added by the optimizer, not here)
+        @test isempty(robustness_scenarios(trap, p; N0=2e6, T0=40e-6))
+    end
+
+    @testset "optimize_ramp_robust maximizes the worst case" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40)
+        base = _euv3_ramp_t()
+        scs = robustness_scenarios(trap, p; N0=2e6, T0=40e-6,
+            power_frac=0.1, imbalance_frac=0.05, T0_frac=0.1)
+        out = optimize_ramp_robust(trap, p, base; N0=2e6, T0=40e-6, scenarios=scs,
+            n_sweeps=3, n_line=9, restarts=1, seed=2)
+        @test out.result.reached_bec                       # nominal reaches BEC
+        @test out.worst > 1                                # every scenario reaches BEC (worst-case is an N_BEC)
+        # the robust schedule reaches BEC for EVERY scenario, including the perturbed ramp/N0/T0
+        rep = robustness_report(trap, p, out.ramp; N0=2e6, T0=40e-6, scenarios=scs)
+        @test all(r -> r.reached_bec, rep)
+        @test length(rep) == length(scs) + 1               # nominal prepended
+        # worst-case of the report equals the returned worst (to the model's tolerance)
+        @test minimum(r.N_BEC for r in rep) ≈ out.worst rtol = 1e-6
+        # seeded ⇒ deterministic
+        out2 = optimize_ramp_robust(trap, p, base; N0=2e6, T0=40e-6, scenarios=scs,
+            n_sweeps=3, n_line=9, restarts=1, seed=2)
+        @test out.fracs == out2.fracs
+    end
+
+    @testset "robust worst-case ≥ nominal-optimal worst-case" begin
+        trap = _eu_trap_t()
+        p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40)
+        base = _euv3_ramp_t()
+        scs = robustness_scenarios(trap, p; N0=2e6, T0=40e-6, power_frac=0.12, T0_frac=0.1)
+        nom = optimize_ramp_monotone(trap, p, base; N0=2e6, T0=40e-6,
+            n_sweeps=3, n_line=9, restarts=1, seed=2)
+        rob = optimize_ramp_robust(trap, p, base; N0=2e6, T0=40e-6, scenarios=scs,
+            n_sweeps=3, n_line=9, restarts=1, seed=2)
+        # missed BEC ⇒ 0 atoms (NaN in the report), which is ≤ any positive worst-case N_BEC
+        worst_nom = minimum(r -> r.reached_bec ? r.N_BEC : 0.0,
+            robustness_report(trap, p, nom.ramp; N0=2e6, T0=40e-6, scenarios=scs))
+        # robust optimum is never worse than the nominal optimum in the worst case
+        @test rob.worst >= worst_nom - 1.0
     end
 
     @testset "summary exposes eta_start + cooled; N_BEC=NaN when not reached" begin

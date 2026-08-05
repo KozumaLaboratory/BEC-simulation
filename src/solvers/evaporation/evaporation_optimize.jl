@@ -232,7 +232,7 @@ function param_uncertainty_ensemble(
             waists=trap.waists, directions=trap.directions, positions=trap.positions,
             mass=trap.mass, gravity_axis=trap.gravity_axis)
         pp = EvapParams(; a_s=p.a_s, tau_bg=p.tau_bg, K3=p.K3 * kf,
-            kappa=p.kappa, eta_min=p.eta_min)
+            eta_min=p.eta_min, heating_rate=p.heating_rate)
         push!(ens, (t, pp))
     end
     ens
@@ -283,16 +283,22 @@ scaled by their calibration uncertainty — build it with [`param_uncertainty_en
 This trades peak N_BEC for a schedule that does not sit on a cliff. The returned
 `result`/`N_BEC` are still evaluated at the nominal `(trap,p)`.
 """
-function optimize_ramp_monotone(
-    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
-    N0::Float64, T0::Float64, frac_bounds::Tuple{Float64, Float64}=(0.02, 1.0),
-    n_sweeps::Int=10, n_line::Int=21, restarts::Int=8, seed::Int=1,
-    ensemble::Vector{Tuple{EvapTrap, EvapParams}}=Tuple{EvapTrap, EvapParams}[])
+# --- Shared monotone-family coordinate descent -----------------------------
+#
+# The monotone-decreasing FORT family: each beam's breakpoint power is
+# `P[b,i] = P[b,1] · ∏_{k<i} fracs[b,k]`, `fracs ∈ frac_bounds ⊆ (0,1]`. The lab
+# ramp lies in this family (its own per-beam ratios), so warm-starting there means
+# the optimum can only improve. `score_ramp::FortRamp -> Float64` is injected —
+# nominal N_BEC for [`optimize_ramp_monotone`](@ref), worst-case over an operational
+# uncertainty set for [`optimize_ramp_robust`](@ref) — so the search machinery is a
+# single declaration shared by both.
+function _descend_monotone_family(
+    base_ramp::FortRamp, frac_bounds::Tuple{Float64, Float64},
+    n_sweeps::Int, n_line::Int, restarts::Int, seed::Int, score_ramp::Function)
     nbeam, nb = size(base_ramp.powers_W)
     base1 = base_ramp.powers_W[:, 1]
     active = [(b, s) for b in 1:nbeam if base1[b] > 0 for s in 1:(nb - 1)]
     line = collect(range(frac_bounds[1], frac_bounds[2]; length=n_line))
-    members = vcat([(trap, p)], ensemble)   # nominal first; worst-case over all
 
     function mono_ramp(fr::Matrix{Float64})
         pw = copy(base_ramp.powers_W)
@@ -305,17 +311,7 @@ function optimize_ramp_monotone(
         end
         FortRamp(base_ramp.times, pw)
     end
-    # worst-case _ramp_score across the uncertainty ensemble (single nominal member ⇒
-    # the plain objective). A member that misses BEC scores in [−1,0), dragging the min
-    # below any BEC-reaching schedule — so the optimizer first makes ALL members reach BEC.
-    function score(fr)
-        ramp = mono_ramp(fr)
-        worst = Inf
-        for (t, pp) in members
-            worst = min(worst, _ramp_score(t, pp, ramp, N0, T0)[1])
-        end
-        worst
-    end
+    score(fr) = score_ramp(mono_ramp(fr))
 
     function descend(start::Matrix{Float64})
         fr = copy(start)
@@ -351,9 +347,29 @@ function optimize_ramp_monotone(
             sc > best_score && (best_score=sc; best_fracs=fr)
         end
     end
+    (fracs=best_fracs, ramp=mono_ramp(best_fracs), score=best_score)
+end
 
-    best_ramp = mono_ramp(best_fracs)
-    _, best_res = _ramp_score(trap, p, best_ramp, N0, T0)
-    (fracs=best_fracs, ramp=best_ramp, result=best_res,
-        N_BEC=best_res.reached_bec ? best_res.N_BEC : NaN, score=best_score)
+function optimize_ramp_monotone(
+    trap::EvapTrap, p::EvapParams, base_ramp::FortRamp;
+    N0::Float64, T0::Float64, frac_bounds::Tuple{Float64, Float64}=(0.02, 1.0),
+    n_sweeps::Int=10, n_line::Int=21, restarts::Int=8, seed::Int=1,
+    ensemble::Vector{Tuple{EvapTrap, EvapParams}}=Tuple{EvapTrap, EvapParams}[])
+    members = vcat([(trap, p)], ensemble)   # nominal first; worst-case over all
+    # worst-case _ramp_score across the uncertainty ensemble (single nominal member ⇒
+    # the plain objective). A member that misses BEC scores in [−1,0), dragging the min
+    # below any BEC-reaching schedule — so the optimizer first makes ALL members reach BEC.
+    function score_ramp(ramp::FortRamp)
+        worst = Inf
+        for (t, pp) in members
+            worst = min(worst, _ramp_score(t, pp, ramp, N0, T0)[1])
+        end
+        worst
+    end
+    d = _descend_monotone_family(
+        base_ramp, frac_bounds, n_sweeps, n_line, restarts, seed, score_ramp
+    )
+    _, best_res = _ramp_score(trap, p, d.ramp, N0, T0)
+    (fracs=d.fracs, ramp=d.ramp, result=best_res,
+        N_BEC=best_res.reached_bec ? best_res.N_BEC : NaN, score=d.score)
 end

@@ -36,8 +36,8 @@ The thesis states the load-bearing constants directly (the PRL only quotes resul
 | First BEC / optimized | 3×10³ / 1.5×10⁴ atoms (this thesis, earlier than the PRL's 5×10⁴) |
 
 **These confirm the model's independently-derived calibration: α (5.88e-37 ✓), the
-γ_eff efficiency (3.9 vs 3.6 ✓), and the T_c formula. `evap_scale = 1` stands.** The
-PRL (below) is the later, higher-N generation of the same apparatus.
+γ_eff efficiency (3.9 vs 3.6 ✓), and the T_c formula. The LRW rate is parameter-free (no
+free prefactor).** The PRL (below) is the later, higher-N generation of the same apparatus.
 
 ## 2022 — Miyazawa/Matsui et al., PRL 129, 223401 (arXiv:2207.11692)
 
@@ -128,7 +128,7 @@ The 2022 → 2023 change (350 µK → 66 µK at comparable power) shows the trap
 3. **The current ramp** (H/V power vs time).
 4. **The BEC atom number achieved** (fixes K₃).
 
-With these, the parameter-free model (`evap_scale = 1`, 3D Luiten rate) predicts and
+With these, the parameter-free model (exact 3-D LRW rate, no free prefactor) predicts and
 optimizes the *current* evaporation. Optional refinement: `τ_bg` (hold lifetime) and the
 magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
 
@@ -144,8 +144,8 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
 
 ## Validation figures
 
-- `figures/eu_bec_thesis_validation.png` — the parameter-free model (`evap_scale=1`,
-  3D Luiten rate) vs the 2021 thesis: efficiency **γ_eff = 3.63 vs measured 3.6** (0.8 %),
+- `figures/eu_bec_thesis_validation.png` — the parameter-free model (exact 3-D LRW
+  rate) vs the 2021 thesis: efficiency **γ_eff = 3.63 vs measured 3.6** (0.8 %),
   cooling 50 µK → ~210 nK landing on T_c, condensate forming between the first (3×10³)
   and optimized (1.5×10⁴) BEC. The definitive validation — physics is epoch-independent.
 - `figures/eu_all_datasets_fit.png` — the same parameter-free model across all datasets.
@@ -171,7 +171,7 @@ magnetic levitation gradient (sets `EvapTrap.gravity_factor`).
 the others is limited by *missing measured inputs* (ramps, current waists) or an
 out-of-regime geometry (single-beam cigar), both honest and identified — not by tuning.
 
-## Validated physics (2026-06-17) — all parameter-free, no `evap_scale` fudge
+## Validated physics (2026-06-17) — all parameter-free (exact LRW, no free prefactor)
 
 Three corrections turned the model from order-of-magnitude to quantitative, each pinned to
 DIRECT data, none a fit knob:

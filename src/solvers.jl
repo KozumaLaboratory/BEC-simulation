@@ -48,6 +48,7 @@ include("solvers/evaporation/evaporation_model.jl")
 include("solvers/evaporation/evaporation_solve.jl")
 include("solvers/evaporation/condensate.jl")  # two-component thermal+condensate (BEC transition)
 include("solvers/evaporation/evaporation_optimize.jl")
+include("solvers/evaporation/evaporation_robust.jl")  # worst-case ramp over operational-error scenarios
 include("solvers/evaporation/euv3.jl")  # lab FORT calibration + the euv3 evaporation ramp
 include("solvers/evaporation/evaporation_handoff.jl")  # evaporation endpoint → GP trap config
 include("solvers/evaporation/cloud_profile.jl")  # thermal-cloud spatial profile during evaporation

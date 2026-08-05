@@ -1,0 +1,9 @@
+ROBUST EVAPORATION WORKFLOW (thesis-calibrated). Ensemble: K3∈{1e-42,1e-41}×τbg∈{10,30}
+Objective = worst-case pure-BEC N0 over the ensemble.
+
+worst-case pure-BEC N0:
+  lab thesis ramp   : 1.976e+03
+  NOMINAL-opt ramp  : 1.540e+05  (worst-case; tuned only to K3=1e-42)
+  ROBUST-opt ramp   : 2.530e+05  (128.1x lab worst-case)
+
+ROBUST ramp at nominal (K3=1e-42,τ15): N0=2.765e+05 T=0nK cf=1.000 dur=2.2s warp=0.75

@@ -1,0 +1,4 @@
+PURE-BEC-CONSTRAINED opt (thesis-calibrated, K3=1e-42, purity>=0.95)
+LAB thesis ramp: N0=1.452e+04 T=55nK cond_frac=0.985 (pure? YES)
+OPT ramp       : N0=2.186e+05 T=20nK cond_frac=1.000 (pure? YES)
+factor(opt/lab N0)=15.06x
