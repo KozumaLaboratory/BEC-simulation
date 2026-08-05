@@ -119,7 +119,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 234 files
+- `FAST_TESTS` — 235 files
 - `CI_EXTRA` — 89 files
 - `FULL_EXTRA` — 33 files
 - `PHYSICS_TESTS` — 7 files

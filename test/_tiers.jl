@@ -18,6 +18,7 @@ const FAST_TESTS = [
     "test_docs_live_set.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
+    "test_claude_md_citations_resolve.jl",
     # A3:R-DOC-01 asked for a CHECK; the design docs must stay terminal-readable.
     "test_design_docs_have_no_latex.jl",
     "test_level1_scalar_exact.jl",
