@@ -32,6 +32,15 @@ if [ "$(git status --porcelain | wc -l)" -ne 0 ]; then
     git status --porcelain | head -10
     exit 1
 fi
+# Validate the mode string BEFORE reserving the node's time. 48 shards once died
+# on the first line because c1 was passed as -6.4e-5 and the parser accepted only
+# [0-9.], and the 20-hour reservations were already made.
+MODE_PROBE="spin11of::::"
+if ! "" --project=. docs/guides/figures/kz_toroidal_winding.jl --check-mode ""; then
+    echo "[kzspin1] FAIL: mode string rejected: "
+    exit 1
+fi
+
 pids=""
 for i in $(seq 1 $NSHARD); do
     "$JULIA" --project=. docs/guides/figures/kz_toroidal_winding.jl \

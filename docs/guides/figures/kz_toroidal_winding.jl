@@ -420,6 +420,26 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     mode = get(ARGS, 1, "smoke")
+    # Parse-only. A typo in a mode string used to cost a 20-hour reservation that
+    # died on its first line — 48 shards did exactly that on `-6.4e-5`, which the
+    # spin1 parser rejected because it accepted only `[0-9.]`. Nothing else looks at
+    # a mode string: CI was green and the submit script's dirty check passed. Every
+    # submit script now calls this before qsub, so the cost of a typo is a second.
+    if mode == "--check-mode"
+        want = get(ARGS, 2, "")
+        pats = (
+            r"^spin1\d+of\d+:-?[-+0-9.eE]+:(nd|full):\d+:(mass|spin|m)$",
+            r"^gam\d+of\d+:[0-9.]+:(nd|full):\d+(:L[0-9.]+)?$",
+            r"^shard\d+of\d+:(nd|full):\d+$",
+            r"^slow\d+of\d+:(nd|full):\d+$",
+            r"^merge:\S+$",
+            r"^(smoke|conv|freeze|size|hold|dtconv)$",
+            r"^(xi|kcut|rate|physq)[0-9._]+$",
+        )
+        ok = any(!isnothing(match(r, want)) for r in pats)
+        println(ok ? "OK $want" : "REJECT $want")
+        exit(ok ? 0 : 1)
+    end
     backend = get(ENV, "SBEC_KZ_BACKEND", "cpu") == "gpu" ? CUDABackend() : CPUBackend()
     if mode == "smoke"
         # Every code path, smallest ensemble, two shortest quenches. NOT physics.
