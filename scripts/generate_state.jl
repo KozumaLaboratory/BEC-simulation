@@ -146,6 +146,23 @@ function ham_terms()
     rows
 end
 
+"The one expression in `src/` that combines `g_F` with the Bohr magneton."
+function sign_declaration()
+    hits = String[]
+    for (root, _, files) in walkdir(joinpath(ROOT, "src"))
+        for f in files
+            endswith(f, ".jl") || continue
+            path = joinpath(root, f)
+            for (n, l) in enumerate(eachline(path))
+                occursin("BOHR_MAGNETON", l) && occursin(r"\bg_F\b", l) &&
+                    !startswith(strip(l), "#") &&
+                    push!(hits, relpath(path, ROOT) * ":" * string(n))
+            end
+        end
+    end
+    hits
+end
+
 "Every function that turns a lab magnetic field into the dimensionless `p`."
 function bfield_converters()
     hits = String[]
@@ -371,20 +388,20 @@ function render()
     p()
 
     conv = bfield_converters()
-    assert_nondegenerate("B → p sites", length(conv) >= 8,
-        "found $(length(conv)) references to `bfield_to_p`; there were 20 on 2026-08-05 " *
-        "and the declaration file alone accounts for 8")
-    p("## The B → p sign: every site that touches it")
+    decl = sign_declaration()
+    assert_nondegenerate("B → p declaration", length(decl) == 1 && length(conv) >= 8,
+        "$(length(decl)) expressions compute the sign (must be exactly 1) and " *
+        "$(length(conv)) references to `bfield_to_p` (there were 20 on 2026-08-05)")
+    p("## The B → p sign")
     p()
-    p("`Units.bfield_to_p` is the ONE declaration (`p ≡ -g_F μ_B B`, Kawaguchi-Ueda).")
-    p("**$(length(conv)) references** across the tree; every one other than the")
-    p("declaration itself must delegate. `CLAUDE.md` said \"the 3 sibling converters\"")
-    p("until 2026-08-05, and a stale count is how a wrong-sign converter survived")
-    p("two months — so this list is generated, not typed.")
-    p()
-    for h in conv
-        p("- `$h`")
-    end
+    p("Declared **once**, at `$(only(decl))`, as `p ≡ -g_F μ_B B` (Kawaguchi-Ueda);")
+    p("$(length(conv)) other references delegate to it. **The uniqueness is a GATE, not a")
+    p("list** — `test/oracles/test_bfield_sign_declared_once.jl` fails if a second")
+    p("expression in `src/` combines `g_F` with the Bohr magneton. This section used to")
+    p("enumerate all $(length(conv)) sites; a derived list cannot rot but only describes,")
+    p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
+    p("sign for two months because eight test files checked the VALUE and none checked")
+    p("that there was only one of them.")
     p()
 
     top, steps = schema_surface()

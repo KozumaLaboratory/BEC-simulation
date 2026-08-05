@@ -61,34 +61,16 @@ Each declares its sign in one coefficient function in the file named.
 | 13 | `spatial_zeeman` | `SpatialZeemanTerm` | `src/hamiltonian/terms/spatial_zeeman.jl:21` |
 | 14 | `loss` | `LossTerm` | `src/hamiltonian/terms/loss.jl:210` |
 
-## The B → p sign: every site that touches it
+## The B → p sign
 
-`Units.bfield_to_p` is the ONE declaration (`p ≡ -g_F μ_B B`, Kawaguchi-Ueda).
-**20 references** across the tree; every one other than the
-declaration itself must delegate. `CLAUDE.md` said "the 3 sibling converters"
-until 2026-08-05, and a stale count is how a wrong-sign converter survived
-two months — so this list is generated, not typed.
-
-- `src/foundation/types/preset.jl:66`
-- `src/hamiltonian/coefficients.jl:347`
-- `src/hamiltonian/coefficients.jl:351`
-- `src/hamiltonian/coefficients.jl:352`
-- `src/hamiltonian/coefficients.jl:359`
-- `src/hamiltonian/coefficients.jl:377`
-- `src/workflow/experiments/runtime/b_block_builders.jl:102`
-- `src/workflow/experiments/runtime/b_block_builders.jl:106`
-- `src/workflow/experiments/runtime/b_block_builders.jl:110`
-- `src/workflow/experiments/runtime/b_block_builders.jl:132`
-- `src/workflow/experiments/schema/parsing_units.jl:33`
-- `src/workflow/experiments/schema/parsing_units.jl:39`
-- `src/workflow/io/units.jl:52`
-- `src/workflow/io/units.jl:69`
-- `src/workflow/io/units.jl:71`
-- `src/workflow/io/units.jl:76`
-- `src/workflow/io/units.jl:89`
-- `src/workflow/io/units.jl:90`
-- `src/workflow/io/units.jl:94`
-- `src/workflow/io/units.jl:95`
+Declared **once**, at `src/workflow/io/units.jl:73`, as `p ≡ -g_F μ_B B` (Kawaguchi-Ueda);
+20 other references delegate to it. **The uniqueness is a GATE, not a
+list** — `test/oracles/test_bfield_sign_declared_once.jl` fails if a second
+expression in `src/` combines `g_F` with the Bohr magneton. This section used to
+enumerate all 20 sites; a derived list cannot rot but only describes,
+whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
+sign for two months because eight test files checked the VALUE and none checked
+that there was only one of them.
 
 ## YAML surface
 
@@ -120,7 +102,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
 - `FAST_TESTS` — 237 files
-- `CI_EXTRA` — 89 files
+- `CI_EXTRA` — 90 files
 - `FULL_EXTRA` — 33 files
 - `PHYSICS_TESTS` — 7 files
 

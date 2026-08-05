@@ -468,6 +468,7 @@ const CI_EXTRA = [
     # Each test runs in seconds; CI tier inclusion gates the bug class
     # documented in `docs/conventions/sign_bug_proof_architecture.md`.
     "oracles/test_hamiltonian_sign_oracles.jl",
+    "oracles/test_bfield_sign_declared_once.jl",
     "oracles/test_hamiltonian_hermiticity.jl",
     "oracles/test_kinetic_trap_analytic.jl",
     "oracles/test_zeeman_diagonal_analytic.jl",

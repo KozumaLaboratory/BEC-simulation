@@ -59,6 +59,10 @@ end
         # vanished would read as complete, which is the failure the staleness
         # comparison cannot see: committed == derived is satisfied by two copies
         # that have BOTH narrowed.
+        # The B → p section must state the PROPERTY, not enumerate sites. A
+        # derived list cannot rot but only describes; the gate refuses.
+        @test occursin("Declared **once**", derived)
+        @test occursin("test_bfield_sign_declared_once.jl", derived)
         @test occursin("## What this document does NOT cover", derived)
         @test occursin("**Covered:**", derived)
         @test occursin("**Not covered:**", derived)
