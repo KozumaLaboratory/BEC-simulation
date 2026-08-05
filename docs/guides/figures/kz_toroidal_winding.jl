@@ -109,6 +109,48 @@ function ideal_torus_Tc(; L::Float64=KZ_L, g1::Float64=KZ_G1, mu0::Float64=KZ_MU
 end
 
 """
+    winding_of(field) -> Float64
+
+`W = θ_c/2π` for one complex field on a ring, from the WRAPPED phase increments.
+"""
+function winding_of(ψ::AbstractVector{<:Complex})
+    n = length(ψ)
+    θ = 0.0
+    for j in 1:n
+        d = angle(ψ[mod1(j + 1, n)]) - angle(ψ[j])
+        θ += d - 2π * round(d / (2π))
+    end
+    θ / (2π)
+end
+
+"""
+    spinor_windings(psi, grid) -> (; per_m, mass, spin)
+
+Every winding a spin-1 ring admits, reported together rather than one chosen in
+advance:
+
+- `per_m[c]` — the phase winding of component `c`.
+- `mass` — the winding of `Σ_c ψ_c`.
+- `spin` — the winding of the transverse spin `ψ_{+1}*ψ_0 + ψ_0*ψ_{−1}`, the order
+  parameter a ferromagnetic ring winds in, invariant under a global phase.
+
+Which of these carries the Kibble-Zurek scaling is a measurement, not a choice: a
+spin rotation mixes the `m` components and changes `per_m`, mass winding misses a
+spin defect, and the topological classification depends on the sign of `c₁`, which
+for ¹⁵¹Eu is unknown. Reporting one number here would bake in an assumption of
+exactly the kind that produced this branch's retracted results.
+"""
+function spinor_windings(psi::AbstractArray{<:Complex}, ::Grid{1})
+    D = size(psi, 2)
+    per_m = [winding_of(@view psi[:, c]) for c in 1:D]
+    mass = winding_of(vec(sum(psi; dims=2)))
+    spin = D == 3 ?
+           winding_of(@views conj.(psi[:, 1]) .* psi[:, 2] .+
+                             conj.(psi[:, 2]) .* psi[:, 3]) : NaN
+    (; per_m, mass, spin)
+end
+
+"""
     winding_number(psi, grid) -> Float64
 
 `W = θ_c/2π`, the phase accumulated around the ring. Summing the *wrapped*
@@ -143,17 +185,24 @@ function kz_trajectory_torus(;
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
     t_hold::Float64=NaN, n_probe::Int=0, L::Float64=KZ_L,
+    spinor::Bool=false, c1::Float64=0.0, atom=KZ_ATOM,
 )
     grid = make_grid(GridConfig((M_grid,), (L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
-    ws = make_workspace(; grid, atom=KZ_ATOM,
-        interactions=InteractionParams(Dict{Int, Float64}(0 => KZ_G1)),
+    ws = make_workspace(; grid, atom,
+        interactions=InteractionParams(
+            spinor ? Dict{Int, Float64}(0 => KZ_G1, 1 => c1) :
+            Dict{Int, Float64}(0 => KZ_G1)),
         potential=HarmonicTrap{1}((0.0,)),      # ring: no confinement along it
         sim_params=sp, backend, fft_flags=FFTW.ESTIMATE)
-    size(ws.state.psi, 2) == 1 || error(
-        "kz_toroidal_winding is a SCALAR reproduction and the field has " *
-        "$(size(ws.state.psi, 2)) components; reservoir noise would populate the " *
+    # Reservoir noise fills EVERY component, so on an F=1 species a scalar run's
+    # empty spin channels thermalise and shift the effective μ through c₀n — a live
+    # bug that showed as non-integer windings (2.25). A spinor run wants those
+    # components and says so with `spinor=true`.
+    spinor || size(ws.state.psi, 2) == 1 || error(
+        "kz_toroidal_winding without spinor=true is a SCALAR reproduction and the " *
+        "field has $(size(ws.state.psi, 2)) components; noise would " *
         "spin channels and shift mu through c0*n.")
     seed_device_rng!(backend, seed)
     fill!(ws.state.psi, 0)
@@ -218,8 +267,11 @@ function kz_trajectory_torus(;
     hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
     rr, g1 = first_order_correlation(psi, grid, hplans)
     cl = coherence_length(rr, g1)
+    sw = spinor_windings(psi, grid)
+    pops = [real(sum(abs2, view(psi, :, c))) * dV for c in 1:size(psi, 2)]
     (; W=winding_number(psi, grid), N_final=real(sum(abs2, psi)) * dV, N_equil,
         xi_hat=cl.xi, f_inf=cl.f_inf, probe_t, probe_N0,
+        W_per_m=sw.per_m, W_mass=sw.mass, W_spin=sw.spin, pops,
         t_total=1000.0 + 2tau_Q + t_hold)
 end
 
@@ -275,7 +327,14 @@ function kz_winding_scan(;
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
                 T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L)
-            push!(Ws, r.W);
+            # For a spinor, WHICH winding scales is the question, so the choice is
+            # explicit and the others go on the record rather than being discarded.
+            push!(Ws, which_W === :mass ? r.W_mass :
+                      which_W === :spin ? r.W_spin : r.W)
+            spinor && j == shard[1] && @printf(
+                "    [tau=%.0f seed1] per_m=%s mass=%.2f spin=%.2f pops=%s\n",
+                τ, string(round.(r.W_per_m; digits=2)), r.W_mass, r.W_spin,
+                string(round.(r.pops; sigdigits=3)))
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
         end
