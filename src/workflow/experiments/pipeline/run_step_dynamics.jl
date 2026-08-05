@@ -379,6 +379,12 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
+    # `spin_step:` picks how the V half-step realizes its spin rotations.
+    # Scoped to this step and restored afterwards, so one dynamics phase
+    # choosing `combined` cannot leak the splitting into the next phase or into
+    # another config sharing the session (same discipline as `dealias:`).
+    spin_step_prev = COMBINED_SPIN_STEP_ENABLED[]
+    COMBINED_SPIN_STEP_ENABLED[] = _parse_spin_step(get(p, "spin_step", nothing))
     # Cutover step 2, invariant 4: the RTP loops swallow `InterruptException`
     # exactly as the ITP does (`simulation/run_loops.jl:51`, `:207`) — they
     # record a final snapshot, print, and return normally, so a killed dynamics
@@ -386,13 +392,19 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     # cover it either: there is no GS step in a dynamics-only pipeline, so
     # `run_registry.jl` records `converged = true` unconditionally. This Ref is
     # the only signal, and it is what withholds the completion marker.
+    # Declared OUTSIDE the try: a Julia `try` body is its own local scope, so an
+    # assignment in there would not survive to the caller below.
     rtp_interrupted = Ref(false)
-    result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
-        ws, save_psi_snap, save_compress, snap_precision_cf;
-        extra_on_step=extra_cb,
-        stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
-        interrupted=rtp_interrupted,
-    )
+    result, snap_tmp_path, snap_count = try
+        _run_dynamics_with_optional_streaming!(
+            ws, save_psi_snap, save_compress, snap_precision_cf;
+            extra_on_step=extra_cb,
+            stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
+            interrupted=rtp_interrupted,
+        )
+    finally
+        COMBINED_SPIN_STEP_ENABLED[] = spin_step_prev
+    end
 
     if verbose
         println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
@@ -542,4 +554,39 @@ function _run_dynamics_with_optional_streaming!(
     end
 
     return (result, snap_tmp, frame_count[])
+end
+
+"""
+    _parse_spin_step(v) -> Bool
+
+`dynamics.spin_step:` — how the V half-step realizes its spin rotations.
+
+    "sequential"  (default)  SM(dt/4) · DDI(dt/2) · SM(dt/4), three rotations
+    "combined"               exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂), one rotation
+
+Both are O(dt²) and share a continuum limit; they differ at O(dt³) because the
+combined form carries no [SM,[SM,DDI]] commutator error. Against `sequential`
+`combined` measured 1.71× faster per step on H100 at 128³ × D=13 with DDI —
+29.99 → 17.51 ms/step (bench/rtp_gpu_ab.jl; table in
+docs/reference/dynamics.md). That bench's own `sp(comb)` column reads 2.84×
+because every column there is against the 5-stage Euler kernel, which this
+knob cannot select: `sequential` already uses the shared Taylor-Horner
+rotation (`_SPIN_TAYLOR_ENABLED` defaults to true), so 2.84× would credit
+this knob with a win `sequential` has too.
+
+It is not the default because the difference is real: a run switching to it
+will not reproduce a previous run's numbers bitwise. The selector silently
+keeps `sequential` for any workspace the combined form cannot represent
+(c₂ ≠ 0, tensor channels, Raman, light shift, spatial or tilted field, padded
+or absent DDI) — see `_rtp_use_combined_step`.
+"""
+function _parse_spin_step(v)
+    v === nothing && return false
+    s = lowercase(String(v))
+    s == "sequential" && return false
+    s == "combined" && return true
+    throw(
+        ArgumentError(
+            "dynamics.spin_step must be \"sequential\" or \"combined\"; got $(repr(v))"),
+    )
 end

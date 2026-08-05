@@ -9,6 +9,47 @@ Every key accepted under a YAML `dynamics:` step. Multiple knobs that return `on
 | `duration`| Float      | total simulated time (in `ω_ref⁻¹`)              |
 | `dt`      | Float      | time step (Strang split-step)                    |
 
+## Spin-step splitting — `spin_step:`
+
+| value          | V half-step                                                        |
+|----------------|--------------------------------------------------------------------|
+| `"sequential"` | (default) `diag · SM(dt/4) · DDI(dt/2) · SM(dt/4) · diag`            |
+| `"combined"`   | `diag · exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂) · diag`                        |
+
+The spin-mixing and DDI substeps are the same operator `exp(-i dt (v·F̂))` with
+different `v`, so they can be applied as one rotation instead of three. Both
+splittings are $O(dt^2)$ and converge to the same continuum limit; they differ
+at $O(dt^3)$, the combined form carrying no $[\mathrm{SM},[\mathrm{SM},
+\mathrm{DDI}]]$ commutator error.
+
+Measured on one H100, ¹⁵¹Eu F=6 (D=13), F64, DDI + c₀ + c₁, midpoint on
+(`bench/rtp_gpu_ab.jl`, same process / same initial ψ for every arm):
+
+| grid | sequential | combined | |
+|------|-----------:|---------:|--:|
+| 64³  |  4.40 ms/step | 2.58 ms/step | 1.70× |
+| 128³ | 29.99 ms/step | 17.51 ms/step | 1.71× |
+
+The `sequential` column is the shipping default, i.e. with the shared
+Taylor-Horner rotation (`_SPIN_TAYLOR_ENABLED` defaults to `true`), so these
+ratios are what choosing `combined` actually buys you. The bench prints a third
+arm and two speedup columns of its own, both against the 5-stage Euler kernel —
+at 128³ its `sp(comb)` reads 2.84×. Do not quote that against `spin_step:`:
+Euler is not selectable through this key, and the extra factor is the Taylor
+rotation, which `sequential` already has.
+
+`combined` is **not** the default: switching a run to it changes its numbers at
+$O(dt^3)$, so an existing result will not reproduce bitwise. Pick it
+deliberately, and do not mix it with `sequential` across phases of one study.
+
+The selector silently keeps `sequential` for any workspace the combined form
+cannot represent — `c₂ ≠ 0`, tensor channels, Raman, light shift, a spatial or
+**tilted** field, and padded or absent DDI. (A tilted field is excluded because
+the combined step folds only the linear `-(b⊥·F̂)` into the rotation and leaves a
+lab-`z` `q F_z²` in the diagonal step, while the sequential path applies the
+whole tilted Zeeman as one eigen-exact matrix; those agree only for an axial
+field or `q = 0`.)
+
 ## Output cadence
 
 | key                          | type     | default | meaning                                   |

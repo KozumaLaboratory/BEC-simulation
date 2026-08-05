@@ -70,6 +70,31 @@ end
     end
 end
 
+@testset "dynamics.spin_step: parsing" begin
+    @test SpinorBEC._parse_spin_step(nothing) == false      # default: sequential
+    @test SpinorBEC._parse_spin_step("sequential") == false
+    @test SpinorBEC._parse_spin_step("combined") == true
+    @test SpinorBEC._parse_spin_step("COMBINED") == true
+    # A typo must not silently fall back to the default splitting.
+    @test_throws ArgumentError SpinorBEC._parse_spin_step("combine")
+    @test_throws ArgumentError SpinorBEC._parse_spin_step("yoshida")
+
+    # The schema accepts it on a dynamics step, and rejects a bad value there
+    # rather than at run time.
+    cfg = Dict{String, Any}(
+        "pipeline" => [
+            Dict{String, Any}(
+                "dynamics" => Dict{String, Any}(
+                    "duration" => 0.01, "dt" => 1.0e-3, "spin_step" => "combined"),
+            ),
+        ],
+    )
+    @test (SpinorBEC.validate_pipeline!(deepcopy(cfg)); true)
+    bad = deepcopy(cfg)
+    bad["pipeline"][1]["dynamics"]["spin_step"] = "combine"
+    @test_throws Exception SpinorBEC.validate_pipeline!(bad)
+end
+
 @testset "combined vs sequential: same solution, converging in dt" begin
     old = COMBINED_SPIN_STEP_ENABLED[]
     # Same physical duration at each dt, so the comparison is of the SOLUTION
