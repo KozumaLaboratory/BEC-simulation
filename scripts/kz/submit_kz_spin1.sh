@@ -32,17 +32,24 @@ if [ "$(git status --porcelain | wc -l)" -ne 0 ]; then
     git status --porcelain | head -10
     exit 1
 fi
-# Validate the mode string BEFORE reserving the node's time. 48 shards once
-# died on their first line because c1 was passed as -6.4e-5 and the parser
-# accepted only [0-9.], with three 20-hour reservations already made. Nothing
-# else reads a mode string: CI was green, the dirty check passed, the remote was
-# verified at the pushed SHA.
-MODE_PROBE="spin11of${NSHARD}:${C1}:${MD}:${NTRAJ}:${W}"
-if ! "$JULIA" --project=. docs/guides/figures/kz_toroidal_winding.jl \
-        --check-mode "$MODE_PROBE"; then
-    echo "[kzspin1] FAIL: mode string rejected: $MODE_PROBE"
+# Smoke the REAL dispatch before reserving the node: one trajectory, one rate, the
+# same mode string modulo n_traj. If the branch does not exist, or its regex rejects
+# the arguments, or a kwarg is missing, this fails here in a minute instead of after
+# a 20-hour reservation — which is what happened three times, 144 shards, because
+# the spin1 branch had never been added and nothing executed it to find out.
+#
+# It must be the dispatch itself. The previous guard kept its own table of regexes
+# and answered OK for a mode with no implementation behind it: a check written in a
+# different vocabulary from the thing it checks cannot see that thing missing.
+SMOKE_MODE="spin11of${NSHARD}:${C1}:${MD}:1:${W}"
+echo "[kzspin1] smoking the dispatch: $SMOKE_MODE"
+if ! SPINORBEC_FIGS_ROOT="$OUT/_smoke" timeout 3600 "$JULIA" --project=. \
+        docs/guides/figures/kz_toroidal_winding.jl "$SMOKE_MODE" > "$OUT/_smoke.log" 2>&1; then
+    echo "[kzspin1] FAIL: the dispatch could not run $SMOKE_MODE"
+    tail -25 "$OUT/_smoke.log"
     exit 1
 fi
+echo "[kzspin1] dispatch OK"
 
 pids=""
 for i in $(seq 1 $NSHARD); do
