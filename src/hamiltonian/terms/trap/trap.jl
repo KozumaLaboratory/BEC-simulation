@@ -92,10 +92,10 @@ end
 Add V_trap(r)·ψ contribution to `grad`. Body used by `energy_gradient!`.
 """
 function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
-    end
+    # Whole-array broadcast (V over the component axis): one GPU kernel instead
+    # of D per-component launches. Bit-identical; zero-alloc on CPU.
+    V_bc = reshape(ws.potential_values, size(ws.potential_values)..., 1)
+    grad .+= V_bc .* psi
     nothing
 end
 
