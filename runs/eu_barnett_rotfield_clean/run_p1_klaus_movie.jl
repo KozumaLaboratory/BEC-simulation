@@ -49,6 +49,7 @@ const SAVE_EVERY = parse(Int, get(ENV, "P1_SAVE_EVERY", SMOKE ? "100" : "300"))
 const TAG = get(ENV, "P1_TAG", "movie1")
 # Far-field TOF is t-independent in SHAPE (cloud and hole both scale with t),
 # so this only sets the axis scale of the stored image.
+const DYN_DT = parse(Float64, get(ENV, "P1_DT", "0.0004"))
 const TOF_T = parse(Float64, get(ENV, "P1_TOF_T", "8.0"))
 const TOF_STEPS = parse(Int, get(ENV, "P1_TOF_STEPS", "25"))
 # TOF costs ~6 s/frame at 64^3 even at n_steps=25, so it runs on a stride while
@@ -103,7 +104,7 @@ pipeline:
       tol: 1.0e-9
   - dynamics:
       duration: $DUR
-      dt: 0.0004
+      dt: $DYN_DT
       ddi: {secular: false}
       B:
         Bz: 0.0
@@ -245,6 +246,7 @@ function _reduce_impl(pj, Om, tag, outjld)
         o["tof_t"] = TOF_T
         o["tof_frames"] = tof_frames
         o["tof_every"] = TOF_EVERY
+        o["dyn_dt"] = DYN_DT
         o["dk"] = [grid.dk[1], grid.dk[2]]
         o["times"] = times
         o["AR"] = ar_t

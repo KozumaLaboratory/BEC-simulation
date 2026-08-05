@@ -8,8 +8,12 @@ One row per stirring rate, columns:
      AR = 1.45 before any stirring: that is the deformation, not the stir.)
      The instantaneous field direction is drawn as a short bar; the ellipse
      LAGGING it is the Klaus signature.
-  2. mid-plane total density — vortex cores as holes, ringed (not covered) by
-     open circles: white +1, cyan -1.
+  2. TOF image — the expanded density, which is where a vortex core is actually
+     visible. In situ the core is xi = 0.17 against dx = 0.25-0.75 and never
+     resolves (measured core/peak 0.63, a dimple); after co-expanding-frame
+     expansion to t_tof = 8 the same core reads 0.016, a black hole. Holes are
+     detected HERE, at render time, so the criterion can be re-asked without
+     re-running the physics.
   3. side view n(x,z) — the pancake trap, for shape context.
   4. history: AR, |lag|, L_z, vortex count, with a time cursor.
 
@@ -40,10 +44,12 @@ SECONDS = float(os.environ.get("SECONDS", "8"))
 DPI = int(os.environ.get("DPI", "120"))
 STRICT = float(os.environ.get("STRICT", "0.25"))
 
-TAGS = ["O0p40", "O0p74", "O0p85"]
+TAGS = os.environ.get("TAGS", "O0p55,O0p65,O0p74,O0p85").split(",")
+PREFIX = os.environ.get("PREFIX", "p1mov_tofscan_")
+HOLE = float(os.environ.get("HOLE", "0.25"))   # hole if below this x local ring
 arms = {}
 for tag in TAGS:
-    p = os.path.join(H, f"p1mov_{tag}.jld2")
+    p = os.path.join(H, f"{PREFIX}{tag}.jld2")
     if not os.path.isfile(p):
         sys.exit(f"missing {p} — run run_p1_klaus_movie.jl first")
     arms[tag] = h5py.File(p, "r")
@@ -57,6 +63,9 @@ n_frames = max(int(np.asarray(arms[t]["n_frames"])) for t in TAGS)
 times = np.linspace(t0, t1, n_frames)
 # index of the nearest saved frame per arm, per movie time
 near = {tag: np.abs(arm_t[tag][None, :] - times[:, None]).argmin(axis=1) for tag in TAGS}
+tof_keys = {tag: np.array(sorted(int(k[4:]) for k in arms[tag].keys()
+                                 if k.startswith("tof_") and k[4:].isdigit()))
+            for tag in TAGS}
 box = np.asarray(arms[TAGS[0]]["box"], dtype=float)
 ext = [-box[0] / 2, box[0] / 2, -box[1] / 2, box[1] / 2]
 ext_side = [-box[0] / 2, box[0] / 2, -box[2] / 2, box[2] / 2]
@@ -111,7 +120,7 @@ for r, tag in enumerate(TAGS):
     (fbar[tag],) = a.plot([], [], "-", color="lime", lw=2.0)
 
     a = ax[r, 1]
-    ims[(tag, "nmid")] = a.imshow(rd(tag, "nmid", 0), origin="lower", extent=ext,
+    ims[(tag, "nmid")] = a.imshow(tof_of(tag, 0), origin="lower",
                                   cmap="viridis", aspect="equal")
     titles[(tag, "nmid")] = a.set_title("", fontsize=9)
     a.set_xticks([]); a.set_yticks([])
@@ -141,6 +150,53 @@ for r, tag in enumerate(TAGS):
 sup = fig.suptitle("", fontsize=12)
 
 
+def tof_of(tag, i):
+    """Nearest STORED TOF frame (they are written on a stride)."""
+    j = int(near[tag][i]) + 1
+    ks = tof_keys[tag]
+    k = ks[np.abs(ks - j).argmin()]
+    return np.asarray(arms[tag][f"tof_{k:05d}"])
+
+
+def _box_blur(a, k=5):
+    """Uniform filter, numpy only (scipy is not installed here)."""
+    pad = k // 2
+    b = np.pad(a, pad, mode="edge")
+    c = np.cumsum(np.cumsum(b, axis=0), axis=1)
+    c = np.pad(c, ((1, 0), (1, 0)))
+    n0, n1 = a.shape
+    out = (c[k:k + n0, k:k + n1] - c[0:n0, k:k + n1]
+           - c[k:k + n0, 0:n1] + c[0:n0, 0:n1])
+    return out / (k * k)
+
+
+def find_holes(img, frac):
+    """Local minima sitting well below their surroundings, inside the cloud.
+
+    Done at render time rather than in the driver so the criterion stays
+    adjustable without re-running the physics. Greedy peak-picking with
+    suppression rather than connected components — no scipy here.
+    """
+    pk = img.max()
+    if pk <= 0:
+        return [], []
+    smooth = _box_blur(img, 5)
+    depth = np.where((img < frac * smooth) & (img > 0) & (smooth > 0.15 * pk),
+                     1.0 - img / np.maximum(smooth, 1e-30), 0.0)
+    ny, nx = img.shape
+    ys, xs = [], []
+    d = depth.copy()
+    for _ in range(40):
+        i = int(d.argmax())
+        if d.flat[i] <= 0:
+            break
+        r, c = divmod(i, nx)
+        ys.append((r / ny - 0.5) * 2)
+        xs.append((c / nx - 0.5) * 2)
+        d[max(0, r - 3):r + 4, max(0, c - 3):c + 4] = 0.0
+    return ys, xs
+
+
 def phys(v, npix, L):
     return (v / npix - 0.5) * L
 
@@ -160,21 +216,15 @@ def draw(k):
         fbar[tag].set_data([-L * np.cos(fa), L * np.cos(fa)],
                            [-L * np.sin(fa), L * np.sin(fa)])
 
-        mid = rd(tag, "nmid", i)
-        ims[(tag, "nmid")].set_data(mid)
-        ims[(tag, "nmid")].set_clim(0, max(mid.max(), 1e-30))
-        vx, vy, vq, vw = (rd(tag, s, i) for s in ("vx", "vy", "vq", "vw"))
-        keep = np.abs(vw - vq) < STRICT if len(vq) else np.zeros(0, bool)
-        # `mid` reads as [iy, ix] (see the orientation note), so Julia's x index
-        # maps to COLUMNS and y to rows.
-        px = phys(vx, mid.shape[1], box[0])
-        py = phys(vy, mid.shape[0], box[1])
+        tof = tof_of(tag, i)
+        ims[(tag, "nmid")].set_data(tof)
+        ims[(tag, "nmid")].set_clim(0, max(tof.max(), 1e-30))
+        hy, hx = find_holes(tof, HOLE)
         p, n = marks[tag]
-        p.set_data(px[keep & (vq > 0)], py[keep & (vq > 0)])
-        n.set_data(px[keep & (vq < 0)], py[keep & (vq < 0)])
+        p.set_data(hx, hy)
+        n.set_data([], [])
         titles[(tag, "nmid")].set_text(
-            f"mid-plane total — {int(keep.sum())} vortices "
-            f"(net {int(vq[keep].sum()) if keep.any() else 0:+d})")
+            f"TOF (t={float(np.asarray(arms[tag]['tof_t'])):.0f}) — {len(hx)} holes")
 
         side = rd(tag, "side", i)
         ims[(tag, "side")].set_data(side)
