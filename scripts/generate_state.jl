@@ -21,9 +21,24 @@
 #     cheaper than making them true. That is the correct move and it is also an
 #     admission: nothing states the current state.
 #
-# A hand-written "current state" document is exactly the artifact that cannot be
-# maintained, because writing it requires the knowledge nobody has. So this file
-# does not write one. **It derives one.** Every section below names the code it
+# THIS IS SSoT, APPLIED ONE LEVEL UP
+#
+# The repository already had Single Source of Truth, and it held. Measured
+# 2026-08-05: exactly ONE line computes the B->p sign (`units.jl:73`) and all 20
+# references delegate; `_outer_operators_fwd!` is the only definition of the
+# substep chain. Not one VALUE was duplicated.
+#
+# What rotted was every DESCRIPTION of those values — "the 3 sibling converters"
+# (four files, seven sites), the comment twenty lines above the function listing
+# seven of its nine substeps, the same list in CLAUDE.md. SSoT says *one place
+# defines it*. It does not say *every other mention must be generated from that
+# place* — and a mention is a copy whether or not anyone calls it one. Prose is
+# where SSoT quietly stops applying, and prose is what a reader actually reads.
+#
+# So: a hand-written "current state" document is exactly the artifact that cannot
+# be maintained, because writing it requires the knowledge nobody has. This file
+# does not write one. **It derives one** — SSoT extended from the declaration to
+# the description. Every section below names the code it
 # reads. Regenerating costs one command, and `--check` makes a stale copy a test
 # failure rather than a thing a future session discovers by being misled.
 #
@@ -235,6 +250,59 @@ function limit_markers()
     sort(rows; by=r -> -r[2])
 end
 
+
+
+"""
+Which parts of `src/` this document says anything about, and which it does not.
+
+The staleness gate cannot see the second way a generated document goes wrong: a
+new subsystem appears, nobody teaches the generator to derive it, and STATE.md
+stays green while being INCOMPLETE about a file titled "what this system is".
+Incompleteness that is invisible reads as absence — "STATE.md does not mention
+it, so it must not exist".
+
+So the gap is derived too. A directory listed as not-covered is not a bug; it is
+an honest statement that this document is silent about it, and the place to look
+is the code. What would be a bug is the list disappearing.
+"""
+function coverage(rendered)
+    dirs = sort([d for d in readdir(joinpath(ROOT, "src"))
+                 if isdir(joinpath(ROOT, "src", d))])
+    [(d, occursin("src/$d/", rendered)) for d in dirs]
+end
+
+# ---------------------------------------------------------------- self-checks
+#
+# The staleness gate compares the committed document against a fresh derivation.
+# That catches "the code moved and the document did not". It does NOT catch the
+# opposite and worse failure: **a derivation that silently narrows.** If a regex
+# stops matching, the section renders empty, someone regenerates, committed ==
+# derived, and the gate is green about a document that now omits the fact it
+# existed to carry — while still being titled "what this system is". A generated
+# document that has quietly stopped deriving is worse than a hand-written one,
+# because the hand-written one never claimed to be current.
+#
+# So every section asserts its own result is non-degenerate, and generation FAILS
+# rather than emitting a thinner document. The floors are set from the measured
+# value, low enough not to be brittle and high enough that a collapse cannot pass.
+# This is the same positive control that caught five blind instruments on
+# 2026-08-05: assert the population before reporting on it.
+
+struct DegenerateDerivation <: Exception
+    section::String
+    detail::String
+end
+Base.showerror(io::IO, e::DegenerateDerivation) = print(io,
+    "DegenerateDerivation in section \"", e.section, "\": ", e.detail,
+    "\n\nThe derivation returned less than it must. Generation is REFUSED rather ",
+    "than emitting a document that silently stopped carrying this fact. ",
+    "Fix the derivation, or lower the floor deliberately and say why.")
+
+function assert_nondegenerate(section, ok::Bool, detail)
+    ok || throw(DegenerateDerivation(section, detail))
+    nothing
+end
+
 # ---------------------------------------------------------------- render
 
 function render()
@@ -246,6 +314,11 @@ function render()
     p("> **GENERATED. Do not edit.** Regenerate with")
     p("> `julia --project=. scripts/generate_state.jl`, and")
     p("> `test/test_state_doc_is_current.jl` fails if this file and the tree disagree.")
+    p(">")
+    p("> **This is SSoT applied to DESCRIPTIONS.** The repo's value-level SSoT held")
+    p("> perfectly — one line computes the B→p sign, one function defines the substep")
+    p("> chain. What rotted was every prose restatement of them, because \"one place")
+    p("> defines it\" does not imply \"every other mention is generated from it\".")
     p(">")
     p("> This file exists because deltas accumulate and nothing states the present.")
     p("> `CLAUDE.md`'s split-step list said 5 operators, was corrected to 7, and the")
@@ -260,6 +333,10 @@ function render()
     p()
 
     rel, ln, ops = split_step_chain()
+    assert_nondegenerate("split-step chain", length(ops) >= 5 && ln > 0,
+        "derived $(length(ops)) substeps at line $ln; the chain has had 9 since 2026-08-05 " *
+        "and cannot plausibly drop below 5 (diagonal, spin_mixing, singlet_pair, tensor, raman " *
+        "are all unconditional in the source)")
     p("## Split-step: the forward outer-potential chain")
     p()
     p("Read from `_outer_operators_fwd!` (`$rel:$ln`), in source order.")
@@ -274,6 +351,13 @@ function render()
     p("been wrong twice.")
     p()
 
+    terms = ham_terms()
+    n_lost = count(t -> t[3] == "(struct not found)", terms)
+    assert_nondegenerate("Hamiltonian terms",
+        length(terms) == length(H_TERMS_CANONICAL_ORDER) && n_lost == 0,
+        "$(length(terms)) rows for $(length(H_TERMS_CANONICAL_ORDER)) registry entries, " *
+        "$n_lost with no struct located — every registry symbol must resolve to a " *
+        "`struct <Name>Term`")
     p("## Hamiltonian terms in the registry")
     p()
     p("`H_TERMS_CANONICAL_ORDER`, in order. **$(length(H_TERMS_CANONICAL_ORDER)) terms.**")
@@ -281,12 +365,15 @@ function render()
     p()
     p("| # | registry symbol | struct | defined at |")
     p("|---|---|---|---|")
-    for (i, (sym, name, home)) in enumerate(ham_terms())
+    for (i, (sym, name, home)) in enumerate(terms)
         p("| $i | `$sym` | `$name` | `$home` |")
     end
     p()
 
     conv = bfield_converters()
+    assert_nondegenerate("B → p sites", length(conv) >= 8,
+        "found $(length(conv)) references to `bfield_to_p`; there were 20 on 2026-08-05 " *
+        "and the declaration file alone accounts for 8")
     p("## The B → p sign: every site that touches it")
     p()
     p("`Units.bfield_to_p` is the ONE declaration (`p ≡ -g_F μ_B B`, Kawaguchi-Ueda).")
@@ -301,6 +388,10 @@ function render()
     p()
 
     top, steps = schema_surface()
+    assert_nondegenerate("YAML surface", length(top) >= 5 && length(steps) >= 2,
+        "$(length(top)) top-level keys and $(length(steps)) step kinds; " *
+        "`pipeline` + `scan` + the lab-units block are always present, and " *
+        "`ground_state` / `dynamics` both exist")
     p("## YAML surface")
     p()
     p("**Top-level keys ($(length(top))):** " * join("`" .* top .* "`", ", "))
@@ -308,6 +399,9 @@ function render()
     p("**Pipeline step kinds ($(length(steps))):** " * join("`" .* steps .* "`", ", "))
     p()
     krel, kr = retired_keys()
+    assert_nondegenerate("retired keys", length(kr) >= 8,
+        "parsed $(length(kr)) rows from the migration table in $krel; there were 13 on " *
+        "2026-08-05, and `test_docs_examples_avoid_removed_keys.jl` depends on this table")
     p("**Retired keys ($(length(kr)))** — from `$krel`. A LIVE document teaching one")
     p("of these fails `test/test_docs_examples_avoid_removed_keys.jl`.")
     p()
@@ -320,6 +414,9 @@ function render()
     p()
 
     trel, tiers = tier_counts()
+    assert_nondegenerate("test tiers", length(tiers) == 4 && all(t -> t[2] > 0, tiers),
+        "parsed $(length(tiers)) of 4 tier lists from $trel; counts " *
+        join(string.(last.(tiers)), "/"))
     p("## Test tiers")
     p()
     p("File counts from `$trel`. Membership is explicit — no auto-discovery.")
@@ -329,16 +426,25 @@ function render()
     end
     p()
 
+    lad = ladder()
+    n_missing = count(r -> occursin("NOT FOUND", r[2]), lad)
+    assert_nondegenerate("validation ladder", n_missing == 0,
+        "$n_missing ladder instruments not found anywhere under test/ — either the file " *
+        "was deleted (a real finding: record it in CLAUDE.md and remove the level here) " *
+        "or the walk is broken")
     p("## Validation ladder — instruments present on disk")
     p()
     p("| level | instrument (located by walking `test/`) |")
     p("|---|---|")
-    for (lvl, path) in ladder()
+    for (lvl, path) in lad
         p("| $lvl | `$path` |")
     end
     p()
 
     lims = limit_markers()
+    assert_nondegenerate("unfinished markers", !isempty(lims),
+        "no `KNOWN-LIMIT` / not-implemented marker found in src/; there were 13 in 8 files " *
+        "on 2026-08-05, so an empty result means the scan broke, not that the work finished")
     p("## What the code says about itself is unfinished")
     p()
     p("Files carrying `KNOWN-LIMIT` or an explicit not-implemented marker —")
@@ -352,7 +458,28 @@ function render()
     end
     p()
 
-    String(take!(io))
+    body = String(take!(io))
+
+    cov = coverage(body)
+    io2 = IOBuffer()
+    print(io2, body)
+    q(s="") = println(io2, s)
+    q("## What this document does NOT cover")
+    q()
+    q("Derived by asking which `src/` subtrees any section above cites. A directory")
+    q("in the second list is not a defect — it is this document stating plainly that")
+    q("it is silent about that subsystem, so its absence above is not evidence of")
+    q("absence in the code. **What would be a defect is this list vanishing**: a")
+    q("generated document whose gaps are invisible reads as complete.")
+    q()
+    q("**Covered:** " * join(("`src/" .* first.(filter(c -> c[2], cov)) .* "/`"), ", "))
+    q()
+    q("**Not covered:** " * join(("`src/" .* first.(filter(c -> !c[2], cov)) .* "/`"), ", "))
+    q()
+    q("For anything in the second list the code is the only authority; `CLAUDE.md`'s")
+    q("subsystem catalog is a curated summary and carries no staleness gate.")
+    q()
+    String(take!(io2))
 end
 
 # ---------------------------------------------------------------- main

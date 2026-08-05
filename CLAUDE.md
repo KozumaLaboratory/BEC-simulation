@@ -25,6 +25,26 @@ Anchors:
   measurement means, which convention is deliberate) stays hand-written here and
   in memory. When this file and `STATE.md` disagree about a derivable fact,
   `STATE.md` wins and this file is wrong.
+  **This is SSoT applied to DESCRIPTIONS, not values.** The repo's value-level
+  SSoT held: exactly one line computes the B→p sign and all 20 references
+  delegate; `_outer_operators_fwd!` is the only definition of the substep
+  chain. Every rot was in a prose RESTATEMENT — "the 3 sibling converters", a
+  code comment listing seven of nine substeps, the same list here. "One place
+  defines it" does not imply "every other mention is generated from it", and a
+  mention is a copy whether or not anyone calls it one.
+  **What the mechanism does and does not protect** — asked 2026-08-05, and the
+  first answer overclaimed: (1) *code moved, document did not* → the gate is red,
+  because it re-derives and compares. (2) *the derivation silently narrows* → the
+  gate CANNOT see it, since `committed == derived` is satisfied by two copies
+  that both shrank; so every section asserts a floor on its own result and
+  **generation is refused** rather than emitting a thinner document. (3) *a
+  subsystem nobody taught the generator about* → invisible incompleteness reads
+  as absence, so the coverage gap is itself derived and printed ("Not covered:
+  `src/model/`, `src/solvers/`"), and the gate pins that the disclosure exists.
+  (4) *nobody extends it as the system grows* → **no mechanism covers this.** It
+  is a human duty, and the honest consequence is that `STATE.md` is complete only
+  about what someone taught it to derive — which is why it names its own silence
+  instead of implying coverage.
 - `README.md` / `docs/index.md` — project description + documentation map.
 - `docs/reference/{yaml_schema_reference,dynamics,architecture}.md` — full YAML schema + dynamics knobs + module data flow.
 - `docs/conventions/{sign_bug_proof_architecture,hamiltonian_sign_audit}.md` — physics convention authority + 14-term sign × path audit. (Both FROZEN 2026-08-04: dated, not maintained. `adding_new_hamiltonian_term.md` was reduced to a pointer BACK to this file — the protocol below is the original, not a summary of it.)

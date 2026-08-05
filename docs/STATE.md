@@ -4,6 +4,11 @@
 > `julia --project=. scripts/generate_state.jl`, and
 > `test/test_state_doc_is_current.jl` fails if this file and the tree disagree.
 >
+> **This is SSoT applied to DESCRIPTIONS.** The repo's value-level SSoT held
+> perfectly — one line computes the B→p sign, one function defines the substep
+> chain. What rotted was every prose restatement of them, because "one place
+> defines it" does not imply "every other mention is generated from it".
+>
 > This file exists because deltas accumulate and nothing states the present.
 > `CLAUDE.md`'s split-step list said 5 operators, was corrected to 7, and the
 > real number is 9 — two sessions each appending to a hand-copied list. Every
@@ -150,4 +155,19 @@ it until 2026-08-04).
 - `src/hamiltonian/terms/loss.jl` — 1
 - `src/hamiltonian/terms/contact/contact.jl` — 1
 - `src/workflow/experiments/pipeline/run_step_dynamics.jl` — 1
+
+## What this document does NOT cover
+
+Derived by asking which `src/` subtrees any section above cites. A directory
+in the second list is not a defect — it is this document stating plainly that
+it is silent about that subsystem, so its absence above is not evidence of
+absence in the code. **What would be a defect is this list vanishing**: a
+generated document whose gaps are invisible reads as complete.
+
+**Covered:** `src/analysis/`, `src/foundation/`, `src/hamiltonian/`, `src/manuscript/`, `src/validation/`, `src/workflow/`
+
+**Not covered:** `src/model/`, `src/solvers/`
+
+For anything in the second list the code is the only authority; `CLAUDE.md`'s
+subsystem catalog is a curated summary and carries no staleness gate.
 

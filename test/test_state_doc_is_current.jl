@@ -55,6 +55,13 @@ end
         end
         @test !occursin("(struct not found)", derived)
         @test !occursin("NOT FOUND anywhere under test/", derived)
+        # The gaps must stay visible. A generated document whose coverage list
+        # vanished would read as complete, which is the failure the staleness
+        # comparison cannot see: committed == derived is satisfied by two copies
+        # that have BOTH narrowed.
+        @test occursin("## What this document does NOT cover", derived)
+        @test occursin("**Covered:**", derived)
+        @test occursin("**Not covered:**", derived)
     end
 
     committed = read(STATE, String)
