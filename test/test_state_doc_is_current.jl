@@ -64,6 +64,11 @@ end
         @test occursin("Declared **once**", derived)
         @test occursin("test_bfield_sign_declared_once.jl", derived)
         # the two sections whose value is an equality / a disagreement, not a list
+        @test occursin("## Ground-state exit contract", derived)
+        # the rendered criterion must BE the code's condition
+        @test occursin("dE < tol", derived)
+        # and `dpsi` must be absent from it — the derived form of "diagnostic only"
+        @test !occursin("dpsi <", derived)
         @test occursin("## Cache admission", derived)
         # the RATIO is the fact; a list of sites without it says nothing
         @test occursin(r"\*\*\d+ sites admit a cached payload; \d+ re-derives", derived)

@@ -283,6 +283,43 @@ end
 
 
 """
+What `tol` actually bounds, and when it is even looked at.
+
+`docs/reference/yaml_schema_reference.md` labelled `tol` as
+"convergence threshold (`grad_norm`)" while the same table defaults `method` to
+`itp` — where `tol` bounds the relative ENERGY change and is evaluated only
+inside a `step % save_every == 0` guard. At the YAML default n_steps=100000 that
+is 1000 steps apart, so a run can sit converged for 999 steps without noticing,
+and a reader tuning `tol` against a gradient is tuning the wrong quantity.
+
+Derived by reading the criterion line and the guard line out of the loop, so the
+rendered condition IS the code's condition rather than a paraphrase of it.
+"""
+function gs_exit_contract()
+    rel = "src/solvers/ground_state/itp_loop.jl"
+    lines = readlines(joinpath(ROOT, rel))
+    crit, crit_n = "", 0
+    guard, guard_n = "", 0
+    for (n, l) in enumerate(lines)
+        if crit_n == 0 && occursin("converged = true", l)
+            for k in (n - 1):-1:max(1, n - 6)
+                if occursin(r"^\s*if ", lines[k])
+                    crit, crit_n = strip(lines[k]), k
+                    break
+                end
+            end
+        end
+        guard_n == 0 && occursin(r"^\s*if step % ", l) && ((guard, guard_n) = (strip(l), n))
+    end
+    reasons = String[]
+    for l in eachline(joinpath(ROOT, "src", "solvers", "lbfgs", "driver.jl"))
+        occursin("stop_reason = ", l) || continue
+        append!(reasons, [m.match for m in eachmatch(r":[a-z_]+", l)])
+    end
+    (rel, crit, crit_n, guard, guard_n, unique(reasons))
+end
+
+"""
 The cache-admission taxonomy and what audits it.
 
 The reader's question is "when a cache hit is served, what actually checked it?"
@@ -570,6 +607,33 @@ function render()
     p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
     p("sign for two months because eight test files checked the VALUE and none checked")
     p("that there was only one of them.")
+    p()
+
+    erel, crit, critn, guard, guardn, reasons = gs_exit_contract()
+    assert_nondegenerate("gs exit contract",
+        !isempty(crit) && !isempty(guard) && occursin("tol", crit) &&
+            !occursin("dpsi", crit) && length(reasons) >= 3,
+        "criterion=[$crit] at $critn, guard=[$guard] at $guardn, " *
+        "stop_reason values " * join(reasons, " "))
+    p("## Ground-state exit contract: what `tol` bounds")
+    p()
+    p("ITP convergence, read from `$erel:$critn`:")
+    p()
+    p("```julia")
+    p(crit)
+    p("```")
+    p()
+    p("`dE` is `_relative_energy_change` — the relative **energy** change, not a")
+    p("gradient norm. It is evaluated only inside `$guard` (`$erel:$guardn`), and")
+    p("the YAML path sets `save_every = max(1, n_steps ÷ 100)`, so at the default")
+    p("`n_steps=100000` the criterion is tested **1000 steps apart**. A run can be")
+    p("converged for 999 steps without noticing. `dpsi` appears in the diagnostics")
+    p("and NOT in the condition above — that absence is derived here, not")
+    p("remembered.")
+    p()
+    p("L-BFGS reports `stop_reason` ∈ " * join("`" .* reasons .* "`", ", ") *
+      " (`src/solvers/lbfgs/driver.jl`), which is a different exit contract with a")
+    p("different meaning of `tol` (there it IS the gradient norm).")
     p()
 
     prov, adm_sites, ver_sites = admission_facts()

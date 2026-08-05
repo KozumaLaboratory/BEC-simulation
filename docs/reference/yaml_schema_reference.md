@@ -69,7 +69,7 @@ a typo warning.
 | `method` | itp / lbfgs | itp | ground-state solver |
 | `dt` | Real [1e-8, 1.0] | 0.001 | imaginary-time step |
 | `n_steps` | Real [0, 1e9] | 100000 | ITP step cap |
-| `tol` | Real [1e-16, 1.0] | 1e-8 | convergence threshold (`grad_norm`) |
+| `tol` | Real [1e-16, 1.0] | 1e-8 | convergence threshold — **meaning depends on `method`**: for `itp` (the default above) it bounds the relative ENERGY change and is tested only every `save_every = max(1, n_steps ÷ 100)` steps, i.e. 1000 apart at the default `n_steps`; for `lbfgs` it is the gradient norm. This cell said `grad_norm` unconditionally until 2026-08-06. Derived form in `docs/STATE.md`. |
 | `m_lbfgs` | Real [1, 100] | 10 | LBFGS history length |
 | `init_m_idx` | Int [1, 25] | — | which m to seed |
 | `init_sigma` | Real [0, 100] | — | Gaussian seed σ |

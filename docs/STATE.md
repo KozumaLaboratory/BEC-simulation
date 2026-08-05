@@ -72,6 +72,25 @@ whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
 
+## Ground-state exit contract: what `tol` bounds
+
+ITP convergence, read from `src/solvers/ground_state/itp_loop.jl:208`:
+
+```julia
+if dE < tol && (tol_drho <= 0.0 || drho < tol_drho)
+```
+
+`dE` is `_relative_energy_change` — the relative **energy** change, not a
+gradient norm. It is evaluated only inside `if step % sp.save_every == 0` (`src/solvers/ground_state/itp_loop.jl:160`), and
+the YAML path sets `save_every = max(1, n_steps ÷ 100)`, so at the default
+`n_steps=100000` the criterion is tested **1000 steps apart**. A run can be
+converged for 999 steps without noticing. `dpsi` appears in the diagnostics
+and NOT in the condition above — that absence is derived here, not
+remembered.
+
+L-BFGS reports `stop_reason` ∈ `:tol`, `:line_search_stalled`, `:max_steps` (`src/solvers/lbfgs/driver.jl`), which is a different exit contract with a
+different meaning of `tol` (there it IS the gradient norm).
+
 ## Cache admission: what is served, and what verified it
 
 | provenance | served as a hit | declared at |
@@ -231,10 +250,10 @@ as complete.
 | `src/hamiltonian/` | 13 | 63 |
 | `src/validation/` | 1 | 8 |
 | `src/manuscript/` | 1 | 15 |
+| `src/solvers/` | 2 | 44 |
 | `src/workflow/` | 5 | 169 |
 | `src/foundation/` | 1 | 40 |
 | `src/analysis/` | 1 | 46 |
-| `src/solvers/` | 0 | 44 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem
 catalog is a curated summary and carries no staleness gate.
