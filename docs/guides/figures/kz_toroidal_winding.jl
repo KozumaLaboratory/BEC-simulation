@@ -288,6 +288,7 @@ function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
     shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
+    spinor::Bool=false, c1::Float64=0.0, atom=KZ_ATOM, which_W::Symbol=:auto,
     L::Float64=KZ_L,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
@@ -326,7 +327,8 @@ function kz_winding_scan(;
         for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L)
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L,
+                spinor, c1, atom)
             # For a spinor, WHICH winding scales is the question, so the choice is
             # explicit and the others go on the record rather than being discarded.
             push!(Ws, which_W === :mass ? r.W_mass :
@@ -705,6 +707,34 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 @printf(io, "%.6f,%d,%.8f,%.8f\n", τ, length(byτ[τ]), σs[i], es[i])
             end
         end
+    elseif startswith(mode, "spin1")
+        # Step 1 of the ladder, on the VALIDATED protocol: toroidal, mu ramp,
+        # gamma = 0.1, L = 800, tau_Q spanning the freeze-out — where beta reproduced
+        # at 0.6 sigma (number-damping) and 0.05 sigma (full). Only c1 != 0 and three
+        # components change.
+        #
+        # "spin1IofN:C1:nd|full:NTRAJ:mass|spin|m". The winding is NAMED, not assumed:
+        # one trajectory at tau_Q = 1000 gave per_m = [+1, -1, 0], mass = 0, spin = -1
+        # for the same field, so the mass winding says no defect and the spin winding
+        # says one. All three print for seed 1 at every rate.
+        #
+        # C1 takes exponent notation. `[0-9.]` rejected -6.4e-5 and killed 48 shards
+        # on their first line with the 20-hour reservations already made.
+        m = match(
+            r"^spin1(\d+)of(\d+):(-?[-+0-9.eE]+):(nd|full):(\d+):(mass|spin|m)$", mode)
+        m === nothing && error(
+            "spin1 mode: spin1IofN:C1:nd|full:NTRAJ:mass|spin|m, got $mode")
+        local i1 = parse(Int, m[1])
+        local n1 = parse(Int, m[2])
+        local c1v = parse(Float64, m[3])
+        local g1v = 0.1
+        local which = m[6] == "m" ? :auto : Symbol(m[6])
+        kz_winding_scan(; tau_Qs=(1 / g1v) .* [1e2, 3e2, 1e3, 3e3, 1e4],
+            n_traj=parse(Int, m[5]), M_damp=(m[4] == "full" ? g1v : 0.0), gamma=g1v,
+            dt=0.05, M_grid=1024, L=800.0, spinor=true, c1=c1v, atom=Rb87,
+            which_W=which, backend, shard=(i1, n1), raw_only=true,
+            tag="kz_torus_spin1c" * replace(string(c1v), "." => "p", "-" => "m") *
+                m[4] * m[6] * "_s$(i1)of$(n1)")
     elseif startswith(mode, "shard")
         # "shardIofN:MD:NTRAJ" — one process per shard, strided over trajectories.
         # Trajectories are independent, and the per-step cost is small enough that
