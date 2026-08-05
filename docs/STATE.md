@@ -50,10 +50,10 @@ Each declares its sign in one coefficient function in the file named.
 | 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl:7` |
 | 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:216` |
 | 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl:33` |
-| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:149` |
+| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:150` |
 | 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl:8` |
 | 7 | `lhy` | `LHYTerm` | `src/hamiltonian/terms/lhy/lhy_term.jl:7` |
-| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:289` |
+| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:297` |
 | 9 | `raman` | `RamanTerm` | `src/hamiltonian/terms/raman.jl:78` |
 | 10 | `light_shift` | `LightShiftTerm` | `src/hamiltonian/terms/light_shift/light_shift_term.jl:8` |
 | 11 | `coriolis` | `CoriolisTerm` | `src/hamiltonian/terms/coriolis.jl:11` |
@@ -119,7 +119,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 235 files
+- `FAST_TESTS` — 237 files
 - `CI_EXTRA` — 89 files
 - `FULL_EXTRA` — 33 files
 - `PHYSICS_TESTS` — 7 files

@@ -247,6 +247,12 @@ const FAST_TESTS = [
     # recovery of an IMPOSED correlation length as it is scaled.
     "analysis/test_coherence_length.jl",
     "dynamics/test_thermal_cfield.jl",
+    # test_spgpe_equilibrium_number.jl is NOT here: main moved it to FULL_EXTRA
+    # with a cost of 1266 s after it timed out the 15-minute per-PR job. Taking my
+    # side of this conflict would have put it back and reddened CI again — a union
+    # of both sides is not a resolution when one side is a fix.
+    "dynamics/test_spgpe_projector_composition.jl",
+    "workflow/test_measurement_provenance.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
     "analysis/test_phase_classification_polyhedral.jl",
@@ -858,6 +864,12 @@ const _COST = Dict{String, Float64}(
     # machine-dependent and the ordering it buys is not — nothing else in
     # any tier is within a factor of four of it.
     "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
+    # Measured, not guessed. An unregistered file is handed out as 3.0, not as
+    # "probably small", and the 1266 s entry above exists because a heavy file
+    # carrying a 3.0 estimate went out last and blew the 15-minute job.
+    "dynamics/test_spgpe_projector_composition.jl" => 12.8,
+    "dynamics/test_thermal_cfield.jl" => 2.4,
+    "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
@@ -987,6 +999,7 @@ const _COST = Dict{String, Float64}(
     "analysis/test_vorticity_berry.jl" => 8.4,
     "analysis/test_physics_level1.jl" => 7.8,
     "workflow/test_inspect_config.jl" => 7.7,
+    "workflow/test_vortex_density_movie.jl" => 6.0,
     "analysis/test_observables.jl" => 7.7,
     "oracles/test_physics_aware_sign_oracles.jl" => 7.6,
     "workflow/test_catalog_index.jl" => 7.4,

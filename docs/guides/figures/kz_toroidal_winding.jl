@@ -51,7 +51,7 @@
 
 using SpinorBEC, FFTW, Printf, Statistics, Random
 
-const KZ_L = 200.0                 # circumference, a_perp
+const KZ_L = 200.0                 # circumference, a_perp (the paper's)
 const KZ_M = 1024                  # grid points
 const KZ_G1 = 0.0139               # 1D coupling, ℏω_perp a_perp
 const KZ_MU0 = 1.0                 # ℏω_perp
@@ -109,6 +109,48 @@ function ideal_torus_Tc(; L::Float64=KZ_L, g1::Float64=KZ_G1, mu0::Float64=KZ_MU
 end
 
 """
+    winding_of(field) -> Float64
+
+`W = θ_c/2π` for one complex field on a ring, from the WRAPPED phase increments.
+"""
+function winding_of(ψ::AbstractVector{<:Complex})
+    n = length(ψ)
+    θ = 0.0
+    for j in 1:n
+        d = angle(ψ[mod1(j + 1, n)]) - angle(ψ[j])
+        θ += d - 2π * round(d / (2π))
+    end
+    θ / (2π)
+end
+
+"""
+    spinor_windings(psi, grid) -> (; per_m, mass, spin)
+
+Every winding a spin-1 ring admits, reported together rather than one chosen in
+advance:
+
+- `per_m[c]` — the phase winding of component `c`.
+- `mass` — the winding of `Σ_c ψ_c`.
+- `spin` — the winding of the transverse spin `ψ_{+1}*ψ_0 + ψ_0*ψ_{−1}`, the order
+  parameter a ferromagnetic ring winds in, invariant under a global phase.
+
+Which of these carries the Kibble-Zurek scaling is a measurement, not a choice: a
+spin rotation mixes the `m` components and changes `per_m`, mass winding misses a
+spin defect, and the topological classification depends on the sign of `c₁`, which
+for ¹⁵¹Eu is unknown. Reporting one number here would bake in an assumption of
+exactly the kind that produced this branch's retracted results.
+"""
+function spinor_windings(psi::AbstractArray{<:Complex}, ::Grid{1})
+    D = size(psi, 2)
+    per_m = [winding_of(@view psi[:, c]) for c in 1:D]
+    mass = winding_of(vec(sum(psi; dims=2)))
+    spin = D == 3 ?
+           winding_of(@views conj.(psi[:, 1]) .* psi[:, 2] .+
+                             conj.(psi[:, 2]) .* psi[:, 3]) : NaN
+    (; per_m, mass, spin)
+end
+
+"""
     winding_number(psi, grid) -> Float64
 
 `W = θ_c/2π`, the phase accumulated around the ring. Summing the *wrapped*
@@ -142,18 +184,25 @@ function kz_trajectory_torus(;
     tau_Q::Float64, seed::Int, T::Float64, eps_cut::Float64,
     gamma::Float64=1e-2, gamma_relax::Float64=1.0, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(),
-    t_hold::Float64=NaN,
+    t_hold::Float64=NaN, n_probe::Int=0, L::Float64=KZ_L,
+    spinor::Bool=false, c1::Float64=0.0, atom=KZ_ATOM,
 )
-    grid = make_grid(GridConfig((M_grid,), (KZ_L,)))
+    grid = make_grid(GridConfig((M_grid,), (L,)))
     sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
         normalize_every=0)
-    ws = make_workspace(; grid, atom=KZ_ATOM,
-        interactions=InteractionParams(Dict{Int, Float64}(0 => KZ_G1)),
+    ws = make_workspace(; grid, atom,
+        interactions=InteractionParams(
+            spinor ? Dict{Int, Float64}(0 => KZ_G1, 1 => c1) :
+            Dict{Int, Float64}(0 => KZ_G1)),
         potential=HarmonicTrap{1}((0.0,)),      # ring: no confinement along it
         sim_params=sp, backend, fft_flags=FFTW.ESTIMATE)
-    size(ws.state.psi, 2) == 1 || error(
-        "kz_toroidal_winding is a SCALAR reproduction and the field has " *
-        "$(size(ws.state.psi, 2)) components; reservoir noise would populate the " *
+    # Reservoir noise fills EVERY component, so on an F=1 species a scalar run's
+    # empty spin channels thermalise and shift the effective μ through c₀n — a live
+    # bug that showed as non-integer windings (2.25). A spinor run wants those
+    # components and says so with `spinor=true`.
+    spinor || size(ws.state.psi, 2) == 1 || error(
+        "kz_toroidal_winding without spinor=true is a SCALAR reproduction and the " *
+        "field has $(size(ws.state.psi, 2)) components; noise would " *
         "spin channels and shift mu through c0*n.")
     seed_device_rng!(backend, seed)
     fill!(ws.state.psi, 0)
@@ -193,15 +242,36 @@ function kz_trajectory_torus(;
     μ_wave = PiecewiseLinearWaveform([0.0, 2tau_Q, 2tau_Q + t_hold],
         [-KZ_MU0, KZ_MU0, KZ_MU0])
     res = mk(gamma, μ_wave, M_damp)
+    n_steps_q = round(Int, (2tau_Q + t_hold) / dt)
+    # N₀ = |∫ψ dx|²/L is the k=0 population on a ring: for a uniform ψ = √n it
+    # returns nL = N exactly, so it needs no normalisation convention argued over.
+    probe_t = Float64[];
+    probe_N0 = Float64[]
+    every = n_probe > 0 ? max(1, n_steps_q ÷ n_probe) : typemax(Int)
     t = 0.0
-    for s in 1:round(Int, (2tau_Q + t_hold) / dt)
+    for s in 1:n_steps_q
         split_step!(ws)
         apply_spgpe_step!(ws, res, dt; t=t, seed=seed + 1_000_003 + s)
         t += dt
+        if s % every == 0
+            ψ = ws.state.psi
+            push!(probe_t, t - tau_Q)              # measured FROM the transition
+            push!(probe_N0, abs2(sum(ψ)) * cell_volume(grid)^2 / L)
+        end
     end
 
     psi = Array(ws.state.psi)
+    # ξ̂ measured directly from g₁(r) on the ring, not inferred from σ(W). The
+    # two must agree — σ(W)² ≈ L/(4ξ̂) for a phase random-walking over L/ξ̂
+    # domains — and if they do not, the disagreement localises the error.
+    hplans = make_fft_plans(grid.config.n_points; flags=FFTW.ESTIMATE)
+    rr, g1 = first_order_correlation(psi, grid, hplans)
+    cl = coherence_length(rr, g1)
+    sw = spinor_windings(psi, grid)
+    pops = [real(sum(abs2, view(psi, :, c))) * dV for c in 1:size(psi, 2)]
     (; W=winding_number(psi, grid), N_final=real(sum(abs2, psi)) * dV, N_equil,
+        xi_hat=cl.xi, f_inf=cl.f_inf, probe_t, probe_N0,
+        W_per_m=sw.per_m, W_mass=sw.mass, W_spin=sw.spin, pops,
         t_total=1000.0 + 2tau_Q + t_hold)
 end
 
@@ -218,6 +288,7 @@ function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
     shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
+    L::Float64=KZ_L,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
     Tc = ideal_torus_Tc()
@@ -255,8 +326,15 @@ function kz_winding_scan(;
         for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
                 tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold)
-            push!(Ws, r.W);
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L)
+            # For a spinor, WHICH winding scales is the question, so the choice is
+            # explicit and the others go on the record rather than being discarded.
+            push!(Ws, which_W === :mass ? r.W_mass :
+                      which_W === :spin ? r.W_spin : r.W)
+            spinor && j == shard[1] && @printf(
+                "    [tau=%.0f seed1] per_m=%s mass=%.2f spin=%.2f pops=%s\n",
+                τ, string(round.(r.W_per_m; digits=2)), r.W_mass, r.W_spin,
+                string(round.(r.pops; sigdigits=3)))
             push!(Ne, r.N_equil);
             push!(Nf, r.N_final)
         end
@@ -312,6 +390,11 @@ function kz_winding_scan(;
     if raw_only
         rawf = joinpath(OUTDIR, "$(tag)_raw.csv")
         open(rawf, "w") do io
+            # First line, so a reader hits it before any data. assert_same_provenance
+            # refuses to merge shards that disagree — which is the guard that was
+            # missing when a merge read 10:49 files as a 13:34 rerun's output.
+            println(io, provenance_header("src/solvers/spgpe.jl",
+                "src/solvers/projected_gp.jl", "docs/guides/figures/kz_toroidal_winding.jl"))
             println(io, "# T=$T eps_cut=$eps_cut gamma=$gamma M_damp=$M_damp dt=$dt " *
                         "M_grid=$M_grid shard=$(shard[1])of$(shard[2])")
             println(io, "tau_Q,W")
@@ -368,6 +451,163 @@ if abspath(PROGRAM_FILE) == @__FILE__
             kz_winding_scan(; tau_Qs=(exp(4.0),), n_traj=32, dt, backend,
                 tag="kz_torus_dt$(replace(string(dt), "." => "p"))")
         end
+    elseif startswith(mode, "gam")
+        # "gamIofN:GAMMA:MD:NTRAJ" — the test the range choice was missing.
+        #
+        # beta was reported as 0.0991 +- 0.0067 against a published 0.0966 and
+        # that claim is withdrawn: the LOCAL slope drifts across the window
+        # (0.066, 0.099, 0.045, 0.131, 0.133, 0.120), so the global fit averages a
+        # changing slope rather than measuring an exponent. Choosing the window
+        # and reading off a number that lands on the target is a fit with extra
+        # steps.
+        #
+        # The window has to come from somewhere independent, and it does: the
+        # MEASURED freeze-out t_hat = 3.4 sqrt(tau_Q/(gamma mu_0)) must be small
+        # against the ramp. At gamma = 1e-2 the ratio t_hat/tau_Q runs
+        # 3.40 2.06 1.25 0.76 0.46 0.28 0.17 over the scan — the first four points
+        # are outside the regime by construction, and even the best is 0.17.
+        # Reaching 0.05 needs tau_Q > 4.6e5, an hour per trajectory.
+        #
+        # gamma buys it back: t_hat/tau_Q = 3.4/sqrt(gamma mu_0 tau_Q), so ten
+        # times the rate reaches the same ratio at a tenth of tau_Q. And the
+        # exponent MUST NOT depend on gamma — gamma sets tau_0, not the scaling.
+        # So the same window in t_hat/tau_Q at three rates is simultaneously the
+        # affordable measurement and the check that the number is an exponent at
+        # all rather than a local slope.
+        m = match(r"^gam(\d+)of(\d+):([0-9.]+):(nd|full):(\d+)(?::L([0-9.]+))?$", mode)
+        m === nothing && error("gam mode: gamIofN:GAMMA:nd|full:NTRAJ[:L<len>], got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        γ = parse(Float64, m[3])
+        # xi_hat = L/(4 sigma(W)^2) reached 145-153 on the paper's ring of 200 at
+        # the slow end of the FULL runs — three quarters of the circumference. The
+        # winding cannot fall further once a single domain spans the ring, so the
+        # last interval flattens and beta is biased low. The size test already
+        # showed xi_hat is physical and sigma(W) ∝ sqrt(L), so a longer ring buys
+        # headroom without changing the length being measured.
+        local Lr = m[6] === nothing ? KZ_L : parse(Float64, m[6])
+        local Mg = round(Int, 256 * Lr / KZ_L)      # dx held fixed
+        # Fixed window in t_hat/tau_Q = 3.4/sqrt(gamma tau_Q): span the same
+        # ratios 0.34 … 0.034 at every gamma, i.e. tau_Q = 100/gamma … 1e4/gamma.
+        τs = (1 / γ) .* [1e2, 3e2, 1e3, 3e3, 1e4]
+        kz_winding_scan(; tau_Qs=τs, n_traj=parse(Int, m[5]),
+            M_damp=(m[4] == "full" ? γ : 0.0), gamma=γ, dt=0.05, M_grid=Mg, L=Lr,
+            backend, shard=(i, n), raw_only=true,
+            # SBEC_TAG lets a rerun after a code change write somewhere new. Reusing
+            # the tag once let a merge read 10:49 files as if they were the 13:34
+            # run's output and report the pre-fix numbers as post-fix — the same
+            # shape as leaving a distinguishing variable out of an output name.
+            tag="kz_torus_$(get(ENV, "SBEC_TAG", ""))gam$(replace(string(γ), "." => "p"))$(m[4])L$(round(Int, Lr))_s$(i)of$(n)")
+    elseif startswith(mode, "size")
+        # Is xi_hat physical or is it the ring? It came out 20-37 at every quench
+        # rate on a ring of 200 — L/6, six to eight domains, which is no dynamic
+        # range for sigma(W) to have. Quadruple the circumference at fixed
+        # everything else: a physical xi_hat stays put and sigma(W)^2 doubles
+        # (more domains on a longer ring); a finite-size-limited one grows with L
+        # and sigma(W) does not move.
+        #
+        # dx is held fixed at L/M so the resolution is identical — only the box
+        # changes.
+        for L in (200.0, 400.0, 800.0)
+            Mg = round(Int, 256 * L / KZ_L)
+            Ws, ξs = Float64[], Float64[]
+            for j in 1:24
+                r = kz_trajectory_torus(; tau_Q=1000.0,
+                    seed=7_000_000 + j * KZ_SEED_STRIDE,
+                    T=0.5 * ideal_torus_Tc(), eps_cut=KZ_MU0 + 0.5 * ideal_torus_Tc(),
+                    M_damp=0.0, dt=0.05, M_grid=Mg, L, backend)
+                push!(Ws, r.W);
+                push!(ξs, r.xi_hat)
+            end
+            σW = std(Ws)
+            fin = filter(isfinite, ξs)
+            @printf("L=%6.0f M=%5d dx=%.3f  sigma(W)=%.3f ± %.3f  xi(from W)=%5.1f  xi(g1)=%5.1f ± %4.1f  L/xi=%.1f\n",
+                L, Mg, L / Mg, σW, σW / sqrt(2 * 23),
+                L / (4σW^2), mean(fin), std(fin) / sqrt(max(length(fin), 1)),
+                L / mean(fin))
+            flush(stdout)
+        end
+    elseif startswith(mode, "freeze")
+        # The three quantities that have to agree, and never have been compared:
+        #
+        #  (1) t_hat, the delay in condensate growth after the transition. The ramp
+        #      argument gives t_hat = sqrt(tau_Q/(gamma mu_0)); the published
+        #      alpha = 0.5119 says t_hat ∝ tau_Q^(1/2). If there is no delay, there
+        #      is no freeze-out and nothing downstream can be Kibble-Zurek.
+        #  (2) xi_hat measured directly from g1(r) on the ring.
+        #  (3) sigma(W)² ≈ L/(4 xi_hat), the random walk of phase over L/xi_hat
+        #      domains.
+        #
+        # sigma(W) = 1.4 implies xi_hat ≈ 25 a_perp where KZ predicts ≈ 1.65 — a
+        # factor of 15 that no choice of tau_Q range can absorb, since the exponent
+        # is 1/4. Measuring all three separates "the scan is in the wrong regime"
+        # from "the observable is wrong" from "the dynamics has no freeze-out".
+        #
+        # The threshold defining t_hat is SWEPT, because a threshold that sets the
+        # answer is how a condensate fraction once passed for a coherence length.
+        τs = [1e2, 1e3, 1e4]
+        for τ in τs
+            Ws, ξs, Ts, N0s = Float64[], Float64[], Vector{Float64}[], Vector{Float64}[]
+            for j in 1:24
+                r = kz_trajectory_torus(; tau_Q=τ, seed=5_000_000 + j * KZ_SEED_STRIDE,
+                    T=0.5 * ideal_torus_Tc(), eps_cut=KZ_MU0 + 0.5 * ideal_torus_Tc(),
+                    M_damp=0.0, dt=0.05, M_grid=256, backend, n_probe=400)
+                push!(Ws, r.W);
+                push!(ξs, r.xi_hat)
+                push!(Ts, r.probe_t);
+                push!(N0s, r.probe_N0)
+            end
+            N_TF = KZ_MU0 * KZ_L / KZ_G1
+            tgrid = Ts[1]
+            N0bar = [mean(N0s[j][i] for j in eachindex(N0s)) for i in eachindex(tgrid)]
+            @printf("\ntau_Q = %.0f   t_hat_predicted = %.1f\n", τ, sqrt(τ / 1e-2))
+            for thr in (0.02, 0.05, 0.10, 0.20)
+                ic = findfirst(>(thr * N_TF), N0bar)
+                @printf("   threshold %4.0f%% of N_TF -> t_hat = %s\n", 100thr,
+                    ic === nothing ? "never" : @sprintf("%.1f", tgrid[ic]))
+            end
+            σW = std(Ws)
+            ξ_from_W = KZ_L / (4 * σW^2)
+            @printf("   sigma(W) = %.3f -> xi_hat(from W) = %.1f ;  xi_hat(from g1) = %.2f ± %.2f\n",
+                σW, ξ_from_W, mean(filter(isfinite, ξs)),
+                std(filter(isfinite, ξs)) / sqrt(max(count(isfinite, ξs), 1)))
+            flush(stdout)
+        end
+    elseif startswith(mode, "slow")
+        # "slowIofN:nd|full:NTRAJ" — the tau_Q range the FREEZE-OUT requires.
+        #
+        # During the ramp |mu(t)| = mu_0 |t|/tau_Q, so the relaxation time is
+        # tau_Q/(gamma mu_0 |t|). Setting that equal to the time still to run, |t|,
+        # gives the freeze-out
+        #
+        #     t_hat = sqrt(tau_Q/(gamma mu_0)) = sqrt(100 tau_Q)
+        #
+        # — and t_hat ∝ tau_Q^(1/2) is the published alpha = 0.5119. Scaling can
+        # only appear where t_hat < tau_Q, i.e.
+        #
+        #     tau_Q > 1/(gamma mu_0) = 100.
+        #
+        # The first scan ran 7.4 … 2981 with FOUR of seven points below that,
+        # frozen through the entire ramp. The measured sigma(W) says the same: it
+        # is flat until the last three points, and fitting only those gives
+        # beta = 0.082 for the full SPGPE against a published 0.0966 ± 0.0128.
+        #
+        # So the paper's e² … e⁸ is in units of the relaxation time tau =
+        # hbar/(gamma mu_0) = 100/omega_perp, not of 1/omega_perp. Read that way
+        # every point sits at least 7x above the crossover.
+        m = match(r"^slow(\d+)of(\d+):(nd|full):(\d+)$", mode)
+        m === nothing && error("slow mode: slowIofN:nd|full:NTRAJ, got $mode")
+        i, n = parse(Int, m[1]), parse(Int, m[2])
+        τ_relax = 1 / (1e-2 * KZ_MU0)
+        # The number-damping case leaves the saturated regime later than the full
+        # one: over 100 … 40343 its residual is 2.3x the propagated error, the
+        # first four points are flat, and only the last three fall. Shifting the
+        # window up by two e-folds rather than trimming points off the bottom —
+        # trimming would be choosing the range from the answer.
+        span = get(ENV, "SBEC_SPAN", "0") == "2" ? (2.0:1.0:8.0) : (0.0:1.0:6.0)
+        kz_winding_scan(; tau_Qs=τ_relax .* exp.(span),
+            n_traj=parse(Int, m[4]), M_damp=(m[3] == "full" ? 1e-2 : 0.0),
+            dt=0.05, M_grid=256, backend, shard=(i, n), raw_only=true,
+            tag="kz_torus_slow$(m[3])_s$(i)of$(n)")
     elseif startswith(mode, "hold")
         # Does the post-quench hold erase the imprint? beta came out 0.012 against
         # a published 0.124 with a hold of 1000 time units — 68x the quench itself
@@ -380,9 +620,17 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # "merge:nd" / "merge:full" — read every shard's RAW windings, then do the
         # statistics once, on the pooled sample.
         md = split(mode, ":")[2]
+        # `occursin`, not `==`: the tag is "slowfull" for the extended scan, and
+        # comparing exactly printed the full-SPGPE data against the
+        # number-damping reference — a mislabel that flatters or damns the result
+        # by whichever number it happens to grab.
+        is_full = occursin("full", md)
         files = filter(f -> startswith(f, "kz_torus_$(md)_s") && endswith(f, "_raw.csv"),
             readdir(OUTDIR))
         isempty(files) && error("no raw shards for $md in $OUTDIR")
+        # Refuse rather than average across code versions.
+        prov = assert_same_provenance(joinpath.(OUTDIR, files))
+        println(prov)
         byτ = Dict{Float64, Vector{Float64}}()
         for f in files, ln in eachline(joinpath(OUTDIR, f))
             (isempty(ln) || startswith(ln, "#") || startswith(ln, "tau_Q")) && continue
@@ -390,8 +638,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
             push!(get!(byτ, parse(Float64, a_), Float64[]), parse(Float64, b_))
         end
         τs = sort(collect(keys(byτ)))
-        @printf("=== %s, %d shards ===\n", md == "full" ? "FULL SPGPE" : "number-damping",
-            length(files))
+        @printf("=== %s [%s], %d shards ===\n",
+            is_full ? "FULL SPGPE" : "number-damping", md, length(files))
         @printf("%-10s %-6s %-9s %-9s %-9s %-8s %-8s\n",
             "tau_Q", "n", "sigma(W)", "err", "<W>", "z(<W>)", "int(W)")
         σs, es = Float64[], Float64[]
@@ -425,7 +673,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         resid = y .- (ȳ .+ slope .* (x .- x̄))
         β_resid = sqrt(sum(resid .^ 2) / (length(x) - 2) / Sxx)
         β_err = max(β_prop, β_resid)
-        ref = md == "full" ? (0.0966, 0.0128) : (0.1236, 0.0098)
+        ref = is_full ? (0.0966, 0.0128) : (0.1236, 0.0098)
         @printf("\nbeta = %.4f ± %.4f  (propagated %.4f, residual %.4f)\n",
             β, β_err, β_prop, β_resid)
         @printf("published %.4f ± %.4f   ->  %.1f sigma\n",

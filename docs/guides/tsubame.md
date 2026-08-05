@@ -70,6 +70,8 @@ pinned, project root off `$HOME`, group-volume headroom, `runs/` present, and (f
 
 Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN` emits one metadata op per frame, which stacks. `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR` redirects `.tmp` files to NVMe and copies to Lustre on success.
 
+> ⚠️ **The node-local NVMe default only fits SMALL grids — but keep the scratch on NVMe anyway.** For n ≳ 100 per-dim, ψ snapshots (112³ F32 = 91 MB/frame) overrun node-local NVMe; the `tmp → runs/` (Lustre) move then dies `EXDEV` / `sendfile -122`. **Do NOT "fix" this by moving the scratch to Lustre** — JLD2 writes via mmap and **mmap on Lustre `SIGBUS`es** (`signal 7` at `unsafe_store!`). The correct fix is to **shrink the snapshot volume** so the jld2 fits NVMe: raise `save.every` (measured: n112 needs ~2000, n80 is fine at 300). Also reap leftover multi-GB run dirs and watch the group quota (`lfs quota -g tga-kozuma-kouhi /gs/fs`, ~1 TB) — over-quota silently breaks `git` and `qsub`.
+
 ## Edit-test-submit loop
 
 ```bash

@@ -22,6 +22,11 @@ const LIVE_DOCS = [
     # `test_state_doc_is_current.jl` — the only LIVE doc whose
     # correctness is machine-checked rather than merely asserted.
     "docs/STATE.md",
+    # The SPGPE Kibble-Zurek record: what reproduces, at what sigma, and under
+    # which invariance checks. LIVE rather than dated because the ladder continues —
+    # step 1 (c1 on) results land here — and freezing a document one is about to
+    # update would be a false label.
+    "docs/validation/spgpe_kz_reproduction.md",
     "docs/architecture/rotating_basis.md",
     "docs/archive/README.md",
     "docs/campaign/CAMPAIGN.md",
