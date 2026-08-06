@@ -14,6 +14,7 @@
 
 export spgpe_reservoir, reservoir_chemical_potential
 export incoherent_population, mu_from_total_number
+export FeedbackWaveform, number_conserving_callback
 
 """
     reservoir_chemical_potential(N, T, ω̄, m, a_s; branch=:condensate) -> μ [J]
@@ -321,4 +322,54 @@ function mu_from_total_number(N_total::Real, N_C::Real, T::Real, eps_cut::Real;
         abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
     end
     0.5 * (lo + hi)
+end
+
+"""
+    FeedbackWaveform(value) <: Waveform
+
+A waveform whose value is read from a `Ref` at every step, so a controller can
+change it while the run is in progress.
+
+`SPGPEReservoir` evaluates `mu` once per step, and a precomputed
+`PiecewiseLinearWaveform` is the right representation when `μ(t)` is known in
+advance. It is the wrong one for [`mu_from_total_number`](@ref), which needs `N_C`
+from the field and therefore cannot be tabulated before the run.
+"""
+struct FeedbackWaveform <: Waveform
+    value::Base.RefValue{Float64}
+end
+FeedbackWaveform(x::Real=0.0) = FeedbackWaveform(Ref(Float64(x)))
+evaluate(w::FeedbackWaveform, ::Float64) = w.value[]
+max_frequency(::FeedbackWaveform) = 0.0
+
+"""
+    number_conserving_callback(mu_ref, N_total_of, T_of, eps_cut; omega=1.0, every=1)
+
+An `on_step` callback that keeps `mu_ref` at the value where the atoms outside the
+c-field fill the I region: `N_I(μ,T) = N_total(t) − N_C(t)`, with `N_C` measured
+from the field.
+
+`N_total_of(t)` supplies the total — from a 0-D evaporation trajectory, or from a
+measurement. The condensate number is then an OUTPUT of the run rather than a
+consequence of the `μ` that was fed in.
+
+When the demand cannot be met — `N_C` already exceeds the total, or the I region
+cannot hold the remainder below the cutoff — [`mu_from_total_number`](@ref) returns
+`NaN` and this leaves `mu_ref` at its previous value and counts the event. A
+trajectory that spends most of its steps unsatisfiable is not describing the
+experiment, and `n_unsatisfiable` is what says so; silently clamping would hide
+exactly the kind of imposed answer this whole mechanism exists to remove.
+"""
+function number_conserving_callback(
+    mu_ref::Base.RefValue{Float64}, N_total_of, T_of, eps_cut;
+    omega::Real=1.0, every::Int=1, counter::Base.RefValue{Int}=Ref(0),
+)
+    function (ws, step, args...)
+        step % every == 0 || return nothing
+        t = step * ws.sim_params.dt
+        N_C = real(sum(abs2, ws.state.psi)) * cell_volume(ws.grid)
+        mu = mu_from_total_number(N_total_of(t), N_C, T_of(t), eps_cut; omega)
+        isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
+        nothing
+    end
 end
