@@ -107,6 +107,32 @@ number and a `c1 ≠ 0` result can be read as a departure from it. If it does no
 either the spinor plumbing changes something it should not, or the reasoning above
 is wrong; both have to be settled before any `c1 ≠ 0` exponent is quoted.
 
+**Result: it failed at 5.3 σ, and the reasoning was wrong.** 320 trajectories per
+point, one provenance record across all 16 shards:
+
+| `τ_Q` | 1000 | 3000 | 10⁴ | 3×10⁴ | 10⁵ |
+|---|---|---|---|---|---|
+| `σ(W)` | 2.143 | 1.997 | 1.814 | 1.820 | 1.909 |
+
+`β = 0.0280 ± 0.0152`, and `σ(W)` is not monotone — it falls, then rises over the
+last two rates.
+
+The error is in the choice of observable. At `c1 = 0` the three components are freely
+interconvertible, nothing penalising the movement of atoms between them, so a single
+component's winding is **not topologically protected**: it can unwind by population
+transfer as well as by a phase slip. That relaxation channel does not exist in the
+scalar case and washing out the `τ_Q` dependence is what it would do — a nearly flat
+`σ(W)` is its signature. What total number conservation does protect at `c1 = 0` is
+the **mass** winding of `Σ_c ψ_c`, and the per-component winding is what was run.
+
+Rejected explanation: that three components at `c1 = 0` is an O(6) model against the
+scalar's O(2), so the class differs. At mean field both give `ν = 1/2`, `z = 2` and
+therefore `β = 0.125`, which does not account for 0.028; the measured scalar 0.1327
+sits close to that mean-field value.
+
+The anchor is being rerun on the mass winding. Until it lands, no `c1 ≠ 0` exponent
+can be quoted in either direction.
+
 Two further anchors exist and are cheaper than a new physics claim:
 
 - **`σ(W) ∝ √L`** for spin vortices, which Uhlmann et al. establish at `T = 0`. The
