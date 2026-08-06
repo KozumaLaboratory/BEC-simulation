@@ -34,9 +34,14 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
     n_pts = NTuple{length(n_pts_raw), Int}(Int.(n_pts_raw))
     box_raw = get(grid_raw, "box", get(grid_raw, "box_size", nothing))
 
+    # F comes from `ATOM_REGISTRY`, the one declaration per species. A
+    # hand-written 5-entry table sat here until 2026-08-06 with a fallback of 6,
+    # and was wrong for 15 of the registry's 23 atoms: Ca40 / Sr / Yb (F=0) were
+    # sized 13x too large, Rb85 2.6x too large, and `Dy162` (F=8) 1.31x too
+    # SMALL. This is the second copy of the same table found today — the first
+    # was in `autopilot/profile_recommend.jl`.
     atom_name = get(gs, "atom", "Eu151")
-    F_map = Dict("Na23" => 1, "Rb87" => 1, "Cr52" => 3, "Dy164" => 8, "Eu151" => 6)
-    F = get(F_map, atom_name, 6)
+    F = haskey(ATOM_REGISTRY, Symbol(atom_name)) ? ATOM_REGISTRY[Symbol(atom_name)].F : 6
     D = 2F + 1
 
     N_voxels = prod(n_pts)

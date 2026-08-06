@@ -129,6 +129,34 @@ function refresh_budget!(; qr::QueueRoot=autopilot_queue_root())
             end
         end
     end
+    # ABSENCE MUST NOT READ AS HEALTH. `gpu_hours_realized` is documented as
+    # "filled in by qacct/scheduler poller" and **no such poller exists** — grep
+    # the tree: the field is only ever read back from TOML or defaulted to 0.0,
+    # never computed from a completed run. So this loop sums zeros, the caps
+    # compare 0.0 against them, and the budget gate has never been able to trip.
+    #
+    # Reporting 0.0 spent is indistinguishable from "well under budget", which is
+    # the direction that costs money. The material for a real number is on the
+    # entry (`cluster_started_at`, `terminal_at`, `profile`), but choosing the
+    # formula — queue time or run time, GPUs per profile, or qacct as the
+    # authority on TSUBAME — is a decision, not a derivation, so this warns
+    # instead of inventing one.
+    n_terminal = 0
+    n_zero = 0
+    for st in (:done, :killed_data, :killed_bug)
+        for e in list_queue(st; qr=qr)
+            n_terminal += 1
+            e.gpu_hours_realized == 0.0 && (n_zero += 1)
+        end
+    end
+    if n_terminal > 0 && n_zero == n_terminal
+        @warn "budget: every one of $n_terminal terminal entries reports " *
+            "gpu_hours_realized == 0.0, so the caps are comparing against " *
+            "nothing. No writer for that field exists (it is documented as " *
+            "filled by a qacct poller that was never built). Treat the " *
+            "budget gate as OFF until one lands." _module = nothing _file = nothing
+    end
+
     b.realized_total = total
     b.realized_today = today_sum
     set_budget!(b; qr=qr)
