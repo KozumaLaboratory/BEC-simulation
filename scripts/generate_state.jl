@@ -283,6 +283,31 @@ end
 
 
 """
+The `src/solvers/` surface: what is there, listed by the filesystem.
+
+`CLAUDE.md` restated this directory TWICE and the two disagreed with each other
+(one omitted `spgpe`, the other named "embedded-adaptive" whose file was deleted
+in `e037867c`), and both omitted `evaporation/`, `newton_cg.jl`,
+`preconditioner.jl`, `convergence_metrics.jl`, `thermal_cfield.jl` and
+`trapped_bdg.jl`. Two hand-written restatements of one directory in one file is
+the disease in its purest form: neither was checked against the tree, and
+nothing checked them against each other.
+"""
+function solver_surface()
+    root = joinpath(ROOT, "src", "solvers")
+    dirs, files = String[], String[]
+    for e in sort(readdir(root))
+        if isdir(joinpath(root, e))
+            n = count(f -> endswith(f, ".jl"), readdir(joinpath(root, e)))
+            push!(dirs, "$e/ ($n)")
+        elseif endswith(e, ".jl")
+            push!(files, e)
+        end
+    end
+    (dirs, files)
+end
+
+"""
 What `tol` actually bounds, and when it is even looked at.
 
 `docs/reference/yaml_schema_reference.md` labelled `tol` as
@@ -607,6 +632,24 @@ function render()
     p("whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite")
     p("sign for two months because eight test files checked the VALUE and none checked")
     p("that there was only one of them.")
+    p()
+
+    sdirs, sfiles = solver_surface()
+    assert_nondegenerate("solver surface",
+        length(sdirs) >= 4 && length(sfiles) >= 12,
+        "found $(length(sdirs)) subdirectories and $(length(sfiles)) top-level files " *
+        "under src/solvers/ (expect >= 4 and >= 12)")
+    p("## `src/solvers/` — what is actually there")
+    p()
+    p("**Subdirectories (.jl count):** " * join("`" .* sdirs .* "`", ", "))
+    p()
+    p("**Top-level files:** " * join("`" .* sfiles .* "`", ", "))
+    p()
+    p("`CLAUDE.md` restated this directory twice and the two restatements disagreed")
+    p("with each other; both omitted `evaporation/` and five top-level files, and one")
+    p("named a module whose file was deleted in `e037867c`. Two hand-written")
+    p("restatements of one directory, in one file, neither checked against the tree")
+    p("nor against each other.")
     p()
 
     erel, crit, critn, guard, guardn, reasons = gs_exit_contract()

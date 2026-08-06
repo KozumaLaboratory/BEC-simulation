@@ -72,6 +72,18 @@ whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
 
+## `src/solvers/` — what is actually there
+
+**Subdirectories (.jl count):** `continuation/ (5)`, `evaporation/ (9)`, `ground_state/ (6)`, `lbfgs/ (4)`, `simulation/ (4)`
+
+**Top-level files:** `adaptive.jl`, `binary_simulation.jl`, `convergence_metrics.jl`, `ground_state.jl`, `hessian.jl`, `newton_cg.jl`, `photon_heating.jl`, `preconditioner.jl`, `projected_gp.jl`, `scalar_egpe.jl`, `sgpe.jl`, `simulation.jl`, `spgpe.jl`, `thermal_cfield.jl`, `trapped_bdg.jl`, `twa.jl`
+
+`CLAUDE.md` restated this directory twice and the two restatements disagreed
+with each other; both omitted `evaporation/` and five top-level files, and one
+named a module whose file was deleted in `e037867c`. Two hand-written
+restatements of one directory, in one file, neither checked against the tree
+nor against each other.
+
 ## Ground-state exit contract: what `tol` bounds
 
 ITP convergence, read from `src/solvers/ground_state/itp_loop.jl:208`:

@@ -64,6 +64,10 @@ end
         @test occursin("Declared **once**", derived)
         @test occursin("test_bfield_sign_declared_once.jl", derived)
         # the two sections whose value is an equality / a disagreement, not a list
+        @test occursin("## `src/solvers/` — what is actually there", derived)
+        # the two omissions that proved both hand-written restatements wrong
+        @test occursin("evaporation/", derived)
+        @test occursin("trapped_bdg.jl", derived)
         @test occursin("## Ground-state exit contract", derived)
         # the rendered criterion must BE the code's condition
         @test occursin("dE < tol", derived)

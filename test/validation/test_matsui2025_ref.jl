@@ -161,7 +161,9 @@ end
         # (the caption admits a 10 nT axis offset, 3x the centre itself). Since
         # W5 `arbitrates` is DERIVED from `disqualified_by`; the derivation and
         # the closed vocabulary behind it are gated by
-        # `test/validation/test_arbitrates_is_derived.jl`.
+        # the `arbitrates` derivation, which is asserted in THIS file rather than in a
+        # separate one. (This named `test/validation/test_arbitrates_is_derived.jl`
+        # until 2026-08-06; no such file has ever existed.)
         @test ref(:matsui2025, :dip_width_exp_scanwindow_nT).arbitrates
         @test ref(:matsui2025, :dip_width_sim_scanwindow_nT).arbitrates
         @test ref(:matsui2025, :dip_centre_sim_nT).arbitrates
