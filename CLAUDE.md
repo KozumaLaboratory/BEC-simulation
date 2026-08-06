@@ -370,6 +370,36 @@ Semantic mismatch is not type-visible — static analysis cannot catch file/func
 
 **User-supplied callbacks** (simulation `SimulationCallbacks.on_step`; this also named `extract_observables` until 2026-08-05, a symbol that exists nowhere in the repo) accept `::Function` — OK in cold paths; hot-loop callbacks must parameterize: `struct Cb{F1,F2} ...`.
 
+## Measuring: never write a bespoke scan
+
+Nine measurements in one session (2026-08-05/06) were silently blind and every
+one printed a clean, plausible number: an external `diff` with no `+`/`-`
+prefixes read as "no changes"; zsh not word-splitting `$VAR` read as "no file
+touched"; `occursin(f)` fixing the SECOND argument read as "unanchored"; a scan
+counting LINES walked past a defect that fit on one; a regex over source
+reported `CI_EXTRA` 90 for a list of 113; `grep -c` on a missing file reported
+0 failures.
+
+Each was fixed where it happened. **That is fixing the instance, and the class
+is: a bespoke scan written inline has no way to say "I looked and found
+nothing" differently from "I could not look".** Both print the same number.
+Calibrating by hand catches most of them and is forgotten about half the time,
+so it is not a design.
+
+**Use `test/helpers/calibrated_scan.jl`.** `calibrated_scan(corpus; match,
+present, absent)` will not return a result until it has shown `match(present)`
+and `!match(absent)`; it throws `BlindScan` naming which probe failed, because
+"the positive control was not found" (broken extractor) and "the negative
+control matched" (predicate too wide) are different bugs. `count_matches`
+counts matches rather than lines — the distinction that let a gate pass its own
+canary. `tree_files` is the single definition of "which files are in scope",
+because two scans this session disagreed about the corpus and each reported an
+absence that was really a gap in its own reach.
+
+Choose the probes from the failure being guarded against, never for
+convenience: a positive control that cannot fail proves nothing, which is the
+degenerate-knob trap in another costume.
+
 ## Before computing — five gates
 
 Measured 2026-08-02: a request to fit an experiment produced **24 × 45-point GPU

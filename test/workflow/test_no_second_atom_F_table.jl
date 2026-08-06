@@ -2,6 +2,8 @@ using Test
 using SpinorBEC
 using SpinorBEC: ATOM_REGISTRY
 
+include(joinpath(@__DIR__, "..", "helpers", "calibrated_scan.jl"))
+
 # `ATOM_REGISTRY` is the ONE declaration of F per species. No other file may
 # carry its own atom→F map.
 #
@@ -66,10 +68,10 @@ end
                                "Dy164" => 8, "Eu151" => 6)
             """
         pat = r"\"[A-Z][a-z]?[0-9]{1,3}(?:star)?\"\s*=>\s*[0-9]+"
-        @test sum(length(collect(eachmatch(pat, l))) for l in split(probe, '\n')) >= 5
-        # and specifically: three pairs on ONE line must count as three
+        @test count_matches(pat, split(probe, '\n')) >= 5
+        # three pairs on ONE line must count as three — the canary's blind spot
         one_line = "const T = Dict(\"Na23\" => 1, \"Rb87\" => 1, \"Eu151\" => 6)"
-        @test length(collect(eachmatch(pat, one_line))) == 3
+        @test count_matches(pat, one_line) == 3
         # and the registry is big enough for a copy of it to be wrong about
         @test length(ATOM_REGISTRY) >= 20
     end

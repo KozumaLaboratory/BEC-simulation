@@ -16,6 +16,7 @@ const FAST_TESTS = [
     "test_tier_membership.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
     "test_claude_md_citations_resolve.jl",

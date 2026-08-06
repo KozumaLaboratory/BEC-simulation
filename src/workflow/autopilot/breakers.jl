@@ -23,7 +23,12 @@ Base.@kwdef struct BreakerThresholds
     recipe_failure_window::Int = 5        # last-N window for the rate
     max_lineage_depth::Int = 16       # transitive parent_id chain cap
     max_dispatches_per_hour::Int = 64       # runaway dispatcher cap
-    max_kill_ratio::Float64 = 1.0      # kills/dispatches in trailing 1h
+    # `kill_rate_ratio` returns kills/dispatches where the kills are a SUBSET of
+    # the dispatches, so the metric is bounded in [0, 1]. This default was 1.0
+    # and the test is `ratio > max_kill_ratio`, which is unreachable — the
+    # breaker that exists to catch "everything is dying" could never trip.
+    # 0.5 = half of a window's runs died, which is already a stop-work signal.
+    max_kill_ratio::Float64 = 0.5      # kills/dispatches in trailing 1h, in [0,1]
 end
 
 const _DEFAULT_BREAKER_THRESHOLDS = Ref{BreakerThresholds}(BreakerThresholds())
