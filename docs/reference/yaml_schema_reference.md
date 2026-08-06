@@ -119,7 +119,7 @@ a typo warning.
 | `hard_polarize` | Real [-12, 12] | — | force `<F_z>=value` at step start |
 | `noise_seed` | Number | random | RNG seed for thermal / mode noise |
 | `integrator` | standard: strang / midpoint / rk4ip — rotating_basis: strang / yoshida4 / yoshida6 / cfet4 | strang | any other value raises `ArgumentError`; `yoshida` / `adaptive` / `richardson` are NOT implemented on the standard path (`_resolve_dynamics_stepper`, `run_step_dynamics.jl:463`) |
-| `backend` | cpu / gpu | inherited | per-step override |
+| `backend` | cpu / gpu | **inherited from the predecessor workspace** | NOT a per-step override on `dynamics:` — `run_step_dynamics.jl:191` takes `ws_prev.backend` and the step key is validated and discarded. Called a per-step override here until 2026-08-06. |
 | `kind` | binary / rotating_basis | inherited | per-step solver override |
 | `B_direction` | dict | — | rotating_basis only |
 | `epsilon` | Real [1e-15, 1.0] | — | rotating_basis adaptive accuracy |
@@ -689,7 +689,7 @@ These keys used to be accepted via `[ALIAS]` rescues; they now raise
 | `phi_omega` / `phi_dot` (flat B_hat) | `B: {phi: <waveform>}` or `B_direction: {phi: {rate: ...}}` | `B_block.jl` |
 | `theta_const`, `theta_ramp`, `phi_chirp` (flat B_hat) | `B: {theta: <waveform>}` | same |
 | `initial_state: ferromagnetic` | `m_plus_F` or `m_minus_F` | schema enum |
-| `kind: option_gamma` | `kind: rotating_basis` | schema enum |
+| `kind: option_gamma` | `kind: rotating_basis` | **retired on `dynamics:` ONLY** — `GS_SCHEMA` still accepts it (`schema.jl:266`), `runner.jl:71` branches on it and `test/rotating_basis/test_rotating_basis_pipeline_parsing.jl` pins that it works. Listed here as unconditionally removed until 2026-08-06; deleting the GS arms on that reading breaks `runs/option_gamma_*/config.yaml`. |
 | `backend: cuda` | `backend: gpu` | `foundation/backend.jl:_resolve_backend` |
 | `B: {level: <0|1|2>}` | (drop the key; coord auto-detects from `p` vs `Bx` vs `B_mag`) | `B_block.jl` |
 | `B: {magnitude: ...}` | `B: {B_mag: ...}` | `B_block.jl` |
