@@ -13,6 +13,7 @@
 # cold, which is what happens in the laboratory.
 
 export spgpe_reservoir, reservoir_chemical_potential
+export incoherent_population, mu_from_total_number
 
 """
     reservoir_chemical_potential(N, T, ω̄, m, a_s; branch=:condensate) -> μ [J]
@@ -234,4 +235,90 @@ function spgpe_reservoir(
         k_cut=k_cut_series, eps_cut=eps_cut_series, k_cut_max=maximum(k_cut_series),
         N0_ref=r.N0[sel], N_ref=r.N[sel], omega_bar=ωbar,
         duration_s=r.t[sel[end]] - t_ref, duration_internal=t_int[end])
+end
+
+"""
+    incoherent_population(mu, T, eps_cut; omega=1.0, n_max=4000) -> Float64
+
+Bose population of the I region — every harmonic level above `eps_cut` — at
+chemical potential `mu` and temperature `T`, in internal units:
+
+    N_I(μ,T) = Σ_{n : ε_n > ϵ_cut} g_n / (exp((ε_n − μ)/T) − 1),
+    ε_n = (n + 3/2)ω̄,   g_n = (n+1)(n+2)/2
+
+Strictly increasing in `mu` and divergent as `mu → ϵ_cut⁻`, which is what makes
+[`mu_from_total_number`](@ref) invertible.
+"""
+function incoherent_population(mu::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, n_max::Int=4000)
+    (T <= 0) && return 0.0
+    s = 0.0
+    for n in 0:n_max
+        ε = (n + 1.5) * Float64(omega)
+        ε > eps_cut || continue
+        x = (ε - Float64(mu)) / Float64(T)
+        x > 0 || return Inf                      # μ above an occupied I level
+        x > 60 && break                          # remaining terms are below 1e-26
+        s += 0.5 * (n + 1) * (n + 2) / expm1(x)
+    end
+    s
+end
+
+"""
+    mu_from_total_number(N_total, N_C, T, eps_cut; omega=1.0) -> Float64
+
+The chemical potential at which the atoms NOT in the c-field fill the I region:
+solve `N_I(μ,T) = N_total − N_C` for `μ`. Returns `NaN` when there is no solution.
+
+# Why this and not `reservoir_chemical_potential`
+
+That function maps a total `N` to a `μ` through an assumed equilibrium split — the
+Thomas–Fermi branch gives `μ = μ_TF(N₀)`, the thermal branch inverts `Li₃`. Either
+way `μ` is computed from `N` under an assumption about how `N` divides, and in a
+grand-canonical SPGPE **prescribing `μ` prescribes `N₀`**: `μ < ε₀` forbids a
+condensate and `μ > ε₀` fixes the size through `μ = ε₀ + c₀n₀`. So a run built that
+way cannot answer "how many atoms condense" — the answer was in the input. That is
+why the euv3 evaporation verdict was retracted: it moved with a one-parameter `K₃`
+fit and flipped at `K₃/fit ≈ 0.3`.
+
+This takes `N_C` from the field instead. What is prescribed is the **total**, an
+extensive measured quantity, and the split is left to the dynamics. The feedback is
+restoring rather than circular: a c-field holding few atoms leaves many for the I
+region, which at fixed `T` requires a higher `μ`, which drives growth — and the
+converse. `N₀` is then an output.
+
+What it does not fix: `N_total(t)` still comes from the 0-D model and still carries
+the `K₃` systematic. The difference is that `K₃` now moves the total rather than
+deciding whether a condensate exists at all.
+
+Requires `μ < ϵ_cut`, since the lowest I level sits there and a Bose occupation
+above it diverges. `NaN` is returned rather than a clamped value when
+`N_total ≤ N_C` (nothing left for the reservoir) or when the demand cannot be met
+below the cutoff — an unsatisfiable constraint is a fact about the trajectory, not
+something to paper over with a default.
+"""
+function mu_from_total_number(N_total::Real, N_C::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, rtol::Real=1e-8, iters::Int=200)
+    N_I_target = Float64(N_total) - Float64(N_C)
+    (N_I_target <= 0 || T <= 0) && return NaN
+
+    # ϵ_cut is the pole; bracket strictly below it. The lower end is walked down
+    # until the I region is under-filled, so the bracket is found rather than
+    # assumed — a hard-coded lower bound would silently fail for a cold reservoir.
+    hi = Float64(eps_cut) - 1e-9 * max(abs(eps_cut), 1.0)
+    incoherent_population(hi, T, eps_cut; omega) >= N_I_target || return NaN
+    lo = hi - Float64(T)
+    for _ in 1:60
+        incoherent_population(lo, T, eps_cut; omega) < N_I_target && break
+        lo -= max(Float64(T), abs(lo))
+        lo < -1e12 && return NaN
+    end
+
+    for _ in 1:iters
+        mid = 0.5 * (lo + hi)
+        n = incoherent_population(mid, T, eps_cut; omega)
+        (n < N_I_target) ? (lo = mid) : (hi = mid)
+        abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
+    end
+    0.5 * (lo + hi)
 end
