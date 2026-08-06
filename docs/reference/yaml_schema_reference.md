@@ -660,8 +660,15 @@ A list of analyzers, each `{<name>: <params>}`. Names include:
 - `bogoliubov` (k_max, n_k, ...)
 - `vortex_detect`, `monopole_charge`, `defect_density`
 - `column_density_movie` (axis, multi_step)
-- `larmor_phase`, `berry_connection`
-- `population_history`
+<!-- `larmor_phase`, `berry_connection` and `population_history` were listed here
+     until 2026-08-06. None has ever been a `_run_analyzer` branch. Analyzer
+     names are not pre-validated, so an unknown one throws only AFTER
+     ground_state and dynamics have run — a reader who copied one paid for the
+     whole simulation and got no point_*.jld2. The nearest real objects are
+     `berry_connection_trajectory` (analyzers/rotating_basis.jl, called
+     directly) and the `larmor_phase_per_step` key of `integrator_meta`;
+     neither is reachable from `analyze:`. Gated by
+     test/workflow/test_docs_teach_real_analyzers.jl. -->
 - `trap_population` (radius, center) — inside-vs-outside-trap norm split; tracks atoms spilling toward the absorbing boundary
 - `cloud_shape` — center of mass, per-axis RMS widths, principal-axis widths, aspect ratio, in-plane tilt; quantifies cloud deformation across a snapshot series
 - `superfluid_fraction` (directions, method) — per-axis $f_s$ from the phase-twist free energy: `leggett` (plane-average bound), `relaxed` (full variational minimum), or `both` (default). Rigid-density, so both are upper bounds; a cloud that does not span the periodic box legitimately reports ≈ 0

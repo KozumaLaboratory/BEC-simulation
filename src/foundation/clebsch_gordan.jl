@@ -31,7 +31,13 @@ end
     wigner_3j(j1, j2, j3, m1, m2, m3)
 
 Wigner 3-j symbol via the Racah formula in log-space.
-All arguments are integers (not half-integers); for half-integer spins, pass 2j values.
+All arguments are integers (not half-integers), and the arithmetic is integer
+throughout — the triangle coefficient and the Racah sum consume them unhalved.
+**There is no doubled-argument convention**: this line promised "for half-integer
+spins, pass 2j values" until 2026-08-06 and nothing implements it, so
+`wigner_3j(1,1,2,1,-1,0)` returns the integer symbol 1/√30, not the 1/√6 a 2j
+reading would mean. Dormant here because F is always integer in this codebase;
+a future half-integer species needs a real implementation, not this docstring.
 For this codebase, F is always integer so we use integer arithmetic throughout.
 """
 function wigner_3j(j1::Int, j2::Int, j3::Int, m1::Int, m2::Int, m3::Int)
