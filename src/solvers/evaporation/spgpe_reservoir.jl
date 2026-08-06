@@ -363,12 +363,25 @@ exactly the kind of imposed answer this whole mechanism exists to remove.
 function number_conserving_callback(
     mu_ref::Base.RefValue{Float64}, N_total_of, T_of, eps_cut;
     omega::Real=1.0, every::Int=1, counter::Base.RefValue{Int}=Ref(0),
+    t_offset::Real=0.0,
 )
     function (ws, step, args...)
         step % every == 0 || return nothing
-        t = step * ws.sim_params.dt
+        # t_offset because a c-field run may start PART WAY through a ramp — the
+        # classical field cannot represent the hot end of an evaporation at all, so
+        # the 0-D model carries the cooling and this takes over for the formation.
+        # Without the offset N_total_of and T_of would be read as if the ramp had
+        # restarted from zero.
+        t = Float64(t_offset) + step * ws.sim_params.dt
         N_C = real(sum(abs2, ws.state.psi)) * cell_volume(ws.grid)
-        mu = mu_from_total_number(N_total_of(t), N_C, T_of(t), eps_cut; omega)
+        # eps_cut may be a NUMBER or a FUNCTION of time. It has to be allowed to
+        # move: both reservoir coefficients depend on the cutoff only through
+        # (eps_cut - mu)/T, so holding it fixed while T falls drives that ratio up and
+        # decouples the reservoir — a failure this repo already gates elsewhere. And
+        # the controller must use the same cutoff the projector does, or it solves for
+        # a mu against an I region the field does not have.
+        ec = eps_cut isa Real ? Float64(eps_cut) : Float64(eps_cut(t))
+        mu = mu_from_total_number(N_total_of(t), N_C, T_of(t), ec; omega)
         isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
         nothing
     end
