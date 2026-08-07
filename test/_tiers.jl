@@ -776,6 +776,7 @@ const FULL_EXTRA = [
     # Round-1..3 regression pins
     "rotating_basis/test_rotating_frame_regression.jl",
     "rotating_basis/test_transverse_spin_is_measured.jl",
+    "rotating_basis/test_dt_matches_the_integrator_that_runs.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
     "dynamics/test_sgpe_stoof.jl",

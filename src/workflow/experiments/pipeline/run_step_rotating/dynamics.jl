@@ -3,6 +3,11 @@
 # const / ramp / chirp), dispatches the chosen integrator, and records
 # observable history (norms, Lz, ⟨F_z⟩, per-m, optional ψ̃ snapshots).
 
+# What this path actually executes. `strang` is the order-2 key
+# `_dt_from_epsilon` understands, and `split_step_midpoint!` is Strang with a
+# midpoint mean-field predictor — same order, restored (CLAUDE.md).
+const _ROTATING_ACTUAL_INTEGRATOR = "strang"
+
 @noinline function _run_rotating_basis_dynamics_inner(
     p::Dict{String, Any}, grid, pipeline_results::Dict;
     verbose::Bool=true,
@@ -21,6 +26,16 @@
 
     duration = Float64(p["duration"])
     integrator_name = String(get(p, "integrator", _default_rotating_integrator(duration)))::String
+    # A request this path cannot honour must be said out loud. It was printed as
+    # "requested=" and recorded as `:integrator`, i.e. the artifact claimed a
+    # method that never ran, and a postmortem checking the Larmor-stiff regime
+    # read the wrong order.
+    if integrator_name != _ROTATING_ACTUAL_INTEGRATOR &&
+        integrator_name != "split_step_midpoint"
+        @warn "rotating_basis runs `split_step_midpoint!` (order 2) regardless of " *
+            "`integrator:`; the requested one is not used, and dt from " *
+            "`epsilon:` is computed for order 2." requested = integrator_name
+    end
 
     # dt resolution priority:
     #   1. explicit `dt:` in YAML (override)
@@ -30,7 +45,15 @@
         Float64(p["dt"])
     elseif haskey(p, "epsilon")
         ε = Float64(p["epsilon"])
-        _dt_from_epsilon(ε, duration, integrator_name)
+        # The order of what RUNS, not of what was asked for. This loop always
+        # calls `split_step_midpoint!` (2nd order); `integrator_name` selects
+        # nothing. Passing it here derived dt from the requested method's ORDER,
+        # so `integrator: yoshida4` with `epsilon: 1e-6` over duration 100 gave
+        # dt = 1e-3 where 2nd order needs 1e-5 — 100x too large, and since the
+        # error goes as dt^2 for the method that actually runs, **10^4 times the
+        # requested tolerance**. `yoshida6` gives 2e5 times. The accuracy knob
+        # silently did not deliver.
+        _dt_from_epsilon(ε, duration, _ROTATING_ACTUAL_INTEGRATOR)
     else
         0.005   # default when neither ε nor dt is specified
     end
@@ -257,7 +280,10 @@
         # check whether a run was in the Larmor-stiff regime
         # (`p · F · dt > π`) without re-loading the YAML config.
         :dt_used => dt_rtp,
-        :integrator => integrator_name,
+        # What RAN. This recorded the REQUEST until 2026-08-07, so an audit
+        # reading `integrator_meta/integrator` got a method that never executed.
+        :integrator => "split_step_midpoint",
+        :integrator_requested => integrator_name,
         :epsilon_target => Float64(get(p, "epsilon", NaN)),
         :p_zeeman => ws_prev.p,
         :F_atom => F_atom_int,

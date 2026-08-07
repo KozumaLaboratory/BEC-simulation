@@ -208,7 +208,7 @@ File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
 - `FAST_TESTS` — 246 files
 - `CI_EXTRA` — 113 files
-- `FULL_EXTRA` — 72 files
+- `FULL_EXTRA` — 73 files
 - `PHYSICS_TESTS` — 7 files
 - `ORACLE_TESTS` — 75 files
 - `INTEGRATION_TESTS` — 44 files
