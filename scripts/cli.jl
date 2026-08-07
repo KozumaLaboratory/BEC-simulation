@@ -121,8 +121,10 @@ end
 
 function _cmd_preflight(args)
     smoke = isempty(args) ? nothing : args[1]
-    cuda_preflight_check(; smoke_config=smoke)
-    return 0
+    # Propagate. This discarded the verdict and returned 0 until 2026-08-07, so
+    # `cli.jl preflight` exited green on a machine with no GPU — the caller threw
+    # away the only signal the check produced.
+    return cuda_preflight_check(; smoke_config=smoke) ? 0 : 1
 end
 
 # ── autopilot subcommand dispatcher ──────────────────────────────────
