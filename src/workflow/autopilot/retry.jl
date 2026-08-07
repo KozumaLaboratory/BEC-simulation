@@ -77,14 +77,28 @@ PERMANENT stays in killed_bug.
 function retry_failed!(;
     max_retries::Int=3,
     qr::QueueRoot=autopilot_queue_root(),
-    backend::AutopilotBackend=LocalBackend(),
+    backend::Union{Nothing, AutopilotBackend}=nothing,
+    config::Union{Nothing, AutopilotConfig}=nothing,
 )
     retried = 0
     escalated = 0
     abandoned = 0
     for entry in list_queue(:killed_bug; qr=qr)
         outcome = _load_outcome(entry)
-        backend_reason = _backend_reason(entry, backend)
+        # Per ENTRY, as `tick` does. This applied a single backend — defaulting
+        # to `LocalBackend()` — to every entry until 2026-08-07, and the CLI
+        # passed none, so a `:uge` failure was interrogated by the LOCAL backend:
+        # `backend_reason` came back empty and qacct's post-mortem never reached
+        # `classify_failure`. `resolve_backend` throws loudly on an unregistered
+        # type, which is the right failure for "queued :uge, running local-only".
+        eb = if backend !== nothing
+            backend
+        elseif config !== nothing
+            resolve_backend(config, entry)
+        else
+            LocalBackend()
+        end
+        backend_reason = _backend_reason(entry, eb)
         cls = classify_failure(outcome, backend_reason)
 
         if entry.attempt >= max_retries

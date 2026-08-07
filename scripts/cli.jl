@@ -181,7 +181,10 @@ end
 
 function _ap_retry(rest)
     max_r = _kvi(rest, "max", 3)
-    out = retry_failed!(; max_retries=max_r)
+    # The config, so the backend is resolved per entry. Passing none meant every
+    # entry was interrogated as if it were local.
+    out = retry_failed!(; max_retries=max_r,
+        config=SpinorBEC.default_autopilot_config())
     println("retry: ", out)
     0
 end
