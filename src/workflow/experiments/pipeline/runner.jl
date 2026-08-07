@@ -118,8 +118,16 @@ _is_nan_error(err) =
     err isa DomainError ||
     (err isa ErrorException && occursin(r"NaN|Inf"i, err.msg))
 
+# Matched by type NAME, not by `isa`: CUDA is a weak dependency, so
+# `CUDA.OutOfGPUMemoryError` cannot be referenced from core. It was therefore not
+# recognised at all until 2026-08-07 — a GPU OOM set `oom_killed=false`, was
+# classified PERMANENT rather than RESOURCE_PERMANENT, and `retry.jl` re-queued
+# it at the SAME memory class until the retry budget ran out. Chained with the
+# VRAM estimate that under-sized 16 of 23 atoms, that is a job priced to fail and
+# then paid for again on every attempt.
 _is_oom_error(err) =
     err isa OutOfMemoryError ||
+    occursin(r"OutOfGPUMemory|OutOfMemory"i, string(typeof(err).name.name)) ||
     (err isa ErrorException && occursin(r"out of memory|OOM"i, err.msg))
 
 # W4. The cache's fail-safes were `@warn` and nothing else: no `Record`, no

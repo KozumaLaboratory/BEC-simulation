@@ -74,6 +74,7 @@ const FAST_TESTS = [
     "workflow/test_full_bdg_advisory_fires.jl",
     "workflow/test_no_second_atom_F_table.jl",
     "workflow/test_every_dynamics_path_reports_liveness.jl",
+    "workflow/test_oom_reaches_resource_permanent.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
     "workflow/test_pipeline_name_and_precedence.jl",

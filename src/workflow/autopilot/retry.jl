@@ -29,24 +29,25 @@ function classify_failure(outcome::AbstractDict, backend_reason::AbstractString=
     nan_enc = get(outcome, "nan_encountered", false) === true
     nan_enc && return PERMANENT
 
+    # `oom_killed` FIRST — and this arm really is first now. It sat BELOW the
+    # `exception_type` block until 2026-08-07 while its own comment said
+    # otherwise, so a GPU OOM (which sets both fields) matched the generic
+    # "unrecognised exception -> PERMANENT" arm and never reached here. The
+    # resource class was therefore never escalated and the job was re-queued at
+    # the same size.
+    get(outcome, "oom_killed", false) === true && return RESOURCE_PERMANENT
+
     exc = get(outcome, "exception_type", "")
     if exc isa AbstractString && !isempty(exc)
+        # An OOM-shaped exception name is resource-permanent even if the Bool was
+        # not set — a second reader of the same fact, because the Bool depends on
+        # `_is_oom_error` having heard of the type.
+        occursin(r"OutOfGPUMemory|OutOfMemory"i, exc) && return RESOURCE_PERMANENT
         if occursin(r"InterruptException|SystemError|IOError|ProcessExitedException"i, exc)
             return TRANSIENT
         end
         return PERMANENT
     end
-
-    # `oom_killed` FIRST, and as a Bool. `run_pipeline` sets it from the actual
-    # exception (`runner.jl:238`, `_is_oom_error`), so this arm needs no string
-    # matching at all — which is what made the free-text arm below unreachable
-    # on the production backend. `backend_failure_reason(::UGEBackend)` emits
-    # qacct's vocabulary (`failed=… exit_status=…`) while the regexes below are
-    # SLURM's (`OUT_OF_MEMORY` / `TIMEOUT`); the two sets do not intersect and
-    # nothing normalises between them, so RESOURCE_PERMANENT was unreachable on
-    # TSUBAME and an OOM'd job re-queued at the same memory class until its
-    # retry budget ran out.
-    get(outcome, "oom_killed", false) === true && return RESOURCE_PERMANENT
 
     # Free-text `reason` field — kept for LocalBackend and for any backend whose
     # reason string does speak this vocabulary. It is now a fallback behind a
