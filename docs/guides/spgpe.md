@@ -192,9 +192,60 @@ What it does answer:
 - **That the solver condenses when the reservoir allows it** — 82 % of
   $N_\mathrm{TF}$ at fixed $\mu=5$, $T=2$, still rising.
 
-Answering the atom-number question needs a **number-conserving** formulation, with
-$\mu(t)$ solved so that $N_C+N_I$ matches a measured total. That is not
-implemented.
+### The number-conserving formulation, and what it gives (2026-08-07)
+
+Implemented. $\mu$ is solved from the standard semiclassical Hartree–Fock constraint
+(Popov / Zaremba–Griffin–Nikuni; [Giorgini, Pitaevskii & Stringari](https://arxiv.org/pdf/cond-mat/9704014)),
+
+$$\mu_\mathrm{eff}(r)=\mu-V(r)-2c_0\big[n_c(r)+\tilde n(r)\big],\qquad
+N_0(\mu)+\tilde n_C(\mu)+N_I(\mu)=N_\mathrm{total},$$
+
+with the exchange factor of 2 on the thermal density only. Inside the condensate
+Thomas–Fermi gives $\mu_\mathrm{eff}=-c_0n_c\le 0$, so nothing diverges. $N_0$ is an
+**output**: whatever the constraint leaves once the thermal regions take their share.
+
+Evaluated along the euv3 trajectory:
+
+| $t$ (s) | $N$ | $T$ (nK) | $\mu_\mathrm{eq}$ | $N_0^\mathrm{eq}$ | $f_0$ |
+|---|---|---|---|---|---|
+| 1.594 | 8.60e4 | 780 | 7.33 | 2.35e4 | 0.27 |
+| **1.726** | 5.34e4 | 434 | 8.13 | **4.01e4** | 0.75 |
+| 1.859 | 1.29e4 | 197 | 4.83 | 1.15e4 | 0.89 |
+| 1.992 | 5485 | 118 | 3.47 | 5157 | 0.94 |
+| 2.390 | 3576 | 64 | 2.95 | 3513 | 0.98 |
+
+**The peak is $N_0\approx4.0\times10^4$ at $t=1.73$ s, 80 % of the measured
+$5.02\times10^4$** (PRL 129, 223401) — and it falls monotonically after that to
+$3.5\times10^3$ at the end of the ramp. Running the evaporation to completion throws
+condensate away: past 1.73 s the losses beat the cooling. So "optimising" this ramp
+means **stopping it at the peak**, and the 0-D model's own final $N_0=1789$ (3.6 % of
+measured) is the value at the wrong end of a curve rather than a failure of the model.
+
+**Three caveats, none of them small.**
+
+The table is the EQUILIBRIUM constraint, not dynamics. Whether the field can follow is
+a separate question, and it visibly cannot at the handoff: the constraint says
+$N_0=1.15\times10^4$ there while the c-field run reports $0$ through the first 5 % of
+its window. That gap is what a finite $\gamma$ costs and it is the thing the SPGPE
+exists to compute.
+
+$N_\mathrm{total}(t)$ still comes from the 0-D model and still carries the $K_3$
+systematic. What changed is that $K_3$ now moves the total rather than deciding
+whether a condensate exists.
+
+The c-field cannot cover the whole ramp. At 50 µK the internal temperature is 1762, so
+$\epsilon_\mathrm{cut}\sim5290$ and resolving it needs $\sim520^3$ — 1300× the $48^3$
+that already costs 460 ms/step with the DDI. The 0-D model carries the cooling and the
+c-field takes over at 1.85 s; everything before that enters only through $(N,T)$ at the
+handoff.
+
+**Three attempts at this constraint, and only measurement caught the first two.**
+Prescribing $\mu$ from an assumed split prescribes $N_0$. Solving
+$N_I=N_\mathrm{total}-N_C$ with $N_C$ read from the field charges the whole
+field-to-equilibrium gap to the reservoir — it returned $\mu=16.7$, demanding
+$2\times10^5$ atoms against 6756 present. A discrete level sum that skipped levels
+below $\mu$ made the total non-monotone, so a 200-iteration bisection returned 2.34
+for 2.5. Reading the standard formalism first would have cost fifteen minutes.
 
 ## Validation
 
