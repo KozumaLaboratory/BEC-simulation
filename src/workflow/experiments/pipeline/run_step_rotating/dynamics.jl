@@ -219,8 +219,16 @@
                 psum > 0 && (pm ./= psum)
                 push!(per_m_arr, pm)
                 push!(Fz_arr, sum((F_val - (c - 1)) * pm[c] for c in 1:length(pm)))
-                push!(Fx_arr, 0.0);
-                push!(Fy_arr, 0.0)
+                # ⟨F_x⟩, ⟨F_y⟩ in the tilde (field-following) frame. These were
+                # literal `0.0` until 2026-08-07 and were written to the jld2 as
+                # `dynamics/Fx` / `dynamics/Fy`, so every rotating-field run
+                # reported "no transverse magnetisation" — a plausible-looking
+                # measurement of exactly the quantity a rotating-field experiment
+                # is about. `sm` and `ψtilde` were already in hand; nothing was
+                # missing but the call.
+                fx_d, fy_d, _ = spin_density_vector(ψtilde, sm, N_dim)
+                push!(Fx_arr, sum(fx_d) * dV)
+                push!(Fy_arr, sum(fy_d) * dV)
                 if save_psi
                     snap = Array{ComplexF64, 4}(undef, size(ψtilde)...)
                     copyto!(snap, ψtilde)
