@@ -406,7 +406,13 @@ function coherent_population(mu::Real, T::Real, eps_cut::Real; omega::Real=1.0)
         ε = (n + 1.5) * Float64(omega)
         ε <= eps_cut || break
         x = (ε - Float64(mu)) / Float64(T)
-        x > 0 || return Inf
+        # A level BELOW mu is not an error and must not return Inf: with a condensate
+        # present mu sits above many excited levels — in Thomas-Fermi mu >> eps_0 — and
+        # those levels are absorbed into the condensate that N_0(mu) already counts.
+        # Returning Inf made the bisection read every such mu as "too many atoms", so
+        # mu could never rise past the first excited level and a round-trip from 6.0
+        # came back 2.5.
+        x > 0 || continue
         x > 60 && continue
         s += 0.5 * (n + 1) * (n + 2) / expm1(x)
     end
