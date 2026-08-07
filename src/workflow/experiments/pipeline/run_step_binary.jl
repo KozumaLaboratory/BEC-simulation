@@ -83,6 +83,7 @@ end
     verbose=true,
     checkpoint_dir=nothing,
     pipeline_results::Union{Nothing, Dict}=nothing,
+    live_status_path::Union{Nothing, String}=nothing,
 )
     grid !== nothing || throw(ArgumentError(
         "binary dynamics step requires grid from preceding ground_state step"))
@@ -146,12 +147,28 @@ end
     times = Float64[]
     psi_A_snaps = Vector{Array{ComplexF64, ndims(sim.psi_A)}}()
     psi_B_snaps = Vector{Array{ComplexF64, ndims(sim.psi_B)}}()
-    on_save = save_psi ? function _on(s)
-        push!(times, s.t)
-        push!(psi_A_snaps, copy(s.psi_A))
-        push!(psi_B_snaps, copy(s.psi_B))
-        return nothing
-    end : nothing
+    # Liveness for the autopilot's divergence kill. Until 2026-08-07 this path
+    # wrote no `_live_status.json`, so a diverging binary run finished and
+    # billed. Note the hook was ALSO conditional on `save_psi` — liveness must
+    # not be, or turning snapshots off turns the safety off with them.
+    dV_bin = prod(grid.dx)
+    cb_live = _build_binary_live_callback(get(p, "live_monitor", true),
+        live_status_path, dV_bin)
+    n_saves = Ref(0)
+    on_save = if (save_psi || cb_live !== nothing)
+        function _on(s)
+            n_saves[] += 1
+            if save_psi
+                push!(times, s.t)
+                push!(psi_A_snaps, copy(s.psi_A))
+                push!(psi_B_snaps, copy(s.psi_B))
+            end
+            cb_live === nothing || cb_live(s, n_saves[])
+            return nothing
+        end
+    else
+        nothing
+    end
     verbose && println("  binary RTP: duration=$duration dt=$dt save_every=$save_every")
     run_binary_simulation!(sim; duration, dt, save_every, on_save)
 

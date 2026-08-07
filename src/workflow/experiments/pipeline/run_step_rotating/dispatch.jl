@@ -18,6 +18,7 @@ end
     psi_prev, grid, atom, ws_prev;
     verbose=true, checkpoint_dir=nothing,
     pipeline_results::Union{Nothing, Dict}=nothing,
+    live_status_path::Union{Nothing, String}=nothing,
 )
     grid !== nothing || throw(
         ArgumentError(
@@ -26,5 +27,5 @@ end
     pipeline_results !== nothing || throw(ArgumentError(
         "rotating_basis dynamics step requires preceding ground_state results"))
     return _run_rotating_basis_dynamics_inner(step.params, grid, pipeline_results;
-        verbose=verbose)
+        verbose=verbose, live_status_path=live_status_path)
 end

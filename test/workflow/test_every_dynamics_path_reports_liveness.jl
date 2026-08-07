@@ -31,26 +31,39 @@ const _RUNNER = normpath(
 
 # Step kinds that do NOT report liveness, and why. Shrinking this list is the
 # fix; growing it silently is the regression.
-const _NO_LIVENESS = Dict(
-    "BinaryDynamicsStep" =>
-        "goes through `_run_binary_dynamics_step`, a separate solver path with " *
-        "its own callback assembly; never received `live_status_path`",
-    "RotatingBasisDynamicsStep" =>
-        "dispatches through `run_step_rotating/dispatch.jl`; never received " *
-        "`live_status_path`",
+const _NO_LIVENESS = Dict{String, String}(
+# EMPTY as of 2026-08-07: all three dynamics paths report liveness. It was
+# {BinaryDynamicsStep, RotatingBasisDynamicsStep} for one day, which is how long
+# it took to notice that "declared" is a record of a gap, not a fix.
 )
 
 "Every `step isa XDynamicsStep` branch in the dispatcher, and whether it is handed `live_status_path`."
 function dynamics_branches()
     src = read(_RUNNER, String)
+    # Scope to `_step_dispatch!`. `runner.jl` has a SECOND if-chain over the same
+    # step types further down, for results collection, and it has no business
+    # carrying `live_status_path` — reading the whole file attributed that branch
+    # to the same kind and reported a wired path as unwired. Narrowing the
+    # extraction is the fix; loosening the assertion would have hidden a real
+    # gap the next time.
+    i = findfirst("function _step_dispatch!", src)
+    i === nothing && return Dict{String, Bool}()
+    tail = src[first(i):end]
+    j = findfirst("\nend\n", tail)
+    body = j === nothing ? tail : tail[1:first(j)]
+
     out = Dict{String, Bool}()
-    # split on the branch heads so each body is attributed to its own kind
-    parts = split(src, r"elseif step isa ")
-    for p in parts
+    for p in split(body, r"elseif step isa ")
         m = match(r"^([A-Za-z]*DynamicsStep)\b", p)
         m === nothing && continue
-        body = first(split(p, r"\n\s*elseif|\n\s*else\b"))
-        out[m.captures[1]] = occursin("live_status_path", body)
+        branch = first(split(p, r"\n\s*elseif|\n\s*else\b"))
+        # A DISPATCH branch is one that calls `_run_step`. `_step_dispatch!`
+        # also carries a results-collection chain over the same step types, and
+        # that one has no business passing `live_status_path` — counting it made
+        # a wired path report as unwired. The discriminator is what the branch
+        # DOES, not where it sits.
+        occursin("_run_step(", branch) || continue
+        out[m.captures[1]] = occursin("live_status_path", branch)
     end
     out
 end
@@ -66,11 +79,32 @@ end
         @test haskey(branches, "DynamicsStep")
         @test haskey(branches, "BinaryDynamicsStep")
         @test haskey(branches, "RotatingBasisDynamicsStep")
-        # the one that DOES report — if this were false the extractor is broken,
-        # not the code
-        @test branches["DynamicsStep"]
-        # and the extractor must be able to say "no"
-        @test !all(values(branches))
+        # Every path reports, so each of these is `true` — if one were false the
+        # extractor is broken, not the code.
+        @test all(values(branches))
+
+        # And the extractor must still be ABLE to say "no". This was asserted
+        # against the real tree (`!all(values(branches))`) while two paths were
+        # unwired, and wiring them killed it: **a calibration that depends on the
+        # defect existing dies when you fix the defect.** Prove it on a synthetic
+        # branch instead, which stays true either way.
+        synthetic = """
+            elseif step isa FakeWiredDynamicsStep
+                _run_step(step, psi; verbose, live_status_path)
+            elseif step isa FakeBareDynamicsStep
+                _run_step(step, psi; verbose)
+            end
+            """
+        probe = Dict{String, Bool}()
+        for p in split(synthetic, r"elseif step isa ")
+            m = match(r"^([A-Za-z]*DynamicsStep)\b", p)
+            m === nothing && continue
+            br = first(split(p, r"\n\s*elseif|\n\s*else\b"))
+            occursin("_run_step(", br) || continue
+            probe[m.captures[1]] = occursin("live_status_path", br)
+        end
+        @test probe["FakeWiredDynamicsStep"]
+        @test !probe["FakeBareDynamicsStep"]
     end
 
     @testset "no path is silently without liveness" begin
@@ -89,7 +123,9 @@ end
 
     # The list must shrink, never quietly grow into a description of everything.
     @testset "the exception list is an exception" begin
-        @test length(_NO_LIVENESS) <= 2
+        # It is empty now. The bound stays as a ratchet: a future path may be
+        # added here deliberately, but not three of them silently.
+        @test length(_NO_LIVENESS) <= 1
         @test all(!isempty, values(_NO_LIVENESS))
         # every listed kind must still BE a branch — a stale entry would let a
         # newly-wired path look exempt

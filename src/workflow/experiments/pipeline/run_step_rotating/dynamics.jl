@@ -6,6 +6,7 @@
 @noinline function _run_rotating_basis_dynamics_inner(
     p::Dict{String, Any}, grid, pipeline_results::Dict;
     verbose::Bool=true,
+    live_status_path::Union{Nothing, String}=nothing,
 )
     haskey(pipeline_results, :rotating_basis_gs) || throw(
         ArgumentError(
@@ -186,8 +187,15 @@
     end
 
     dV = prod(grid.dx)
+    # Liveness for the autopilot's divergence kill. This path wrote no
+    # `_live_status.json` until 2026-08-07, so a diverging rotating_basis run ran
+    # to completion and billed for it — the reaper had nothing to read. Same
+    # writer as the standard path (`_emit_live_status`), so the keys cannot drift
+    # apart again.
+    cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     _record =
         (step, t) -> begin
+            cb_live === nothing || cb_live(ws, step, times_arr, Float64[])
             if step == 1 || step % save_every == 0
                 push!(times_arr, t)
                 push!(norms_arr, sqrt(sum(abs2, ws.state.psi) * dV))

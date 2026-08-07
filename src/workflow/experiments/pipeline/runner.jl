@@ -308,10 +308,10 @@ end
             verbose, checkpoint_dir, pipeline_results=results)
     elseif step isa BinaryDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, pipeline_results=results)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa RotatingBasisDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, pipeline_results=results)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa DynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, live_status_path)
