@@ -214,6 +214,34 @@ if abspath(PROGRAM_FILE) == @__FILE__
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
 
+    elseif mode == "lag"
+        # Does the field reach the equilibrium the constraint names, and how far
+        # behind is it?
+        #
+        # The constraint says N_0 = 1.15e4 at the 1.85 s handoff and the field reports
+        # 0 through the first 5% of its window. That gap is the physics the SPGPE
+        # exists to compute: a finite gamma decides whether a condensate the
+        # thermodynamics allows actually forms in the time available. An equilibrium
+        # table cannot answer it and neither can a run that stops at 5%.
+        #
+        # Handed off at three points spanning the peak, since where the field is
+        # started changes how much time it has: 1.73 s is where N_0^eq peaks at 4.0e4,
+        # 1.85 s is the earliest affordable grid, 1.99 s is comfortably inside.
+        for ts in (1.73, 1.85, 1.99)
+            @printf("\n########## handoff at %.2f s ##########\n", ts)
+            o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, t_start_s=ts)
+            h = isempty(o.hist) ? nothing : o.hist[end]
+            if h !== nothing
+                # The equilibrium the field was being driven toward, at the same point.
+                g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02,
+                    eps_cut=1.5 + 3 * h.T)
+                @printf("  END  N_tot=%.4g  field N0=%.4g  equilibrium N0=%.4g  ratio=%.4f\n",
+                    h.N_tot, h.N0, g.N0, h.N0 / max(g.N0, 1))
+            end
+            @printf("  unsatisfiable: %d of %d\n", o.unsat, o.n_cb)
+            flush(stdout)
+        end
+
     elseif mode == "dtbox"
         # The two factors, measured before an 11-hour run rather than assumed.
         #
