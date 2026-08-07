@@ -72,7 +72,7 @@ const _OPEN_JLD_MAX = 32
 #   data_cache             run-level JSON responses (per /api/data/<run>)
 #   psi_cache              ψ + derived binary blobs keyed by fpath[#snap=K]
 #   _OPEN_JLD_HANDLES      persistent JLD2 read handles (mmap'd)
-#   _vector3d_plans_cache  FFT plans per (nx, ny, nz)
+#   _vector3d_plans_cache  FFT plans + grid per ((nx, ny, nz), box_size)
 #   _PREPACK_INFLIGHT      in-flight prepack-warmer task IDs
 #   _DASHBOARD_CACHE_DIRNAME  on-disk atlas blobs (per run dir)
 #

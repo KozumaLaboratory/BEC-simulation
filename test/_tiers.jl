@@ -78,6 +78,8 @@ const FAST_TESTS = [
     "workflow/test_preflight_can_fail.jl",
     "workflow/test_slack_alerts_report_delivery.jl",
     "workflow/test_inert_dynamics_keys_are_refused.jl",
+    "hamiltonian/test_absorbing_boundary_honours_the_step.jl",
+    "workflow/test_plan_cache_is_keyed_on_the_box.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
     "workflow/test_dashboard_does_not_invent_a_time_axis.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
