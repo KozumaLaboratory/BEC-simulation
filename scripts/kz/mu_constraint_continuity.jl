@@ -18,7 +18,9 @@ total(mu) = tf(mu) + coherent_population(mu, T, eps_cut) +
             incoherent_population(mu, T, eps_cut)
 @printf("%-9s %-13s %-13s %-13s %-13s %-9s\n",
     "mu", "N_0(TF)", "N_C^th", "N_I", "total", "jump")
-prev = NaN
+# `global`: a bare assignment inside a top-level `for` binds a NEW local in Julia,
+# and this is the third time today. Scripts that loop at top level need it.
+global prev = NaN
 for mu in 1.0:0.125:7.0
     t = total(mu)
     j = isnan(prev) ? 0.0 : (t - prev) / max(abs(prev), 1)
@@ -26,7 +28,7 @@ for mu in 1.0:0.125:7.0
         mu, tf(mu), coherent_population(mu, T, eps_cut),
         incoherent_population(mu, T, eps_cut), t, j,
         abs(j) > 0.05 ? "   <-- JUMP" : "")
-    prev = t
+    global prev = t
 end
 @printf("\nlevels: eps_n = (n+1.5) for n=1..5 -> %s\n",
     join((@sprintf("%.1f", (n + 1.5)) for n in 1:5), ", "))
