@@ -206,7 +206,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 247 files
+- `FAST_TESTS` — 248 files
 - `CI_EXTRA` — 113 files
 - `FULL_EXTRA` — 73 files
 - `PHYSICS_TESTS` — 7 files
@@ -227,6 +227,20 @@ File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 | 10 | `test/test_level10_hpsi_self_consistency.jl` |
 | 11 | `test/test_level11_convergence_sweep.jl` |
 | 12 | `test/test_level12_production_audit.jl` |
+
+## Extensions and how their triggers are declared
+
+Derived from `Project.toml`. CLAUDE.md called all four *weak-dep*
+extensions; one is not. Loading is lazy either way — a bare
+`using SpinorBEC` pulls in none of them — so the mismatch shows up at
+install time, not startup.
+
+| extension | trigger | in `[weakdeps]` | in `[deps]` |
+|---|---|---|---|
+| `SpinorBECCUDAExt` | `CUDA` | **no** | **yes** |
+| `SpinorBECHTTPExt` | `HTTP` | yes | no |
+| `SpinorBECMakieExt` | `Makie` | yes | no |
+| `SpinorBECVTKExt` | `WriteVTK` | yes | no |
 
 ## What the code says about itself is unfinished
 

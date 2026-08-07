@@ -91,7 +91,7 @@ src/
     ├── io/dashboard.jl        # module Dashboard — HTTP/WS server + routes + compute helpers + binary packers (bitshuffle + zstd)
     └── autopilot.jl           # queue + tick + on_complete + retry + budget + breakers + UGE backend + observability + Day-1 recipes + trust gradient
 
-ext/        SpinorBEC{CUDA, Makie, HTTP, VTK}Ext (weak-dep extensions)
+ext/        SpinorBEC{CUDA, Makie, HTTP, VTK}Ext (lazily loaded; CUDA is NOT a weakdep — see docs/STATE.md)
 test/       subdirs mirror src/ + test/oracles/ (sign-bug-proof gates) + test/helpers/
 scripts/    one-off audit drivers (m1_*, m2_*, fisher_*, build_sysimage*, cli.jl, deploy_dashboard_auth.sh)
 dashboard/  React + WebGPU frontend (Vite + R3F + Three WebGPU + TSL + leva + shadcn + Tailwind v4)

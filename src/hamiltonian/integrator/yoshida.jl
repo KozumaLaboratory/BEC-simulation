@@ -1,4 +1,42 @@
 """
+Refuse a composition that the DDI path cannot realise at its nominal order.
+
+`use_mid` swaps the merged ABA product for an un-merged triple jump of symmetric
+midpoint cores at the weights `b`. For Yoshida-4/6 and Suzuki those weights ARE
+the S2 sub-step sizes and the order carries over; for the two RKN methods
+(`:omelyan_pefrl`, `:blanes_moan_srkn6b`) the extra order conditions come from
+the a/b interleaving, and the jump collapses to **order 2** — measured, see the
+table in `split_step_composers.jl`. That is four to six stages per step for the
+order one Strang step already delivers, and nothing said so: the order gate
+tested the ABA form, and the DDI path never takes it.
+
+Refusing rather than warning, and rather than silently substituting: an
+integrator that quietly runs a different method than the one named is what the
+`epsilon:`/`integrator:` mismatch in the rotating handler was, fixed the same
+day. No config under `runs/` selects either method.
+"""
+function _assert_jump_realisable(requested, comp, use_mid::Bool)
+    use_mid || return nothing
+    jo = get(comp, :jump_order, nothing)
+    ord = get(comp, :order, nothing)
+    if jo === nothing || ord === nothing
+        @warn "composition has no declared jump_order; on the DDI path it is " *
+            "composed as a triple jump of S2 cores, which does not preserve " *
+            "the order of an RKN method" requested
+        return nothing
+    end
+    jo < ord && throw(
+        ArgumentError(
+            "composition $(requested) is order $(ord) as an ABA product but " *
+            "only order $(jo) as the triple jump of S2 cores that the DDI " *
+            "path builds. Use :yoshida (4), :suzuki (4) or :yoshida_s6 (6), " *
+            "which keep their order in both forms, or disable the midpoint base.",
+        ),
+    )
+    nothing
+end
+
+"""
 Adaptive 4th-order Yoshida integration with embedded Strang error estimator.
 
 Uses S₄(dt) as propagator and ‖S₄(dt)ψ - S₂(dt)ψ‖/‖ψ‖ as error estimate.

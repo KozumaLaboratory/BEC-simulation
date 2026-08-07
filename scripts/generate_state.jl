@@ -228,7 +228,7 @@ function tier_counts()
     Core.eval(m, :(using SpinorBEC))
     Base.include(m, joinpath(ROOT, rel))
     names = (:FAST_TESTS, :CI_EXTRA, :FULL_EXTRA, :PHYSICS_TESTS,
-             :ORACLE_TESTS, :INTEGRATION_TESTS)
+        :ORACLE_TESTS, :INTEGRATION_TESTS)
     (rel, [(string(n), length(getfield(m, n))) for n in names if isdefined(m, n)])
 end
 
@@ -273,14 +273,12 @@ function limit_markers()
             endswith(f, ".jl") || continue
             p = joinpath(root, f)
             n = count(l -> occursin("KNOWN-LIMIT", l) || occursin("NOT IMPLEMENTED", uppercase(l)),
-                      readlines(p))
+                readlines(p))
             n > 0 && push!(rows, (relpath(p, ROOT), n))
         end
     end
     sort(rows; by=r -> -r[2])
 end
-
-
 
 """
 The `src/solvers/` surface: what is there, listed by the filesystem.
@@ -446,10 +444,13 @@ function gs_knob_defaults()
         d === nothing ? "—" : string(d)
     end
     for key in ("n_steps", "tol", "m_lbfgs")
-        push!(rows, (key,
-            sigdefault("src/solvers/ground_state.jl", "find_ground_state", key),
-            sigdefault("src/solvers/lbfgs/driver.jl", "find_ground_state_lbfgs", key),
-            yamlfallback(key) * " (schema `" * specdefault(key) * "`)"))
+        push!(
+            rows,
+            (key,
+                sigdefault("src/solvers/ground_state.jl", "find_ground_state", key),
+                sigdefault("src/solvers/lbfgs/driver.jl", "find_ground_state_lbfgs", key),
+                yamlfallback(key) * " (schema `" * specdefault(key) * "`)"),
+        )
     end
     rows
 end
@@ -473,16 +474,16 @@ function introspected()
     docs = filter(d -> isdir(joinpath(ROOT, "docs", d)), readdir(joinpath(ROOT, "docs")))
     [
         ("`Workspace` type parameters", string(length(P)),
-         "`length(Base.unwrap_unionall(Workspace).parameters)`"),
+            "`length(Base.unwrap_unionall(Workspace).parameters)`"),
         ("`AbstractPotential` subtypes", string(length(pots)),
-         "`length(subtypes(AbstractPotential))`"),
+            "`length(subtypes(AbstractPotential))`"),
         ("named `init_psi_*` builders", string(length(zoo)),
-         "exported names of `SpinorBEC`"),
+            "exported names of `SpinorBEC`"),
         ("`H_TERMS_CANONICAL_ORDER`", string(length(SpinorBEC.H_TERMS_CANONICAL_ORDER)),
-         "the registry constant"),
+            "the registry constant"),
         ("`LHY_KINDS`", string(length(SpinorBEC.LHY_KINDS)), "`src/model/specs.jl`"),
         ("`RunResult` fields", join(string.(fieldnames(SpinorBEC.RunResult)), ", "),
-         "`fieldnames(RunResult)`"),
+            "`fieldnames(RunResult)`"),
         ("`docs/` subdirectories", string(length(docs)), "`readdir(\"docs\")`"),
     ]
 end
@@ -544,6 +545,42 @@ Base.showerror(io::IO, e::DegenerateDerivation) = print(io,
     "\n\nThe derivation returned less than it must. Generation is REFUSED rather ",
     "than emitting a document that silently stopped carrying this fact. ",
     "Fix the derivation, or lower the floor deliberately and say why.")
+
+"""
+    extension_table()
+
+Which package triggers each extension, and whether that trigger is a WEAK
+dependency. Derived from `Project.toml` because the prose restating it was
+wrong: CLAUDE.md called all four "weak-dep extensions" while CUDA sits in
+`[deps]`. Loading is still lazy — `using SpinorBEC` does not pull CUDA in
+(measured 2026-08-07: 0.7 s, `CUDA` absent from `Base.loaded_modules`) — so the
+mismatch costs installation, not startup, and 74 of the CUDA stack's 77 artifact
+entries are lazy. Recorded rather than "fixed": moving CUDA to `[weakdeps]` is a
+user-facing packaging change and the saving is small.
+"""
+function extension_table()
+    txt = readsrc("Project.toml")
+    sect(name) = begin
+        m = match(Regex("\\[" * name * "\\](.*?)(?=\\n\\[|\\z)", "s"), txt)
+        if m === nothing
+            String[]
+        else
+            [strip(split(l, "=")[1]) for l in split(m.captures[1], "\n") if occursin("=", l)]
+        end
+    end
+    deps, weak = sect("deps"), sect("weakdeps")
+    exts = Dict{String, String}()
+    m = match(r"\[extensions\](.*?)(?=\n\[|\z)"s, txt)
+    if m !== nothing
+        for l in split(m.captures[1], "\n")
+            occursin("=", l) || continue
+            k, v = split(l, "="; limit=2)
+            exts[strip(k)] = strip(replace(v, '"' => "", '[' => "", ']' => ""))
+        end
+    end
+    rows = [(e, t, t in weak, t in deps) for (e, t) in sort(collect(exts))]
+    (rows=rows, n_deps=length(deps), n_weak=length(weak))
+end
 
 function assert_nondegenerate(section, ok::Bool, detail)
     ok || throw(DegenerateDerivation(section, detail))
@@ -674,8 +711,10 @@ function render()
     p("and NOT in the condition above — that absence is derived here, not")
     p("remembered.")
     p()
-    p("L-BFGS reports `stop_reason` ∈ " * join("`" .* reasons .* "`", ", ") *
-      " (`src/solvers/lbfgs/driver.jl`), which is a different exit contract with a")
+    p(
+        "L-BFGS reports `stop_reason` ∈ " * join("`" .* reasons .* "`", ", ") *
+        " (`src/solvers/lbfgs/driver.jl`), which is a different exit contract with a",
+    )
     p("different meaning of `tol` (there it IS the gradient norm).")
     p()
 
@@ -704,7 +743,9 @@ function render()
     p("four — two lists seventy lines apart, and their agreement is the only thing")
     p("checking either.")
     p()
-    p("**$(length(adm_sites)) sites admit a cached payload; $(length(ver_sites)) re-derives its verdict.**")
+    p(
+        "**$(length(adm_sites)) sites admit a cached payload; $(length(ver_sites)) re-derives its verdict.**",
+    )
     p()
     for site in adm_sites
         p("- admits: `$site`")
@@ -762,8 +803,9 @@ function render()
     p()
 
     intro = introspected()
-    assert_nondegenerate("introspected sizes", length(intro) >= 7 &&
-        all(r -> !isempty(r[2]) && r[2] != "0", intro),
+    assert_nondegenerate("introspected sizes",
+        length(intro) >= 7 &&
+            all(r -> !isempty(r[2]) && r[2] != "0", intro),
         "read $(length(intro)) introspected facts; values " *
         join([r[2] for r in intro], " / "))
     p("## Sizes and vocabularies, by introspection")
@@ -812,13 +854,13 @@ function render()
     # lists that really hold 113/71 — non-zero, plausible, and wrong. A floor
     # only catches corruption when it is set near the true value.
     want = Dict("FAST_TESTS" => 200, "CI_EXTRA" => 100, "FULL_EXTRA" => 50,
-                "PHYSICS_TESTS" => 5, "ORACLE_TESTS" => 50, "INTEGRATION_TESTS" => 40)
+        "PHYSICS_TESTS" => 5, "ORACLE_TESTS" => 50, "INTEGRATION_TESTS" => 40)
     short = [t for t in tiers if t[2] < get(want, t[1], 1)]
     assert_nondegenerate("test tiers",
         length(tiers) >= 6 && isempty(short),
         "read $(length(tiers)) tier lists from $trel (expect >= 6); " *
         (isempty(short) ? "" : "below floor: " *
-         join(["$(t[1])=$(t[2])" for t in short], ", ")) *
+                               join(["$(t[1])=$(t[2])" for t in short], ", ")) *
         "; all counts " * join(["$(t[1])=$(t[2])" for t in tiers], " "))
     p("## Test tiers")
     p()
@@ -841,6 +883,28 @@ function render()
     p("|---|---|")
     for (lvl, path) in lad
         p("| $lvl | `$path` |")
+    end
+    p()
+
+    ext = extension_table()
+    # Floor: four extensions are declared today. A regex that matched nothing
+    # would report a tree with no GPU path at all, which reads as healthy.
+    assert_nondegenerate("extension triggers",
+        length(ext.rows) >= 4 && ext.n_deps >= 10 && ext.n_weak >= 3,
+        "read $(length(ext.rows)) extensions, $(ext.n_deps) deps, " *
+        "$(ext.n_weak) weakdeps from Project.toml (expect >= 4/10/3)")
+    p("## Extensions and how their triggers are declared")
+    p()
+    p("Derived from `Project.toml`. CLAUDE.md called all four *weak-dep*")
+    p("extensions; one is not. Loading is lazy either way — a bare")
+    p("`using SpinorBEC` pulls in none of them — so the mismatch shows up at")
+    p("install time, not startup.")
+    p()
+    p("| extension | trigger | in `[weakdeps]` | in `[deps]` |")
+    p("|---|---|---|---|")
+    for (e, t, w, d) in ext.rows
+        p("| `$e` | `$t` | " * (w ? "yes" : "**no**") * " | " *
+          (d ? "**yes**" : "no") * " |")
     end
     p()
 
@@ -880,7 +944,7 @@ function render()
     q()
     q("| subtree | files cited | of |")
     q("|---|---|---|")
-    for (d, cited, total) in sort(cov; by = r -> (-r[2] / max(r[3], 1), r[1]))
+    for (d, cited, total) in sort(cov; by=r -> (-r[2] / max(r[3], 1), r[1]))
         q("| `src/$d/` | $cited | $total |")
     end
     q()

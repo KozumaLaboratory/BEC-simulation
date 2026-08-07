@@ -34,7 +34,7 @@ using LinearAlgebra
 using SpinorBEC
 using SpinorBEC:
     _COMP_YOSHIDA, _COMP_SUZUKI, _COMP_BLANES_MOAN_SRKN6B,
-    _COMP_OMELYAN_PEFRL, _COMP_YOSHIDA_S6
+    _COMP_OMELYAN_PEFRL, _COMP_YOSHIDA_S6, _assert_jump_realisable
 
 const _N = 8
 const _L = 4.0
@@ -114,5 +114,69 @@ const _COMPOSERS = [
         @test w[2] < 0
         @test sum(w)≈1.0 atol=1e-12
         @test sum(w .^ 3)≈0.0 atol=1e-12
+    end
+end
+
+# THE SECOND REALISATION. `_composition_midpoint_core!` does not build the ABA
+# product above — it builds ∏ᵢ S₂(b[i]·dt), an un-merged triple jump of complete
+# symmetric cores, and `_run_yoshida_adaptive!` takes that path whenever DDI is
+# active, i.e. on every production Eu run. Only the ABA form was measured here
+# until 2026-08-07, so the order of the form that actually runs in production was
+# never checked. Two of the five composers lose half their order in it.
+"""Triple jump of symmetric S₂ cores at the composition's `b` weights."""
+function _jump(comp, dt::Float64)
+    M = Matrix{ComplexF64}(I, _N, _N)
+    for b in comp.b
+        M = exp(b * dt / 2 * _V) * exp(b * dt * _K) * exp(b * dt / 2 * _V) * M
+    end
+    M
+end
+
+function _global_order_of(f, comp; T::Float64=0.5, dt0::Float64=0.05)
+    errs = map(0:2) do j
+        dt = dt0 / 2^j
+        opnorm(f(comp, dt)^round(Int, T / dt) - exp(T * (_K + _V)))
+    end
+    (log2(errs[1] / errs[2]), log2(errs[2] / errs[3]))
+end
+
+@testset "both realisations have their declared order" begin
+    # CALIBRATION. If `_jump` and `_compose` built the same operator, every
+    # assertion below would hold for the wrong reason and the demotion would be
+    # invisible — which is exactly how it stayed hidden. Show they differ.
+    @testset "the two realisations are different operators" begin
+        c = _COMP_BLANES_MOAN_SRKN6B
+        @test opnorm(_jump(c, 0.05) - _compose(c, 0.05)) > 1e-8
+    end
+
+    @testset "$name" for (name, comp, p_aba) in _COMPOSERS
+        # the declarations must exist — a composer without them slips past the
+        # runner's guard with only a warning
+        @test haskey(comp, :order)
+        @test haskey(comp, :jump_order)
+
+        oa = _global_order_of(_compose, comp)
+        oj = _global_order_of(_jump, comp)
+        @test comp.order == p_aba
+        @test all(o -> isapprox(o, comp.order; atol=0.15), oa)
+        @test all(o -> isapprox(o, comp.jump_order; atol=0.15), oj)
+    end
+
+    # And the runner must refuse exactly the composers that lose order, on the
+    # path that loses it — measured above, not assumed.
+    @testset "the DDI path refuses what it cannot realise" begin
+        for (name, comp, _) in _COMPOSERS
+            demoted = comp.jump_order < comp.order
+            if demoted
+                @test_throws ArgumentError _assert_jump_realisable(name, comp, true)
+            else
+                @test _assert_jump_realisable(name, comp, true) === nothing
+            end
+            # ...and never on the merged path, which keeps the ABA order
+            @test _assert_jump_realisable(name, comp, false) === nothing
+        end
+        # the negative control: if nothing were demoted the loop above would be
+        # vacuous on its throwing arm
+        @test count(c -> c[2].jump_order < c[2].order, _COMPOSERS) == 2
     end
 end
