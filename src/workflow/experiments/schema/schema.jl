@@ -386,6 +386,10 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "projected_gp" => FieldSpec(; type=Union{Dict, Bool}, schema=PROJECTED_GP_SCHEMA),
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}, schema=PHOTON_SCATTERING_SCHEMA),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}, schema=LOSS_SCHEMA),
+    # KEPT so `inspect_config` does not report this as a typo — but the key is
+    # REFUSED at step construction by `_reject_inert_dynamics_keys`. Nothing
+    # under src/workflow constructs `AdaptiveDtParams`; adaptive stepping is a
+    # Julia-API path only, and this block was validated and discarded.
     "adaptive_dt" => FieldSpec(; type=Dict, schema=ADAPTIVE_DT_SCHEMA),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).

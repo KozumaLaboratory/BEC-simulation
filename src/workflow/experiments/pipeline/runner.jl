@@ -56,6 +56,35 @@ function _apply_step_defaults(step::Dict, defaults::AbstractDict)
     Dict{Any, Any}(key => seeded)
 end
 
+"""
+Refuse `dynamics:` keys that the schema validates and no step reads.
+
+`adaptive_dt` declared five numeric fields with ranges — `dt_init`, `dt_min`,
+`dt_max`, `tol`, `error_mode` — so a config asking for adaptive stepping
+validated cleanly, and then ran at fixed `dt`. Nothing under `src/workflow`
+constructs `AdaptiveDtParams` or calls `run_simulation_yoshida!` at all; the
+adaptive runners are a Julia-API path only. An accuracy knob that is accepted
+and discarded is worse than one that does not exist, and it is the same defect
+as the rotating handler sizing `dt` for an integrator it would not run.
+
+Unknown keys are only a `:warn`, which is right for a typo and too quiet for
+this: the user gets what they asked for spelled correctly and not honoured. No
+config under `runs/` sets it and `docs/reference/yaml_schema_reference.md` never
+documented it, so refusing breaks nothing in the tree.
+"""
+function _reject_inert_dynamics_keys(params::AbstractDict)
+    haskey(params, "adaptive_dt") && throw(
+        ArgumentError(
+            "`dynamics.adaptive_dt` is validated by the schema but read by " *
+            "nothing — the run would proceed at fixed dt. Adaptive stepping " *
+            "is a Julia-API path: call `run_simulation_yoshida!(ws; " *
+            "adaptive=AdaptiveDtParams(...))` directly. Remove the key to " *
+            "confirm you want fixed-dt dynamics.",
+        ),
+    )
+    nothing
+end
+
 function _parse_step(d::Dict)
     keys_list = collect(keys(d))
     length(keys_list) == 1 || throw(ArgumentError(
@@ -76,6 +105,7 @@ function _parse_step(d::Dict)
         end
     elseif key == :dynamics
         params = Dict{String, Any}(string(k) => v for (k, v) in val)
+        _reject_inert_dynamics_keys(params)
         kind = get(params, "kind", nothing)
         if kind == "binary" || kind == :binary
             BinaryDynamicsStep(params)

@@ -77,6 +77,7 @@ const FAST_TESTS = [
     "workflow/test_oom_reaches_resource_permanent.jl",
     "workflow/test_preflight_can_fail.jl",
     "workflow/test_slack_alerts_report_delivery.jl",
+    "workflow/test_inert_dynamics_keys_are_refused.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
     "workflow/test_dashboard_does_not_invent_a_time_axis.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
