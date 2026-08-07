@@ -42,12 +42,27 @@ function _route_dynamics_series(path::String, base_dir::String)
             # differ by exactly one; otherwise fall back to the raw times.
             if haskey(d, "dynamics/times")
                 ts = Float64.(d["dynamics/times"])
-                out["pop_times"] = if length(ts) == n_snaps + 1
-                    ts[2:end]
+                # When the lengths align, these are TIMES. When they do not, we
+                # do not know the times — and the fallback emitted
+                # `collect(1.0:n_snaps)`, i.e. frame INDICES, under the key
+                # `pop_times`, which the front end plots as a time axis. A reader
+                # then sees an axis running 1, 2, 3… in whatever unit they assume.
+                #
+                # Absence written out as a plausible value, the same shape as the
+                # `Fx` literal fixed the same day. The key is omitted instead, and
+                # the mismatch is reported so the caller can say "no time axis"
+                # rather than draw a wrong one.
+                if length(ts) == n_snaps + 1
+                    out["pop_times"] = ts[2:end]
                 elseif length(ts) == n_snaps
-                    ts
+                    out["pop_times"] = ts
                 else
-                    collect(1.0:n_snaps)
+                    out["pop_times_unavailable"] = Dict(
+                        "n_times" => length(ts), "n_snapshots" => n_snaps,
+                        "reason" =>
+                            "times and snapshots cannot be aligned; " *
+                            "frame indices are NOT times",
+                    )
                 end
             end
         end
