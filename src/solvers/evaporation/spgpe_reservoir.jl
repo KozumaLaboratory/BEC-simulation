@@ -15,6 +15,7 @@
 export spgpe_reservoir, reservoir_chemical_potential
 export incoherent_population, mu_from_total_number
 export FeedbackWaveform, number_conserving_callback
+export coherent_population, mu_from_total_number_equilibrium
 
 """
     reservoir_chemical_potential(N, T, ω̄, m, a_s; branch=:condensate) -> μ [J]
@@ -385,4 +386,86 @@ function number_conserving_callback(
         isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
         nothing
     end
+end
+
+"""
+    coherent_population(mu, T, eps_cut; omega=1.0) -> Float64
+
+Bose population of the C region — the harmonic levels at or below `eps_cut`,
+excluding the ground state — at `(μ, T)`:
+
+    N_C^th(μ,T) = Σ_{n : ε_n ≤ ϵ_cut, ε_n > ε_0} g_n / (exp((ε_n − μ)/T) − 1)
+
+The ground state is left out because its occupation is the condensate, which is what
+`mu_from_total_number_equilibrium` solves for rather than assumes.
+"""
+function coherent_population(mu::Real, T::Real, eps_cut::Real; omega::Real=1.0)
+    (T <= 0) && return 0.0
+    s = 0.0
+    for n in 1:4000
+        ε = (n + 1.5) * Float64(omega)
+        ε <= eps_cut || break
+        x = (ε - Float64(mu)) / Float64(T)
+        x > 0 || return Inf
+        x > 60 && continue
+        s += 0.5 * (n + 1) * (n + 2) / expm1(x)
+    end
+    s
+end
+
+"""
+    mu_from_total_number_equilibrium(N_total, T, eps_cut; omega=1.0, c0, V) -> (; mu, N0)
+
+Solve `N₀(μ) + N_C^th(μ,T) + N_I(μ,T) = N_total` for the chemical potential of the
+WHOLE cloud, with the condensate taken in Thomas–Fermi, `N₀ = (4π/c₀)[μR³/3 − R⁵/10]`,
+`R = √(2(μ−ε₀))` for `μ > ε₀` and zero below.
+
+# Why this replaces `mu_from_total_number`
+
+That version solved `N_I(μ,T) = N_total − N_C` with `N_C` read from the field, which
+looked like the right way to stop prescribing `N₀`. It is not: it charges the whole
+discrepancy between the field and equilibrium to the reservoir. Measured on the euv3
+ramp at 10 % — `N_total = 8835`, field `N_C = 6756` — it returned `μ = 16.7`, a value
+whose Thomas–Fermi condensate is `2×10⁵`, thirty times the atoms present, and the
+field's `N₀` sat at 0.64 while `μ` stayed pinned there. A drive that demands thirty
+times what exists is not a transient, it is a mis-stated constraint.
+
+Here every region is a function of `μ` at the same `T`, so the solution is the `μ` the
+whole cloud would have in equilibrium at that total — which is what the reservoir
+should be driving the field toward. `N₀` still comes out rather than going in: it is
+whatever the constraint leaves after the thermal regions take their share.
+"""
+function mu_from_total_number_equilibrium(N_total::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, c0::Real, V::Real=1.0, rtol::Real=1e-8, iters::Int=200)
+    (N_total <= 0 || T <= 0) && return (; mu=NaN, N0=NaN)
+    ε0 = 1.5 * Float64(omega)
+    function total(mu)
+        N0 = if mu > ε0
+            R = sqrt(2 * (mu - ε0))
+            max((4π / Float64(c0)) * ((mu - ε0) * R^3 / 3 - R^5 / 10), 0.0)
+        else
+            0.0
+        end
+        N0 + coherent_population(mu, T, eps_cut; omega) +
+        incoherent_population(mu, T, eps_cut; omega)
+    end
+    hi = Float64(eps_cut) - 1e-9 * max(abs(eps_cut), 1.0)
+    total(hi) >= N_total || return (; mu=NaN, N0=NaN)
+    lo = min(ε0 - 10 * Float64(T), -Float64(T))
+    for _ in 1:60
+        total(lo) < N_total && break
+        lo -= max(Float64(T), abs(lo))
+        lo < -1e12 && return (; mu=NaN, N0=NaN)
+    end
+    for _ in 1:iters
+        mid = 0.5 * (lo + hi)
+        (total(mid) < N_total) ? (lo = mid) : (hi = mid)
+        abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
+    end
+    mu = 0.5 * (lo + hi)
+    N0 = mu > ε0 ?
+         let R = sqrt(2 * (mu - ε0))
+        max((4π / Float64(c0)) * ((mu - ε0) * R^3 / 3 - R^5 / 10), 0.0)
+    end : 0.0
+    (; mu, N0)
 end
