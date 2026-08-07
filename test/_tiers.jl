@@ -251,6 +251,7 @@ const FAST_TESTS = [
     "dynamics/test_spgpe_projector_composition.jl",
     "dynamics/test_mu_from_total_number.jl",
     "dynamics/test_mu_equilibrium_constraint.jl",
+    "dynamics/test_mu_lda_constraint.jl",
     "dynamics/test_number_conserving_spgpe.jl",
     "workflow/test_measurement_provenance.jl",
     "hamiltonian/test_majorana.jl",
