@@ -271,6 +271,7 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    "hamiltonian/test_ddi_bufs_are_empty_when_padded.jl",
     # energy and gradient must come from the SAME DDI kernel; test_ddi_padded.jl
     # never calls either face
     "hamiltonian/test_ddi_gradient_padding_parity.jl",
