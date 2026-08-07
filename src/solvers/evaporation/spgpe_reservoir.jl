@@ -364,7 +364,7 @@ exactly the kind of imposed answer this whole mechanism exists to remove.
 function number_conserving_callback(
     mu_ref::Base.RefValue{Float64}, N_total_of, T_of, eps_cut;
     omega::Real=1.0, every::Int=1, counter::Base.RefValue{Int}=Ref(0),
-    t_offset::Real=0.0,
+    t_offset::Real=0.0, c0_lda::Union{Nothing, Real}=nothing,
 )
     function (ws, step, args...)
         step % every == 0 || return nothing
@@ -382,7 +382,21 @@ function number_conserving_callback(
         # the controller must use the same cutoff the projector does, or it solves for
         # a mu against an I region the field does not have.
         ec = eps_cut isa Real ? Float64(eps_cut) : Float64(eps_cut(t))
-        mu = mu_from_total_number(N_total_of(t), N_C, T_of(t), ec; omega)
+        # The semiclassical Hartree-Fock constraint, which is the standard form and
+        # the third one tried here. It solves N_0(mu) + n_th,C(mu) + N_I(mu) = N_total
+        # with every region at the same mu through mu_eff = mu - V - 2c0 n, so it does
+        # NOT read N_C from the field. Reading N_C was the second version's error: it
+        # charged the whole field-to-equilibrium gap to the reservoir and returned
+        # mu = 16.7 against a field of 6756 atoms, demanding 2e5.
+        #
+        # What is driven toward is the mu the whole cloud would have in equilibrium at
+        # this total and temperature — a target, not a residual.
+        g = if c0_lda === nothing
+            (; mu=NaN)
+        else
+            mu_from_total_lda(N_total_of(t); T=T_of(t), c0=c0_lda, eps_cut=ec, omega)
+        end
+        mu = g.mu
         isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
         nothing
     end

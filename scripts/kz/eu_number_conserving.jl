@@ -173,7 +173,7 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     # The controller must use the SAME cutoff the projector does, or it solves for a
     # mu against an I region that is not the one the field sees.
     cb = number_conserving_callback(mu_ref, N_of, T_of, eps_cut_of; every=25,
-        counter=bad, t_offset=t0_int)
+        counter=bad, t_offset=t0_int, c0_lda=c0_field)
     res = SPGPEReservoir(; T=FunctionWaveform(T_of), mu=FeedbackWaveform(mu_ref),
         a_s=0.007, k_cut=k_cut_wave, gamma=NaN, M=NaN)          # rates DERIVED
 
