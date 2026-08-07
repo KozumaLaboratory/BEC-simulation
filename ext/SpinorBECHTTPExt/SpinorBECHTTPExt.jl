@@ -43,11 +43,17 @@ function SpinorBEC.send_slack_notification(
 
         if response.status != 200
             @warn "Slack notification failed with status $(response.status)"
+            return false
         end
     catch e
         @warn "Slack notification failed: $e"
+        return false
     end
-    return nothing
+    # `true` only here — the one path on which the message actually reached
+    # Slack. Every path returned `nothing` until 2026-08-07, including the two
+    # above that had just @warn'd a failure, so `notify_slack` could not tell
+    # its caller whether an alert had been delivered.
+    return true
 end
 
 end # module
