@@ -76,13 +76,13 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
     ),
     ("paper3", "FIG-2") => (
         title="Sign Pattern β_S^(λ_spin) vs S for 6 F-cases",
-        data_source="scripts/manuscript/lemma1_general_S_verification.jl",
+        data_source="lemma1_general_S_verification.jl (archived)",
         kind=:scatter_grid,
         builder=build_paper3_fig2,
     ),
     ("paper3", "FIG-3") => (
         title="F-systematic 13-instance verification (β_0 = 1/(2F+1))",
-        data_source="scripts/manuscript/f_systematic_lemma1_predictions.jl",
+        data_source="f_systematic_lemma1_predictions.jl (archived)",
         kind=:verification_table,
         builder=build_paper3_fig3,
     ),

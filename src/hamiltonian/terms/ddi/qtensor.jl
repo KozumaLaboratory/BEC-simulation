@@ -13,7 +13,7 @@ vanishes at 0. Production stores +k_Nyq on the rfft axis but −k_Nyq on the
 full-fft axes, so the raw representative is nonzero and axis-asymmetric; a
 z-polarized cloud then relaxes into a spuriously squished shape despite a
 symmetric trap, field and dipole axis. See
-`scripts/ddi_nyquist_xy_asymmetry_probe.jl` and the regression test
+`ddi_nyquist_xy_asymmetry_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)` and the regression test
 `test/hamiltonian/test_ddi_nyquist_xy_symmetry.jl`.
 """
 function _zero_odd_offdiag_at_nyquist!(Q_xy, Q_xz, Q_yz, full_n::NTuple{N, Int}) where {N}

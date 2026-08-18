@@ -62,7 +62,7 @@ SPINORBEC_TEST_WORKERS=auto julia --project=. -e 'using Pkg; Pkg.test()'  # para
 julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test
 julia --project=. -e 'using Pkg; Pkg.instantiate()'               # install deps
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU REPL on WSL2
-julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / autopilot / tag / catalog / tsubame)
+julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / autopilot / tag / catalog / gs-library / validation-matrix / tsubame); body = SpinorBEC.cli_main
 ```
 
 `SPINORBEC_TEST_TIER` ∈ `{fast, ci, full, physics}` plus two **derived views** used as per-PR gates: `oracles` (every `test/oracles/` file, from any tier) and `integration` (`CI_EXTRA` minus the oracles). `fast` + `oracles` + `integration` run as three parallel per-PR jobs and between them cover the whole `ci` tier — a property `test_tier_membership.jl` enforces by reading the tiers back out of `.github/workflows/ci.yml`, so deleting a job reddens the suite rather than shrinking coverage silently. Tier membership is **explicit in `test/_tiers.jl`** — every test belongs to exactly one list. (`runtests.jl` is the runner; it `include`s `_tiers.jl`, which is where a new test is added. This said `runtests.jl` until 2026-08-04.) New tests get added to a list, not auto-discovered. The runner also honours `SPINORBEC_TEST_WORKERS` (`1` default = serial in-process / `N` / `auto` = N **independent julia processes** taking files **on demand** from a shared O_EXCL claim queue, heaviest first — separate processes, not Distributed workers, so each loads SpinorBEC once in a clean session; a shared worker pool reloads the package mid-run and `x isa T` flakes false. `_COST` is only the hand-out order: per-file times swing ±30 % run to run, so static bin-packing left the makespan 8-21 % above the floor no matter how well it was fitted), `SPINORBEC_TEST_SKIP` (comma-separated paths to omit), and `SPINORBEC_TEST_TIMING=quiet`. Parallel mode requires each test file to stay a dependency-free unit (own `using` / `@testset` / `@__DIR__` helpers, no cross-file fixed `/tmp` paths) — preserve that when adding tests.
@@ -93,7 +93,7 @@ src/
 
 ext/        SpinorBEC{CUDA, Makie, HTTP, VTK}Ext (lazily loaded; CUDA is NOT a weakdep — see docs/STATE.md)
 test/       subdirs mirror src/ + test/oracles/ (sign-bug-proof gates) + test/helpers/
-scripts/    one-off audit drivers (m1_*, m2_*, fisher_*, build_sysimage*, cli.jl, deploy_dashboard_auth.sh)
+scripts/    operational artifacts ONLY (cli.jl shim, generate_state.jl, build_sysimage*, systemd/ops specs, active campaign dirs) — gated by test/test_scripts_allowlist.jl; one-off drivers archive to BEC-simulation-archive/
 dashboard/  React + WebGPU frontend (Vite + R3F + Three WebGPU + TSL + leva + shadcn + Tailwind v4)
 runs/       YAML configs + per-config jld2 cache  (the `_loop/` loop record was RETIRED 2026-06-08 → /home/suzume/workspace/BEC-simulation-archive/loop_record_2026_06_08/ (outside the repo))
 docs/       api/ architecture/ conventions/ design/ guides/ reference/ refs/ research_notes/ theory/ validation/ manuscript/

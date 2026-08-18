@@ -14,6 +14,9 @@ const FAST_TESTS = [
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # The CONTRIBUTING.md scripts/ charter, gated: set equality between
+    # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
+    "test_scripts_allowlist.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
     "test_calibrated_scan.jl",

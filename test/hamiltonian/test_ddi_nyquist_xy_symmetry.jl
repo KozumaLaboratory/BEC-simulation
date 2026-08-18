@@ -8,7 +8,7 @@
 # y-squished shape despite a fully xy-symmetric trap/field/dipole axis.
 # The continuum value of an odd kernel at a folded Nyquist mode is 0, so
 # `_build_q_tensor!` zeros the off-diagonals on every odd-axis Nyquist
-# plane. See scripts/ddi_nyquist_xy_asymmetry_probe.jl.
+# plane. See ddi_nyquist_xy_asymmetry_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/).
 
 using Test
 using SpinorBEC

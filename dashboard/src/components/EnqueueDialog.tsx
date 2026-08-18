@@ -407,7 +407,7 @@ function AutonomyHint({ level }: { level: 'suggest' | 'propose' | 'dispatch' }) 
     <div className="text-xs text-[var(--ink-soft)]">
       <strong>:propose</strong> enqueues to <code className="font-mono">:pending</code>{' '}
       but the autopilot waits for an operator to promote
-      via <code className="font-mono">scripts/autopilot.jl</code> before dispatching.
+      via <code className="font-mono">scripts/cli.jl autopilot</code> before dispatching.
     </div>
   )
 }

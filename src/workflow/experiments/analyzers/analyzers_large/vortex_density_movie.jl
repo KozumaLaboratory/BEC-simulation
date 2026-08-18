@@ -9,7 +9,7 @@
 # that say whether a density hole is a vortex or a domain.
 #
 # Everything is streamed frame-by-frame into one JLD2 archive. The renderer
-# (scripts/viz_dynamics_movie.py) is deliberately outside Julia — matplotlib
+# (archived viz_dynamics_movie.py) is deliberately outside Julia — matplotlib
 # writes the mp4, and re-rendering must not mean re-running the physics.
 
 """

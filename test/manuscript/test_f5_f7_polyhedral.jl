@@ -14,7 +14,7 @@
 #   - group equivariance g·ζ = χ(g)·ζ
 #   - β_S^{c_0} per channel
 #
-# Run: julia --project=. scripts/manuscript/f5_f7_polyhedral_verification.jl
+# Run: the archived f5_f7_polyhedral_verification.jl driver
 
 using Test
 using SpinorBEC
