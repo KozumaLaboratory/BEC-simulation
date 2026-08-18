@@ -77,7 +77,7 @@ function make_workspace(;
     # A/B fixture. Callers building a workspace by hand for production physics
     # want `ddi_padding=true, ddi_trunc_radius=-1.0`: without them the bare
     # periodic kernel carries a 2-5% dipolar field error that is flat in
-    # resolution (scripts/ddi_cutoff_geometry_jz_probe.jl).
+    # resolution (ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)).
     ddi_padding::Bool=false,
     ddi_trunc_radius::Float64=NaN,
     ddi_pad_factor::Union{Real, NTuple{N, Real}}=2,

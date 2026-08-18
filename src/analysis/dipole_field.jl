@@ -69,7 +69,7 @@ enough: it pushes the *source* images out but leaves the *kernel* periodic on
 the doubled box, and the 1/r³ tail wraps. Measured on the DDI mean field, which
 is the same convolution, padding alone leaves a 3.9e-4 (isotropic) to 9.1e-4
 (aspect-2) relative field error against free space, versus 0 with the cutoff —
-see `scripts/ddi_cutoff_geometry_jz_probe.jl`. Pass an explicit `Float64` to set
+see `ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)`. Pass an explicit `Float64` to set
 the radius yourself, or `false`/`nothing` for the bare kernel.
 
 On an anisotropic box at the doubled grid the cutoff is capped at `min(box)`

@@ -27,6 +27,8 @@ include("figures/paper3_fig4.jl")
 include("figures/paper3_fig6.jl")
 include("figures/paper4_fig2.jl")
 include("figures/paper4_fig3.jl")
+include("figures/docs_field_noise.jl")
+include("figures/docs_lhy_uv.jl")
 
 # Dispatch table: (paper, FIG-N) → (title, data_source, kind, builder)
 const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
@@ -74,13 +76,13 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
     ),
     ("paper3", "FIG-2") => (
         title="Sign Pattern β_S^(λ_spin) vs S for 6 F-cases",
-        data_source="scripts/manuscript/lemma1_general_S_verification.jl",
+        data_source="lemma1_general_S_verification.jl (archived)",
         kind=:scatter_grid,
         builder=build_paper3_fig2,
     ),
     ("paper3", "FIG-3") => (
         title="F-systematic 13-instance verification (β_0 = 1/(2F+1))",
-        data_source="scripts/manuscript/f_systematic_lemma1_predictions.jl",
+        data_source="f_systematic_lemma1_predictions.jl (archived)",
         kind=:verification_table,
         builder=build_paper3_fig3,
     ),
@@ -125,6 +127,19 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
         data_source="runs/ensemble_traces_round5/",
         kind=:trace_overlay,
         builder=nothing,
+    ),
+    # "docs" pseudo-paper: documentation figures rendered into docs/figs/.
+    ("docs", "FIG-FIELD-NOISE") => (
+        title="Shielded field-noise budget vs weak-field Eu feature scale",
+        data_source="computed in-builder (FieldNoiseSpec, seed=11)",
+        kind=:line_plot,
+        builder=build_docs_field_noise,
+    ),
+    ("docs", "FIG-LHY-UV") => (
+        title="full_bdg spinor LHY UV-subtraction convergence",
+        data_source="computed in-builder (BdG zero-point integral)",
+        kind=:loglog_plot,
+        builder=build_docs_lhy_uv,
     ),
 )
 

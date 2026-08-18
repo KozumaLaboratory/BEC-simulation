@@ -87,18 +87,14 @@ end
 resolve(raw) = isfile(raw) ? raw :
                joinpath(LIB, join(splitpath(raw)[max(1, end - 2):end], "/"))
 
-"""Density-weighted (⟨F_z⟩, ⟨F⊥⟩) per atom — same definition as the library
-driver's `frame_scalars`, so numbers are comparable across scans."""
-function spin_scalars(path, grid)
+"""Density-weighted (⟨F_z⟩, ⟨F⊥⟩) per atom at a stored ψ path — delegates to
+`spin_scalars` (src/analysis/observables/spin_scalars.jl), so numbers are
+comparable across scans by construction."""
+function spin_scalars_at(path, grid)
     psi = jldopen(resolve(path), "r") do f
         Array{ComplexF64}(f["psi"])
     end
-    dV = cell_volume(grid)
-    dens = dropdims(sum(abs2, psi; dims=4); dims=4)
-    fx, fy, fz = _spin_expectation_fields(psi, grid)
-    ntot = sum(dens) * dV
-    (; fz=sum(fz) * dV / ntot,
-        fperp=sum(sqrt.(fx .^ 2 .+ fy .^ 2)) * dV / ntot)
+    spin_scalars(psi, grid)
 end
 
 # ------------------------------------------------------------------- analysis
@@ -169,8 +165,8 @@ for κ in KAPPAS
     for B in Bs
         ru = up[argmin(abs.(getfield.(up, :B) .- B))]
         rd = dn[argmin(abs.(getfield.(dn, :B) .- B))]
-        su = spin_scalars(ru.raw, PRESET_REF.grid)
-        sd = spin_scalars(rd.raw, PRESET_REF.grid)
+        su = spin_scalars_at(ru.raw, PRESET_REF.grid)
+        sd = spin_scalars_at(rd.raw, PRESET_REF.grid)
         push!(
             tab,
             (; B, E_up=ru.E, E_dn=rd.E, dE=ru.E - rd.E,
@@ -237,8 +233,8 @@ for κ in KAPPAS
             "none (δ⟨F⊥⟩ < $DFTOL everywhere)"
         else
             @sprintf("%.1f – %.1f µG (width %.1f%s)", bracket[1], bracket[2],
-            bracket[2] - bracket[1],
-            data_limited ? ", LOWER BOUND — branches still distinct at the data edge" : "")
+                bracket[2] - bracket[1],
+                data_limited ? ", LOWER BOUND — branches still distinct at the data edge" : "")
         end,
         δmax)
     @printf("  branch extent (up/dn)  : %.1f–%.1f / %.1f–%.1f µG\n",

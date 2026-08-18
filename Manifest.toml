@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "3355b21d2532ea7b6b66097c8121249015e9dc67"
+project_hash = "cac99f43cf6e0ff0369b292f63f7289a4952f9e5"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -623,7 +623,7 @@ version = "2.7.2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 
 [[deps.SpinorBEC]]
-deps = ["Base64", "BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "TimerOutputs", "Unitful", "YAML"]
+deps = ["Base64", "BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "Test", "TimerOutputs", "Unitful", "YAML"]
 path = "."
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "1.0.0"
@@ -710,6 +710,11 @@ version = "1.12.1"
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 version = "1.10.0"
+
+[[deps.Test]]
+deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
+uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+version = "1.11.0"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]

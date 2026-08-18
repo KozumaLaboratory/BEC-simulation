@@ -106,7 +106,7 @@ export function SweepView({ run }: Props) {
     return (
       <Empty
         msg={
-          'No sweep viewspec for this run. Generate one with `scripts/m1_sweep_golden_export.jl` (or the runtime equivalent that calls `write_viewspec`).'
+          'No sweep viewspec for this run. Generate one with `write_viewspec` (src/analysis/sweep_viewspec.jl).'
         }
       />
     )
