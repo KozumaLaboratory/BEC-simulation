@@ -13,7 +13,7 @@
 #$ -l h_rt=24:00:00
 #$ -j y
 #$ -o logs/tsubame/
-source "$(dirname "$0")/_preamble.sh"
+source "${EU335_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu335}/scripts/eu_hysteresis/_preamble.sh"
 
 export AR_KAPPA="${AR_KAPPA:-1.8}"
 export AR_GRID="${AR_GRID:-32}"

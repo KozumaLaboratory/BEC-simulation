@@ -16,7 +16,10 @@
 #$ -l h_rt=1:00:00
 #$ -j y
 #$ -o logs/tsubame/
-source "$(dirname "$0")/_preamble.sh"
+# UGE copies the job script into a spool directory, so `dirname $0` is NOT the
+# repo and `-cwd` does not help — it sets the working directory, not $0. Source
+# by absolute path.
+source "${EU335_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu335}/scripts/eu_hysteresis/_preamble.sh"
 
 SEEDS=/gs/fs/tga-kozuma-kouhi/uk07267/runs/eu335/seeds
 SM="$EU335_OUT/smoke"

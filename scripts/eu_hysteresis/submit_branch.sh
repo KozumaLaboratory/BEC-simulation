@@ -11,7 +11,7 @@
 #$ -l h_rt=24:00:00
 #$ -j y
 #$ -o logs/tsubame/
-source "$(dirname "$0")/_preamble.sh"
+source "${EU335_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu335}/scripts/eu_hysteresis/_preamble.sh"
 
 export HB_KAPPA="${HB_KAPPA:-1.8}"
 export HB_GRID="${HB_GRID:-32}"
