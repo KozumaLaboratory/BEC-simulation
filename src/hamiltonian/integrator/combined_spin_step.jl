@@ -268,6 +268,16 @@ function _combined_step_unusable(ws::Workspace)
     ws.raman === nothing || return "Raman coupling is not supported yet"
     is_uniform(ws.zeeman) || return "a spatial Zeeman field B(r,t) is not supported"
     ws.light_shift === nothing || return "light_shift is not supported yet"
+    # `_half_potential_step_combined!` never calls `apply_spatial_lhy_spin_step!` —
+    # its only two call sites are in the general chain (split_step.jl:632, :708) —
+    # so a SpatialLHY workspace accepted here loses that substep entirely. The
+    # sibling guard `_spin_chain_reason` (spin_chain.jl) has carried this line
+    # since the substep was added; this one did not, which is what two
+    # independent lists of the same property produce. Measured 2026-08-08 on an
+    # 8^3 Rb87 DDI workspace: `spinor_lhy=:spatial` gave
+    # `_spin_chain_reason` = "a spatial-LHY spin substep sits between them" and
+    # `_combined_step_unusable` = nothing.
+    _lhy_needs_spin(ws.lhy) && return "a spatial-LHY spin substep is not carried"
     ws.ddi_bufs === nothing &&
         return "DDI buffers are required (enable_ddi=true; the spin-density and Φ scratch lives there)"
     nothing

@@ -32,6 +32,9 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    # The #335 loop-width extractor refuses to report until its controls pass;
+    # that refusal is the guarantee, so it is gated rather than left to --selftest.
+    "analysis/test_hysteresis_conversion_depth.jl",
     "analysis/test_spin_rotation.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
@@ -79,6 +82,9 @@ const FAST_TESTS = [
     "workflow/test_slack_alerts_report_delivery.jl",
     "workflow/test_inert_dynamics_keys_are_refused.jl",
     "hamiltonian/test_absorbing_boundary_honours_the_step.jl",
+    "hamiltonian/test_two_spin_step_guards_agree.jl",
+    "workflow/test_absence_is_not_reported_as_health.jl",
+    "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
     "workflow/test_plan_cache_is_keyed_on_the_box.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
     "workflow/test_dashboard_does_not_invent_a_time_axis.jl",
@@ -735,6 +741,7 @@ const FULL_EXTRA = [
     # host k-space arrays (k², 1/|k|, √(1/|k|)) against device buffers.
     "gpu/test_spgpe_gpu_cpu_parity.jl",
     "gpu/test_gpu_tabulated_lhy_parity.jl",
+    "gpu/test_gpu_device_caches_key_on_the_object.jl",
     "gpu/test_gpu_lhy_term_faces.jl",
     # Same bug class again, this time in the dispatch itself: `energy_gradient!`
     # chose CPU vs GPU from `psi`, while computing on `ws.state.psi` and writing
