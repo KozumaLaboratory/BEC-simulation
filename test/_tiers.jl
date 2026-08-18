@@ -324,6 +324,7 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_orbital_angular_momentum_vector.jl",
     "analysis/test_superfluid_fraction.jl",
     "analysis/test_superfluid_fraction_gp_twist.jl",
     "solvers/test_scalar_ddi_transverse_pad.jl",

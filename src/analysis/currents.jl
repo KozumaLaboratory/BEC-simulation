@@ -1,4 +1,5 @@
 export probability_current, orbital_angular_momentum, superfluid_velocity
+export orbital_angular_momentum_vector
 export total_angular_momentum, spin_texture_charge, circulation
 
 # CPU FFT plans keyed by spatial shape. `orbital_angular_momentum` is polled
@@ -113,6 +114,65 @@ function orbital_angular_momentum(
     end
 
     Lz
+end
+
+"""
+Orbital angular momentum vector ⟨L⟩ = (⟨Lx⟩, ⟨Ly⟩, ⟨Lz⟩) with
+`L_α = -i ε_{αβγ} r_β ∂_γ`, summed over spinor components.
+
+3D only: in 2D the in-plane components need a z coordinate, so `(0, 0, ⟨Lz⟩)`
+is returned. The z component agrees with `orbital_angular_momentum` (same
+spectral derivatives, same no-Nyquist-null convention — see the note there).
+
+Needed whenever the field is not along z: mechanical Larmor precession turns
+the cloud about **B**, so all three components move and ⟨Lz⟩ alone reads as a
+decay rather than a rotation.
+"""
+function orbital_angular_momentum_vector(
+    psi::AbstractArray{<:Complex},
+    grid::Grid{N},
+    plans::FFTPlans,
+) where {N}
+    N == 3 || return (0.0, 0.0, orbital_angular_momentum(psi, grid, plans))
+
+    psi = psi isa Array ? psi : Array(psi)
+    n_comp = size(psi, N + 1)
+    n_pts = ntuple(d -> size(psi, d), N)
+    dV = cell_volume(grid)
+
+    psi_k = zeros(ComplexF64, n_pts)
+    d = ntuple(_ -> zeros(ComplexF64, n_pts), 3)
+
+    local_plans = get!(_ORBITAL_CPU_PLAN_CACHE, n_pts) do
+        make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
+    end
+
+    L = zeros(Float64, 3)
+    for c in 1:n_comp
+        idx = _component_slice(N, n_pts, c)
+        psi_c = view(psi, idx...)
+
+        psi_k .= psi_c
+        local_plans.forward * psi_k
+        for dim in 1:3
+            @inbounds for I in CartesianIndices(n_pts)
+                d[dim][I] = im * grid.k[dim][I[dim]] * psi_k[I]
+            end
+            local_plans.inverse * d[dim]
+        end
+
+        @inbounds for I in CartesianIndices(n_pts)
+            x = grid.x[1][I[1]]
+            y = grid.x[2][I[2]]
+            z = grid.x[3][I[3]]
+            pc = conj(psi_c[I])
+            L[1] += real(pc * (-im) * (y * d[3][I] - z * d[2][I])) * dV
+            L[2] += real(pc * (-im) * (z * d[1][I] - x * d[3][I])) * dV
+            L[3] += real(pc * (-im) * (x * d[2][I] - y * d[1][I])) * dV
+        end
+    end
+
+    (L[1], L[2], L[3])
 end
 
 """
