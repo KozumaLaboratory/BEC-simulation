@@ -34,7 +34,8 @@ using LinearAlgebra
 using SpinorBEC
 using SpinorBEC:
     _COMP_YOSHIDA, _COMP_SUZUKI, _COMP_BLANES_MOAN_SRKN6B,
-    _COMP_OMELYAN_PEFRL, _COMP_YOSHIDA_S6, _assert_jump_realisable
+    _COMP_OMELYAN_PEFRL, _COMP_YOSHIDA_S6, _assert_jump_realisable,
+    MEANFIELD_MIDPOINT_ENABLED
 
 const _N = 8
 const _L = 4.0
@@ -178,5 +179,42 @@ end
         # the negative control: if nothing were demoted the loop above would be
         # vacuous on its throwing arm
         @test count(c -> c[2].jump_order < c[2].order, _COMPOSERS) == 2
+    end
+
+    # THROUGH THE REAL ENTRY POINT. The arm above calls the guard directly, and
+    # that is not enough: the first version of this fix defined
+    # `_assert_jump_realisable` and never called it — an aborted edit dropped the
+    # call site — and this file stayed green through a commit claiming the DDI
+    # path refuses. It did not. Drive `run_simulation_yoshida!` itself.
+    @testset "run_simulation_yoshida! refuses at the entry point" begin
+        g = make_grid(GridConfig{3}((8, 8, 8), (6.0, 6.0, 6.0)))
+        mk(ddi) = make_workspace(;
+            grid=g, atom=resolve_atom(:Na23),
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => 0.03)),
+            potential=HarmonicTrap((1.0, 1.0, 1.0)),
+            enable_ddi=ddi, c_dd=ddi ? 1.0 : 0.0,
+            sim_params=SimParams(; dt=1.0e-3, n_steps=1, save_every=1))
+
+        # CALIBRATION for the fixture: the guard keys on `ws.ddi !== nothing`,
+        # so the two workspaces must actually differ in that field or both arms
+        # below test the same branch.
+        ws_ddi, ws_plain = mk(true), mk(false)
+        @test ws_ddi.ddi !== nothing
+        @test ws_plain.ddi === nothing
+        @test MEANFIELD_MIDPOINT_ENABLED[]   # else `use_mid` is false for both
+
+        # it must throw BEFORE stepping — this call costs nothing if it does
+        @test_throws ArgumentError run_simulation_yoshida!(
+            ws_ddi; t_end=1.0e-3, save_interval=1.0e-3,
+            composition=:blanes_moan_srkn6b)
+        @test_throws ArgumentError run_simulation_yoshida!(
+            ws_ddi; t_end=1.0e-3, save_interval=1.0e-3,
+            composition=:omelyan_pefrl)
+
+        # NEGATIVE CONTROL: without DDI the same composition is fine, so the
+        # guard is not simply rejecting these two names everywhere.
+        r = run_simulation_yoshida!(ws_plain; t_end=2.0e-3, save_interval=2.0e-3,
+            composition=:blanes_moan_srkn6b)
+        @test r.n_accepted > 0
     end
 end
