@@ -279,6 +279,67 @@ ramp somewhere else; a sector does. Registered before the runs: the falling leg 
 The 65 µG arm is the predecessor's own seed field, where it reported ⟨F⊥⟩ = 3.58.
 `runs/eu335/sector_test_B{65,75,90}`.
 
+**Result: the sector dependence is confirmed; my predicted ordering was wrong.**
+
+| seed field | 65 µG | 75 µG | 90 µG |
+|---|---:|---:|---:|
+| J_z at the seed | −4.385 | −5.018 | −5.750 |
+| J_z at 20 µG | −4.382 | −5.014 | −5.746 |
+| ⟨F⊥⟩ at 20 µG | **2.250** | **2.561** | **2.803** |
+| predicted | ≈3.5–3.6 | intermediate | 2.80 |
+
+J_z is conserved to 3×10⁻³ along all three, and the endpoint at **one final field, one
+rate, one pin takes three different values** depending only on where the ramp
+started. No spinodal does that: a branch instability is a property of the field, not
+of where you began. So the "conversion" the predecessor measured is a sector
+property.
+
+The ordering I predicted is the reverse of the measured one, and the reason is a
+confound in my own test rather than in the conclusion: at a fixed *rate* the three
+arms traverse 45, 55 and 70 µG, so they last 375, 458 and 583 ms. The endpoint's
+⟨F⊥⟩ grows monotonically along a leg, so duration and |J_z| push the same way here
+and this design cannot separate them. What it does establish — seed-field dependence
+— is the falsifiable part, and it stands. Separating the two would need arms of
+equal span at different J_z, which branch seeds cannot supply since the seed field
+fixes both.
+
+Note also what is **not** reproduced: at ε = 0.002 the 65 µG arm ends at 2.250,
+smoothly, where the predecessor reported a sharp jump to 3.58 from 64 µG at
+ε = 0.001. The pin is the only remaining difference, which makes it a candidate for
+the controlling variable rather than a footnote — §5.6.
+
+### 5.5b Is the polarised branch a minimum? Yes, and the flower's collapse is slow
+
+`runs/eu335/stability_{polar,flower}_k1.8`. The instrument's controls pass: the last
+converged flower ψ (68.25 µG) held at 93.25 µG **departs** (⟨F⊥⟩ 2.274 → 1.490, max
+excursion 1.042), while the *same* ψ held at its own field does not (excursion
+0.001). So the hold can return both answers.
+
+**The polarised branch is a genuine dynamically stable minimum wherever it was
+tested** — 20, 40 and 60 µG — with the hold moving ⟨F⊥⟩ by ≤ 0.001 over 434 ms and
+the perturb-and-re-minimise returning to the branch value exactly:
+
+| B [µG] | 20 | 40 | 60 |
+|---|---:|---:|---:|
+| ⟨F⊥⟩ on the branch | 0.0745 | 0.3214 | 0.7199 |
+| hold, max Δ⟨F⊥⟩ over 434 ms | 0.0010 | 0.0006 | 0.0006 |
+| re-minimised after a 1 % kick | 0.0745 | 0.3214 | 0.7199 |
+
+It is not a saddle, and it has no spinodal in this range. The falling leg's departure
+from it is therefore neither a spinodal collapse nor barrier crossing — it is the
+J_z slide of §5.4, and the branch it left is still sitting there, stable.
+
+**And the flower's collapse above its spinodal is slow**, which is why a ramp carries
+flower-like ⟨F⊥⟩ well past 68.4 µG:
+
+| hold field [µG] | 68.25 (its own) | 69 | 70 | 93.25 |
+|---|---:|---:|---:|---:|
+| max Δ⟨F⊥⟩ in 434 ms | 0.0006 | 0.041 | 0.096 | **1.042** |
+
+A spinodal is where the unstable mode's growth rate passes through zero, so 0.75 µG
+past the end of the branch nothing happens on any experimentally relevant timescale.
+The branch has ended — but the state does not know it yet.
+
 ### 5.5 A note on the predecessor's rising leg
 
 Its τ = 434 ms rising leg ended at 100 µG with ⟨F⊥⟩ = 1.608 and ⟨F_z⟩ = −5.132,
