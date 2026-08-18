@@ -382,6 +382,8 @@ _step_params(s::BinaryGroundStateStep) = s.params
 _step_params(s::BinaryDynamicsStep) = s.params
 _step_params(s::RotatingBasisGroundStateStep) = s.params
 _step_params(s::RotatingBasisDynamicsStep) = s.params
+_step_params(s::ScalarEGPEGroundStateStep) = s.params
+_step_params(s::ScalarEGPEDynamicsStep) = s.params
 _step_params(::AnalyzeStep) = nothing
 
 _step_path(::GroundStateStep) = :split_step
@@ -390,6 +392,8 @@ _step_path(::BinaryGroundStateStep) = :binary
 _step_path(::BinaryDynamicsStep) = :binary
 _step_path(::RotatingBasisGroundStateStep) = :rotating_basis
 _step_path(::RotatingBasisDynamicsStep) = :rotating_basis
+_step_path(::ScalarEGPEGroundStateStep) = :scalar_egpe
+_step_path(::ScalarEGPEDynamicsStep) = :scalar_egpe
 _step_path(::AnalyzeStep) = :analyze
 
 _step_name(::GroundStateStep) = "ground_state"
@@ -398,11 +402,14 @@ _step_name(::BinaryGroundStateStep) = "ground_state (binary)"
 _step_name(::BinaryDynamicsStep) = "dynamics (binary)"
 _step_name(::RotatingBasisGroundStateStep) = "ground_state (rotating_basis)"
 _step_name(::RotatingBasisDynamicsStep) = "dynamics (rotating_basis)"
+_step_name(::ScalarEGPEGroundStateStep) = "ground_state (scalar_egpe)"
+_step_name(::ScalarEGPEDynamicsStep) = "dynamics (scalar_egpe)"
 _step_name(::AnalyzeStep) = "analyze"
 
 _is_dynamics(::DynamicsStep) = true
 _is_dynamics(::BinaryDynamicsStep) = true
 _is_dynamics(::RotatingBasisDynamicsStep) = true
+_is_dynamics(::ScalarEGPEDynamicsStep) = true
 _is_dynamics(_) = false
 
 function _inspect_step(step::AnalyzeStep, idx::Int, _atom,
