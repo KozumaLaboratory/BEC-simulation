@@ -1,7 +1,10 @@
 using Test
 using SpinorBEC
 using SpinorBEC: GS_SCHEMA, inspect_config
-using Logging
+# `Base.CoreLogging`, not `using Logging`: under `Pkg.test()` the sandbox
+# environment has no `Logging` entry and the file errors on load. Same reason as
+# test/model/test_gs_admission_axes.jl.
+using Base.CoreLogging: with_logger, SimpleLogger, Info
 
 # The `full_bdg` cost advisory must fire for every ansatz that HAS a closed form.
 #
@@ -54,7 +57,7 @@ function advises(spec)
         p = joinpath(d, "probe.yaml")
         open(io -> print(io, _to_yaml(spec)), p, "w")
         buf = IOBuffer()
-        with_logger(SimpleLogger(buf, Logging.Info)) do
+        with_logger(SimpleLogger(buf, Info)) do
             try
                 inspect_config(p)
             catch

@@ -689,7 +689,7 @@ These keys used to be accepted via `[ALIAS]` rescues; they now raise
 | `phi_omega` / `phi_dot` (flat B_hat) | `B: {phi: <waveform>}` or `B_direction: {phi: {rate: ...}}` | `B_block.jl` |
 | `theta_const`, `theta_ramp`, `phi_chirp` (flat B_hat) | `B: {theta: <waveform>}` | same |
 | `initial_state: ferromagnetic` | `m_plus_F` or `m_minus_F` | schema enum |
-| `kind: option_gamma` | `kind: rotating_basis` | **retired on `dynamics:` ONLY** — `GS_SCHEMA` still accepts it (`schema.jl:266`), `runner.jl:71` branches on it and `test/rotating_basis/test_rotating_basis_pipeline_parsing.jl` pins that it works. Listed here as unconditionally removed until 2026-08-06; deleting the GS arms on that reading breaks `runs/option_gamma_*/config.yaml`. |
+| `kind: option_gamma` | `kind: rotating_basis` | **retired on `dynamics:` ONLY** — `GS_SCHEMA` still accepts it (`schema.jl:266`), `runner.jl:100`/`:112` branch on it and `test/rotating_basis/test_rotating_basis_pipeline_parsing.jl` pins that it works. Listed here as unconditionally removed until 2026-08-06; deleting the GS arms on that reading breaks that test. |
 | `backend: cuda` | `backend: gpu` | `foundation/backend.jl:_resolve_backend` |
 | `B: {level: <0|1|2>}` | (drop the key; coord auto-detects from `p` vs `Bx` vs `B_mag`) | `B_block.jl` |
 | `B: {magnitude: ...}` | `B: {B_mag: ...}` | `B_block.jl` |

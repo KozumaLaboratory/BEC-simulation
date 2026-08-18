@@ -1,4 +1,24 @@
 """
+Refuse a composition that is missing the weights every path needs.
+
+The signature used to pin `NamedTuple{(:a, :b)}`, which stopped accepting the
+module's own constants the moment they gained `order` / `jump_order`: exactly
+the two keys `_assert_jump_realisable` was added to read. A closed key set on a
+kwarg that the same file then extends is a signature that rejects its own
+defaults, so the requirement is stated here instead — `a` and `b` are needed,
+anything else is optional.
+"""
+function _assert_composition_keys(comp::NamedTuple)
+    (haskey(comp, :a) && haskey(comp, :b)) || throw(
+        ArgumentError(
+            "composition NamedTuple needs both `a` (kinetic weights) and `b` " *
+            "(potential weights); got keys $(keys(comp))",
+        ),
+    )
+    nothing
+end
+
+"""
 Refuse a composition that the DDI path cannot realise at its nominal order.
 
 `use_mid` swaps the merged ABA product for an un-merged triple jump of symmetric
@@ -65,11 +85,12 @@ function run_simulation_yoshida!(
     t_end::Float64,
     save_interval::Float64,
     callback::Union{Nothing, Function}=nothing,
-    composition::Union{Symbol, NamedTuple{(:a, :b)}}=:yoshida,
+    composition::Union{Symbol, NamedTuple}=:yoshida,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
     comp = composition isa Symbol ? _resolve_composition(composition) : composition
+    _assert_composition_keys(comp)
 
     dt = clamp(adaptive.dt_init, adaptive.dt_min, adaptive.dt_max)
 
