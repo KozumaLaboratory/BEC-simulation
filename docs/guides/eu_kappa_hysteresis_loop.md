@@ -147,19 +147,32 @@ H100 and ends with a negative control that must refuse.
 second polish of the same budget — so these are settled cells by criterion 6, not
 merely small-gradient ones.
 
-**The flower branch ends.** Walked upward from the converged 20 µG state it
-survives, converged, to **67 µG** and has collapsed by **70 µG**:
+**The flower branch ends, at 68.25–68.50 µG.** Walked upward from the converged
+20 µG state it survives, converged, and then stops existing. Three passes at
+shrinking step size, each anchored on the last surviving cell of the one before:
+
+| ΔB [µG] | last converged flower cell | first cell on the polarised branch | bracket |
+|---:|---:|---:|---:|
+| 5 | 65 (⟨F⊥⟩ 2.478) | 70, mid-collapse and **excluded** | [65, 70] |
+| 1 | 68 (⟨F⊥⟩ 2.290) | 69 (⟨F⊥⟩ 0.916), |∇E| 8.8e-6 | [68, 69] |
+| 0.25 | **68.25** (⟨F⊥⟩ 2.275) | **68.50** (⟨F⊥⟩ 0.905), |∇E| 8.3e-6 | **[68.25, 68.50]** |
+
+Each bracket lies inside the previous one, and the last surviving cell moved
++3 µG under the first refinement but only +0.25 µG — one step — under the second.
+That is a branch endpoint being approached, not a step-size artefact: **B_sp =
+68.4 ± 0.15 µG**. Along the way:
 
 | B [µG] | 20 | 40 | 55 | 60 | 65 | 67 | 70 | 75 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | ⟨F⊥⟩ | 5.137 | 4.092 | 3.120 | 2.796 | 2.478 | 2.352 | **0.938** | 1.045 |
 | ⟨F_z⟩ | −1.04 | −2.36 | −3.46 | −3.82 | −4.17 | −4.31 | −4.56 | −4.84 |
 
-The 70 µG cell is the collapse in progress and is **excluded** by criterion 6 —
-`stop_reason = max_steps`, |∇E| = 4.9×10⁻³, and ⟨F⊥⟩ still moving by 3.2×10⁻² under
-more polishing. Above it the continuation has fallen onto the polarised branch
-(⟨F_z⟩ → −5.8, ⟨F⊥⟩ ≈ 1.0–1.4), which is exactly what a branch ending looks like
-from a warm continuation.
+The ΔB = 5 scan's 70 µG cell is the collapse in progress and is **excluded** by
+criterion 6 — `stop_reason = max_steps`, |∇E| = 4.9×10⁻³, and ⟨F⊥⟩ still moving by
+3.2×10⁻² under more polishing. Above it the continuation has fallen onto the
+polarised branch (⟨F_z⟩ → −5.8, ⟨F⊥⟩ ≈ 1.0–1.4), which is exactly what a branch
+ending looks like from a warm continuation. At ΔB = 0.25 the post-collapse cell is
+itself cleanly converged, so the transition is resolved rather than straddled.
 
 **The polarised branch does not end.** Walked downward from 300 µG it stays
 converged at the gate all the way to **5 µG**, with ⟨F⊥⟩ shrinking monotonically
@@ -175,7 +188,7 @@ Its 20 µG energy, 10.863612, reproduces the independently converged reference
 reached two ways.
 
 **So the loop at κ = 1.8 is one-sided, and this is the campaign's main structural
-finding.** The rising edge is a genuine mean-field **spinodal at 67–70 µG**: the
+finding.** The rising edge is a genuine mean-field **spinodal at 68.4 µG**: the
 flower branch stops existing there, so a rising ramp must convert by then at *any*
 rate. The falling edge is **not** a spinodal — the polarised branch is still a
 stationary state at 27.4 µG where the predecessor's falling leg converted, and
