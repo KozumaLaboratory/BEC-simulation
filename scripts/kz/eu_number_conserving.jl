@@ -62,7 +62,8 @@ everything else is measured from the field.
 """
 function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_nT::Float64=3.0, seed::Int=9001, dt::Float64=0.02,
-    t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend())
+    t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend(),
+    number_damping::Bool=true, energy_damping::Bool=true)
     traj = zero_d_trajectory(; K3)
     r = traj.r
     # Internal units: the 0-D model is in SI, the field is in units of omega_ref.
@@ -175,7 +176,8 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     cb = number_conserving_callback(mu_ref, N_of, T_of, eps_cut_of; every=25,
         counter=bad, t_offset=t0_int, c0_lda=c0_field)
     res = SPGPEReservoir(; T=FunctionWaveform(T_of), mu=FeedbackWaveform(mu_ref),
-        a_s=0.007, k_cut=k_cut_wave, gamma=NaN, M=NaN)          # rates DERIVED
+        a_s=0.007, k_cut=k_cut_wave, gamma=NaN, M=NaN,         # rates DERIVED
+        number_damping, energy_damping)
 
     dV = cell_volume(grid)
     n_steps = round(Int, t_frac * (t_int[end] - t0_int) / dt)
@@ -213,6 +215,25 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if mode == "smoke"
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
+
+    elseif mode == "which"
+        # The field EMPTIES where it should grow: seeded at 1716, N_C falls monotonically
+        # to 14.9 while mu stays at 2.9-6.1 — above eps_0 = 1.5 throughout — and the
+        # constraint is satisfiable at all 4977 callbacks. The equilibrium it is being
+        # driven toward is N_0 = 3498. So something is removing atoms, not failing to
+        # add them, and that is a defect rather than a finite-gamma lag.
+        #
+        # Two candidates and one run each settles it: growth alone must GROW toward the
+        # equilibrium, and energy damping alone conserves number by construction (it is
+        # the number-conserving reservoir) so any drift there is the defect.
+        for (nd, ed, label) in ((true, false, "growth only"),
+            (false, true, "energy damping only"), (true, true, "both"))
+            @printf("\n########## %s ##########\n", label)
+            o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=0.3, t_start_s=1.73,
+                number_damping=nd, energy_damping=ed)
+            @printf("  unsatisfiable: %d of %d\n", o.unsat, o.n_cb)
+            flush(stdout)
+        end
 
     elseif mode == "lag"
         # Does the field reach the equilibrium the constraint names, and how far
