@@ -112,6 +112,18 @@ function load_points(dir)
     (b_ug, pts, axis_label, axis_unit)
 end
 
+"""Median |ΔΕ/Δaxis| over the scan — the conversion factor from an energy-gap
+shift to a boundary displacement. Reported per arm because it is NOT arm
+independent: measured 66.8 and 58.5 on the two arms that cross, 13 % apart."""
+function local_slope(bs, des)
+    sl = Float64[]
+    for i in 1:(length(bs) - 1)
+        (isnan(des[i]) || isnan(des[i + 1])) && continue
+        push!(sl, abs(des[i + 1] - des[i]) / (bs[i + 1] - bs[i]))
+    end
+    isempty(sl) ? NaN : sort(sl)[cld(length(sl), 2)]
+end
+
 """Zero crossing of ΔE(B) by linear interpolation, plus the local slope actually
 observed. Returns `nothing` when no bracketing pair exists — an extrapolated
 boundary is not a measured one."""
@@ -172,6 +184,7 @@ results = Dict{String, Any}()
 de_by_pair = Dict{String, Vector{Float64}}()
 for (label, fm, pol) in PAIRS
     des = Float64[]
+    merged = Bool[]
     allconv = true
     for i in eachindex(b_ug)
         a = get(pts, (i, fm), nothing)
@@ -181,13 +194,23 @@ for (label, fm, pol) in PAIRS
             continue
         end
         push!(des, a.E - b.E)
+        push!(merged, a.phase == b.phase)
         (a.conv && b.conv) || (allconv = false)
     end
     de_by_pair[label] = des
     c = crossing(b_ug, des)
-    results[label] = (c=c, conv=allconv, des=des)
+    results[label] = (c=c, conv=allconv, des=des, merged=merged, slope=local_slope(b_ug, des))
     @printf("\n  %-34s  %s\n", label, allconv ? "" : "  [NOT every cell converged]")
     @printf("    ΔE: %s\n", join([isnan(d) ? "  —  " : @sprintf("%+8.4f", d) for d in des], " "))
+    if any(merged)
+        # The degeneracy guard this project insists on: when both seeds land in
+        # the SAME phase they have merged, and their ΔE is a gap between two
+        # points on one branch, not between two phases. A ΔE drifting to zero
+        # then reads exactly like an approaching crossing and is not one.
+        @printf("    MERGED at %s = %s — both seeds in one phase there; ΔE past that\n",
+            AXIS, join([@sprintf("%.4g", b_ug[i]) for i in eachindex(merged) if merged[i]], ", "))
+        println("    point is not a gap between phases and no crossing may be read from it.")
+    end
     if c === nothing
         println("    no sign change inside the scanned window — boundary NOT bracketed")
     else
@@ -236,6 +259,30 @@ else
                 r.conv ? "" : "   [unconverged cells]")
         end
     end
+end
+
+# --- the gap shift, which exists whether or not a crossing does ---------------
+#
+# A crossing is the preferred readout, but it is not always available: the
+# baseline's stretched branch can MERGE into the polar one before ΔE reaches
+# zero, in which case there is no mean-field boundary on this axis to displace.
+# The shift in the gap is defined regardless, and converts to an axis
+# displacement through each arm's own measured slope. First order, and labelled
+# as such — it assumes the arms are parallel near the reference point.
+println("\n[gap shift] δ(ΔE) against the baseline, at the reference point and converted")
+println("through each arm's own median |∂ΔE/∂axis|. Independent of whether a crossing")
+println("exists, so this is the reading when a branch merges instead of crossing.")
+const REF_I = cld(length(b_ug), 2)
+@printf("\n  reference %s = %.5g\n", AXIS, b_ug[REF_I])
+@printf("  %-34s %12s %12s %12s %14s\n",
+    "arm", "ΔE", "δ(ΔE)", "slope", "δ(axis)")
+for (label, _, _) in PAIRS
+    r = results[label]
+    d = r.des[REF_I]
+    isnan(d) && continue
+    dd = d - base[REF_I]
+    @printf("  %-34s %12.5f %12.5f %12.4g %14.5g\n",
+        label, d, dd, r.slope, isnan(r.slope) || r.slope == 0 ? NaN : dd / r.slope)
 end
 
 # --- criterion C: the SpatialLHY residual, and what it is worth in µG ---------
