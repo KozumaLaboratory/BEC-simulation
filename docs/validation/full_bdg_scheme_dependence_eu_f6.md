@@ -1,5 +1,21 @@
 # The Eu F=6 LHY instability is entirely dipolar — and that names the fix
 
+> **Superseded in part, 2026-08-19 (#337).** Two things here have since been
+> measured rather than argued, and both change the verdict:
+>
+> * the scheme dependence this document treats as an unbounded obstacle is
+>   **≤ 6 % of ε_LHY** over `0 ≤ c_dd ≤ c_dd(Eu)`, and exactly 0 where the
+>   spectrum is real. So "quote a bound rather than an ordering" — the third
+>   honest route listed at the bottom of this file — is not a consolation prize,
+>   it is a usable measurement with a known error bar;
+> * the `q` escape-route table below was computed at 10⁻⁴ of the campaign's
+>   field. It is corrected in place.
+>
+> Read `docs/theory/lhy_scheme_selection_eu_f6.md` for the current statement.
+> Everything else here — that the instability is entirely dipolar, that
+> converging does not null it, that `icosahedral` refuses at `c₁ < 0` — stands.
+
+
 **Corrected 2026-07-30, same day.** The first version of this document concluded
 "there is no usable LHY mode in this regime". That was too strong, and the
 measurement that shows why took one extra column: **switch the DDI off and the
@@ -102,21 +118,37 @@ were found shut on the same day, by different routes:
 
 The warning names `(F, c₀, c₁, q)`. `F` is the atom. That leaves three.
 
-### q — unreachable by 15 orders of magnitude
+### q — unreachable, but not by the margin this section claimed
 
-`q` scales as `Bz²`. At the campaign's fields:
+**Corrected 2026-08-19 (#337).** The table below was computed at 10⁻⁴ of the
+campaign's field. `linear_zeeman_p` takes **tesla**; the campaign YAML writes
+`Bz: "4.4e-5 Gauss"` = 4.4e-9 T, and `julia --project=. scripts/cli.jl inspect`
+on `config_texture_bscan.yaml` resolves `p = −0.651`, `q = +2.502e-08` there.
+Every field label in the original was therefore 10⁴ too large — the row printed
+as "1 G" is in fact 100 µG, which is why its numbers are the only ones that
+survive unchanged. Corrected:
 
 | Bz | p (dimensionless) | q (dimensionless) |
 |---|---:|---:|
-| 50 µG | −7.40e-05 | **3.23e-16** |
-| 60 µG | −8.88e-05 | 4.65e-16 |
-| 70 µG | −1.04e-04 | 6.33e-16 |
-| 80 µG | −1.18e-04 | **8.27e-16** |
-| 1 G | −1.48 | 1.29e-07 |
+| 50 µG | **−0.7398** | **3.231e-08** |
+| 60 µG | −0.8877 | 4.652e-08 |
+| 70 µG | −1.036 | 6.331e-08 |
+| 80 µG | **−1.184** | **8.270e-08** |
+| 100 µG | −1.480 | 1.292e-07 |
 
 Moving the table by 9.6 % (V(n=1): 46.09 → 50.52) took `q = 0.5`. The physical
-`q` here is `~1e-16`. Reaching `q ~ 0.5` needs kilogauss, which is not this
-experiment.
+`q` here is `~3e-8`, not `~1e-16`, so the margin is 8 orders and not 16.
+Reaching `q ~ 0.5` still needs kilogauss, which is not this experiment.
+
+**The conclusion survives, and is now measured rather than extrapolated.**
+`bench/lhy_growth_vs_field.jl` sweeps the real field and the growth rate is flat:
+3.667 → 3.883 → 3.891 (FM, m=+F) and 15.164 → 15.142 → 15.051 (polar) at
+B = 0 / 44 / 100 µG. A linear Zeeman term shifts every branch and the chemical
+potential together, so it does not gap the spin channel at all — which is a
+better reason than "q is small", and one that would have held even if q had been
+large. ε_LHY itself moves −2 % over the same range, so the zero-field tables the
+2026-07-30 `zeeman`-passing defect produced were, in this regime, numerically
+close to right.
 
 *Prerequisite for even asking:* until 2026-07-30 `_build_spinor_lhy` never passed
 `zeeman` to the table builder, so every table was built at **zero field** and `q`

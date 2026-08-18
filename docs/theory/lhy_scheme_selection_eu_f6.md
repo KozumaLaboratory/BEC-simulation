@@ -244,3 +244,82 @@ the two conventions differ by a few percent regardless.
 ## 6. Criterion C — the `SpatialLHY` residual in µG
 
 ## 7. Criterion D — which claims need ε_LHY at all
+
+Measured by `bench/lhy_state_dependence.jl` and `bench/lhy_texture_polarisation.jl`.
+
+### 7.1 The dependence is on |⟨F⟩|, not on its direction — with two caveats that were not recorded
+
+Rotating the FM spinor through six Euler triples, at fixed p = 1:
+
+| | contact | with DDI |
+|---|---:|---:|
+| B = 0, max relative deviation | **5.3e-7** | **2.6e-2** |
+| B = 44 µG, max relative deviation | 7.6e-3 | 4.2e-2 |
+
+The contact part is an SO(3) scalar and the B = 0 row confirms it to the
+quadrature's own accuracy. Two things this repo records are wrong at Eu:
+
+- **`CLAUDE.md` and `spatial.jl` say the DDI moves ε_LHY by 0.25 % under
+  rotation, and conclude that "a pure direction texture is free".** That 0.25 %
+  was measured at ε_dd ≈ 0.05. At Eu's ε_dd = 0.54 it is **2.6 %**, an order of
+  magnitude larger. Direction textures are cheap, not free.
+- **A magnetic field breaks the contact invariance too**, because it picks the
+  z axis: 7.6e-3 at 44 µG against 5.3e-7 at zero field. Any statement of the
+  form "rotating the spinor cannot change ε_LHY" is a zero-field statement.
+  (My first run of this probe measured only the 44 µG case and would have
+  reported the contact invariance as broken at the 1 % level — the B = 0 row is
+  the control that separates the theory from the probe.)
+
+### 7.2 The magnitude dependence is a factor 3.9, not "~20 %"
+
+Along ζ(α) = cos α |m=+F⟩ + sin α |m=0⟩, which sweeps p from 1 to 0:
+
+| p | 1.000 | 0.905 | 0.794 | 0.655 | 0.500 | 0.345 | 0.206 | 0.095 | 0.000 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ε (contact) ×10³ | 1.354 | 1.154 | 0.963 | 0.739 | 0.512 | 0.392 | 0.344 | 0.342 | 0.364 |
+| ε (with DDI) ×10³ | 2.119 | 1.987 | 1.558 | 1.216 | 0.847 | 0.657 | 0.523 | 0.515 | 0.546 |
+
+**ε(p=1)/ε(p=0) = 3.88 with the DDI, 3.72 contact-only** — not the ~20 % that
+`spatial.jl` records. The knob it rides on is `c1_ratio`, which is why a number
+measured near zero would have looked small:
+
+| c1_ratio | 0 | 0.001 | 0.005 | 0.01 | 0.02 | **1/36** | 0.05 | 0.10 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| ε(p=1)/ε(p=0) | 1.50 | 1.61 | 2.09 | 2.71 | 3.56 | **3.88** | 4.04 | 3.49 |
+
+At `c1_ratio = 0` every `g_S` collapses to `c₀` and the two contact closed forms
+are identical — the residual 1.50 there is the DDI alone. So the spatial LHY is
+doing considerably more work at the campaign's coupling than its own docstring
+claims, and that matters for criterion C.
+
+### 7.3 Which named states carry a p spread at all
+
+`_lhy_texture_spread` — the same function `make_workspace` warns from —
+evaluated on each seed at 32×32×64:
+
+| seed | spread in p | p | single-spinor table |
+|---|---:|---:|---|
+| `m_plus_F`, `m_minus_F`, `flower`, `chiral_spin_vortex`, `radial_spin_vortex`, `axial_spin_texture`, `skyrmion`, `spin_helix`, `vortex_lattice` | 0.0000 | 1.00 | **exact** |
+| `polar`, `polar_core_vortex`, `cyclic`, `biaxial_nematic` | 0.0000 | 0.00 | **exact** |
+| `uniform`, `antiferromagnetic` | 0.0000 | 0.83 | **exact** |
+| `magnetic_domain` | 0.0424 | 0.96 | ok |
+| `domain_wall` | 0.6973 | 0.30 | **needs `:spatial`** |
+
+"Exact" means *at that state's own p* — not at p = 1. `polar_core_vortex` is a
+pure direction texture with p ≡ 0, so giving it the fully-polarised functional is
+a 3.9× error, not a free choice. This is the seed, not the converged state; the
+campaign's relaxed weak-field Eu states sit at spread ≈ 0.9.
+
+### 7.4 The table
+
+| claim | needs ε_LHY? | why |
+|---|---|---|
+| a p ≡ 1 texture (flower, CSV, skyrmion, vortex lattice) exists at these parameters | **no** | ε_LHY is a common offset; the table is exact at p = 1 |
+| energy ORDERING between two p ≡ 1 textures | **no**, to 2.6 % of ε_LHY | only the DDI's rotational anisotropy survives — ~2.6 % of ~1.3 % of E |
+| energy ordering between a p = 1 and a p = 0 state (FM vs polar, FM vs PCV) | **yes** | ε differs 3.9× between them |
+| the stretched↔polar boundary B_c(κ) | **yes** — §5 quantifies it | it is the previous row's ordering, read as a crossing |
+| discrete observables at fixed parameters (winding number, vortex count, ring count) | **no** | unless the boundary they sit next to moves past them — §5 |
+| **#336** droplet self-binding | **yes, and it is the reason the object exists** | but the droplet is p ≈ 1, so `fm_dipolar` is both correct and sufficient |
+| **#334** in-place nucleation, beyond mean field | **yes, and needs `:spatial`** | p varies across the cloud during nucleation |
+| **#335** hysteresis numbers | **yes**, through the boundary position | §5 |
+| anything at `c1_ratio = 0` | **weakly** | the p-dependence collapses to the DDI's 1.50× there |
