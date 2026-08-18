@@ -35,8 +35,14 @@ the two sides not directly comparable:
 | the rate scan was indexed by τ over **asymmetric spans** | at fixed τ a wider span is a *faster* ramp, so two legs at "the same τ" were at different rates |
 | loop width at **one grid** (32³) | the width is a spinodal separation, and spinodals are where mean field is most resolution-sensitive |
 
-This campaign closes all four and reports a single width with its uncertainty, plus
-the Stern-Gerlach signature and the shielding requirement.
+This campaign closes all four defects — and having closed them, finds that **there
+is no width to report**: with both legs over one window at one pin, no leg converts
+at any rate, because a B_z ramp conserves J_z and the two branches occupy different
+J_z sectors (§5.4). The deliverable is therefore the static spinodal, the
+Stern-Gerlach level count that replaces the loop width, and the shielding
+sensitivity. §6 is the summary; the sentence you are reading was written before the
+runs and originally promised a single width, which is exactly the claim the
+measurements retired.
 
 **Two numbers that are easy to mis-quote, and this document must not:** there is
 **no universal transition field** (the band is 40–62 µG and rises with κ, so a
@@ -52,11 +58,11 @@ scan rather than after it.
 
 | axis | points | what it separates |
 |---|---|---|
-| ramp rate | 6, spanning ~2.5 decades | lag vs bistability vs crossover — the verdict |
+| ramp rate | 6 measured, 40 → 0.12 µG/ms (1.8–583 ms). A 7th at 0.04 was submitted and is not in the analysis | lag vs bistability vs crossover — the verdict |
 | κ | 1.8 and 0.9 | whether the loop is attributable to κ at all |
 | grid | 32³ and 64³ | resolution sensitivity of the spinodal separation |
-| pin ε | 0.002 and 0.02 (0.135 and 1.35 µG) | the shielding requirement |
-| dt | 0.002 and 0.001 at the fastest rate | that the fastest arm is still resolved in time |
+| pin ε | 0.001 and 0.002 (0.068 and 0.135 µG) — run as §5.6; the planned 0.02 arm was superseded once §5.6 showed a 2× change already halves the effect | the shielding requirement |
+| dt | **NOT RUN.** Superseded: the ramps carry no sharp feature to resolve, and norm drift came out 1×10⁻¹³ to 8×10⁻¹¹ across every arm. Listed here so the gap is visible rather than implied away | that the fastest arm is still resolved in time |
 | τ → ∞ | static branch continuation | the lag-free limit the rate scan must saturate to |
 
 Held fixed, and load-bearing:
@@ -435,13 +441,13 @@ What the campaign delivers instead, all of it new and all of it falsifiable:
 
 | deliverable | value | where |
 |---|---|---|
-| flower-branch spinodal at κ = 1.8 | **68.4 ± 0.15 µG** (32³), bracket [65, 70] at 64³ | §5.1, §5.8 |
+| flower-branch spinodal at κ = 1.8 | **68.4 ± 0.15 µG** at 32³, **[68.0, 68.5] µG** at 64³ — 0.2 % apart | §5.1, §5.8 |
 | polarised branch's lower spinodal | **none above 5 µG** — it is a stable minimum throughout | §5.5b |
 | static branch separation at 20 µG | δ⟨F⊥⟩ = **5.06** (5.137 vs 0.075) | §5.1 |
 | κ = 0.9: number of branches | **one** — two continuations from opposite ends agree to 6–7 digits in E | §5.3 |
 | **the experimental discriminator** | **6 populated m_F levels at κ = 1.8 vs 2–3 at κ = 0.9**, both ramp directions, every rate ≤ 1 µG/ms | §5.7 |
 | shielding sensitivity | doubling the residual transverse field 0.068 → 0.135 µG **halves** the transverse response | §5.6 |
-| grid | 32³ ↔ 64³ agree to **≤ 0.3 %** in ⟨F⊥⟩ and 1×10⁻⁵ relative in E | §5.8 |
+| grid | 32³ ↔ 64³: spinodal to **0.2 %**, ⟨F⊥⟩ to **≤ 0.3 %**, E to 1×10⁻⁵ relative | §5.8 |
 
 The falsifiable statement to hand the demagnetisation experiment is therefore **not**
 "a loop appears at κ ≳ 1 and not at κ ≤ 0.9" but:
@@ -462,9 +468,22 @@ unpadded, with both reaching |∇E| ≈ 9×10⁻⁶:
 | polarised, 90 µG | 7.194428 | 7.195198 | 1.3096 | 1.2954 | −5.7500 | −5.7504 |
 
 ⟨F⊥⟩ agrees to 0.04 % and 1.1 %, E to 1×10⁻⁵ and 1×10⁻⁴ relative. Along the whole
-flower branch the two grids agree to ≤ 0.3 %, and the 64³ spinodal bracket is [65,
-70] µG at ΔB = 5 — the same bracket the 32³ coarse pass gave before refinement.
-`runs/eu335/branch_k1.8_up_g64{,_fine}`.
+flower branch the two grids agree to ≤ 0.3 %.
+
+**The spinodal itself — the deliverable number — is grid-converged.** Refined at
+64³ with ΔB = 0.5 µG, anchored on the 64³ 65 µG cell, every cell at
+|∇E| ≈ 8×10⁻⁶ with `stop_reason = tol`:
+
+| | last converged flower cell | first polarised cell | bracket | ⟨F⊥⟩ at 68.0 µG |
+|---|---:|---:|---:|---:|
+| 32³ (ΔB = 0.25) | 68.25 | 68.50 | [68.25, 68.50] | 2.2903 |
+| 64³ (ΔB = 0.50) | 68.00 | 68.50 | **[68.00, 68.50]** | 2.2910 |
+
+The brackets overlap, the 64³ bracket contains the 32³ value, the midpoints differ
+by **0.15 µG = 0.2 %**, and the order parameter at the last common field agrees to
+0.03 %. That is far inside the 15 % criterion §3 fixed in advance — the only one of
+the three grid criteria that could be evaluated, since the other two concerned a
+loop width that does not exist. `runs/eu335/branch_k1.8_up_g64{,_fine}`.
 
 ## 7. Limits
 
