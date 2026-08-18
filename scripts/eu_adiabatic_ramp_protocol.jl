@@ -59,8 +59,6 @@ using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
 
-include(joinpath(@__DIR__, "eu_gs_library.jl"))     # load_lib
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 const SMOKE = get(ENV, "AR_SMOKE", "") == "1"
 const KAPPA = getf("AR_KAPPA", 1.8)
@@ -107,7 +105,7 @@ seed one epoch's state into another epoch's Hamiltonian: the seed would not be
 stationary and the whole rate scan would be measuring that transient instead of
 the ramp. Also returns the pin ε the seed was converged with."""
 function seed(branch, B_uG)
-    e = load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
+    e = load_gs(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
     abs(e.meta.B - B_uG) < 0.5 ||
         @warn "requested seed B=$B_uG µG; nearest library state is $(e.meta.B) µG"
     m = jldopen(e.meta.path, "r") do f

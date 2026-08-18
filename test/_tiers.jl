@@ -399,6 +399,9 @@ const CI_EXTRA = [
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
+    # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
+    # run, pinned). 17 imprints + fingerprints — ci rather than fast.
+    "analysis/test_spinor_phase_classifier.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
     # so the type-C target cannot drift when the fixture or the metric changes.
@@ -1011,6 +1014,7 @@ const _COST = Dict{String, Float64}(
     "workflow/test_calibration_edge_cases.jl" => 9.3,
     "analysis/test_forward_image.jl" => 9.3,
     "analysis/test_spinor_fingerprint.jl" => 9.2,
+    "analysis/test_spinor_phase_classifier.jl" => 10.3,
     "oracles/test_global_phase_covariance.jl" => 8.7,
     "test_level1_scalar_exact.jl" => 8.5,
     "workflow/validation/test_scalar_summary.jl" => 8.4,

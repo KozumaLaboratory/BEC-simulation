@@ -1,7 +1,8 @@
 # Hierarchical, data-driven phase classifier for a spinor_fingerprint.
 #
 # Uses the FULL fingerprint so distinguishable textures get distinct labels
-# (thresholds set from scripts/eu_fingerprint_validate.jl on known imprints):
+# (thresholds set on known state_zoo imprints; the setting run is pinned by
+# test/analysis/test_spinor_phase_classifier.jl):
 #   modulation (structure factor)  → stripe / domain / lattice  ("modulated")
 #   uniform bulk (coherence≈1)     → σ_S point group: polar / cyclic /
 #                                     biaxial_nematic / I_h / ferromagnetic
@@ -16,6 +17,8 @@
 # Thresholds (validated 2026-07-24 on 32³ imprints): flower fc≈0.12, radial
 # fc≈0.94, baseline 0.577; CSV χ≈0.24, skyrmion χ≈0.70; uniform coh=1.0,
 # textures coh≤0.77.
+
+export classify_spinor_phase
 
 function classify_spinor_phase(fp;
     coh_texture::Float64=0.65,          # spinor coherence g: <0.65 = genuine spatial

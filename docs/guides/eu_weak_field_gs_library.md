@@ -29,18 +29,22 @@ Each `psi.jld2` carries: `psi`, `B_uG`, `pin_bx`, `grid_n_points`,
 ## Reuse recipes
 
 ```julia
-using SpinorBEC
-include("scripts/eu_gs_library.jl")
+using SpinorBEC   # gs_library/load_gs/merge_gs_library live in src since
+                  # 2026-08-18 (src/workflow/io/gs_library.jl); the former
+                  # scripts/eu_gs_library.jl + eu_merge_library.jl are retired.
 
 # 1. Discover — index all states (writes library.csv), sorted by B.
 lib = gs_library("figs/eu_bscan_pin_tight")
 
 # 2. Load the converged GS nearest a field.
 e = load_gs("figs/eu_bscan_pin_tight"; B_uG=50)     # e.psi (host array), e.meta
+
+# 2b. Or from the MERGED physics-keyed library (built by merge_gs_library()).
+e = load_gs(; κ=1.8, B_uG=61)                        # figs/eu_gs_library/
 ```
 
 **Seed a finer / different run** (same grid → straight seed; different grid →
-`scripts/upsample_spinor.jl` first):
+`upsample_spinor` first):
 
 ```julia
 find_ground_state_lbfgs(; grid=g, atom=Eu151, interactions=..., c_dd=e.meta.c_dd,
