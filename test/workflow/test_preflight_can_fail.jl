@@ -58,9 +58,12 @@ using SpinorBEC: cuda_preflight_check, cuda_state_lines
 
     # The CLI must PROPAGATE it. A checker with a verdict and a caller that
     # discards it is the same defect one layer up, and that is exactly what
-    # happened: `_cmd_preflight` returned 0 regardless.
+    # happened: `_cmd_preflight` returned 0 regardless. (The CLI body moved
+    # from scripts/cli.jl to src/workflow/cli.jl on 2026-08-18; the shim has
+    # no logic to drop the verdict in, so the gate reads the body.)
     @testset "the CLI turns the verdict into an exit code" begin
-        src = read(joinpath(@__DIR__, "..", "..", "scripts", "cli.jl"), String)
+        src = read(joinpath(@__DIR__, "..", "..", "src", "workflow", "cli.jl"),
+            String)
         i = findfirst("function _cmd_preflight", src)
         @test i !== nothing
         body = src[first(i):min(lastindex(src), first(i) + 600)]
