@@ -27,34 +27,61 @@ using Printf
 using JLD2
 using YAML
 using SpinorBEC
-using SpinorBEC: compute_spatial_lhy, spatial_lhy_residual, LHYTableOpts
+using SpinorBEC: compute_spatial_lhy, spatial_lhy_residual,
+    spatial_lhy_energy_residual, LHYTableOpts
 
 const RUN_DIR = length(ARGS) >= 1 ? ARGS[1] : error("usage: lhy_boundary_report.jl <run_dir>")
 const WANT_RESIDUAL = "--residual" in ARGS
 
 # Arm pairings: (label, stretched-branch run name, polar-branch run name).
-const PAIRS = [
+const PAIRS_BASE = [
     ("none (mean field)", "fm_none", "polar_none"),
     ("one functional (fm_dipolar both)", "fm_fmdip", "polar_fmdip"),
     ("own ansatz per branch", "fm_fmdip", "polar_polcon"),
     ("spatial (texture-following)", "fm_spatial", "polar_spatial"),
-    ("CONTROL scalar ×10", "fm_ctrl10", "polar_ctrl10"),
 ]
+# The control arm is named for its factor, so which one exists tells us the
+# factor without a second place to keep it in sync.
+const CONTROL_LABEL = Ref("CONTROL")
 
 # dp/dB at the campaign's atom and ω_ref, from cli.jl inspect: p = −0.651 at
 # 44 µG. The stretched branch sits at m = −F and gains 6p; the polar branch is
 # flat in p. So |∂ΔE/∂B| = 6 |dp/dB|.
 const DPDB_PER_UG = 0.651 / 44.0
 const SLOPE_PER_UG = 6 * DPDB_PER_UG
+# ...and the slope actually OBSERVED near the crossing, which is 0.35x that
+# because the stretched branch is `cyclic` rather than fully polarised at these
+# fields. Derived slopes are for sanity-checking; measured ones are for dividing by.
+const SLOPE_MEASURED_PER_UG = 0.0311
+# The pre-launch rejection threshold, per axis: 5 µG on the field scan, one grid
+# step (0.001) on the c1 scan. Below this the control is inside the resolution
+# and proves nothing.
+ctrl_min_shift(unit) = unit == "µG" ? 5.0 : 0.001
+
+"""Scan axis, values and unit label. The two campaigns scan DIFFERENT axes — Bz
+in `config_arms.yaml`, c1_ratio in `config_arms_c1.yaml` — and hard-coding one of
+them is how a report silently misreads the other's points as fields."""
+function scan_axis(cfg)
+    prod = cfg["scan"]["product"]
+    if haskey(prod, "pipeline.0.B.Bz")
+        vals = map(prod["pipeline.0.B.Bz"]) do s
+            v = s isa AbstractString ? parse(Float64, split(String(s))[1]) : Float64(s)
+            v * 1e6                       # Gauss → µG
+        end
+        return (collect(vals), "B (µG)", "µG")
+    elseif haskey(prod, "pipeline.0.interactions.c1_ratio")
+        r = prod["pipeline.0.interactions.c1_ratio"]
+        vals = r isa AbstractDict ?
+               collect(range(Float64(r["from"]), Float64(r["to"]); length=Int(r["n"]))) :
+               Float64.(collect(r))
+        return (vals, "c1_ratio", "c1")
+    end
+    error("scan axis is neither pipeline.0.B.Bz nor pipeline.0.interactions.c1_ratio")
+end
 
 function load_points(dir)
     cfg = YAML.load_file(joinpath(dir, "config.yaml"))
-    bz = cfg["scan"]["product"]["pipeline.0.B.Bz"]
-    # "4.4e-5 Gauss" → µG
-    b_ug = map(bz) do s
-        v = s isa AbstractString ? parse(Float64, split(String(s))[1]) : Float64(s)
-        v * 1e6
-    end
+    b_ug, axis_label, axis_unit = scan_axis(cfg)
     pts = Dict{Tuple{Int, String}, Any}()
     for f in readdir(dir)
         m = match(r"^point_(\d+)_(.+)\.jld2$", f)
@@ -82,7 +109,7 @@ function load_points(dir)
             )
         end
     end
-    (b_ug, pts)
+    (b_ug, pts, axis_label, axis_unit)
 end
 
 """Zero crossing of ΔE(B) by linear interpolation, plus the local slope actually
@@ -101,10 +128,28 @@ function crossing(bs, des)
     nothing
 end
 
-b_ug, pts = load_points(RUN_DIR)
+b_ug, pts, AXIS, AXIS_UNIT = load_points(RUN_DIR)
+# Build PAIRS now that the arm names on disk are known: the control's factor is
+# in its name (fm_ctrl10 / fm_ctrl30), so the label reports the real factor
+# instead of a constant that can drift away from the config.
+const CTRL_ARM = let a = sort(unique(k[2] for k in keys(pts)))
+    i = findfirst(x -> startswith(x, "fm_ctrl"), a)
+    i === nothing ? nothing : a[i]
+end
+# Absent is NOT "no control needed" — it is a directory that cannot support a
+# verdict, and the verdict block below says so rather than quietly omitting the
+# row. (This path is normal when only the `spatial` arms have been pulled for a
+# `--residual` pass.)
+const PAIRS = if CTRL_ARM === nothing
+    CONTROL_LABEL[] = ""
+    PAIRS_BASE
+else
+    CONTROL_LABEL[] = "CONTROL scalar ×" * replace(CTRL_ARM, "fm_ctrl" => "")
+    vcat(PAIRS_BASE, [(CONTROL_LABEL[], CTRL_ARM, replace(CTRL_ARM, "fm_" => "polar_"))])
+end
 println("="^104)
 println("#337 criterion B — LHY and the Eu F=6 phase boundary.  run: ", RUN_DIR)
-println("B points (µG): ", join(round.(b_ug; digits=2), ", "))
+println(AXIS, " points: ", join(round.(b_ug; sigdigits=5), ", "))
 println("|∂ΔE/∂B| expected from the Zeeman slope alone: ",
     round(SLOPE_PER_UG; sigdigits=4), " per µG")
 println("="^104)
@@ -112,12 +157,12 @@ println("="^104)
 # --- per-cell table, so a bad cell is visible before any verdict --------------
 arms = sort(unique(k[2] for k in keys(pts)))
 println("\n[cells] E, convergence and E_LHY per arm and field")
-@printf("  %-15s %8s %12s %6s %10s %10s %-18s\n",
-    "arm", "B (µG)", "E", "conv", "grad", "E_LHY", "phase")
+@printf("  %-15s %10s %12s %6s %10s %10s %-18s\n",
+    "arm", AXIS, "E", "conv", "grad", "E_LHY", "phase")
 for arm in arms, i in eachindex(b_ug)
     p = get(pts, (i, arm), nothing)
     p === nothing && continue
-    @printf("  %-15s %8.2f %12.7f %6s %10.2e %10.5f %-18s\n",
+    @printf("  %-15s %10.5g %12.7f %6s %10.2e %10.5f %-18s\n",
         arm, b_ug[i], p.E, p.conv ? "yes" : "NO", p.grad, p.elhy, p.phase)
 end
 
@@ -146,8 +191,8 @@ for (label, fm, pol) in PAIRS
     if c === nothing
         println("    no sign change inside the scanned window — boundary NOT bracketed")
     else
-        @printf("    B_c = %.3f µG   (local |∂ΔE/∂B| = %.4f per µG, %.2f× the Zeeman-only slope)\n",
-            c.B, c.slope, c.slope / SLOPE_PER_UG)
+        @printf("    crossing at %s = %.5g   (local |∂ΔE/∂axis| = %.5g)\n",
+            AXIS, c.B, c.slope)
     end
 end
 
@@ -166,24 +211,28 @@ end
 # --- verdict ------------------------------------------------------------------
 println("\n[verdict]")
 bc_none = results["none (mean field)"].c
-bc_ctrl = results["CONTROL scalar ×10"].c
-if bc_none === nothing || bc_ctrl === nothing
+bc_ctrl = CTRL_ARM === nothing ? nothing : results[CONTROL_LABEL[]].c
+if CTRL_ARM === nothing
+    println("  REFUSED: no positive-control arm (fm_ctrl*) is present in this")
+    println("  directory, so nothing establishes that the instrument can see LHY.")
+elseif bc_none === nothing || bc_ctrl === nothing
     println("  REFUSED: the boundary is not bracketed for the baseline or the control,")
-    println("  so there is nothing to compare. Widen the B window and re-run.")
+    println("  so there is nothing to compare. Widen the scan window and re-run.")
 else
     ctrl_shift = bc_ctrl.B - bc_none.B
-    @printf("  control shift: %+.3f µG\n", ctrl_shift)
-    if abs(ctrl_shift) < 5.0
-        println("  REFUSED: the ×10 control moved the boundary by less than the 5 µG the")
-        println("  pre-launch criterion demanded. The instrument cannot see LHY here, so")
+    CTRL_MIN_SHIFT = ctrl_min_shift(AXIS_UNIT)
+    @printf("  control shift: %+.5g (%s), threshold %.5g\n", ctrl_shift, AXIS, CTRL_MIN_SHIFT)
+    if abs(ctrl_shift) < CTRL_MIN_SHIFT
+        println("  REFUSED: the control moved the boundary by less than the pre-launch")
+        println("  criterion demanded. The instrument cannot see LHY here, so")
         println("  no verdict may be read off the physics arms.")
     else
         println("  control passes — the instrument responds to LHY amplitude.\n")
-        @printf("  %-34s %12s %12s\n", "arm", "B_c (µG)", "δB vs none")
+        @printf("  %-34s %14s %14s\n", "arm", "crossing", "δ vs none")
         for (label, _, _) in PAIRS
             r = results[label]
             r.c === nothing && continue
-            @printf("  %-34s %12.3f %12.3f%s\n", label, r.c.B, r.c.B - bc_none.B,
+            @printf("  %-34s %14.5g %14.5g%s\n", label, r.c.B, r.c.B - bc_none.B,
                 r.conv ? "" : "   [unconverged cells]")
         end
     end
@@ -195,26 +244,60 @@ if WANT_RESIDUAL
     println("boundary displacement it implies.")
     ip = interaction_params_from_constraint(; c_total=4687.27, c1_ratio=1 / 36, F=6)
     c_dd = 211.021
-    @printf("\n  %-15s %8s %12s %12s %14s\n",
-        "arm", "B (µG)", "residual", "E_LHY", "δ(ΔE) bound")
+    println("  `signed` is the error on ∫ε_LHY dV and is what propagates. `uniform worst`")
+    println("  is the OLD unweighted worst case, kept so the difference is visible: it is")
+    println("  dominated by dilute edge voxels that carry no energy.")
+    @printf("\n  %-15s %10s %10s %10s %10s %14s %12s\n",
+        "arm", AXIS, "signed", "abs", "worst", "uniform worst", "E_LHY")
+    resid = Dict{Tuple{String, Int}, Float64}()
     for arm in ("fm_spatial", "polar_spatial"), i in eachindex(b_ug)
         p = get(pts, (i, arm), nothing)
         p === nothing && continue
-        psi = jldopen(io -> io["psi"], p.file)
+        psi = Array(jldopen(io -> io["psi"], p.file))
         pB = SpinorBEC.linear_zeeman_p(Eu151, b_ug[i] * 1e-10, 691.1504)
         zee = ZeemanParams(pB,
             SpinorBEC.compute_quadratic_zeeman(Eu151; p_dimless=pB, omega_ref=691.1504))
-        tbl = compute_spatial_lhy(; psi_init=Array(psi), F=6, interactions=ip,
+        tbl = compute_spatial_lhy(; psi_init=psi, F=6, interactions=ip,
             zeeman=zee, c_dd=c_dd, n_atoms=50000)
-        r = tbl === nothing ? NaN :
-            spatial_lhy_residual(tbl, Array(psi), 6, ip; zeeman=zee, c_dd=c_dd)
-        @printf("  %-15s %8.2f %12.4g %12.5f %14.5f\n",
-            arm, b_ug[i], r, p.elhy, isnan(r) ? NaN : r * abs(p.elhy))
+        if tbl === nothing
+            # `compute_spatial_lhy` returns nothing when the p spread is below
+            # `min_spread`, i.e. when the state HAS one spinor shape and the
+            # single-spinor table is exact. That is residual 0 by construction,
+            # not a missing measurement — recording it as absent would drop the
+            # branch out of the propagation below and silently halve the answer.
+            resid[(arm, i)] = 0.0
+            @printf("  %-15s %10.5g %10s %10s %10s %14s %12.5f\n",
+                arm, b_ug[i], "0 (exact)", "—", "—", "—", p.elhy)
+            continue
+        end
+        sg, ab, wo = spatial_lhy_energy_residual(tbl, psi, 6, ip; zeeman=zee, c_dd=c_dd)
+        un = spatial_lhy_residual(tbl, psi, 6, ip; zeeman=zee, c_dd=c_dd)
+        resid[(arm, i)] = sg
+        @printf("  %-15s %10.5g %10.4f %10.4f %10.4f %14.4f %12.5f\n",
+            arm, b_ug[i], sg, ab, wo, un, p.elhy)
         flush(stdout)
     end
-    println("\n  A residual r on ε_LHY moves each branch's energy by at most r·E_LHY, so")
-    println("  the gap by at most the SUM of the two (they can move oppositely), and the")
-    println("  boundary by that over ", round(SLOPE_PER_UG; sigdigits=4), " per µG.")
+
+    println("\n  [propagation] the boundary displacement the signed residual implies")
+    @printf("  %10s %14s %14s %14s %12s\n",
+        AXIS, "δE(stretched)", "δE(polar)", "δ(ΔE)", "δB (µG)")
+    for i in eachindex(b_ug)
+        sf = get(resid, ("fm_spatial", i), NaN)
+        sp = get(resid, ("polar_spatial", i), NaN)
+        pf = get(pts, (i, "fm_spatial"), nothing)
+        pp = get(pts, (i, "polar_spatial"), nothing)
+        (isnan(sf) || isnan(sp) || pf === nothing || pp === nothing) && continue
+        dEf = sf * pf.elhy
+        dEp = sp * pp.elhy
+        # They can move oppositely, so the gap error is the DIFFERENCE of the two
+        # signed shifts, not a sum of magnitudes — which would be a bound nobody
+        # could ever tighten.
+        dgap = dEf - dEp
+        @printf("  %10.5g %14.5f %14.5f %14.5f %12.3f\n",
+            b_ug[i], dEf, dEp, dgap, dgap / SLOPE_MEASURED_PER_UG)
+    end
+    println("\n  δB uses the MEASURED local slope ", SLOPE_MEASURED_PER_UG,
+        " per µG, not the Zeeman-only ", round(SLOPE_PER_UG; sigdigits=4), ".")
 end
 
 println("\ndone.")
