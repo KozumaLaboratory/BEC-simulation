@@ -80,8 +80,16 @@ function conversion(B::Vector{Float64}, f::Vector{Float64};
     # Plateau levels over ±window either side of the winning interval, so an
     # overshoot-and-ring arrival (which the κ=1.8 conversion does: 3.58 with a
     # 3.72 excursion) is not read as extra depth.
-    pre = [f[m] for m in 1:n if abs(B[m] - B[i]) <= window && expect * (B[m] - B[i]) <= 0]
-    post = [f[m] for m in 1:n if abs(B[m] - B[j]) <= window && expect * (B[m] - B[j]) >= 0]
+    #
+    # Sided by INDEX, not by comparing fields against `expect`: `expect` is the
+    # sign of Δ⟨F⊥⟩, and using it to pick a side in B conflates the direction the
+    # order parameter moves with the direction the ramp travels. The first version
+    # did exactly that and returned the post-jump plateau as the pre-jump level on
+    # a falling leg — the unit test's plateau assertion is what found it.
+    step = median([abs(B[m + 1] - B[m]) for m in 1:(n - 1)])
+    w = max(1, round(Int, window / max(step, 1e-12)))
+    pre = f[max(1, i - w):i]
+    post = f[j:min(n, j + w)]
     (; depth=best.depth, B_jump,
         level_before=isempty(pre) ? f[i] : median(pre),
         level_after=isempty(post) ? f[j] : median(post),
