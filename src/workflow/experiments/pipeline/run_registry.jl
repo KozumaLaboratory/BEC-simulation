@@ -739,6 +739,14 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             # a 16 GB device before CUDA's allocator reclaims (each
             # workspace pins ~150 MB across psi/fft_buf/k²/ddi_kernel/...).
             result = nothing
+            # BEFORE the GC: the scratch registry holds strong references by
+            # design (that is what pins a host array against address reuse), so
+            # anything parked there — including the device k² copy this comment
+            # claims to be freeing — survives `GC.gc()` and is invisible to
+            # `CUDA.reclaim()`, which only returns memory the pool already
+            # considers free. Every entry is a pure function of its key, so
+            # dropping them between points costs a rebuild and nothing else.
+            scratch_clear!()
             GC.gc()
             _maybe_cuda_reclaim()
         end

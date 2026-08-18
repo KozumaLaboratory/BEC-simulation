@@ -76,9 +76,12 @@ const _OPEN_JLD_MAX = 32
 #   _PREPACK_INFLIGHT      in-flight prepack-warmer task IDs
 #   _DASHBOARD_CACHE_DIRNAME  on-disk atlas blobs (per run dir)
 #
-# Two helpers below are the canonical entry points for invalidation:
-# `clear_all_caches!` (used by /api/refresh) and `invalidate_path!`
-# (used when a single run regenerates).
+# Two helpers below are the invalidation entry points. `clear_all_caches!` is
+# the one in use — /api/refresh calls it. `invalidate_path!` has NO caller
+# today; this comment claimed it was "used when a single run regenerates", in
+# the present tense, and it never has been. It is kept because it is the right
+# primitive for a file watcher, and it is now correct — see its own docstring
+# for the matching bug that made it a no-op even if it had been called.
 
 """Drop every cache layer at once. Used by /api/refresh."""
 function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
@@ -99,10 +102,23 @@ function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
 end
 
 """Drop every cache entry that references `fpath` so the next request
-reads it fresh. Other runs' caches are preserved."""
+reads it fresh. Other runs' caches are preserved.
+
+NO CALLER as of 2026-08-08 — see the comment above. It was also a no-op if
+called: the two loops below used opposite `occursin` argument orders, and the
+`data_cache` one asked whether the whole cache KEY is a substring of the path.
+Those keys are `"<run_name>#<live_count>"` (`routes/misc.jl`), so the `#3`
+suffix is never in a file path and the test could not match — the
+fixing-the-wrong-`occursin`-argument class this repository has hit before. The
+run name is the part before `#`, and that IS a path component, so the
+comparison is made on the prefix.
+
+`psi_cache` keys embed the full path (`"phase_bin:<fpath>#snap=..."`), so that
+loop's direction was already right and is unchanged."""
 function invalidate_path!(data_cache::Dict, psi_cache::Dict, fpath::String)
     for k in collect(keys(data_cache))
-        occursin(k, fpath) && delete!(data_cache, k)
+        run_name = first(split(k, '#'))
+        !isempty(run_name) && occursin(run_name, fpath) && delete!(data_cache, k)
     end
     for k in collect(keys(psi_cache))
         occursin(fpath, k) && delete!(psi_cache, k)

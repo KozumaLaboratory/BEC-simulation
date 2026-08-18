@@ -719,8 +719,26 @@ function _update_batched_kinetic_phase!(
         # GPU: `k_squared` is a host Array — broadcasting it into a device
         # kernel is illegal (non-bitstype). Move it to a device array that
         # matches `kp` first, then build the phase on-device.
-        k_sq_dev = similar(kp, RT, size(k_squared))
-        copyto!(k_sq_dev, k_squared)
+        #
+        # CACHED. This used to `similar` + `copyto!` on EVERY call, re-uploading
+        # an immutable array: 16.0 MiB per call at 128³ Float64, and this
+        # function runs once per step under `split_step_midpoint!` and
+        # `rk4ip_step!`, three times per step under the Yoshida cores, and twice
+        # per step in the Richardson adaptive loop. `_to_device_cached`'s own
+        # docstring (`foundation/backend.jl`) names this exact k² re-upload as
+        # the defect it was written to remove — on the OPERATOR face, which was
+        # fixed; the propagator face was not.
+        #
+        # Keyed on `(device array type, RT, k_squared)` and NOT on size: two
+        # grids of equal shape and different box size share a shape and differ
+        # in k², which is the trap `cached_kspace_filter` above documents.
+        # Holding `k_squared` in the key also pins it against GC, so no later
+        # array can reuse its address and inherit the entry.
+        k_sq_dev = scratch_get!(:kinetic_phase_k2, (typeof(kp), RT, k_squared)) do
+            d = similar(kp, RT, size(k_squared))
+            copyto!(d, k_squared)
+            d
+        end
         kp_view = selectdim(kp, ndim + 1, 1)
         if imaginary_time
             kp_view .= exp.(-half .* k_sq_dev .* dt_t) .* inv_npts
