@@ -72,17 +72,19 @@ a.barh(y, ratios, color=cols, height=0.55)
 a.axvline(1.0, color=INK, lw=1.4, ls="--")
 for i, (rr, et) in enumerate(zip(ratios, etas)):
     a.text(rr * 1.06, i, f"{rr:.2f}×   $\\eta_{{start}}$={et:.2f}", va="center",
-           fontsize=8.5, color="#b91c1c" if et < 4 else "#065f46")
+           # amber, not green: eta_start > 4 here is reached only by pairing the
+           # 2023 T0 with the 2022 trap, which is epoch-mixing (see the guide).
+           fontsize=8.5, color="#b91c1c" if et < 4 else "#92400e")
 a.set_yticks(y)
 a.set_yticklabels(labels, fontsize=8.5)
 a.invert_yaxis()
 a.set_xscale("log")
 a.set_xlim(0.7, 40)
 a.set_xlabel("$N_{BEC}$ / measured   (1.0 = agreement)")
-a.set_title("Green $\\eta_{start}$ is physical (5–10); red is below the floor")
+a.set_title("Red $\\eta_{start}$ is below the $\\eta_{min}=4$ floor")
 a.grid(axis="y", visible=False)
 
-fig.suptitle("Neither anchor is both physical in $\\eta_{start}$ and agreeing at the endpoint",
+fig.suptitle("Only the MIXED-epoch row lifts $\\eta_{start}$; see the guide",
              y=1.03, fontsize=11, fontweight="bold")
 fig.tight_layout()
 fig.savefig(f"{D}/eu_evap_k3_band_exclusion.png", bbox_inches="tight", facecolor="white")
