@@ -29,8 +29,13 @@
 # the two populations stay on their own sides of it.
 
 using SpinorBEC
-using Logging
 using Test
+# `Base.CoreLogging`, not the Logging stdlib: that package is not in this project's
+# test target, so importing it resolves in an interactive `--project=.` session and
+# dies on a clean CI environment ("Package Logging not found in current path").
+# Same form as test/model/test_gs_admission_axes.jl; gated now by
+# test_tier_membership.jl.
+using Base.CoreLogging: with_logger, Warn
 
 const _DT_ATOM = AtomSpecies("itp_probe", SpinorBEC.Units.AMU * 151, 1,
     100 * SpinorBEC.Units.BOHR_RADIUS, 0.0,
@@ -86,12 +91,11 @@ _ws_of(case; dt) = make_workspace(; case...,
 
 "Did `f()` emit a warning mentioning the advisory?"
 function _warned(f)
-    logger = Test.TestLogger(; min_level=Logging.Warn)
-    Logging.with_logger(logger) do
+    logger = Test.TestLogger(; min_level=Warn)
+    with_logger(logger) do
         f()
     end
-    any(r -> r.level >= Logging.Warn && occursin("displaced by dt", r.message),
-        logger.logs)
+    any(r -> r.level >= Warn && occursin("displaced by dt", r.message), logger.logs)
 end
 
 @testset "ITP dt-limited advisory" begin
