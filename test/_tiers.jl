@@ -80,6 +80,7 @@ const FAST_TESTS = [
     "workflow/test_inert_dynamics_keys_are_refused.jl",
     "hamiltonian/test_absorbing_boundary_honours_the_step.jl",
     "hamiltonian/test_two_spin_step_guards_agree.jl",
+    "workflow/test_absence_is_not_reported_as_health.jl",
     "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
     "workflow/test_plan_cache_is_keyed_on_the_box.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
