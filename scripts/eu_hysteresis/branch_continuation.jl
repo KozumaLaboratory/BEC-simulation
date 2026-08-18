@@ -72,18 +72,24 @@ getl(k, d) = sort(parse.(Float64, split(get(ENV, k, d), ",")); rev=true)
 
 const SMOKE = get(ENV, "HB_SMOKE", "") == "1"
 const KAPPA = getf("HB_KAPPA", 1.8)
-const GRID_N = SMOKE ? 16 : Int(getf("HB_GRID", 32))
+# SMOKE shrinks the iteration caps and the cell count, NOT the grid. The grid has
+# to match the anchor file's, so a 16³ smoke could never render the production
+# path — it would fail on the anchor and the smoke would be testing its own
+# shortcut instead of the run it is standing in for.
+const GRID_N = Int(getf("HB_GRID", 32))
 const BOX = getf("HB_BOX", 24.0)
 const DB = getf("HB_DB", 5.0)
 const BMIN = getf("HB_BMIN", 20.0)
-const BMAX = SMOKE ? BMIN + 2 * DB : getf("HB_BMAX", 200.0)
+const BMAX = getf("HB_BMAX", 200.0)
 const DIR = let d = lowercase(get(ENV, "HB_DIR", "up"))
     d in ("up", "down") || error("HB_DIR must be up|down, got `$d`")
     d
 end
 const PIN = getf("HB_PIN", 0.002)
-const LADDER = SMOKE ? [PIN] : getl("HB_LADDER", "0.008,0.004,0.002")
-const LADDER_A = SMOKE ? [PIN] : getl("HB_LADDER_ANCHOR", "0.02,0.01,0.005,0.002")
+# Two rungs even in SMOKE: a single-rung ladder does not execute the warm-restart
+# between rungs, which is the part that can be wrong.
+const LADDER = SMOKE ? [2PIN, PIN] : getl("HB_LADDER", "0.008,0.004,0.002")
+const LADDER_A = SMOKE ? [4PIN, PIN] : getl("HB_LADDER_ANCHOR", "0.02,0.01,0.005,0.002")
 const LBFGS = SMOKE ? 40 : Int(getf("HB_LBFGS", 400))
 const ITP = SMOKE ? 150 : Int(getf("HB_ITP", 2000))
 const TOL = getf("HB_TOL", 1e-5)
@@ -115,7 +121,12 @@ const ATOM = PRESET.atom
 const SYS = SpinSystem(ATOM.F)
 
 p_of(B_uG) = Units.bfield_to_p(B_uG * 1e-6, ATOM.g_F, PRESET.omega_ref)
-const B_PER_EPS = 1e6 * PIN / abs(p_of(1.0))     # ε [p-units] → µG, for the log
+# ε is in p-units; `p_of(1.0)` is p per µG, so the pin as a physical transverse
+# field is ε / |p_of(1)|. This printed 135176 µG until the 1e6 in it was removed —
+# the µG→Gauss factor is already inside `p_of`. The number matters: it is the
+# residual transverse field the whole result assumes the lab has nulled to, and it
+# goes into the shielding row of the deliverable.
+const B_PER_EPS = PIN / abs(p_of(1.0))
 
 base_kw(p, ε) = (; grid=PRESET.grid, atom=ATOM,
     interactions=PRESET.interactions, potential=PRESET.potential,
@@ -126,7 +137,10 @@ base_kw(p, ε) = (; grid=PRESET.grid, atom=ATOM,
 const B_LADDER = let
     n = max(1, round(Int, abs(BMAX - BMIN) / DB) + 1)
     v = collect(range(min(BMIN, BMAX), max(BMIN, BMAX); length=n))
-    DIR == "up" ? v : reverse(v)
+    v = DIR == "up" ? v : reverse(v)
+    # SMOKE keeps the real endpoints and the real ΔB and only takes the first few
+    # cells, so the anchor it renders is the anchor production will use.
+    SMOKE ? v[1:min(3, length(v))] : v
 end
 
 """Full scalar set at one ψ. `Lz` needs an FFT plan set, so it is taken from the
