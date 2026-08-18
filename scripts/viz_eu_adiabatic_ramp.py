@@ -60,12 +60,19 @@ def load_runs(data: Path) -> dict[float, dict]:
     every figure can treat it as one axis."""
     runs: dict[float, dict] = {}
     for kdir in sorted(data.glob("k*")):
-        man = kdir / "manifest.csv"
-        if not man.is_file():
+        # One manifest per leg: the legs are separate jobs writing into one dir,
+        # and a shared file meant the last to finish deleted the other's rows.
+        mans = sorted(kdir.glob("manifest*.csv"))
+        if not mans:
             continue
         kappa = float(kdir.name[1:])
-        entry: dict = {"manifest": read_tsv(man), "legs": {}, "pops": {},
-                       "kinds": set(), "tau_ms": {}}
+        merged: dict[str, list] = {}
+        for m in mans:
+            t = read_tsv(m)
+            for k, v in t.items():
+                merged.setdefault(k, []).extend(list(v))
+        entry: dict = {"manifest": {k: np.asarray(v) for k, v in merged.items()},
+                       "legs": {}, "pops": {}, "kinds": set(), "tau_ms": {}}
         for f in sorted(kdir.glob("*.csv")):
             if f.name == "manifest.csv":
                 continue

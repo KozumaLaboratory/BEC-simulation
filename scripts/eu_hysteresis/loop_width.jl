@@ -200,12 +200,25 @@ read_tsv(p) = let d = readdlm(p, '\t'; header=true)
     (d[1], Dict(strip(String(x)) => i for (i, x) in enumerate(vec(d[2]))))
 end
 
-"""Manifest rows of one ramp output dir, as NamedTuples keyed by column name."""
+"""Manifest rows of one ramp output dir, as NamedTuples keyed by column name.
+
+Globs `manifest*.csv`: the two legs of a loop are submitted as separate jobs into
+one directory and each writes its own manifest, because a shared one meant
+whichever job finished last deleted the other leg's rows — and a loop missing one
+leg reads as a lower bound rather than as a lost file."""
 function manifest_rows(dir)
-    p = joinpath(dir, "manifest.csv")
-    isfile(p) || throw(BlindMetric("no manifest.csv in $dir — the ramp did not run, which is not the same as no loop"))
-    A, ci = read_tsv(p)
-    [(; (Symbol(k) => A[r, i] for (k, i) in ci)...) for r in 1:size(A, 1)]
+    ps = filter(f -> startswith(basename(f), "manifest") && endswith(f, ".csv"),
+        isdir(dir) ? readdir(dir; join=true) : String[])
+    isempty(ps) && throw(BlindMetric(
+        "no manifest*.csv in $dir — the ramp did not run, which is not the same " *
+        "as running and finding no loop"))
+    rows = NamedTuple[]
+    for p in ps
+        A, ci = read_tsv(p)
+        append!(rows, [(; (Symbol(k) => A[r, i] for (k, i) in ci)...)
+                       for r in 1:size(A, 1)])
+    end
+    rows
 end
 
 """Per-leg analysis of every arm in `dir`."""

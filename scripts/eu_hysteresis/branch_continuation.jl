@@ -68,7 +68,22 @@ using Printf
 include(joinpath(@__DIR__, "..", "eu_ramp_common.jl"))   # spin_scalars
 
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
-getl(k, d) = sort(parse.(Float64, split(get(ENV, k, d), ",")); rev=true)
+
+"""Descending list from an env var, refusing a silent truncation.
+
+`qsub -v` separates variables with commas, so a comma inside a value ends it and
+the rest becomes variables with numeric names. Semicolons are accepted for that
+reason, and `<name>_N` states the intended length so a cut list is an error rather
+than a shorter ladder that still runs and still looks converged."""
+function getl(k, d)
+    s = get(ENV, k, d)
+    v = sort(parse.(Float64, split(s, r"[,;]")); rev=true)
+    n = get(ENV, k * "_N", "")
+    isempty(n) || length(v) == parse(Int, n) || error("""
+        $k parsed $(length(v)) entries but $(k)_N says $n: $(repr(s)).
+        A list passed through `qsub -v` is cut at the first comma — use `;`.""")
+    v
+end
 
 const SMOKE = get(ENV, "HB_SMOKE", "") == "1"
 const KAPPA = getf("HB_KAPPA", 1.8)

@@ -27,7 +27,12 @@ mkdir -p logs/tsubame "$OUT"
 
 # 2.5 decades of ramp rate. τ = span / rate, so the two legs of one loop get the
 # same field rate over the same window even though they run in opposite directions.
-RATES=${RATES:-40,12,4,1.2,0.4,0.12}
+# Semicolons, NOT commas: `qsub -v` separates VARIABLES with commas, so a
+# comma-joined list arrives as its first element only. That silently turned a
+# 7-rate scan into a 1-rate scan that looked entirely healthy. The drivers accept
+# both separators and cross-check the count against `<NAME>_N`.
+RATES=${RATES:-"40;12;4;1.2;0.4;0.12;0.04"}
+RATES_N=$(awk -F";" "{print NF}" <<< "$RATES")
 PIN=${PIN:-0.002}
 
 q() { echo "+ qsub $*"; qsub -g "$G" "$@"; }
@@ -75,7 +80,7 @@ ramps)
             fi
             [ -f "$SEEDF" ] || { echo "missing seed $SEEDF — extract it from stage A first" >&2; exit 1; }
             q -N ar${K/./}_$LEG -l h_rt=24:00:00 \
-              -v AR_KAPPA=$K,AR_GRID=32,AR_LEGS=$LEG,AR_B_LO=20,AR_B_HI=$T,AR_RATES=$RATES,$SEEDVAR=$SEEDF,AR_OUT=$OUT/ramp_g32 \
+              -v AR_KAPPA=$K,AR_GRID=32,AR_LEGS=$LEG,AR_B_LO=20,AR_B_HI=$T,AR_RATES=$RATES,AR_RATES_N=$RATES_N,$SEEDVAR=$SEEDF,AR_OUT=$OUT/ramp_g32 \
               scripts/eu_hysteresis/submit_ramp.sh
         done
     done
@@ -93,7 +98,7 @@ grid64)
       -v HB_KAPPA=1.8,HB_GRID=64,HB_DIR=down,HB_BMIN=$T,HB_BMAX=$T,HB_DB=5,HB_PIN=$PIN,HB_LBFGS=1200,HB_ANCHOR_FILE=$SEEDS/polar_k1.8_B${T}_g32.jld2,HB_OUT=$OUT/seed64_polar \
       scripts/eu_hysteresis/submit_branch.sh
     echo "when both 64³ seeds exist, submit the two legs with:"
-    echo "  RATES=0.4,0.12 bash scripts/eu_hysteresis/launch.sh ramps64 $T"
+    echo "  RATES='0.4;0.12' bash scripts/eu_hysteresis/launch.sh ramps64 $T"
     ;;
 
 ramps64)
@@ -105,7 +110,7 @@ ramps64)
         fi
         [ -f "$SEEDF" ] || { echo "missing seed $SEEDF" >&2; exit 1; }
         q -N ar18_${LEG}64 -l h_rt=24:00:00 \
-          -v AR_KAPPA=1.8,AR_GRID=64,AR_LEGS=$LEG,AR_B_LO=20,AR_B_HI=$T,AR_RATES=${RATES},$SEEDVAR=$SEEDF,AR_OUT=$OUT/ramp_g64 \
+          -v AR_KAPPA=1.8,AR_GRID=64,AR_LEGS=$LEG,AR_B_LO=20,AR_B_HI=$T,AR_RATES=${RATES},AR_RATES_N=$RATES_N,$SEEDVAR=$SEEDF,AR_OUT=$OUT/ramp_g64 \
           scripts/eu_hysteresis/submit_ramp.sh
     done
     ;;
@@ -116,10 +121,10 @@ ramps64)
 pin)
     T=${2:?B_TOP required}
     q -N hb18up_p02 -l h_rt=24:00:00 \
-      -v HB_KAPPA=1.8,HB_DIR=up,HB_BMIN=20,HB_BMAX=20,HB_DB=5,HB_PIN=0.02,HB_LADDER=0.08,0.04,0.02,HB_LADDER_ANCHOR=0.08,0.04,0.02,HB_ANCHOR_FILE=$SEEDS/reference_flower.jld2,HB_OUT=$OUT/seedpin_flower \
+      -v HB_KAPPA=1.8,HB_DIR=up,HB_BMIN=20,HB_BMAX=20,HB_DB=5,HB_PIN=0.02,HB_LADDER="0.08;0.04;0.02",HB_LADDER_N=3,HB_LADDER_ANCHOR="0.08;0.04;0.02",HB_LADDER_ANCHOR_N=3,HB_ANCHOR_FILE=$SEEDS/reference_flower.jld2,HB_OUT=$OUT/seedpin_flower \
       scripts/eu_hysteresis/submit_branch.sh
     q -N hb18dn_p02 -l h_rt=24:00:00 \
-      -v HB_KAPPA=1.8,HB_DIR=down,HB_BMIN=$T,HB_BMAX=$T,HB_DB=5,HB_PIN=0.02,HB_LADDER=0.08,0.04,0.02,HB_LADDER_ANCHOR=0.08,0.04,0.02,HB_ANCHOR_STATE=m_minus_F,HB_OUT=$OUT/seedpin_polar \
+      -v HB_KAPPA=1.8,HB_DIR=down,HB_BMIN=$T,HB_BMAX=$T,HB_DB=5,HB_PIN=0.02,HB_LADDER="0.08;0.04;0.02",HB_LADDER_N=3,HB_LADDER_ANCHOR="0.08;0.04;0.02",HB_LADDER_ANCHOR_N=3,HB_ANCHOR_STATE=m_minus_F,HB_OUT=$OUT/seedpin_polar \
       scripts/eu_hysteresis/submit_branch.sh
     ;;
 

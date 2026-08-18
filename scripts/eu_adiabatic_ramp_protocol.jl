@@ -74,17 +74,31 @@ using Printf
 include(joinpath(@__DIR__, "eu_gs_library.jl"))     # load_lib
 
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
+
+"""Parse a list-valued env var, and REFUSE a silent truncation.
+
+UGE's `qsub -v` separates variables with commas, so a comma inside a value ends
+it: `-v AR_RATES=40,12,4` sets AR_RATES=40 and then creates variables named `12`
+and `4`. That is not a hypothetical — it cost this campaign a full rate scan that
+came back looking like a clean single-rate run. Semicolons are accepted for that
+reason, and `<name>_N` states how many entries the caller meant, so a truncation
+becomes an error instead of a plausible answer."""
+function getlist(k, default)
+    s = get(ENV, k, default)
+    v = isempty(strip(s)) ? Float64[] : parse.(Float64, split(s, r"[,;]"))
+    n = get(ENV, k * "_N", "")
+    isempty(n) || length(v) == parse(Int, n) || error("""
+        $k parsed $(length(v)) entries but $(k)_N says $n: $(repr(s)).
+        A list passed through `qsub -v` is cut at the first comma — use `;`.""")
+    v
+end
 const SMOKE = get(ENV, "AR_SMOKE", "") == "1"
 const KAPPA = getf("AR_KAPPA", 1.8)
-const TAUS = SMOKE ? [1.0] :
-             sort(parse.(Float64, split(get(ENV, "AR_TAUS", "3,10,30,100"), ",")))
+const TAUS = SMOKE ? [1.0] : sort(getlist("AR_TAUS", "3,10,30,100"))
 # |dB/dt| in µG/ms. Non-empty ⇒ each leg derives its own τ from its own span, so
 # both legs of one loop are ramped at the SAME field rate even when the window is
 # traversed in opposite directions from different seed fields.
-const RATES = SMOKE ? Float64[] :
-              let s = get(ENV, "AR_RATES", "")
-    isempty(s) ? Float64[] : sort(parse.(Float64, split(s, ",")); rev=true)
-end
+const RATES = SMOKE ? Float64[] : sort(getlist("AR_RATES", ""); rev=true)
 const B_LO = getf("AR_B_LO", 20.0)
 const B_HI = getf("AR_B_HI", 100.0)
 const LEGS = split(get(ENV, "AR_LEGS", "rise,fall"), ",")
@@ -380,7 +394,22 @@ else
     end
 end
 
+# One manifest file PER LEG, not one per directory. The legs of a loop are
+# submitted as separate jobs writing into the same output dir, and each rewrites
+# its manifest whole from its own rows — so a single `manifest.csv` means whichever
+# job finished last silently deleted the other leg's rows. Readers glob
+# `manifest*.csv`.
+const MANIFEST = joinpath(OUT, "manifest_" * join(sort(collect(LEGS)), "_") * ".csv")
+
 manifest = Any[]
+write_manifest() = isempty(manifest) ? nothing : open(MANIFEST, "w") do io
+    ks = collect(keys(manifest[1]))
+    writedlm(io, reshape(String.(ks), 1, :))
+    for m in manifest
+        writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))
+    end
+end
+
 for J in jobs
     println()
     τ = J.τ
@@ -413,13 +442,7 @@ for J in jobs
                 n_frames=n, wall_s=NaN))
         @printf("SKIP %s (cached, %d frames; AR_FORCE=1 to redo)\n", J.label, n)
         flush(stdout)
-        ks = collect(keys(manifest[1]))
-        open(joinpath(OUT, "manifest.csv"), "w") do io
-            writedlm(io, reshape(String.(ks), 1, :))
-            for m in manifest
-                writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))
-            end
-        end
+        write_manifest()
         continue
     end
     r = run_ramp(; branch=J.branch, B_seed=J.B_seed, B_end=J.B_end, τ,
@@ -442,16 +465,10 @@ for J in jobs
         last.Jz - first_.Jz, last.norm - first_.norm, r.wall_s)
     flush(stdout)
 
-    ks = collect(keys(manifest[1]))
-    open(joinpath(OUT, "manifest.csv"), "w") do io
-        writedlm(io, reshape(String.(ks), 1, :))
-        for m in manifest
-            writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))
-        end
-    end
+    write_manifest()
 end
 
-println("\nwrote $(OUT)/manifest.csv + per-run trajectory/population CSVs")
+println("\nwrote $MANIFEST + per-run trajectory/population CSVs")
 println("""
 Loop width from these runs: for each τ, the field at which ⟨F⊥⟩ jumps on the
 `rise` leg minus the field at which it jumps on `fall`. Saturating with τ ⇒

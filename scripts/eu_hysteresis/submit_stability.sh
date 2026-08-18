@@ -17,9 +17,13 @@ export SB_ETA="${SB_ETA:-0.01}"
 export SB_HOLD_TAU="${SB_HOLD_TAU:-60}"
 export SB_REMIN="${SB_REMIN:-600}"
 export SB_OUT="${SB_OUT:-$EU335_OUT/stability_k${SB_KAPPA}_g${SB_GRID}}"
-for v in SB_CELLS SB_CONTROL_FLOWER SB_CONTROL_POLAR SB_CONTROL_UNSTABLE_B \
+# SB_CELLS is `;`-separated: qsub -v cuts a value at the first comma, so a
+# comma-joined cell list would arrive as its first cell only — and a one-cell
+# stability run is indistinguishable from one that was asked for. SB_CELLS_N is
+# cross-checked by the driver.
+for v in SB_CELLS SB_CELLS_N SB_CONTROL_FLOWER SB_CONTROL_UNSTABLE_B \
          SB_CONTROL_STABLE_B SB_HOLD_B SB_DEPART SB_FRAMES SB_DT SB_PADDING \
-         SB_SKIP_CONTROLS; do
+         SB_ETA SB_HOLD_TAU SB_SKIP_CONTROLS; do
     [ -n "${!v:-}" ] && export "$v"
 done
 

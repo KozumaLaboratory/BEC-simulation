@@ -19,24 +19,27 @@
 # Neither alone is conclusive and they are reported separately, never merged into
 # one verdict.
 #
-# CONTROLS. The script refuses to report unless it has shown that HOLD can see an
-# instability and can also stay quiet on a state that is definitely stable:
-#   positive  the flower ψ held ABOVE its spinodal must depart
-#   negative  the polarised ψ held at high field must not
-# A stability test that cannot return "unstable" proves nothing, which is the
-# degenerate-knob trap in yet another costume.
+# CONTROLS — one state, two hold fields, straddling the known spinodal:
+#   positive  the last converged flower ψ, held a few µG PAST the end of its
+#             branch, must depart
+#   negative  the SAME ψ held at its own field must not
+# The pair differs in exactly the variable under test. Holding two different
+# states at two different fields would also have varied the branch and the
+# field mismatch, so a departure could have been non-stationarity instead of
+# instability. A stability test that cannot return "unstable" proves nothing,
+# which is the degenerate-knob trap in yet another costume.
 #
 # Env:
 #   SB_CELLS=a.jld2,b.jld2      cells to test (branch-scan psi.jld2 files)
 #   SB_HOLD_B=                  per-cell hold field [µG]; default each cell's own
-#   SB_ETA=0.01                 noise amplitude (fraction, add_white_noise!)
+#   SB_ETA=0.01                 perturbation as a FRACTION of ψ, density-weighted
 #   SB_HOLD_TAU=60              hold duration [ω_ref⁻¹]  (60 ≈ 87 ms)
 #   SB_DT=0.002  SB_FRAMES=120
 #   SB_REMIN=600                LBFGS cap for the re-minimisation (0 = skip)
 #   SB_KAPPA=1.8  SB_GRID=32  SB_BOX=24.0  SB_PIN=0.002  SB_PADDING=0
-#   SB_CONTROL_FLOWER=  SB_CONTROL_POLAR=   ψ for the two controls
-#   SB_CONTROL_UNSTABLE_B=90    field at which the flower ψ must be unstable
-#   SB_CONTROL_STABLE_B=200     field at which the polarised ψ must be stable
+#   SB_CONTROL_FLOWER=          the last converged flower cell; BOTH controls
+#   SB_CONTROL_UNSTABLE_B=      use it, held past its spinodal (default +4 µG)
+#   SB_CONTROL_STABLE_B=        and at its own field, so the pair differs only in B
 #   SB_OUT=figs/eu_hysteresis/stability
 #   SB_SKIP_CONTROLS=1          only for debugging; the result is then uncalibrated
 #
@@ -47,11 +50,12 @@ import CUDA
 using SpinorBEC
 using SpinorBEC: Units, eu151_preset, SpinSystem, make_workspace, SimParams,
     TimeDependentZeeman, ConstantWaveform, split_step_midpoint!, static_zeeman,
-    find_ground_state_lbfgs, add_white_noise!, total_norm, total_energy,
+    find_ground_state_lbfgs, total_norm, total_energy,
     magnetization, orbital_angular_momentum, CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldopen
 using Printf
+using Random
 
 include(joinpath(@__DIR__, "..", "eu_ramp_common.jl"))   # spin_scalars
 
@@ -106,11 +110,33 @@ function load_cell(path)
     end
 end
 
-"""Hold at constant `B_uG` from `psi + noise(η)`. Returns the ⟨F⊥⟩ trace and the
-largest excursion from t=0. Uses the ramp's integrator with dB/dt = 0."""
+"""Perturb ψ by a fraction η OF ITSELF, weighted by the local density.
+
+Not `add_white_noise!`: its `amp` is an ABSOLUTE per-point amplitude applied to
+every one of 32³×13 entries and then renormalised, so η = 0.01 adds noise of norm²
+≈ 36 against the state's 1 — the "perturbed" state is 97 % noise. That is not a
+hypothetical: the first run of this script fed both controls such a state and they
+came back reading ⟨F⊥⟩ ≈ 1.25 apiece, from branches whose true values are 2.478 and
+0.637. The controls refused, which is why the number was never quoted.
+
+Density-weighted, because a stability test wants the perturbation where the atoms
+are; amplitude spread into vacuum does not couple to the mode under test."""
+function perturb!(ψ, η, seed)
+    η > 0 || return ψ
+    rng = Random.MersenneTwister(seed)
+    @inbounds for i in eachindex(ψ)
+        ψ[i] += η * abs(ψ[i]) * (randn(rng) + im * randn(rng)) / sqrt(2)
+    end
+    ψ ./= sqrt(sum(abs2, ψ) * SpinorBEC.cell_volume(PRESET.grid))
+    ψ
+end
+
+"""Hold at constant `B_uG` from `psi` perturbed by a fraction η. Returns the ⟨F⊥⟩
+trace and the largest excursion from t=0. Uses the ramp's integrator with
+dB/dt = 0."""
 function hold(psi, B_uG, ε; η=ETA, τ=HOLD_TAU, seed=1)
     ψ = Array{ComplexF64}(psi)
-    η > 0 && add_white_noise!(ψ, η, seed, PRESET.grid)
+    perturb!(ψ, η, seed)
     n_steps = max(1, ceil(Int, τ / DT))
     save_every = max(1, n_steps ÷ FRAMES)
     zee = TimeDependentZeeman(ConstantWaveform(p_of(B_uG)), ConstantWaveform(0.0),
@@ -143,7 +169,7 @@ end
 ⟨F⊥⟩; a saddle slides off."""
 function remin(psi, B_uG, ε; η=ETA, cap=REMIN, seed=2)
     ψ = Array{ComplexF64}(psi)
-    η > 0 && add_white_noise!(ψ, η, seed, PRESET.grid)
+    perturb!(ψ, η, seed)
     g = find_ground_state_lbfgs(; grid=PRESET.grid, atom=ATOM,
         interactions=PRESET.interactions, potential=PRESET.potential,
         zeeman=static_zeeman(; Bz=p_of(B_uG), Bx=ε, q=0.0),
@@ -168,35 +194,52 @@ end
 Base.showerror(io::IO, e::BlindStability) = print(io, "BlindStability: ", e.msg)
 
 """Show that HOLD can report unstable AND can report stable, before any cell's
-verdict is believed."""
+verdict is believed.
+
+**One state, two hold fields, straddling the known spinodal.** The controls use
+the SAME ψ — the last converged flower cell — held at its own field and a few µG
+past the spinodal, so the pair differs in exactly the variable under test. An
+earlier design held the flower ψ far above the spinodal and the polarised ψ at
+high field; that pair also varied the state, the field mismatch and the branch at
+once, so a departure could have been non-stationarity rather than instability.
+Here the field mismatch is a few percent in p for both arms, and only one of them
+crosses the branch's end."""
 function calibrate_hold()
     fl = get(ENV, "SB_CONTROL_FLOWER", "")
-    po = get(ENV, "SB_CONTROL_POLAR", "")
-    (isempty(fl) || isempty(po)) && throw(BlindStability(
-        "SB_CONTROL_FLOWER and SB_CONTROL_POLAR are required: without them this " *
-        "script cannot show that it is able to return `unstable`, and a " *
-        "stability test that can only say `stable` is not a measurement"))
-    Bu = getf("SB_CONTROL_UNSTABLE_B", 90.0)
-    Bs = getf("SB_CONTROL_STABLE_B", 200.0)
+    isempty(fl) && throw(BlindStability(
+        "SB_CONTROL_FLOWER is required: without it this script cannot show that " *
+        "it is able to return `unstable`, and a stability test that can only say " *
+        "`stable` is not a measurement"))
+    c = load_cell(fl)
+    Bu = getf("SB_CONTROL_UNSTABLE_B", c.B + 4)     # past the spinodal
+    Bs = getf("SB_CONTROL_STABLE_B", c.B)           # its own field
     bad = String[]
 
-    c = load_cell(fl)
     pos = hold(c.psi, Bu, c.pin)
-    @printf("  positive control: flower ψ(B=%.0f) held at %.0f µG → ⟨F⊥⟩ %.3f → %.3f (max excursion %.3f)\n",
-        c.B, Bu, pos.f0, pos.fperp_end, pos.max_excursion)
+    @printf("  positive control: flower ψ(B=%.2f, ⟨F⊥⟩=%.3f) held at %.2f µG (past the spinodal) → ⟨F⊥⟩ %.3f → %.3f (max excursion %.3f)\n",
+        c.B, c.fperp0, Bu, pos.f0, pos.fperp_end, pos.max_excursion)
     pos.max_excursion >= DEPART || push!(bad,
         "POSITIVE control did not depart (excursion $(round(pos.max_excursion; digits=4)) < $DEPART): " *
-        "the flower state held ABOVE its spinodal must go unstable, so this " *
-        "instrument cannot currently detect instability at all")
+        "the flower state held past the end of its own branch must go unstable, " *
+        "so this instrument cannot currently detect instability at all. Either " *
+        "the hold is shorter than the growth time, or the perturbation is too " *
+        "small to seed the unstable mode")
 
-    c2 = load_cell(po)
-    neg = hold(c2.psi, Bs, c2.pin)
-    @printf("  negative control: polarised ψ(B=%.0f) held at %.0f µG → ⟨F⊥⟩ %.3f → %.3f (max excursion %.3f)\n",
-        c2.B, Bs, neg.f0, neg.fperp_end, neg.max_excursion)
+    neg = hold(c.psi, Bs, c.pin)
+    @printf("  negative control: the SAME ψ held at its own field %.2f µG → ⟨F⊥⟩ %.3f → %.3f (max excursion %.3f)\n",
+        Bs, neg.f0, neg.fperp_end, neg.max_excursion)
     neg.max_excursion < DEPART || push!(bad,
         "NEGATIVE control departed (excursion $(round(neg.max_excursion; digits=4)) ≥ $DEPART): " *
-        "the polarised state at high field is not in question, so the threshold " *
-        "or the noise amplitude is calling ordinary breathing an instability")
+        "a converged cell held at its own field is not in question, so the " *
+        "threshold or the perturbation is calling ordinary breathing an instability")
+
+    # The perturbation must also not have swamped the state: if it did, both arms
+    # start from the same noise-dominated ⟨F⊥⟩ and neither verdict is about ψ.
+    isnan(c.fperp0) || abs(pos.f0 - c.fperp0) < 0.05 * max(c.fperp0, 1) ||
+        push!(bad,
+        "the perturbation moved ⟨F⊥⟩ from $(round(c.fperp0; digits=4)) to " *
+        "$(round(pos.f0; digits=4)) BEFORE any propagation — η is too large and " *
+        "the hold would be measuring the noise, not the state")
 
     isempty(bad) || throw(BlindStability(join(bad, "\n  ")))
     println("  controls passed: the hold can report both unstable and stable\n")
@@ -206,7 +249,15 @@ end
 # --------------------------------------------------------------------- driver
 
 cells = let s = get(ENV, "SB_CELLS", "")
-    isempty(s) ? String[] : String.(split(s, ","))
+    # `;` as well as `,`: qsub -v separates VARIABLES with commas, so a
+    # comma-joined cell list arrives as its first element only — silently, and a
+    # one-cell run looks exactly like a one-cell run that was asked for.
+    v = isempty(s) ? String[] : String.(split(s, r"[,;]"))
+    n = get(ENV, "SB_CELLS_N", "")
+    isempty(n) || length(v) == parse(Int, n) || error("""
+        SB_CELLS parsed $(length(v)) entries but SB_CELLS_N says $n.
+        A list passed through `qsub -v` is cut at the first comma — use `;`.""")
+    v
 end
 isempty(cells) && error("SB_CELLS is empty — nothing to test")
 
