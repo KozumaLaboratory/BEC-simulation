@@ -40,6 +40,7 @@ using SpinorBEC: _gs_stage_dir, _run_step, GroundStateStep,
     make_grid, GridConfig, InteractionParams, resolve_atom,
     marker_path, incomplete_marker_path, admit_payload, read_complete_marker,
     write_complete_marker, _reset_unmarked_warnings!
+include(joinpath(@__DIR__, "..", "helpers", "interrupt_harness.jl"))
 
 probe_gs_params(; tol=1.0e-6) = Dict{String, Any}(
     "atom" => "Rb87",
@@ -277,12 +278,10 @@ end
                     @test isfile(itp_ckpt)
                     # A lost race must be a clean FAILURE that names itself, never an
                     # ErrorException("schedule: Task not runnable") that aborts the whole FILE
-                    # and takes its sibling gates with it.
-                    won_race = !istaskdone(task)
-                    won_race || @warn "interrupt harness LOST THE RACE: the run finished before " *
-                        "the interrupt landed; this gate measured nothing"
+                    # and takes its sibling gates with it. The delivery IS the check —
+                    # see test/helpers/interrupt_harness.jl.
+                    won_race = warn_lost_race(deliver_interrupt!(task))
                     @test won_race
-                    won_race && schedule(task, InterruptException(); error=true)
                     try
                         wait(task)
                         fetch(task)
