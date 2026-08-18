@@ -49,8 +49,6 @@ using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
 
-include(joinpath(@__DIR__, "eu_ramp_common.jl"))    # spin_scalars, assert_seed_epoch
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 const SMOKE = get(ENV, "TQ_SMOKE", "") == "1"
 const KAPPA = getf("TQ_KAPPA", 1.8)

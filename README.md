@@ -112,7 +112,7 @@ docs/   guides/ reference/ conventions/ design/ validation/ theory/ … (see doc
 test/   Tiered suite (fast / ci / oracles / integration / full / physics)
 dashboard/  React + WebGPU dashboard frontend
 ext/    CUDA, Makie, HTTP and VTK extensions
-scripts/    cli.jl and one-off audit drivers
+scripts/    operational entry points (cli.jl, ops specs; allowlist-gated)
 bench/  Benchmarks
 ```
 

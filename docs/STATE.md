@@ -206,12 +206,12 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 255 files
-- `CI_EXTRA` — 119 files
+- `FAST_TESTS` — 256 files
+- `CI_EXTRA` — 120 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
 - `ORACLE_TESTS` — 76 files
-- `INTEGRATION_TESTS` — 49 files
+- `INTEGRATION_TESTS` — 50 files
 
 ## Validation ladder — instruments present on disk
 
@@ -274,12 +274,12 @@ as complete.
 |---|---|---|
 | `src/model/` | 3 | 14 |
 | `src/hamiltonian/` | 13 | 63 |
-| `src/validation/` | 1 | 8 |
-| `src/manuscript/` | 1 | 15 |
+| `src/validation/` | 1 | 10 |
+| `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 44 |
-| `src/workflow/` | 5 | 170 |
+| `src/workflow/` | 5 | 172 |
 | `src/foundation/` | 1 | 40 |
-| `src/analysis/` | 1 | 48 |
+| `src/analysis/` | 1 | 51 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem
 catalog is a curated summary and carries no staleness gate.

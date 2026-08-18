@@ -13,7 +13,7 @@
 #      + Goldstone theorem (no full BdG required)
 #   7. Tabulate β_S^{λ_spin} sign pattern → confirm/falsify S_bd ≈ 2F = 24
 #
-# Run: julia --project=. scripts/manuscript/f12_icosahedral_verification.jl
+# Run: the archived f12_icosahedral_verification.jl driver
 
 using Test
 using SpinorBEC

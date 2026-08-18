@@ -14,6 +14,9 @@ const FAST_TESTS = [
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
     "test_tier_membership.jl",
+    # The CONTRIBUTING.md scripts/ charter, gated: set equality between
+    # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
+    "test_scripts_allowlist.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
     "test_calibrated_scan.jl",
@@ -405,6 +408,9 @@ const CI_EXTRA = [
     # Noether ledger for the EdH / Barnett program: at B=0 the DDI conserves
     # J_z = L_z + F_z exactly, and the drift is set by the box, not by dt.
     "oracles/test_jz_conservation_ddi.jl",
+    # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
+    # run, pinned). 17 imprints + fingerprints — ci rather than fast.
+    "analysis/test_spinor_phase_classifier.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     # Klaus 2022 magnetostirring: the coefficient chain, the directional
     # magnetostriction oracle (coarse-grid ITP), and the pre-registered
@@ -1044,6 +1050,7 @@ const _COST = Dict{String, Float64}(
     "workflow/test_calibration_edge_cases.jl" => 9.3,
     "analysis/test_forward_image.jl" => 9.3,
     "analysis/test_spinor_fingerprint.jl" => 9.2,
+    "analysis/test_spinor_phase_classifier.jl" => 10.3,
     "oracles/test_global_phase_covariance.jl" => 8.7,
     "test_level1_scalar_exact.jl" => 8.5,
     "workflow/validation/test_scalar_summary.jl" => 8.4,

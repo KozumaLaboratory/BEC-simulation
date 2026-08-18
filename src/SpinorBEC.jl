@@ -114,6 +114,7 @@ include("workflow/experiment_observables.jl")   # observables (plain functions o
 include("workflow/experiment_collections.jl")   # spec_diff / sweep / twin / tabulate
 include("workflow/io/cluster.jl")  # cluster helpers (needs Experiment)
 include("workflow/autopilot.jl")   # queue + tick + on_complete + retry
+include("workflow/cli.jl")         # cli_main — body behind scripts/cli.jl
 
 # ========================================
 # SOLVERS: Ground state & time evolution

@@ -33,6 +33,7 @@ using YAML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload, _has_result,
     _run_simulation_standard!, _run_simulation_leapfrog!, _reset_unmarked_warnings!
+include(joinpath(@__DIR__, "..", "helpers", "interrupt_harness.jl"))
 
 # 1-D, 64 points, F=1, no DDI: the cheapest workspace that still exercises the
 # real V/K/V chain both loops run.
@@ -194,15 +195,15 @@ const DYN_DURATION = 100.0
         @test isfile(live)
         # A lost race must be a clean FAILURE that names itself, never an
         # ErrorException("schedule: Task not runnable") that aborts the whole FILE
-        # and takes its sibling gates with it.
-        won_race = !istaskdone(task)
-        won_race || @warn "interrupt harness LOST THE RACE: the run finished before " *
-            "the interrupt landed; this gate measured nothing"
+        # and takes its sibling gates with it. The delivery IS the check — see
+        # test/helpers/interrupt_harness.jl. Delivered here rather than after the
+        # `live_step` assertions below, which only widened the window; the status
+        # file is already on disk, so reading it after the interrupt is fine.
+        won_race = warn_lost_race(deliver_interrupt!(task))
         @test won_race
         live_step = JSON.parse(read(live, String))["step"]
         @test live_step >= 1
 
-        won_race && schedule(task, InterruptException(); error=true)
         task_returned_normally = try
             wait(task)
             true

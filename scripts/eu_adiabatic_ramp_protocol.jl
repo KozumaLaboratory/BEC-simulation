@@ -71,8 +71,6 @@ using DelimitedFiles: writedlm, readdlm
 using JLD2: jldsave, jldopen
 using Printf
 
-include(joinpath(@__DIR__, "eu_gs_library.jl"))     # load_lib
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 
 """Parse a list-valued env var, and REFUSE a silent truncation.
@@ -141,7 +139,7 @@ stationary and the whole rate scan would be measuring that transient instead of
 the ramp. Also returns the pin ε the seed was converged with."""
 function seed(branch, B_uG; file="")
     e = if isempty(file)
-        x = load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
+        x = load_gs(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
         abs(x.meta.B - B_uG) < 0.5 ||
             @warn "requested seed B=$B_uG µG; nearest library state is $(x.meta.B) µG"
         x
@@ -192,7 +190,7 @@ manifest row of a cached arm; a NaN there would be an unknown masquerading as a
 number in the one column that says which Hamiltonian was ramped)."""
 function seed_pin(branch, B_uG; file="")
     path = isempty(file) ?
-           load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB).meta.path :
+           load_gs(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB).meta.path :
            file
     jldopen(path, "r") do f
         haskey(f, "pin_bx") ? f["pin_bx"] :

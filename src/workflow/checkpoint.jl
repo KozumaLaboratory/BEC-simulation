@@ -125,7 +125,7 @@ result = (; psi=Array(ws.state.psi), E=ws.energy, ...)
 save_checkpoint!(cp, key, result)
 ```
 
-This is the convention used by `scripts/sprint5_M1_*.jl`.
+This is the convention used by the archived `sprint5_M1_*.jl` drivers.
 """
 function save_checkpoint!(cp::Checkpoint, key, result; metadata=nothing)
     mkpath(cp.cache_dir)
