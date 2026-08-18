@@ -333,6 +333,7 @@ const FAST_TESTS = [
     "foundation/test_property_based.jl",
     "foundation/test_types_validation.jl",
     "analysis/test_currents.jl",
+    "analysis/test_orbital_angular_momentum_vector.jl",
     "analysis/test_superfluid_fraction.jl",
     "analysis/test_superfluid_fraction_gp_twist.jl",
     "solvers/test_scalar_ddi_transverse_pad.jl",
@@ -504,6 +505,8 @@ const CI_EXTRA = [
     "oracles/test_spin_operator_algebra.jl",
     "oracles/test_energy_operator_identity.jl",
     "oracles/test_ddi_uniform_zero.jl",
+    "oracles/test_flux_closure_ddi_identity.jl",
+    "oracles/test_itp_dt_limited_advisory.jl",
     "oracles/test_contact_meanfield_analytic.jl",
     "oracles/test_strang_energy_conservation.jl",
     "oracles/test_parity_symmetry.jl",
@@ -902,6 +905,10 @@ const _COST = Dict{String, Float64}(
     "dynamics/test_thermal_cfield.jl" => 2.4,
     "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
+    # Measured locally 2026-08-19 (10-core box): 128 s of solver time for the
+    # ITP-vs-L-BFGS pair plus one L-BFGS control. Registered so it goes out
+    # early rather than last.
+    "oracles/test_itp_dt_limited_advisory.jl" => 150.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.

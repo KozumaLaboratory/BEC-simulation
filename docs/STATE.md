@@ -86,14 +86,14 @@ nor against each other.
 
 ## Ground-state exit contract: what `tol` bounds
 
-ITP convergence, read from `src/solvers/ground_state/itp_loop.jl:208`:
+ITP convergence, read from `src/solvers/ground_state/itp_loop.jl:295`:
 
 ```julia
 if dE < tol && (tol_drho <= 0.0 || drho < tol_drho)
 ```
 
 `dE` is `_relative_energy_change` — the relative **energy** change, not a
-gradient norm. It is evaluated only inside `if step % sp.save_every == 0` (`src/solvers/ground_state/itp_loop.jl:160`), and
+gradient norm. It is evaluated only inside `if step % sp.save_every == 0` (`src/solvers/ground_state/itp_loop.jl:247`), and
 the YAML path sets `save_every = max(1, n_steps ÷ 100)`, so at the default
 `n_steps=100000` the criterion is tested **1000 steps apart**. A run can be
 converged for 999 steps without noticing. `dpsi` appears in the diagnostics
@@ -206,11 +206,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 256 files
-- `CI_EXTRA` — 114 files
+- `FAST_TESTS` — 257 files
+- `CI_EXTRA` — 116 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 75 files
+- `ORACLE_TESTS` — 77 files
 - `INTEGRATION_TESTS` — 45 files
 
 ## Validation ladder — instruments present on disk
