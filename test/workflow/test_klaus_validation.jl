@@ -1,4 +1,4 @@
-# Klaus 2022 minimal validation — exercises the magnetostir code path
+# Klaus et al. 2022 minimal validation — exercises the magnetostir code path
 # end-to-end at small grid + short stir to keep CI cost bounded. Asserts
 # that the GPU-safe transverse-Zeeman path (commit 59a52a1), the
 # streamed-snapshot reader (3685fd7), and vortex_detect 3D (7769d84)
@@ -6,12 +6,12 @@
 #
 # This is NOT a physics validation of the published vortex-stripe count
 # (that needs the full 64x64x32 + 1 s stir overnight). It IS a regression
-# guard so the next session doesn't silently break the Klaus path.
+# guard so the next session doesn't silently break the magnetostir path.
 
 using Test
 using SpinorBEC
 
-@testset "Klaus 2022 minimal regression" begin
+@testset "Klaus et al. 2022 minimal regression" begin
     # Tiny smoke version of runs/klaus2022_full
     # Schema notes: `trap:` migrated to `potential:`,
     # `level:` removed from B-block, `ferromagnetic_min` → `m_minus_F`.

@@ -39,7 +39,7 @@ For every scan, ONE top-level YAML at the scan dir root:
 # runs/phi_omega_scan/scan.yaml
 name: phi_omega_eu151
 description: |
-  Klaus magnetostir frequency optimisation on Eu151.
+  Magnetostir frequency optimisation on Eu151.
   Tests whether 226 Hz (= 4.524 dimless at ω_ref = 2π·50 Hz) is the
   optimal stir rate for the F=6 spinor regime.
 parameter:

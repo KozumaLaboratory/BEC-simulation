@@ -131,7 +131,7 @@ disagreeing human. Note which one a claim rests on.
 
 - **A — code correctness**: units, sign, conservation, bit-identity, GPU = CPU.
 - **B — physics agreement**: closed-form limits, F=1 polar vs FM, polyhedral classification.
-- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus 2022,
+- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus et al. 2022,
   Yan-Li-Saito Barnett).
 
 Every numeric claim a session writes must carry: **type (A/B/C) + producing commit +

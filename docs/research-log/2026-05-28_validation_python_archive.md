@@ -22,7 +22,7 @@ Per the scripts/ invariant in CONTRIBUTING.md, these don't fit category
   Python scripts.
 
 Recovery: `git show <commit>:scripts/validation/<name>.py`. Last
-touched at SHA `2eab19f` (feat(figures): Klaus protocol K1 v3 +
+touched at SHA `2eab19f` (feat(figures): rotation-assisted EdH quench K1 v3 +
 long-time vortex statistics).
 
 ## Inventory

@@ -259,7 +259,7 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              (species_A, species_B blocks required).
 #   rotating_basis             — B̂(t) rotating-direction frame (Option γ; see docs/design/option_gamma_rotating_basis.md)
 #                              that absorbs Larmor analytically. Use for
-#                              Klaus-style protocols where B direction
+#                              fast-Larmor protocols where B direction
 #                              evolves and p·F·dt would otherwise blow up.
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String,
@@ -305,7 +305,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
             # `from_jld2`: load the initial ψ from a prior run's
             # result.jld2 instead of seeding a Gaussian. Pair with
             # `init_state_params: {path: ..., snap: last|N}`. Used to
-            # continue a long Klaus / EdH run beyond its original
+            # continue a long fast-Larmor / EdH run beyond its original
             # endpoint without re-running the spin-up phase.
             "from_jld2"]),
     "backend" => FieldSpec(; type=String, default="cpu", enum=["cpu", "gpu"]),

@@ -70,14 +70,14 @@ end
 
 # 6. apply_ddi_step! on Eu151 16³ (CPU). 6 rFFTs + spin-density + tensor
 # contraction in k-space + Euler spin rotation. Single largest cost in
-# Klaus / Berry rotating-basis runs (called every split-step).
+# Fast-Larmor / Berry rotating-basis runs (called every split-step).
 #
 # `make_ddi_params(grid, Eu151)` returns C_dd ≈ 1.5e-52 (compute_c_dd
 # is in SI units that don't match the dimensionless grid — see
 # compute_c_dd_dimless), which makes the per-voxel Euler rotation
 # early-return everywhere (phi_mag·dt < 1e-14). That masks ~80% of
 # apply_ddi_step's real cost — the bench was reporting 330 µs for what
-# costs ~1.8 ms in production. Override C_dd to a Klaus-regime
+# costs ~1.8 ms in production. Override C_dd to a fast-Larmor
 # dimensionless value (~100) so the bench measures the production path.
 let
     grid = make_grid(GridConfig((16, 16, 16), (8.0, 8.0, 8.0)))
@@ -92,7 +92,7 @@ end
 
 # 5. apply_uniform_spin_rotation! on Eu151 (D=13). GPU-safe matmul
 # rebuilds R::Matrix per call from (phi_x, phi_y, phi_z) — host scalar
-# work + broadcast, used heavily by rotating-basis Klaus runs. Bench
+# work + broadcast, used heavily by rotating-basis fast-Larmor runs. Bench
 # the production path (scratch threaded through) — without scratch the
 # function falls back to similar(psi) per call (~432 KB) which is the
 # fallback path, not what production callers exercise. Optimising the
@@ -155,7 +155,7 @@ end
 # 9. apply_local_spin_step! on Eu151 16³ rotating basis (CPU). Per call:
 # builds D×D Zeeman_diag + gauge-connection Hamiltonian, eigendecomposes,
 # applies U_loc to every voxel via _apply_rotation_to_spin_axis!. Hot in
-# every Yoshida sub-step of Klaus / Berry / phi_omega runs. Profile shows
+# every Yoshida sub-step of fast-Larmor / Berry / phi_omega runs. Profile shows
 # 2K+ allocs from `Hermitian(Matrix(...))` round-trip + `eigen()` arrays
 # + `Diagonal([...])` comprehension + `Vmat * D_diag * Vmat'` BLAS chain.
 let
@@ -165,7 +165,7 @@ let
         x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
-    # Klaus-like config: nonzero phi_dot exercises the gauge-connection
+    # Magnetostir-like config: nonzero phi_dot exercises the gauge-connection
     # branch (production hot path). theta tilt nonzero so sin(theta) ≠ 0.
     ws_rb = SpinorBEC.make_rotating_basis_ws(
         grid, 6, V_trap;
@@ -199,7 +199,7 @@ let
         x = grid.x[1][I[1]]; y = grid.x[2][I[2]]; z = grid.x[3][I[3]]
         V_trap[I] = 0.5 * (x*x + y*y + z*z)
     end
-    # Klaus-like setup: nonzero c_dd so apply_ddi_step! runs (not skipped),
+    # Magnetostir-like setup: nonzero c_dd so apply_ddi_step! runs (not skipped),
     # nonzero theta AND phi so _apply_UB! exercises both Fy and Fz rotations
     # (production stir trajectory: φ(t) precesses round B̂). Earlier configs
     # with phi=0 hid the second rotation behind the apply_uniform_spin_rotation

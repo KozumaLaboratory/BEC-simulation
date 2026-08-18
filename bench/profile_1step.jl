@@ -1,6 +1,6 @@
 # Profile ONE split_step! by kernel. Two configs:
 #   (A) bench config: Eu151 16³, c0/c1, NO DDI  (matches baseline split_step bench)
-#   (B) production:    Eu151 16³ + 32³, c0 + DDI (Klaus/Matsui regime)
+#   (B) production:    Eu151 16³ + 32³, c0 + DDI (fast-Larmor / Matsui regime)
 # Uses the built-in TimerOutputs tracing (enable_tracing! / TIMER) for a
 # per-kernel breakdown, plus a BenchmarkTools minimum for the whole step.
 

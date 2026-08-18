@@ -5,7 +5,7 @@ using SpinorBEC
 #
 # CLAUDE.md defines the verification-type split and requires a report to say
 # which type a claim falls under: "A: code correctness … B: physics agreement …
-# **C: model fidelity** — comparison to published experimental data (Klaus 2022,
+# **C: model fidelity** — comparison to published experimental data (Klaus et al. 2022,
 # Matsui Eu Bogoliubov cascade, Prasad 2019 vortex, Yan-Li-Saito Barnett)."
 #
 # Nothing enumerated the type-C claims, so the question could only be answered
@@ -73,10 +73,17 @@ const TYPE_C_CLAIMS = TypeCClaim[
     TypeCClaim(
         "Matsui et al. 2025, Fig. 4B", "EdH dip centre and width",
         "their sim −2.5495 / 13.07 nT; their exp −2.5 / 12.84 nT", nothing,
-        "test_matsui_fig4_dip.jl pins THEIR curve only. Ours (−2.138 / 14.62) " *
-        "lives in a memory note and a PR body, not in a gate. The exp abscissa " *
-        "carries a ±10 nT offset, so only the WIDTH arbitrates."),
+        "test_matsui_fig4_dip.jl pins THEIR curve only. Ours is −2.5099 / 12.740 " *
+        "at N = 3.5e4 (per-field rms 1.1 %, width 0.10 % — #299/#323, recorded in " *
+        "docs/validation/matsui_residual_root_cause.md and matsui_campaign_report.md), " *
+        "and lives in those documents, not in a gate. The 2026-08-19 reading of " *
+        "this row was −2.138 / 14.62, superseded when the atom number was " *
+        "corrected. The exp abscissa carries a ±10 nT offset, so only the WIDTH " *
+        "arbitrates."),
     TypeCClaim(
+        # THE PAPER (arXiv:2206.12265), not the fast-Larmor regime and not this
+        # project's own rotation-assisted EdH quench — see
+        # docs/conventions/klaus_name_disambiguation.md for why that mattered.
         "Klaus et al. 2022", "magnetostirring vortex nucleation", "—", nothing,
         "workflow/test_klaus_validation.jl now RUNS (2026-08-01 — it was not a " *
         "schema problem, its `initial_state` was inverted against the field sign) " *
@@ -136,7 +143,10 @@ const TYPE_C_CLAIMS = TypeCClaim[
         line = only(filter(l -> occursin("C: model fidelity", l), split(claude, '\n')))
         # (what CLAUDE.md writes, what the registry calls it)
         for (doc_name, registry_key) in (
-            ("Klaus 2022", "Klaus"),
+            # "Klaus et al. 2022", not "Klaus 2022" and never bare "Klaus":
+            # the word alone also named the fast-Larmor regime and this
+            # project's own protocol. docs/conventions/klaus_name_disambiguation.md.
+            ("Klaus et al. 2022", "Klaus"),
             ("Matsui", "Matsui"),
             ("Prasad 2019", "Prasad"),
             ("Yan-Li-Saito", "Saito"),

@@ -53,7 +53,7 @@ The machinery exists. The rotating path simply does not (1) store the params on
 2. **Zeeman is diagonal in the frame.** Frame alignment makes the linear Zeeman
    `−p F_z`; the transverse part is absorbed by `U_B`. Handled by the
    eigen-exact local-spin step (with the static-field diagonal fast path).
-3. **Eigen-exact spin integrator.** Klaus regime `p ≈ 30000` makes Strang-
+3. **Eigen-exact spin integrator.** The fast-Larmor regime, `p ≈ 30000`, makes Strang-
    splitting the Zeeman vs `Â` fail; combining them in one matrix exponential is
    exact at any `dt`. This is a *numerical-method* enhancement, orthogonal to the
    rotation — the standard path could adopt it as an option, and in the rotating

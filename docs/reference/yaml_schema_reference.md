@@ -524,7 +524,7 @@ Used by every field that accepts time dependence (`B.{Bx, By, Bz, ...}`,
 | `{sum: [<spec>, ...]}` | additive composition of any of the above |
 | existing `Waveform` | passthrough |
 
-**`frequency` convention** (Klaus-2022 footgun, memory
+**`frequency` convention** (Klaus et al. 2022 footgun, memory
 `gotcha_waveform_frequency_convention.md`): for `sinusoidal`, YAML
 `frequency` is `f_phys / (2π · f_ref)`, not `f_phys / f_ref`. Pass
 `"X Hz"` (string with units) for unambiguous lab-unit input.

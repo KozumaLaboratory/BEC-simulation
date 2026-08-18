@@ -25,7 +25,7 @@ set_divergence_thresholds!(t::DivergenceThresholds) = (_DIVERGENCE_THRESHOLDS[] 
 """
     register_recipe_divergence_thresholds!(name::Symbol, t::DivergenceThresholds)
 
-Recipes that expect physically-large transient drifts (Klaus deep
+Recipes that expect physically-large transient drifts (deep EdH
 quench, vortex nucleation, etc.) declare their own thresholds here so
 the global default doesn't false-positive on legitimate physics. The
 global thresholds remain the fallback for runs without a recipe.
@@ -82,7 +82,7 @@ end
 
 function _is_divergent(entry::QueueEntry)::Bool
     # Recipe-specific thresholds take precedence over the global default;
-    # ambitious physics scans (Klaus deep quench, vortex nucleation) need
+    # ambitious physics scans (deep EdH quench, vortex nucleation) need
     # their own envelopes.
     thr = recipe_divergence_thresholds(entry.recipe_name)
     status = _live_status_for(entry)

@@ -6,7 +6,7 @@ wavefunction factorizes: |Ψ(r,t)⟩ = ψ(r,t)·|B̂(t)⟩_F. The spin degree of
 freedom follows B̂(t) instantaneously, leaving a scalar GPE for ψ(r,t)
 with a **time-dependent dipolar polarization axis** B̂(t).
 
-This file is the minimal Klaus-2022-style scalar dipolar eGPE skeleton:
+This file is the minimal scalar dipolar eGPE skeleton, in the shape of Klaus et al. 2022 [arXiv:2206.12265]:
 
     iℏ ∂_t ψ = [-ℏ²∇²/2m + V_trap + g|ψ|² + Φ_dd(r,t) + γ_LHY|ψ|³] ψ
 
