@@ -46,7 +46,7 @@ pipeline:
       n_steps: 10000
       tol: 1.0e-7
       initial_state: polar
-      backend: cuda
+      backend: gpu
 
   - dynamics:
       duration: 5.0
@@ -56,7 +56,7 @@ pipeline:
         psi: true
         precision: "f32"
       interactions: {omega_ref: 691.15}
-      zeeman:
+      B:                                  # unified block; step-level `zeeman:` throws
         p_mv: {from: 2.5, to: 0.5}
         coil_mode: strong
         q: 0.1

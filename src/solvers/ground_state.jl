@@ -12,8 +12,27 @@ function _check_itp_overflow(ws, step::Int)
         )
     end
     ws.ddi === nothing && return nothing
-    bufs = ws.ddi_bufs
-    phi_max = max(maximum(abs, bufs.Phi_x), maximum(abs, bufs.Phi_y), maximum(abs, bufs.Phi_z))
+    # Read whichever buffers the ACTIVE path fills. Under `ddi_padding` — the
+    # YAML default — the propagator and `_grad_ddi!` write `ddi_padded.*_pad`
+    # and never touch `ws.ddi_bufs`, so this guard computed `phi_max` from a
+    # buffer that is still `_zeros` and was identically 0 on every padded run:
+    # the DDI-overflow check could not fire for the configuration that uses it.
+    # Measured 2026-08-07 at 8³: `max|ddi_bufs.Phi_x|` is 4.8e-3 unpadded and
+    # exactly 0.0 padded, with the gradient nonzero in both.
+    #
+    # Only the physical corner of the padded array is the field on our grid; the
+    # rest is the pad region.
+    phi_max = if ws.ddi_padded === nothing
+        bufs = ws.ddi_bufs
+        max(maximum(abs, bufs.Phi_x), maximum(abs, bufs.Phi_y), maximum(abs, bufs.Phi_z))
+    else
+        pad = ws.ddi_padded
+        n_pts = size(ws.state.psi)[1:(ndims(ws.state.psi) - 1)]
+        c = ntuple(d -> 1:n_pts[d], length(n_pts))
+        max(maximum(abs, view(pad.Phi_x_pad, c...)),
+            maximum(abs, view(pad.Phi_y_pad, c...)),
+            maximum(abs, view(pad.Phi_z_pad, c...)))
+    end
     dt = ws.sim_params.dt
     exponent = phi_max * dt / 2
     if exponent > _ITP_EXPONENT_LIMIT

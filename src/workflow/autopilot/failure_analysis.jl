@@ -85,7 +85,12 @@ function analyze_failure(entry::QueueEntry)
     end
 
     # 3. stderr.log tail — last 8 KB to find ERROR lines.
-    stderr_path = joinpath(entry.run_dir, "stderr.log")
+    # `.autopilot/` — where `LocalBackend` actually writes it
+    # (`backends.jl:140`). This read `run_dir/stderr.log` until 2026-08-07, a
+    # path nothing writes, so the stderr-tail arm never matched and every local
+    # failure fell through to the "no evidence" branch. Writer and reader naming
+    # the same file differently, for the third time today.
+    stderr_path = joinpath(entry.run_dir, ".autopilot", "stderr.log")
     if isfile(stderr_path)
         tail = _stderr_tail(stderr_path, 8 * 1024)
         if !isempty(tail)

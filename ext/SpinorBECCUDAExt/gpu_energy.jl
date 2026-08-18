@@ -114,8 +114,7 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     # dot(ψ,out). (A batched full-field FFT was measured ~9-19% WORSE on H100 —
     # the 436 MB copy + full-field broadcasts beat the per-component locality.)
     E_kin = 0.0
-    let fftb = ctx.fft_buf,
-        ksq = SpinorBEC._to_device(ws.backend, ws.grid.k_squared),
+    let fftb = ctx.fft_buf, ksq = SpinorBEC._to_device(ws.backend, ws.grid.k_squared),
         invn = 1.0 / prod(n_pts)
 
         for c in 1:n_comp
@@ -164,21 +163,58 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     E_c1 = 0.0
     if abs(ws.interactions[1]) > 1e-30
         accum_grad(c1_t)   # (re)computes ctx.fx/fy/fz = spin density
-        E_c1 = 0.5 * ws.interactions[1] *
-               (sum(abs2, ctx.fx) + sum(abs2, ctx.fy) + sum(abs2, ctx.fz)) * dV
+        E_c1 =
+            0.5 * ws.interactions[1] *
+            (sum(abs2, ctx.fx) + sum(abs2, ctx.fy) + sum(abs2, ctx.fz)) * dV
     end
+    # DDI energy, from whichever buffers the ACTIVE path fills.
+    #
+    # `ws.ddi_bufs` is written only on the UNPADDED path. Under `ddi_padding` —
+    # `DDI_PADDED_DEFAULT = true`, so the default for every `run_yaml` — both the
+    # propagator and `_grad_ddi!` write `ddi_padded.*_pad` and leave `ddi_bufs`
+    # at its `_zeros`. Measured on CPU 2026-08-07 at 8³: `max|ddi_bufs.Phi_x|`
+    # after a gradient call is 4.8e-3 unpadded and **exactly 0.0** padded, with
+    # the gradient nonzero in both.
+    #
+    # So this returned `E_ddi = 0.0` exactly on the fused path while the gradient
+    # from the same call carried the full padded DDI — and that call IS the
+    # L-BFGS objective (`solvers/lbfgs/energy_gradient.jl:92`). Line search and
+    # the relative-energy convergence test then ran on a functional the descent
+    # direction did not come from. On the energy-only path it instead ran the
+    # UNPADDED convolution, so `energy_decomposition` on GPU reported the
+    # periodic-image energy that padding exists to remove.
+    #
+    # Only the physical corner of a padded array is the field on our grid, and it
+    # must be taken as a Cartesian view: the first `prod(n_pts)` LINEAR elements
+    # walk into the pad region for ndim >= 2.
     E_ddi = 0.0
     if ws.ddi !== nothing
-        b = ws.ddi_bufs
+        pad = ws.ddi_padded
         if accumulate
-            accum_grad(ddi_t)   # _grad_ddi! fills b.F*_r + b.Phi_* and accumulates grad
-        else
+            accum_grad(ddi_t)   # fills whichever branch's buffers, and accumulates grad
+        elseif pad === nothing
+            b = ws.ddi_bufs
             SpinorBEC._compute_spin_density!(
                 b.Fx_r, b.Fy_r, b.Fz_r, psi, ws.spin_matrices, Val(n_comp), N, n_pts
             )
             SpinorBEC.compute_ddi_potential!(ws.ddi, b)
+        else
+            SpinorBEC._compute_and_convolve_ddi_padded!(
+                psi, ws.spin_matrices, ws.ddi, pad, Val(n_comp), N, n_pts
+            )
         end
-        E_ddi = 0.5 * sum(b.Phi_x .* b.Fx_r .+ b.Phi_y .* b.Fy_r .+ b.Phi_z .* b.Fz_r) * dV
+        E_ddi = if pad === nothing
+            b = ws.ddi_bufs
+            0.5 * sum(b.Phi_x .* b.Fx_r .+ b.Phi_y .* b.Fy_r .+ b.Phi_z .* b.Fz_r) * dV
+        else
+            c = ntuple(d -> 1:n_pts[d], Val(N))
+            0.5 *
+            sum(
+                view(pad.Phi_x_pad, c...) .* view(pad.Fx_pad, c...) .+
+                view(pad.Phi_y_pad, c...) .* view(pad.Fy_pad, c...) .+
+                view(pad.Phi_z_pad, c...) .* view(pad.Fz_pad, c...),
+            ) * dV
+        end
     end
     # LHY: energy via device mapreduce (kind-specific power); gradient via the
     # gated apply_operator! face (no FFT — a density-power broadcast).

@@ -98,7 +98,7 @@ edit any files when:
 - Profile shows no function ≥5% of time that isn't already in
   baseline.json (perf is exhausted — the loop should stop).
 - The next hot function is a known-limitations item from CLAUDE.md
-  (e.g., `_get_spinor`'s 352-byte alloc is documented and intentional).
+  (e.g. an allocation a measurement in CLAUDE.md declares intentional). **Do NOT bail on `_get_spinor` on that ground** — the 352-byte figure this line cited until 2026-08-06 was wrong; the `Val{D}` form allocates 0 in situ and the `n_comp::Int` overload costs ~1.6 kB/call at D=13, which is a real target.
 - You can't construct a meaningful @benchmarkable for the candidate
   (workspace setup is too tangled, requires GPU but bench infra is
   CPU-only, etc.).

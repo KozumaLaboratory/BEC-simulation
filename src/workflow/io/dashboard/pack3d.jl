@@ -166,14 +166,22 @@ end
 
 # --- Vector field (current / spin_density / velocity) binary API ---
 
-const _vector3d_plans_cache = Dict{NTuple{3, Int}, Tuple{FFTPlans, Grid{3}}}()
+# Keyed on (n_pts, box_size), NOT n_pts alone. The FFT plans depend only on the
+# point count, but the cached tuple also carries a `Grid{3}` built from
+# `box_size` — so two runs at the same resolution and different box sizes shared
+# the first one's grid, and `probability_current` used its k-vectors. The
+# current came out scaled by the box ratio, silently: the chart renders, the
+# magnitudes are wrong.
+const _vector3d_plans_cache = Dict{
+    Tuple{NTuple{3, Int}, NTuple{3, Float64}}, Tuple{FFTPlans, Grid{3}}
+}()
 
 """Compatibility shim: returns just the `box_size` tuple. Prefer
 `load_run_metadata(jld2_path).box_size` in new code."""
 _load_box_size(jld2_path::String) = load_run_metadata(jld2_path).box_size
 
 function _get_plans_and_grid(n_pts::NTuple{3, Int}, box_size::NTuple{3, Float64})
-    get!(_vector3d_plans_cache, n_pts) do
+    get!(_vector3d_plans_cache, (n_pts, box_size)) do
         grid = make_grid(GridConfig(n_pts, box_size))
         plans = make_fft_plans(n_pts; flags=FFTW.ESTIMATE)
         (plans, grid)

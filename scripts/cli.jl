@@ -121,8 +121,10 @@ end
 
 function _cmd_preflight(args)
     smoke = isempty(args) ? nothing : args[1]
-    cuda_preflight_check(; smoke_config=smoke)
-    return 0
+    # Propagate. This discarded the verdict and returned 0 until 2026-08-07, so
+    # `cli.jl preflight` exited green on a machine with no GPU — the caller threw
+    # away the only signal the check produced.
+    return cuda_preflight_check(; smoke_config=smoke) ? 0 : 1
 end
 
 # ── autopilot subcommand dispatcher ──────────────────────────────────
@@ -179,7 +181,10 @@ end
 
 function _ap_retry(rest)
     max_r = _kvi(rest, "max", 3)
-    out = retry_failed!(; max_retries=max_r)
+    # The config, so the backend is resolved per entry. Passing none meant every
+    # entry was interrogated as if it were local.
+    out = retry_failed!(; max_retries=max_r,
+        config=SpinorBEC.default_autopilot_config())
     println("retry: ", out)
     0
 end

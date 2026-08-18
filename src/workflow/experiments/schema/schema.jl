@@ -370,6 +370,11 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # different splitting, ~2.8× faster per step on H100 at 128³ × D=13.
     # See `_parse_spin_step` in pipeline/run_step_dynamics.jl.
     "spin_step" => FieldSpec(; type=String, enum=["sequential", "combined"]),
+    # Validated and DISCARDED on dynamics: `run_step_dynamics.jl:191` takes
+    # `ws_prev.backend`. Kept in the schema because `runner.jl` seeds
+    # `defaults.backend` into every step, so rejecting it would fail every
+    # config under `runs/`. It is not a per-step override; the reference table
+    # said it was until 2026-08-06.
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
     "absorbing_boundary" => FieldSpec(; type=Dict, schema=ABSORBING_SCHEMA),
@@ -381,6 +386,10 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "projected_gp" => FieldSpec(; type=Union{Dict, Bool}, schema=PROJECTED_GP_SCHEMA),
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}, schema=PHOTON_SCATTERING_SCHEMA),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}, schema=LOSS_SCHEMA),
+    # KEPT so `inspect_config` does not report this as a typo — but the key is
+    # REFUSED at step construction by `_reject_inert_dynamics_keys`. Nothing
+    # under src/workflow constructs `AdaptiveDtParams`; adaptive stepping is a
+    # Julia-API path only, and this block was validated and discarded.
     "adaptive_dt" => FieldSpec(; type=Dict, schema=ADAPTIVE_DT_SCHEMA),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
@@ -627,7 +636,14 @@ function _validate_ground_state_physics!(step_params::Dict, path::String,
         elseif kind == "icosahedral" && F != 6
             msg = "$path.lhy.kind = icosahedral is F=6 specific (I_h symmetry); got F=$F."
             strict ? throw(ArgumentError(msg)) : @warn msg
-        elseif kind == "full_bdg" && init in ("polar", "ferromagnetic")
+            # `ferromagnetic` was retired from the `initial_state` enum in favour of
+            # `m_plus_F` / `m_minus_F`, and this condition was never updated — so from
+            # that day until 2026-08-06 the advisory was a FALSE NEGATIVE on exactly
+            # the configs it exists for: `runs/eu_lhy_longtime/LHY_full_bdg_*.yaml`
+            # and friends paid the ~100x BdG cost with no hint that a closed form
+            # agrees to ~1e-4. Gated by
+            # `test/workflow/test_full_bdg_advisory_fires.jl`.
+        elseif kind == "full_bdg" && init in ("polar", "m_plus_F", "m_minus_F")
             @info "$path.lhy.kind = full_bdg is the general-spinor BdG path; for the " *
                 "$init ansatz the closed form is ~100× cheaper and agrees to ~1e-4 " *
                 "(gated by test/oracles/test_lhy_full_bdg_closed_form_parity.jl). " *

@@ -37,9 +37,23 @@ const UGE_PROFILE_DIRECTIVES = Dict{String, Vector{String}}(
     "long_q" => ["-l node_q=1", "-l h_rt=72:00:00"],
 )
 
-# Escalation for retry.jl when a RESOURCE_PERMANENT failure (OOM / timeout)
-# is classified. Goes wider on memory/CPU (node_q → node_h → node_f) then
-# stops. `nothing` = no escalation, retry policy gives up.
+# Escalation for retry.jl when a RESOURCE_PERMANENT failure (OOM / timeout) is
+# classified.
+#
+# **READ THIS BEFORE ASSUMING IT FIXES AN OOM.** These steps buy WALLTIME and
+# CPU, not VRAM. `node_h` is two H100s and `node_f` is four, and this codebase is
+# single-device — `grep -riE "multi.?gpu|CUDA.device!|device_id" src ext` returns
+# nothing — so a job that exhausted one 80 GB card exhausts exactly the same card
+# on the wider profile, and does it at 2x then 4x the billing rate before the
+# ladder gives up.
+#
+# So the ladder is right for a TIMEOUT (12h → 24h → 72h via `long_q`) and cannot
+# help an OOM. `classify_failure` returns RESOURCE_PERMANENT for both causes and
+# does not distinguish them; `_escalation_can_help` below says so at the point of
+# use rather than letting the operator infer it from a bill. Fixing an OOM means
+# a smaller grid, `dtype: f32`, or fewer saved snapshots — not a bigger profile.
+#
+# `nothing` = no escalation, retry policy gives up.
 const UGE_PROFILE_ESCALATION = Dict{String, Union{Nothing, String}}(
     "default" => "node_h",
     "node_h" => "node_f",
@@ -47,6 +61,17 @@ const UGE_PROFILE_ESCALATION = Dict{String, Union{Nothing, String}}(
     "gpu_1" => "default",
     "long_q" => nothing,
 )
+
+"""
+    _escalation_can_help(cause::Symbol) -> Bool
+
+Whether moving up `UGE_PROFILE_ESCALATION` can plausibly fix `cause`.
+
+`:timeout` yes — every step raises `h_rt`. `:oom` no — every step adds GPUs, and
+nothing in this codebase uses more than one. Separated so the useless case is
+stated where the decision is made instead of discovered on an invoice.
+"""
+_escalation_can_help(cause::Symbol) = cause !== :oom
 
 # ── struct + constructor ─────────────────────────────────────────────
 

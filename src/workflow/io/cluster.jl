@@ -61,10 +61,33 @@ function cuda_preflight_check(;
     io::IO=stdout,
 )
     report_cuda_state(io)
+
+    # A CHECK THAT CANNOT FAIL IS NOT A CHECK. This returned `true`
+    # unconditionally and printed "preflight passed" until 2026-08-07 — including
+    # on a machine with no GPU at all, because `report_cuda_state` prints "CUDA
+    # not loaded" and returns `nothing`. `_cmd_preflight` then discarded the
+    # value and exited 0, so `cli.jl preflight` was a green light with no red
+    # available, immediately before a paid GPU submission.
+    lines = cuda_state_lines()
+    cuda_live = !any(l -> occursin("not loaded", l), lines)
+    if !cuda_live
+        println(io, "\n❌ preflight FAILED: the CUDA extension is not active.")
+        println(io, "   `using CUDA` must come before `using SpinorBEC`, and on WSL2")
+        println(io, "   LD_LIBRARY_PATH=/usr/lib/wsl/lib is required.")
+        return false
+    end
+
     if smoke_config !== nothing
         println(io, "\n--- Smoke test: $smoke_config ---")
         config = load_config(String(smoke_config))
-        @time run_config(config; verbose=false)
+        try
+            @time run_config(config; verbose=false)
+        catch err
+            # A smoke test whose failure does not reach the caller is decoration.
+            println(io, "\n❌ preflight FAILED: smoke config threw ",
+                typeof(err).name.name)
+            return false
+        end
         println(io, "✅ smoke test passed")
     end
     println(io, "\n✅ preflight passed")

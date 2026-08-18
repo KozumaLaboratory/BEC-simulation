@@ -16,6 +16,10 @@ const FAST_TESTS = [
     "test_tier_membership.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    "test_calibrated_scan.jl",
+    "test_docs_examples_avoid_removed_keys.jl",
+    "test_state_doc_is_current.jl",
+    "test_claude_md_citations_resolve.jl",
     # A3:R-DOC-01 asked for a CHECK; the design docs must stay terminal-readable.
     "test_design_docs_have_no_latex.jl",
     "test_level1_scalar_exact.jl",
@@ -65,6 +69,19 @@ const FAST_TESTS = [
     # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
     # OOM-is-permanent, and the on_complete lineage bound.
     "workflow/test_autopilot_invariants.jl",
+    "workflow/test_profile_vram_uses_the_registry.jl",
+    "workflow/test_docs_teach_real_analyzers.jl",
+    "workflow/test_full_bdg_advisory_fires.jl",
+    "workflow/test_no_second_atom_F_table.jl",
+    "workflow/test_every_dynamics_path_reports_liveness.jl",
+    "workflow/test_oom_reaches_resource_permanent.jl",
+    "workflow/test_preflight_can_fail.jl",
+    "workflow/test_slack_alerts_report_delivery.jl",
+    "workflow/test_inert_dynamics_keys_are_refused.jl",
+    "hamiltonian/test_absorbing_boundary_honours_the_step.jl",
+    "workflow/test_plan_cache_is_keyed_on_the_box.jl",
+    "workflow/test_failure_evidence_reaches_the_reader.jl",
+    "workflow/test_dashboard_does_not_invent_a_time_axis.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
     "workflow/test_pipeline_name_and_precedence.jl",
@@ -258,6 +275,7 @@ const FAST_TESTS = [
     "hamiltonian/test_singlet_pair.jl",
     "hamiltonian/test_batched_kinetic.jl",
     "hamiltonian/test_ddi_padded.jl",
+    "hamiltonian/test_ddi_bufs_are_empty_when_padded.jl",
     # energy and gradient must come from the SAME DDI kernel; test_ddi_padded.jl
     # never calls either face
     "hamiltonian/test_ddi_gradient_padding_parity.jl",
@@ -465,6 +483,7 @@ const CI_EXTRA = [
     # Each test runs in seconds; CI tier inclusion gates the bug class
     # documented in `docs/conventions/sign_bug_proof_architecture.md`.
     "oracles/test_hamiltonian_sign_oracles.jl",
+    "oracles/test_bfield_sign_declared_once.jl",
     "oracles/test_hamiltonian_hermiticity.jl",
     "oracles/test_kinetic_trap_analytic.jl",
     "oracles/test_zeeman_diagonal_analytic.jl",
@@ -761,6 +780,8 @@ const FULL_EXTRA = [
     "rotating_basis/test_scalar_egpe_smoke.jl",
     # Round-1..3 regression pins
     "rotating_basis/test_rotating_frame_regression.jl",
+    "rotating_basis/test_transverse_spin_is_measured.jl",
+    "rotating_basis/test_dt_matches_the_integrator_that_runs.jl",
     "analysis/test_bogoliubov_goldstone.jl",
     "dynamics/test_sgpe_fdr.jl",
     "dynamics/test_sgpe_stoof.jl",
