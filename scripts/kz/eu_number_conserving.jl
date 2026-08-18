@@ -63,7 +63,8 @@ everything else is measured from the field.
 function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_nT::Float64=3.0, seed::Int=9001, dt::Float64=0.02,
     t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend(),
-    number_damping::Bool=true, energy_damping::Bool=true)
+    number_damping::Bool=true, energy_damping::Bool=true,
+    gamma_mult::Float64=1.0)
     traj = zero_d_trajectory(; K3)
     r = traj.r
     # Internal units: the 0-D model is in SI, the field is in units of omega_ref.
@@ -176,8 +177,8 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     cb = number_conserving_callback(mu_ref, N_of, T_of, eps_cut_of; every=25,
         counter=bad, t_offset=t0_int, c0_lda=c0_field)
     res = SPGPEReservoir(; T=FunctionWaveform(T_of), mu=FeedbackWaveform(mu_ref),
-        a_s=0.007, k_cut=k_cut_wave, gamma=NaN, M=NaN,         # rates DERIVED
-        number_damping, energy_damping)
+        a_s=0.007 * gamma_mult, k_cut=k_cut_wave, gamma=NaN, M=NaN,  # DERIVED
+        number_damping, energy_damping, allow_unphysical_rates=(gamma_mult != 1.0))
 
     dV = cell_volume(grid)
     n_steps = round(Int, t_frac * (t_int[end] - t0_int) / dt)
@@ -215,6 +216,34 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if mode == "smoke"
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
+
+    elseif mode == "gammascan"
+        # Is N_0 = 0 a finite-gamma LAG or a defect?
+        #
+        # Growth alone GROWS the field — N_C rises 1716 -> 3110 — so atoms arrive. What
+        # does not happen is condensation: N_0 stays at 0.004 while mu sits at 5.3-7.4
+        # against eps_0 = 1.5, where Thomas-Fermi says a condensate should exist. The
+        # N_0 estimator is not the suspect; it returns 1.00000 on a known TF state
+        # (scripts/kz/n0_estimator_check.jl).
+        #
+        # The discriminator is gamma. If a larger gamma condenses, the zero is the lag
+        # this run exists to measure — the reservoir simply has not had time to build
+        # coherence. If it does not condense at any gamma, the zero is a defect. This is
+        # the same positive-control shape as the KZ gamma x3 invariance check, and gamma
+        # is raised through a_s since the rates are DERIVED and pinning them is what the
+        # unphysical-rate gate refuses.
+        for gm in (1.0, 3.0, 10.0, 30.0)
+            @printf("\n########## gamma multiplier %.0fx (growth only) ##########\n", gm)
+            o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=0.25, t_start_s=1.73,
+                number_damping=true, energy_damping=false, gamma_mult=gm)
+            h = isempty(o.hist) ? nothing : o.hist[end]
+            if h !== nothing
+                g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02, eps_cut=1.5 + 3 * h.T)
+                @printf("  END  N_C=%.4g  field N0=%.4g  equilibrium N0=%.4g  ratio=%.5f\n",
+                    h.N_C, h.N0, g.N0, h.N0 / max(g.N0, 1))
+            end
+            flush(stdout)
+        end
 
     elseif mode == "which"
         # The field EMPTIES where it should grow: seeded at 1716, N_C falls monotonically
