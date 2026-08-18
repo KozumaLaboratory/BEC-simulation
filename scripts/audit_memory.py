@@ -335,11 +335,23 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]|\]\(([A-Za-z0-9_\-]+)\.md\)")
 
 
 def link_targets(text):
-    """Every stem this text points at, in EITHER link form."""
+    """Every stem this text points at, in EITHER link form.
+
+    BOTH the raw stem and its underscored form are yielded. The `-` -> `_` fold
+    is there so a `[[kebab-case]]` wikilink resolves to an underscored file, but
+    applied alone it also mangles hyphens that are part of the real filename:
+    `gotcha_..._at_1e-4_of_the_field` folded to `..._at_1e_4_...`, matched
+    nothing, and the memory was reported as reachable from nothing while its
+    index line sat right there. Found 2026-08-19 on a freshly written memory —
+    i.e. the scan reported a false orphan, which is the one failure mode a
+    reachability check must not have.
+    """
     for wiki, md in _LINK.findall(prose(text)):
         raw = wiki or md
         key = raw[:-3] if raw.endswith(".md") else raw
-        yield key.replace("-", "_")
+        yield key
+        if "-" in key:
+            yield key.replace("-", "_")
 
 
 def reachable(texts, roots):
