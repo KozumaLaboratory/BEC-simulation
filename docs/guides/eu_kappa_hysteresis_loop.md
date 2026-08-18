@@ -254,6 +254,12 @@ branch separation — while the κ = 0.9 legs relax toward their single branch a
 ramp slows (departure 1.88 → 0.60 on the rising leg). The κ = 1.8 state leaves its
 branch entirely and lands on neither.
 
+![order parameter vs field, both legs over one window, with the static branches](figures/eu335_hysteresis.png)
+
+The grey curve is the static branches; the blue ones are the ramps. Neither leg goes
+anywhere near the branch it is nominally following, and the annotation is the
+extractor's own refusal to report a width.
+
 **Why: a B_z ramp conserves J_z, and the two branches are in different J_z sectors
 at every field.** The static branches are found by energy minimisation, which does
 not conserve J_z, and along them J_z varies strongly:
@@ -422,7 +428,7 @@ faster rate. At that duration the pin has had long enough to break the axial sym
 appreciably, so it is the least clean arm and the quoted ranges would tighten to
 6 vs 2–3 without it. Both readings are given rather than the flattering one.
 
-![Stern-Gerlach readout at two trap aspect ratios](../../figs/eu335/eu335_sg_kappa_contrast.png)
+![Stern-Gerlach readout at two trap aspect ratios](figures/eu335_sg_kappa_contrast.png)
 
 This is what the experiment should be handed, and it is preferable to a loop width
 for a reason that is not presentational. A level count is **discrete**: no error
