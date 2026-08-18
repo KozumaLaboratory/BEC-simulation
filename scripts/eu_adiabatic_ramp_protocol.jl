@@ -36,9 +36,21 @@
 # Env:
 #   AR_KAPPA=1.8            trap oblateness ω_z/ω_⊥ (library key)
 #   AR_TAUS=3,10,30,100     ramp durations [ω_ref⁻¹]  (1 ω_ref⁻¹ = 1.447 ms)
+#   AR_RATES=               |dB/dt| [µG/ms]; sets τ per leg from ITS OWN span, so
+#                           the rate axis is not confounded by the window width.
+#                           Overrides AR_TAUS when set. Prefer this whenever the
+#                           two legs are compared: at fixed τ a wider window is a
+#                           faster ramp, and loop width grows with ramp speed, so
+#                           a τ-indexed scan over an asymmetric window compares
+#                           two different rates and calls the difference physics.
 #   AR_B_LO=20  AR_B_HI=100 ramp endpoints [µG]
 #   AR_SEED_RISE_B=         seed field for the flower leg  (default: max B on "up")
 #   AR_SEED_FALL_B=         seed field for the polar leg   (default: max B on "dn")
+#   AR_SEED_RISE_FILE=      explicit seed jld2 for the flower leg (bypasses the
+#   AR_SEED_FALL_FILE=      library index). Use when the seeds were converged at
+#                           a pin ε the merged library does not carry — the pin
+#                           must be ONE value across both legs and both κ, or the
+#                           loop is being attributed to κ while ε also moved.
 #   AR_LEGS=rise,fall       which legs to run
 #   AR_DT=0.002  AR_FRAMES=200
 #   AR_LIB=figs/eu_gs_library   AR_OUT=figs/eu_adiabatic_ramp
@@ -55,17 +67,38 @@ using SpinorBEC: Units, eu151_preset, SpinSystem, make_workspace, SimParams,
     _spin_expectation_fields, cell_volume, component_populations, total_energy,
     total_norm, magnetization, orbital_angular_momentum,
     CUDABackend, CPUBackend
-using DelimitedFiles: writedlm
+using DelimitedFiles: writedlm, readdlm
 using JLD2: jldsave, jldopen
 using Printf
 
 include(joinpath(@__DIR__, "eu_gs_library.jl"))     # load_lib
 
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
+
+"""Parse a list-valued env var, and REFUSE a silent truncation.
+
+UGE's `qsub -v` separates variables with commas, so a comma inside a value ends
+it: `-v AR_RATES=40,12,4` sets AR_RATES=40 and then creates variables named `12`
+and `4`. That is not a hypothetical — it cost this campaign a full rate scan that
+came back looking like a clean single-rate run. Semicolons are accepted for that
+reason, and `<name>_N` states how many entries the caller meant, so a truncation
+becomes an error instead of a plausible answer."""
+function getlist(k, default)
+    s = get(ENV, k, default)
+    v = isempty(strip(s)) ? Float64[] : parse.(Float64, split(s, r"[,;]"))
+    n = get(ENV, k * "_N", "")
+    isempty(n) || length(v) == parse(Int, n) || error("""
+        $k parsed $(length(v)) entries but $(k)_N says $n: $(repr(s)).
+        A list passed through `qsub -v` is cut at the first comma — use `;`.""")
+    v
+end
 const SMOKE = get(ENV, "AR_SMOKE", "") == "1"
 const KAPPA = getf("AR_KAPPA", 1.8)
-const TAUS = SMOKE ? [1.0] :
-             sort(parse.(Float64, split(get(ENV, "AR_TAUS", "3,10,30,100"), ",")))
+const TAUS = SMOKE ? [1.0] : sort(getlist("AR_TAUS", "3,10,30,100"))
+# |dB/dt| in µG/ms. Non-empty ⇒ each leg derives its own τ from its own span, so
+# both legs of one loop are ramped at the SAME field rate even when the window is
+# traversed in opposite directions from different seed fields.
+const RATES = SMOKE ? Float64[] : sort(getlist("AR_RATES", ""); rev=true)
 const B_LO = getf("AR_B_LO", 20.0)
 const B_HI = getf("AR_B_HI", 100.0)
 const LEGS = split(get(ENV, "AR_LEGS", "rise,fall"), ",")
@@ -106,13 +139,32 @@ p_of(B_uG) = Units.bfield_to_p(B_uG * 1e-6, ATOM.g_F, ΩREF)
 seed one epoch's state into another epoch's Hamiltonian: the seed would not be
 stationary and the whole rate scan would be measuring that transient instead of
 the ramp. Also returns the pin ε the seed was converged with."""
-function seed(branch, B_uG)
-    e = load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
-    abs(e.meta.B - B_uG) < 0.5 ||
-        @warn "requested seed B=$B_uG µG; nearest library state is $(e.meta.B) µG"
+function seed(branch, B_uG; file="")
+    e = if isempty(file)
+        x = load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB)
+        abs(x.meta.B - B_uG) < 0.5 ||
+            @warn "requested seed B=$B_uG µG; nearest library state is $(x.meta.B) µG"
+        x
+    else
+        isfile(file) || error("seed file $file does not exist")
+        jldopen(file, "r") do f
+            g(k, d) = haskey(f, k) ? f[k] : d
+            (; psi=Array{ComplexF64}(f["psi"]),
+                meta=(; B=g("B_uG", B_uG), path=file,
+                    E=g("E_total", g("E", NaN)), grad=g("grad_norm", NaN)))
+        end
+    end
     m = jldopen(e.meta.path, "r") do f
+        g(k, d) = haskey(f, k) ? f[k] : d
+        # `pin_bx` is the continuation driver's name, `pin_eps` the reference
+        # solver's, for the same ε. Neither may default: a missing pin silently
+        # becoming 0 would unpin the Goldstone and the seed would not be
+        # stationary at t=0, which is the transient the whole rate scan would
+        # then be measuring.
+        pin = g("pin_bx", g("pin_eps", nothing))
+        pin === nothing && error("seed $(e.meta.path) records no pin (pin_bx / pin_eps)")
         (; c0=f["c0"], c1=f["c1"], c_dd=f["c_dd"], p=f["zeeman_p"],
-            pin=f["pin_bx"], box=f["grid_box_size"], n=f["grid_n_points"])
+            pin=pin, box=f["grid_box_size"], n=f["grid_n_points"])
     end
     for (name, got, want, tol) in (
         ("c0", m.c0, PRESET.interactions.c[0], 1e-8),
@@ -133,6 +185,20 @@ function seed(branch, B_uG)
         branch, e.meta.B, e.meta.E, e.meta.grad, m.pin, e.meta.path)
     (; psi=e.psi, B=e.meta.B, E=e.meta.E, grad=e.meta.grad, path=e.meta.path,
         pin=m.pin, c0_ref=m.c0, c1_ref=m.c1)
+end
+
+"""The pin ε a seed was converged with, read WITHOUT loading ψ (used to fill the
+manifest row of a cached arm; a NaN there would be an unknown masquerading as a
+number in the one column that says which Hamiltonian was ramped)."""
+function seed_pin(branch, B_uG; file="")
+    path = isempty(file) ?
+           load_lib(; κ=KAPPA, B_uG, branch=String(branch), grid=GRID_N, lib=LIB).meta.path :
+           file
+    jldopen(path, "r") do f
+        haskey(f, "pin_bx") ? f["pin_bx"] :
+        haskey(f, "pin_eps") ? f["pin_eps"] :
+        error("seed $path records no pin (pin_bx / pin_eps)")
+    end
 end
 
 """Extreme converged field on one branch (`which` = :max or :min)."""
@@ -180,8 +246,8 @@ end
 
 """One ramp: `B_start → B_end` over `τ` (ω_ref units), seeded from `branch`.
 Returns the recorded trajectory."""
-function run_ramp(; branch, B_seed, B_end, τ, tag)
-    s = seed(branch, B_seed)
+function run_ramp(; branch, B_seed, B_end, τ, tag, seed_file="")
+    s = seed(branch, B_seed; file=seed_file)
     ε = s.pin
     n_steps = max(1, ceil(Int, τ / DT))
     save_every = max(1, n_steps ÷ FRAMES)
@@ -204,6 +270,9 @@ function run_ramp(; branch, B_seed, B_end, τ, tag)
     flush(stdout)
 
     rows = Any[]
+    # `B_at` reconstructs the ramp's field from the recorded time rather than
+    # reading the waveform, so a change to the waveform and a change here can
+    # disagree — keep it linear-in-t to match `RampWaveform(..., :linear)`.
     B_at(t) = s.B + (B_end - s.B) * clamp(t / τ, 0.0, 1.0)
     record!(step) = begin
         f = frame_scalars(ws)
@@ -234,7 +303,7 @@ function run_ramp(; branch, B_seed, B_end, τ, tag)
     end
 
     # trajectory CSV (scalars) + per-frame populations CSV
-    base = joinpath(OUT, @sprintf("%s_tau%g", tag, τ))
+    base = joinpath(OUT, tag)
     scalar_keys = (:step, :t, :t_ms, :B_uG, :fz, :fperp, :Lz, :Sz, :Jz, :E, :norm)
     open(base * ".csv", "w") do io
         writedlm(io, reshape(String.(collect(scalar_keys)), 1, :))
@@ -265,31 +334,125 @@ end
 
 @printf("Eu adiabatic ramp protocol: κ=%.2f  grid=%d³ box=%.1f  %s%s\n",
     KAPPA, GRID_N, BOX, HAS_GPU ? "CUDA" : "CPU", SMOKE ? "  [SMOKE]" : "")
-@printf("τ grid: %s ω_ref⁻¹ = %s ms\n",
-    join(TAUS, ", "), join(round.(TAUS .* MS_PER_TAU; digits=2), ", "))
+
+# A seed is stationary only at ITS OWN field, so an explicit seed file DICTATES
+# where its leg starts. Assert that field is the window end the leg is supposed to
+# start from: handing the fall leg a 100 µG seed while declaring the window top as
+# 200 leaves the two legs spanning different windows, which is the exact defect
+# this campaign exists to remove — and it would show up only as a suspiciously
+# narrow loop.
+function seed_start(file, B_want, branch)
+    isempty(file) && return getf(
+        branch == "up" ? "AR_SEED_RISE_B" : "AR_SEED_FALL_B",
+        branch_edge(branch, :max))
+    isfile(file) || error("seed file $file does not exist")
+    B = jldopen(file, "r") do f
+        haskey(f, "B_uG") ? Float64(f["B_uG"]) :
+        error("seed $file records no B_uG, so its ramp start is unknown")
+    end
+    tol = getf("AR_SEED_B_TOL", 0.5)
+    abs(B - B_want) < tol || error("""
+        seed file is at B=$B µG but this leg must start at $B_want µG (the window
+        end), so the two legs would not span one field window.
+          seed = $file
+        Set AR_SEED_B_TOL to widen, or AR_B_LO/AR_B_HI to match the seeds.""")
+    B
+end
 
 legs = Any[]
 for leg in LEGS
     if leg == "rise"          # flower, metastable ABOVE B_eq → ramp up
-        B_seed = getf("AR_SEED_RISE_B", branch_edge("up", :max))
-        push!(legs, (; tag="rise", branch="up", B_seed, B_end=B_HI))
+        f = get(ENV, "AR_SEED_RISE_FILE", "")
+        push!(legs, (; tag="rise", branch="up", B_seed=seed_start(f, B_LO, "up"),
+            B_end=B_HI, file=f))
     elseif leg == "fall"      # polarised, metastable BELOW B_eq → ramp down
-        B_seed = getf("AR_SEED_FALL_B", branch_edge("dn", :max))
-        push!(legs, (; tag="fall", branch="dn", B_seed, B_end=B_LO))
+        f = get(ENV, "AR_SEED_FALL_FILE", "")
+        push!(legs, (; tag="fall", branch="dn", B_seed=seed_start(f, B_HI, "dn"),
+            B_end=B_LO, file=f))
     else
         error("unknown leg '$leg' (expected rise / fall)")
     end
 end
 
+# One job per (rate, leg) or (τ, leg). With AR_RATES the two legs of a loop get
+# DIFFERENT τ — whatever each needs to cross its own span at the same |dB/dt| —
+# and the pairing key for the analysis is the rate, so the label carries it.
+jobs = Any[]
+if isempty(RATES)
+    @printf("τ grid: %s ω_ref⁻¹ = %s ms\n",
+        join(TAUS, ", "), join(round.(TAUS .* MS_PER_TAU; digits=2), ", "))
+    for τ in TAUS, L in legs
+        push!(jobs, (; L..., τ, rate=abs(L.B_end - L.B_seed) / (τ * MS_PER_TAU),
+            label=@sprintf("%s_tau%g", L.tag, τ)))
+    end
+else
+    @printf("rate grid: %s µG/ms\n", join(RATES, ", "))
+    for R in RATES, L in legs
+        τ = abs(L.B_end - L.B_seed) / (R * MS_PER_TAU)
+        push!(jobs, (; L..., τ, rate=R,
+            label=@sprintf("%s_rate%g", L.tag, R)))
+    end
+end
+
+# One manifest file PER LEG, not one per directory. The legs of a loop are
+# submitted as separate jobs writing into the same output dir, and each rewrites
+# its manifest whole from its own rows — so a single `manifest.csv` means whichever
+# job finished last silently deleted the other leg's rows. Readers glob
+# `manifest*.csv`.
+const MANIFEST = joinpath(OUT, "manifest_" * join(sort(collect(LEGS)), "_") * ".csv")
+
 manifest = Any[]
-for τ in TAUS, L in legs
+write_manifest() = isempty(manifest) ? nothing : open(MANIFEST, "w") do io
+    ks = collect(keys(manifest[1]))
+    writedlm(io, reshape(String.(ks), 1, :))
+    for m in manifest
+        writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))
+    end
+end
+
+for J in jobs
     println()
-    r = run_ramp(; branch=L.branch, B_seed=L.B_seed, B_end=L.B_end, τ, tag=L.tag)
+    τ = J.τ
+    # Resume: the slowest arm of a rate scan is hours, and a wall-clock kill part
+    # way through must not cost the arms that already finished. A run is complete
+    # iff BOTH its CSVs exist (the pops file is written second).
+    base = joinpath(OUT, J.label)
+    if isfile(base * ".csv") && isfile(base * "_pops.csv") &&
+       get(ENV, "AR_FORCE", "0") != "1"
+        # Rebuild the manifest row FROM the cached trajectory rather than from the
+        # previous manifest.csv: the manifest is rewritten whole each iteration,
+        # so a skipped arm that contributed no row would be silently dropped from
+        # the file — a resumed job would then report a rate scan missing exactly
+        # the arms that had already succeeded.
+        d = readdlm(base * ".csv", '\t'; header=true)
+        A, h = d[1], vec(d[2])
+        ci = Dict(strip(String(x)) => i for (i, x) in enumerate(h))
+        gv(r, k) = Float64(A[r, ci[k]])
+        n = size(A, 1)
+        push!(manifest,
+            (; kappa=KAPPA, grid=GRID_N, tag=J.tag, label=J.label, branch=J.branch,
+                rate_uG_per_ms=J.rate, tau=τ, tau_ms=τ * MS_PER_TAU,
+                B_seed=gv(1, "B_uG"), B_end=J.B_end,
+                pin=seed_pin(J.branch, J.B_seed; file=J.file),
+                fperp_start=gv(1, "fperp"), fperp_end=gv(n, "fperp"),
+                fz_start=gv(1, "fz"), fz_end=gv(n, "fz"),
+                Lz_end=gv(n, "Lz"), Jz_end=gv(n, "Jz"),
+                Jz_drift=gv(n, "Jz") - gv(1, "Jz"),
+                E_end=gv(n, "E"), norm_drift=gv(n, "norm") - gv(1, "norm"),
+                n_frames=n, wall_s=NaN))
+        @printf("SKIP %s (cached, %d frames; AR_FORCE=1 to redo)\n", J.label, n)
+        flush(stdout)
+        write_manifest()
+        continue
+    end
+    r = run_ramp(; branch=J.branch, B_seed=J.B_seed, B_end=J.B_end, τ,
+        tag=J.label, seed_file=J.file)
     last = r.rows[end]
     first_ = r.rows[1]
     push!(
         manifest,
-        (; kappa=KAPPA, tag=r.tag, branch=r.branch, tau=τ,
+        (; kappa=KAPPA, grid=GRID_N, tag=J.tag, label=J.label, branch=r.branch,
+            rate_uG_per_ms=J.rate, tau=τ,
             tau_ms=τ * MS_PER_TAU, B_seed=r.B_seed, B_end=r.B_end, pin=r.ε,
             fperp_start=first_.fperp, fperp_end=last.fperp,
             fz_start=first_.fz, fz_end=last.fz,
@@ -302,16 +465,10 @@ for τ in TAUS, L in legs
         last.Jz - first_.Jz, last.norm - first_.norm, r.wall_s)
     flush(stdout)
 
-    ks = collect(keys(manifest[1]))
-    open(joinpath(OUT, "manifest.csv"), "w") do io
-        writedlm(io, reshape(String.(ks), 1, :))
-        for m in manifest
-            writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))
-        end
-    end
+    write_manifest()
 end
 
-println("\nwrote $(OUT)/manifest.csv + per-run trajectory/population CSVs")
+println("\nwrote $MANIFEST + per-run trajectory/population CSVs")
 println("""
 Loop width from these runs: for each τ, the field at which ⟨F⊥⟩ jumps on the
 `rise` leg minus the field at which it jumps on `fall`. Saturating with τ ⇒
