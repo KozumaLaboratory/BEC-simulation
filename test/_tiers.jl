@@ -493,6 +493,7 @@ const CI_EXTRA = [
     "oracles/test_spin_operator_algebra.jl",
     "oracles/test_energy_operator_identity.jl",
     "oracles/test_ddi_uniform_zero.jl",
+    "oracles/test_flux_closure_ddi_identity.jl",
     "oracles/test_contact_meanfield_analytic.jl",
     "oracles/test_strang_energy_conservation.jl",
     "oracles/test_parity_symmetry.jl",
