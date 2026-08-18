@@ -16,7 +16,8 @@
 # report, docs figure builders, cli_main).
 
 using Test
-using SpinorBEC   # parallel-runner contract: every test file loads the package
+# parallel-runner contract: every test file loads the package (plain form)
+using SpinorBEC
 
 const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
