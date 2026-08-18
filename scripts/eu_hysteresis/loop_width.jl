@@ -221,8 +221,49 @@ function manifest_rows(dir)
     rows
 end
 
+"""Static branch tables per κ, from the branch-continuation `frames.csv` files.
+
+Cells whose order parameter was still moving under a stronger polish, or whose
+L-BFGS ran out of steps while still descending, are dropped: neither can say where
+a branch is."""
+function load_branches(root)
+    out = Dict{Float64, Vector{NamedTuple{(:B, :f), Tuple{Vector{Float64}, Vector{Float64}}}}}()
+    isdir(root) || return out
+    for (d, _, fs) in walkdir(root), f in fs
+        f == "frames.csv" || continue
+        m = match(r"branch_k([0-9.]+)_", d)
+        m === nothing && continue
+        κ = parse(Float64, m.captures[1])
+        A, ci = read_tsv(joinpath(d, f))
+        keep = [r for r in 1:size(A, 1) if
+                (!haskey(ci, "dfperp_polish") || !(abs(Float64(A[r, ci["dfperp_polish"]])) > 0.02)) &&
+                (!haskey(ci, "stop_reason") || strip(String(A[r, ci["stop_reason"]])) != "max_steps")]
+        isempty(keep) && continue
+        B = Float64[A[r, ci["B_uG"]] for r in keep]
+        f_ = Float64[A[r, ci["fperp"]] for r in keep]
+        o = sortperm(B)
+        push!(get!(out, κ, []), (; B=B[o], f=f_[o]))
+    end
+    out
+end
+
+"""⟨F⊥⟩ of a static branch at field B, or NaN outside its converged extent —
+never extrapolated. A branch that has ended has no value there, and inventing one
+is how a spinodal gets read as a smooth continuation."""
+function branch_at(t, B)
+    (B < first(t.B) || B > last(t.B)) && return NaN
+    Float64(_interp(t.B, t.f, B))
+end
+_interp(x, y, q) = begin
+    i = searchsortedfirst(x, q)
+    i <= 1 && return y[1]
+    i > length(x) && return y[end]
+    x[i] == q ? y[i] :
+    y[i - 1] + (y[i] - y[i - 1]) * (q - x[i - 1]) / (x[i] - x[i - 1])
+end
+
 """Per-leg analysis of every arm in `dir`."""
-function analyse_dir(dir; window, depth_min)
+function analyse_dir(dir; window, depth_min, branches=Dict())
     out = NamedTuple[]
     for m in manifest_rows(dir)
         label = String(m.label)
@@ -236,13 +277,33 @@ function analyse_dir(dir; window, depth_min)
         # branch can only convert INTO the flower (⟨F⊥⟩ rises).
         expect = tag == "rise" ? -1 : +1
         c = conversion(B, f; window, expect)
-        push!(out, (; dir, kappa=Float64(m.kappa), grid=Int(m.grid), tag, label,
+        # Departure from the branch the leg STARTED on, at the field it ended at.
+        # This is the criterion #335 actually states — "a branch conversion moves
+        # ⟨F⊥⟩ by ≈2, canting along one branch by ≤1" — and it is not the same
+        # question as the localised-jump depth above. A leg can leave its branch
+        # completely without ever jumping: the κ=1.8 falling leg runs 1.31 → 2.80
+        # while its branch runs 1.31 → 0.07, a departure of 2.73 spread over 70 µG
+        # with no feature wider than 0.26 in any 8 µG window. Reporting only the
+        # jump would have called that "no conversion", which is false.
+        κ = Float64(m.kappa)
+        ts = get(branches, κ, [])
+        vals = sort([(mean_f=sum(t.f) / length(t.f), v=branch_at(t, B[end])) for t in ts];
+            by=x -> x.mean_f)
+        lo = isempty(vals) ? NaN : vals[1].v
+        hi = isempty(vals) ? NaN : vals[end].v
+        # `start` branch = the one the seed sat on: `dn` is the low-⟨F⊥⟩ one.
+        start_v = tag == "rise" ? hi : lo
+        other_v = tag == "rise" ? lo : hi
+        push!(out, (; dir, kappa=κ, grid=Int(m.grid), tag, label,
             rate=Float64(m.rate_uG_per_ms), tau_ms=Float64(m.tau_ms),
             pin=Float64(m.pin), B_from=B[1], B_to=B[end],
             depth=c.depth, converted=c.depth >= depth_min, B_jump=c.B_jump,
             level_before=c.level_before, level_after=c.level_after,
             span=c.span, ratio=slope_ratio(B, f),
-            norm_drift=Float64(m.norm_drift), Jz_drift=Float64(m.Jz_drift)))
+            norm_drift=Float64(m.norm_drift), Jz_drift=Float64(m.Jz_drift),
+            depart_start=isnan(start_v) ? NaN : abs(f[end] - start_v),
+            depart_other=isnan(other_v) ? NaN : abs(f[end] - other_v),
+            branch_start=start_v, branch_other=other_v))
     end
     out
 end
@@ -328,6 +389,7 @@ function main(args)
     window = DEFAULT_WINDOW
     depth_min = DEFAULT_DEPTH
     outfile = ""
+    branchdir = ""
     dirs = String[]
     selftest = false
     for a in args
@@ -337,6 +399,8 @@ function main(args)
             window = parse(Float64, split(a, '=')[2])
         elseif startswith(a, "--depth=")
             depth_min = parse(Float64, split(a, '=')[2])
+        elseif startswith(a, "--branches=")
+            branchdir = split(a, '='; limit=2)[2]
         elseif startswith(a, "--out=")
             outfile = split(a, '='; limit=2)[2]
         elseif startswith(a, "--")
@@ -356,22 +420,31 @@ function main(args)
     end
     isempty(dirs) && error("give at least one ramp output dir (or --selftest)")
 
+    branches = load_branches(branchdir)
+    isempty(branches) && !isempty(branchdir) &&
+        throw(BlindMetric("--branches=$branchdir holds no usable branch_k*/frames.csv"))
     legs = NamedTuple[]
     for d in dirs
-        append!(legs, analyse_dir(d; window, depth_min))
+        append!(legs, analyse_dir(d; window, depth_min, branches))
     end
     isempty(legs) && throw(BlindMetric("no arms found in $(join(dirs, ", "))"))
 
-    println("per-leg conversion depth (window=$(window) µG, threshold $(depth_min)):")
-    println(rpad("label", 22), rpad("κ", 6), rpad("grid", 6), rpad("rate", 10),
-        rpad("τ[ms]", 10), rpad("depth", 9), rpad("B_jump", 9),
-        rpad("before→after", 16), rpad("span", 8), rpad("ratio", 8), "conv")
+    println("per-leg conversion (window=$(window) µG, threshold $(depth_min)):")
+    println("  `jump` is the largest change inside one window — was there a JUMP.")
+    println("  `depart` is |⟨F⊥⟩_end − the branch the leg started on, at B_end| —")
+    println("  did it LEAVE the branch. A leg can do the second without the first.")
+    println(rpad("label", 22), rpad("κ", 6), rpad("rate", 9), rpad("τ[ms]", 9),
+        rpad("jump", 8), rpad("B_jump", 9), rpad("depart", 9), rpad("to-other", 10),
+        rpad("span", 8), rpad("ratio", 8), "jumped")
     for r in sort(legs; by=x -> (x.kappa, x.grid, -x.rate, x.tag))
-        @printf("%-22s%-6.2f%-6d%-10.4g%-10.1f%-9.3f%-9.2f%-16s%-8.3f%-8.1f%s\n",
-            r.label, r.kappa, r.grid, r.rate, r.tau_ms, r.depth,
-            r.converted ? r.B_jump : NaN,
-            @sprintf("%.2f→%.2f", r.level_before, r.level_after),
+        @printf("%-22s%-6.2f%-9.4g%-9.1f%-8.3f%-9.2f%-9.3f%-10.3f%-8.3f%-8.1f%s\n",
+            r.label, r.kappa, r.rate, r.tau_ms, r.depth,
+            r.converted ? r.B_jump : NaN, r.depart_start, r.depart_other,
             r.span, r.ratio, r.converted ? "YES" : "no")
+    end
+    if all(isnan, [r.depart_start for r in legs])
+        println("\n  (no static branches given: pass --branches=DIR to get the " *
+                "departure columns, without which only the JUMP question is answered)")
     end
 
     ls = loops(legs; depth_min)

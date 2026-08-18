@@ -225,10 +225,59 @@ and is the static half of the control. Below 30 µG the two scans separate sligh
 not two branches — the energies agree three orders better than the branch
 separation at κ = 1.8 (which is ~1.5 in ⟨F⊥⟩ and 2.5×10⁻³ in E at the crossing).
 
-### 5.4 The rate scan
+### 5.4 The rate scan: no loop at either κ, and the reason is a selection rule
 
-*(`runs/eu335/ramp_g32`, in flight: κ ∈ {1.8, 0.9} × {rise, fall} over the common
-window [20, 90] µG at 7 rates from 40 down to 0.04 µG/ms)*
+`runs/eu335/ramp_g32`. Both legs over the **same** window [20, 90] µG at one pin,
+at rates from 40 down to 0.12 µG/ms (1.8 ms to 583 ms). Norm drift 1×10⁻¹³ to
+8×10⁻¹¹; J_z drift ≤ 6×10⁻² on the slowest arm.
+
+**No leg jumps, at either κ, at any rate.** The largest change in ⟨F⊥⟩ inside any
+8 µG window is 0.55 at κ = 1.8 and 0.77 at κ = 0.9 — against the ≥ 1.5 a branch
+conversion requires. The falling leg at κ = 1.8 and 583 ms runs
+⟨F⊥⟩ 1.310 → 2.798 perfectly smoothly, with no feature anywhere.
+
+That is *not* the same as "nothing happened". Measured against the static branch
+each leg started on, the κ = 1.8 legs end **2.1–2.9 away from it in ⟨F⊥⟩** — a full
+branch separation — while the κ = 0.9 legs relax toward their single branch as the
+ramp slows (departure 1.88 → 0.60 on the rising leg). The κ = 1.8 state leaves its
+branch entirely and lands on neither.
+
+**Why: a B_z ramp conserves J_z, and the two branches are in different J_z sectors
+at every field.** The static branches are found by energy minimisation, which does
+not conserve J_z, and along them J_z varies strongly:
+
+| B [µG] | 90 | 65 | 60 | 40 | 20 | 5 |
+|---|---:|---:|---:|---:|---:|---:|
+| J_z, polarised branch | −5.750 | −4.385 | −4.044 | −2.621 | −1.262 | −0.312 |
+| J_z, flower branch | — | −4.346 | −3.968 | −2.380 | −1.088 | — |
+
+A real-time B_z ramp cannot move J_z: `B_z F_z` commutes with `J_z = L_z + S_z`,
+and only the pin breaks it (drift 4×10⁻³ over the slowest ramp). So the falling leg
+seeded at 90 µG is locked at J_z = −5.750 for the entire descent, while the branch
+it is nominally following runs to −1.262 at 20 µG. It does the only thing it can:
+slide along its own J_z surface, trading spin for orbital angular momentum one for
+one — S_z −5.517 → −2.997 against L_z −0.233 → −2.749. That is Einstein–de Haas,
+and it is what the whole "hysteresis loop" consists of.
+
+**So the loop is not a loop, and no rate will make it one.** The obstruction is a
+conservation law, not a ramp speed. The predecessor's document states the rule for
+the κ ramp in as many words — *"a B_z ramp is no better, since B_z F_z commutes
+with J_z too"* — and did not apply it to its own field-ramp hysteresis result.
+
+#### The falsifiable consequence, and its test
+
+If the loop is a J_z slide, the endpoint is set by the **seed field** (which fixes
+the sector) and not by any spinodal. A spinodal does not move when you start the
+ramp somewhere else; a sector does. Registered before the runs: the falling leg to
+20 µG at 0.12 µG/ms should end higher in ⟨F⊥⟩ the *less* |J_z| it carries —
+
+| seed field | 65 µG | 75 µG | 90 µG |
+|---|---:|---:|---:|
+| J_z it is locked to | −4.385 | −5.018 | −5.750 |
+| predicted ⟨F⊥⟩ at 20 µG | ≈ 3.5–3.6 | intermediate | 2.80 (measured) |
+
+The 65 µG arm is the predecessor's own seed field, where it reported ⟨F⊥⟩ = 3.58.
+`runs/eu335/sector_test_B{65,75,90}`.
 
 ### 5.5 A note on the predecessor's rising leg
 
