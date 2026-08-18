@@ -270,7 +270,12 @@ Eu noise hold: κ=%.2f B=%.1f µG grid=%d³ box=%.1f  %s
     N_SEEDS, DT, F_LO, F_HI)
 flush(stdout)
 
-const COLS = (:kappa, :B_uG, :hold_ms, :shape, :rms_uG, :pin_uG, :seed,
+# The columns that DEFINE the arm come first, and `rot_hz`/`f_lo`/`f_hi` are
+# among them: without the frequency in its own output, a frequency scan reads as
+# one `rotating` cell whose seed-to-seed "spread" is really the scan axis. The
+# directory name carried it, and a path is not a record.
+const COLS = (:kappa, :B_uG, :hold_ms, :shape, :rms_uG, :rot_hz, :f_lo_hz, :f_hi_hz,
+    :pin_uG, :seed,
     :Jz0, :Jz_end, :dJz, :fperp0, :fperp_end, :dfperp, :fperp_excursion,
     :n_pop0, :n_pop_end, :pr0, :pr_end, :norm_drift, :f_max_hz, :wall_s)
 
@@ -294,7 +299,11 @@ for hold_ms in HOLDS_MS, rms in RMS_UG
         t0 = time()
         h = hold(S.psi, PIN_P, rms, sd, τ)
         push!(rows, (; kappa=KAPPA, B_uG=B_HOLD, hold_ms, shape=String(SHAPE),
-            rms_uG=rms, pin_uG=p_to_ug(PIN_P), seed=sd,
+            rms_uG=rms,
+            rot_hz=SHAPE === :rotating ? ROT_HZ : NaN,
+            f_lo_hz=SHAPE in (:rotating, :lines) ? NaN : F_LO,
+            f_hi_hz=SHAPE in (:rotating, :lines) ? NaN : F_HI,
+            pin_uG=p_to_ug(PIN_P), seed=sd,
             Jz0=h.first_s.Jz, Jz_end=h.last_s.Jz, dJz=h.dJz,
             fperp0=h.first_s.fperp, fperp_end=h.last_s.fperp, dfperp=h.dfperp,
             fperp_excursion=h.fperp_excursion,

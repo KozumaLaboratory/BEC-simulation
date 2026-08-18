@@ -129,21 +129,45 @@ function main(args)
         loud, loud / max(cworst, 1e-30))
 
     # ---------------------------- per-cell table ----------------------------
-    key(r) = (String(r.shape), Float64(r.hold_ms), Float64(r.rms_uG))
+    # The frequency is part of the KEY, not part of the ensemble. Pooling a
+    # frequency scan into one `rotating` cell reports the scan axis as a
+    # seed-to-seed spread — which is how a resonance gets averaged into a
+    # shrug. `rot_hz` is NaN for the broadband shapes, and NaN keys group
+    # together only if compared with `isequal`.
+    fkey(r) = hasproperty(r, :rot_hz) ? Float64(r.rot_hz) : NaN
+    key(r) = (String(r.shape), Float64(r.hold_ms), Float64(r.rms_uG), fkey(r))
     cells = NamedTuple[]
-    for k in sort(unique(key.(rows)))
-        g = filter(r -> key(r) == k, rows)
+    ks = unique(key.(rows))
+    sort!(ks; by=k -> (k[1], k[2], k[3], isnan(k[4]) ? -1.0 : k[4]))
+    for k in ks
+        g = filter(r -> isequal(key(r), k), rows)
         s = cell_stats(g)
-        push!(cells, (; shape=k[1], hold_ms=k[2], rms=k[3], s...))
+        push!(cells, (; shape=k[1], hold_ms=k[2], rms=k[3], rot_hz=k[4], s...))
     end
 
     println("ensemble (mean ± sd over seeds):")
-    println(rpad("shape", 10), rpad("hold[ms]", 10), rpad("rms[µG]", 10), rpad("n", 4),
-        rpad("|ΔJ_z|", 24), rpad("Δ⟨F⊥⟩", 22), "n_pop moved")
+    println(rpad("shape", 10), rpad("f[Hz]", 8), rpad("hold[ms]", 10), rpad("rms[µG]", 10),
+        rpad("n", 4), rpad("|ΔJ_z|", 24), rpad("Δ⟨F⊥⟩", 22), "n_pop moved")
     for c in cells
-        @printf("%-10s%-10.0f%-10.3f%-4d%-24s%-22s%.0f %%\n", c.shape, c.hold_ms, c.rms,
-            c.n, @sprintf("%.3e ± %.1e", c.dJz, c.dJz_sd),
+        @printf("%-10s%-8s%-10.0f%-10.3f%-4d%-24s%-22s%.0f %%\n", c.shape,
+            isnan(c.rot_hz) ? "—" : @sprintf("%.0f", c.rot_hz),
+            c.hold_ms, c.rms, c.n, @sprintf("%.3e ± %.1e", c.dJz, c.dJz_sd),
             @sprintf("%+.4f ± %.4f", c.dfperp, c.dfperp_sd), 100 * c.npop_changed)
+    end
+
+    # The worst frequency is the one the specification has to be written for.
+    rot = [c for c in cells if !isnan(c.rot_hz) && c.rms > 0]
+    if !isempty(rot)
+        println("\nrotating drive: response vs frequency (the spec must use the WORST)")
+        for rms in sort(unique(getfield.(rot, :rms))), hold in sort(unique(getfield.(rot, :hold_ms)))
+            g = sort([c for c in rot if c.rms == rms && c.hold_ms == hold]; by=x -> x.rot_hz)
+            length(g) >= 2 || continue
+            w = g[argmax(getfield.(g, :dJz))]
+            @printf("  %4.0f ms rms=%-6.3f  %s\n      ⇒ worst %.0f Hz (%.2e), %.0f× the quietest\n",
+                hold, rms,
+                join((@sprintf("%.0fHz:%.1e", c.rot_hz, c.dJz) for c in g), "  "),
+                w.rot_hz, w.dJz, w.dJz / max(minimum(getfield.(g, :dJz)), 1e-30))
+        end
     end
 
     # ------------------- does the SHAPE matter at fixed rms? -----------------
@@ -186,7 +210,7 @@ function main(args)
         g = [c for c in cells if c.shape == sh && c.hold_ms == hold]
         length(g) >= 2 || continue
         t = threshold(g, dJz_max)
-        push!(spec, (; shape=sh, hold_ms=hold,
+        push!(spec, (; shape=sh, hold_ms=hold, rot_hz=maximum(c -> isnan(c.rot_hz) ? -1.0 : c.rot_hz, g),
             last_ok=t.last_ok === nothing ? NaN : t.last_ok,
             first_bad=t.first_bad === nothing ? NaN : t.first_bad,
             bounded=t.first_bad === nothing))
