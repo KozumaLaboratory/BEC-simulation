@@ -535,7 +535,6 @@ function _energy_damping_buffers(
         @. kinv = ifelse((ksq > 0) & (ksq <= kc2), 1 / sqrt(max(ksq, eps(kc2))), 0)
         last_kc[] = k_cut
     end
-    end
     (divj, phase_k, ksq, kinv)
 end
 
