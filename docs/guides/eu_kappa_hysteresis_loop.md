@@ -415,9 +415,9 @@ the DC offset (the pin at 0.135 µG left J_z flat to 3×10⁻³ over 434 ms, whi
 `scripts/eu_hysteresis/sg_signature.jl` on `runs/eu335/ramp_g32`. At every ramp
 rate ≤ 1 µG/ms (τ ≳ 60 ms) and in **both** ramp directions:
 
-**Use the FALLING leg.** It is the arm where J_z is conserved to ≤ 3.6×10⁻⁴ at both
-κ at *every* rate, so the comparison is between two J_z-conserving evolutions and
-nothing else. It is also operationally simpler: one ramp direction suffices.
+**Use the FALLING leg.** It is the arm where J_z is conserved at both κ at *every*
+rate, so the comparison is between two J_z-conserving evolutions and nothing else. It
+is also operationally simpler: one ramp direction suffices.
 
 | rate [µG/ms] | 4 | 1.2 | 0.4 | 0.12 | 0.04 |
 |---|---:|---:|---:|---:|---:|
@@ -426,7 +426,7 @@ nothing else. It is also operationally simpler: one ramp direction suffices.
 | **κ = 1.8**: 1/Σp² | 5.01 | 5.57 | 5.76 | 6.31 | 7.41 |
 | **κ = 0.9**: levels ≥ 5 % | **3** | **3** | **3** | **3** | **4** |
 | **κ = 0.9**: 1/Σp² | 1.60 | 1.98 | 2.30 | 2.33 | 2.88 |
-| J_z drift, both κ | ≤ 5×10⁻⁵ | ≤ 8×10⁻⁵ | ≤ 1×10⁻⁴ | ≤ 2×10⁻⁴ | ≤ 4×10⁻⁴ |
+| |ΔJ_z/J_z|, worse of the two κ | 0.009 % | 0.015 % | 0.028 % | 0.069 % | 0.9 % |
 
 **Disjoint at all five rates**, with a ≥ 3-level gap and the participation ratios
 never closer than a factor 1.7. At κ = 0.9 the cloud stays in m_F = −6 and −5 (peak
@@ -440,8 +440,16 @@ ramp gets too fast to rearrange), so **τ ≳ 17 ms is the requirement**.
 a large transverse spin sitting on that κ's soft manifold. So a rising-leg comparison
 at slow rates is partly a measurement of how much the pin torqued each arm. The
 counts *are* still disjoint there (6–7 vs 2–4 across both legs), and at 4 µG/ms both
-rising arms are clean to ≤ 1.8 % and give 6 vs 3 — but the falling leg needs no such
-qualification at any rate, so it is the one to quote.
+rising arms are clean to ≤ 1.8 % and give 6 vs 3 — but the falling leg's worst
+fractional drift is 0.9 %, at the slowest rate, and 0.07 % or better everywhere else,
+so it needs no such qualification and it is the one to quote.
+
+The drift is quoted as a **fraction** of each arm's own J_z rather than in absolute
+units, because the two κ start at different |J_z| (−5.75 vs −6.00 on this leg, −1.09
+vs −2.70 on the other): an absolute cut labelled the κ = 1.8 falling leg "pin-driven"
+at 0.9 % while passing arms that had moved several percent. An earlier version of the
+table above quoted κ = 0.9's absolute column as if it bounded both, which understated
+the κ = 1.8 falling arm at the slowest rate by two orders of magnitude.
 
 The participation ratio says the same thing without any threshold, so the conclusion
 does not rest on where 5 % was drawn.
@@ -477,7 +485,7 @@ What the campaign delivers instead, all of it new and all of it falsifiable:
 | polarised branch's lower spinodal | **none above 5 µG** — it is a stable minimum throughout | §5.5b |
 | static branch separation at 20 µG | δ⟨F⊥⟩ = **5.06** (5.137 vs 0.075) | §5.1 |
 | κ = 0.9: number of branches | **one** — two continuations from opposite ends agree to 6–7 digits in E | §5.3 |
-| **the experimental discriminator** | on the FALLING leg, **6–7 populated m_F levels at κ = 1.8 vs 3–4 at κ = 0.9** — disjoint at all five rates from 17.5 ms to 1750 ms, with J_z conserved to 4×10⁻⁴ at both κ | §5.7 |
+| **the experimental discriminator** | on the FALLING leg, **6–7 populated m_F levels at κ = 1.8 vs 3–4 at κ = 0.9** — disjoint at all five rates from 17.5 ms to 1750 ms, with |ΔJ_z/J_z| ≤ 0.9 % at both κ | §5.7 |
 | shielding sensitivity | doubling the residual transverse field 0.068 → 0.135 µG **halves** the transverse response | §5.6 |
 | grid | 32³ ↔ 64³: spinodal to **0.2 %**, ⟨F⊥⟩ to **≤ 0.3 %**, E to 1×10⁻⁵ relative | §5.8 |
 
@@ -490,8 +498,8 @@ The falsifiable statement to hand the demagnetisation experiment is therefore **
 
 No scattering length has to be known, and one ramp direction suffices. The falling
 direction is specified rather than left free: it is the leg on which J_z is conserved
-to ≤ 3.6×10⁻⁴ at *both* κ at every rate, so the comparison is between two
-J_z-conserving evolutions. On the rising leg at κ = 0.9 the pin drags J_z by up to
+to ≤ 0.9 % at *both* κ at every rate — 0.07 % or better except at the slowest — so the
+comparison is between two J_z-conserving evolutions. On the rising leg at κ = 0.9 the pin drags J_z by up to
 55 % at slow rates (§5.7), which would put part of the contrast down to the pin.
 
 ### 5.8 Grid check

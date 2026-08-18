@@ -386,6 +386,33 @@ def fig_sg_signal(runs: dict, out: Path) -> None:
     print(f"wrote {out}")
 
 
+def _arm_jz_drift(entry: dict, tag: str, key: float) -> float | None:
+    """J_z drift of one arm, from the manifest, matched on (tag, rate-or-τ)."""
+    m = entry["manifest"]
+    col = "rate_uG_per_ms" if entry["index"] == "rate" else "tau"
+    if col not in m or "Jz_drift" not in m or "tag" not in m:
+        return None
+    for i in range(len(m[col])):
+        if str(m["tag"][i]).strip() == tag and math.isclose(
+                float(m[col][i]), key, rel_tol=1e-9):
+            return float(m["Jz_drift"][i])
+    return None
+
+
+def _arm_jz_start(entry: dict, tag: str, key: float) -> float | None:
+    """J_z at the START of one arm = Jz_end − Jz_drift, from the manifest."""
+    m = entry["manifest"]
+    col = "rate_uG_per_ms" if entry["index"] == "rate" else "tau"
+    for need in (col, "Jz_end", "Jz_drift", "tag"):
+        if need not in m:
+            return None
+    for i in range(len(m[col])):
+        if str(m["tag"][i]).strip() == tag and math.isclose(
+                float(m[col][i]), key, rel_tol=1e-9):
+            return float(m["Jz_end"][i]) - float(m["Jz_drift"][i])
+    return None
+
+
 def _n_populated(vals, thresh=0.05) -> int:
     return int(sum(1 for v in vals if v >= thresh))
 
@@ -434,9 +461,24 @@ def fig_sg_kappa_contrast(runs: dict, out: Path, thresh: float = 0.05) -> None:
             x = np.arange(len(ms)) + (i - 0.5) * (width + 0.02)
             ax.bar(x, vals, width=width, color=CAT[i],
                    label="$B$ rising" if tag == "rise" else "$B$ falling")
+            # J_z drift per arm, on the figure. The comparison is between two
+            # J_z-conserving evolutions, and on the RISING leg at κ = 0.9 the pin
+            # drags J_z by up to 55 % at slow rates — so an arm's drift is not a
+            # footnote, it is what says whether that arm's count means anything.
+            # FRACTIONAL, not absolute: the two κ start at different |J_z|
+            # (−5.75 vs −6.00 on this leg, −1.09 vs −2.70 on the other), so an
+            # absolute cut flags an 0.9 % drift on one arm and passes a 5 % drift
+            # on another. An absolute threshold here labelled the κ=1.8 falling
+            # leg "pin-driven" at 0.9 %.
+            drift = _arm_jz_drift(entry, tag, key)
+            jz0 = _arm_jz_start(entry, tag, key)
+            frac = None if (drift is None or not jz0) else abs(drift / jz0)
             notes.append(f"{'rising' if tag == 'rise' else 'falling'}: "
                          f"{_n_populated(vals, thresh)} levels ≥ {thresh:.0%}, "
-                         f"$1/\\Sigma p^2$ = {_participation(vals):.1f}")
+                         f"$1/\\Sigma p^2$ = {_participation(vals):.1f}"
+                         + ("" if frac is None
+                            else f",  $|\\Delta J_z / J_z|$ = {frac:.1%}"
+                                 + ("  ⚠ pin-driven" if frac > 0.02 else "")))
         ax.annotate("\n".join(notes), xy=(0.02, 0.97), xycoords="axes fraction",
                     va="top", ha="left", color=INK2, fontsize=9)
         order = "bistable side" if kappa >= 1.0 else "crossover control"
@@ -450,7 +492,7 @@ def fig_sg_kappa_contrast(runs: dict, out: Path, thresh: float = 0.05) -> None:
             ax.set_xticklabels([l.replace("m", "$m_F$=") if l == labels[0] else l[1:]
                                 for l in labels])
     axes[0].set_ylabel("fractional population")
-    axes[0].legend(loc="upper right")
+    axes[0].legend(loc="center right")
     fig.suptitle("Predicted Stern-Gerlach readout after a slow $B_z$ ramp — "
                  "the level count is the discriminator", color=INK)
     fig.tight_layout()
