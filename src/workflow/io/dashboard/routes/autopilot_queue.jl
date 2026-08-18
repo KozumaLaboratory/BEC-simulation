@@ -41,11 +41,22 @@ function _route_autopilot_queue(path::String)
         "\"dry_run\":", is_autopilot_dry_run(qr),
         ",\"paused\":", is_autopilot_paused(qr),
         "}")
+    # A failed `list_queue` used to become `QueueEntry[]`, which serialises
+    # identically to a healthy empty state — so a locked, missing or corrupt
+    # queue root rendered as "no jobs queued" in a 200 with no error field, and
+    # neither the operator nor the front end could tell. Absence folding into
+    # health at a boundary; the same shape as the divergence-kill keys, the
+    # budget gate summing zeros, and the preflight that could only pass.
+    #
+    # Still not throwing: one bad state directory must not take the whole queue
+    # view down. The failure is REPORTED instead, per state.
+    failed = String[]
     for st_str in (wanted === nothing ? _QUEUE_STATES_JSON : (wanted,))
         st = Symbol(st_str)
         entries = try
             list_queue(st; qr=qr)
-        catch
+        catch e
+            push!(failed, "$(st_str): $(replace(string(e), '"' => "'"))")
             QueueEntry[]
         end
         print(out_io, ",")
@@ -55,6 +66,10 @@ function _route_autopilot_queue(path::String)
             print(out_io, _entry_to_json(e, qw_medians))
         end
         print(out_io, "]")
+    end
+    if !isempty(failed)
+        print(out_io, ",\"unreadable\":[",
+            join(("\"$(f)\"" for f in failed), ","), "]")
     end
     print(out_io, "}")
     return (200, "application/json", String(take!(out_io)))

@@ -92,6 +92,18 @@ function run_simulation_yoshida!(
     comp = composition isa Symbol ? _resolve_composition(composition) : composition
     _assert_composition_keys(comp)
 
+    # Checked ONCE, before any stepping: neither `MEANFIELD_MIDPOINT_ENABLED[]`
+    # nor `ws.ddi` changes during the run, so a composition the DDI path cannot
+    # realise should cost nothing rather than fail on the first accepted step.
+    #
+    # `_assert_jump_realisable` was DEFINED and never called — an edit script
+    # aborted before writing, and the gate that should have caught it called the
+    # guard directly instead of going through this entry point. So the DDI path
+    # went on silently running `omelyan_pefrl` / `blanes_moan_srkn6b` at order 2.
+    _assert_jump_realisable(
+        composition, comp, MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing
+    )
+
     dt = clamp(adaptive.dt_init, adaptive.dt_min, adaptive.dt_max)
 
     psi_old = similar(ws.state.psi)
