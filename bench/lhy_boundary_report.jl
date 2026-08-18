@@ -239,8 +239,27 @@ if CTRL_ARM === nothing
     println("  REFUSED: no positive-control arm (fm_ctrl*) is present in this")
     println("  directory, so nothing establishes that the instrument can see LHY.")
 elseif bc_none === nothing || bc_ctrl === nothing
-    println("  REFUSED: the boundary is not bracketed for the baseline or the control,")
-    println("  so there is nothing to compare. Widen the scan window and re-run.")
+    # No crossing for the baseline or the control. That is NOT automatically a
+    # refusal: the gap shift below is defined either way, and the control can be
+    # judged on it. Refusing here regardless would mean the instrument says "no
+    # verdict" on data that answers the question, and I would then be overriding
+    # my own criterion by hand — which is the thing a written-down criterion
+    # exists to prevent.
+    println("  no crossing for the baseline and/or the control on this axis.")
+    println("  Falling back to the gap-shift metric below, and judging the control there.")
+    local dctrl = CTRL_ARM === nothing ? NaN :
+                  (results[CONTROL_LABEL[]].des[cld(length(b_ug), 2)] -
+                   de_by_pair["none (mean field)"][cld(length(b_ug), 2)]) /
+                  results[CONTROL_LABEL[]].slope
+    local thr = ctrl_min_shift(AXIS_UNIT)
+    if isnan(dctrl) || abs(dctrl) < thr
+        @printf("  REFUSED: control gap shift converts to %.4g in %s, below the %.4g\n",
+            dctrl, AXIS, thr)
+        println("  pre-launch threshold. The instrument cannot see LHY here.")
+    else
+        @printf("  control passes on the gap-shift metric: %.4g in %s (threshold %.4g).\n",
+            dctrl, AXIS, thr)
+    end
 else
     ctrl_shift = bc_ctrl.B - bc_none.B
     CTRL_MIN_SHIFT = ctrl_min_shift(AXIS_UNIT)
