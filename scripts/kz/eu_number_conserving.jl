@@ -34,8 +34,15 @@ and returns 0.816 of a trapped TF condensate. Measured in
 and the uniform case is kept as the control. An earlier single-k-mode estimator in
 this branch understated `N₀` by 22×, so the check is a gate rather than a comment.
 """
-function _n0_tf_projection(psi::AbstractArray{<:Complex}, grid::Grid{3}, c0::Real)
-    ψ = @view psi[:, :, :, 1]
+function _n0_tf_projection(psi::AbstractArray{<:Complex}, grid::Grid{3}, c0::Real;
+    comp::Int=size(psi, 4))
+    # `comp` defaults to the LAST component, which is where thermal_cfield! seeds
+    # (`comp = size(psi, N+1)`). Hard-coding component 1 read an EMPTY array on every
+    # Eu151 run — D = 13 — so N_0 came back ~0 whatever the reservoir or gamma did,
+    # while N_C summed all components and looked healthy. That is the entire "the field
+    # does not condense" observation: four gamma arms were queued to discriminate a lag
+    # from a defect when the defect was that the estimator was not reading the field.
+    ψ = @view psi[:, :, :, comp]
     dV = cell_volume(grid)
     n_peak = maximum(abs2, ψ)
     n_peak > 0 || return 0.0
@@ -199,11 +206,16 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
             # with mu taken from the field's own peak density so nothing external is
             # assumed — on a pure TF state that estimator returns N to 1.0000.
             N0 = _n0_tf_projection(ws.state.psi, grid, c0_field)
-            push!(hist, (; t=t0_int + s * dt, N_C=NC, N0, N_tot=N_of(t0_int + s * dt),
+            # Every component, so a defect that puts atoms somewhere unexpected shows up
+            # as a disagreement rather than as a silent zero.
+            N0_all = sum(_n0_tf_projection(ws.state.psi, grid, c0_field; comp=c)
+                         for c in 1:size(ws.state.psi, 4))
+            push!(hist, (; t=t0_int + s * dt, N_C=NC, N0=N0_all, N0_seedcomp=N0,
+                N_tot=N_of(t0_int + s * dt),
                 mu=mu_ref[], T=T_of(t0_int + s * dt)))
             ta = t0_int + s * dt
             @printf("  t=%8.1f N_tot=%-10.4g N_C=%-10.4g N0=%-10.4g f0=%-6.3f mu=%-8.3f T=%-7.3f eps_cut=%-7.2f unsat=%d\n",
-                ta, N_of(ta), NC, N0, N0 / max(NC, 1), mu_ref[], T_of(ta),
+                ta, N_of(ta), NC, N0_all, N0_all / max(NC, 1), mu_ref[], T_of(ta),
                 eps_cut_of(ta), bad[])
             flush(stdout)
         end

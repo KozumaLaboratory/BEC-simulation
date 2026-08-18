@@ -32,3 +32,32 @@ psi2 = fill(ComplexF64(sqrt(100.0)), n, n, n)
 @printf("\nuniform control: N=%.6g  k=0 gives %.6g  ratio %.4f\n",
     real(sum(abs2, psi2)) * dV, abs2(sum(psi2)) * dV^2 / V,
     abs2(sum(psi2)) * dV^2 / V / (real(sum(abs2, psi2)) * dV))
+
+# The component the estimator reads must be the component the field is in.
+#
+# `_n0_tf_projection` hard-coded component 1 while `thermal_cfield!` seeds the LAST
+# component, so on every Eu151 run (D = 13) it projected an empty array and returned
+# ~0 no matter what the reservoir did. N_C summed all components and looked healthy,
+# which is exactly the shape of "the field holds 3000 atoms and none of them are
+# condensed" — and four gamma arms were queued to tell a lag from a defect when the
+# defect was that the estimator was not reading the field.
+#
+# So the check is not "does it work on a TF state" but "does it find the state wherever
+# it is". A single-component version of this file passed while the bug was live.
+include(joinpath(@__DIR__, "eu_number_conserving.jl"))
+@printf("\n%-28s %-14s %-14s %-8s\n", "seeded component", "estimator", "true N", "ratio")
+for D in (1, 3, 13)
+    for comp in (1, D)
+        p13 = zeros(ComplexF64, n, n, n, D)
+        for I in CartesianIndices((n, n, n))
+            x, y, z = grid.x[1][I[1]], grid.x[2][I[2]], grid.x[3][I[3]]
+            d = (mu - 0.5 * (x^2 + y^2 + z^2)) / c0
+            p13[I, comp] = d > 0 ? sqrt(d) : 0.0
+        end
+        Ntrue = real(sum(abs2, p13)) * dV
+        got = sum(_n0_tf_projection(p13, grid, c0; comp=c) for c in 1:D)
+        @printf("D=%-2d seeded comp %-11d %-14.6g %-14.6g %-8.5f%s\n",
+            D, comp, got, Ntrue, got / Ntrue,
+            abs(got / Ntrue - 1) > 1e-3 ? "   <-- WRONG" : "")
+    end
+end
