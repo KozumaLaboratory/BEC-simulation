@@ -18,9 +18,19 @@
 # an O(D) ladder sum per voxel, on component reads it already performs.
 #
 # `e₁` is tabulated against `p = |⟨F⟩|/F` because that is the direction it
-# actually varies in. Measured at F=6: rotating a spinor leaves ε_LHY invariant
-# to machine precision for contact (an SO(3) scalar) and moves it 0.25% under
-# the DDI, while taking `p` from 1 to 0 moves it ~20%.
+# actually varies in. Re-measured at ¹⁵¹Eu F=6, c1_ratio = 1/36, ε_dd = 0.54
+# (#337, `bench/lhy_state_dependence.jl`) — the numbers this comment used to
+# carry were both taken at a much weaker dipole and are quoted here corrected:
+#
+#   rotation, contact, B = 0     5.3e-7   (SO(3) scalar, as claimed)
+#   rotation, contact, B = 44 µG 7.6e-3   (a field picks an axis; not scale-free)
+#   rotation, with DDI, B = 0    2.6e-2   (was recorded as 0.25%, at ε_dd ~ 0.05)
+#   p: 1 → 0                     factor 3.9  (was recorded as "~20%")
+#
+# The p-dependence rides on `c1_ratio`: it is a factor 1.50 at c1_ratio = 0,
+# where every g_S collapses to c₀ and only the DDI distinguishes the endpoints,
+# and 3.9 at the campaign's 1/36. A number measured near zero therefore says
+# nothing about production, which is where the "~20%" came from.
 #
 # `p` does not fix ζ uniquely, so this remains an approximation — but the
 # representative spinors are taken from the ACTUAL cloud rather than from an
@@ -73,7 +83,7 @@ function compute_spatial_lhy(;
             _lhy_bdg_energy_density(reps[i], 1.0, F, interactions, zeeman,
                 c_dd, nothing, nothing, nothing; rtol) / n_atoms
     end
-    SpatialLHY(ps, e1, F, [fp_ladder_coeff(F, F - (c - 1)) for c in 1:D])
+    SpatialLHY(ps, e1, F, [fp_ladder_coeff(F, F - (c - 1)) for c in 1:D], n_atoms)
 end
 
 # Bin voxels by |⟨F⟩|/F and return (bin centres, bin weights, representative
@@ -148,6 +158,14 @@ solve, over `n_probe` randomly drawn voxels per occupied bin.
 `p` does not determine ζ, so this is the approximation's own error bar, and it
 is what should be quoted alongside a spatially-varying LHY result rather than
 assumed small. Returns `NaN` when nothing could be probed.
+
+The reference is divided by `lhy.n_atoms` because `compute_spatial_lhy` divided
+the table by it — the closed forms are in physical units while `n = |ψ|²` here is
+normalised to 1 and `c₀` already carries N. Without that division this compared
+two quantities N apart and returned ≈ 1 − 1/N: measured 2026-08-19 on converged
+Eu ground states at N = 50000 it read exactly **1.0000** for every state, a
+"100 % residual" that was entirely the missing factor and would have been read as
+the spatial approximation collapsing.
 """
 function spatial_lhy_residual(lhy::SpatialLHY, psi_init::AbstractArray{<:Complex, M},
     F::Int, interactions::InteractionParams;
@@ -181,8 +199,9 @@ function spatial_lhy_residual(lhy::SpatialLHY, psi_init::AbstractArray{<:Complex
         fre = sum(c -> fp[c] * real(conj(z[c - 1]) * z[c]), 2:D)
         fim = sum(c -> fp[c] * imag(conj(z[c - 1]) * z[c]), 2:D)
         p = clamp(sqrt(fre^2 + fim^2 + fz^2) / F, 0.0, 1.0)
-        exact = _lhy_bdg_energy_density(z, 1.0, F, interactions, zeeman, c_dd,
-            nothing, nothing, nothing; rtol)
+        exact =
+            _lhy_bdg_energy_density(z, 1.0, F, interactions, zeeman, c_dd,
+                nothing, nothing, nothing; rtol) / lhy.n_atoms
         tab = _interpolate_1d(lhy.polarisations, lhy.e1_values, p)
         abs(exact) < 1e-30 && continue
         worst = max(worst, abs(tab - exact) / abs(exact))

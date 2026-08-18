@@ -133,7 +133,7 @@ end
 abstract type TabulatedLHY <: AbstractLHY end
 
 """
-    SpatialLHY(polarisations, e1_values, F, fp_coeffs)
+    SpatialLHY(polarisations, e1_values, F, fp_coeffs, n_atoms = 1)
 
 LHY whose strength varies with the LOCAL spin texture, not just the local
 density.
@@ -150,23 +150,37 @@ energies the stiffness matrices are exactly ∝ n, so
 
 with all the spinor dependence in `e₁`. `e1_values` tabulates `e₁` against the
 local polarisation `p = |⟨F⟩|/F`, which is the direction ε_LHY actually varies
-in: rotating a spinor leaves ε_LHY invariant to machine precision for contact
-(it is an SO(3) scalar) and moves it 0.25% under the DDI, whereas taking `p`
-from 1 to 0 moves it ~20%.
+in. Re-measured at ¹⁵¹Eu (ε_dd = 0.54, c1_ratio = 1/36) in #337, since the
+numbers previously quoted here came from a ~10× weaker dipole: rotating a spinor
+leaves ε_LHY invariant to 5.3e-7 for contact at zero field (it is an SO(3)
+scalar), but the DDI breaks that by **2.6%** — not 0.25% — and a nonzero field
+breaks even the contact part (7.6e-3 at 44 µG), because a field picks an axis.
+Taking `p` from 1 to 0 moves ε_LHY by a **factor 3.9**, not ~20%.
 
 `p` does not determine ζ uniquely, so this is an approximation — the measured
 residual within a `p` bin is ~2%, against the ~5% it removes. `fp_coeffs` are
 the F₊ ladder coefficients, cached so the propagator can get ⟨F⟩ from the same
 component reads it already does for the density.
+
+`n_atoms` is the divisor `compute_spatial_lhy` already applied to `e1_values`,
+carried so that anything comparing this table against a fresh BdG solve can undo
+it. It is NOT a knob and nothing in the propagator reads it — the values are
+stored pre-divided, exactly as before. It exists because
+`spatial_lhy_residual` compared a table built with `n_atoms = N` against an
+undivided reference and therefore returned ≈ 1 − 1/N for every production
+config: a 100 % "residual" that is entirely the missing factor. Measured
+2026-08-19 (#337) on converged Eu states at N = 50000, where it read exactly
+1.0000 and would have been reported as "the spatial approximation fails".
 """
 struct SpatialLHY <: AbstractLHY
     polarisations::Vector{Float64}
     e1_values::Vector{Float64}
     F::Int
     fp_coeffs::Vector{Float64}
+    n_atoms::Int
 
     function SpatialLHY(polarisations::Vector{Float64}, e1_values::Vector{Float64},
-        F::Int, fp_coeffs::Vector{Float64})
+        F::Int, fp_coeffs::Vector{Float64}, n_atoms::Int=1)
         length(polarisations) == length(e1_values) ||
             throw(ArgumentError("polarisations and e1_values must have equal length"))
         length(polarisations) >= 2 ||
@@ -175,7 +189,8 @@ struct SpatialLHY <: AbstractLHY
             throw(ArgumentError("polarisations must be sorted"))
         length(fp_coeffs) == 2F + 1 ||
             throw(ArgumentError("fp_coeffs must have 2F+1 entries"))
-        new(polarisations, e1_values, F, fp_coeffs)
+        n_atoms >= 1 || throw(ArgumentError("n_atoms must be ≥ 1"))
+        new(polarisations, e1_values, F, fp_coeffs, n_atoms)
     end
 end
 

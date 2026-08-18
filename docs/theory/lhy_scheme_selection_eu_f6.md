@@ -239,7 +239,67 @@ the two conventions differ by a few percent regardless.
 
 ## 5. Criterion B — how much the phase boundary moves without LHY
 
-*(measured in `runs/eu_lhy_boundary_337/`; see §5 below)*
+Two campaigns, both at ¹⁵¹Eu, 32×32×64, box 12×12×24, κ = 1, LBFGS +
+`newton_polish`, `tol = 1e-9` — the campaign's own precision recipe from
+`config_c1_precise_B0k1.yaml`, differing from it only in the `lhy` block.
+`runs/eu_lhy_boundary_337/config_arms.yaml` scans Bz at `c1_ratio = 1/36`;
+`config_arms_c1.yaml` scans `c1_ratio` at B = 5 µG. Read by
+`bench/lhy_boundary_report.jl`.
+
+### 5.1 The gap shift, and the positive control
+
+At `c1_ratio = 1/36`, B = 5 µG. ΔE = E(stretched seed) − E(polar seed); the two
+branches are `cyclic` and `nematic` in every arm at this field, so the arms are
+comparing the same pair of states:
+
+| arm | E_LHY (stretched) | E_LHY (polar) | ΔE | **δ(ΔE) vs none** |
+|---|---:|---:|---:|---:|
+| `none` | 0 | 0 | −0.1195 | — |
+| one functional (`fm_dipolar` both) | 0.3562 | 0.3485 | −0.1101 | **+0.0094** |
+| own ansatz (`fm_dipolar` / `polar_contact`) | 0.3562 | 0.0717 | +0.1896 | **+0.3091** |
+| `spatial` (texture-following) | 0.4175 | 0.1165 | +0.2069 | **+0.3264** |
+| CONTROL, scalar ×10 | 1.8241 | 1.8099 | −0.0811 | **+0.0384** |
+
+Three readings, in order of how much they matter:
+
+1. **The scheme choice dominates the LHY magnitude by 33×.** Giving both
+   branches the same fully-polarised functional shifts the gap by 0.0094 —
+   because a common offset almost cancels in a difference. Giving each branch the
+   functional its own spinor calls for shifts it by 0.3091. That is the 3.9×
+   ε(FM)/ε(polar) ratio of §7.2 arriving in an actual solve.
+2. **`spatial` independently confirms which of the two is physical.** It assumes
+   no ansatz — it tabulates `e₁(p)` from the local spinors of the actual cloud —
+   and it lands at +0.3264, within 6 % of the own-ansatz answer and 35× the
+   single-functional one. So this is not a matter of taste between two
+   conventions: the calculation that asks the cloud agrees with the per-state
+   functional. (Its 0.4175 on the stretched branch runs ~17 % above
+   `fm_dipolar`'s 0.3562, of which ~7.5 % is the `full_bdg`-vs-closed-form method
+   gap of §4 and the rest is the texture.)
+3. **The control fires.** ×10 on the amplitude moves the gap 4.1× further than
+   ×1 in the same single-functional configuration — sub-linear because the state
+   relaxes against the added repulsion, but unambiguous. And no arm is
+   bit-identical to `none`: the wiring check reports 1.07e-1, 3.10e-1, 3.28e-1
+   and 5.99e-1 as the maximum |ΔE(arm) − ΔE(none)| over the scan. Nothing here
+   is silently inert.
+
+### 5.2 Why the field axis could not give the boundary, and what did
+
+The Bz scan does not produce a baseline boundary: at `c1_ratio = 1/36` the
+stretched branch is **already** below the polar one at B = 0 (ΔE = −0.085), so
+the `none` crossing lies outside B ≥ 0 and only the two arms that push ΔE
+positive have one to report (`own ansatz` at 15.6 µG, `spatial` at 16.4 µG).
+That is itself a result — **at this coupling, including LHY per-state is what
+creates a stretched↔polar boundary in accessible fields at all** — but it is not
+a δB, so the boundary measurement moved to the `c1_ratio` axis, which is where
+the campaign pins c1\* ≈ 0.028–0.029 and where every arm crosses.
+
+One number from the field scan is reused below: the observed local slope
+|∂ΔE/∂B| = 0.0311 per µG near the crossing. That is 0.35× the 0.0888 the pure
+Zeeman argument predicts, because the stretched branch is `cyclic` rather than
+fully polarised at these fields — which is exactly why the slope has to be
+measured rather than derived.
+
+*(c1-axis boundary numbers: pending job 8440274.)*
 
 ## 6. Criterion C — the `SpatialLHY` residual in µG
 
