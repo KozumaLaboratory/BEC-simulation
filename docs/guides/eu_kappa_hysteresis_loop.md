@@ -1,11 +1,17 @@
 # The κ-dependent hysteresis loop in weak-field ¹⁵¹Eu — one number for the demagnetisation experiment
 
-> **Status: campaign in progress (opened 2026-08-18).** §1–§3 were written BEFORE
-> any compute and are the pre-registration: the axes, the systematics, and the
-> rejection criteria. §4 onward is filled in from measurements as they land, and
-> every row there names the run that produced it. Predecessor:
+> **Status: 2026-08-18, answered.** §1–§3 were written BEFORE any compute and are
+> the pre-registration: the axes, the systematics, and the rejection criteria. §5
+> is the measurements, each row naming the run that produced it. §6 is the answer —
+> and it is not the answer the issue asked for, because **the loop is not a loop**:
+> a B_z ramp conserves J_z and the two branches sit in different J_z sectors, so no
+> rate converts between them. What replaces the loop width is a discrete
+> Stern-Gerlach level count. Predecessor:
 > `docs/guides/eu_adiabatic_protocol.md` (FROZEN 2026-07-28) — read it for how the
-> prediction was established; read this for the loop width.
+> prediction was established; read §5.4 here for why its hysteresis reading does not
+> survive.
+>
+> **Read §6 first if you want the number to hand the experiment.**
 
 ## 1. What is being delivered, and why it is worth the compute
 
@@ -330,15 +336,27 @@ from it is therefore neither a spinodal collapse nor barrier crossing — it is 
 J_z slide of §5.4, and the branch it left is still sitting there, stable.
 
 **And the flower's collapse above its spinodal is slow**, which is why a ramp carries
-flower-like ⟨F⊥⟩ well past 68.4 µG:
+flower-like ⟨F⊥⟩ well past 68.4 µG. The last converged flower state (68.25 µG) held
+for 434 ms at a ladder of fields:
 
-| hold field [µG] | 68.25 (its own) | 69 | 70 | 93.25 |
-|---|---:|---:|---:|---:|
-| max Δ⟨F⊥⟩ in 434 ms | 0.0006 | 0.041 | 0.096 | **1.042** |
+| hold field [µG] | 68.25 | 69 | 70 | 72 | 75 | 80 | 90 | 110 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| µG past the branch end | 0 | 0.75 | 1.75 | 3.75 | 6.75 | 11.75 | 21.75 | 41.75 |
+| max Δ⟨F⊥⟩ in 434 ms | 0.0006 | 0.041 | 0.096 | 0.229 | 0.369 | 0.595 | **0.801** | **1.206** |
 
-A spinodal is where the unstable mode's growth rate passes through zero, so 0.75 µG
-past the end of the branch nothing happens on any experimentally relevant timescale.
-The branch has ended — but the state does not know it yet.
+A spinodal is where the unstable mode's growth rate passes through zero, so a few µG
+past the end of the branch nothing happens on an experimentally relevant timescale:
+the branch has ended, and the state does not know it yet. Within 434 ms the flower
+configuration survives to ≈ 12 µG past its own spinodal.
+
+**One caveat on the two largest holds, stated because the instrument cannot separate
+the effects there.** At 90 and 110 µG the 68.25 µG state is far from stationary, so
+its rapid initial change (the recorded `t_depart` is 3.6 ms, far too fast for a mode
+that grows from zero at the spinodal) is a field-mismatch response and not the
+instability alone. The small-ΔB rows are the ones where the state is nearly
+stationary and the reading is clean; those are the rows the conclusion rests on. The
+two large-ΔB rows still serve their purpose as the positive control — they show the
+hold *can* report a departure.
 
 ### 5.5 A note on the predecessor's rising leg
 
@@ -351,7 +369,104 @@ endpoint sits between the two static branches at ε = 0.002 (polarised: ⟨F⊥�
 flower survived, and it is not evidence that it did not. §5.4 measures the same leg
 at one pin over a window that contains the spinodal, which is what settles it.
 
-## 6. Limits
+### 5.6 The shielding row: the pin is the controlling variable, and it is not small
+
+The predecessor's sharp jump is reproduced **exactly**, at its own pin, and
+disappears at twice that pin. Same branch, same seed field to within 1 µG, same
+rate (0.101 µG/ms), same window bottom; the only difference is ε:
+
+| | ε [p-units] | ε [µG] | seed | ⟨F⊥⟩ at 20 µG | conversion |
+|---|---:|---:|---:|---:|---:|
+| predecessor's epoch (`pin_test_eps001`) | 0.001 | 0.0676 | 64 µG | 0.800 → **3.577** | 2.78 |
+| this campaign (`pin_test_eps002`) | 0.002 | 0.1352 | 65 µG | 0.829 → **2.214** | 1.39 |
+| predecessor, as published | 0.001 | 0.0676 | 64 µG | 0.80 → 3.58 | 2.78 |
+
+Reproducing 3.577 against a published 3.58 validates this pipeline against theirs;
+and **doubling the residual transverse field from 0.068 to 0.135 µG halves the
+conversion.** Both values are one to two orders below any plausible laboratory
+residual, so this is the shielding row #335 asks for, and it is not a caveat at the
+margin: the effect the protocol measures is a strong function of a field the
+experiment cannot null to that level. A lab at the µG scale should expect the field
+ramp's transverse response to be substantially smaller than either number here.
+Hand to #340 for the specification proper; the AC/drift content matters more than
+the DC offset (the pin at 0.135 µG left J_z flat to 3×10⁻³ over 434 ms, while a
+*rotating* residual of 1.35 µG moves J_z by +1.6 in 145 ms).
+
+### 5.7 What replaces the loop width: a discrete Stern-Gerlach level count
+
+`scripts/eu_hysteresis/sg_signature.jl` on `runs/eu335/ramp_g32`. At every ramp
+rate ≤ 1 µG/ms (τ ≳ 60 ms) and in **both** ramp directions:
+
+| | κ = 1.8 | κ = 0.9 |
+|---|---:|---:|
+| m_F levels holding ≥ 5 % of the atoms | **6** | **2–3** |
+| participation ratio 1/Σp² (threshold-free) | **5.5–6.3** | **1.8–2.3** |
+| largest single population | 0.22–0.27 | 0.59–0.72 |
+
+**Disjoint, with a three-level gap, from eight independent arms.** At κ = 0.9 the
+cloud stays in m_F = −6 and −5; at κ = 1.8 it spreads over m_F = −6 … 0 with no
+component above 0.27. The participation ratio says the same thing without any
+threshold, so the conclusion does not rest on where 5 % was drawn.
+
+![Stern-Gerlach readout at two trap aspect ratios](../../figs/eu335/eu335_sg_kappa_contrast.png)
+
+This is what the experiment should be handed, and it is preferable to a loop width
+for a reason that is not presentational. A level count is **discrete**: no error
+bar, no calibration, no fitted jump field. The loop width is a difference of two
+fitted jump fields, and §5.4–5.6 showed both of them moving with the ramp's starting
+J_z sector and with the residual transverse field. The level count survives all of
+that, and it is read directly off a single Stern-Gerlach + TOF shot.
+
+The κ dependence is also visible without any dynamics at all — §5.1 vs §5.3, two
+branches against one — so the prediction has a static and a dynamic face that agree.
+
+## 6. The answer to #335
+
+**The loop cannot be turned into one number, because it is not a loop.** A B_z ramp
+conserves J_z, the two static branches sit in different J_z sectors at every field,
+and so no ramp at any rate converts between them: what the predecessor measured as
+hysteresis is the Einstein–de Haas slide of a fixed-J_z state, whose endpoint depends
+on the seed field (§5.4) and on the residual transverse field (§5.6) rather than on
+any spinodal. Three of #335's acceptance criteria — a single loop width, its rate
+saturation, its 64³ agreement — are therefore **not achievable as posed**, and
+reporting a width would have meant reporting the sector slide as a branch conversion.
+
+What the campaign delivers instead, all of it new and all of it falsifiable:
+
+| deliverable | value | where |
+|---|---|---|
+| flower-branch spinodal at κ = 1.8 | **68.4 ± 0.15 µG** (32³), bracket [65, 70] at 64³ | §5.1, §5.8 |
+| polarised branch's lower spinodal | **none above 5 µG** — it is a stable minimum throughout | §5.5b |
+| static branch separation at 20 µG | δ⟨F⊥⟩ = **5.06** (5.137 vs 0.075) | §5.1 |
+| κ = 0.9: number of branches | **one** — two continuations from opposite ends agree to 6–7 digits in E | §5.3 |
+| **the experimental discriminator** | **6 populated m_F levels at κ = 1.8 vs 2–3 at κ = 0.9**, both ramp directions, every rate ≤ 1 µG/ms | §5.7 |
+| shielding sensitivity | doubling the residual transverse field 0.068 → 0.135 µG **halves** the transverse response | §5.6 |
+| grid | 32³ ↔ 64³ agree to **≤ 0.3 %** in ⟨F⊥⟩ and 1×10⁻⁵ relative in E | §5.8 |
+
+The falsifiable statement to hand the demagnetisation experiment is therefore **not**
+"a loop appears at κ ≳ 1 and not at κ ≤ 0.9" but:
+
+> **Ramp B_z slowly (≳ 60 ms) at two trap aspect ratios and count Zeeman levels.
+> At κ ≈ 1.8 the Stern-Gerlach signal spreads over six sublevels; at κ ≈ 0.9 it
+> stays in two. No scattering length has to be known, and the count is the same in
+> both ramp directions, so a single direction suffices.**
+
+### 5.8 Grid check
+
+The static structure is grid-converged. 64³ against 32³ at the same (κ, B, ε),
+unpadded, with both reaching |∇E| ≈ 9×10⁻⁶:
+
+| state | E (32³) | E (64³) | ⟨F⊥⟩ (32³) | ⟨F⊥⟩ (64³) | J_z (32³) | J_z (64³) |
+|---|---:|---:|---:|---:|---:|---:|
+| flower, 20 µG | 10.731085 | 10.731193 | 5.1367 | 5.1345 | −1.0876 | −1.0856 |
+| polarised, 90 µG | 7.194428 | 7.195198 | 1.3096 | 1.2954 | −5.7500 | −5.7504 |
+
+⟨F⊥⟩ agrees to 0.04 % and 1.1 %, E to 1×10⁻⁵ and 1×10⁻⁴ relative. Along the whole
+flower branch the two grids agree to ≤ 0.3 %, and the 64³ spinodal bracket is [65,
+70] µG at ΔB = 5 — the same bracket the 32³ coarse pass gave before refinement.
+`runs/eu335/branch_k1.8_up_g64{,_fine}`.
+
+## 7. Limits
 
 - **T = 0 mean field, no thermal or technical noise.** The measured loop is an
   **upper bound** on what an experiment sees: noise and finite temperature nucleate

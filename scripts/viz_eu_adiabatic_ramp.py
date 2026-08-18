@@ -386,6 +386,78 @@ def fig_sg_signal(runs: dict, out: Path) -> None:
     print(f"wrote {out}")
 
 
+def _n_populated(vals, thresh=0.05) -> int:
+    return int(sum(1 for v in vals if v >= thresh))
+
+
+def _participation(vals) -> float:
+    a = np.asarray(vals, dtype=float)
+    s = a.sum()
+    return float(1.0 / np.sum((a / s) ** 2)) if s > 0 else float("nan")
+
+
+def fig_sg_kappa_contrast(runs: dict, out: Path, thresh: float = 0.05) -> None:
+    """The deliverable: the m_F distribution at two trap aspect ratios.
+
+    This is the figure to hand the experiment, and the reason it is this one rather
+    than a loop width is that its observable is DISCRETE — how many Zeeman
+    sublevels hold atoms. A level count carries no error bar and needs no
+    calibration; the loop width is a difference of two fitted jump fields, and both
+    turned out to depend on the ramp's starting J_z sector and on the residual
+    transverse field. Row-normalisation is not applied: the populations are already
+    fractions, and dividing by their sum would hide a writer that stopped
+    conserving them."""
+    kappas = sorted(runs, reverse=True)
+    if len(kappas) < 2:
+        print("need two κ for the contrast figure — skipped")
+        return
+    fig, axes = plt.subplots(1, len(kappas), figsize=(5.2 * len(kappas), 4.0),
+                             sharey=True)
+    axes = np.atleast_1d(axes)
+    width = 0.4
+    labels = None
+    for ax, kappa in zip(axes, kappas):
+        entry = runs[kappa]
+        keys = slow_to_fast({t for (tag, t) in entry["pops"] if tag == "rise"},
+                            entry["index"])
+        if not keys:
+            continue
+        key = keys[-1]                      # slowest
+        notes = []
+        for i, tag in enumerate(("rise", "fall")):
+            pops = entry["pops"].get((tag, key))
+            if pops is None:
+                continue
+            ms = [k for k in pops if k.startswith("m")]
+            labels = ms
+            vals = [pops[k][-1] for k in ms]
+            x = np.arange(len(ms)) + (i - 0.5) * (width + 0.02)
+            ax.bar(x, vals, width=width, color=CAT[i],
+                   label="$B$ rising" if tag == "rise" else "$B$ falling")
+            notes.append(f"{'rising' if tag == 'rise' else 'falling'}: "
+                         f"{_n_populated(vals, thresh)} levels ≥ {thresh:.0%}, "
+                         f"$1/\\Sigma p^2$ = {_participation(vals):.1f}")
+        ax.annotate("\n".join(notes), xy=(0.02, 0.97), xycoords="axes fraction",
+                    va="top", ha="left", color=INK2, fontsize=9)
+        order = "bistable side" if kappa >= 1.0 else "crossover control"
+        ax.set_title(f"$\\kappa = {kappa:g}$  ({order})", color=INK)
+        ax.set_xlabel("Zeeman sublevel  $m_F$")
+        ax.grid(axis="y", alpha=0.9)
+        ax.set_axisbelow(True)
+    if labels:
+        for ax in axes:
+            ax.set_xticks(np.arange(len(labels)))
+            ax.set_xticklabels([l.replace("m", "$m_F$=") if l == labels[0] else l[1:]
+                                for l in labels])
+    axes[0].set_ylabel("fractional population")
+    axes[0].legend(loc="upper right")
+    fig.suptitle("Predicted Stern-Gerlach readout after a slow $B_z$ ramp — "
+                 "the level count is the discriminator", color=INK)
+    fig.tight_layout()
+    fig.savefig(out, dpi=200)
+    print(f"wrote {out}")
+
+
 def fig_loop_width(runs: dict, out: Path,
                    static: dict[float, float] | None = None) -> None:
     """Loop width vs ramp rate — the figure that carries the verdict.
@@ -510,6 +582,7 @@ def main() -> None:
                    static_b_eq(a.window), branches)
     fig_conversion(runs, a.out / f"{a.prefix}_conversion.png")
     fig_sg_signal(runs, a.out / f"{a.prefix}_sg_signal.png")
+    fig_sg_kappa_contrast(runs, a.out / f"{a.prefix}_sg_kappa_contrast.png")
     fig_loop_width(runs, a.out / f"{a.prefix}_loop_width.png",
                    static_spinodal_separation(branches))
 
