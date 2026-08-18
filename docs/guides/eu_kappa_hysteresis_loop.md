@@ -484,10 +484,15 @@ What the campaign delivers instead, all of it new and all of it falsifiable:
 The falsifiable statement to hand the demagnetisation experiment is therefore **not**
 "a loop appears at κ ≳ 1 and not at κ ≤ 0.9" but:
 
-> **Ramp B_z slowly (≳ 60 ms) at two trap aspect ratios and count Zeeman levels.
-> At κ ≈ 1.8 the Stern-Gerlach signal spreads over six or seven sublevels; at
-> κ ≈ 0.9 it stays in two to four. No scattering length has to be known, and the count is the same in
-> both ramp directions, so a single direction suffices.**
+> **Ramp B_z DOWN — from ≈ 90 to ≈ 20 µG, in ≳ 17 ms — at two trap aspect ratios
+> and count Zeeman levels. At κ ≈ 1.8 the Stern-Gerlach signal spreads over six or
+> seven sublevels; at κ ≈ 0.9 it stays in three or four.**
+
+No scattering length has to be known, and one ramp direction suffices. The falling
+direction is specified rather than left free: it is the leg on which J_z is conserved
+to ≤ 3.6×10⁻⁴ at *both* κ at every rate, so the comparison is between two
+J_z-conserving evolutions. On the rising leg at κ = 0.9 the pin drags J_z by up to
+55 % at slow rates (§5.7), which would put part of the contrast down to the pin.
 
 ### 5.8 Grid check
 
