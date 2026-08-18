@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────
+#  #337 criterion B, second axis — the FM/polar line in c1_ratio.
+#
+#  WHY NOT THE FIELD AXIS. config_arms.yaml scanned Bz and answered the physics
+#  but not the boundary question: at c1_ratio = 1/36 the stretched branch is
+#  ALREADY below the polar one at B = 0 (ΔE = −0.085), so the baseline crossing
+#  lies outside B ≥ 0 and only the two LHY arms that push ΔE positive have a
+#  boundary to report. The campaign's own precision axis is c1 — see
+#  config_c1_precise_B0k1.yaml, which pins c1* ≈ 0.028–0.029 at B = 0, κ = 1 —
+#  and that is where every arm's crossing exists.
+#
+#  B = 5 µG, NOT 0. At B = 0 the stretched branch sits on an exactly degenerate
+#  spin manifold and the solver stalls: measured |∇E| = 5.7e-1 at B = 0 against
+#  4.8e-6 at 5 µG, same everything else. 5 µG breaks the degeneracy and costs
+#  nothing on the polar branch, whose energy is B-independent to 1e-9 across the
+#  whole 0–70 µG scan (Mz = 0, and q ~ 1e-8).
+#
+#  SENSITIVITY, from config_arms.yaml at c1 = 1/36, B = 5 µG. ΔE and its shift
+#  against the `none` arm:
+#      none            −0.1195
+#      one functional  −0.1101   δ = +0.0094
+#      own ansatz      +0.1896   δ = +0.3091
+#      spatial         +0.2069   δ = +0.3264
+#      scalar ×10      −0.0811   δ = +0.0384
+#  With ∂ΔE/∂c1 ≈ 70 (from c1* ≈ 0.029 and ΔE(1/36) = −0.085 at B = 0) the
+#  crossings are predicted at c1* ≈ 0.0290 (none), 0.0289 (one functional),
+#  0.0246 (own ansatz), 0.0243 (spatial), 0.0277 (×30 control). The window below
+#  brackets all five with ≥ 2 points either side at a 0.001 step.
+#
+#  REJECTION CRITERION, written before launch. If the ×30 control fails to move
+#  c1* by ≥ 0.001 the instrument is blind and no verdict may be read off the
+#  physics arms. If it passes, the answer to #337-B is δc1* per arm, converted to
+#  µG through the field slope measured in config_arms.yaml.
+#
+#  11 c1 × 9 comparison runs = 99 solves, submitted as 11 array tasks.
+# ─────────────────────────────────────────────────────────────────────
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.027}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "5.0e-6 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 4000
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.interactions.c1_ratio: {from: 0.022, to: 0.032, n: 11}
+  comparison_runs:
+    - {name: fm_none,      override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar_none,   override: {pipeline.0.initial_state: polar}}
+    - {name: fm_fmdip,     override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: fm_dipolar}}}
+    - {name: polar_fmdip,  override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: fm_dipolar}}}
+    - {name: polar_polcon, override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: polar_contact}}}
+    - {name: fm_spatial,   override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: spatial, n_points: 40}}}
+    - {name: polar_spatial, override: {pipeline.0.initial_state: polar,   pipeline.0.lhy: {kind: spatial, n_points: 40}}}
+    # POSITIVE CONTROL at ×30 rather than ×10: at ×10 the predicted c1* shift is
+    # 0.00055, barely one step of this grid. A control that lands inside the
+    # resolution proves nothing.
+    - {name: fm_ctrl30,    override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: scalar, c_lhy: 177564.0}}}
+    - {name: polar_ctrl30, override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: scalar, c_lhy: 177564.0}}}
