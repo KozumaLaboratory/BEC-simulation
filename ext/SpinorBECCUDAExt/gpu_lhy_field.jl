@@ -33,18 +33,26 @@ end
 function _assert_uniform_lhy_grid(xs, m::Int)
     all(k -> abs((xs[k + 1] - xs[k]) - (xs[2] - xs[1])) <=
              1e-9 * max(abs(xs[2] - xs[1]), 1.0), 1:(m - 1)) ||
-        throw(ArgumentError(
-            "GPU LHY lookup needs a uniform density grid; got a non-uniform one " *
-            "with $m nodes. Build the table with `range(0, n_max; length=n)`."))
+        throw(
+            ArgumentError(
+                "GPU LHY lookup needs a uniform density grid; got a non-uniform one " *
+                "with $m nodes. Build the table with `range(0, n_max; length=n)`."),
+        )
     nothing
 end
 
-const _LHY_TABLE_CACHE = Dict{Tuple{UInt64, DataType}, Any}()
-
+# Routed through the shared scratch registry rather than a local
+# `Dict{objectid}`. `objectid` is address-derived for a struct with Vector
+# fields, and this cache held no reference to `l`, so once a table was collected
+# a later `TabulatedLHY` landing on the same address inherited its device copy —
+# silently, as a wrong LHY potential. `scratch_get!` is an `IdDict` whose key
+# tuple HOLDS the object, which both pins it against GC and makes the id
+# unreusable; `_to_device_cached` (foundation/backend.jl) spells out the same
+# rationale, and `foundation/scratch.jl` says the registry exists precisely to
+# replace ad-hoc IdDict caches like this one.
 function _device_lhy_table(l::SpinorBEC.TabulatedLHY, ::Type{RT},
     proto::CUDA.CuArray) where {RT}
-    key = (objectid(l), RT)
-    get!(_LHY_TABLE_CACHE, key) do
+    SpinorBEC.scratch_get!(:gpu_lhy_table, (l, RT)) do
         CUDA.CuArray(RT.(l.potential_values))
     end::CUDA.CuArray{RT, 1}
 end
@@ -96,11 +104,15 @@ end
     2.5 * e1 * n * sqrt(n)
 end
 
-const _SPATIAL_LHY_CACHE = Dict{UInt64, Any}()
-
+# Same change, same reason as `_device_lhy_table` above: the key held only the
+# address, not the object.
 function _device_spatial_table(l::SpinorBEC.SpatialLHY)
-    get!(_SPATIAL_LHY_CACHE, objectid(l)) do
-        (CUDA.CuArray(l.polarisations), CUDA.CuArray(l.e1_values))
+    SpinorBEC.scratch_get!(
+        :gpu_spatial_lhy_table, l
+    ) do
+        (
+            CUDA.CuArray(l.polarisations), CUDA.CuArray(l.e1_values)
+        )
     end::Tuple{CUDA.CuArray{Float64, 1}, CUDA.CuArray{Float64, 1}}
 end
 
