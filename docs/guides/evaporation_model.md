@@ -184,7 +184,13 @@ evaporation works — across `K₃` ×0.5–1, `α` ×1.0–1.15, `τ_bg` 8–30
   shipped default `1.61×10⁻⁴⁰` is itself already above the band and still over-predicts
   by 1.31×. So the endpoint gap is a **model deficiency, not a parameter to tune**, and a
   "parameter-free prediction that brackets the measurement" is not available here. Swept
-  on 2026-08-05 over `K₃ ∈ [10⁻⁴²·³, 10⁻³⁹·³]` at both anchors.
+  over `K₃ ∈ [10⁻⁴²·³, 10⁻³⁹·³]` at both anchors — `figures/eu_evap_k3_band_exclusion.png`,
+  regenerate with `figures/eu_evap_k3_band_exclusion.jl <outdir>` then its `_plot.py`.
+  The right panel is the same figure's other half: **no anchor is both physical in
+  `η_start` and agreeing at the endpoint**, which is this bullet and the one above it
+  seen together.
+
+  ![K₃ band exclusion](figures/eu_evap_k3_band_exclusion.png)
 
 For a schedule that does **not** sit on a cliff, optimize the **worst case** over the
 calibration-uncertainty set:
