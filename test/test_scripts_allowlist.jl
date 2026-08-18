@@ -77,6 +77,17 @@ const _SCRIPTS_ALLOWLIST = Set([
     "viz_eu_edh_quantisation.py",
     "viz_eu_kappa_ramp.py",
     "viz_eu_torque.py",
+    # ── active campaign: Eu κ-hysteresis loop (docs/guides/eu_kappa_hysteresis_loop.md, #352) ──
+    "eu_hysteresis/_preamble.sh",
+    "eu_hysteresis/branch_continuation.jl",
+    "eu_hysteresis/branch_stability.jl",
+    "eu_hysteresis/launch.sh",
+    "eu_hysteresis/loop_width.jl",
+    "eu_hysteresis/sg_signature.jl",
+    "eu_hysteresis/submit_branch.sh",
+    "eu_hysteresis/submit_ramp.sh",
+    "eu_hysteresis/submit_smoke.sh",
+    "eu_hysteresis/submit_stability.sh",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",

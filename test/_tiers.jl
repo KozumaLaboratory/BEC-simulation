@@ -35,6 +35,9 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    # The #335 loop-width extractor refuses to report until its controls pass;
+    # that refusal is the guarantee, so it is gated rather than left to --selftest.
+    "analysis/test_hysteresis_conversion_depth.jl",
     "analysis/test_spin_rotation.jl",
     "analysis/test_sign_pattern.jl",
     "analysis/test_polyhedral_classifier.jl",
