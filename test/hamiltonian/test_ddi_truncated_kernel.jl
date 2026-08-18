@@ -16,7 +16,7 @@
 # the periodic-image contamination of the un-padded convolution — a deviation
 # from *continuous* rotational symmetry that is only visible against a free-space
 # / large-box reference. That convergence diagnostic lives in
-# `scripts/ddi_truncation_isotropy_probe.jl` (B: physics-fidelity); the asserts
+# `ddi_truncation_isotropy_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)` (B: physics-fidelity); the asserts
 # below pin the kernel construction itself (A: code-correctness).
 
 using Test

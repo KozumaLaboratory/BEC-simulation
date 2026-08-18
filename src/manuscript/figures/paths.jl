@@ -15,9 +15,15 @@ const _MANUSCRIPT_PAPER_DIRS = Dict(
 const _MANUSCRIPT_PROJECT_ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
 
 function manuscript_figure_dir(paper::AbstractString)
-    paper_dir = get(_MANUSCRIPT_PAPER_DIRS, String(paper), String(paper))
-    dir = joinpath(_MANUSCRIPT_PROJECT_ROOT,
-        "docs", "manuscript", "papers", paper_dir, "figures")
+    # The "docs" pseudo-paper collects documentation figures; they land in
+    # docs/figs/ (the paths the prose already knows), not under papers/.
+    dir = if String(paper) == "docs"
+        joinpath(_MANUSCRIPT_PROJECT_ROOT, "docs", "figs")
+    else
+        paper_dir = get(_MANUSCRIPT_PAPER_DIRS, String(paper), String(paper))
+        joinpath(_MANUSCRIPT_PROJECT_ROOT,
+            "docs", "manuscript", "papers", paper_dir, "figures")
+    end
     mkpath(dir)
     return dir
 end
@@ -29,10 +35,15 @@ function manuscript_figure_path(paper::AbstractString, fig::AbstractString,
 end
 
 # Helper: write structured CSV alongside a matplotlib renderer.
+# `basename` overrides the `<fig>_<paper>` naming for figures whose output
+# path predates the registry (e.g. the docs/figs/ PNGs).
 function _emit_csv_py(io::IO, paper::AbstractString, fig::AbstractString,
-    csv::AbstractString, py::AbstractString)
+    csv::AbstractString, py::AbstractString;
+    basename::Union{Nothing, AbstractString}=nothing)
     dir = manuscript_figure_dir(paper)
-    base = joinpath(dir, lowercase(String(fig)) * "_" * paper)
+    base = joinpath(dir,
+        basename === nothing ? lowercase(String(fig)) * "_" * paper :
+        String(basename))
     csv_path = base * ".csv"
     py_path = base * ".py"
     open(csv_path, "w") do f

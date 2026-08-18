@@ -13,7 +13,7 @@
 #   T:E_1 multiplicity 2 (deferred)
 #   O:A_2 multiplicity 1
 #
-# Run: julia --project=. scripts/manuscript/f9_f11_polyhedral_verification.jl
+# Run: the archived f9_f11_polyhedral_verification.jl driver
 
 using Test
 using SpinorBEC

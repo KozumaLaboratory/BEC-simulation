@@ -14,3 +14,5 @@
 
 include("validation/reference_rhs.jl")
 include("validation/dumb_reference.jl")
+include("validation/validation_matrix.jl")
+include("validation/matsui_fig4b_report.jl")

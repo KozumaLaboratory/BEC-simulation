@@ -67,9 +67,6 @@ using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
 
-include(joinpath(@__DIR__, "eu_gs_library.jl"))     # load_lib
-include(joinpath(@__DIR__, "eu_ramp_common.jl"))    # spin_scalars, seed assertions
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 const SMOKE = get(ENV, "KR_SMOKE", "") == "1"
 const B_HOLD = getf("KR_B_HOLD", 20.0)
@@ -141,8 +138,10 @@ function build_shape()
         @. 1.0 + SHAPE_AMP * exp(-((ks - SHAPE_KAPPA) / SHAPE_WIDTH)^2)
     elseif SHAPE === :const_dF
         isfile(SHAPE_REF) ||
-            error("KR_SHAPE=const_dF needs KR_SHAPE_REF=<a kramp_tau*.csv to read " *
-                  "d⟨F⊥⟩/dκ from>; got '$SHAPE_REF'")
+            error(
+                "KR_SHAPE=const_dF needs KR_SHAPE_REF=<a kramp_tau*.csv to read " *
+                "d⟨F⊥⟩/dκ from>; got '$SHAPE_REF'",
+            )
         rows = readlines(SHAPE_REF)
         hdr = split(rows[1], '\t')
         ci = Dict(strip(h) => i for (i, h) in enumerate(hdr))
@@ -158,12 +157,14 @@ function build_shape()
         kk, ff = kk[1:i], ff[1:i]
         o = sortperm(kk)
         kk, ff = kk[o], ff[o]
-        f_on_ks = [begin
-            j = searchsortedfirst(kk, κ)
-            j = clamp(j, 2, length(kk))
-            ff[j - 1] + (ff[j] - ff[j - 1]) *
-                        (κ - kk[j - 1]) / max(kk[j] - kk[j - 1], eps())
-        end for κ in ks]
+        f_on_ks = [
+            begin
+                j = searchsortedfirst(kk, κ)
+                j = clamp(j, 2, length(kk))
+                ff[j - 1] + (ff[j] - ff[j - 1]) *
+                (κ - kk[j - 1]) / max(kk[j] - kk[j - 1], eps())
+            end for κ in ks
+        ]
         d = abs.(diff(f_on_ks) ./ diff(ks))
         d = vcat(d, d[end])
         # floor at 15 % of the mean: without it a flat stretch would take zero time
@@ -235,7 +236,7 @@ set_kappa!(ws, A, B, κ) = (@. ws.potential_values = A + κ^2 * B; nothing)
 
 """Converged κ_start ground state at the held field, with the epoch assertion."""
 function seed()
-    e = load_lib(; κ=K0, B_uG=B_HOLD, branch=SEED_BRANCH, grid=GRID_N, lib=LIB)
+    e = load_gs(; κ=K0, B_uG=B_HOLD, branch=SEED_BRANCH, grid=GRID_N, lib=LIB)
     abs(e.meta.B - B_HOLD) < 0.5 ||
         error(
             "no converged κ=$K0 library state at B=$B_HOLD µG " *
@@ -454,7 +455,7 @@ for τ in TAUS
 
     ks = collect(keys(manifest[1]))
     open(joinpath(OUT, SHAPE === :linear ? "manifest.csv" :
-                          "manifest_$(SHAPE).csv"), "w") do io
+                       "manifest_$(SHAPE).csv"), "w") do io
         writedlm(io, reshape(String.(ks), 1, :))
         for m in manifest
             writedlm(io, reshape(Any[getfield(m, k) for k in ks], 1, :))

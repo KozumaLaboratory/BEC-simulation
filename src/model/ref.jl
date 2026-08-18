@@ -257,7 +257,7 @@ ref_quantities(source::Symbol) = sort!(Symbol.(collect(keys(_ref_doc(source)["qu
 
 # Deliberately the ONLY parser of these fixtures inside `src/`. The same CSV is
 # also read by `test/validation/test_matsui_fig4_dip.jl` and by
-# `scripts/validation/matsui_fig4b_report.jl`; three implementations of one parse
+# `matsui_fig4b_report` (src/validation/matsui_fig4b_report.jl); three implementations of one parse
 # is a parallel declaration of the reference curve, which is the disease one
 # level down. Those two are the next callers to move onto this.
 function _split_quoted(line::AbstractString)

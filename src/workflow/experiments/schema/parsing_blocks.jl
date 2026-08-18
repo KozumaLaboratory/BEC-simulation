@@ -489,7 +489,7 @@ Map a YAML `ddi.trunc_radius` value to the `make_workspace` sentinel:
 absent ⇒ `-1.0` (auto); `"auto"`/`"box_half"` ⇒ `-1.0`; `"none"`/`"off"` ⇒
 `NaN` (the bare periodic kernel); a number ⇒ that value.
 
-Absent used to mean OFF. Measured 2026-07-29 (`scripts/ddi_cutoff_geometry_jz_probe.jl`):
+Absent used to mean OFF. Measured 2026-07-29 (`ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)`):
 the bare periodic kernel carries a 2.1e-2 … 4.7e-2 dipolar field error against
 free space, and the error is FLAT in resolution — 1.91e-2 at 32³, 48³ and 64³
 alike — so no amount of grid refinement touches it. `"none"` keeps the old

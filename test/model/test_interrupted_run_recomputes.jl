@@ -49,6 +49,7 @@ using YAML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload,
     _reset_unmarked_warnings!
+include(joinpath(@__DIR__, "..", "helpers", "interrupt_harness.jl"))
 
 # 1-D, 64 points, CPU. The step budget is large so that the interrupt lands far
 # from convergence; the recomputation still finishes in a few seconds.
@@ -83,17 +84,12 @@ interrupt_probe_config() = Dict{String, Any}(
         # The two preconditions that stop this gate passing for the wrong
         # reason: the ITP really ran, and it is still running when we hit it.
         @test isfile(itp_ckpt)
-        # If the solve already finished we have not measured the property, and
-        # `schedule` on a finished task throws ErrorException("schedule: Task not
-        # runnable"), which aborts the whole FILE and takes the sibling gates with
-        # it. Observed once under load, when this file ran after the dynamics
-        # interrupt file. A lost race must be a clean FAILURE that names itself,
-        # never an error that hides its siblings.
-        won_race = !istaskdone(task)
-        won_race || @warn "interrupt harness LOST THE RACE: the run finished before the " *
-            "interrupt was delivered, so this gate measured nothing"
+        # If the solve already finished we have not measured the property. The
+        # delivery IS the check — see test/helpers/interrupt_harness.jl for why
+        # asking `istaskdone` first cannot work. A lost race is a clean FAILURE
+        # that names itself, never an error that hides its siblings.
+        won_race = warn_lost_race(deliver_interrupt!(task))
         @test won_race
-        won_race && schedule(task, InterruptException(); error=true)
         task_returned_normally = try
             wait(task)
             true
@@ -180,17 +176,12 @@ end
             sleep(0.02)
         end
         @test isfile(itp_ckpt)
-        # If the solve already finished we have not measured the property, and
-        # `schedule` on a finished task throws ErrorException("schedule: Task not
-        # runnable"), which aborts the whole FILE and takes the sibling gates with
-        # it. Observed once under load, when this file ran after the dynamics
-        # interrupt file. A lost race must be a clean FAILURE that names itself,
-        # never an error that hides its siblings.
-        won_race = !istaskdone(task)
-        won_race || @warn "interrupt harness LOST THE RACE: the run finished before the " *
-            "interrupt was delivered, so this gate measured nothing"
+        # If the solve already finished we have not measured the property. The
+        # delivery IS the check — see test/helpers/interrupt_harness.jl for why
+        # asking `istaskdone` first cannot work. A lost race is a clean FAILURE
+        # that names itself, never an error that hides its siblings.
+        won_race = warn_lost_race(deliver_interrupt!(task))
         @test won_race
-        won_race && schedule(task, InterruptException(); error=true)
         @test try
             wait(task)
             true
@@ -209,4 +200,32 @@ end
         res = joinpath(run_dir, "result.jld2")
         !isfile(res) || @test !isfile(marker_path(res))
     end
+end
+
+# The canary for the harness itself (#346). The gates above can only ever
+# exercise `deliver_interrupt!`'s WINNING branch — a lost race is by definition
+# the rare one — so without this the losing branch would be untested code that
+# only ever runs on the day it matters. That is exactly how the predecessor
+# failed: it was written to turn a lost race into a clean failure, and nobody
+# could show that it did.
+@testset "deliver_interrupt! reports a lost race instead of throwing (#346)" begin
+    finished = @async 1 + 1
+    wait(finished)
+    @test istaskdone(finished)
+    # The old `istaskdone`-then-`schedule` shape threw here, outside any @test,
+    # killing the whole file.
+    @test deliver_interrupt!(finished) === false
+    @test warn_lost_race(false) === false
+
+    running = @async (sleep(120); :never)
+    while !istaskstarted(running)
+        sleep(0.01)
+    end
+    @test deliver_interrupt!(running) === true
+    @test warn_lost_race(true) === true
+    try
+        wait(running)
+    catch
+    end
+    @test istaskdone(running)
 end
