@@ -139,7 +139,94 @@ H100 and ends with a negative control that must refuse.
 
 ## 5. Results
 
-*(filled in as runs land; each row names its run directory)*
+### 5.1 The static branches at κ = 1.8 — the open end is closed, and it is one-sided
+
+`runs/eu335/branch_k1.8_{up,dn}_g32` (32³, ε = 0.002, unpadded, ΔB = 5 µG; plus
+`branch_k1.8_up_g32_fine` at ΔB = 1 µG). Every cell quoted below reached
+|∇E| ≈ 1×10⁻⁵ with `stop_reason = tol`, and moved by < 2×10⁻⁵ in ⟨F⊥⟩ under a
+second polish of the same budget — so these are settled cells by criterion 6, not
+merely small-gradient ones.
+
+**The flower branch ends.** Walked upward from the converged 20 µG state it
+survives, converged, to **67 µG** and has collapsed by **70 µG**:
+
+| B [µG] | 20 | 40 | 55 | 60 | 65 | 67 | 70 | 75 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| ⟨F⊥⟩ | 5.137 | 4.092 | 3.120 | 2.796 | 2.478 | 2.352 | **0.938** | 1.045 |
+| ⟨F_z⟩ | −1.04 | −2.36 | −3.46 | −3.82 | −4.17 | −4.31 | −4.56 | −4.84 |
+
+The 70 µG cell is the collapse in progress and is **excluded** by criterion 6 —
+`stop_reason = max_steps`, |∇E| = 4.9×10⁻³, and ⟨F⊥⟩ still moving by 3.2×10⁻² under
+more polishing. Above it the continuation has fallen onto the polarised branch
+(⟨F_z⟩ → −5.8, ⟨F⊥⟩ ≈ 1.0–1.4), which is exactly what a branch ending looks like
+from a warm continuation.
+
+**The polarised branch does not end.** Walked downward from 300 µG it stays
+converged at the gate all the way to **5 µG**, with ⟨F⊥⟩ shrinking monotonically
+and no collapse anywhere:
+
+| B [µG] | 100 | 90 | 60 | 40 | 20 | 10 | 5 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ⟨F⊥⟩ | 1.372 | 1.310 | 0.720 | 0.321 | 0.0745 | 0.0301 | 0.0203 |
+| ⟨F_z⟩ | −5.77 | −5.52 | −3.94 | −2.60 | −1.26 | −0.62 | −0.31 |
+
+Its 20 µG energy, 10.863612, reproduces the independently converged reference
+(10.864086, `figs/eu_kappa_ramp/B020/reference_branches.csv`) — the same branch
+reached two ways.
+
+**So the loop at κ = 1.8 is one-sided, and this is the campaign's main structural
+finding.** The rising edge is a genuine mean-field **spinodal at 67–70 µG**: the
+flower branch stops existing there, so a rising ramp must convert by then at *any*
+rate. The falling edge is **not** a spinodal — the polarised branch is still a
+stationary state at 27.4 µG where the predecessor's falling leg converted, and
+indeed everywhere down to 5 µG. A conversion there is barrier crossing driven by
+whatever excitation the ramp delivered, which means it moves with rate and does
+**not** saturate; in the adiabatic limit it should disappear.
+
+That distinction is the one #335 asks for in as many words: two converged minima
+with a barrier are *bistability*, not by themselves a first-order transition.
+Whether those low-field polarised cells are true minima or saddles that L-BFGS is
+content to sit on is not something a gradient norm can settle — §5.2.
+
+### 5.2 Is the polarised branch a minimum or a saddle?
+
+*(`runs/eu335/stability_k1.8_g32`, in flight)*
+
+### 5.3 The κ = 0.9 control, statically: one branch
+
+`runs/eu335/branch_k0.9_{up,dn}_g32`. The two continuations start from *different*
+states at *opposite* ends of the window — the flower at 20 µG walking up, the
+polarised state at 300 µG walking down — and **land on the same branch**, agreeing
+to 6–7 digits in the total energy across 35–80 µG:
+
+| B [µG] | 35 | 40 | 50 | 60 | 70 | 80 |
+|---|---:|---:|---:|---:|---:|---:|
+| E, from below | 7.068525 | 6.686985 | 5.839169 | 4.972532 | 4.101536 | 3.227555 |
+| E, from above | 7.068524 | 6.686985 | 5.839169 | 4.972532 | 4.101536 | 3.227555 |
+| ⟨F⊥⟩ | 1.263 | 1.212 | 1.104 | 0.982 | 0.888 | 0.812 |
+
+There is **no second branch to be metastable on**, which is what a crossover means
+and is the static half of the control. Below 30 µG the two scans separate slightly
+(⟨F⊥⟩ 2.84 vs 2.47 at 20 µG, E agreeing to 3.6×10⁻³) with several cells reporting
+`max_steps`: that is the soft manifold as B → 0 and the orientation freedom on it,
+not two branches — the energies agree three orders better than the branch
+separation at κ = 1.8 (which is ~1.5 in ⟨F⊥⟩ and 2.5×10⁻³ in E at the crossing).
+
+### 5.4 The rate scan
+
+*(`runs/eu335/ramp_g32`, in flight: κ ∈ {1.8, 0.9} × {rise, fall} over the common
+window [20, 90] µG at 7 rates from 40 down to 0.04 µG/ms)*
+
+### 5.5 A note on the predecessor's rising leg
+
+Its τ = 434 ms rising leg ended at 100 µG with ⟨F⊥⟩ = 1.608 and ⟨F_z⟩ = −5.132,
+and was read as "the flower survives to 100 µG". Against the static branches
+measured here the flower branch does not exist at 100 µG at all — but that run used
+ε = 0.001, half this campaign's pin, and a ramped state carries excitation, so its
+endpoint sits between the two static branches at ε = 0.002 (polarised: ⟨F⊥⟩ 1.372,
+⟨F_z⟩ −5.772) and cannot be re-assigned from here. It is **not** evidence that the
+flower survived, and it is not evidence that it did not. §5.4 measures the same leg
+at one pin over a window that contains the spinodal, which is what settles it.
 
 ## 6. Limits
 
