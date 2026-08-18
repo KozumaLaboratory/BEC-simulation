@@ -20,9 +20,15 @@
 # one verdict.
 #
 # CONTROLS — one state, two hold fields, straddling the known spinodal:
-#   positive  the last converged flower ψ, held a few µG PAST the end of its
-#             branch, must depart
+#   positive  the last converged flower ψ, held WELL past the end of its branch,
+#             must depart
 #   negative  the SAME ψ held at its own field must not
+# "Well past" is not slack. A spinodal is where the unstable mode's growth rate
+# passes through zero, so just past it nothing happens on any reasonable hold:
+# measured, the flower ψ from 68.25 µG held at 70 µG moved 0.089 in 217 ms. The
+# control uses +25 µG by default, and the departure TIME across a range of hold
+# fields is itself a result — it is what reconciles a branch that ends at 68.4 µG
+# with a ramp carrying flower-like ⟨F⊥⟩ well above it.
 # The pair differs in exactly the variable under test. Holding two different
 # states at two different fields would also have varied the branch and the
 # field mismatch, so a departure could have been non-stationarity instead of
@@ -30,16 +36,20 @@
 # which is the degenerate-knob trap in yet another costume.
 #
 # Env:
-#   SB_CELLS=a.jld2,b.jld2      cells to test (branch-scan psi.jld2 files)
-#   SB_HOLD_B=                  per-cell hold field [µG]; default each cell's own
+#   SB_CELLS=a.jld2;b.jld2      cells to test (branch-scan psi.jld2 files)
+#   SB_CELLS_N=                 expected count; guards the qsub -v comma cut
+#   SB_HOLD_B=70;80;90          hold fields [µG]; default each cell's own. A LIST
+#                               gives the departure time vs distance past the end
+#                               of the branch.
 #   SB_ETA=0.01                 perturbation as a FRACTION of ψ, density-weighted
 #   SB_HOLD_TAU=60              hold duration [ω_ref⁻¹]  (60 ≈ 87 ms)
 #   SB_DT=0.002  SB_FRAMES=120
 #   SB_REMIN=600                LBFGS cap for the re-minimisation (0 = skip)
 #   SB_KAPPA=1.8  SB_GRID=32  SB_BOX=24.0  SB_PIN=0.002  SB_PADDING=0
 #   SB_CONTROL_FLOWER=          the last converged flower cell; BOTH controls
-#   SB_CONTROL_UNSTABLE_B=      use it, held past its spinodal (default +4 µG)
+#   SB_CONTROL_UNSTABLE_B=      use it, held well past its spinodal (default +25)
 #   SB_CONTROL_STABLE_B=        and at its own field, so the pair differs only in B
+#   SB_DEPART=0.6               ⟨F⊥⟩ movement that counts as leaving the branch
 #   SB_OUT=figs/eu_hysteresis/stability
 #   SB_SKIP_CONTROLS=1          only for debugging; the result is then uncalibrated
 #
@@ -110,6 +120,17 @@ function load_cell(path)
     end
 end
 
+# A departure has to be large enough that it is a branch change and not the
+# breathing a perturbation excites on ANY state. A branch change moves ⟨F⊥⟩ by
+# ≈ 1.4 here (2.27 → 0.9); the threshold sits well below that and well above the
+# 0.001 a converged cell shows at its own field.
+const DEPART = getf("SB_DEPART", 0.6)
+
+struct BlindStability <: Exception
+    msg::String
+end
+Base.showerror(io::IO, e::BlindStability) = print(io, "BlindStability: ", e.msg)
+
 """Perturb ψ by a fraction η OF ITSELF, weighted by the local density.
 
 Not `add_white_noise!`: its `amp` is an ABSOLUTE per-point amplitude applied to
@@ -160,8 +181,13 @@ function hold(psi, B_uG, ε; η=ETA, τ=HOLD_TAU, seed=1)
         (step % save_every == 0 || step == n_steps) && rec!()
     end
     f0 = trace[1][2]
+    # First time the order parameter has moved by DEPART. NaN when it never does —
+    # which is the answer "it did not depart within this hold", not "it is stable":
+    # the hold is finite and the caller is told its length.
+    idx = findfirst(t -> abs(t[2] - f0) >= DEPART, trace)
     (; trace, f0, fperp_end=trace[end][2],
         max_excursion=maximum(abs(t[2] - f0) for t in trace),
+        t_depart_ms=idx === nothing ? NaN : trace[idx][1],
         drift_norm=trace[end][4] - trace[1][4])
 end
 
@@ -182,17 +208,6 @@ end
 
 # ----------------------------------------------------------------- calibration
 
-# A departure has to be large enough that it is a branch change and not the
-# breathing a noise kick excites on ANY state. A branch change moves ⟨F⊥⟩ by ≈ 2;
-# the threshold is set well below that and well above the ~0.05 a stable hold
-# shows, and the two controls demonstrate both sides.
-const DEPART = getf("SB_DEPART", 0.6)
-
-struct BlindStability <: Exception
-    msg::String
-end
-Base.showerror(io::IO, e::BlindStability) = print(io, "BlindStability: ", e.msg)
-
 """Show that HOLD can report unstable AND can report stable, before any cell's
 verdict is believed.
 
@@ -211,7 +226,14 @@ function calibrate_hold()
         "it is able to return `unstable`, and a stability test that can only say " *
         "`stable` is not a measurement"))
     c = load_cell(fl)
-    Bu = getf("SB_CONTROL_UNSTABLE_B", c.B + 4)     # past the spinodal
+    # WELL past the spinodal, not just past it. An instability's growth rate
+    # vanishes at the spinodal (generically as √(B − B_sp)), so a hold a couple of
+    # µG beyond the branch's end sees almost nothing: measured, the flower ψ from
+    # 68.25 µG held at 70 µG moved by 0.089 in 217 ms and the control correctly
+    # refused. That is physics, not a broken instrument — and §5.2 turns it into
+    # the departure-time scan. The control needs a field where the growth is fast
+    # enough to be unambiguous within the hold.
+    Bu = getf("SB_CONTROL_UNSTABLE_B", c.B + 25)
     Bs = getf("SB_CONTROL_STABLE_B", c.B)           # its own field
     bad = String[]
 
@@ -279,10 +301,19 @@ else
     calibrate_hold()
 end
 
+# SB_HOLD_B may be a LIST. Holding one state at several fields past its spinodal
+# is how the departure TIME is measured, and the departure time is what reconciles
+# a branch that ends at 68.4 µG with a ramp that carries flower-like ⟨F⊥⟩ well
+# above it: the branch is gone, but the mode that destroys it grows slowly near
+# the end of the branch.
+hold_fields = let s = get(ENV, "SB_HOLD_B", "")
+    isempty(strip(s)) ? Float64[] : parse.(Float64, split(s, r"[,;]"))
+end
+
 rows = NamedTuple[]
-for (i, p) in enumerate(cells)
+for (i, p) in enumerate(cells), B in (isempty(hold_fields) ? [NaN] : hold_fields)
     c = load_cell(p)
-    B = haskey(ENV, "SB_HOLD_B") ? getf("SB_HOLD_B", c.B) : c.B
+    B = isnan(B) ? c.B : B
     t0 = time()
     h = hold(c.psi, B, c.pin)
     r = REMIN > 0 ? remin(c.psi, B, c.pin) : nothing
@@ -295,13 +326,16 @@ for (i, p) in enumerate(cells)
     push!(rows, (; cell=i, path=p, B_uG=B, B_cell=c.B, pin=c.pin,
         fperp0=isnan(c.fperp0) ? h.f0 : c.fperp0, fperp_hold_end=h.fperp_end,
         hold_max_excursion=h.max_excursion, hold=verdict_hold,
+        t_depart_ms=h.t_depart_ms, hold_ms=HOLD_TAU * MS_PER_TAU,
         norm_drift=h.drift_norm,
         fperp_remin=r === nothing ? NaN : r.fperp,
         remin_grad=r === nothing ? NaN : r.grad,
         remin=verdict_remin, wall_s=round(time() - t0; digits=1)))
-    @printf("[%2d] B=%6.1f µG  ⟨F⊥⟩0=%.4f   HOLD %s (end %.4f, max Δ %.4f, |ψ|² drift %.1e)   REMIN %s (%.4f)  %.0fs\n",
-        i, B, rows[end].fperp0, verdict_hold, h.fperp_end, h.max_excursion,
-        h.drift_norm, verdict_remin, rows[end].fperp_remin, time() - t0)
+    @printf("[%2d] cell B=%6.2f held at %6.2f µG  ⟨F⊥⟩0=%.4f   HOLD %s (end %.4f, max Δ %.4f, t_depart %s ms of %.0f, |ψ|² drift %.1e)   REMIN %s (%.4f)  %.0fs\n",
+        i, c.B, B, rows[end].fperp0, verdict_hold, h.fperp_end, h.max_excursion,
+        isnan(h.t_depart_ms) ? "never" : string(round(h.t_depart_ms; digits=1)),
+        HOLD_TAU * MS_PER_TAU, h.drift_norm, verdict_remin,
+        rows[end].fperp_remin, time() - t0)
     flush(stdout)
     ks = collect(keys(rows[1]))
     open(joinpath(OUT, "stability.csv"), "w") do io
