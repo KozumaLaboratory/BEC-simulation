@@ -31,6 +31,8 @@
 #   NH_HOLD_MS=145                   hold time(s) [ms], `;`-separated
 #   NH_RMS_UG=0;0.05;0.15;0.5;1.5    AC rms of EACH transverse component [µG]
 #   NH_SHAPE=white                   white | pink | lines | brown | lorentzian
+#                                    | rotating (coherent circular tone, worst case)
+#   NH_ROT_HZ=11                     Ω/2π for shape=rotating
 #   NH_LINES=50;150;250              line frequencies [Hz] when shape=lines
 #   NH_SEEDS=20                      ensemble size
 #   NH_F_LO=1  NH_F_HI=1000          broadband band [Hz]
@@ -48,7 +50,7 @@ using SpinorBEC
 using SpinorBEC: spin_scalars, Units, eu151_preset, SpinSystem, make_workspace, SimParams,
     Waveform, TimeDependentZeeman, ConstantWaveform, CompositeWaveform,
     split_step_midpoint!,
-    FieldNoiseSpec, field_noise_waveform, max_frequency,
+    FieldNoiseSpec, SpectralNoiseWaveform, field_noise_waveform, max_frequency,
     component_populations, total_norm, magnetization, orbital_angular_momentum,
     CUDABackend, CPUBackend
 using JLD2: jldopen
@@ -85,6 +87,10 @@ const N_SEEDS = Int(getf("NH_SEEDS", 20))
 const F_LO = getf("NH_F_LO", 1.0)
 const F_HI = getf("NH_F_HI", 1000.0)
 const F_CORNER = getf("NH_F_CORNER", 1.0)
+# Ω/2π for shape=:rotating. 11 Hz is the predecessor's most efficient drive —
+# NOT the 33 Hz Larmor resonance; the mechanism is quasi-static dragging of
+# the transverse spin rather than a resonant flip.
+const ROT_HZ = getf("NH_ROT_HZ", 11.0)
 const OUT = get(ENV, "NH_OUT", "figs/eu_noise")
 mkpath(OUT)
 
@@ -140,10 +146,24 @@ function load_seed(path)
     end
 end
 
-"""The AC waveform for one transverse component: `rms_ug` of `SHAPE`, seeded."""
-function noise_wf(rms_ug, seed, dur_tau)
+"""The AC waveform for one transverse component: `rms_ug` of `SHAPE`, seeded.
+
+`:rotating` is not noise — it is a single COHERENT circularly polarised tone,
+b_x = A cos Ωt, b_y = A sin Ωt. It is here because it is the worst case and
+because it is the one arm with a published number to reproduce: the predecessor
+campaign found a rotating residual of 1.35 µG moving J_z by +1.6 in 145 ms at
+Ω/2π = 11 Hz. A broadband spec that cannot say how much worse a coherent tone is
+would let an experiment meet the rms number and still lose the state."""
+function noise_wf(rms_ug, seed, dur_tau; quad=false)
     rms_ug <= 0 && return nothing
     r = ug_to_p(rms_ug)
+    if SHAPE === :rotating
+        # A·sin has rms A/√2, so amplitude √2·rms keeps the per-component rms
+        # comparable with the broadband arms. cos = sin shifted by π/2, which is
+        # what makes the pair circular rather than two independent tones.
+        f = ROT_HZ / HZ_PER_UNIT
+        return SpectralNoiseWaveform([f], [sqrt(2.0) * r], [quad ? 0.0 : π / 2])
+    end
     spec = if SHAPE === :lines
         # All the power in the mains harmonics, split equally, so the total rms
         # matches the broadband arms it is compared against.
@@ -167,8 +187,12 @@ function hold(psi, pin_p, rms_ug, seed, τ)
     # components, and using one waveform for both would make it a fixed-azimuth
     # oscillation rather than a wandering direction. The seeds are offset rather
     # than reused so x and y are not the same trace.
+    # For :rotating the two components are one field in quadrature, so they share
+    # a seed and differ by the phase offset. For the random shapes they are
+    # INDEPENDENT realisations: one waveform on both would be a fixed-azimuth
+    # oscillation rather than a wandering direction.
     wx = noise_wf(rms_ug, seed, τ)
-    wy = noise_wf(rms_ug, seed + 100_000, τ)
+    wy = noise_wf(rms_ug, SHAPE === :rotating ? seed : seed + 100_000, τ; quad=true)
     # dt must resolve the fastest component, or the noise ALIASES to some other
     # frequency instead of averaging out — a silent change of the spectrum being
     # tested. Guard rather than assume.
@@ -263,7 +287,9 @@ for hold_ms in HOLDS_MS, rms in RMS_UG
     # rms = 0 is deterministic: one seed IS the ensemble, and running 20
     # identical holds would only inflate the wall clock and fake a spread of 0
     # that was never sampled.
-    seeds = rms == 0 ? [1] : collect(1:N_SEEDS)
+    # rms=0 and :rotating are deterministic — one run IS the ensemble, and
+    # repeating it would fake a spread of 0 that was never sampled.
+    seeds = (rms == 0 || SHAPE === :rotating) ? [1] : collect(1:N_SEEDS)
     for sd in seeds
         t0 = time()
         h = hold(S.psi, PIN_P, rms, sd, τ)
