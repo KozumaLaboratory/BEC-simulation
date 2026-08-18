@@ -321,16 +321,40 @@ end
 @printf("Eu adiabatic ramp protocol: κ=%.2f  grid=%d³ box=%.1f  %s%s\n",
     KAPPA, GRID_N, BOX, HAS_GPU ? "CUDA" : "CPU", SMOKE ? "  [SMOKE]" : "")
 
+# A seed is stationary only at ITS OWN field, so an explicit seed file DICTATES
+# where its leg starts. Assert that field is the window end the leg is supposed to
+# start from: handing the fall leg a 100 µG seed while declaring the window top as
+# 200 leaves the two legs spanning different windows, which is the exact defect
+# this campaign exists to remove — and it would show up only as a suspiciously
+# narrow loop.
+function seed_start(file, B_want, branch)
+    isempty(file) && return getf(
+        branch == "up" ? "AR_SEED_RISE_B" : "AR_SEED_FALL_B",
+        branch_edge(branch, :max))
+    isfile(file) || error("seed file $file does not exist")
+    B = jldopen(file, "r") do f
+        haskey(f, "B_uG") ? Float64(f["B_uG"]) :
+        error("seed $file records no B_uG, so its ramp start is unknown")
+    end
+    tol = getf("AR_SEED_B_TOL", 0.5)
+    abs(B - B_want) < tol || error("""
+        seed file is at B=$B µG but this leg must start at $B_want µG (the window
+        end), so the two legs would not span one field window.
+          seed = $file
+        Set AR_SEED_B_TOL to widen, or AR_B_LO/AR_B_HI to match the seeds.""")
+    B
+end
+
 legs = Any[]
 for leg in LEGS
     if leg == "rise"          # flower, metastable ABOVE B_eq → ramp up
         f = get(ENV, "AR_SEED_RISE_FILE", "")
-        B_seed = getf("AR_SEED_RISE_B", isempty(f) ? branch_edge("up", :max) : B_LO)
-        push!(legs, (; tag="rise", branch="up", B_seed, B_end=B_HI, file=f))
+        push!(legs, (; tag="rise", branch="up", B_seed=seed_start(f, B_LO, "up"),
+            B_end=B_HI, file=f))
     elseif leg == "fall"      # polarised, metastable BELOW B_eq → ramp down
         f = get(ENV, "AR_SEED_FALL_FILE", "")
-        B_seed = getf("AR_SEED_FALL_B", isempty(f) ? branch_edge("dn", :max) : B_HI)
-        push!(legs, (; tag="fall", branch="dn", B_seed, B_end=B_LO, file=f))
+        push!(legs, (; tag="fall", branch="dn", B_seed=seed_start(f, B_HI, "dn"),
+            B_end=B_LO, file=f))
     else
         error("unknown leg '$leg' (expected rise / fall)")
     end
