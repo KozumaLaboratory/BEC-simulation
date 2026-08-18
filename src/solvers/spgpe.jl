@@ -498,7 +498,13 @@ function _energy_damping_buffers(
     ws::Workspace, n_pts::NTuple{N, Int}, k_cut::Float64=Inf
 ) where {N}
     psi = ws.state.psi
-    key = (typeof(psi), n_pts, k_cut)
+    # NOT keyed on k_cut. Three of these four buffers do not depend on it, and the
+    # cutoff TRACKS the temperature — so keying them all on its value allocated a
+    # fresh set every step and retained the old ones: 2.0 MB per step at 44^3 over
+    # ~17000 steps, which is the 36.6 GB that killed three cluster runs with exit 137.
+    # The control loop was the suspect and measured only 1.3 GB of it
+    # (scripts/kz/mu_lda_allocation.jl), which is what sent the search here.
+    key = (typeof(psi), n_pts)
     divj = scratch_get!(:ed_divj, key) do
         _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
     end
@@ -514,13 +520,21 @@ function _energy_damping_buffers(
     # that multiplies the field, and the product was then removed by the caller's
     # projector — 0.05 % of the norm per step at ℳ̄ = 0.01 and 0.53 % at ℳ̄ = 0.1,
     # which over 20000 steps took N from 56.4 to 1.6e-3 and 1.2e-44.
+    # ONE buffer, refilled when the cutoff moves, rather than one per cutoff value.
+    # A tracking cutoff takes a different value every step, so caching by value is
+    # unbounded growth; the refill is a single broadcast over the grid, negligible
+    # beside the step's FFTs.
     kinv = scratch_get!(:ed_kinv, key) do
-        kc2 = k_cut^2
-        host = map(ws.grid.k_squared) do k2
-            (k2 > 0 && k2 <= kc2) ? real(eltype(psi))(1 / sqrt(k2)) :
-            zero(real(eltype(psi)))
-        end
-        _to_device(ws.backend, host)
+        _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
+    end
+    last_kc = scratch_get!(:ed_kinv_kc, key) do
+        Ref(NaN)
+    end
+    if last_kc[] != k_cut
+        kc2 = real(eltype(psi))(k_cut^2)
+        @. kinv = ifelse((ksq > 0) & (ksq <= kc2), 1 / sqrt(max(ksq, eps(kc2))), 0)
+        last_kc[] = k_cut
+    end
     end
     (divj, phase_k, ksq, kinv)
 end
