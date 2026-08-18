@@ -58,7 +58,7 @@ scan rather than after it.
 
 | axis | points | what it separates |
 |---|---|---|
-| ramp rate | 6 measured, 40 → 0.12 µG/ms (1.8–583 ms). A 7th at 0.04 was submitted and is not in the analysis | lag vs bistability vs crossover — the verdict |
+| ramp rate | 7 measured, 40 → 0.04 µG/ms (1.8–1750 ms) | lag vs bistability vs crossover — the verdict |
 | κ | 1.8 and 0.9 | whether the loop is attributable to κ at all |
 | grid | 32³ and 64³ | resolution sensitivity of the spinodal separation |
 | pin ε | 0.001 and 0.002 (0.068 and 0.135 µG) — run as §5.6; the planned 0.02 arm was superseded once §5.6 showed a 2× change already halves the effect | the shielding requirement |
@@ -405,14 +405,22 @@ rate ≤ 1 µG/ms (τ ≳ 60 ms) and in **both** ramp directions:
 
 | | κ = 1.8 | κ = 0.9 |
 |---|---:|---:|
-| m_F levels holding ≥ 5 % of the atoms | **6** | **2–3** |
-| participation ratio 1/Σp² (threshold-free) | **5.5–6.3** | **1.8–2.3** |
-| largest single population | 0.22–0.27 | 0.59–0.72 |
+| m_F levels holding ≥ 5 % of the atoms | **6–7** | **2–4** |
+| participation ratio 1/Σp² (threshold-free) | **4.72–7.41** | **1.66–2.88** |
+| largest single population | 0.22–0.36 | 0.47–0.72 |
 
-**Disjoint, with a three-level gap, from eight independent arms.** At κ = 0.9 the
-cloud stays in m_F = −6 and −5; at κ = 1.8 it spreads over m_F = −6 … 0 with no
-component above 0.27. The participation ratio says the same thing without any
-threshold, so the conclusion does not rest on where 5 % was drawn.
+**Disjoint, from ten independent arms** (2 legs × 5 rates ≤ 1 µG/ms), with a
+two-level gap in the count and a factor 1.6 between the closest participation ratios
+(2.88 against 4.72). At κ = 0.9 the cloud stays in m_F = −6 and −5; at κ = 1.8 it
+spreads over m_F = −6 … 0 with no component above 0.36. The participation ratio says
+the same thing without any threshold, so the conclusion does not rest on where 5 %
+was drawn.
+
+The margin is narrowest at the slowest arm (0.04 µG/ms, 1750 ms), which is also the
+one whose J_z drifted most — −0.248 out of −5.75, i.e. 4 %, against ≤ 0.07 at every
+faster rate. At that duration the pin has had long enough to break the axial symmetry
+appreciably, so it is the least clean arm and the quoted ranges would tighten to
+6 vs 2–3 without it. Both readings are given rather than the flattering one.
 
 ![Stern-Gerlach readout at two trap aspect ratios](../../figs/eu335/eu335_sg_kappa_contrast.png)
 
@@ -445,7 +453,7 @@ What the campaign delivers instead, all of it new and all of it falsifiable:
 | polarised branch's lower spinodal | **none above 5 µG** — it is a stable minimum throughout | §5.5b |
 | static branch separation at 20 µG | δ⟨F⊥⟩ = **5.06** (5.137 vs 0.075) | §5.1 |
 | κ = 0.9: number of branches | **one** — two continuations from opposite ends agree to 6–7 digits in E | §5.3 |
-| **the experimental discriminator** | **6 populated m_F levels at κ = 1.8 vs 2–3 at κ = 0.9**, both ramp directions, every rate ≤ 1 µG/ms | §5.7 |
+| **the experimental discriminator** | **6–7 populated m_F levels at κ = 1.8 vs 2–4 at κ = 0.9** — disjoint, both ramp directions, all 5 rates ≤ 1 µG/ms | §5.7 |
 | shielding sensitivity | doubling the residual transverse field 0.068 → 0.135 µG **halves** the transverse response | §5.6 |
 | grid | 32³ ↔ 64³: spinodal to **0.2 %**, ⟨F⊥⟩ to **≤ 0.3 %**, E to 1×10⁻⁵ relative | §5.8 |
 
@@ -453,8 +461,8 @@ The falsifiable statement to hand the demagnetisation experiment is therefore **
 "a loop appears at κ ≳ 1 and not at κ ≤ 0.9" but:
 
 > **Ramp B_z slowly (≳ 60 ms) at two trap aspect ratios and count Zeeman levels.
-> At κ ≈ 1.8 the Stern-Gerlach signal spreads over six sublevels; at κ ≈ 0.9 it
-> stays in two. No scattering length has to be known, and the count is the same in
+> At κ ≈ 1.8 the Stern-Gerlach signal spreads over six or seven sublevels; at
+> κ ≈ 0.9 it stays in two to four. No scattering length has to be known, and the count is the same in
 > both ramp directions, so a single direction suffices.**
 
 ### 5.8 Grid check

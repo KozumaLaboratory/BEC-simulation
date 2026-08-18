@@ -125,11 +125,16 @@ include(joinpath(@__DIR__, "..", "..", "scripts", "eu_hysteresis", "loop_width.j
         @test v.verdict == "dynamical_lag"
         @test occursin("still falling", v.reason)
 
-        # Nothing converted at any rate ⇒ crossover. This is the κ ≤ 0.9 control's
-        # expected verdict, and it must be distinguishable from "one leg open".
+        # Nothing converted at any rate is NOT reported as "crossover": it is also
+        # what a bistability the ramp cannot cross looks like, which is what κ=1.8
+        # turned out to be (branches in different conserved-J_z sectors). The
+        # verdict names the observation and defers the physics to the static branch
+        # count — otherwise this function would have contradicted an unambiguous
+        # static measurement.
         v = verdict([row(4.0, NaN; bound=true), row(0.4, NaN; bound=true)])
-        @test v.verdict == "crossover"
+        @test v.verdict == "no_loop_in_window"
         @test occursin("no leg converted", v.reason)
+        @test occursin("static branch count", v.reason)
 
         # One leg converting and the other not, at every rate, is NOT a crossover:
         # it is the open end, and it has to block the verdict rather than be read

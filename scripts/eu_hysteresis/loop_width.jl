@@ -356,10 +356,16 @@ function verdict(ls; sat_tol=0.10)
     conv = filter(r -> !r.is_lower_bound, ls)
     if isempty(conv)
         anyconv = any(r -> r.depth_rise >= DEFAULT_DEPTH || r.depth_fall >= DEFAULT_DEPTH, ls)
-        return (; verdict=anyconv ? "indeterminate" : "crossover",
+        # NOT "crossover". No loop in the ramps is consistent with a crossover, and
+        # equally with a bistability the ramp cannot cross — which is what κ=1.8
+        # turned out to be, its two branches sitting in different J_z sectors that a
+        # B_z ramp conserves. Calling this "crossover" from the ramps alone would
+        # have contradicted an unambiguous static measurement. The name says what
+        # was observed; the physics reading needs the static branch count too.
+        return (; verdict=anyconv ? "indeterminate" : "no_loop_in_window",
             reason=anyconv ?
                    "one leg converts and the other does not at every rate, so no rate yields a width — the open end must be closed before a verdict" :
-                   "no leg converted at any rate: no loop, which is what a crossover must show",
+                   "no leg converted at any rate. Consistent with a crossover AND with a bistability the ramp cannot cross (e.g. branches in different conserved-J_z sectors) — decide with the static branch count, not from these ramps",
             width=NaN, rel_change=NaN)
     end
     length(conv) < 2 && return (; verdict="indeterminate",
