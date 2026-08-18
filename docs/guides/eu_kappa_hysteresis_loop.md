@@ -150,7 +150,14 @@ Fixed in advance, so the interpretation is not chosen after the runs finish.
 | rate scan, both legs over one window | `scripts/eu_adiabatic_ramp_protocol.jl` (`AR_RATES`, `AR_SEED_*_FILE`) |
 | loop width by conversion depth, with its controls | `scripts/eu_hysteresis/loop_width.jl` |
 | figures | `scripts/viz_eu_adiabatic_ramp.py` (`--branches`, `--prefix`) |
-| TSUBAME submission | `scripts/eu_hysteresis/submit_{smoke,branch,ramp}.sh` |
+| TSUBAME submission | `scripts/eu_hysteresis/submit_{smoke,branch,ramp,stability}.sh`, driven by `launch.sh` |
+
+**Where the run outputs live, and where they do not.** The jobs write to the TSUBAME
+group area, `/gs/fs/tga-kozuma-kouhi/uk07267/runs/eu335/`. The CSVs are mirrored
+locally to `figs/eu335/`, which is **gitignored** — so the `figs/eu335/...` paths cited
+in §5 are NOT in the repository and a fresh clone will not have them. They are named
+so the numbers are attributable to a specific job, not so they can be opened. The ψ
+files (6.8 MB each at 32³) stay on TSUBAME.
 
 Run the smoke before any production launch; it renders every path in ≤ 2 h on an
 H100 and ends with a negative control that must refuse.
@@ -159,7 +166,7 @@ H100 and ends with a negative control that must refuse.
 
 ### 5.1 The static branches at κ = 1.8 — the open end is closed, and it is one-sided
 
-`runs/eu335/branch_k1.8_{up,dn}_g32` (32³, ε = 0.002, unpadded, ΔB = 5 µG; plus
+`figs/eu335/branch_k1.8_{up,dn}_g32` (32³, ε = 0.002, unpadded, ΔB = 5 µG; plus
 `branch_k1.8_up_g32_fine` at ΔB = 1 µG). Every cell quoted below reached
 |∇E| ≈ 1×10⁻⁵ with `stop_reason = tol`, and moved by < 2×10⁻⁵ in ⟨F⊥⟩ under a
 second polish of the same budget — so these are settled cells by criterion 6, not
@@ -221,11 +228,11 @@ content to sit on is not something a gradient norm can settle — §5.2.
 
 ### 5.2 Is the polarised branch a minimum or a saddle?
 
-*(`runs/eu335/stability_k1.8_g32`, in flight)*
+*(`figs/eu335/stability_k1.8_g32`, in flight)*
 
 ### 5.3 The κ = 0.9 control, statically: one branch
 
-`runs/eu335/branch_k0.9_{up,dn}_g32`. The two continuations start from *different*
+`figs/eu335/branch_k0.9_{up,dn}_g32`. The two continuations start from *different*
 states at *opposite* ends of the window — the flower at 20 µG walking up, the
 polarised state at 300 µG walking down — and **land on the same branch**, agreeing
 to 6–7 digits in the total energy across 35–80 µG:
@@ -245,7 +252,7 @@ separation at κ = 1.8 (which is ~1.5 in ⟨F⊥⟩ and 2.5×10⁻³ in E at the
 
 ### 5.4 The rate scan: no loop at either κ, and the reason is a selection rule
 
-`runs/eu335/ramp_g32`. Both legs over the **same** window [20, 90] µG at one pin,
+`figs/eu335/ramp_g32`. Both legs over the **same** window [20, 90] µG at one pin,
 at rates from 40 down to 0.12 µG/ms (1.8 ms to 583 ms). Norm drift 1×10⁻¹³ to
 8×10⁻¹¹; J_z drift ≤ 6×10⁻² on the slowest arm.
 
@@ -301,7 +308,7 @@ ramp somewhere else; a sector does. Registered before the runs: the falling leg 
 | predicted ⟨F⊥⟩ at 20 µG | ≈ 3.5–3.6 | intermediate | 2.80 (measured) |
 
 The 65 µG arm is the predecessor's own seed field, where it reported ⟨F⊥⟩ = 3.58.
-`runs/eu335/sector_test_B{65,75,90}`.
+`figs/eu335/sector_test_B{65,75,90}`.
 
 **Result: the sector dependence is confirmed; my predicted ordering was wrong.**
 
@@ -334,7 +341,7 @@ the controlling variable rather than a footnote — §5.6.
 
 ### 5.5b Is the polarised branch a minimum? Yes, and the flower's collapse is slow
 
-`runs/eu335/stability_{polar,flower}_k1.8`. The instrument's controls pass: the last
+`figs/eu335/stability_{polar,flower}_k1.8`. The instrument's controls pass: the last
 converged flower ψ (68.25 µG) held at 93.25 µG **departs** (⟨F⊥⟩ 2.274 → 1.490, max
 excursion 1.042), while the *same* ψ held at its own field does not (excursion
 0.001). So the hold can return both answers.
@@ -412,7 +419,7 @@ the DC offset (the pin at 0.135 µG left J_z flat to 3×10⁻³ over 434 ms, whi
 
 ### 5.7 What replaces the loop width: a discrete Stern-Gerlach level count
 
-`scripts/eu_hysteresis/sg_signature.jl` on `runs/eu335/ramp_g32`. At every ramp
+`scripts/eu_hysteresis/sg_signature.jl` on `figs/eu335/ramp_g32`. At every ramp
 rate ≤ 1 µG/ms (τ ≳ 60 ms) and in **both** ramp directions:
 
 **Use the FALLING leg.** It is the arm where J_z is conserved at both κ at *every*
@@ -528,7 +535,7 @@ The brackets overlap, the 64³ bracket contains the 32³ value, the midpoints di
 by **0.15 µG = 0.2 %**, and the order parameter at the last common field agrees to
 0.03 %. That is far inside the 15 % criterion §3 fixed in advance — the only one of
 the three grid criteria that could be evaluated, since the other two concerned a
-loop width that does not exist. `runs/eu335/branch_k1.8_up_g64{,_fine}`.
+loop width that does not exist. `figs/eu335/branch_k1.8_up_g64{,_fine}`.
 
 ## 7. Limits
 

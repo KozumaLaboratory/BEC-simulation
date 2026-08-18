@@ -15,15 +15,53 @@
 # Usage (pure CSV post-processing; no SpinorBEC, no GPU):
 #   julia --project=. scripts/eu_hysteresis/sg_signature.jl RAMP_DIR [--thresh=0.05]
 
-using DelimitedFiles: readdlm, writedlm
 using Printf
+
+# Plain-Julia TSV I/O. NOT DelimitedFiles: it is not a direct dependency of this
+# package, so it resolves under `--project=.` but NOT in the test environment that
+# `Pkg.test()` builds — which is where this file is gated. A post-processing script
+# reading tab-separated text does not need a package for it.
+"""Read a `writedlm`-produced TSV: header row, then rows. Returns (matrix, colmap)
+with numeric fields parsed to Float64 and everything else left as String."""
+function read_tsv_matrix(path::AbstractString)
+    lines = filter(!isempty, readlines(path))
+    isempty(lines) && error("empty file: $path")
+    hdr = String.(split(lines[1], '\t'))
+    rows = Any[]
+    for ln in lines[2:end]
+        c = split(ln, '\t')
+        length(c) < length(hdr) && continue
+        push!(rows, Any[something(tryparse(Float64, String(x)), String(x)) for x in c[1:length(hdr)]])
+    end
+    isempty(rows) && error("no data rows in $path")
+    A = Matrix{Any}(undef, length(rows), length(hdr))
+    for (i, r) in enumerate(rows), j in 1:length(hdr)
+        A[i, j] = r[j]
+    end
+    (A, Dict(strip(h) => i for (i, h) in enumerate(hdr)))
+end
+
+"""Write rows of NamedTuples as TSV with a header from the first row's keys."""
+function write_tsv(path::AbstractString, rows::AbstractVector)
+    isempty(rows) && return nothing
+    ks = collect(keys(rows[1]))
+    open(path, "w") do io
+        println(io, join(String.(ks), '\t'))
+        for r in rows
+            println(io, join((string(getfield(r, k)) for k in ks), '\t'))
+        end
+    end
+end
 
 const DEFAULT_THRESH = 0.05
 
 """Populations of the LAST frame of one `*_pops.csv`, with the m values."""
 function last_frame(path)
-    d = readdlm(path, '\t'; header=true)
-    A, h = d[1], vec(d[2])
+    A, ci = read_tsv_matrix(path)
+    h = Vector{Any}(undef, length(ci))
+    for (k, i) in ci
+        h[i] = k
+    end
     ms = Int[]
     cols = Int[]
     for (i, x) in enumerate(h)
@@ -112,13 +150,7 @@ function main(args)
     end
 
     if !isempty(out)
-        ks = collect(keys(rows[1]))
-        open(out, "w") do io
-            writedlm(io, reshape(String.(ks), 1, :))
-            for r in rows
-                writedlm(io, reshape(Any[getfield(r, k) for k in ks], 1, :))
-            end
-        end
+        write_tsv(out, rows)
         println("\nwrote $out")
     end
     0
