@@ -27,6 +27,8 @@ include("figures/paper3_fig4.jl")
 include("figures/paper3_fig6.jl")
 include("figures/paper4_fig2.jl")
 include("figures/paper4_fig3.jl")
+include("figures/docs_field_noise.jl")
+include("figures/docs_lhy_uv.jl")
 
 # Dispatch table: (paper, FIG-N) → (title, data_source, kind, builder)
 const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
@@ -125,6 +127,19 @@ const MANUSCRIPT_FIGURE_REGISTRY = Dict{Tuple{String, String}, NamedTuple}(
         data_source="runs/ensemble_traces_round5/",
         kind=:trace_overlay,
         builder=nothing,
+    ),
+    # "docs" pseudo-paper: documentation figures rendered into docs/figs/.
+    ("docs", "FIG-FIELD-NOISE") => (
+        title="Shielded field-noise budget vs weak-field Eu feature scale",
+        data_source="computed in-builder (FieldNoiseSpec, seed=11)",
+        kind=:line_plot,
+        builder=build_docs_field_noise,
+    ),
+    ("docs", "FIG-LHY-UV") => (
+        title="full_bdg spinor LHY UV-subtraction convergence",
+        data_source="computed in-builder (BdG zero-point integral)",
+        kind=:loglog_plot,
+        builder=build_docs_lhy_uv,
     ),
 )
 
