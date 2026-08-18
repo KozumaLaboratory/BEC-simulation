@@ -1,6 +1,12 @@
 # The κ-dependent hysteresis loop in weak-field ¹⁵¹Eu — one number for the demagnetisation experiment
 
-> **Status: 2026-08-18, answered.** §1–§3 were written BEFORE any compute and are
+> **FROZEN 2026-08-18.** A record of what was measured on that date, not a
+> maintained document — the repo's live/frozen gate asks every doc to be one or the
+> other, and nobody will be re-deriving these numbers as the code moves. The
+> measurements are reproducible from the runs named in §5 and the drivers in §4.
+> Live sources: `CLAUDE.md`, `docs/index.md`, and the code.
+>
+> **Answered.** §1–§3 were written BEFORE any compute and are
 > the pre-registration: the axes, the systematics, and the rejection criteria. §5
 > is the measurements, each row naming the run that produced it. §6 is the answer —
 > and it is not the answer the issue asked for, because **the loop is not a loop**:
