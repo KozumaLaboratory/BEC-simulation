@@ -11,8 +11,24 @@ current machinery") said could not be done.
 
 Everything below is measured at the campaign's own parameter point — ¹⁵¹Eu,
 `c1_ratio = 1/36`, N = 50000, ω_ref = 2π × 110 Hz, peak density n = 3.7e-3,
-32 propagation directions — by `bench/lhy_unstable_window.jl`,
-`bench/lhy_growth_vs_field.jl` and `bench/lhy_scheme_probe.jl`.
+32 propagation directions — by `bench/lhy_{scheme_probe,unstable_window,
+growth_vs_field,state_dependence,texture_polarisation}.jl` and the two GPU
+campaigns in `runs/eu_lhy_boundary_337/` (jobs 8440204 and 8440274, both GREEN).
+
+## The decision, in five lines
+
+1. **Use `fm_dipolar`** for any state with |⟨F⟩|/F ≈ 1. It is the fully-polarised
+   dipolar LHY the spinor-droplet literature uses, and it is *identical* to the
+   SI-anchored `scalar` × Q₅ path here (gated to 6.6e-16). §4.
+2. **Never give one ansatz's functional to a state of different |⟨F⟩|.** ε_LHY
+   differs 3.9× between p = 1 and p = 0 at this coupling, and doing so changes a
+   phase boundary by 26 % of `c1_ratio`. §5, §7.
+3. **For comparisons across different |⟨F⟩| use `:spatial`**, and quote ±6 %.
+   It assumes no ansatz and it is what decides between the two schemes. §5.4.
+4. **The residual ambiguity is ~6 %, not O(1)** — the issue's premise is too
+   strong, and a beyond-mean-field result here *is* quotable with an error bar. §3.
+5. **The mean-field FM/polar line at `c1_ratio ≈ 1/36` is not defensible.** LHY
+   does not displace it, it *creates* it. §5.3.
 
 ---
 
@@ -203,7 +219,8 @@ form; that gap is the spin-channel zero-point energy that the fully-polarised
 scheme omits by construction.
 
 **For comparing states of different |⟨F⟩| — one ansatz functional is not
-allowed, and the comparison is now quotable anyway.** ε_LHY at the campaign
+allowed, and §5 measures what it costs to do it anyway (a factor 21 on the
+boundary shift). The comparison is now quotable.** ε_LHY at the campaign
 point is 2.119e-3 for FM and 5.456e-4 for polar, a factor **3.9**. That is
 physics, not convention: applying the fully-polarised functional to a polar state
 overestimates it ~4×. So an FM-vs-polar energy ordering must evaluate each state
@@ -299,9 +316,133 @@ Zeeman argument predicts, because the stretched branch is `cyclic` rather than
 fully polarised at these fields — which is exactly why the slope has to be
 measured rather than derived.
 
-*(c1-axis boundary numbers: pending job 8440274.)*
+### 5.3 The c1 axis — where every arm has a boundary, and the answer
+
+`config_arms_c1.yaml`, 11 points of `c1_ratio` ∈ [0.022, 0.032] at B = 5 µG,
+4000 LBFGS steps (job 8440274, GREEN, 11/11 tasks). B = 5 µG rather than 0
+because at exactly zero field the stretched branch sits on a degenerate spin
+manifold and the solver stalls — |∇E| = 5.7e-1 at B = 0 against 4.8e-6 at 5 µG,
+same everything else — while the polar branch's energy is B-independent to 1e-9
+across the whole 0–70 µG scan.
+
+**The mean-field calculation has no FM→polar crossing on this axis.** ΔE(`none`)
+runs −0.4117 → −0.0195 and never reaches zero; past `c1_ratio = 0.031` both seeds
+land in the same phase (`nematic`), i.e. the stretched branch **merges** into the
+polar one rather than crossing it. A ΔE drifting toward zero reads exactly like an
+approaching boundary and is not one — that is the degeneracy-guard failure this
+project has made before, so the report names the merged points and refuses to read
+a crossing past them.
+
+**Two of the LHY arms do have a crossing:**
+
+| arm | crossing at `c1_ratio` | local ∂ΔE/∂c1 |
+|---|---:|---:|
+| `none` | — (merges instead) | 41.9 |
+| one functional (`fm_dipolar` both) | — (merges instead) | 36.8 |
+| **own ansatz per branch** | **0.02376** | 66.8 |
+| **`spatial`** | **0.02345** | 58.5 |
+| CONTROL scalar ×30 | — | 17.4 |
+
+So at this coupling, **including ε_LHY per state does not merely displace the
+FM/polar line — it creates one that mean field does not produce.** The Bz scan
+said the same thing from the other axis (§5.2), which is two independent routes
+to the same statement.
+
+### 5.4 The number criterion B asks for
+
+The gap shift is defined whether or not a crossing exists, so it is the readout
+that survives the merge. At the reference point `c1_ratio = 0.027`, converted
+through each arm's own median |∂ΔE/∂c1| — and through the field slope
+0.0311 per µG measured in §5.2:
+
+| arm | ΔE | **δ(ΔE)** | **δc1\*** | **δB (µG)** |
+|---|---:|---:|---:|---:|
+| `none` | −0.1524 | 0 | 0 | 0 |
+| one functional (`fm_dipolar` both) | −0.1399 | **+0.0125** | **+3.4e-4** | **+0.40** |
+| own ansatz per branch | +0.1557 | **+0.3081** | **+7.3e-3** | **+9.9** |
+| `spatial` | +0.1709 | **+0.3233** | **+9.4e-3** | **+10.4** |
+| CONTROL scalar ×30 | −0.0810 | +0.0714 | +4.1e-3 | +2.3 |
+
+**The control passes**: ×30 on the amplitude moves the gap 5.7× further than ×1
+and converts to 4.1e-3 in `c1_ratio`, four times the 1e-3 pre-launch threshold.
+Sub-linear in the amplitude because the cloud relaxes against the added
+repulsion, which is expected and is why a control has to be run rather than
+assumed.
+
+**The answer to criterion B, in one line: it depends entirely on the scheme, and
+by a factor of 21.**
+
+- Under **one common functional**, leaving LHY out costs **3.4e-4 in `c1_ratio`
+  (0.4 µG)** — 1.2 % of `c1_ratio`'s own value. On that reading the mean-field
+  phase diagram is defensible.
+- Under **each branch in its own functional**, it costs **7.3e-3 (9.9 µG)** —
+  26 % of `c1_ratio`, and it changes the *topology* of the diagram, not just the
+  position of a line.
+- **`spatial` decides between them.** It assumes no ansatz and lands with the
+  per-state answer (9.4e-3 against 7.3e-3), not with the common-functional one
+  (3.4e-4). So the defensible reading is the expensive one: **the mean-field
+  FM/polar line at `c1_ratio ≈ 1/36` is NOT defensible**, and the campaign's
+  `provisional / mean-field-only` self-labelling was right.
+
+Scope, plainly: 32×32×64, one geometry, one field, `c1_ratio` axis only. No
+convergence-in-resolution study was run, and the `converged` flag is false on
+every cell because `tol = 1e-9` is below this problem's gradient floor — the
+figures that matter are |∇E| ~ 1e-5 to 1e-8, which puts the energy error many
+orders below the 0.01 shifts being read. Three cells sit at |∇E| ~ 1e-1 to 3e-2
+(`fm_ctrl30` and `fm_spatial` at `c1_ratio = 0.028`, `fm_spatial` at 0.029) and
+should not be leaned on individually.
 
 ## 6. Criterion C — the `SpatialLHY` residual in µG
+
+**Two defects had to be fixed before this could be measured at all**, and both
+were silent:
+
+1. `spatial_lhy_residual` compared a table built with `n_atoms = N` against an
+   **undivided** BdG reference, so it returned ≈ 1 − 1/N for every production
+   config. On the converged Eu states it read exactly **1.0000** — a "100 %
+   residual" that is entirely the missing factor and that would have been
+   reported as the spatial approximation collapsing. Every existing test ran at
+   the default `n_atoms = 1`, where the bug is invisible; the new case runs at
+   50000 and asserts the residual is *invariant* under `n_atoms`, which a scale
+   bug cannot satisfy.
+2. Even fixed, that function is the wrong quantity for this question. It takes
+   the worst case over voxels drawn **uniformly**, so it is dominated by the
+   dilute edge, where the local spinor is furthest from its bin's representative
+   and the density contributes essentially nothing. It reads 16–38 % where the
+   error on the integrated energy is 3–7 %. `spatial_lhy_energy_residual`
+   importance-samples ∝ `n^(5/2)` instead — the weight ε_LHY actually carries —
+   and compares at each voxel's **own** density rather than at n = 1, which also
+   folds in the `ε ∝ n^(5/2)` scaling the table assumes (exact only for
+   degenerate Zeeman energies, and at 44 µG `p·F ≈ 3.9` against `c₀n ≈ 8.6`).
+
+Measured on the converged states of the Bz campaign:
+
+| B (µG) | signed | non-cancelling | worst weighted voxel | uniform worst (old) |
+|---:|---:|---:|---:|---:|
+| 0 | −0.029 | 0.057 | 0.127 | 0.193 |
+| 5 | **−0.065** | 0.066 | 0.160 | 0.204 |
+| 10 | −0.072 | 0.072 | 0.166 | 0.161 |
+| 15 | +0.060 | 0.078 | 0.205 | 0.248 |
+| 20 | −0.016 | 0.053 | 0.163 | 0.168 |
+| 30 | +0.032 | 0.089 | 0.331 | 0.330 |
+| 40 | −0.011 | 0.055 | 0.189 | 0.382 |
+
+The **polar branch has no residual at all**: its p spread is below `min_spread`,
+so `compute_spatial_lhy` declines to build a table and the single-spinor one is
+exact by construction. (Recording that as a missing row rather than as zero would
+have dropped the branch out of the propagation and halved the answer.)
+
+**Propagation.** The residual moves only the stretched branch, by
+`signed × E_LHY = −0.065 × 0.417 = −0.027`, so the gap by the same and the
+boundary by
+
+    δc1* = 0.027 / 34.4 = 7.9e-4        δB = 0.027 / 0.0311 = 0.87 µG
+
+**So the `SpatialLHY` residual is worth ~0.9 µG on the boundary — an order of
+magnitude below the ~10 µG the scheme choice is worth.** Quote it; do not lead
+with it. Note this is ~7 %, not the 1–3 % the issue and `spatial.jl` record;
+those came from `n_atoms = 1` test states and from the uniform-worst statistic
+respectively.
 
 ## 7. Criterion D — which claims need ε_LHY at all
 
@@ -383,3 +524,36 @@ campaign's relaxed weak-field Eu states sit at spread ≈ 0.9.
 | **#334** in-place nucleation, beyond mean field | **yes, and needs `:spatial`** | p varies across the cloud during nucleation |
 | **#335** hysteresis numbers | **yes**, through the boundary position | §5 |
 | anything at `c1_ratio = 0` | **weakly** | the p-dependence collapses to the DDI's 1.50× there |
+
+
+---
+
+## 8. What this changes for the blocked work
+
+| issue | was blocked on | now |
+|---|---|---|
+| **#334** in-place nucleation, beyond mean field | "no usable ε_LHY" | **unblocked.** Use `:spatial` — p varies across the cloud during nucleation, so no fixed ansatz applies. Quote ±6 % (scheme) ⊕ ~7 % (spatial residual). |
+| **#335** hysteresis numbers | "the boundary position is an LHY-free value" | **the concern is confirmed, not dismissed.** At `c1_ratio ≈ 1/36` the mean-field FM/polar line is not merely displaced but absent; any boundary-position number wants the `:spatial` arm. The discrete observables #335 settled on (occupied m_F count, spinodal field) are the right shape precisely because they do not ride on a boundary position. |
+| **#336** Saito–Li torus / droplet | "the stabilising term is ill-posed" | **unblocked, and it was the easiest case all along.** A droplet is p ≈ 1, so `fm_dipolar` is exact for its ansatz and is what the Saito group itself uses. |
+| `runs/eu_gs_phase_c1_B_kappa` (35 configs) | self-labelled `mean-field-only / provisional` | **the label was right and should stay** for the FM/polar line. It is not a caveat about missing compute — §5.4 measures the effect at 26 % of `c1_ratio`. |
+
+## 9. What is NOT established
+
+- **One geometry.** 32×32×64, box 12×12×24, κ = 1. No resolution-convergence
+  study of the boundary shift was run.
+- **Two conventions, not all conventions.** §3 measures the spread between
+  `full_bdg`'s branch/counterterm bookkeeping and its counterterm-consistent
+  repair. That is a measurement of the mechanism the code's own warning names,
+  not a proof that every conceivable prescription agrees to 6 %.
+- **No experimental anchor.** Everything here is verification type **A/B** in the
+  repo's own taxonomy — code correctness and internal physics agreement. Nothing
+  in this document is compared against published Eu data.
+- **The `spatial` table's own second approximation is now measured but not
+  removed.** `ε ∝ n^(5/2)` is exact only for degenerate Zeeman energies, and at
+  44 µG the splitting is comparable to the interaction energy. §6 folds that into
+  the residual; it does not fix it.
+- **`c₁ < 0` was not measured here.** The `verification_suite` / `eu_k3_*`
+  families run at `c1_ratio = −0.005`, where `icosahedral` and `polar_contact`
+  refuse by construction. Those configs need `fm_dipolar` (their states are
+  `m_minus_F`, i.e. p = 1, so it is the right functional) — but the boundary
+  measurement above was done at `+1/36` and does not transfer.
