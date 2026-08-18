@@ -183,9 +183,13 @@ type-C gate; it is not evidence about this paper in either direction.
 ## 6. Rejection criteria — written here, before launch
 
 Both runs are declared rejected-or-accepted by these, and by nothing decided
-afterwards. They live in the run configs as `rejection_criterion:` blocks
-(`runs/klaus2022_ar_ramp.yaml`, `runs/klaus2022_stripes.yaml`) so the criterion
-travels with the run.
+afterwards. They live as the `ACCEPT` constants at the top of
+`scripts/klaus2022_reproduce.jl`, which is also what applies them and what
+writes the verdict — so the criterion cannot drift from the thing that enforces
+it. (An earlier draft of this section promised two `runs/*.yaml` files carrying
+`rejection_criterion:` blocks. Those were never written: a schema slot nothing
+reads is the failure mode `metadata:` was deleted for, and the criterion is
+only real where it is executed.)
 
 **Run A — Ω_c from the aspect-ratio ramp (Fig. 1c).**
 Single 1 s linear ramp Ω: 0 → ω_⊥ at Ω̇ = 2π×50 Hz/s, reading AR(t) → AR(Ω).
@@ -409,17 +413,24 @@ implement the control §6 declares. `scripts/klaus2022_reanalyse.jl` re-derives
 both windows from the saved frames and reports both (on that contaminated
 window the control reads 2.52× null, i.e. an axis that is really the tilted
 segment leaking in). The same script reproduces the run's own reduction on the
-pre-registered window to 1e-6, which is what makes it trustworthy. Frames live
-in `runs/klaus2022/*_frames.jld2` precisely so a window or metric change costs
+pre-registered window to 1e-6, which is what makes it trustworthy. Each arm
+persists its column-density frames, precisely so a window or metric change costs
 seconds — the first stripe metric had to be replaced and that cost a 45-minute
-re-run because only the reduced numbers had been kept.
+re-run because only the reduced numbers had been kept. They land at
 
-**Those frames are local, not in the repository** (48 MB, and `*.jld2` is
-gitignored). What is committed is `klaus2022_results.json`: the reduced
-per-frame series, both windows, the thresholds and the provenance. So the gate
-re-applies the criteria without a run, but *re-deriving a new metric* needs
-either the local frames or a 1.7 h re-run. The gate's `frames_path` assertion
-checks that a path was recorded, not that the file is present on your machine.
+```
+runs/klaus2022/{stripes,control}_frames.jld2
+```
+
+**and they are local, not in the repository** (48 MB, and `*.jld2` is
+gitignored — which is also why that path is fenced here rather than written as
+a citation: an untracked path makes a citation gate answer differently on the
+machine that ran it and in CI). What *is* committed is
+`klaus2022_results.json`: the reduced per-frame series, both windows, the
+thresholds and the provenance. So the gate re-applies the criteria without a
+run, but re-deriving a *new* metric needs either the local frames or a 1.7 h
+re-run. The gate's `frames_path` assertion checks that a path was recorded, not
+that the file is present on your machine.
 
 ## 6e. Summary of the type-C comparison
 

@@ -52,6 +52,12 @@ const LIVE_DOCS = [
     # what this campaign established, excluded, and could not close", and
     # matsui_reproduction_status.md now points readers at it — so it is what a
     # reader is sent to, which is the LIVE test.
+    # The Klaus 2022 type-C claim's evidence: published parameters per figure,
+    # the systematics, the model-selection numbers, and the pre-registered
+    # thresholds. LIVE rather than dated because the gate reads its thresholds
+    # and one row of it is an OPEN disagreement — a reader has to know it is
+    # maintained.
+    "docs/validation/klaus2022_primary_source.md",
     "docs/validation/matsui_campaign_report.md",
     "docs/validation/parameter_contract_with_Ueda.md",
     "docs/validation/step6_ueda_reference_state/reference_state.yaml",
