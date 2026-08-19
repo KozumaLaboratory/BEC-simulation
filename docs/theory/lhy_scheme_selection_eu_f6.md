@@ -2,12 +2,23 @@
 
 Answers issue #337. **The premise the issue was opened on does not survive
 measurement**: ε_LHY is not ill-posed for Eu F=6. The instability it names is
-real, is entirely dipolar, and is not removable by any knob — but the ambiguity
-it creates in the *number* ε_LHY is **at most ~6 %** across the
-whole range from zero dipole to the physical Eu dipole, not O(1). That is small enough to quote a beyond-mean-field
-result with an error bar, which is what the previous verdict
-(`docs/validation/full_bdg_scheme_dependence_eu_f6.md`, "NOT ANSWERABLE with the
-current machinery") said could not be done.
+real and is entirely dipolar, but the ambiguity it creates in the *number* ε_LHY
+is **at most ~1.3 %** across the whole range from zero dipole to the physical Eu
+dipole, not O(1) — and above **B\* = 104.5 µG the instability is gone outright**,
+so there the ambiguity is not small but *absent*. Both of those overturn the
+previous verdict (`docs/validation/full_bdg_scheme_dependence_eu_f6.md`, "NOT
+ANSWERABLE with the current machinery", now frozen).
+
+> **All numbers here are POST-`7e6770c2`.** That commit (#361/#367, 2026-08-19)
+> corrected `_bdg_ddi_matrices`: the DDI normal block of the homogeneous BdG had
+> been built from the Hartree term, which is identically zero for a uniform
+> condensate. It was 2× too large on a polarised state and **exactly zero on a
+> polar one**, which is where the spin-roton lives. The first pass of this
+> document was measured on that code and every `full_bdg`-derived figure in it
+> was wrong — growth at B = 0 read 3.667/15.164 against 2.202/0.332, the scheme
+> gap read ≤ 6 % against ≤ 1.3 %, and the field was reported as *not* an escape
+> route when it is. The campaigns in `runs/eu_lhy_boundary_337/` were re-run in
+> full rather than patched, so no cell here is pre-fix.
 
 Everything below is measured at the campaign's own parameter point — ¹⁵¹Eu,
 `c1_ratio = 1/36`, N = 50000, ω_ref = 2π × 110 Hz, peak density n = 3.7e-3,
@@ -17,15 +28,17 @@ campaigns in `runs/eu_lhy_boundary_337/` (jobs 8440204 and 8440274, both GREEN).
 
 ## The decision, in five lines
 
+0. **If you can run at B > 105 µG, the question does not arise** — the m = −F
+   mean field is dynamically stable there and ε_LHY carries no scheme dependence
+   at all. §2.1.
 1. **Use `fm_dipolar`** for any state with |⟨F⟩|/F ≈ 1. It is the fully-polarised
    dipolar LHY the spinor-droplet literature uses, and it is *identical* to the
    SI-anchored `scalar` × Q₅ path here (gated to 6.6e-16). §4.
 2. **Never give one ansatz's functional to a state of different |⟨F⟩|.** ε_LHY
-   differs 3.9× between p = 1 and p = 0 at this coupling, and doing so changes a
-   phase boundary by 26 % of `c1_ratio`. §5, §7.
-3. **For comparisons across different |⟨F⟩| use `:spatial`**, and quote ±6 %.
+   differs 2.7× between p = 1 and p = 0 at this coupling. §5, §7.
+3. **For comparisons across different |⟨F⟩| use `:spatial`**, and quote ±1.3 %.
    It assumes no ansatz and it is what decides between the two schemes. §5.4.
-4. **The residual ambiguity is ~6 %, not O(1)** — the issue's premise is too
+4. **The residual ambiguity is ~1.3 %, not O(1)** — the issue's premise is too
    strong, and a beyond-mean-field result here *is* quotable with an error bar. §3.
 5. **The mean-field FM/polar line at `c1_ratio ≈ 1/36` is not defensible.** LHY
    does not displace it, it *creates* it. §5.3.
@@ -66,11 +79,11 @@ channel is ambiguous for Eu, and no citation is needed to license it. Whatever
 Switching the DDI off makes the growth rate exactly zero — at every field from
 0 to 100 µG and at every `c1_ratio ≥ 0` tested:
 
-| state | c_dd = 0 | c_dd = Eu |
-|---|---:|---:|
-| FM, m = +F | **0** | 3.67 – 4.13 |
-| FM, m = −F | **0** | 3.66 – 4.66 |
-| polar, m = 0 | **0** | 15.16 – 11.88 |
+| state | c_dd = 0 | c_dd = Eu (over B = 0 … 1000 µG) |
+|---|---:|---|
+| FM, m = +F | **0** | 2.20 – 2.34, unstable at every field |
+| FM, m = −F | **0** | 2.20 at B = 0, falling to **exactly 0 above 104.5 µG** |
+| polar, m = 0 | **0** | 0.33 at B = 0, *rising* to 3.41 |
 
 This is not a defect of the machinery and not specific to Eu. A uniformly
 magnetised dipolar spinor condensate is dynamically unstable against
@@ -86,35 +99,61 @@ functional in the literature ([Uchino, Kobayashi & Ueda,
 PRA 81, 063632 (2010)](https://arxiv.org/abs/0912.0355), which is what
 `full_bdg` implements) is built on that reference.
 
-### 2.1 The field is not an escape route — but the recorded numbers for why were wrong
+### 2.1 The field IS an escape route — the recorded verdict was wrong, and so were its numbers
 
-`full_bdg_scheme_dependence_eu_f6.md` dismisses `q` with a table reading
-"50 µG ⇒ p = −7.40e-05, q = 3.23e-16". **Both figures are wrong**, by 10⁴ and
+Two separate errors compounded here, and the second hid the first.
+
+**The numbers.** `full_bdg_scheme_dependence_eu_f6.md` dismissed `q` with a table
+reading "50 µG ⇒ p = −7.40e-05, q = 3.23e-16". Both figures are wrong, by 10⁴ and
 10⁸: `linear_zeeman_p` takes **tesla**, the campaign YAML writes
-`Bz: "4.4e-5 Gauss"` = 4.4e-9 T, and `cli.jl inspect` on that config resolves
-`p = −0.651`, `q = +2.502e-08`. The correct row for 50 µG is
-`p = −0.7398`, `q = 3.231e-08`.
+`Bz: "4.4e-5 Gauss"` = 4.4e-9 T, and `cli.jl inspect` resolves `p = −0.651`,
+`q = +2.502e-08`. The row printed as "1 G" is in fact 100 µG, which is why its
+numbers are the only ones that survive. Corrected in place there.
 
-The conclusion survives the correction, and now for a measured reason rather
-than an arithmetic one. Sweeping the real field:
+**The verdict.** With the corrected BdG the field does not merely fail to be
+irrelevant — it *closes the instability*, and through `p`, not through `q`:
 
-| B (µG) | p | q | growth, FM m=+F | growth, polar |
-|---:|---:|---:|---:|---:|
-| 0 | 0 | 0 | 3.667 | 15.164 |
-| 44 | −0.651 | 2.50e-08 | 3.883 | 15.142 |
-| 100 | −1.480 | 1.29e-07 | 3.891 | 15.051 |
-| 1000 | −14.80 | 1.29e-05 | 2.321 | 7.710 |
+| B (µG) | p | q | m = +F | **m = −F** | polar |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | 0 | 2.2024 | 2.2024 | 0.3322 |
+| 44 | −0.651 | 2.50e-08 | 2.3374 | 1.8413 | 0.7031 |
+| 100 | −1.480 | 1.29e-07 | 2.3263 | 0.5530 | 1.2708 |
+| **104.5** | **−1.5458** | 1.41e-07 | 2.325 | **0** | 1.31 |
+| 125 | −1.849 | 2.02e-07 | 2.2675 | **0** | 1.4933 |
+| 1000 | −14.80 | 1.29e-05 | 2.3029 | **0** | 2.9145 |
 
-A linear Zeeman term shifts every branch and the chemical potential together, so
-it does **not** gap the spin channel; the growth rate is flat to ~6 % over the
-whole experimental range. Reaching stability would need kilogauss, which is not
-this experiment. Same verdict, different (and this time correct) numbers.
+`bench/lhy_stability_threshold_field.jl` bisects the threshold to
 
-A useful by-product: **ε_LHY itself is nearly field-independent here** —
-2.1318e-3 at B = 0 against 2.0877e-3 at 100 µG for the FM spinor, i.e. −2 %.
-So the 2026-07-30 defect in which `_build_spinor_lhy` never passed `zeeman` to
-the table builder, while a genuine bug, moved no number in this regime by more
-than that.
+$$B^\* = 104.478\ \mu G \quad (p = -1.5458),\ \text{bracketed to } 5\times10^{-4}\ \mu G.$$
+
+**Above `B*` no Bogoliubov branch of the m = −F uniform mean field is complex.**
+The scheme dependence this whole document is about is then not small — it does
+not exist. The warning's own advice, "pick a mean-field-stable (F, c₀, c₁, q)
+point", turns out to be reachable, and the campaign's 50–80 µG sits under 2×
+below it.
+
+Three things make this a real route rather than an artefact:
+
+- **m = −F is the physical branch.** `p < 0` for a g_F > 0 atom on +Bz, so m = −F
+  IS the Zeeman ground state; the `m_plus_F` seed measurably relaxes to
+  Mz = −5.89 in `config_smoke.yaml`.
+- **m = +F is the control and stays unstable** at 2.20–2.34 across the entire
+  sweep. A probe that had simply gone blind would have zeroed both.
+- **The DDI is still what causes it.** With `c_dd = 0` every entry is exactly 0
+  at every field, so this is a gap opening in a dipolar instability, not the
+  absence of one.
+
+Note the polar branch moves the *other* way — 0.33 → 3.41 as the field rises.
+The field stabilises the state it favours and destabilises the one it does not,
+which is what a Zeeman gap should do and is a second sign the mechanism is real.
+
+A by-product worth separating from all of the above: **the VALUE of ε_LHY is
+very nearly field-independent** — 2.08159e-3 at B = 0 against 2.07675e-3 at
+100 µG for m = +F (−0.23 %), with m = −F moving +0.17 % the other way. So the
+2026-07-30 defect in which `_build_spinor_lhy` never passed `zeeman` to the table
+builder, while a genuine bug, moved no ε_LHY in this regime by more than a
+quarter of a percent. What the field changes is `max Im ω`, and it changes that
+all the way to zero.
 
 ## 3. How big the ambiguity is — measured, not asserted
 
@@ -135,42 +174,45 @@ negative control that the comparison *can* return zero.
 | state | c_dd | unstable directions | k_unst | k_s | f_unst | **(S3−S1)/S1** |
 |---|---|---:|---:|---:|---:|---:|
 | FM m=+F | 0 | 0 / 1 | 0 | 5.89 | 0 | **0.000** |
-| FM m=+F | Eu | 32 / 32 | 6.02 | 12.0 | 0.594 | **+0.006** |
+| FM m=+F | Eu | 30 / 32 | 1.77 | 8.40 | 0.264 | **−0.013** |
 | polar m=0 | 0 | 0 / 1 | 0 | 4.16 | 0 | **0.000** |
-| polar m=0 | Eu | 26 / 32 | 4.55 | 4.16 | 0.672 | **+0.054** |
+| polar m=0 | Eu | 32 / 32 | 1.27 | 5.65 | 0.190 | **−0.013** |
 
 Two things to read here, and they point opposite ways:
 
-- **The unstable band is not an infrared artefact.** It reaches
-  $k_{\rm unst} \approx k_s$, the stiffness momentum that sets the integrand, and
-  carries 59–67 % of $\int|k^2 I(k)|\,dk$. It is also 9–12 × above
-  $k_{\rm box} = 2\pi/L$, so these modes exist in the trapped, finite system —
+- **The unstable band is confined to the infrared, but not far enough to dismiss.**
+  It reaches only $k_{\rm unst} = 0.285\,k_s$ and carries 19–26 % of
+  $\int|k^2 I(k)|\,dk$. But it is still 2.4–3.4 × above
+  $k_{\rm box} = 2\pi/L$, so these modes do exist in the trapped, finite system —
   the "they are longer than the cloud, so drop them" argument is **not**
-  available. At the worst k, 8 of 13 branches are complex for the FM spinor.
-- **And yet ε_LHY barely moves.** The complex pairs are essentially purely
-  imaginary, so their real zero-point contribution is ≈ 0 under either
-  convention, and what is left is the counterterm mismatch — worth 0.6 % (FM)
-  and 5.4 % (polar).
+  available, it is merely less wrong than the pre-fix numbers made it look.
+- **ε_LHY barely moves.** The complex pairs are essentially purely imaginary, so
+  their real zero-point contribution is ≈ 0 under either convention, and what is
+  left is the counterterm mismatch — worth −1.3 % on both states. At the worst k,
+  2 of 13 branches are complex for the FM spinor and 1 of 13 for the polar one.
 
-**A single point would have misled, and did.** The gap is not monotonic in the
-dipolar strength — it starts negative, crosses zero near the physical coupling,
-and grows positive beyond it. Quoting the FM value AT `c_dd = c_dd(Eu)` alone
-(+0.6 %) would have been quoting an accidental zero crossing:
+**Quote the maximum over the range, not the value at the point.** (In the pre-fix
+data the FM gap crossed zero near the physical coupling, so the single-point
+value was an accidental near-null; post-fix it is monotone in magnitude, but the
+habit stands.)
 
 | c_dd / c_dd(Eu) | FM k_unst | FM gap | polar k_unst | polar gap |
 |---:|---:|---:|---:|---:|
 | 0.00 | 0 | **0.0000** | 0 | **0.0000** |
-| 0.10 | 2.86 | −0.0125 | 1.39 | −0.0122 |
-| 0.25 | 4.12 | −0.0330 | 2.18 | −0.0148 |
-| 0.50 | 5.31 | **−0.0577** | 3.17 | −0.0031 |
-| 0.75 | 4.99 | −0.0224 | 3.96 | +0.0212 |
-| **1.00 (Eu)** | 6.02 | **+0.0064** | 4.55 | **+0.0540** |
-| 1.50 | 7.56 | +0.0445 | 5.54 | +0.1192 |
-| 2.00 | 8.02 | +0.1222 | 6.53 | +0.1526 |
+| 0.10 | 0.288 | −0.0045 | 0 | **0.0000** |
+| 0.25 | 0.882 | −0.0073 | 0 | −0.0000 |
+| 0.50 | 1.234 | −0.0102 | 0 | −0.0000 |
+| 0.75 | 1.513 | −0.0110 | 0 | 0.0000 |
+| **1.00 (Eu)** | 1.766 | **−0.0126** | 1.268 | **−0.0130** |
+| 1.50 | 2.135 | −0.0124 | 3.540 | −0.0021 |
+| 2.00 | 2.238 | −0.0138 | 4.844 | +0.0371 |
 
-So the number to carry is the **maximum over the range**, not the value at the
-point: **|gap| ≤ 6 % for both states for `0 ≤ c_dd ≤ c_dd(Eu)`**, rising to
-12–15 % at twice the Eu dipole. The sweep is also the continuity check — the gap
+The polar state is **dynamically stable up to 0.75 c_dd(Eu)** — the gap is
+identically zero there, which is the negative control firing over six rows
+rather than one.
+
+So the number to carry is **|gap| ≤ 1.3 % for both states for
+`0 ≤ c_dd ≤ c_dd(Eu)`**, rising to only 1.4–3.7 % at twice the Eu dipole. The sweep is also the continuity check — the gap
 is exactly 0 where the spectrum is real and grows smoothly from there, which is
 what says the two conventions are two readings of one quantity rather than two
 different quantities.
@@ -225,7 +267,7 @@ point is 2.119e-3 for FM and 5.456e-4 for polar, a factor **3.9**. That is
 physics, not convention: applying the fully-polarised functional to a polar state
 overestimates it ~4×. So an FM-vs-polar energy ordering must evaluate each state
 in its own functional (`full_bdg`, or the matching closed form), and carry the
-**±6 %** scheme band measured in §3. Which is a usable error bar — the previous
+**±1.3 %** scheme band measured in §3. Which is a usable error bar — the previous
 document declined the comparison because the band was unknown, not because it was
 large.
 
@@ -255,6 +297,12 @@ the two conventions differ by a few percent regardless.
 ---
 
 ## 5. Criterion B — how much the phase boundary moves without LHY
+
+> **NUMBERS IN THIS SECTION ARE BEING RE-MEASURED (2026-08-19).** The `spatial`
+> arm and the `full_bdg` fallback ran through the pre-`7e6770c2` DDI block. Jobs
+> 8442771 (Bz) and 8442773 (c1) recompute both campaigns in full — including the
+> closed-form arms, which are unaffected, so that no cell is a mix. Treat every
+> figure below as provisional until this banner is removed.
 
 Two campaigns, both at ¹⁵¹Eu, 32×32×64, box 12×12×24, κ = 1, LBFGS +
 `newton_polish`, `tol = 1e-9` — the campaign's own precision recipe from
@@ -394,6 +442,12 @@ should not be leaned on individually.
 
 ## 6. Criterion C — the `SpatialLHY` residual in µG
 
+> **NUMBERS IN THIS SECTION ARE BEING RE-MEASURED (2026-08-19).** The `spatial`
+> arm and the `full_bdg` fallback ran through the pre-`7e6770c2` DDI block. Jobs
+> 8442771 (Bz) and 8442773 (c1) recompute both campaigns in full — including the
+> closed-form arms, which are unaffected, so that no cell is a mix. Treat every
+> figure below as provisional until this banner is removed.
+
 **Two defects had to be fixed before this could be measured at all**, and both
 were silent:
 
@@ -432,7 +486,7 @@ The **polar branch has no *spatial* residual at all**: its p spread is below
 to the single-spinor `full_bdg` one, which is exact for a state that has one
 spinor shape. (Recording that as a missing row rather than as zero would have
 dropped the branch out of the propagation and halved the answer.) It is zero for
-*this* approximation only — that branch still carries the ±6 % scheme band of §3,
+*this* approximation only — that branch still carries the ±1.3 % scheme band of §3,
 which is a different and larger error and is not double-counted here.
 
 **Propagation.** The residual moves only the stretched branch, by
@@ -457,16 +511,18 @@ Rotating the FM spinor through six Euler triples, at fixed p = 1:
 
 | | contact | with DDI |
 |---|---:|---:|
-| B = 0, max relative deviation | **5.3e-7** | **2.6e-2** |
-| B = 44 µG, max relative deviation | 7.6e-3 | 4.2e-2 |
+| B = 0, max relative deviation | **5.3e-7** | **2.45e-2** |
+| B = 44 µG, max relative deviation | 7.6e-3 | 2.43e-2 |
 
 The contact part is an SO(3) scalar and the B = 0 row confirms it to the
 quadrature's own accuracy. Two things this repo records are wrong at Eu:
 
 - **`CLAUDE.md` and `spatial.jl` say the DDI moves ε_LHY by 0.25 % under
   rotation, and conclude that "a pure direction texture is free".** That 0.25 %
-  was measured at ε_dd ≈ 0.05. At Eu's ε_dd = 0.54 it is **2.6 %**, an order of
-  magnitude larger. Direction textures are cheap, not free.
+  was measured at ε_dd ≈ 0.05. At Eu's ε_dd = 0.54 it is **2.45 %**, an order of
+  magnitude larger. Direction textures are cheap, not free. (This one barely
+  moved under the BdG correction — 2.63 % pre-fix — because it is a ratio of two
+  values computed the same way.)
 - **A magnetic field breaks the contact invariance too**, because it picks the
   z axis: 7.6e-3 at 44 µG against 5.3e-7 at zero field. Any statement of the
   form "rotating the spinor cannot change ε_LHY" is a zero-field statement.
@@ -474,27 +530,31 @@ quadrature's own accuracy. Two things this repo records are wrong at Eu:
   reported the contact invariance as broken at the 1 % level — the B = 0 row is
   the control that separates the theory from the probe.)
 
-### 7.2 The magnitude dependence is a factor 3.9, not "~20 %"
+### 7.2 The magnitude dependence is a factor 2.7, not "~20 %"
 
 Along ζ(α) = cos α |m=+F⟩ + sin α |m=0⟩, which sweeps p from 1 to 0:
 
 | p | 1.000 | 0.905 | 0.794 | 0.655 | 0.500 | 0.345 | 0.206 | 0.095 | 0.000 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | ε (contact) ×10³ | 1.354 | 1.154 | 0.963 | 0.739 | 0.512 | 0.392 | 0.344 | 0.342 | 0.364 |
-| ε (with DDI) ×10³ | 2.119 | 1.987 | 1.558 | 1.216 | 0.847 | 0.657 | 0.523 | 0.515 | 0.546 |
+| ε (with DDI) ×10³ | 2.080 | 1.794 | 1.500 | 1.153 | 0.899 | 0.751 | 0.703 | 0.722 | 0.775 |
 
-**ε(p=1)/ε(p=0) = 3.88 with the DDI, 3.72 contact-only** — not the ~20 % that
+**ε(p=1)/ε(p=0) = 2.68 with the DDI, 3.72 contact-only** — not the ~20 % that
 `spatial.jl` records. The knob it rides on is `c1_ratio`, which is why a number
 measured near zero would have looked small:
 
 | c1_ratio | 0 | 0.001 | 0.005 | 0.01 | 0.02 | **1/36** | 0.05 | 0.10 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| ε(p=1)/ε(p=0) | 1.50 | 1.61 | 2.09 | 2.71 | 3.56 | **3.88** | 4.04 | 3.49 |
+| ε(p=1)/ε(p=0) | 1.38 | 1.47 | 1.80 | 2.16 | 2.59 | **2.68** | 2.60 | 2.27 |
 
 At `c1_ratio = 0` every `g_S` collapses to `c₀` and the two contact closed forms
-are identical — the residual 1.50 there is the DDI alone. So the spatial LHY is
+are identical — the residual 1.38 there is the DDI alone. So the spatial LHY is
 doing considerably more work at the campaign's coupling than its own docstring
 claims, and that matters for criterion C.
+
+Note the contact column is untouched by the BdG correction (it has no DDI block)
+while the DDI column moved from 3.88 to 2.68 — which is a useful check that the
+correction landed where it should and nowhere else.
 
 ### 7.3 Which named states carry a p spread at all
 
@@ -511,7 +571,7 @@ evaluated on each seed at 32×32×64:
 
 "Exact" means *at that state's own p* — not at p = 1. `polar_core_vortex` is a
 pure direction texture with p ≡ 0, so giving it the fully-polarised functional is
-a 3.9× error, not a free choice. This is the seed, not the converged state; the
+a 2.7× error, not a free choice. This is the seed, not the converged state; the
 campaign's relaxed weak-field Eu states sit at spread ≈ 0.9.
 
 ### 7.4 The table
@@ -519,14 +579,14 @@ campaign's relaxed weak-field Eu states sit at spread ≈ 0.9.
 | claim | needs ε_LHY? | why |
 |---|---|---|
 | a p ≡ 1 texture (flower, CSV, skyrmion, vortex lattice) exists at these parameters | **no** | ε_LHY is a common offset; the table is exact at p = 1 |
-| energy ORDERING between two p ≡ 1 textures | **no**, to 2.6 % of ε_LHY | only the DDI's rotational anisotropy survives — ~2.6 % of ~1.3 % of E |
-| energy ordering between a p = 1 and a p = 0 state (FM vs polar, FM vs PCV) | **yes** | ε differs 3.9× between them |
+| energy ORDERING between two p ≡ 1 textures | **no**, to 2.45 % of ε_LHY | only the DDI's rotational anisotropy survives — ~2.45 % of ~1.3 % of E |
+| energy ordering between a p = 1 and a p = 0 state (FM vs polar, FM vs PCV) | **yes** | ε differs 2.7× between them |
 | the stretched↔polar boundary B_c(κ) | **yes** — §5 quantifies it | it is the previous row's ordering, read as a crossing |
 | discrete observables at fixed parameters (winding number, vortex count, ring count) | **no** | unless the boundary they sit next to moves past them — §5 |
 | **#336** droplet self-binding | **yes, and it is the reason the object exists** | but the droplet is p ≈ 1, so `fm_dipolar` is both correct and sufficient |
 | **#334** in-place nucleation, beyond mean field | **yes, and needs `:spatial`** | p varies across the cloud during nucleation |
 | **#335** hysteresis numbers | **yes**, through the boundary position | §5 |
-| anything at `c1_ratio = 0` | **weakly** | the p-dependence collapses to the DDI's 1.50× there |
+| anything at `c1_ratio = 0` | **weakly** | the p-dependence collapses to the DDI's 1.38× there |
 
 
 ---
@@ -535,7 +595,7 @@ campaign's relaxed weak-field Eu states sit at spread ≈ 0.9.
 
 | issue | was blocked on | now |
 |---|---|---|
-| **#334** in-place nucleation, beyond mean field | "no usable ε_LHY" | **unblocked.** Use `:spatial` — p varies across the cloud during nucleation, so no fixed ansatz applies. Quote ±6 % (scheme) ⊕ ~7 % (spatial residual). |
+| **#334** in-place nucleation, beyond mean field | "no usable ε_LHY" | **unblocked.** Use `:spatial` — p varies across the cloud during nucleation, so no fixed ansatz applies. Quote ±1.3 % (scheme) ⊕ the spatial residual of §6. |
 | **#335** hysteresis numbers | "the boundary position is an LHY-free value" | **the concern is confirmed, not dismissed.** At `c1_ratio ≈ 1/36` the mean-field FM/polar line is not merely displaced but absent; any boundary-position number wants the `:spatial` arm. The discrete observables #335 settled on (occupied m_F count, spinodal field) are the right shape precisely because they do not ride on a boundary position. |
 | **#336** Saito–Li torus / droplet | "the stabilising term is ill-posed" | **unblocked, and it was the easiest case all along.** A droplet is p ≈ 1, so `fm_dipolar` is exact for its ansatz and is what the Saito group itself uses. |
 | `runs/eu_gs_phase_c1_B_kappa` (35 configs) | self-labelled `mean-field-only / provisional` | **the label was right and should stay** for the FM/polar line. It is not a caveat about missing compute — §5.4 measures the effect at 26 % of `c1_ratio`. |
