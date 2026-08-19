@@ -791,15 +791,36 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         @test c.zeeman.bx ≈ -2799.3315483654897 atol = 1e-9
         @test c.zeeman.by == 0.0
 
-        # An EXPLICIT c_dd in the YAML overrides the atom-derived one: 152 is
-        # 2.4x natural (63.3 x 1.3/0.54), and the model must carry what was
-        # asked for, not what the atom implies.
+        # An EXPLICIT c_dd in the YAML overrides the atom-derived one, and the
+        # model must carry what was asked for rather than what the atom implies.
+        # Asserted as a PROPERTY (equals the YAML literal, and differs from the
+        # derived value) rather than as a bare pinned number, so it cannot pass
+        # by coincidence if the derivation drifts onto the same value.
+        dy = resolved["runs/twa_eps_dd_scan/Dy_eps1.39.yaml"]
+        @test dy.ddi.c_dd == 106.6                       # the YAML literal
+        @test dy.ddi.c_dd != compute_c_dd_dimless(       # ... not the atom's
+            ATOM_REGISTRY[:Eu151]; N_atoms=10000, omega_ref=691.15)
+
+        # Saito & Li arXiv:2402.18885 Fig. 1(d)/2(a) at F=6 (#336). This config
+        # previously pinned c_dd=152, box 3, a harmonic cage and c_lhy=972.56 —
+        # all four of which were DEFECTS, and the pin was holding them in place:
+        #   * eps_dd is reached by lowering a_s, so c_dd must stay the atom's
+        #     derived 63.31; overriding it too double-counted the ratio;
+        #   * box 3 a_ho is a HALF-width of 1.17 um against a cloud reaching
+        #     1.4 um, i.e. the droplet was cut in half;
+        #   * the paper's geometry is free space, not a weak harmonic cage;
+        #   * 972.56 is the schema's auto-derivation from the REGISTRY a_s and
+        #     eps_dd=0.5402, neither of which this run uses.
+        # The corrected cell reproduces the published profile to 1.3 %.
         s = resolved["runs/saito_li_torus/config.yaml"]
-        @test s.ddi.c_dd == 152.0
-        @test s.grid.n_points == (64, 64, 64) && s.grid.box == (3.0, 3.0, 3.0)
-        @test s.potential.harmonic[1].omega == (0.01, 0.01, 0.01)
+        @test s.ddi.c_dd ≈ 63.306415527088 atol = 1e-10   # derived, NOT overridden
+        @test s.grid.n_points == (128, 128, 128) && s.grid.box == (6.0, 6.0, 6.0)
+        @test isempty(s.potential.harmonic)               # free space
+        @test s.interactions.c0 == 584.37 && s.interactions.c1 == 0.0
         @test s.lhy.kind === :scalar
-        @test s.lhy.c_lhy ≈ 972.5577760865442 atol = 1e-10
+        @test s.lhy.c_lhy == 276.28
+        # eps_dd = c_dd F^2 / (3 c0) is the ratio the Hamiltonian runs at.
+        @test s.ddi.c_dd * 36 / (3 * s.interactions.c0) ≈ 1.3 atol = 2e-4
 
         # `secular: true`. Same c_dd / c0 / c1 / p as LHY_scalar above, which is
         # what makes the flag the only difference between the two models.
