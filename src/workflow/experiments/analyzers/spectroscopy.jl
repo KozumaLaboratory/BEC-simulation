@@ -130,6 +130,21 @@ function _analyze_kibble_zurek_stats(psi, grid, atom, params, ws_prev)
     (defect_count=defect_count, defect_density=defect_count / volume, n_samples=1)
 end
 
+"""
+    _analyze_bragg_spectroscopy(psi, grid, atom, params, ws_prev) -> (; structure_factor)
+
+STATIC structure factor `S(k) = |δn_k|²` of one snapshot. It is the ω-INTEGRAL of
+the dynamic structure factor, so it says how much weight sits at each k and
+nothing about where in ω that weight is.
+
+**A roton cannot be read off this.** A roton is a minimum of `ω(k)`; `S(k)` has
+had the ω axis summed away, and two states whose spin branch differs by a factor
+of two can return the same `S(k)`. For a Bragg-spectroscopy prediction use
+`bragg_response` (real-time impulse response → `S(k,ω)`), or
+`trapped_bdg_frequencies` for the soft end of the spectrum. This analyzer stays
+because a static `S(k)` is the right thing for density-modulation / supersolid
+contrast, which is what it was added for.
+"""
 function _analyze_bragg_spectroscopy(psi, grid, atom, params, ws_prev)
     F = atom.F
     ndim = length(grid.config.n_points)
