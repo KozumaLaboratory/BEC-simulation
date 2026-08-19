@@ -88,6 +88,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: field-noise shielding spec (docs/guides/eu_shielding_spec.md, #362) ──
+    "eu_noise/noise_hold.jl",
+    "eu_noise/shielding_spec.jl",
+    "eu_noise/submit_noise.sh",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
