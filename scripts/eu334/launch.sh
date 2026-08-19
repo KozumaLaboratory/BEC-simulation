@@ -97,12 +97,21 @@ ensemble)
     for f in "$SEEDCELL" "$ENDCELL"; do
         [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
     done
-    # SHARDED over seeds. One trajectory is ~48 min at 64³ over 6 s of internal
-    # time, so a 20-seed cell in one job is 16 h — inside a 24 h slot with nothing
-    # to spare, and a kill costs the whole error bar. `SHARD` seeds per job makes
-    # the wall clock the shard, and the per-seed skip in submit_nucleate.sh makes a
-    # re-submission free.
-    SHARD=${SHARD:-5}
+    # GROWTH-ONLY, and that is a measurement rather than a preference: the
+    # projected scattering step loses number at ~1.25× the growth rate
+    # (`docs/guides/spgpe.md`), which at this operating point took N_C down 11.5 %
+    # in 60 ms with the growth drive set to exactly zero. A condensate cannot be
+    # grown through a window while a "number-conserving" term outruns the growth.
+    # Rooney Eq. (20) — the growth SPGPE — is the sub-theory that answers #334's
+    # question, and it is what carries the M_z-changing exchange that makes
+    # nucleation possible where transport is blocked. Passed through `-v`, not
+    # exported: qsub only forwards the variables it is named, so an `export` here
+    # would have left every job running the full theory.
+    # SHARDED over seeds. One trajectory is ~1.5 h at 64³ over 4 s of internal time
+    # (measured: 7.7 ms/step, 691k steps at dt = 0.004), so a 20-seed cell in one
+    # job would be 30 h. `SHARD` seeds per job makes the wall clock the shard, and
+    # the per-seed skip in submit_nucleate.sh makes a re-submission free.
+    SHARD=${SHARD:-3}
     for T in $TEMPS; do
         for TAU in $TAUS; do
             HOLD=$(awk -v a="$TOTAL_MS" -v b="$TAU" 'BEGIN{printf "%.1f", (a-b>0? a-b : 0)}')
@@ -110,7 +119,7 @@ ensemble)
             while [ "$s0" -le "$NSEED" ]; do
                 n=$(( NSEED - s0 + 1 )); [ "$n" -gt "$SHARD" ] && n=$SHARD
                 q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=12:00:00 \
-                  -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_SEEDS_N=$n,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
+                  -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_NO_ED=1,NU_SEEDS_N=$n,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
                   scripts/eu334/submit_nucleate.sh
                 s0=$(( s0 + n ))
             done
@@ -133,12 +142,12 @@ control)
     # here", and that difference is the whole positive control.
     HOLD=$(awk -v a="$TOTAL_MS" 'BEGIN{printf "%.1f", a-1500}')
     q -N nu_quiet_p -l h_rt=12:00:00 \
-      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_polar \
+      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_NO_ED=1,NU_SEEDS_N=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_polar \
       scripts/eu334/submit_nucleate.sh
     FLOWERCELL=${4:-}
     if [ -n "$FLOWERCELL" ]; then
         q -N nu_quiet_f -l h_rt=12:00:00 \
-          -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$FLOWERCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_flower \
+          -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_NO_ED=1,NU_SEEDS_N=1,NU_SEED_FILE=$FLOWERCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_flower \
           scripts/eu334/submit_nucleate.sh
     else
         echo "note: the flower-seeded quiet arm needs a flower cell as argument 4"
@@ -151,7 +160,7 @@ kappa09)
     SEED09=${2:?SEED_CELL required — a κ=0.9 cell below its own window}
     END09=${3:?END_CELL required}
     q -N nu_k09 -l h_rt=24:00:00 \
-      -v NU_KAPPA=0.9,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_MU1_FROM=$END09,NU_OUT=$OUT/nucleate_k0.9_T5.0_tau500 \
+      -v NU_KAPPA=0.9,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_NO_ED=1,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_MU1_FROM=$END09,NU_OUT=$OUT/nucleate_k0.9_T5.0_tau500 \
       scripts/eu334/submit_nucleate.sh
     ;;
 
