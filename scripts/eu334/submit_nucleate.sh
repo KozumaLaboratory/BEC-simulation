@@ -36,6 +36,7 @@ SEED0="${NU_SEED0:-1}"
 export NU_SEED_FILE
 [ -n "${NU_MU0:-}" ] && export NU_MU0
 [ -n "${NU_MU1:-}" ] && export NU_MU1
+[ -n "${NU_MU1_FROM:-}" ] && export NU_MU1_FROM
 [ -n "${NU_NOISE:-}" ] && export NU_NOISE
 
 echo "=== nucleate κ=$NU_KAPPA T=$NU_T τ=$NU_TAU_MS ms, seeds $SEED0..$((SEED0+SEEDS_N-1)) ==="

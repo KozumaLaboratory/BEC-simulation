@@ -24,8 +24,16 @@ mkdir -p logs/tsubame "$OUT"
 
 # Semicolons, NOT commas: `qsub -v` separates VARIABLES with commas, so a
 # comma-joined list arrives as its first element only.
-TEMPS=${TEMPS:-"2.0 5.0"}
-TAUS=${TAUS:-"50 200 800"}
+# Temperatures both fit the 64³ C region over the whole ramp (k_max/k_cut = 1.45
+# and 1.27 at the top of the window) and bracket the selection scale: the two
+# branches are within ~8 k_BT of each other at the bifurcation at T = 10 and
+# within ~16 at T = 5, so if a thermal fluctuation can choose at all, it can here.
+TEMPS=${TEMPS:-"5.0 10.0"}
+# Traversal times around the reservoir-limited growth time, which is what the
+# experiment's evaporation rate maps onto: 1/(γµ) is ~1 s at T = 5 and ~0.65 s at
+# T = 10, and the window is 0.6 e-foldings of N₀ wide. So 500 ms is roughly
+# matched and the other two bracket it by 3×.
+TAUS=${TAUS:-"150 500 1500"}
 NSEED=${NSEED:-20}
 
 q() { echo "+ qsub $*"; qsub -g "$G" "$@"; }
@@ -70,12 +78,15 @@ window)
 # Stage C. One job per (T, τ) cell, every seed inside it. The cell is the unit
 # the binomial error is quoted over.
 ensemble)
-    SEEDCELL=${2:?SEED_CELL required — the 64³ polarised cell below the bifurcation}
-    [ -f "$SEEDCELL" ] || { echo "missing $SEEDCELL" >&2; exit 1; }
+    SEEDCELL=${2:?SEED_CELL required — the 64³ polarised cell BELOW the bifurcation}
+    ENDCELL=${3:?END_CELL required — the 64³ cell the growth should end at}
+    for f in "$SEEDCELL" "$ENDCELL"; do
+        [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
+    done
     for T in $TEMPS; do
         for TAU in $TAUS; do
             q -N nu_T${T}_t${TAU} -l h_rt=24:00:00 \
-              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_TAU_MS=$TAU,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEEDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
+              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_TAU_MS=$TAU,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
               scripts/eu334/submit_nucleate.sh
         done
     done
@@ -89,17 +100,32 @@ ensemble)
 #             selection statistic appears there, it is the solver being measured.
 control)
     SEEDCELL=${2:?SEED_CELL required}
-    q -N nu_quiet -l h_rt=12:00:00 \
-      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=2.0,NU_TAU_MS=200,NU_NOISE=0,NU_SEEDS_N=2,NU_SEED_FILE=$SEEDCELL,NU_OUT=$OUT/nucleate_quiet \
+    ENDCELL=${3:?END_CELL required}
+    # Two quiet arms, one from EACH branch. From the polarised seed the growth
+    # must stay polarised; from a flower cell it must stay flower. One arm alone
+    # cannot tell "the solver holds a branch" from "the solver always ends up
+    # here", and that difference is the whole positive control.
+    q -N nu_quiet_p -l h_rt=12:00:00 \
+      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_polar \
       scripts/eu334/submit_nucleate.sh
-    SEED09=${3:-}
-    if [ -n "$SEED09" ]; then
-        q -N nu_k09 -l h_rt=24:00:00 \
-          -v NU_KAPPA=0.9,NU_GRID=64,NU_T=2.0,NU_TAU_MS=200,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_OUT=$OUT/nucleate_k0.9_T2.0_tau200 \
+    FLOWERCELL=${4:-}
+    if [ -n "$FLOWERCELL" ]; then
+        q -N nu_quiet_f -l h_rt=12:00:00 \
+          -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$FLOWERCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_flower \
           scripts/eu334/submit_nucleate.sh
     else
-        echo "note: κ=0.9 arm not submitted — pass its seed cell as the 3rd argument"
+        echo "note: the flower-seeded quiet arm needs a flower cell as argument 4"
     fi
+    ;;
+
+# The κ = 0.9 crossover control: #335 measured ONE branch there statically, so a
+# selection statistic appearing here is the instrument, not the physics.
+kappa09)
+    SEED09=${2:?SEED_CELL required — a κ=0.9 cell below its own window}
+    END09=${3:?END_CELL required}
+    q -N nu_k09 -l h_rt=24:00:00 \
+      -v NU_KAPPA=0.9,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_MU1_FROM=$END09,NU_OUT=$OUT/nucleate_k0.9_T5.0_tau500 \
+      scripts/eu334/submit_nucleate.sh
     ;;
 
 *) echo "unknown stage '$1'" >&2; exit 64 ;;

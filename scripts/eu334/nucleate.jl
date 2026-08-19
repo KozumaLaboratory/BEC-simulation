@@ -63,6 +63,9 @@
 #   NU_GRID=64  NU_BOX=24.0  NU_PIN=0.002
 #   NU_T=5.0                       reservoir temperature k_BT/ℏω_ref
 #   NU_MU0= NU_MU1=                µ ramp endpoints; MU0 from the seed's own µ
+#   NU_MU1_FROM=<cell.jld2>        …or MEASURE MU1 on the branch cell the growth
+#                                  should end at, which is what makes the ramp a
+#                                  statement about condensate fraction
 #   NU_TAU_MS=200.0                ramp duration [ms]
 #   NU_HOLD_MS=0.0                 hold at µ = MU1 after the ramp
 #   NU_NT=1.0                      C-region depth, ϵ_cut = µ + n_T·T
@@ -245,8 +248,35 @@ function main()
     isapprox(mu0_measured, mu1_measured; rtol=1e-6) ||
         error("µ disagrees between normalisations — the norm-N couplings are wrong")
 
+    # The ramp's endpoint is a condensate fraction, not a number someone picked:
+    # `NU_MU1_FROM` names the branch cell the growth should end at and µ is
+    # MEASURED on it, in the same Hamiltonian, by the same routine that measured
+    # the seed's. Writing 14.897 by hand instead would silently target f = 1 even
+    # when the window stops at 0.52.
+    MU1_FROM = gets("NU_MU1_FROM", "")
+    mu1_target = if isempty(MU1_FROM)
+        getf("NU_MU1", 14.897)
+    else
+        isfile(MU1_FROM) || error("NU_MU1_FROM=$MU1_FROM does not exist")
+        jldopen(MU1_FROM, "r") do h
+            ft = Float64(h["f"])
+            pt = eu151_preset(; n_atoms=max(1, round(Int, ft * NATOMS)),
+                n_pts=(GRID_N, GRID_N, GRID_N), box=(BOX, BOX, BOX),
+                trap_ratios=(1.0, 1.0, KAPPA))
+            wt = make_workspace(; grid=pt.grid, atom=ATOM, interactions=pt.interactions,
+                potential=pt.potential,
+                zeeman=static_zeeman(; Bz=p_of(B_UG), Bx=PIN, q=0.0),
+                sim_params=SimParams(; dt=DT, n_steps=0, imaginary_time=false),
+                psi_init=Array{ComplexF64}(h["psi"]), enable_ddi=true, c_dd=pt.c_dd,
+                secular_ddi=false, backend=BACKEND, ddi_padding=false,
+                ddi_trunc_radius=-1.0)
+            m = chemical_potential(wt)
+            @printf("  µ target from %s (f = %.4f): %.4f\n", basename(MU1_FROM), ft, m)
+            m
+        end
+    end
     MU0 = getf("NU_MU0", mu0_measured)
-    MU1 = getf("NU_MU1", 14.897)
+    MU1 = mu1_target
     MU1 > MU0 || error("NU_MU1 ($MU1) must exceed the seed's µ ($MU0) — this is a growth ramp")
 
     # The C region has to clear µ at BOTH ends and stay inside the grid. Refusing
