@@ -67,6 +67,8 @@ function _run_analyzer(name::Symbol, psi, grid, atom, params; ws_prev=nothing,
         return _analyze_momentum_distribution(psi, grid, atom, params, ws_prev)
     elseif name == :vortex_detect
         return _analyze_vortex_detect(psi, grid, atom, params, ws_prev)
+    elseif name == :vortex_stripes
+        return _analyze_vortex_stripes(psi, grid, atom, params, ws_prev)
     elseif name == :correlation_length
         return _analyze_correlation_length(psi, grid, atom, params, ws_prev)
     elseif name == :superfluid_fraction

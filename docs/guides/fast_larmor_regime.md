@@ -4,7 +4,26 @@
 
 It is a property of `(atom, field, dt)` and of nothing else. Eu151 at 1 G gives `p ≈ 26 700`; Dy164 at 1 G gives `p ≈ 28 400`; both are in it. This page is the one place to read for "how do I run an experiment in this regime in this code".
 
-> **Renamed 2026-08-19 (issue #344), from `klaus_regime.md`.** This regime does **not** need a paper's name, and under the repo's "name by content" convention it no longer has one. Klaus et al. 2022 (`arXiv:2206.12265`) is *an experiment in* this regime — Dy, magnetostirred, vortex stripes — not the regime itself, and this project's own Eu *rotation-assisted EdH quench* is a third thing again. Which name means what: `docs/conventions/klaus_name_disambiguation.md`.
+> **Renamed 2026-08-19 (issue #344), from `klaus_regime.md`.** This regime does **not** need a paper's name, and under the repo's "name by content" convention it no longer has one. L. Klaus *et al.*, Nat. Phys. **18**, 1453 (2022), `arXiv:2206.12265` is prior art *inside* this regime, not its definition — it is a Dy magnetostir experiment, reproduced separately in `docs/validation/klaus2022_primary_source.md` — and this project's own Eu *rotation-assisted EdH quench* is a third thing again. Which name means what: `docs/conventions/klaus_name_disambiguation.md`. The rest of this page is about the regime.
+
+## Two solutions, and the question that picks between them
+
+`rotating_basis` (below) keeps the spin and removes the `dt` penalty.
+`scalar_egpe` **eliminates the spin entirely**, replacing the spinor by one
+component with a B̂(t)-tilted dipolar kernel.
+
+Which is correct is a computation, not a taste: `spin_treatment_report` /
+`recommend_spin_treatment` (`src/solvers/scalar_egpe.jl`) compare ω_L against
+the mean field, the trap and the drive, and return `:scalar_adiabatic` when the
+neglected non-adiabatic admixture is below 1 %. **Adiabatic elimination is not
+merely cheaper — it is a different model**, and it is the right one only when
+the spin has nothing of its own to do. For ¹⁶²Dy at 5.3 G that ratio is
+6 × 10⁻⁵ and the spinor path would cost ~10⁴× more for the same answer; for
+weak-field ¹⁵¹Eu (the bare-DDI experiments) the same function returns
+`:spinor`, and using the scalar path there would silently delete the physics
+under study.
+
+Everything below is the `rotating_basis` path.
 
 ## The problem in one sentence
 

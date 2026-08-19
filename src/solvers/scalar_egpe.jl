@@ -12,12 +12,95 @@ This file is the minimal scalar dipolar eGPE skeleton, in the shape of Klaus et 
 
 where Φ_dd(r,t) = c_dd F² · F⁻¹{[(k̂·B̂(t))² - 1/3] · F{|ψ|²}}.
 
-Not yet integrated with Workspace / YAML / dashboard — pass raw arrays.
+Reachable from YAML as `kind: scalar_egpe` on `ground_state` and `dynamics`
+(`workflow/experiments/pipeline/run_step_scalar_egpe.jl`); the raw-array API
+below is still the direct entry point. **Whether this model is the right one is
+a computation** — `spin_treatment_report` / `recommend_spin_treatment`, at the
+top of this file. Adiabatic elimination is not a cheaper approximation of the
+spinor solver, it is a different Hamiltonian, and it deletes exactly the physics
+that weak-field spinor experiments are about.
 """
 
 # --- Workspace ---
 
-export make_scalar_ddi_pad
+export make_scalar_ddi_pad, spin_treatment_report, recommend_spin_treatment
+export scalar_column_density, planar_aspect_ratio, ho_eigenfunctions
+
+# --- Model selection: is the spin adiabatically eliminable? ---
+#
+# Choosing between this solver and the spinor one is a physics decision with a
+# numeric answer, so it is computed rather than argued. Everything below is
+# derived from the atom, the field and the mean field; nothing is a constant
+# fitted to a regime we happen to care about.
+
+"""
+Scale hierarchy that decides scalar-vs-spinor for a rotating-polarization
+experiment. All frequencies in Hz (ordinary, not angular); the two `dt` fields
+are in units of `1/ω_ref`.
+"""
+struct SpinTreatmentReport
+    f_larmor::Float64        # g_F μ_B |B| / h
+    f_meanfield::Float64     # μ/h — the fastest scale that is NOT Larmor
+    f_trap::Float64          # max trap frequency
+    f_drive::Float64         # polarization-rotation (stir) frequency
+    n_components::Int        # 2F+1 the spinor path would carry
+    dt_zeeman_max::Float64   # π/(p·F): the Zeeman substep bound
+    dt_physics::Float64      # the dt the trap/mean-field scales actually need
+end
+
+"""
+    spin_treatment_report(atom; B_gauss, omega_ref, mu_dimless,
+                          f_trap_hz, f_drive_hz, dt_physics) -> SpinTreatmentReport
+
+Assemble the scale hierarchy. `mu_dimless` is the chemical potential in units of
+`ℏω_ref` (the mean-field scale — use the interacting μ, not `c₀`, because it is
+what sets the spin-mixing rate the Larmor precession must beat). `omega_ref` is
+angular, matching the rest of the code base.
+
+`f_larmor` delegates to `larmor_frequency` (`analysis/larmor_adiabaticity.jl`)
+and the dimensionless Zeeman coefficient to `Units.bfield_to_p_gauss`, so this
+introduces no second statement of either.
+"""
+function spin_treatment_report(
+    atom::AtomSpecies;
+    B_gauss::Real, omega_ref::Real, mu_dimless::Real,
+    f_trap_hz::Real, f_drive_hz::Real, dt_physics::Real,
+)
+    atom.F == 0 && throw(ArgumentError(
+        "spin_treatment_report is a spinor-vs-scalar decision; atom has F=0"))
+    ω_L = larmor_frequency(B_gauss * 1e-4, atom)          # rad/s, B in tesla
+    p = abs(Units.bfield_to_p_gauss(B_gauss, atom.g_F, omega_ref))
+    SpinTreatmentReport(
+        ω_L / 2π,
+        mu_dimless * omega_ref / 2π,
+        Float64(f_trap_hz),
+        Float64(f_drive_hz),
+        2 * Int(atom.F) + 1,
+        π / (p * atom.F),
+        Float64(dt_physics),
+    )
+end
+
+"""Non-adiabatic spin admixture ≈ (fastest non-Larmor scale)/(Larmor)."""
+adiabatic_parameter(r::SpinTreatmentReport) =
+    max(r.f_meanfield, r.f_trap, r.f_drive) / r.f_larmor
+
+"""How much more the spinor path costs: extra substeps × extra components."""
+spinor_cost_factor(r::SpinTreatmentReport) =
+    r.n_components * max(1.0, r.dt_physics / r.dt_zeeman_max)
+
+"""
+    recommend_spin_treatment(r; tol=1e-2) -> Symbol
+
+`:scalar_adiabatic` when the spin follows B̂(t) to better than `tol`, else
+`:spinor`. `tol = 1e-2` is the point below which the neglected admixture is
+smaller than the scattering-length systematics of any experiment in this class;
+it is a stated threshold, not a fitted one, and the returned report carries the
+raw ratio so a caller can apply its own.
+"""
+function recommend_spin_treatment(r::SpinTreatmentReport; tol::Real=1e-2)
+    adiabatic_parameter(r) < tol ? :scalar_adiabatic : :spinor
+end
 
 # --- Transverse-truncated dipolar kernel ---
 #
@@ -420,6 +503,79 @@ function scalar_aspect_ratio(ws::ScalarSimWS{T, 3}) where {T}
     σ_xy > 0 ? sqrt(σ_z / σ_xy) : zero(T)
 end
 
+"""
+    scalar_column_density(ws) -> Matrix
+
+Density integrated along z — the observable a vertical absorption image
+measures. 3D only.
+"""
+function scalar_column_density(ws::ScalarSimWS{T, 3}) where {T}
+    nx, ny, nz = ws.grid.config.n_points
+    col = zeros(T, nx, ny)
+    dz = ws.grid.dx[3]
+    @inbounds for k in 1:nz, j in 1:ny, i in 1:nx
+        re = real(ws.psi[i, j, k]);
+        im = imag(ws.psi[i, j, k])
+        col[i, j] += (re * re + im * im) * dz
+    end
+    col
+end
+
+"""
+    planar_aspect_ratio(col, x, y) -> (ratio, angle, sigma_max, sigma_min)
+
+In-plane aspect ratio `σ_max/σ_min`, the long-axis angle (radians, from +x) and
+the two rms half-widths of a column density, from the eigenvalues of the
+second-moment tensor.
+
+Klaus et al. fit a *rotated 2D Gaussian* and quote `σ_max/σ_min`. For any
+elliptically-symmetric profile — Gaussian or Thomas-Fermi — the moment tensor
+gives the same ratio, and unlike a fit it cannot fail to converge on the spiral
+and vortex-riddled profiles this is applied to. That robustness is the reason
+for the substitution, and it is a substitution: on a profile that is NOT
+elliptically symmetric the two definitions differ.
+"""
+function planar_aspect_ratio(
+    col::AbstractMatrix{T}, x::AbstractVector, y::AbstractVector
+) where {T}
+    tot = zero(T);
+    mx = zero(T);
+    my = zero(T)
+    @inbounds for j in eachindex(y), i in eachindex(x)
+        w = col[i, j]
+        tot += w;
+        mx += w * x[i];
+        my += w * y[j]
+    end
+    tot > 0 || return (one(T), zero(T))
+    mx /= tot;
+    my /= tot
+    sxx = zero(T);
+    syy = zero(T);
+    sxy = zero(T)
+    @inbounds for j in eachindex(y), i in eachindex(x)
+        w = col[i, j]
+        dx = x[i] - mx;
+        dy = y[j] - my
+        sxx += w * dx * dx;
+        syy += w * dy * dy;
+        sxy += w * dx * dy
+    end
+    sxx /= tot;
+    syy /= tot;
+    sxy /= tot
+    tr = sxx + syy
+    disc = sqrt(max(zero(T), (sxx - syy)^2 / 4 + sxy * sxy))
+    λ_max = tr / 2 + disc
+    λ_min = tr / 2 - disc
+    ar = λ_min > 0 ? sqrt(λ_max / λ_min) : T(Inf)
+    (ratio=ar, angle=atan(2 * sxy, sxx - syy) / 2,
+        sigma_max=sqrt(max(zero(T), λ_max)), sigma_min=sqrt(max(zero(T), λ_min)))
+end
+
+planar_aspect_ratio(ws::ScalarSimWS{T, 3}) where {T} =
+    planar_aspect_ratio(scalar_column_density(ws), ws.grid.x[1], ws.grid.x[2])
+
 """Energy decomposition: (E_kin, E_trap, E_contact, E_dd, E_total).
 Excludes LHY (assumes γ_LHY=0; safe for current callers)."""
 function scalar_energies(ws::ScalarSimWS{T, N}, B_hat::SVector{3, T}) where {T, N}
@@ -493,6 +649,107 @@ function seed_scalar_noise!(
     end
     normalize_scalar!(ws)
     nothing
+end
+
+"""
+    ho_eigenfunctions(x, ω, n_max) -> Matrix (length(x) × n_max+1)
+
+1D harmonic-oscillator eigenfunctions `h_0 … h_n_max` on `x`, normalised to
+`∫|h_n|²dx = 1` in the code's units (ℏ = m = 1, so the length scale is
+`1/√ω`). Built by the stable upward recurrence
+`ψ_{n+1} = √(2/(n+1))·u·ψ_n − √(n/(n+1))·ψ_{n−1}`; the closed form with
+`H_n`/`√(2ⁿ n!)` overflows both factors around n ≈ 20 and is a well-known way
+to get silent garbage at exactly the mode numbers a thermal cutoff reaches.
+"""
+function ho_eigenfunctions(x::AbstractVector{T}, ω::Real, n_max::Int) where {T}
+    n_max >= 0 || throw(ArgumentError("n_max must be ≥ 0"))
+    w = T(ω)
+    h = zeros(T, length(x), n_max + 1)
+    pref = T(w)^T(0.25)
+    @inbounds for (i, xi) in enumerate(x)
+        u = sqrt(w) * xi
+        p0 = T(π)^T(-0.25) * exp(-u * u / 2)
+        h[i, 1] = pref * p0
+        n_max == 0 && continue
+        p1 = sqrt(T(2)) * u * p0
+        h[i, 2] = pref * p1
+        for n in 1:(n_max - 1)
+            p2 = sqrt(T(2) / (n + 1)) * u * p1 - sqrt(T(n) / (n + 1)) * p0
+            h[i, n + 2] = pref * p2
+            p0 = p1;
+            p1 = p2
+        end
+    end
+    h
+end
+
+"""
+    seed_scalar_thermal!(ws; kT, omega, n_atoms, seed=nothing, e_cut_ratio=2.0)
+        -> (n_modes, seeded_fraction)
+
+Add the truncated-Wigner initial noise Klaus et al. use to seed the surface
+instability (their Methods A.5): `ψ += Σ' α_n φ_n / √N` with
+`⟨|α_n|²⟩ = (e^{ε_n/kT} − 1)⁻¹ + ½` over the **single-particle eigenstates**
+`φ_n` of the trap `omega`, restricted to `ε_n ≤ e_cut_ratio·kT`, excluding the
+ground mode. `kT` is in units of `ℏω_ref` (T = 20 nK at ω_ref = 2π×50 Hz is
+`kT = 8.33`).
+
+The basis is the whole point and is not interchangeable with plane waves.
+Trap eigenstates live on the cloud; plane waves fill the simulation box, so the
+mode count — and with it the seeded atom number — scales with the box instead
+of with the physics. Measured on the Klaus cell (16×16×8 a_ho, kT = 8.33,
+N = 10⁴): plane waves give 6644 modes carrying **102 % of N**, trap
+eigenstates give ~300 carrying a few percent. The first is a different initial
+state; the second is a perturbation of one, which is what "seed" means.
+`seed_scalar_noise!` is a third thing again — white in real space, so it has
+power above the cutoff.
+
+Returns the mode count and the seeded atom fraction. **Read the fraction.**
+"""
+function seed_scalar_thermal!(
+    ws::ScalarSimWS{T, 3}; kT::Real, omega::NTuple{3, <:Real}, n_atoms::Integer,
+    seed::Union{Nothing, Integer}=nothing, e_cut_ratio::Real=2.0,
+    verbose::Bool=false,
+) where {T}
+    kT > 0 || return (0, zero(T))
+    rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    ε_cut = T(e_cut_ratio) * T(kT)
+    ω = T.(omega)
+    e0 = sum(ω) / 2
+    n_max = ntuple(d -> max(0, floor(Int, (ε_cut - e0) / ω[d])), 3)
+
+    hx = ho_eigenfunctions(ws.grid.x[1], ω[1], n_max[1])
+    hy = ho_eigenfunctions(ws.grid.x[2], ω[2], n_max[2])
+    hz = ho_eigenfunctions(ws.grid.x[3], ω[3], n_max[3])
+
+    nx, ny, nz = ws.grid.config.n_points
+    scale = T(1 / sqrt(n_atoms))
+    n_modes = 0
+    occ_total = zero(T)
+    for kz in 0:n_max[3], ky in 0:n_max[2], kx in 0:n_max[1]
+        ε = e0 + kx * ω[1] + ky * ω[2] + kz * ω[3]
+        (ε <= ε_cut && (kx + ky + kz) > 0) || continue
+        occ = one(T) / (exp((ε - e0) / T(kT)) - one(T)) + T(0.5)
+        n_modes += 1
+        occ_total += occ
+        α = sqrt(occ / 2) * (randn(rng, T) + im * randn(rng, T)) * scale
+        @inbounds for k in 1:nz
+            azk = α * hz[k, kz + 1]
+            azk == 0 && continue
+            for j in 1:ny
+                ayj = azk * hy[j, ky + 1]
+                for i in 1:nx
+                    ws.psi[i, j, k] += ayj * hx[i, kx + 1]
+                end
+            end
+        end
+    end
+    frac = occ_total / T(n_atoms)
+    verbose && println("    thermal seed: ", n_modes, " trap modes, ",
+        round(100 * frac; digits=2), " % of N")
+    frac > 0.5 && @warn "thermal seed carries $(round(100*frac, digits=1)) % of N — " *
+        "this is a different initial state, not a perturbation" kT n_atoms
+    (n_modes, frac)
 end
 
 """

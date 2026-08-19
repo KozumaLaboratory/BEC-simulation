@@ -47,7 +47,7 @@ decision rather than convenience:
 """
 function _governed_files()
     out = String[]
-    for sub in ("src", "test", "docs", "bench")
+    for sub in ("src", "ext", "test", "docs", "bench", "scripts")
         root = joinpath(_REPO, sub)
         isdir(root) || continue
         for (dir, dirs, files) in walkdir(root)
