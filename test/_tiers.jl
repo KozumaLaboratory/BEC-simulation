@@ -418,6 +418,25 @@ const CI_EXTRA = [
     # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
     "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # Klaus 2022 magnetostirring: the coefficient chain, the directional
+    # magnetostriction oracle (coarse-grid ITP), and the pre-registered
+    # thresholds re-applied to the stored production verdicts.
+    "validation/test_klaus2022_vortex_stripes.jl",
+    # Why that reproduction runs on the scalar eGPE and not the spinor solver,
+    # as a computation over the scale hierarchy rather than a paragraph.
+    "validation/test_klaus_model_selection.jl",
+    # Calibration of the Klaus residual-image hole/stripe detector: every
+    # assertion paired with the pattern that must NOT be found.
+    "analysis/test_vortex_stripes.jl",
+    # The truncated-Wigner seed and its basis. Pins the seeded atom fraction:
+    # drawn on plane waves instead of trap eigenstates it came out at 102 % of N.
+    "solvers/test_scalar_thermal_seed.jl",
+    # Magnitude oracle for the dipolar kernel. The existing kernel test pins
+    # symmetry and direction only — a kernel scaled by any constant passes it.
+    "oracles/test_dipolar_magnetostriction_magnitude.jl",
+    # The `kind: scalar_egpe` YAML wiring: parse, step types, refusals, one
+    # end-to-end run. The solver existed for two months with no way to reach it.
+    "workflow/test_scalar_egpe_yaml.jl",
     # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
     # so the type-C target cannot drift when the fixture or the metric changes.
     # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
@@ -896,6 +915,13 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Three coarse-grid scalar-eGPE ITP solves for the magnetostriction
+    # direction oracle; the rest is table lookups against a stored JSON.
+    "validation/test_klaus2022_vortex_stripes.jl" => 25.0,
+    # Three coarse ITP solves against the dipolar Thomas-Fermi closed form.
+    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 100.0,
+    # One 24³ ground state + 100 dynamics steps through the YAML entry point.
+    "workflow/test_scalar_egpe_yaml.jl" => 40.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
     # against the 3.0 s default it had been taking. The default made it the
     # LAST file handed out, which is the worst possible order for the one
