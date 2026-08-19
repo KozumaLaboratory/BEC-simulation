@@ -72,6 +72,8 @@
 #   NU_DT=0.002  NU_EVERY=5        unitary step / reservoir sub-step interval
 #   NU_SEED=1                      trajectory seed (the ensemble axis)
 #   NU_NOISE=1                     0 ⇒ quiet SPGPE — the positive control
+#   NU_NO_ED=1                     drop the scattering reservoir (growth-only)
+#   NU_MU1_EQ_MU0=1                hold µ at the seed's own — the zero-drive null
 #   NU_SEED_FILE=                  converged unit-norm ψ + its f (bifurcation cell)
 #   NU_FRAMES=200  NU_OUT=figs/eu334/nucleate  NU_SMOKE=1
 #
@@ -276,8 +278,14 @@ function main()
         end
     end
     MU0 = getf("NU_MU0", mu0_measured)
-    MU1 = mu1_target
-    MU1 > MU0 || error("NU_MU1 ($MU1) must exceed the seed's µ ($MU0) — this is a growth ramp")
+    # `NU_MU1_EQ_MU0=1` is the NULL arm: the reservoir sits at the field's own µ,
+    # so the growth drive is zero by construction and N_C must not move. Anything
+    # that does move it is bookkeeping — the noise/projector pair, or the
+    # energy-damping term's approximate number conservation — and without this arm
+    # a loss and a drive are indistinguishable in the trajectory.
+    MU1 = gets("NU_MU1_EQ_MU0", "") == "1" ? MU0 : mu1_target
+    MU1 >= MU0 ||
+        error("NU_MU1 ($MU1) must be ≥ the seed's µ ($MU0) — this is a growth ramp")
 
     # The C region has to clear µ at BOTH ends and stay inside the grid. Refusing
     # here is the point: a k_cut above k_max makes the projector a no-op and the
@@ -301,7 +309,12 @@ function main()
     Tw = ConstantWaveform(T_RES)
     kcw = PiecewiseLinearWaveform(tw,
         [sqrt(2 * (mu + N_T * T_RES)) for mu in (MU0, MU1, MU1)])
-    res = SPGPEReservoir(; T=Tw, mu=muw, a_s=A_S_HO, k_cut=kcw)
+    # `NU_NO_ED=1` selects the growth-only sub-theory (Rooney Eq. 20). Not a
+    # convenience switch: the scattering term is number-conserving only BEFORE the
+    # projector, and turning it off is how its residual is attributed rather than
+    # argued about.
+    res = SPGPEReservoir(; T=Tw, mu=muw, a_s=A_S_HO, k_cut=kcw,
+        energy_damping=gets("NU_NO_ED", "") != "1")
 
     r0 = spgpe_rates(res, 0.0)
     r1 = spgpe_rates(res, TAU)
