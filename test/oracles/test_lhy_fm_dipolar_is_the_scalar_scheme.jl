@@ -18,6 +18,13 @@
 # covers the gap those two conditions leave, which is where the scheme decision
 # actually lives.
 #
+# NOT a duplicate of `test_stretched_channel_invariance.jl`, which gained a
+# dipolar-FM block on 2026-08-19 (#342). That file pins INVARIANCE — that a
+# `c1_ratio` sweep at fixed `c_total` cannot move `fm_dipolar`, because the six
+# unmeasured channels do not enter it. This file pins MAGNITUDE — that the value
+# it is invariant at is the SI one. An implementation off by a constant factor
+# satisfies every assertion there and none here.
+#
 # It also pins the ε_dd CONVERSION. `_build_spinor_lhy(::Val{:fm_dipolar})`
 # reaches Lima-Pelster through `eps_dd = c_dd·F²/(3·g_{2F})`, converting from the
 # spin-Hamiltonian coupling to the scalar ratio; the claim is that this equals the
