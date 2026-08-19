@@ -54,3 +54,5 @@ for dt in (0.02, 0.01, 0.005, 0.002, 0.001)
 end
 @printf("\nloss/TIME flat  => the term is wrong (a defect)\n")
 @printf("loss/TIME -> 0  => discretisation, and dt was too large\n")
+@printf("\nBEFORE the increment form: 4.5285e-03 4.5288e-03 4.5305e-03 4.5312e-03 4.5303e-03\n")
+@printf("  (dt 0.02 -> 0.001, flat to 0.06%% over a factor of 20 — the exponential form)\n")

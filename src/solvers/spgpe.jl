@@ -478,10 +478,27 @@ function apply_energy_damping_step!(
     # norm-preserving before projection, with the projector's bite made small by
     # band-limiting rather than argued away.
     plans.inverse * phase_k
+    # The INCREMENT, not the exponential.
+    #
+    # `psi *= cis(phi)` is norm-preserving pointwise and therefore looks like the safe
+    # choice, but `exp(i phi)` is NOT band-limited even when `phi` is — the exponential
+    # generates harmonics — so the product carries weight outside C and the caller's
+    # projector deletes it. That loss does not shrink with the step: measured in
+    # scripts/kz/energy_damping_dt_convergence.jl, loss per unit TIME is 4.53e-3 across
+    # dt from 0.02 to 0.001, flat to 0.06% over a factor of twenty. On the euv3 ramp it
+    # took N_C from 1716 to 64.
+    #
+    # Rooney, Blakie & Bradley (PRE 89, 013302) evaluate the scattering term inside the
+    # restricted basis for exactly this reason: the projector acts on the INCREMENT, so
+    # the increment is in C by construction. `psi + i phi psi` is band-limited whenever
+    # `phi` and `psi` are, up to the single convolution the product makes, and its norm
+    # error is O(dt^2) per step — O(dt) per unit time, which vanishes as the step
+    # shrinks. That is the difference between a scheme that converges and one that does
+    # not.
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        @. psi_c *= cis(real(phase_k))
+        @. psi_c += im * real(phase_k) * psi_c
     end
     nothing
 end
