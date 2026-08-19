@@ -89,10 +89,11 @@ const TYPE_C_CLAIMS = TypeCClaim[
         "test_matsui_fig4_dip.jl pins THEIR curve only. Ours is −2.5099 / 12.740 " *
         "at N = 3.5e4 (per-field rms 1.1 %, width 0.10 % — #299/#323, recorded in " *
         "docs/validation/matsui_residual_root_cause.md and matsui_campaign_report.md), " *
-        "and lives in those documents, not in a gate. The 2026-08-19 reading of " *
-        "this row was −2.138 / 14.62, superseded when the atom number was " *
-        "corrected. The exp abscissa carries a ±10 nT offset, so only the WIDTH " *
-        "arbitrates."),
+        "and lives in those documents, not in a gate. This row carried " *
+        "−2.138 / 14.62 until 2026-08-19; that number predates #299/#323 and was " *
+        "superseded when the atom number was corrected, so the registry was " *
+        "ratcheting a value the campaign had already retired. The exp abscissa " *
+        "carries a ±10 nT offset, so only the WIDTH arbitrates."),
     TypeCClaim(
         "Matsui et al. (Eu Bogoliubov cascade)", "spin-excitation cascade", "—", nothing,
         "no test"),
