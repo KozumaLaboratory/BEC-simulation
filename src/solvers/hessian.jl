@@ -323,6 +323,18 @@ stiffness `V_trap + c₀n` that the kinetic-only inverse leaves alone), `α_v`
 `rng`. A preconditioner changes the iteration and not the spectrum, so the two
 `precond` arms must agree on λ — gated.
 
+**Use `:combined` on interaction-dominated states; the default is not it because
+one measurement is not a mandate.** Measured on ¹⁵¹Eu 32³ × 13 at B = 68.25 µG
+(H100, `nev=4`, same seed, same wall clock): the lowest Ritz value came back
+1.85e-3 with `:kinetic` and 4.87e-7 with `:combined` at `max_iter=200`, and
+7.62e-8 at 400. Ritz values converge from ABOVE, so those are upper bounds on
+λ_min and the improvement is 3800× at equal cost — the difference between
+"λ_min ≤ 2e-3" and "λ_min ≤ 8e-8". The kinetic arm does not descend further with
+more iterations; it is preconditioning the wrong stiffness. The default stays
+`:kinetic` because changing it moves every gate-2 stability verdict, which
+deserves its own measurement across those consumers rather than an inference
+from one state.
+
 VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. The
 preconditioner's convergence ADVANTAGE is NOT yet realised at Eu production
 scale — there the stiffness is interaction-dominated (`c₀·n~2343`), which the
