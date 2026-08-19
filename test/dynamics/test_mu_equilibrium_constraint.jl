@@ -27,8 +27,19 @@ using SpinorBEC
         @test issorted(tots)
     end
 
-    @testset "it round-trips" begin
-        for mu_want in (-4.0, 0.0, 2.5, 6.0)
+    @testset "it round-trips ONLY where no level sits below mu" begin
+        # This form sums discrete harmonic levels and skips every level below mu, which
+        # deletes the atoms that level was holding: the total falls as mu crosses a
+        # level, measured in scripts/kz/mu_constraint_continuity.jl as N_C^th going
+        # 377 -> 258 across mu = 2.375 -> 2.5. A bisection cannot invert a
+        # non-monotone function, so the round-trip fails above the first excited level —
+        # 2.34 returned for 2.5 — and that is the defect, not a tolerance to widen.
+        #
+        # Superseded by mu_from_total_lda, which puts every region at the same mu through
+        # mu_eff = mu - V - 2 c0 n and has no level to skip. Kept because the boundary is
+        # the lesson: below eps_1 the two agree, above it this one is wrong, and nothing
+        # in the code says so unless a test does.
+        for mu_want in (-4.0, 0.0)
             N0 = if mu_want > 1.5
                 (R=sqrt(2 * (mu_want - 1.5));
                     max((4π / c0) * ((mu_want - 1.5) * R^3 / 3 - R^5 / 10), 0.0))
@@ -42,6 +53,19 @@ using SpinorBEC
             got = mu_from_total_number_equilibrium(N, T, eps_cut; c0)
             @test got.mu≈mu_want rtol=1e-4 atol=1e-5
         end
+    end
+
+    @testset "and it does NOT round-trip above the first excited level" begin
+        # The positive control on the paragraph above: if this ever starts round-tripping
+        # at 2.5, the level-skipping is gone and this whole file should go with it.
+        mu_want = 2.5
+        N0 = (R=sqrt(2 * (mu_want - 1.5));
+            max((4π / c0) * ((mu_want - 1.5) * R^3 / 3 - R^5 / 10), 0.0))
+        N =
+            N0 + coherent_population(mu_want, T, eps_cut) +
+            incoherent_population(mu_want, T, eps_cut)
+        got = mu_from_total_number_equilibrium(N, T, eps_cut; c0)
+        @test !isapprox(got.mu, mu_want; rtol=1e-3)
     end
 
     @testset "the euv3 point no longer demands thirty times what exists" begin

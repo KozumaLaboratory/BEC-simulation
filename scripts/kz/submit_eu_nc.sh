@@ -28,9 +28,16 @@ echo "[eunc] HEAD=$(git rev-parse --short HEAD) dirty=$(git status --porcelain |
 # because nothing executed the invocation before qsub took the node.
 if [ "$MODE" != "smoke" ]; then
     echo "[eunc] smoking at 5% first"
+    # Job id in the name. A shared _smoke.log is whichever run touched it last, so a
+    # dead job's log reads as the live one's — which happened: a 17:33 failure was read
+    # as the 18:19 run's output and reported as that run having died, while it was still
+    # going and the failure had already been fixed. Same class as the provenance work in
+    # this branch: an output that does not record what produced it cannot refuse to be
+    # misread.
+    SMOKE="$OUT/_smoke_${JOB_ID:-nojob}.log"
     timeout 3600 "$JULIA" --project=. scripts/kz/eu_number_conserving.jl smoke \
-        > "$OUT/_smoke.log" 2>&1 || {
-        echo "[eunc] FAIL: the smoke could not run"; tail -25 "$OUT/_smoke.log"; exit 1; }
+        > "$SMOKE" 2>&1 || {
+        echo "[eunc] FAIL: the smoke could not run"; tail -25 "$SMOKE"; exit 1; }
     echo "[eunc] smoke OK"
 fi
 "$JULIA" --project=. scripts/kz/eu_number_conserving.jl "$MODE"

@@ -364,7 +364,11 @@ exactly the kind of imposed answer this whole mechanism exists to remove.
 function number_conserving_callback(
     mu_ref::Base.RefValue{Float64}, N_total_of, T_of, eps_cut;
     omega::Real=1.0, every::Int=1, counter::Base.RefValue{Int}=Ref(0),
-    t_offset::Real=0.0, c0_lda::Union{Nothing, Real}=nothing,
+    # REQUIRED. It was optional with a "return NaN" fallback, so a caller that forgot it
+    # got a control loop that silently never updated mu — measured in CI as N_C identical
+    # across a 3x change in the total, with all 150 callbacks recorded unsatisfiable. An
+    # absent argument is missing, not a default; a MethodError is the correct outcome.
+    t_offset::Real=0.0, c0_lda::Real,
 )
     function (ws, step, args...)
         step % every == 0 || return nothing
@@ -391,12 +395,7 @@ function number_conserving_callback(
         #
         # What is driven toward is the mu the whole cloud would have in equilibrium at
         # this total and temperature — a target, not a residual.
-        g = if c0_lda === nothing
-            (; mu=NaN)
-        else
-            mu_from_total_lda(N_total_of(t); T=T_of(t), c0=c0_lda, eps_cut=ec, omega)
-        end
-        mu = g.mu
+        mu = mu_from_total_lda(N_total_of(t); T=T_of(t), c0=c0_lda, eps_cut=ec, omega).mu
         isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
         nothing
     end

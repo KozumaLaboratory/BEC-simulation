@@ -23,8 +23,13 @@ using SpinorBEC
             potential=HarmonicTrap{1}((0.0,)), sim_params=sp, fft_flags=FFTW.ESTIMATE)
         mu_ref = Ref(0.0)
         bad = Ref(0)
+        # c0 is REQUIRED. It was optional and defaulted to "return NaN", so a caller
+        # that forgot it got a control loop that silently never updated mu — which is
+        # exactly what this test hit: N_C identical across a 3x change in the total, and
+        # every one of 150 callbacks unsatisfiable. An absent argument is missing, not a
+        # default, and the fix is a MethodError rather than a quiet no-op.
         cb = number_conserving_callback(mu_ref, _ -> N_total, _ -> T, eps_cut;
-            every=20, counter=bad)
+            every=20, counter=bad, c0_lda=c0)
         res = SPGPEReservoir(; T, mu=FeedbackWaveform(mu_ref), a_s=0.02, k_cut,
             gamma=0.05, M=0.0, allow_unphysical_rates=true)
         fill!(ws.state.psi, 0)
