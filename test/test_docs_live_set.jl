@@ -30,6 +30,11 @@ const LIVE_DOCS = [
     "docs/architecture/rotating_basis.md",
     "docs/archive/README.md",
     "docs/campaign/CAMPAIGN.md",
+    # Per-claim expansion of CAMPAIGN §5's one-line policy: which live claims the
+    # six unmeasured Eu scattering channels can move. LIVE because the claim set
+    # it partitions is itself live — new type-C entries and new figures land in
+    # registries this file reads (#342).
+    "docs/campaign/as_dependency_map.md",
     "docs/campaign/fix_list.toml",
     # Which of the three things "Klaus" named is meant where (#344). LIVE
     # because it is a naming rule people are told to follow, and it has its
