@@ -134,6 +134,16 @@ function main(args)
     # seed-to-seed spread — which is how a resonance gets averaged into a
     # shrug. `rot_hz` is NaN for the broadband shapes, and NaN keys group
     # together only if compared with `isequal`.
+    # REFUSE a row that lacks the column the grouping keys on. Without this a
+    # file written before `rot_hz` existed gets fkey = NaN and lands in the
+    # BROADBAND group while carrying shape="rotating" — which is how "worst
+    # broadband (rotating)" appeared, comparing coherent tones against
+    # themselves and reporting a 3× ratio where the truth is ~120×.
+    stale = [r for r in rows if String(r.shape) == "rotating" && !hasproperty(r, :rot_hz)]
+    isempty(stale) || throw(BlindSpec(
+        "$(length(stale)) `rotating` row(s) have no `rot_hz` column — written by a " *
+        "driver older than the column. They would be grouped as broadband and " *
+        "silently compared against themselves. Re-run those arms."))
     fkey(r) = hasproperty(r, :rot_hz) ? Float64(r.rot_hz) : NaN
     key(r) = (String(r.shape), Float64(r.hold_ms), Float64(r.rms_uG), fkey(r))
     cells = NamedTuple[]
@@ -172,35 +182,61 @@ function main(args)
 
     # ------------------- does the SHAPE matter at fixed rms? -----------------
     println("\nsame rms, different spectrum — is an rms specification enough?")
+    println("  Two questions, two tests, and they can disagree:")
+    println("    MEAN   do the spectra differ ON AVERAGE?  compare means against the")
+    println("           standard error sd/√n — this is the physics question.")
+    println("    SHOT   can ONE shot tell them apart?  compare against the shot-to-shot")
+    println("           sd — this is what a specification for a single run must use.")
     shapes = unique(getfield.(cells, :shape))
     rand_shapes = filter(s -> s != "rotating", shapes)
     verdict_shape = "not tested"
     if length(rand_shapes) >= 2
         worst_ratio, worst_at = 1.0, ""
-        for hold in unique(getfield.(cells, :hold_ms)),
-            rms in unique(getfield.(cells, :rms))
+        for hold in sort(unique(getfield.(cells, :hold_ms))),
+            rms in sort(unique(getfield.(cells, :rms)))
 
             g = [c for c in cells if c.hold_ms == hold && c.rms == rms &&
                      c.shape in rand_shapes]
             length(g) >= 2 && rms > 0 || continue
             lo, hi = minimum(c -> c.dJz, g), maximum(c -> c.dJz, g)
-            # Compare the gap with the ensemble spread: two shapes differ only if
-            # the difference is larger than the scatter within each of them.
-            spread = maximum(c -> c.dJz_sd, g)
-            sep = (hi - lo) > 2 * spread
-            @printf("  %4.0f ms  rms=%-6.3f  %s   spread within arms ±%.1e  ⇒ %s\n",
+            sd_shot = maximum(c -> c.dJz_sd, g)
+            sem = maximum(c -> c.dJz_sd / sqrt(max(c.n, 1)), g)
+            sep_mean = (hi - lo) > 2 * sem
+            sep_shot = (hi - lo) > 2 * sd_shot
+            @printf("  %4.0f ms rms=%-7.3f %s\n      ratio %.2f×   MEAN: %-16s SHOT: %s\n",
                 hold, rms,
                 join((@sprintf("%s %.2e", c.shape, c.dJz) for c in g), "  "),
-                spread, sep ? "DIFFERENT" : "indistinguishable")
+                lo > 0 ? hi / lo : NaN,
+                sep_mean ? "DIFFERENT" : "indistinguishable",
+                sep_shot ? "DIFFERENT" : "indistinguishable")
             if lo > 0 && hi / lo > worst_ratio
                 worst_ratio = hi / lo
                 worst_at = @sprintf("%.0f ms, rms=%.3g", hold, rms)
             end
         end
-        verdict_shape = worst_ratio <= 2 ?
-            @sprintf("an rms specification is SUFFICIENT (worst spread between shapes %.2f×, at %s)", worst_ratio, worst_at) :
-            @sprintf("an rms specification is NOT sufficient (%.2f× between shapes at %s) — quote the worst shape", worst_ratio, worst_at)
+        # One literal format string: `@sprintf` is a macro and cannot see through
+        # a `*` concatenation to find the format at compile time.
+        verdict_shape = @sprintf("spectra differ by up to %.2f× in the MEAN (worst at %s), but by less than the shot-to-shot spread — the shape matters to the physics, not to a single shot. Write the specification for the WORST spectrum.",
+            worst_ratio, worst_at)
         println("  ⇒ ", verdict_shape)
+    end
+
+    # The coherent tone is the case the rms specification cannot cover.
+    coh = [c for c in cells if !isnan(c.rot_hz) && c.rms > 0]
+    bb = [c for c in cells if isnan(c.rot_hz) && c.rms > 0]
+    if !isempty(coh) && !isempty(bb)
+        println("\ncoherent tone vs broadband AT THE SAME TOTAL rms:")
+        for rms in sort(unique(getfield.(coh, :rms)))
+            cs = [c for c in coh if c.rms == rms]
+            bs = [c for c in bb if c.rms == rms]
+            (isempty(cs) || isempty(bs)) && continue
+            wc = cs[argmax(getfield.(cs, :dJz))]
+            wb = bs[argmax(getfield.(bs, :dJz))]
+            @printf("  rms=%-7.3f worst coherent %.2e (%.0f Hz)  vs  worst broadband %.2e (%s)  ⇒ %.0f×\n",
+                rms, wc.dJz, wc.rot_hz, wb.dJz, wb.shape, wc.dJz / max(wb.dJz, 1e-30))
+        end
+        println("  ⇒ a TOTAL-rms limit does not bound a line at the resonance; the")
+        println("    specification needs a per-frequency limit near the worst frequency.")
     end
 
     # ---------------------------- the specification ---------------------------
@@ -232,8 +268,9 @@ function main(args)
             maximum(getfield.(cells, :rms)))
     else
         for c in sort(moved; by=x -> x.rms)
-            @printf("  %-9s %4.0f ms  rms=%-6.3f  moved in %.0f %% of shots\n",
-                c.shape, c.hold_ms, c.rms, 100 * c.npop_changed)
+            @printf("  %-9s %-7s %4.0f ms  rms=%-6.3f  moved in %.0f %% of shots\n",
+                c.shape, isnan(c.rot_hz) ? "—" : @sprintf("%.0fHz", c.rot_hz),
+                c.hold_ms, c.rms, 100 * c.npop_changed)
         end
         @printf("  ⇒ lowest rms at which the level count moves: %.3g µG\n",
             minimum(getfield.(moved, :rms)))
