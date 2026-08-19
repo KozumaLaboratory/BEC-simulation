@@ -1,11 +1,22 @@
 # --- Zeeman: data accessors + static builders + the ZeemanTerm HamTerm ---
 #
-# `H_Zeeman = -(g_F μ_B B · F) + q F_z²` (user spec
+# `H_Zeeman = -(g_F μ_B B · F) + q (B̂·F)²` (user spec
 # `b_block_builders.jl:27`), written as ONE operator:
 #
-#   H = -(bx·F_x + by·F_y + bz·F_z) + q·F_z²
+#   H = -(bx·F_x + by·F_y + bz·F_z) + q·(b̂·F)²,   b̂ = (bx,by,bz)/|b|
 #
 # with `bz ≡ p` the linear z-Zeeman coefficient.
+#
+# **The quadratic term is along the FIELD AXIS, not along ẑ.** `q F_z²` is the
+# b̂ = ẑ special case (`_diag_coef`, taken whenever bx = by = 0), not the general
+# form; `_zeeman_term_matrix!` builds `q(b̂·F)²` for a tilted field. This is the
+# right physics — second-order perturbation theory quantises along B — and it has
+# a sharp consequence for scripted runs: setting `bz = 0` with a small transverse
+# pin and `q ≠ 0` puts b̂ in the PLANE, so the quadratic Zeeman becomes `q F_x²`
+# and a ground-state search relaxes to the nematic along x (⟨F_z²⟩ = F(F+1)/2,
+# Zeeman energy ≈ 0) rather than to m = 0. The header said `q F_z²` unqualified
+# until 2026-08-19, which is how that reads as a bug in the solver instead of a
+# mis-specified field. To hold q along ẑ, leave bx = by = 0.
 #
 # Three concerns, one file (each small, one cohesive subsystem):
 #   1. accessors — operations on the Zeeman DATA type
