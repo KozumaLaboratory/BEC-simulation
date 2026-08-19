@@ -42,8 +42,8 @@ import CUDA
 using SpinorBEC
 using SpinorBEC: Units, eu151_preset, make_workspace, SimParams,
     static_zeeman, find_ground_state_lbfgs, cell_volume, energy_gradient!,
-    constrained_hessian_params, trapped_bdg_low_modes, trapped_bdg_frequencies,
-    trapped_bdg_lowest_eigenvalue,
+    constrained_hessian_params, constrained_hessian_action, _tangent_project,
+    trapped_bdg_low_modes, trapped_bdg_frequencies, trapped_bdg_lowest_eigenvalue,
     CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldopen
@@ -158,13 +158,48 @@ function measure(ws, ψ; nev=NEV, block=BLOCK, max_iter=MAXITER, fd=FD_EPS, seed
         ε=fd, params=p, rng=MersenneTwister(seed))
     fr = trapped_bdg_frequencies(ws, ψ; nev, ε=fd, params=p, modes=lm,
         rng=MersenneTwister(seed))
-    (; μ=p.μ, stationarity=stat,
+    (; params=p, μ=p.μ, stationarity=stat,
         λ_min=lz.λ_min, λ_lower=lz.λ_lower, width=lz.width,
         converged=lz.converged, goldstone=lz.goldstone, niter=lz.niter_used,
         λ_block=lm.λ, block_converged=lm.converged_modes,
         ω=fr.omega, growth=fr.growth, labels=fr.labels,
         spectrum_reached=fr.spectrum_reached, fd_floor=fr.hessian_symmetry_defect,
         lhy=fr.lhy_active)
+end
+
+"""Rayleigh quotient of the constrained Hessian along the BRANCH TANGENT —
+the observable this campaign actually needs.
+
+WHY NOT λ_min. Measured on these very cells (H100, 300 Lanczos iterations, and a
+block LOBPCG before it): λ_min = 6.5e-3 at B = 68.25 with a Kato–Temple width of
+7e-2, and 7.1e-3 at B = 25 with width 6.5e-2. Zero is inside both intervals and
+the two fields are indistinguishable. That is not a solver being lazy — it is the
+weak-field Eu soft manifold (κ ≥ 4.7e3), where the bottom of the spectrum is a
+dense CLUSTER and the smallest eigenvalue is whichever member of it the Krylov
+space resolves first. `trapped_bdg_low_modes` documents exactly this regime.
+
+The fold does not need λ_min. At a saddle-node the null direction is TANGENT TO
+THE BRANCH, so the quantity that vanishes there is the second variation along
+`t = dψ/dB` — and the branch is stored: consecutive continuation cells are 0.25 µG
+apart near the end. `R(B) = ⟨t, A t⟩` costs ONE Hessian application, needs no
+eigensolver and therefore no convergence certificate, and it is variationally an
+UPPER bound on λ_min. R → 0 is sufficient evidence of the fold; λ_min ≤ R says the
+Hessian has gone soft in the direction the branch is about to leave along.
+
+The global phase of each stored ψ is arbitrary (L-BFGS leaves it free), so the
+difference is taken after aligning it — otherwise `ψ₂ − ψ₁` is dominated by a
+gauge rotation that has nothing to do with B."""
+function tangent_rayleigh(ws, ψ, ψ_next, ΔB, p; fd=FD_EPS)
+    ov = sum(conj.(ψ) .* ψ_next)
+    φ = abs(ov) < 1e-30 ? one(ComplexF64) : conj(ov) / abs(ov)
+    t = (φ .* ψ_next .- ψ) ./ ΔB
+    t = _tangent_project(t, ψ, p.dV, p.n2)
+    nt = sqrt(real(sum(conj.(t) .* t)) * p.dV)
+    nt > 0 || return (; R=NaN, tangent_norm=0.0, overlap=abs(ov) * p.dV)
+    t = t ./ nt
+    At = constrained_hessian_action(ws, ψ, t; p.μ, p.dV, p.n2, ε=fd)
+    (; R=real(sum(conj.(t) .* At)) * p.dV, tangent_norm=nt,
+        overlap=abs(ov) * p.dV)
 end
 
 # ----------------------------------------------------------------- calibration
@@ -244,13 +279,34 @@ else
     calibrate()
 end
 
+# Cells are consumed in the order given, and the branch tangent is formed with
+# the NEXT one. `SP_TANGENT_MAX_DB` keeps a chord from being called a derivative:
+# two cells 5 µG apart on a branch that is about to fold are not a tangent.
+const TANGENT_MAX_DB = getf("SP_TANGENT_MAX_DB", 1.5)
+
+loaded = [load_cell(p) for p in cells]
 rows = NamedTuple[]
 for (i, path) in enumerate(cells)
-    c = load_cell(path)
+    c = loaded[i]
     ws = cell_workspace(c.psi, c.B, c.pin)
     ψ = copy(ws.state.psi)
     t0 = time()
     m = measure(ws, ψ)
+    # The fold observable. Only against a neighbour on the SAME branch (⟨F⊥⟩
+    # within 25 %) and close enough in B to be a derivative.
+    R = NaN
+    R_dB = NaN
+    if i < length(loaded)
+        nx = loaded[i + 1]
+        ΔB = nx.B - c.B
+        same_branch = isfinite(c.fperp0) && isfinite(nx.fperp0) &&
+                      abs(nx.fperp0 - c.fperp0) <= 0.25 * max(abs(c.fperp0), 1e-9)
+        if abs(ΔB) <= TANGENT_MAX_DB && abs(ΔB) > 1e-9 && same_branch
+            tr = tangent_rayleigh(ws, ψ, copyto!(similar(ψ), nx.psi), ΔB, m.params)
+            R = tr.R
+            R_dB = ΔB
+        end
+    end
     # Second FD step on the SAME cell: a λ_min near zero is exactly where the
     # central-difference Hessian is least trustworthy, so the step is an axis and
     # not a constant.
@@ -275,12 +331,14 @@ for (i, path) in enumerate(cells)
         width=m.width, converged=m.converged, lanczos_iters=m.niter,
         goldstone=m.goldstone, lambda_min_fd2=λ2,
         lambda_block1=m.λ_block[1], block1_converged=m.block_converged[1],
+        R_tangent=R, R_dB=R_dB,
         omega_min=m.ω[1], growth_max=maximum(abs, m.growth),
         spectrum_reached=m.spectrum_reached, label1=String(m.labels[1]),
         fd_floor=m.fd_floor, lhy_active=m.lhy, verdict,
         wall_s=round(time() - t0; digits=1)))
-    @printf("[%2d] B=%7.3f µG  λ_min=%+.4e [%+.4e] w=%.1e conv=%-5s (%3d it)  ω_min=%.4e γ=%.1e  %-12s stat=%.1e  %s  %.0fs\n",
-        i, c.B, m.λ_min, m.λ_lower, m.width, m.converged, m.niter, m.ω[1],
+    @printf("[%2d] B=%7.3f µG  R_tangent=%s  λ_min=%+.3e [w=%.1e conv=%s]  ω_min=%.3e γ=%.1e  %-12s stat=%.1e %s %.0fs\n",
+        i, c.B, isnan(R) ? "     n/a   " : @sprintf("%+.4e", R),
+        m.λ_min, m.width, m.converged, m.ω[1],
         maximum(abs, m.growth), verdict, m.stationarity,
         isnan(λ2) ? "" : @sprintf("fd2 λ=%+.3e", λ2), time() - t0)
     flush(stdout)
@@ -299,16 +357,20 @@ end
 # gates (stationary and converged) and sit above SP_FIT_BMIN, and its verdict was
 # fixed in `docs/guides/eu_spinodal_spectrum.md` §4 before the run.
 is_flower(r) = isfinite(r.fperp0) && r.fperp0 >= FIT_FPERP_MIN
-usable = [r for r in rows if r.converged && r.stationarity < STAT_TOL &&
-              is_flower(r) && r.B_uG >= FIT_BMIN && isfinite(r.lambda_min) &&
-              r.lambda_min > 0]
+# The fit is on R, the branch-tangent curvature: it is the quantity that vanishes
+# at a fold, it needs no convergence certificate, and on these states λ_min has a
+# width ten times its own value (see `tangent_rayleigh`). λ_min is still reported
+# per cell — as the bound R sits above, and as the evidence for why it is not the
+# observable here.
+usable = [r for r in rows if r.stationarity < STAT_TOL && is_flower(r) &&
+              r.B_uG >= FIT_BMIN && isfinite(r.R_tangent) && r.R_tangent > 0]
 println()
 if length(usable) < 3
     println("FIT: skipped — only $(length(usable)) usable cell(s) above B=$FIT_BMIN " *
             "(need ≥ 3). This is a reportable outcome, not a reason to lower the gate.")
 else
     B = [r.B_uG for r in usable]
-    y = [r.lambda_min^2 for r in usable]
+    y = [r.R_tangent^2 for r in usable]
     n = length(B)
     B̄, ȳ = sum(B) / n, sum(y) / n
     Sbb = sum((B .- B̄) .^ 2)
@@ -322,23 +384,23 @@ else
               Δ <= 1.0 ? "SOFT DISAGREEMENT (0.3–1.0 µG)" :
               "DISAGREES — a finding, not a fit to improve"
     @printf("""
-FIT (pre-registered): λ_min² = a·(B_sp − B) over %d cells with B ≥ %.1f µG
+FIT (pre-registered): R² = a·(B_sp − B) over %d cells with B ≥ %.1f µG   [R = branch-tangent curvature]
   slope a      = %.4e per µG   (negative ⇒ softening toward larger B)
   B_sp (fit)   = %.3f µG
   continuation = %.2f ± 0.15 µG   →  Δ = %.3f µG   ⇒  %s
-  rms residual = %.3e in λ²      (compare the λ² of the softest cell, %.3e)
+  rms residual = %.3e in R²      (compare the R² of the softest cell, %.3e)
   NOTE the field systematic is ±0.1 µG; no B_sp may be quoted tighter than that.
 """, n, FIT_BMIN, slope, B_sp, BSP_REF, Δ, verdict, rms, minimum(y))
 end
 
 # Criterion 3: the softening claim, measured rather than eyeballed.
-flower = [r for r in rows if r.converged && r.stationarity < STAT_TOL &&
-              is_flower(r) && r.lambda_min > 0]
+flower = [r for r in rows if r.stationarity < STAT_TOL && is_flower(r) &&
+              isfinite(r.R_tangent) && r.R_tangent > 0]
 if length(flower) >= 2
     lo, hi = argmin(r -> r.B_uG, flower), argmax(r -> r.B_uG, flower)
-    ratio = lo.lambda_min / hi.lambda_min
-    @printf("SOFTENING: λ_min(B=%.2f)=%.4e → λ_min(B=%.2f)=%.4e   ratio %.2f× %s\n",
-        lo.B_uG, lo.lambda_min, hi.B_uG, hi.lambda_min, ratio,
+    ratio = lo.R_tangent / hi.R_tangent
+    @printf("SOFTENING: R(B=%.2f)=%.4e → R(B=%.2f)=%.4e   ratio %.2f× %s\n",
+        lo.B_uG, lo.R_tangent, hi.B_uG, hi.R_tangent, ratio,
         ratio >= 3 ? "≥ 3× ⇒ criterion 3 PASSES" : "< 3× ⇒ criterion 3 FAILS (report it)")
 end
 
