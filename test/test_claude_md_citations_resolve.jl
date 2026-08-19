@@ -128,6 +128,83 @@ end
         @test isempty(bad)
     end
 
+    # A NAME is the other half of a citation, and until 2026-08-19 nothing
+    # checked it. `even_c_extra(F; c2, c4, c6, …)` was named as the canonical
+    # API on two lines for months; the function has never existed in this tree
+    # (#342), and it is the second of its kind — `compute_interaction_params_
+    # general_f` was the first. Both were invisible to a path check, and both
+    # are invisible to grep too: the name occurs in a docstring and in a hook's
+    # warning pattern, so "does this string appear in src/" answers YES for a
+    # function that cannot be called. The question is whether it RESOLVES, so
+    # ask the loaded package, not the text.
+    @testset "every backticked call symbol resolves" begin
+        mods = Module[SpinorBEC]
+        for n in names(SpinorBEC; all=true)
+            v = try
+                getglobal(SpinorBEC, n)
+            catch
+                nothing
+            end
+            v isa Module && v !== SpinorBEC && push!(mods, v)
+        end
+        # Test-side helpers are not in the package but are real, callable code.
+        helpers = Module[]
+        let m = Module(:_ClaudeMdHelpers)
+            Base.include(m, joinpath(REPO, "test", "helpers", "calibrated_scan.jl"))
+            push!(helpers, m)
+        end
+
+        # Prose that is call-SHAPED but is not a call. Each entry states why;
+        # the ratchet below deletes any that starts resolving, so this cannot
+        # become the place unresolved names go to be forgotten.
+        allowed = Dict(
+            "Q" => "the DDI tensor Q_αβ(k̂) in prose, not a function",
+            "V" => "the potential V(dt/2) in the split-step sandwich",
+            "g" => "the ramp time-warp g(t) = log(1 + (e-1)t)",
+            "diagonal" =>
+                "names the c₀ substep in prose (`diagonal(c₀)`), " *
+                "not the function `Diagonal`",
+            "make_params" =>
+                "a callback the CALLER supplies to " *
+                "`scan_phase_diagram_2d` / `find_phase_boundary`; " *
+                "a kwarg name, never a global",
+        )
+
+        call_symbols(s) = unique([m.captures[1]
+                for m in eachmatch(r"`([A-Za-z_][A-Za-z0-9_!]*)\(", s)])
+        syms = call_symbols(text)
+        resolves(t) =
+            any(m -> isdefined(m, Symbol(t)), mods) ||
+            any(m -> isdefined(m, Symbol(t)), helpers) ||
+            isdefined(Base, Symbol(t)) || isdefined(Core, Symbol(t))
+
+        # CALIBRATION, the same discipline as above: an extractor that finds
+        # nothing and a resolver that says YES to everything both report a clean
+        # file. Probe each on synthetic input so the controls do not depend on
+        # CLAUDE.md's current wording — a control that moves with the thing under
+        # test is not a control.
+        @test call_symbols("call `foo_bar!(x)` but not `plain_name` or foo(y)") == ["foo_bar!"]
+        @test length(syms) >= 20
+        @test count(resolves, syms) >= 15         # the resolver resolves
+        @test !resolves("zzz_no_such_function")   # and rejects
+        @test !resolves("even_c_extra")           # the #342 name, still absent
+
+        dead = [t for t in syms if !resolves(t) && !haskey(allowed, t)]
+        isempty(dead) || println(
+            "\nCLAUDE.md names functions that do not resolve:\n  ", join(dead, "\n  "),
+            "\n(if one is prose rather than a call, add it to `allowed` WITH ITS REASON)")
+        @test isempty(dead)
+
+        stale = [t for t in keys(allowed) if resolves(t)]
+        isempty(stale) || println("\n`allowed` entries that now resolve — delete them:\n  ",
+            join(stale, "\n  "))
+        @test isempty(stale)
+        unused = [t for t in keys(allowed) if !(t in syms)]
+        isempty(unused) || println("\n`allowed` entries CLAUDE.md no longer mentions:\n  ",
+            join(unused, "\n  "))
+        @test isempty(unused)
+    end
+
     # The derived document must stay reachable from the always-loaded one, or it
     # is written and never read — the failure mode the memory index had.
     @testset "CLAUDE.md points at the derived state document" begin
