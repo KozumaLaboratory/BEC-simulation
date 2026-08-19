@@ -57,6 +57,16 @@ if [ "$(git status --porcelain -- src test | wc -l)" -ne 0 ]; then
     exit 2
 fi
 
+# Julia's GC heap target comes from the NODE's 755 GB, not from this job's
+# 36.8 GB grant, and job 8445105 died at exactly the grant with a 1.1 GB working
+# set. Sourced rather than inlined: the derivation belongs in one place because
+# every TSUBAME julia job in this repo has the same exposure, and this script is
+# only the one that found it. It prints where its number came from — see the
+# file's header for why a heap hint from a guess and one from the cgroup are
+# otherwise indistinguishable.
+source "$(dirname "$0")/../tsubame/_julia_heap_hint.sh"
+echo "heap_hint=$HEAP_HINT_SRC"
+
 export KLAUS_SEED="${KLAUS_SEED:-1}"
 export KLAUS_HOLD_S="${KLAUS_HOLD_S:-1.1}"
 export KLAUS_TAG="${KLAUS_TAG:-_s${KLAUS_SEED}}"
@@ -93,7 +103,8 @@ echo "results=$KLAUS_RESULTS"
 export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-}"
 JT="${KLAUS_JULIA_THREADS:-16}"
 echo "julia_threads=$JT fftw_threads=${KLAUS_FFTW_THREADS:-<follows julia>}"
-time "$JULIA" --project=. -t "$JT" scripts/klaus2022_reproduce.jl stripes $EXTRA
+time "$JULIA" --project=. -t "$JT" $HEAP_HINT_FLAG \
+    scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
 exit $rc

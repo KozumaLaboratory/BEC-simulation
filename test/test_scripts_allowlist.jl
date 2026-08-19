@@ -48,6 +48,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_kz_exponent.sh",
     "submit_eu_bscan.sh",
     "tsubame/_preamble.sh",
+    # Derives --heap-size-hint from the JOB's grant, because Julia sizes its GC
+    # heap from the NODE's physical memory (755 GB on r18n9) and a cpu_16 job
+    # holds 36.8 GB. Sourced by submit wrappers; category 3.
+    "tsubame/_julia_heap_hint.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
     "tsubame/submit_load_check.sh",
