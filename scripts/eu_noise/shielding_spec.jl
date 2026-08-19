@@ -226,14 +226,19 @@ function main(args)
     bb = [c for c in cells if isnan(c.rot_hz) && c.rms > 0]
     if !isempty(coh) && !isempty(bb)
         println("\ncoherent tone vs broadband AT THE SAME TOTAL rms:")
-        for rms in sort(unique(getfield.(coh, :rms)))
-            cs = [c for c in coh if c.rms == rms]
-            bs = [c for c in bb if c.rms == rms]
+        # Matched on HOLD TIME as well as rms: comparing a 145 ms coherent arm
+        # against a 500 ms broadband one measures the hold, not the spectrum.
+        for hold in sort(unique(getfield.(coh, :hold_ms))),
+            rms in sort(unique(getfield.(coh, :rms)))
+
+            cs = [c for c in coh if c.rms == rms && c.hold_ms == hold]
+            bs = [c for c in bb if c.rms == rms && c.hold_ms == hold]
             (isempty(cs) || isempty(bs)) && continue
             wc = cs[argmax(getfield.(cs, :dJz))]
             wb = bs[argmax(getfield.(bs, :dJz))]
-            @printf("  rms=%-7.3f worst coherent %.2e (%.0f Hz)  vs  worst broadband %.2e (%s)  ⇒ %.0f×\n",
-                rms, wc.dJz, wc.rot_hz, wb.dJz, wb.shape, wc.dJz / max(wb.dJz, 1e-30))
+            @printf("  %4.0f ms rms=%-7.3f worst coherent %.2e (%.0f Hz)  vs  worst broadband %.2e (%s)  ⇒ %.0f×\n",
+                hold, rms, wc.dJz, wc.rot_hz, wb.dJz, wb.shape,
+                wc.dJz / max(wb.dJz, 1e-30))
         end
         println("  ⇒ a TOTAL-rms limit does not bound a line at the resonance; the")
         println("    specification needs a per-frequency limit near the worst frequency.")
@@ -243,19 +248,38 @@ function main(args)
     println("\nspecification: |ΔJ_z| must stay below $dJz_max (mean + 1 sd)")
     spec = NamedTuple[]
     for sh in shapes, hold in sort(unique(c.hold_ms for c in cells if c.shape == sh))
-        g = [c for c in cells if c.shape == sh && c.hold_ms == hold]
-        length(g) >= 2 || continue
-        t = threshold(g, dJz_max)
-        push!(spec, (; shape=sh, hold_ms=hold, rot_hz=maximum(c -> isnan(c.rot_hz) ? -1.0 : c.rot_hz, g),
+        g0 = [c for c in cells if c.shape == sh && c.hold_ms == hold]
+        length(g0) >= 2 || continue
+        # A specification is a worst case. Pooling frequencies lets a quiet one
+        # supply `last_ok` while a loud one supplies `first_bad`, which printed
+        # "B⊥ < 0.5 µG (breaks between 0.5 and 0.35)" — a threshold above its own
+        # break. Take the frequency whose threshold is lowest.
+        fs = unique(getfield.(g0, :rot_hz))
+        g, t = if length(fs) > 1
+            best = nothing
+            for f in fs
+                gf = [c for c in g0 if isequal(c.rot_hz, f)]
+                length(gf) >= 2 || continue
+                tf = threshold(gf, dJz_max)
+                lo = tf.first_bad === nothing ? Inf : tf.first_bad
+                (best === nothing || lo < best[3]) && (best = (gf, tf, lo))
+            end
+            best === nothing ? (g0, threshold(g0, dJz_max)) : (best[1], best[2])
+        else
+            (g0, threshold(g0, dJz_max))
+        end
+        push!(spec, (; shape=sh, hold_ms=hold, rot_hz=g[1].rot_hz,
             last_ok=t.last_ok === nothing ? NaN : t.last_ok,
             first_bad=t.first_bad === nothing ? NaN : t.first_bad,
             bounded=t.first_bad === nothing))
         if t.first_bad === nothing
-            @printf("  %-9s %4.0f ms:  LOWER BOUND ONLY — every rms up to %.3g µG stays inside; scan higher\n",
-                sh, hold, maximum(c -> c.rms, g))
+            @printf("  %-9s %-7s %4.0f ms:  LOWER BOUND ONLY — every rms up to %.3g µG stays inside; scan higher\n",
+                sh, isnan(g[1].rot_hz) ? "—" : @sprintf("%.0fHz", g[1].rot_hz), hold,
+                maximum(c -> c.rms, g))
         else
-            @printf("  %-9s %4.0f ms:  B⊥(AC) < %.3g µG   (breaks between %.3g and %.3g)\n",
-                sh, hold, t.last_ok === nothing ? 0.0 : t.last_ok,
+            @printf("  %-9s %-7s %4.0f ms:  B⊥(AC) < %.3g µG   (last pass %.3g, first fail %.3g)\n",
+                sh, isnan(g[1].rot_hz) ? "—" : @sprintf("%.0fHz", g[1].rot_hz), hold,
+                t.last_ok === nothing ? 0.0 : t.last_ok,
                 t.last_ok === nothing ? 0.0 : t.last_ok, t.first_bad)
         end
     end
