@@ -310,6 +310,7 @@ log the reservoir trajectory.
 function apply_spgpe_step!(
     ws::Workspace{N}, res::SPGPEReservoir, dt::Real;
     t::Real=ws.state.t, seed::Union{Nothing, Int}=nothing, noise::Bool=true,
+    cayley_iters::Int=0,
 ) where {N}
     r = spgpe_rates(res, t)
     dt_f = Float64(dt)
@@ -329,7 +330,7 @@ function apply_spgpe_step!(
         apply_energy_damping_step!(
             ws, r.M, r.T, dt_f;
             seed=seed === nothing ? nothing : seed + 7_919, noise=noise,
-            k_cut=r.k_cut,
+            k_cut=r.k_cut, cayley_iters=cayley_iters,
         )
     end
     # Projection last, so both noises are projected within the same step — the
