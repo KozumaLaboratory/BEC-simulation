@@ -57,8 +57,10 @@ this one** and its λ_min would be measuring that mismatch:
 - 32³, box 24, κ = ω_z/ω_⊥ ∈ {1.8, 0.9}, **unpadded DDI**, secular off, q = 0,
   **LHY off**, pin ε = 0.002 p-units = 0.1352 µG (the pin is part of the
   Hamiltonian and stays in it for the Hessian).
-- Cells are the #335 outputs on TSUBAME, `runs/eu335/branch_*`; each carries its
-  own (B, pin) and the c₀/c₁/c_dd epoch assertion `load_cell` already enforces.
+- Cells are the #335 outputs `runs/eu335/branch_*` (untracked — 6.8 MB of ψ per
+  cell, living in the TSUBAME group area `/gs/fs/tga-kozuma-kouhi/uk07267/runs/`
+  and never in this repository); each carries its own (B, pin) and the c₀/c₁/c_dd
+  epoch assertion `load_cell` already enforces.
 
 **Mean-field only.** LHY is off, matching #335. Every number here is a mean-field
 spectrum and `lhy_active=false` is recorded per cell to keep that attributable.
