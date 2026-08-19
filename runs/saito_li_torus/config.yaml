@@ -1,27 +1,80 @@
 # ─────────────────────────────────────────────────────────────────────
-#  Saito & Li, "Quantum droplets with magnetic vortices in spinor dipolar
+#  Li & Saito, "Quantum droplets with magnetic vortices in spinor dipolar
 #  Bose-Einstein condensates", arXiv:2402.18885 (2024).
+#  (Author order is Li then Saito; the directory name predates reading it.)
 #
-#  Validation target: Fig. 1(d) F=6 N=15000 ε_dd=1.3 self-bound torus
-#  droplet with magnetic vortex (z-axis symmetry axis).
+#  Validation target: Fig. 1(d) third panel and the Fig. 2(a) red curve —
+#  F=6, N=15000, ε_dd=1.3, self-bound torus droplet with a magnetic vortex.
 #
-#  Geometry: free space (no trap, B=0), with ω_ref = 2π·110 Hz only as a
-#  unit choice (a_ho ≈ 0.78 μm). Box [3, 3, 3] a_ho ≈ 2.4 μm fits the
-#  ~1 μm torus with buffer.
+#  EVERY NUMBER BELOW IS DERIVED BY `a2_variational_target.jl`, which prints
+#  it and cross-checks it against an independent direct-quadrature solver.
+#  Re-run that script before editing anything here.
 #
-#  The simulator's default Eu151 has a_s=110 a_0 → ε_dd_phys = 0.54.
-#  Saito-Li uses hypothetical smaller a_s for droplet formation; we
-#  override c_total ∝ N·a_s to produce ε_dd_phys = 1.3 at N=15000:
-#    c_total(N=15000, ε_dd=0.54) ≈ 1406    (natural)
-#    c_total target              = 1406 × 0.54/1.3 ≈ 583
+#  ── geometry ────────────────────────────────────────────────────────
+#  Free space at B=0. ω_ref = 2π·110 Hz is a UNIT CHOICE only (a_ho =
+#  0.78029 µm); `potential.omega = 0.01` is a residual cage to hold the
+#  droplet on the origin, not physics: ⟨V⟩/N = 8.3e-5 ℏω_ref against
+#  E/N = -1.36 ℏω_ref, a ratio of 6.1e-5, and the cage's own length
+#  1/√ω = 10 a_ho is 8× the droplet's ⟨r⟩ = 1.22 a_ho.
 #
-#  LHY: scalar Lima-Pelster Q5 (matches paper Eq. 1, χ(ε_dd) = Q5).
-#  After validation, sister run with :polar_dipolar mode tests the
-#  paper-#1 closed form on the same physical setup.
+#  Box was [3, 3, 3] a_ho and DID NOT FIT THE OBJECT. The variational
+#  droplet reaches 1e-4 of its peak density at r = 2.54 a_ho, against a
+#  1.5 a_ho half-width — short by 1.7× in xy. Now [6.5, 6.5, 3.5]:
+#      xy half-width 3.25 a_ho vs 2.54 a_ho required (28 % margin)
+#      z  half-width 1.75 a_ho vs 1.31 a_ho required (33 % margin)
+#  z is deliberately tighter than xy: the torus is oblate (A = 4.21), and
+#  a cube would have spent resolution where there is no density. DDI runs
+#  zero-padded (`padded` defaults true) so the periodic images the small
+#  box would otherwise impose on a self-bound object are gone.
 #
-#  Initial state: polar_core_vortex (winding=1, axis=z) seeds the
-#  magnetic-vortex topology so ITP relaxes to the torus (Fig. 1(d))
-#  rather than the cigar (Fig. 3(a)) bistable partner.
+#  ── interactions ────────────────────────────────────────────────────
+#  ε_dd ≡ a_dd/a_s, and the paper reaches ε_dd > 1 by assuming a smaller
+#  a_s (Eu's moment, hence a_dd, is fixed). In this code
+#      c_dd/c_total = 3 ε_dd / F²      (exact; `effective_eps_dd`)
+#  so ONLY c_total moves and c_dd must stay at its natural value:
+#      c_total = 1406.18 × (45.71/110) = 584.367   → a_s = 45.71 a₀
+#      c_dd    = 63.3064  (auto-derived; DO NOT override)
+#  The previous revision scaled BOTH by 2.407, which squares the ratio:
+#  it realised ε_dd = 3.129, not 1.3. That is why `c_dd` is now absent
+#  rather than pinned — the auto-derived value is the correct one.
+#
+#  repo Eu151 has µ = 6.9769 µ_B ⇒ a_dd = 59.4266 a₀, against the paper's
+#  idealised µ = 7 µ_B ⇒ 59.82 a₀ (Table S1). 0.66 % apart; ε_dd is exactly
+#  1.3 either way, so only the physical length scale carries that 0.66 %.
+#
+#  c1_ratio: 0.0 is THE PAPER'S MODEL, not a convenience — "Since the
+#  values of Δa are predicted to be relatively small for the europium
+#  atoms, we ignore the spin-dependent contact interaction."
+#
+#  ── LHY ─────────────────────────────────────────────────────────────
+#  Scalar Lima-Pelster, which is the paper's Eq. (1) exactly: the repo's
+#  `lima_pelster_Q5` reproduces the paper's χ(ε_dd) to 5 digits, and
+#  `scalar_lhy_coefficient` is algebraically identical to Eq. (1) under
+#  ∫|ψ|²dV = 1. Auto-derives to c_lhy = 276.279 (a_s = 45.71 a₀,
+#  Q₅(1.3) = 3.71608) — but ONLY since the 2026-08-19 fix that makes the
+#  derivation read the effective a_s. Before it, this block silently
+#  produced 972.558 (3.52× too large) from the atom's 110 a₀.
+#
+#  ── seed ────────────────────────────────────────────────────────────
+#  The paper's state is Ψ = √ρ e^{-i S_z φ} ζ^(y): magnetization fully
+#  in-plane everywhere and circulating azimuthally (n̂ = φ̂). That is
+#  `spin_coherent` with θ=π/2, φ₀=π/2, winding 1 — the m-component phases
+#  come out as e^{-imφ}, i.e. e^{-i S_z φ}, and each m≠0 carries a charge-m
+#  vortex, so only m=0 survives on the axis. The paper: "The central hole
+#  of the torus is mainly occupied by the m = 0 component."
+#
+#  NOT `polar_core_vortex` (an m=0 core inside m=±F density — a different
+#  object) and NOT `flower` (whose implementation is axial in the core and
+#  only cants in-plane at the rim).
+#
+#  ── solver ──────────────────────────────────────────────────────────
+#  method: lbfgs, NOT ITP. In the free-space droplet regime imaginary time
+#  has a dt-displaced fixed point: measured on the sibling paper's droplet
+#  it was 44 % wrong in peak density while reporting dpsi = 3e-6, and
+#  grid- and box-independent, so a convergence scan certifies the wrong
+#  answer. See `runs/yls_barnett_f6/README.md` §2 and
+#  `test/oracles/test_itp_dt_limited_advisory.jl`. This cell's cancellation
+#  ratio puts it squarely in the warned regime.
 # ─────────────────────────────────────────────────────────────────────
 
 defaults:
@@ -31,30 +84,25 @@ defaults:
 mixins:
   saito_li_droplet:
     atom:      Eu151
-    grid:      {n: [64, 64, 64], box: [3, 3, 3]}
-    potential: {type: harmonic, omega: [0.01, 0.01, 0.01]}     # ≈ free space, weak cage to keep cloud near origin
+    grid:      {n: [64, 64, 64], box: [6.5, 6.5, 3.5]}
+    potential: {type: harmonic, omega: [0.01, 0.01, 0.01]}
     interactions:
       N_atoms:   15000
-      omega_ref: 691.15                                         # = 2π·110 Hz, defines a_ho ≈ 0.78 μm
-      c1_ratio:  0.0
-      c_total:   583                                            # ε_dd_phys ≈ 1.3 (vs 0.54 natural)
+      omega_ref: 691.15          # 2π·110 Hz — unit choice; a_ho = 0.78029 µm
+      c1_ratio:  0.0             # the paper ignores spin-dependent contact
+      c_total:   584.367         # a_s = 45.713 a₀ = a_dd/1.3
 
 pipeline:
   - ground_state:
       use:           [saito_li_droplet]
-      interactions:
-        N_atoms:   15000
-        omega_ref: 691.15
-        c1_ratio:  0.0
-      ddi:
-        c_dd:      152                                          # 2.4× natural (63.3 × 1.3/0.54) → effective ε_dd ≈ 1.3
-                                                                # (ε_dd is c_dd/c_total ratio in dimensionless units; the
-                                                                # atom-level a_dd/a_s display in "Derived:" line stays at
-                                                                # natural 0.54 but the simulation uses overridden c_dd)
+      ddi:           {}          # c_dd auto-derives to 63.3064 ⇒ ε_dd = 1.3
       B:             {Bz: 0}
-      initial_state: polar_core_vortex
-      init_state_params: {init_vortex_charge: 1.0}              # winding=+1 around z (state_dispatch.jl arg name)
-      lhy: {kind: scalar}                                       # paper Eq. 1: scalar Lima-Pelster Q5
-      n_steps:       8000
+      initial_state: spin_coherent
+      init_state_params:
+        init_theta:         1.5707963267948966   # π/2 — spin in the xy-plane
+        init_phi:           1.5707963267948966   # π/2 — n̂ = φ̂ (flux closure)
+        init_vortex_charge: 1                    # one spin winding about z
+      lhy:           {kind: scalar}              # → c_lhy = 276.279
+      method:        lbfgs
+      n_steps:       4000
       tol:           1.0e-9
-      dt:            0.005
