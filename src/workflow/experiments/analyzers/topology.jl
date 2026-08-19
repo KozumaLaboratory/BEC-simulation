@@ -81,6 +81,53 @@ function _analyze_vortex_detect(psi, grid, atom, params, ws_prev)
     (vortex_count=vortex_count, positions=positions, component=component)
 end
 
+# Klaus-2022 residual-image analysis of the COLUMN DENSITY. Deliberately not
+# `vortex_detect`: that one reads the phase and counts every circulation, which
+# is a different observable from the published 𝒩ᵥ (a detector output on a
+# blurred, noise-added image). Mixing them is a ≈3.7× error in the direction
+# that flatters disagreement — Klaus Methods A.7 benchmarks it.
+function _analyze_vortex_stripes(psi, grid, atom, params, ws_prev)
+    n_pts = grid.config.n_points
+    length(n_pts) == 3 || throw(ArgumentError("vortex_stripes requires a 3D grid"))
+    # Column density along z, summed over whatever spinor components exist.
+    col = zeros(Float64, n_pts[1], n_pts[2])
+    dz = grid.dx[3]
+    @inbounds for c in axes(psi, 4), k in 1:n_pts[3], j in 1:n_pts[2], i in 1:n_pts[1]
+        col[i, j] += abs2(psi[i, j, k, c]) * dz
+    end
+
+    σ_px = Float64(get(params, "sigma_px", 5.0))
+    res, mask = residual_image(col; sigma_px=σ_px,
+        mask_threshold=Float64(get(params, "mask_threshold", 0.1)))
+    holes = detect_density_holes(res, mask;
+        contrast_threshold=Float64(get(params, "contrast_threshold", -0.11)),
+        min_distance=Float64(get(params, "min_distance", 5.0)))
+
+    kx, ky, mag = stripe_spectrum(res, grid.dx[1], grid.dx[2])
+    k_lo = Float64(get(params, "k_lo", 0.0))
+    k_hi = Float64(get(params, "k_hi", 0.0))
+    (k_lo > 0 && k_hi > k_lo) || throw(
+        ArgumentError(
+            "vortex_stripes requires an explicit k_lo < k_hi annulus. An annulus " *
+            "chosen after seeing the spectrum is not a measurement — put it in the " *
+            "config before launch."),
+    )
+    m = stripe_metrics(kx, ky, mag; k_lo=k_lo, k_hi=k_hi,
+        n_angle=Int(get(params, "n_angle", 180)))
+    (
+        n_holes=length(holes),
+        hole_positions=holes,
+        stripe_angle=m.angle,
+        axis_order=m.axis_order,
+        axis_order_null=m.axis_order_null,
+        k_peak=m.k_peak,
+        k_mode=m.k_mode,
+        radial_prominence=m.radial_prominence,
+        angular_profile=m.angular_profile,
+        sigma_px=σ_px, k_lo=k_lo, k_hi=k_hi,
+    )
+end
+
 function _analyze_non_abelian_homotopy(psi, grid, atom, params, ws_prev)
     ndim = length(grid.config.n_points)
     ndim >= 2 || throw(ArgumentError("non_abelian_homotopy requires N >= 2"))

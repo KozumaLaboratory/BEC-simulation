@@ -71,6 +71,7 @@ docs/
 | Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
 | Whether a claim survives the ¹⁵¹Eu `a_S` measurement, or waits for it | `campaign/as_dependency_map.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
+| Klaus 2022 magnetostirring vortex stripes (type-C reproduction): published parameters per figure, systematics, model selection, pre-registered accept/reject | `validation/klaus2022_primary_source.md` |
 | Closed-form theory derivations | `theory/*.md` |
 
 ## Documentation philosophy
