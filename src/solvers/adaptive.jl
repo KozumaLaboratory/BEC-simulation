@@ -8,7 +8,7 @@ function _psi_relative_change(psi_new, psi_old)
         diff_sq += abs2(d)
         old_sq += abs2(psi_old[i])
     end
-    sqrt(diff_sq / max(old_sq, 1e-300))
+    sqrt(diff_sq / max(old_sq, UNDERFLOW_FLOOR))
 end
 
 function _density_relative_change(psi_new, psi_old)
@@ -20,7 +20,7 @@ function _density_relative_change(psi_new, psi_old)
         diff_sq += (dn - do_)^2
         old_sq += do_^2
     end
-    sqrt(diff_sq / max(old_sq, 1e-300))
+    sqrt(diff_sq / max(old_sq, UNDERFLOW_FLOOR))
 end
 
 """
@@ -41,7 +41,7 @@ function _wavefunction_l2_change(psi_new, psi_old)
     # AND runs on the GPU — `run_simulation_yoshida!` drives this every step.
     diff_sq = mapreduce((a, b) -> abs2(a - b), +, psi_new, psi_old)
     old_sq = sum(abs2, psi_old)
-    diff_sq / max(old_sq, 1e-300)
+    diff_sq / max(old_sq, UNDERFLOW_FLOOR)
 end
 
 @inline function _flush_fsal!(ws::Workspace{N}, fsal_dt, n_comp, ndim) where {N}
@@ -190,7 +190,7 @@ function _adaptive_step_change_loop!(
                 rel_change = _wavefunction_l2_change(ws.state.psi, psi_old)
             end
             factor =
-                rel_change > 1e-300 ? min(2.0, 0.9 * sqrt(adaptive.tol / rel_change)) : 2.0
+                rel_change > UNDERFLOW_FLOOR ? min(2.0, 0.9 * sqrt(adaptive.tol / rel_change)) : 2.0
             dt = clamp(dt * factor, adaptive.dt_min, adaptive.dt_max)
         end
 
@@ -316,7 +316,7 @@ function _adaptive_richardson_loop!(
         n_accepted += 1
 
         if !is_clamped
-            factor = err > 1e-300 ? min(2.0, 0.9 * cbrt(adaptive.tol / err)) : 2.0
+            factor = err > UNDERFLOW_FLOOR ? min(2.0, 0.9 * cbrt(adaptive.tol / err)) : 2.0
             dt = clamp(dt * factor, adaptive.dt_min, adaptive.dt_max)
         end
 

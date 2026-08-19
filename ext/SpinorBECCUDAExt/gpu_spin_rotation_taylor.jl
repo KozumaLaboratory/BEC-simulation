@@ -42,7 +42,7 @@ end
 const _SPIN_TRIDIAG_CACHE = Dict{UInt64, Any}()
 
 function _get_spin_tridiag_coef(
-    ::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
+    ::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D}
 ) where {D, T <: AbstractFloat}
     key = hash((objectid(sm), D, T))
     c = get(_SPIN_TRIDIAG_CACHE, key, nothing)
@@ -162,7 +162,7 @@ end
 # diagonal entry, its super-diagonal entry A[c,c+1], the conjugate of the
 # sub-diagonal entry A[c-1,c] (shuffled down from lane c-1), and g = |v|²F².
 @inline function _rot_generator(
-    Vx::T, Vy::T, Vz::T, mz, sxu, syu, c, cdn, F2, ::Val{W},
+    Vx::T, Vy::T, Vz::T, mz, sxu, syu, c, cdn, F2, ::Val{W}
 ) where {T, W}
     CT = Complex{T}
     diag_c = Vz * (@inbounds mz[c])                          # real F_z diagonal
@@ -333,7 +333,7 @@ DDI, `c₁·dt` for spin-mixing. Real time means `exp(-i·scale·(v·F))` and
 imaginary time `exp(-scale·(v·F))`; the kernel's `Val{RT}` picks which.
 """
 function _spin_taylor_plan(
-    psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D},
+    psi::CuArray{Complex{T}}, sm::SpinorBEC.SpinMatrices{D}
 ) where {T <: AbstractFloat, D}
     SPIN_TAYLOR_ENABLED[] || return nothing
     # The warp layout puts one spin component per lane of a width-16 subgroup,

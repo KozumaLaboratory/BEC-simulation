@@ -208,7 +208,7 @@ function _apply_rodrigues_rotation(
 
     f_mag = sqrt(fx^2 + fy^2 + fz^2)
 
-    if f_mag < 1e-30
+    if f_mag < COUPLING_TOL
         return spinor_in
     end
 

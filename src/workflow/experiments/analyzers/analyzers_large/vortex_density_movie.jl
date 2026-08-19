@@ -233,7 +233,7 @@ function _mass_current_vortices(psi_slice, n_tot::AbstractMatrix,
     vy = zeros(Float64, nx, ny)
     @inbounds for j in 2:(ny - 1), i in 2:(nx - 1)
         n = n_tot[i, j]
-        n < 1e-30 && continue
+        n < COUPLING_TOL && continue
         jx = 0.0
         jy = 0.0
         for c in 1:D

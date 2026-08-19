@@ -80,7 +80,7 @@ function _singlet_pair_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_tim
                     c_pair = D - c + 1
                     V = V_base * signs[c]
                     absV = abs(V)
-                    absV < 1e-30 && continue
+                    absV < COUPLING_TOL && continue
 
                     ch = cosh(absV * dt)
                     sh = sinh(absV * dt)
@@ -101,7 +101,7 @@ function _singlet_pair_loop!(psi, psi_mf, ::Val{D}, n_pts, c2, dt, imaginary_tim
                     c_pair = D - c + 1
                     V = V_base * signs[c]
                     absV = abs(V)
-                    absV < 1e-30 && continue
+                    absV < COUPLING_TOL && continue
 
                     cosV = cos(absV * dt)
                     sinV = sin(absV * dt)

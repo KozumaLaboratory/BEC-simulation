@@ -88,7 +88,7 @@ function trapped_bdg_spectrum(ws, ψ; μ::Real, ε::Float64=1e-5, dim_cap::Int=4
 
     omega = eigvals(H)
     max_growth = maximum(imag, omega)
-    radius = maximum(abs, omega) + 1e-30
+    radius = maximum(abs, omega) + COUPLING_TOL
 
     # ω↦−conj(ω) symmetry: a NECESSARY-but-not-sufficient self-check. It is a
     # property of the [[A,B],[−conj(B),−conj(A)]] block PATTERN and holds for

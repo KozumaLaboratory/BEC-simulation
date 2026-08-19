@@ -43,17 +43,52 @@ bisect handle if a future backend kernel is ever suspect.
 const SPIN_CHAIN_FUSION_ENABLED = Ref(true)
 
 """
+    SPIN_CHAIN_FUSED_SUBSTEPS
+
+The `OUTER_CHAIN` substeps the fused kernel PERFORMS. Every other substep in
+`OUTER_CHAIN` sits between them, so the fused path must decline whenever one is
+active — that is what `_spin_chain_reason` enumerates below.
+
+Declared as a value so the obligation is mechanical. This file used to carry, in
+prose, "**If you add an operator to the outer chain, add it here**" — an
+instruction to a human, with nothing that fires when the human is a different
+person six weeks later. `test_outer_chain_registry_mapping.jl` now asserts
+
+    SPIN_CHAIN_FUSED_SUBSTEPS ∪ SPIN_CHAIN_DECLINED_SUBSTEPS == OUTER_CHAIN
+
+so appending a substep to `OUTER_CHAIN` reddens the suite until it has been
+classified here, and the failure names the substep.
+"""
+const SPIN_CHAIN_FUSED_SUBSTEPS = (:diagonal, :spin_mixing)
+
+"""
+The `OUTER_CHAIN` substeps that force the fused path to decline — each has an
+arm in `_spin_chain_reason`. See `SPIN_CHAIN_FUSED_SUBSTEPS` for why this is a
+value and not a comment.
+"""
+const SPIN_CHAIN_DECLINED_SUBSTEPS = (
+    :light_shift_offdiag,
+    :spatial_lhy_spin,
+    :singlet_pair,
+    :tensor,
+    :transverse_zeeman,
+    :spatial_zeeman,
+    :raman,
+)
+
+"""
     _spin_chain_reason(ws, ip, psi_mf) -> String or nothing
 
 Why the V half-step cannot be taken as one pass, or `nothing` if it can.
 
 The fused path REPLACES the whole half-step, so this list must cover every
-operator `_outer_operators_fwd!`/`_bwd!` can apply beyond the diagonal step and
-spin-mixing, and every diagonal-step feature beyond `V + c₀n + scalar LHY` and
-a uniform axial Zeeman. **If you add an operator to the outer chain, or a term
-to the diagonal step, add it here** — otherwise the fused path would silently
-drop it. `test/oracles/test_spin_chain_fusion_parity.jl` pins one arm per entry
-and demands bit-identity for the eligible shape.
+`OUTER_CHAIN` substep outside `SPIN_CHAIN_FUSED_SUBSTEPS`, and every
+diagonal-step feature beyond `V + c₀n + scalar LHY` and a uniform axial Zeeman —
+otherwise the fused path would silently drop it.
+`test/oracles/test_spin_chain_fusion_parity.jl` pins one arm per entry and
+demands bit-identity for the eligible shape;
+`test/oracles/test_outer_chain_registry_mapping.jl` pins that the two constants
+above partition `OUTER_CHAIN`.
 
 An entry belongs here only for something that sits BETWEEN the operators, or
 that changes the diagonal phase's form. How Φ itself is computed is neither: the

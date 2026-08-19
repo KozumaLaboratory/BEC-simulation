@@ -107,7 +107,7 @@ function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
     h = zeros(ComplexF64, D, D)
     for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
-        abs(gS) < 1e-30 && continue
+        abs(gS) < COUPLING_TOL && continue
         for m in (-F):F
             cm = F - m + 1
             for mp in (-F):F
@@ -120,7 +120,7 @@ function _bdg_normal_matrix(spinor, F, D, g_dict, cg_table)
                     abs(nu) > F && continue
                     cg1 = get(cg_table, (S, M, m, mu), 0.0)
                     cg2 = get(cg_table, (S, M, mp, nu), 0.0)
-                    abs(cg1 * cg2) < 1e-30 && continue
+                    abs(cg1 * cg2) < COUPLING_TOL && continue
                     val += cg1 * cg2 * conj(spinor[F - mu + 1]) * spinor[F - nu + 1]
                 end
                 h[cm, cmp] += gS * val
@@ -134,23 +134,23 @@ function _bdg_anomalous_matrix(spinor, F, D, g_dict, cg_table)
     M_mat = zeros(ComplexF64, D, D)
     for S in 0:2:2F
         gS = get(g_dict, S, 0.0)
-        abs(gS) < 1e-30 && continue
+        abs(gS) < COUPLING_TOL && continue
         for M_val in (-S):S
             A_SM = zero(ComplexF64)
             for mu in (-F):F
                 nu = M_val - mu
                 abs(nu) > F && continue
                 cg = get(cg_table, (S, M_val, mu, nu), 0.0)
-                abs(cg) < 1e-30 && continue
+                abs(cg) < COUPLING_TOL && continue
                 A_SM += cg * spinor[F - mu + 1] * spinor[F - nu + 1]
             end
-            abs(A_SM) < 1e-30 && continue
+            abs(A_SM) < COUPLING_TOL && continue
 
             for m in (-F):F
                 mp = M_val - m
                 abs(mp) > F && continue
                 cg = get(cg_table, (S, M_val, m, mp), 0.0)
-                abs(cg) < 1e-30 && continue
+                abs(cg) < COUPLING_TOL && continue
                 M_mat[F - m + 1, F - mp + 1] += gS * cg * A_SM
             end
         end
@@ -209,7 +209,7 @@ function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
     M_mat = zeros(ComplexF64, D, D)
     for a in 1:3, b in 1:3
         coeff = c_dd * Q_ab[a, b]
-        abs(coeff) < 1e-30 && continue
+        abs(coeff) < COUPLING_TOL && continue
         va, vb = fa_zeta[a], fa_zeta[b]
         for i in 1:D, j in 1:D
             h[i, j] += 0.5 * coeff * va[i] * conj(vb[j])

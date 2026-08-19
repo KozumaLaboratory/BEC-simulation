@@ -99,7 +99,7 @@ end
 # Same expression as `_lhy_V(n, p, ::SpatialLHY)`, in the same order, so the
 # two paths agree to the last bit rather than to a tolerance.
 @inline function _spatial_lhy_V(n::Float64, p::Float64, xs, ys, m::Int)
-    n < 1e-30 && return 0.0
+    n < COUPLING_TOL && return 0.0
     e1 = _lhy_interp_scan(clamp(p, 0.0, 1.0), xs, ys, m)
     2.5 * e1 * n * sqrt(n)
 end

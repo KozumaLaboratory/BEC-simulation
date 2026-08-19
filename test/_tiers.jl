@@ -10,6 +10,12 @@ const FAST_TESTS = [
     # at. Three src comments said it was inert there, from an R three orders
     # too small; nothing checked them.
     "hamiltonian/test_taylor_tolerance_binds.jl",
+    # The mutation catalog's self-check, moved OUT of the nightly harness it was
+    # buried in. `check_anchors` is a regex over ~40 files (0.5 s) but ran only
+    # inside the hour-scale mutation job — which was producing nothing (#275) —
+    # so three mutants had rotted with nothing to say so. An instrument's
+    # self-check must not be gated behind running the instrument.
+    "mutation/test_catalog_anchors_resolve.jl",
     "test_quality.jl",
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
@@ -153,6 +159,11 @@ const FAST_TESTS = [
     "model/test_yaml_to_model.jl",
     "model/test_resolve_gs_is_shared.jl",
     "model/test_ddi_trunc_radius_three_states.jl",
+    # The Model migration's ratchet: the count of call sites still transcribing
+    # a config's physics into `make_workspace` kwargs by hand may shrink and may
+    # not grow. `src/model.jl` said "still to come" with no number and no
+    # consequence for months; this is the number (CLAUDE.md commitment 11).
+    "model/test_model_adoption_ratchet.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
@@ -423,7 +434,16 @@ const CI_EXTRA = [
     # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
+    # ¹⁵¹Eu ↔ ¹⁵³Eu: the isotope is exactly three numbers (c_total, c_dd, q), the
+    # q ratio is exact from measured hyperfine constants, and the |m| ≥ 2 magnons
+    # of the polar state carry no interaction shift. #341 stage 1's deliverable
+    # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
+    "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # The `:evolve` Stage producer: the DYNAMICS_SCHEMA partition is total, a
+    # model-level key is refused rather than dropped, and the real-time ambient
+    # switches finally move an artifact id.
+    "model/test_evolve_stage.jl",
     # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
     # refusal that follows from it — a paper with no re-measurable record has
     # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
@@ -567,6 +587,10 @@ const CI_EXTRA = [
     # of the exchange term, so it was 2x on a polarized state and identically
     # zero on a polar one (#361).
     "oracles/test_dipolar_bogoliubov_anchor.jl",
+    # The other half of `test_magnetization_conservation_rtp.jl`: imaginary time
+    # is not unitary, so it leaves the magnetization sector — which is why an
+    # adiabatic ramp need not reach the ITP ground state (#22, #335, #334).
+    "oracles/test_itp_does_not_conserve_magnetization.jl",
     # What the six unmeasured Eu scattering channels CANNOT move: the stretched
     # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
     # fixed c_total leaves them exact. Each invariance carries a control that
@@ -591,6 +615,27 @@ const CI_EXTRA = [
     # gradient to `fp_ladder_coeff` / `singlet_pair_sign`, so the formula can no
     # longer drift independently across c₁ / Raman / spatial-Zeeman / DDI sites.
     "oracles/test_spin_ladder_single_source.jl",
+    # Same shape, for the imaginary-time ↔ real-time branch. 14 of the tree's 32
+    # `if imaginary_time` blocks carried a full copy of their exponent in each
+    # arm — including the diagonal Hamiltonian, four times. `wick_phase` is the
+    # one statement; this is the gate that makes the next hand-written branch
+    # red on the day it lands (CLAUDE.md commitment 11).
+    "oracles/test_wick_phase_single_statement.jl",
+    # And for the numerical-zero thresholds. `COUPLING_TOL` lost 7:121 to the
+    # bare `1e-30` precisely because it shipped without this file.
+    "oracles/test_threshold_single_statement.jl",
+    # The split-step outer chain is one value (`OUTER_CHAIN`), both directions
+    # derive from it, and the substep → registry-term map is TOTAL: a new
+    # HamTerm that no propagator applies is red here. Also pins that
+    # fwd(+dt)·bwd(−dt) = id, which is what makes the derived reversal a
+    # checked property rather than a claim.
+    "oracles/test_outer_chain_registry_mapping.jl",
+    # A `dynamics:` step must build the kernel its own `ddi:` block declares.
+    # `secular` / `quasi_2d` / `l_z` are baked into the Q tensors so they cannot
+    # ride the inherited DDIParams, and the handler re-resolved neither — a
+    # dynamics step asking for the secular kernel silently got the full one,
+    # which is the PATH-GAP class this campaign found to be the commonest.
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.

@@ -93,6 +93,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     # the SAME states, one by continuation and one by the second variation.
     "eu_spectrum/branch_spectrum.jl",
     "eu_spectrum/submit_spectrum.sh",
+    # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
+    "eu_isotope_q/q_boundary.jl",
+    "eu_isotope_q/magnon_gap.jl",
     # ── active campaign: field-noise shielding spec (docs/guides/eu_shielding_spec.md, #362) ──
     "eu_noise/noise_hold.jl",
     "eu_noise/shielding_spec.jl",

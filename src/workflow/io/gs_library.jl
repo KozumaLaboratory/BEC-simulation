@@ -274,7 +274,7 @@ function assert_seed_epoch(
         ("c_dd", m.c_dd, c_dd, 1e-8),
         ("zeeman_p", m.p, p, 1e-6),
     )
-        rel = abs(got - want) / max(abs(want), 1e-30)
+        rel = abs(got - want) / max(abs(want), COUPLING_TOL)
         rel < tol || error("""
             seed/preset mismatch on $name: stored $got vs preset $want (rel $rel).
             The library state was computed with a different parameter epoch — fix
