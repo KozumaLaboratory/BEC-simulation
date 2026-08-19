@@ -5,7 +5,7 @@
 # local / path-based analyzers — they do not touch the GP solver and can run
 
 export winding_number_field, monopole_charge_3d, total_monopole_charge
-export non_abelian_holonomy
+export non_abelian_holonomy, component_phase_winding
 # on any post-ITP or post-dynamics snapshot.
 #
 # Conventions follow Kawaguchi-Ueda §9 for ferromagnetic vortices and
@@ -278,4 +278,131 @@ function _box_smooth_3d(q::Array{Float64, 3})
         out[i, j, k] = s / n
     end
     out
+end
+
+"""
+    component_phase_winding(psi, grid, component; radius, z=0.0, amp_frac=0.05,
+                            n_start=64, n_max=4096)
+        -> (; winding, converged, n_samples, min_amp_ratio, radius)
+
+Phase winding of ONE spinor component around a circle of `radius` (internal
+length units) in the xy-plane at height `z`, by accumulating wrapped phase
+differences along the loop.
+
+Why this exists rather than `sum(winding_number_field(...))`: the plaquette
+detector resolves at most ±1 per plaquette, so a charge-ℓ core sitting on a
+single plaquette is invisible for |ℓ| ≥ 2. A spin-F magnetic vortex has
+component windings `v_m = -m`, i.e. up to ∓F — ±6 for ¹⁵¹Eu. And
+`non_abelian_holonomy` returns `cis(phase_acc)`, which is ≈ 1 for EVERY
+integer winding and so cannot tell ℓ=1 from ℓ=6.
+
+Resolving winding ℓ on an `n`-point loop needs `n > 2|ℓ|`, and ℓ is not known
+in advance, so the loop is sampled at `n_start` points and repeatedly DOUBLED.
+
+The acceptance criterion is the largest single-step phase jump on the loop,
+required below `π/2`. Agreement between two successive `n` is NOT sufficient
+and was the first thing tried: an under-sampled loop returns
+`ℓ - n·round(ℓ/n)`, which for ℓ=-6 is +2 at BOTH n=4 and n=8 — two resolutions
+agreeing on the same wrong integer. The max-jump bound is a direct property of
+the sampled data rather than an indirect stability check, so it cannot be
+fooled that way.
+
+`converged=false` means the loop is under-sampled (or the amplitude on it is
+too small to carry a phase) and `winding` must NOT be reported.
+
+`min_amp_ratio` is the smallest |ψ_c| on the loop divided by that component's
+own maximum over the grid — NOT by the total density. A minority component
+holding 0.3 % of the atoms is orders of magnitude below the global peak, and a
+global-density mask erases it and returns a spurious zero.
+
+The field is sampled by bilinear interpolation, so `radius` need not land on
+grid points.
+"""
+function component_phase_winding(
+    psi::AbstractArray{<:Complex}, grid::Grid{N}, component::Int;
+    radius::Real, z::Real=0.0, amp_frac::Real=0.05,
+    n_start::Int=64, n_max::Int=4096,
+) where {N}
+    N >= 2 || throw(ArgumentError("component_phase_winding requires N ≥ 2"))
+    D = size(psi, N + 1)
+    1 <= component <= D ||
+        throw(ArgumentError("component $component outside 1:$D"))
+    radius > 0 || throw(ArgumentError("radius must be positive"))
+
+    x, y = grid.x[1], grid.x[2]
+    kz = if N >= 3
+        argmin(abs.(grid.x[3] .- Float64(z)))
+    else
+        nothing
+    end
+    slice = kz === nothing ? view(psi,:,:,component) :
+            view(psi,:,:,kz,component)
+
+    amp_max = maximum(abs, slice)
+    amp_max > 0 || return (; winding=0, converged=false, n_samples=0,
+        min_amp_ratio=0.0, radius=Float64(radius))
+
+    amp_floor = Float64(amp_frac) * amp_max
+
+    function circulation(n::Int)
+        acc = 0.0
+        min_amp = Inf
+        max_step = 0.0
+        prev = _bilinear(slice, x, y, Float64(radius), 0.0)
+        first_val = prev
+        for k in 1:n
+            θ = 2π * k / n
+            cur = _bilinear(slice, x, y,
+                Float64(radius) * cos(θ), Float64(radius) * sin(θ))
+            k == n && (cur = first_val)          # close the loop exactly
+            min_amp = min(min_amp, abs(cur))
+            if abs(prev) > 0 && abs(cur) > 0
+                Δ = _wrap(atan(imag(cur), real(cur)) -
+                          atan(imag(prev), real(prev)))
+                acc += Δ
+                max_step = max(max_step, abs(Δ))
+            end
+            prev = cur
+        end
+        (acc / 2π, min_amp, max_step)
+    end
+
+    # BOTH criteria are required, because each alone has a blind spot:
+    #   * max jump < π/2 alone — at n=2 an ℓ=-6 loop aliases to exactly 0 phase
+    #     change per step, so the jump test passes trivially on a wrong answer;
+    #   * agreement across a doubling alone — ℓ=-6 reads +2 at both n=4 and
+    #     n=8, two resolutions agreeing on the same wrong integer.
+    # Together they are not fooled by either.
+    n = n_start
+    w, min_amp, max_step = circulation(n)
+    while true
+        w2, min_amp2, max_step2 = circulation(2n)
+        if max_step < π / 2 && round(Int, w) == round(Int, w2)
+            # A loop dipping into the vacuum carries no reliable phase there.
+            return (; winding=round(Int, w2),
+                converged=(min_amp2 >= amp_floor), n_samples=2n,
+                min_amp_ratio=min_amp2 / amp_max, radius=Float64(radius))
+        end
+        2n >= n_max && return (; winding=round(Int, w2), converged=false,
+            n_samples=2n, min_amp_ratio=min_amp2 / amp_max,
+            radius=Float64(radius))
+        n *= 2
+        w, min_amp, max_step = w2, min_amp2, max_step2
+    end
+end
+
+"""Bilinear sample of a 2D complex slice at physical coordinates (px, py)."""
+@inline function _bilinear(slice, x::AbstractVector, y::AbstractVector,
+    px::Float64, py::Float64)
+    nx, ny = length(x), length(y)
+    dx = x[2] - x[1]
+    dy = y[2] - y[1]
+    fx = (px - x[1]) / dx
+    fy = (py - y[1]) / dy
+    i = clamp(floor(Int, fx) + 1, 1, nx - 1)
+    j = clamp(floor(Int, fy) + 1, 1, ny - 1)
+    tx = clamp(fx - (i - 1), 0.0, 1.0)
+    ty = clamp(fy - (j - 1), 0.0, 1.0)
+    (1 - tx) * (1 - ty) * slice[i, j] + tx * (1 - ty) * slice[i + 1, j] +
+    (1 - tx) * ty * slice[i, j + 1] + tx * ty * slice[i + 1, j + 1]
 end
