@@ -33,6 +33,12 @@ measurements, not tests).
 | 2 | How many stored runs does the new row disqualify? | **0 marginally.** All 200 gateable runs were already disqualified by older refs; 3 more have no producing commit at all |
 | 3 | Does the field sign move the load-bearing observables? | **Yes, by ×2.2 to ×5.0.** Peak P_{−5,−4} 0.244 → 0.530; peak \|L_z\| 0.020 → 0.101. Nothing depending on either is quotable without re-derivation. §3 |
 | 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is not re-derivable as posed. §3.4 |
+| 7 | What replaces `\|Ω\|/ω_⊥ = 0.468 ± 0.003`? | **`\|Ω*\|/ω_⊥ = 0.68 ± 0.04`** at the anti-aligned preparation, +24.9 % over Ω=0. Two digits, not three. §9.1 |
+| 8 | Is the enhancement chirality-matched, as the sheet says? | **No.** The response is **even in Ω** to ≤ 0.124 %; Ω=0 is the minimum and both senses enhance equally. §9.2 |
+| 9 | Then what is the mechanism? | **Centrifugal, not Coriolis.** A *static* trap weakened to ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to **0.06 %** across the range. **Rotation is not needed** — weaken the radial trap to **0.71 ω_⊥**. §9.3, §10.1 |
+| 10 | Is it density, or the radial confinement? | **Radial.** A density-matched weakening along **z** instead lands *below* the baseline (−36 % of the gain). Same ω̄, opposite sign. §10.4 |
+| 11 | Does the prescription hold at the other two fields? | **No, and differently.** 1.3 nT: **no window at all** (+1.8 %, flat) — the old `0.3 @ 1.3 nT` has no replacement. 5.2 nT: enhancement exists but is **unresolved** at 7 points (non-monotonic, dip at 0.650) — no optimum quoted. §10.2 |
+| 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
 | 4b | Is `eu151_klaus_phi_phys` really "the one Eu arc on the other side"? | **No.** `p > 0` puts m=+F at the *bottom*, so it is aligned like everything else — and therefore on the wrong side for the EdH quench. #343 §2's premise was an m-label comparison across two field parameterisations. §4.2 |
 | 5 | Is the stored `(init m × Ω)` "mirror" pair still a mirror? | **No — `bce2068f` broke it.** Repaired here, and the repair is confirmed by measurement to 5 digits (§3.6 arm G). §5 |
@@ -434,12 +440,17 @@ It did not find observables insensitive enough to skip; it found that the
 headline prescription is **not re-derivable as posed** and has to be replaced by
 a different measurement.
 
-### 6.1 Re-derive — 2 items
+### 6.1 Re-derive — 2 items, **both discharged 2026-08-19**
 
-| # | item | why, and what changes |
+| # | item | outcome |
 |---|---|---|
-| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`, and the `0.3 @ 1.3 nT` / `[0.5,0.6] @ 5.2 nT` rows with it) | **Not a refinement — a re-posing.** At the aligned preparation there is no optimum (−0.45 %). Re-derive at the **anti-aligned** preparation (m=+F, B_z>0), where the enhancement is +16.5 %. Until then the sheet's three-significant-figure window has no measured basis on current code and must not go to the lab |
-| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | The `(init m × Ω)` reversal-symmetry gate is now *measured* to hold to 5 digits (§3.6, arms E and G), so it re-derives green — but only against the **repaired** pair (§5). The other five have not been re-run |
+| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`) | **DONE — §9.1/9.2/9.3.** Not a refinement but a re-posing, and then a replacement: `\|Ω*\|/ω_⊥ = 0.68 ± 0.04`, +24.9 % over Ω=0. The response is **even in Ω**, so the chirality rule is void, and a **static** weakened trap reproduces the whole effect — the operative variable is ω_⊥,eff ≈ 0.73 ω_⊥, not Ω |
+| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | **DONE — §9.4.** 5 of 6 pass on criteria fixed before launch. G6 (N=5×10⁴, P_exc rises) **fails**, for a reason R1 explains. G3 passes at 2.47 %, refuting the sheet's "4-digit match" by two orders of magnitude |
+
+The `0.3 @ 1.3 nT` and `[0.5, 0.6] @ 5.2 nT` rows were **not** re-derived: they
+are the same prescription at other fields, and §9.3 says the whole family is
+parameterised by the wrong variable. They should be re-posed as a trap-frequency
+scan at each field, not re-fitted in Ω.
 
 ### 6.2 Do NOT re-derive — with the reason, so nobody re-opens it
 
@@ -464,6 +475,232 @@ a different measurement.
   factor-2.2 and the +16.5 % vs −0.45 % split are far outside any plausible
   seed scatter, but the *values* are not converged results and are not quotable
   as such.
+
+### 6.4 Status — both discharged 2026-08-19
+
+The corpus was retargeted (52 production arms to m=+F at B_z>0, 2 mirror arms to
+m=−F at B_z<0, all declaring `# anti-aligned-seed:`) and R1/R2 then ran. Results
+in §9. **R1 did not return a refined 0.468; it returned a different number and a
+different mechanism.**
+
+---
+
+## 9. R1 / R2 — measured at the anti-aligned preparation
+
+All CPU, 32³ unless stated, one seed, `lhy: none`. Observable is peak
+P_{m_init∓1, m_init∓2} over the streamed trajectory, **relative to the prepared
+state**. Configs are the committed ones, unmodified.
+
+### 9.1 R1 — the Ω operating window
+
+The 20 `*_holdonly_delay2ms_refine.yaml` cells — the same protocol, grid and
+delay the 0.468 came from, so this is a re-derivation of the same quantity.
+
+| Ω | peak P_adj | Ω | peak P_adj |
+|---:|---:|---:|---:|
+| −1.00 | 0.44063 | −0.42 | 0.58978 |
+| −0.90 | 0.50132 | −0.38 | 0.58018 |
+| −0.80 | 0.61730 | −0.34 | 0.56998 |
+| **−0.70** | **0.65905** | −0.30 | 0.55964 |
+| −0.66 | 0.65258 | −0.20 | 0.53616 |
+| −0.62 | 0.64131 | −0.10 | 0.52902 |
+| −0.58 | 0.63022 | **0.00** | **0.52748** |
+| −0.54 | 0.62053 | +0.10 | 0.52940 |
+| −0.50 | 0.61088 | +0.30 | 0.56027 |
+| −0.46 | 0.59943 | +0.50 | 0.61164 |
+
+Against the criteria fixed **before** launch:
+
+| | criterion | measured | |
+|---|---|---|---|
+| C1 | interior maximum required | max at Ω = −0.70, falling to 0.441 at −1.00 | **PASS** |
+| C2 | enhancement over Ω=0 > 5 % | 0.65905 / 0.52748 = **+24.9 %** | **PASS** |
+| C3 | ≥5-pt parabolic fit, negative curvature, vertex inside window | \|Ω\| ∈ [0.58, 0.80], c₂ = −2.70, vertex 0.682, fit rms 4.7e−3 | **PASS** |
+| C4 | digits limited by the fit | δ ≈ 0.042 ⇒ two digits, not three | **applied** |
+
+> **|Ω*| / ω_⊥ = 0.68 ± 0.04 at B = 2.6 nT.**
+> This **replaces** `0.468 ± 0.003`. The old value is not recovered, and its
+> third significant figure is not supportable at one seed.
+
+### 9.2 The response is EVEN in Ω — the stated mechanism is not what acts
+
+| \|Ω\| | P_adj(+Ω) | P_adj(−Ω) | rel diff |
+|---:|---:|---:|---:|
+| 0.10 | 0.52940 | 0.52902 | **0.071 %** |
+| 0.30 | 0.56027 | 0.55964 | **0.113 %** |
+| 0.50 | 0.61164 | 0.61088 | **0.124 %** |
+
+The sheet's mechanism is **odd** in Ω — "matched chirality (Ω·sign(m_init) < 0)
+lowers the mode energy", ΔE = −Ω·ℓ. An effect that is even in Ω to 0.12 % cannot
+come from that term. Ω = 0 is the *minimum*; **both** senses of rotation enhance,
+equally.
+
+### 9.3 The decisive control: it is CENTRIFUGAL, not Coriolis
+
+The rotating frame also carries −½Ω²ρ², which is even in Ω and weakens the radial
+trap to ω_eff = √(ω_⊥² − Ω²). Test: replace rotation in the hold with a **static
+trap already weakened to that ω_eff**, Ω = 0, everything else identical
+(`potential` is a dynamics-step field, so this is clean).
+
+| \|Ω\| | rotating | static ω_eff | rel diff | ω_eff |
+|---:|---:|---:|---:|---:|
+| 0.70 | 0.65905 | **0.65864** | **0.06 %** | 0.7141 |
+| 0.50 | 0.61088 | **0.61205** | **0.19 %** | 0.8660 |
+
+peak P_exc agrees too (0.72168 / 0.72073 and 0.75743 / 0.75829).
+
+**A static, non-rotating trap reproduces the entire "rotation-assisted"
+enhancement to 0.06–0.19 %.** The control carries its own positive control: had
+the per-step `potential:` override been silently ignored, these arms would have
+returned the Ω = 0 value 0.527, not 0.659.
+
+**Consequences, and they are large:**
+
+1. **Chirality is irrelevant to this observable.** "Rotate against the stretched-
+   spin direction" is not a prescription — either sense works, identically.
+2. **Rotation is not required at all.** The operative variable is the effective
+   radial trap frequency. The optimum |Ω*| = 0.68 corresponds to
+   **ω_⊥,eff ≈ 0.73 ω_⊥**, i.e. simply weaken the radial trap by ~27 %. That is a
+   far easier laboratory prescription than mechanically rotating an anisotropic
+   trap, and it removes the whole "sign-convention mapping from simulation Ω to
+   lab rotation direction" caveat.
+3. **The upper bound has a physical origin**: the cascade collapses as
+   |Ω| → ω_⊥ = 1 (peak P_exc 0.76 → 0.49), which is where the effective radial
+   trap vanishes. The window is bounded by the centrifugal limit, not by a
+   resonance.
+
+*Marked as hypothesis, not measured here:* the microscopic reason a softer radial
+trap helps (larger cloud, lower kinetic cost for the ℓ ≠ 0 orbital modes the spin
+flip must populate). The **variable** is established; the mechanism behind the
+variable is not.
+
+### 9.4 R2 — the acceptance gates
+
+Criteria fixed before launch and **not** inherited from the sheet.
+
+| gate | criterion | measured | verdict |
+|---|---|---|---|
+| G1 DDI off → 0 | < 0.005 | **0.00000** | PASS |
+| G2 no B quench → 0 | < 0.005 | **0.00016** | PASS |
+| G3 32³ ↔ 64³ | \|rel\| < 5 % | **+2.47 %** (0.61698 → 0.63223) | PASS |
+| G4 mirror symmetry | \|rel\| < 1e−3 | 0.61698 vs 0.61698, **< 1e−5** | PASS |
+| G5 dt/2 reproducibility | \|rel\| < 1 % | **0.029 %** | PASS |
+| G6 N = 5×10⁴, P_exc rises | sign | 0.81531 vs 0.81613, **−0.10 %** | **FAIL** |
+
+**G4** is the repaired pair from §5, now with both members anti-aligned; it
+agrees to five decimals, which is a stronger result than the sheet's "3-digit".
+
+**G6 fails as posed, and the reason is in R1.** Ω does not create excitation, it
+*concentrates* it: peak P_exc is flat to |Ω| ≈ 0.6 while P_adj rises 24 %. At
+N = 5×10⁴ the cascade is already saturated (P_exc = 0.816), so there is no room
+for the +30 % the sheet claims. On the adjacent-pair observable the enhancement is
+there: P_adj **+6.4 %** (0.36119 vs 0.33956). The sheet's own row carried
+"(with metric caveat)"; the caveat was load-bearing.
+
+**G3 passes the criterion but refutes the sheet's stated precision.** The sheet
+claims a "4-digit match" between 32³ and 64³. Measured: **+2.47 %** on peak
+P_adj (0.61698 → 0.63223) and +2.05 % on peak P_exc — a **2-digit** agreement,
+two orders of magnitude looser than advertised. That is fine for a converged
+result and is why the criterion here was set at 5 %, but "4-digit" was never a
+credible resolution claim for a nonlinear cascade and should not be repeated.
+The residual is one-signed (64³ higher on both observables), i.e. 32³ slightly
+under-resolves the cascade rather than scattering about it.
+
+**Cost note for whoever runs this next:** the 64³ arm took 3026 s against ~590 s
+at 32³ on the same core — 5.1×, not the 8× the cell count suggests, because the
+FFT work does not scale linearly and the run is partly memory-bound (3.0 GB RSS).
+
+---
+
+## 10. Scanning the variable that actually acts
+
+§9.3 said the operative variable is ω_⊥,eff, not Ω. So scan **that**, with a
+static trap and no rotation at all — which is also the correct re-posing of the
+two rows §6.1 deliberately did not re-derive. 34 arms, CPU, 32³, holdonly + 2 ms
+delay, anti-aligned.
+
+### 10.1 The static scan reproduces the rotating one
+
+At every ω_eff where the two scans sample the same point:
+
+| ω_eff | static trap, Ω = 0 | rotating, from \|Ω\| = √(1−ω_eff²) | rel |
+|---:|---:|---:|---:|
+| 1.000 | 0.52748 | 0.52748 (Ω=0.00) | **0.00 %** |
+| 0.750 | 0.65219 | 0.65258 (Ω=0.66) | **0.06 %** |
+| 0.714 | 0.65864 | 0.65905 (Ω=0.70) | **0.06 %** |
+| 0.600 | 0.61707 | 0.61730 (Ω=0.80) | **0.04 %** |
+
+**Worst 0.06 %.** Rotation is fully substitutable by a static radial trap of the
+same ω_eff, across the range — not just at the two points of §9.3.
+
+Static optimum at 2.6 nT: **ω_eff = 0.714, +24.9 % over ω_eff = 1**, which is the
+same optimum and the same enhancement the Ω scan gave.
+
+### 10.2 The optimum IS field-dependent — and one field has no window at all
+
+| field | best ω_eff | peak P_adj | enhancement | shape |
+|---|---:|---:|---:|---|
+| **1.3 nT** | 0.900 | 0.51386 | **+1.8 %** | flat: 0.505 → 0.514 over ω_eff ∈ [0.65, 1.0] |
+| **2.6 nT** | **0.714** | 0.65864 | **+24.9 %** | clean single peak |
+| **5.2 nT** | 0.550 | 0.51387 | +17.0 % | **non-monotonic**, with a dip at 0.650 |
+
+Three different answers, and only one of them is a number:
+
+- **1.3 nT — there is no operating window.** +1.8 % across a flat range is not an
+  optimum; it is the absence of one. The sheet's `|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT`
+  therefore has **no replacement**, and that is the finding. Do not re-fit it.
+- **2.6 nT — ω_⊥,eff / ω_⊥ = 0.71.** This is the prescription.
+- **5.2 nT — unresolved at this sampling.** The best sampled point (0.550,
+  0.51387) is only 2.6 % above ω_eff = 0.800 (0.5007) and there is a dip between
+  them at 0.650. Seven points cannot distinguish one broad optimum from two
+  narrow ones, so **no optimum is quoted**; the sheet's `[0.5, 0.6] at 5.2 nT`
+  is neither confirmed nor replaced. Denser sampling would settle it.
+
+### 10.3 The seed is live, and the observable is deterministic anyway
+
+Five seeds at ω_eff = 1.000 and at 0.714 returned peak P_adj identical to five
+decimals (sd = 0.00000). That is exactly what a dead knob looks like, so it was
+checked rather than reported:
+
+| | overlap between seed 101 and seed 202 | max rel density diff |
+|---|---:|---:|
+| frame 1 (just after the seeded step) | 0.999999702 | 2.3e−7 |
+| frame 39 (end) | 0.999999881 | 1.9e−5 |
+
+**The seed reaches the state**, and its influence *grows* by two orders over the
+run — the cascade does amplify it — but it is still ~1e−5 at the end, far below
+anything that moves peak P_adj. The `noise_seed` knob was also initially wired to
+the wrong step (it is read only by the step carrying `seed_amplitude`), which
+produced the same all-identical table for a different and wrong reason; that was
+found and fixed before these numbers.
+
+**Consequence:** the one-seed values in §9 are not one sample of a distribution.
+On this protocol and duration the observable is deterministic, so the seed axis
+carries no uncertainty to quote. **The grid, dt and box axes still do** — G3
+measured 2.5 % between 32³ and 64³, which dwarfs everything here.
+
+### 10.4 Why a softer *radial* trap: not density
+
+Two candidates for the microscopic reason, and they are separable. Weaken **ω_z**
+instead, chosen to give the *same* mean trap frequency ω̄ = (ω_x ω_y ω_z)^⅓ —
+hence the same Thomas-Fermi density scaling — while leaving ω_⊥ at 1:
+
+| arm | trap | peak P_adj |
+|---|---|---:|
+| baseline | (1.000, 1.000, 1.1818) | 0.52748 |
+| radial | (0.714, 0.714, 1.1818) | **0.65864** |
+| **z-weakened, same ω̄** | (1.000, 1.000, 0.6026) | **0.48073** |
+
+The z-weakened arm does not merely fail to reproduce the gain — it lands
+**below** the baseline, recovering **−36 %** of it. Same mean trap frequency,
+same density scaling, opposite sign of effect.
+
+> **The variable is the radial confinement specifically, not the density.**
+
+That is consistent with the ℓ ≠ 0 orbital modes the spin flip must populate
+having their cost set by ω_⊥ — but that reading is still an interpretation. What
+is *measured* is that a density-matched change along z does not substitute for
+it, which is what rules the density explanation out.
 
 <!-- REDERIVE -->
 

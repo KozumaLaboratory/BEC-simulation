@@ -79,3 +79,54 @@ end
     @test res.width < 1e-6
     @test res.goldstone
 end
+
+# A PRECONDITIONER CHANGES THE ITERATION, NEVER THE SPECTRUM. `precond=:combined`
+# wires in `P_C = P_V^½ P_K P_V^½` (`solvers/preconditioner.jl`), which adds the
+# real-space stiffness `V_trap + c₀n` that the kinetic-only inverse leaves alone —
+# the stiffness that matters on the weak-field Eu manifold, where the block
+# solver was measured returning λ_min = 1.68 with a Kato–Temple width of 5.7.
+#
+# The claim is that the two arms return the same eigenvalues. It is only a claim
+# about CONVERGED modes: at a fixed iteration budget two different metrics are
+# simply at different points of their own descent, and comparing those would be
+# comparing iteration counts, not spectra. So the comparison runs over the modes
+# both arms certify by their own residual, and the non-vacuity of that set is
+# asserted FIRST — an equivalence over an empty set passes for free, which is the
+# failure this file exists to prevent elsewhere.
+#
+# Correctness per mode does not need the other arm at all: `converged_modes[k]`
+# means ‖Av − λv‖ < tol, i.e. it IS an eigenpair. Individual Ritz VECTORS are
+# deliberately not compared — inside a degenerate multiplet they are
+# basis-arbitrary, so a mismatch there would be an artefact rather than a defect.
+#
+# Speed is NOT asserted: it is a property of the state, and this small gapped
+# fixture is not the state the option exists for. Measured where it does matter
+# (¹⁵¹Eu 32³ × 13, B = 68.25 µG, H100, equal wall time): the block's lowest Ritz
+# value fell from 1.85e-3 to 4.87e-7 — and since Ritz values converge from above,
+# that is a 3800× tighter upper bound on λ_min for the same cost.
+@testset "preconditioner is a metric: :combined ≡ :kinetic on the spectrum" begin
+    grid = make_grid(GridConfig(16, 10.0))
+    interactions = InteractionParams(Dict(0 => 4.0, 1 => 0.3))
+    r = find_ground_state_lbfgs(;
+        grid, atom=Rb87, interactions, potential=HarmonicTrap(1.0),
+        n_steps=400, tol=1e-11, initial_state=:polar, verbose=false,
+    )
+    ws = r.workspace
+    ψ = copy(ws.state.psi)
+    prm = constrained_hessian_params(ws, ψ)
+
+    kin = trapped_bdg_low_modes(ws, ψ; nev=2, block=8, max_iter=200, tol=1e-7,
+        params=prm, rng=MersenneTwister(3))
+    comb = trapped_bdg_low_modes(ws, ψ; nev=2, block=8, max_iter=200, tol=1e-7,
+        precond=:combined, params=prm, rng=MersenneTwister(3))
+
+    both = [k for k in 1:2 if kin.converged_modes[k] && comb.converged_modes[k]]
+    @test !isempty(both)                       # or the comparison below is free
+    for k in both
+        @test isapprox(comb.λ[k], kin.λ[k];
+            atol=max(1e-6, 2 * max(kin.widths[k], comb.widths[k])))
+    end
+
+    @test_throws ArgumentError trapped_bdg_low_modes(ws, ψ; precond=:bogus,
+        params=prm, max_iter=1)
+end

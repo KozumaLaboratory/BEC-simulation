@@ -249,14 +249,16 @@ end
             @test haskey(gs, "atom")                        # came from the mixin
             atom = _atom_of(gs)
             @test atom !== nothing
-            # …and the config is self-consistent: p > 0 puts m=+F at the BOTTOM
-            # of the ladder, and it seeds m=+F. #343 §2 read this as "the only Eu
-            # arc on the opposite side"; it is not — comparing m labels across two
-            # field parameterisations is what made it look that way. It is ALIGNED
-            # like everything else, and (docs/campaign/edh_quench_polarisation_decision.md
-            # §4.2) that is the wrong side for the EdH quench.
-            @test _m_lowest(gs, atom) === :plus_F
-            @test _seed_of(gs, atom) === :plus_F
+            # `H = -p·F_z` with p > 0 puts m=+F at the BOTTOM of the ladder, so
+            # the ANTI-ALIGNED seed here is m=-F — `init_m_idx: 13`, retargeted
+            # 2026-08-19 from the schema default of 1. #343 §2 read this config
+            # as "the only Eu arc on the opposite side"; it was not — comparing m
+            # labels across two field parameterisations is what made it look that
+            # way — and it was on the wrong side for a different reason.
+            @test _m_lowest(gs, atom) === :plus_F     # p > 0 ⇒ m=+F is lowest
+            @test _seed_of(gs, atom) === :minus_F     # …so m=-F is the highest
+            # Deliberate, and it must SAY so, or the gate is right to flag it.
+            @test occursin(_ANTIALIGNED, read(p, String))
         end
     end
 

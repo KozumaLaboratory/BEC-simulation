@@ -29,8 +29,51 @@
 > **2026-05-26's gates and 2026-05-26's field convention**. It is left as
 > written because it is what the record said; it is not a claim about today.
 >
-> **One of those gates is now known to be un-re-runnable as written** (2026-08-19,
-> #343). The "(init m × Ω sign) reversal symmetry — 3-digit match" row in the
+> ## RE-DERIVED 2026-08-19 — three of this sheet's central claims do not survive
+>
+> The corpus was retargeted to the ANTI-ALIGNED preparation (the EdH cascade only
+> runs from the Zeeman-HIGHEST stretched state) and the Ω scan re-run. Full
+> record and criteria: `docs/campaign/edh_quench_polarisation_decision.md` §9.
+>
+> 1. **`|Ω|/ω_⊥ = 0.468 ± 0.003` → `|Ω*|/ω_⊥ = 0.68 ± 0.04`.** The optimum moves
+>    and the third significant figure is not supportable at one seed. The
+>    "Three-regime Ω operating window" table below, and every 0.5 / 0.3 / 0.7
+>    recommendation in it, is superseded.
+> 2. **Chirality does not matter.** The response is **even in Ω** to ≤ 0.124 %
+>    (±0.1, ±0.3, ±0.5 all agree), and Ω = 0 is the *minimum*. So step 5's
+>    "chirality opposite to the initial spin polarisation", the Mechanism
+>    one-liner's `Ω·sign(m_init) < 0`, and the falsification row "rotation
+>    chirality may be wrong — try the opposite trap rotation" are all wrong: both
+>    senses enhance identically.
+> 3. **You do not need to rotate the trap at all.** A *static* radial trap
+>    weakened to ω_eff = √(ω_⊥² − Ω²) reproduces the entire enhancement to
+>    **0.06–0.19 %**. The effect is CENTRIFUGAL, not Coriolis. The lab
+>    prescription becomes **weaken the radial trap to ≈ 0.73 ω_⊥** — no rotating
+>    anisotropic trap, and the "sign-convention mapping from simulation Ω to lab
+>    rotation direction" caveat disappears with it.
+>
+> The upper bound also has a physical origin rather than a resonance: the cascade
+> collapses as |Ω| → ω_⊥, where the effective radial trap vanishes.
+>
+> **Scanned directly 2026-08-19 (§10 of the same document), 34 further arms:**
+>
+> 4. **The lab prescription at 2.6 nT is `ω_⊥,eff / ω_⊥ = 0.71`** — a static trap,
+>    no rotation. The static scan reproduces the rotating one to **0.06 %** at
+>    every matched point, so the substitution is not a coincidence of two points.
+> 5. **The other two field rows do not survive, and they fail differently.** At
+>    **1.3 nT there is no operating window at all** (+1.8 % across a flat range),
+>    so `|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT` has **no replacement** — the effect is
+>    absent, not relocated. At **5.2 nT** an enhancement exists (+17 %) but the
+>    ω_eff dependence is non-monotonic at 7 points, so **no optimum is quoted**
+>    and `[0.5, 0.6] at 5.2 nT` is neither confirmed nor replaced.
+> 6. **It is the radial confinement, not the density.** A density-matched
+>    weakening along z instead lands *below* the baseline.
+>
+> Five seeds agree to five decimals with the seed proved live, so none of this is
+> seed noise; the live uncertainty is resolution (32³ ↔ 64³ = 2.5 %).
+>
+> **One of the 6 acceptance gates is now known to be un-re-runnable as written**
+> (2026-08-19, #343). The "(init m × Ω sign) reversal symmetry — 3-digit match" row in the
 > validation chain below compared `klaus_quench_omm0p5_keeprot` against
 > `klaus_quench_omp0p5_keeprot_mFplus`. At the time those two flipped all three
 > axial quantities — m, Ω **and B_z** — so they were a genuine mirror pair.
