@@ -15,21 +15,39 @@ using SpinorBEC
 # `COUPLING_TOL` shipped with "the bare values are kept available for legacy
 # call sites" and lost 7 : 121 (CLAUDE.md commitment 11).
 #
-# The Model layer is 4107 lines and genuinely correct; what it lacks is the
-# Spec → runtime realisation (`GridSpec` → `Grid`, `PotentialSpec` → the eight
-# trap terms, `ZeemanSpec` → `ZeemanParams`/`ZeemanField`, …) that
-# `make_workspace(::Model)` needs. That is real work and building it in a hurry
-# would produce exactly the half-finished second layer this whole campaign is
-# about.
+# The realisation layer now EXISTS (`src/model/realise.jl`, 2026-08-19) and
+# `make_workspace(::Model)` works — gated against the resolver path by
+# `test_realise_matches_resolver.jl`. So the obvious next move is to point the
+# pipeline at it and watch this number fall.
 #
-# So the interim commitment is a RATCHET rather than a promise. The count below
-# is what the tree has today. A new hand-mapped call site — a sixth pipeline
-# handler, a new solver entry point — turns this red and the author has to
-# either use the bundle or argue the number up deliberately, in a diff someone
-# reviews. It cannot drift.
+# IT CANNOT FALL YET, AND THE REASON IS NOT THE CALL SITES.
 #
-# Lowering the number when a site is migrated is the point; the test says so and
-# names the new value, so the ratchet tightens by itself.
+# `gs_model` is not TOTAL over the corpus: measured 351 of 429 configs under
+# `runs/` resolve to a `Model` (`test_corpus_resolves.jl`, which lists every
+# exclusion by name and reason — a tabulated LHY with no resolved `n_max`, a step
+# with no `N_atoms`, a dropped B tilt). The other 78 run fine today. Swapping the
+# ground-state runner onto `make_workspace(::Model)` would refuse them, so the
+# migration is blocked on MODEL COVERAGE, not on transcription discipline, and
+# the work runs through that exclusion list rather than through this file.
+#
+# Naming that is the point of this comment. "Still to come" with no number is how
+# the last migration stalled; "still to come, blocked on 78 configs, here is the
+# list" is a work item.
+#
+# WHAT THIS RATCHET MEASURES, AND WHAT IT DELIBERATELY DOES NOT
+#
+# Only CONFIG TRANSCRIPTION: a site that turns a YAML block into kwargs by hand.
+# The four solver entry points (`find_ground_state`, its adaptive and pinned
+# variants, `find_ground_state_lbfgs`) are excluded BY NAME below, because they
+# are the direct-Julia API — `find_ground_state(; grid, atom, …)` is the
+# documented primitive, and forwarding one's own kwargs is not transcription.
+# Forcing a `Model` on them would be the wrong shape.
+#
+# Their risk is real but different: a kwarg present in the signature and inert in
+# the body, which is exactly the LBFGS `rotating_frame_omega` bug. That is gated
+# BEHAVIOURALLY by `test_solver_forwards_every_knob.jl` — build twice, require a
+# difference — which is a stronger check than a count, so counting them here as
+# well would double-report one risk and understate the other.
 
 const _RATCHET_PHYSICS_KWARGS = (
     "zeeman", "potential", "raman", "loss", "light_shift", "magnetic_gradient",
@@ -39,18 +57,31 @@ const _RATCHET_PHYSICS_KWARGS = (
     "lhy_opts", "quasi_2d", "l_z", "interactions",
 )
 
-# Measured 2026-08-19, after `run_step_ground_state.jl`'s three copies were
-# collapsed into `gs_physics_kwargs`. Each entry is a place a config's physics
-# is transcribed into kwargs by hand.
+# The direct-Julia solver API. Forwarding one's own kwargs is not config
+# transcription, and `test_solver_forwards_every_knob.jl` gates the risk these
+# sites DO carry (an accepted-but-inert knob) behaviourally. Excluded by name so
+# the exclusion is a decision with a reason attached, not a threshold quietly
+# fitted until the count passed.
+const RATCHET_SOLVER_API = (
+    "src/solvers/ground_state.jl",
+    "src/solvers/ground_state/adaptive.jl",
+    "src/solvers/ground_state/pinned.jl",
+    "src/solvers/lbfgs/driver.jl",
+)
+
+# Measured 2026-08-19. Config-transcription sites only — the solver API above is
+# excluded. Each is a place a YAML block becomes kwargs by hand.
 #
-#   16  solvers/ground_state.jl                        ITP entry point
-#   16  solvers/ground_state/adaptive.jl               adaptive-dt ITP
-#   16  workflow/.../pipeline/run_step_dynamics.jl     the dynamics handler
-#   14  solvers/lbfgs/driver.jl                        LBFGS entry point
-#   14  solvers/ground_state/pinned.jl                 pinned-branch continuation
-#    7  workflow/validation/accuracy_profiles.jl       profile probe
+#   19  workflow/.../pipeline/run_step_dynamics.jl     the dynamics handler
+#    7  workflow/validation/accuracy_profiles.jl       accuracy-profile probe
 #    6  workflow/.../run_step_rotating/dynamics.jl     rotating-basis dynamics
-const RATCHET_HAND_MAPPED_SITES = 7
+#
+# `run_step_ground_state.jl` is absent because its three copies were collapsed
+# into `gs_physics_kwargs` — that is what this ratchet looks like when it works.
+# The dynamics handler is the one to do next: 19 kwargs, no resolver of its own,
+# and the second LHY resolver (`_resolve_dyn_lhy!`) lives there because of it.
+# Its `ddi: {secular}` was silently dropped until 2026-08-19 for the same reason.
+const RATCHET_HAND_MAPPED_SITES = 3
 
 _ratchet_code(txt) = join([split(l, "#")[1] for l in split(txt, "\n")], "\n")
 
@@ -105,8 +136,21 @@ end
         @test length(sites) >= 10
     end
 
+    @testset "the solver-API exclusion is real and still needed" begin
+        # Each excluded path must EXIST and must actually be a hand-mapped site,
+        # or the exclusion is stale cover. A path that stopped qualifying should
+        # be removed from the list, not left to excuse a future one.
+        for p in RATCHET_SOLVER_API
+            matching = [s for s in sites if s[1] == p && s[3] >= 6 && !s[4]]
+            if isempty(matching)
+                println("  stale RATCHET_SOLVER_API entry (no longer hand-mapped): $p")
+            end
+            @test !isempty(matching)
+        end
+    end
+
     @testset "count" begin
-        hand = [s for s in sites if s[3] >= 6 && !s[4]]
+        hand = [s for s in sites if s[3] >= 6 && !s[4] && !(s[1] in RATCHET_SOLVER_API)]
         for s in sort(hand; by=x -> -x[3])
             println("  hand-mapped: $(s[3]) physics kwargs at $(s[1]):$(s[2])")
         end
