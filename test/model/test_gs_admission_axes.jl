@@ -283,8 +283,11 @@ end
 
         @test sum(length(s) for (_, s) in AX_BUCKETS) == length(all_keys)
         # The bucket the SOURCE owns, pinned so moving a key out of it costs a
-        # deliberate edit here as well.
-        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman", "B_direction"])
+        # deliberate edit here as well. `a_s`, `ddi_pad` and `B_magnitude_gauss`
+        # joined 2026-08-18 with `kind: scalar_egpe` — declared in GS_SCHEMA and
+        # read only by that path, so the spinor runner drops them silently.
+        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman",
+            "B_direction", "a_s", "ddi_pad", "B_magnitude_gauss"])
     end
 
     # ---------------------------------------------------------------

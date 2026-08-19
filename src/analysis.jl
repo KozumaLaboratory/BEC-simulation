@@ -31,6 +31,8 @@ include("analysis/currents.jl")
 include("analysis/vorticity.jl")
 include("analysis/superfluid_fraction.jl")  # phase-twist f_s (Leggett bound + relaxed)
 include("analysis/vortex_extraction.jl")
+include("analysis/vortex_stripes.jl")  # Klaus-2022 residual-image hole count + stripe FT
+include("analysis/dipolar_tf_aspect_ratio.jl")  # closed-form magnetostriction anchor
 include("analysis/diagnostics.jl")
 include("analysis/sinatra_diagnostics.jl")  # TWA-validity (Sinatra) per-knob helpers
 include("analysis/grid_resolution.jl")  # planning: suggest_grid + sinatra_check (ATOM_REGISTRY)
