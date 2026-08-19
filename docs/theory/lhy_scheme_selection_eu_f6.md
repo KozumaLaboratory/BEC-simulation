@@ -427,10 +427,13 @@ Measured on the converged states of the Bz campaign:
 | 30 | +0.032 | 0.089 | 0.331 | 0.330 |
 | 40 | −0.011 | 0.055 | 0.189 | 0.382 |
 
-The **polar branch has no residual at all**: its p spread is below `min_spread`,
-so `compute_spatial_lhy` declines to build a table and the single-spinor one is
-exact by construction. (Recording that as a missing row rather than as zero would
-have dropped the branch out of the propagation and halved the answer.)
+The **polar branch has no *spatial* residual at all**: its p spread is below
+`min_spread`, so `compute_spatial_lhy` declines to build a table and falls back
+to the single-spinor `full_bdg` one, which is exact for a state that has one
+spinor shape. (Recording that as a missing row rather than as zero would have
+dropped the branch out of the propagation and halved the answer.) It is zero for
+*this* approximation only — that branch still carries the ±6 % scheme band of §3,
+which is a different and larger error and is not double-counted here.
 
 **Propagation.** The residual moves only the stretched branch, by
 `signed × E_LHY = −0.065 × 0.417 = −0.027`, so the gap by the same and the
