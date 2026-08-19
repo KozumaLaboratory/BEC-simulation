@@ -203,7 +203,7 @@ function spatial_lhy_residual(lhy::SpatialLHY, psi_init::AbstractArray{<:Complex
             _lhy_bdg_energy_density(z, 1.0, F, interactions, zeeman, c_dd,
                 nothing, nothing, nothing; rtol) / lhy.n_atoms
         tab = _interpolate_1d(lhy.polarisations, lhy.e1_values, p)
-        abs(exact) < 1e-30 && continue
+        abs(exact) < COUPLING_TOL && continue
         worst = max(worst, abs(tab - exact) / abs(exact))
         hit = true
     end
@@ -289,7 +289,7 @@ function spatial_lhy_energy_residual(lhy::SpatialLHY,
             _lhy_bdg_energy_density(z, n_loc, F, interactions, zeeman, c_dd,
                 nothing, nothing, nothing; rtol) / lhy.n_atoms
         tab = n_loc^2.5 * _interpolate_1d(lhy.polarisations, lhy.e1_values, p)
-        abs(exact) < 1e-30 && continue
+        abs(exact) < COUPLING_TOL && continue
         # Importance sampling: drawing ∝ n^(5/2) and then weighting by n^(5/2)
         # again would square the weight. The draw IS the weight, so each sample
         # enters with weight 1 and the ratio below is the energy-weighted mean.

@@ -22,11 +22,13 @@
 
 ## Split-step: the forward outer-potential chain
 
-Read from `_outer_operators_fwd!` (`src/hamiltonian/integrator/split_step.jl:600`), in source order.
-**9 substeps.** Each auto-skips when its coupling is ≈ 0.
+Read from `OUTER_CHAIN` (`src/hamiltonian/integrator/split_step.jl:622`), the Tuple both directions derive from:
+`_outer_operators_fwd!` runs it as declared, `_outer_operators_bwd!` runs
+`reverse` of it. **9 substeps.** Each auto-skips when its
+coupling is ≈ 0.
 
 1. `diagonal`
-2. `light_shift`
+2. `light_shift_offdiag`
 3. `spin_mixing`
 4. `spatial_lhy_spin`
 5. `singlet_pair`
@@ -50,10 +52,10 @@ Each declares its sign in one coefficient function in the file named.
 | 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl:7` |
 | 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:227` |
 | 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl:33` |
-| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:150` |
+| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:147` |
 | 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl:8` |
 | 7 | `lhy` | `LHYTerm` | `src/hamiltonian/terms/lhy/lhy_term.jl:7` |
-| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:297` |
+| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:294` |
 | 9 | `raman` | `RamanTerm` | `src/hamiltonian/terms/raman.jl:78` |
 | 10 | `light_shift` | `LightShiftTerm` | `src/hamiltonian/terms/light_shift/light_shift_term.jl:8` |
 | 11 | `coriolis` | `CoriolisTerm` | `src/hamiltonian/terms/coriolis.jl:11` |
@@ -124,7 +126,7 @@ checking either.
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:840`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:491`
-- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:555`
+- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:548`
 
 Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated
 migration allowance argued at `src/model/complete.jl`, not an oversight — so
@@ -206,11 +208,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 259 files
-- `CI_EXTRA` — 131 files
+- `FAST_TESTS` — 261 files
+- `CI_EXTRA` — 135 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 84 files
+- `ORACLE_TESTS` — 88 files
 - `INTEGRATION_TESTS` — 53 files
 
 ## Validation ladder — instruments present on disk
@@ -278,7 +280,7 @@ as complete.
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
 | `src/workflow/` | 5 | 173 |
-| `src/foundation/` | 1 | 40 |
+| `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem

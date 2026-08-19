@@ -128,14 +128,31 @@ function _run_step(
     else
         prev_c_dd
     end
-    # DDI truncation / padding (Tier A/B). Like `secular`, these are NOT carried
-    # on the inherited `DDIParams` (the kernel bakes them in), so the dynamics
-    # kernel is rebuilt from these values rather than inherited from ws_prev.
-    # They therefore default the same way the ground_state block does — before
-    # 2026-07-29 they defaulted OFF here while a config could turn them ON in
-    # `ground_state`, which silently gave a padded GS feeding bare-kernel
-    # dynamics. A config that explicitly opts OUT in `ground_state` still has to
-    # repeat that opt-out here; the inherited DDIParams cannot carry it.
+    # Kernel-shaping DDI knobs. NONE of these are carried on the inherited
+    # `DDIParams` — the kernel bakes them into the Q tensors — so the dynamics
+    # kernel is rebuilt from the step's own `ddi:` block, defaulting the same way
+    # the ground_state block does. A config that explicitly opts OUT in
+    # `ground_state` still has to repeat that opt-out here; the inherited
+    # DDIParams cannot carry it.
+    #
+    # The comment here named `secular` as the exemplar of this class from
+    # 2026-07-29 and the code then did not resolve it — `secular_ddi` was never
+    # passed to `make_workspace`, so it took the `false` default no matter what
+    # the YAML said. Measured 2026-08-19 against the two reference kernels: a
+    # `dynamics:` step declaring `ddi: {secular: true}` built a workspace 0.5
+    # from the secular kernel (i.e. the non-secular one), while the
+    # `ground_state:` step of the SAME config matched the secular kernel
+    # exactly. `runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml` is the
+    # live casualty, and its stated purpose — "Compare against 24_nonsec to
+    # isolate the impact of off-diagonal DDI terms" — is precisely what the drop
+    # defeats: both arms ran the dynamics on the same kernel.
+    #
+    # `quasi_2d` / `l_z` were missing for the same reason and are resolved here
+    # too. They select an entirely different (Q2D) kernel, so a dynamics step
+    # asking for one silently got the 3D one.
+    ddi_secular = ddi_raw isa Dict ? Bool(get(ddi_raw, "secular", false)) : false
+    ddi_q2d = ddi_raw isa Dict ? Bool(get(ddi_raw, "quasi_2d", false)) : false
+    ddi_lz = ddi_raw isa Dict ? Float64(get(ddi_raw, "l_z", 0.0)) : 0.0
     ddi_trunc = if ddi_raw isa Dict
         _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
     else
@@ -238,6 +255,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         sim_params=sp,
         psi_init=psi_prev,
         enable_ddi, c_dd=c_dd_val, ddi_trunc_radius=ddi_trunc,
+        secular_ddi=ddi_secular, quasi_2d_ddi=ddi_q2d, l_z_ddi=ddi_lz,
         ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
         backend,
         absorbing_boundary,

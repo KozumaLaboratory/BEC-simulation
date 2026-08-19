@@ -78,10 +78,8 @@ on the rotation block.
         @. W *= cis_PD
         mul!(P, W, V_T)
         # Step 3: D_z(θ) — exp(-m·θ) (see imaginary_time note above).
-        if imaginary_time
-            @. cis_PD = exp(-m_row * θ_col)
-        else
-            @. cis_PD = cis(-m_row * θ_col)
+        let itv = Val(imaginary_time)
+            @. cis_PD = wick_phase(-m_row * θ_col, itv)
         end
         @. P *= cis_PD
         # Step 4: R_y(β)

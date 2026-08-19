@@ -175,7 +175,7 @@ function run_simulation_yoshida!(
         n_accepted += 1
 
         if !is_clamped
-            factor = err > 1e-300 ? min(3.0, 0.9 * (adaptive.tol / err)^0.2) : 3.0
+            factor = err > UNDERFLOW_FLOOR ? min(3.0, 0.9 * (adaptive.tol / err)^0.2) : 3.0
             dt = clamp(dt * factor, adaptive.dt_min, adaptive.dt_max)
         end
 

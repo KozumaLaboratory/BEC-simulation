@@ -36,7 +36,7 @@ function _compute_3d_densities(jld2_path::String; target_n::Int=0, max_component
             components,
             Dict{String, Any}(
                 "m" => m_values[ci],
-                "population" => pops[ci] / max(total_pop, 1e-300),
+                "population" => pops[ci] / max(total_pop, UNDERFLOW_FLOOR),
                 "density" => vec(dens),
             ),
         )
