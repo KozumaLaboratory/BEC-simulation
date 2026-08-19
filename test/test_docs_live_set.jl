@@ -36,11 +36,15 @@ const LIVE_DOCS = [
     # registries this file reads (#342).
     "docs/campaign/as_dependency_map.md",
     "docs/campaign/fix_list.toml",
+    # Which of the three things "Klaus" named is meant where (#344). LIVE
+    # because it is a naming rule people are told to follow, and it has its
+    # own gate: test/validation/test_klaus_name_disambiguation.jl.
+    "docs/conventions/klaus_name_disambiguation.md",
     "docs/conventions/testing_strategy.md",
     "docs/design/hamiltonian_layered_architecture.md",
     "docs/design/research_spec_and_provenance_architecture.md",
     "docs/design/unified_spec_architecture.md",
-    "docs/guides/klaus_regime.md",
+    "docs/guides/fast_larmor_regime.md",
     "docs/guides/lab_user_tutorial.md",
     "docs/guides/pipeline_cookbook.md",
     "docs/guides/spgpe.md",

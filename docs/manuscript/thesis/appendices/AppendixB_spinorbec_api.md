@@ -138,7 +138,7 @@ src/
 │   └── integrator/       # split-step, Yoshida, Force-Gradient, midpoint
 ├── analysis/             # observables, BdG, vorticity, phases
 ├── solvers/              # ground state ITP, LBFGS, simulation, TWA, continuation
-├── rotating_basis/       # Klaus regime path (B̂-rotated)
+├── rotating_basis/       # fast-Larmor regime path (B̂-rotated)
 └── workflow/
     ├── initialization/   # atoms, state zoo, make_workspace
     ├── io/               # JLD2, dashboard, html_report
@@ -172,7 +172,7 @@ before `using SpinorBEC`. Then `backend = CUDABackend()` enables GPU kernels.
 |---|---|---|
 | `runs/F6_phase_diagram/config.yaml` | Eu F=6 phase diagram (paper #2 primary) | CUDA, 32³ |
 | `runs/Eu151_GS_64g/` (gone) | Eu ground state 64³ verification | CUDA |
-| `runs/samples/eu151_klaus_lab_units/` (example) | Klaus 2022 magnetostir lab-units | CUDA |
+| `runs/samples/eu151_klaus_lab_units/` (example) | Klaus et al. 2022 magnetostir, lab units | CUDA |
 
 ### B.5.2 LHY mode ablation (Ch.5 §5.2, T3.1)
 

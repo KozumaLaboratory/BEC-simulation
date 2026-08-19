@@ -154,7 +154,7 @@ end
     density_stats(density::AbstractArray{<:Real, 3}; variance=nothing) -> NamedTuple
 
 Compute the standard single-frame density observables used across the
-old TWA / Klaus density-slice analyzers:
+old TWA / rotating-basis density-slice analyzers:
 
   `peak`        — `maximum(density)`
   `peak_voxel`  — `CartesianIndex` of the peak voxel

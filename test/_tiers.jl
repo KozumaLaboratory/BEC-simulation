@@ -232,6 +232,11 @@ const FAST_TESTS = [
     # itself against, and — the load-bearing half — which of the targets
     # CLAUDE.md names have no gate at all. Pure table + file/tier lookups.
     "validation/test_type_c_claims.jl",
+    # One word ("Klaus") named the paper, the fast-Larmor regime and this
+    # project's own protocol at once, and a "correction" denying the paper's
+    # existence sat above a citation to it (#344). Pure text scan over the
+    # maintained tree, every arm through `calibrated_scan`.
+    "validation/test_klaus_name_disambiguation.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
@@ -493,7 +498,7 @@ const CI_EXTRA = [
     # being true and nobody had checked.
     "workflow/test_active_learning_yaml.jl",
     "workflow/test_multi_fidelity_yaml.jl",
-    # Klaus 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
+    # Klaus et al. 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",

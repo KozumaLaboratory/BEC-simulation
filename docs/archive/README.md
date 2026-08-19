@@ -14,11 +14,11 @@ Bug fixed 2026-05-02 in `src/solvers/ground_state/itp_loop.jl`. Regression test:
 
 ## Empirical findings (now enforced in code)
 
-- **`thesis_batch_audit_2026-04-28.md`** — ε threshold finding (`p · F · dt > 100` needs ε=1e-6) + regime classification table. Now enforced via `_run_rotating_basis_dynamics_inner` advisory + `guides/klaus_regime.md` "Hard constraint".
+- **`thesis_batch_audit_2026-04-28.md`** — ε threshold finding (`p · F · dt > 100` needs ε=1e-6) + regime classification table. Now enforced via `_run_rotating_basis_dynamics_inner` advisory + `guides/fast_larmor_regime.md` "Hard constraint".
 
 ## Superseded designs
 
-- **`phase15_zeeman_levels.md`** — design rationale for Level 0/1/2 Zeeman dispatch (closures vs sampled waveforms; omega_ref resolution rules). Implementation done 2026-04-23. User-facing reference is now `reference/yaml_schema_reference.md` "zeeman" section + `guides/klaus_regime.md` "Spec B(t)".
+- **`phase15_zeeman_levels.md`** — design rationale for Level 0/1/2 Zeeman dispatch (closures vs sampled waveforms; omega_ref resolution rules). Implementation done 2026-04-23. User-facing reference is now `reference/yaml_schema_reference.md` "zeeman" section + `guides/fast_larmor_regime.md` "Spec B(t)".
 
 ## Promoted out of agent memory 2026-07-31
 
@@ -38,7 +38,7 @@ citations pinned as permanent exceptions.
 - **`hamiltonian_layered_architecture_arc_2026-06-05.md`** — round-by-round log of the layered-Hamiltonian redesign. Live SSoT is `design/hamiltonian_layered_architecture.md`; this is only the reasoning trail that produced it.
 - **`sprint3_static_gate_baseline_2026-06-01.md`** — static-gate measurement baseline for Sprint 3. Live equivalent: the oracle suite under `test/oracles/`.
 - **`integrator_modernization_status_2026-05.md`** — May-2026 status snapshot. Live equivalent: `design/integrator_modernization_plan.md` + `design/integrator_ch3_plan.md`.
-- **`klaus_quench_protocol_pivot_2026-05-26.md`** — record of the rotation+quench magnetostir protocol pivot. Live equivalent: `guides/klaus_regime.md`.
+- **`klaus_quench_protocol_pivot_2026-05-26.md`** — record of the rotation+quench magnetostir protocol pivot. Live equivalent: `guides/fast_larmor_regime.md`.
 
 ## Removed in tidy-up 2026-05-13
 

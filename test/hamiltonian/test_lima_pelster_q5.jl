@@ -30,7 +30,7 @@ end
     # BOTH exponents low — so the scaling assertions below already contradicted it.
     scalar_lhy = SpinorBEC.scalar_lhy_coefficient
 
-    # Dy164 Klaus regime: γ_LHY ratio to c0 should be O(1) (LHY substantial)
+    # Dy164 fast-Larmor regime: γ_LHY ratio to c0 should be O(1) (LHY substantial)
     a0 = 5.291772109e-11
     γ_dy = scalar_lhy(92*a0/1.11e-6, 60000; eps_dd=1.42)
     @test γ_dy > 0
