@@ -1029,7 +1029,8 @@ const _COST = Dict{String, Float64}(
     # direction oracle; the rest is table lookups against a stored JSON.
     "validation/test_klaus2022_vortex_stripes.jl" => 25.0,
     # Three coarse ITP solves against the dipolar Thomas-Fermi closed form.
-    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 100.0,
+    # 369 s measured on the CI runner (was 100).
+    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
     # One 24³ ground state + 100 dynamics steps through the YAML entry point.
     "workflow/test_scalar_egpe_yaml.jl" => 40.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
@@ -1046,10 +1047,15 @@ const _COST = Dict{String, Float64}(
     "dynamics/test_thermal_cfield.jl" => 2.4,
     "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
-    # Measured locally 2026-08-19 (10-core box): 128 s of solver time for the
-    # ITP-vs-L-BFGS pair plus one L-BFGS control. Registered so it goes out
-    # early rather than last.
-    "oracles/test_itp_dt_limited_advisory.jl" => 150.0,
+    # 655 s on the CI runner. The 150 here was set from "measured locally
+    # 2026-08-19 (10-core box): 128 s" — a real measurement, on the wrong
+    # machine. This table is calibrated for the 4-vCPU GitHub runner (see the
+    # header below), and a 10-core box is 5x wider, so a local number cannot be
+    # entered here without scaling. It is now the LONGEST file in the whole
+    # per-PR suite and single-handedly sets the `oracles` job's floor: that job
+    # measured makespan 654.9 s against a 586 s perfect-split floor, i.e. the
+    # floor is this one file and no rebalancing can move it.
+    "oracles/test_itp_dt_limited_advisory.jl" => 655.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.
@@ -1162,8 +1168,8 @@ const _COST = Dict{String, Float64}(
     "manuscript/test_f9_f11_polyhedral.jl" => 10.7,
     "analysis/test_paper3_validation.jl" => 10.6,
     "oracles/test_trapped_bdg_spectrum.jl" => 10.6,
-    "oracles/test_trapped_bdg_frequencies.jl" => 26.0,  # 6 LOBPCG fixtures + dense
-    "oracles/test_bragg_response_spectrum.jl" => 13.0,  # 7 real-time runs
+    "oracles/test_trapped_bdg_frequencies.jl" => 78.0,  # 6 LOBPCG fixtures + dense
+    "oracles/test_bragg_response_spectrum.jl" => 133.0,  # 7 real-time runs
     "oracles/test_apply_operator_accumulates.jl" => 10.3,
     "oracles/test_stability_sneaky_prover.jl" => 10.3,
     "oracles/test_path_coverage.jl" => 10.0,
@@ -1271,6 +1277,17 @@ const _COST = Dict{String, Float64}(
     "test_level4_f1_phase_emergence.jl" => 28.0,
     "hamiltonian/test_taylor_tolerance_criterion.jl" => 23.0,
     "workflow/test_pipeline_name_and_precedence.jl" => 22.0,
+
+    # ── Second harvest. The first pass read the annotations out of the `fast`
+    # and `integration` job logs only, which is two thirds of the per-PR suite,
+    # and `oracles` is the third — the one that BINDS once the other two are
+    # packed (measured makespan 654.9 s against fast 544.6 s and integration
+    # 384.9 s). Its remaining nine annotations, all from run 32237847445:
+    "oracles/test_jz_conservation_ddi.jl" => 204.0,
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl" => 78.0,
+    "oracles/test_solver_forwards_every_knob.jl" => 67.0,
+    "oracles/test_term_consistency.jl" => 22.0,
+    "oracles/test_flux_closure_ddi_identity.jl" => 20.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)
@@ -1286,7 +1303,8 @@ hurt makespan; an over-estimate merely over-reserves a slot. Returns the stale
 entries (for tests).
 """
 function warn_cost_drift(
-    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0
+    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0,
+    quiet::Bool=false,
 )
     stale = NamedTuple{(:file, :measured, :estimate), Tuple{String, Float64, Float64}}[]
     for (f, t) in timings
@@ -1295,7 +1313,13 @@ function warn_cost_drift(
             push!(stale, (file=f, measured=t, estimate=est))
         end
     end
-    isempty(stale) && return stale
+    # `quiet` is for the meta-test, which calls this with synthetic fixtures to
+    # check the arithmetic. Without it those fixtures print real-looking
+    # annotations into the CI log on every run — a stale-cost line naming a file
+    # that does not exist and therefore can never be actioned, sitting in the
+    # same stream as the ones that can. Nine genuine annotations went unread for
+    # weeks; adding permanent noise to that stream is the wrong direction.
+    (isempty(stale) || quiet) && return stale
     ci = lowercase(get(ENV, "GITHUB_ACTIONS", "")) == "true"
     for s in stale
         msg = string(
