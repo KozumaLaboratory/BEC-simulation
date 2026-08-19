@@ -332,6 +332,16 @@ m = 6 magnon is 510 Hz (¹⁵¹Eu) against 1163 Hz (¹⁵³Eu) at 0.1 G.
 isotope shift — leaves the ratio at 2.278719 and the interaction offset at 1.3×10⁻¹⁴. The
 prediction is a_S-free, not merely a_S-insensitive.
 
+**Two controls on "with the DDI on", because that clause is doing work.** Switching the
+DDI off (`MG_DDI=0`) *does* change the spectrum — the interaction-gapped |m| = 1 branch
+moves — while every |m| ≥ 2 branch stays at exactly q·m². So the dipolar path is live in
+this measurement and the exactness is a selection rule, not a dead code path. Second: the
+whole table is **bit-identical across `7e6770c2`** ("the DDI block of the homogeneous BdG
+was the Hartree term, which is zero", #361), a 100-line rewrite of the very function this
+section calls, merged the same day. A result that survives a real correction to the code
+that produced it, for a reason stated in advance, is worth more than one that was only
+ever computed once.
+
 **The caveat that survives, and it is the best part of the result.** The exactness is a
 property of the c₀/c₁ truncation, and Eu has *seven unknown even channels*. A rank-2
 channel has no such selection rule: it adds an **isotope-independent** offset δ, so the
