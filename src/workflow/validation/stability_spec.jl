@@ -86,7 +86,7 @@ function check(spec::StabilitySpec, ws, ψ; rng=Random.default_rng())
     gproj = _tangent_project(p.g, ψ, p.dV, p.n2)
     stat_abs = sqrt(real(sum(abs2, gproj)) * p.dV)
     g_abs = sqrt(real(sum(abs2, p.g)) * p.dV)
-    stat_rel = stat_abs / max(g_abs, 1e-30)
+    stat_rel = stat_abs / max(g_abs, DENOM_FLOOR)
     stat_status = stat_rel < spec.ε_stat ? :pass : :indeterminate
     push!(details, :stationarity => (
         got=stat_rel, bound=spec.ε_stat, status=stat_status))

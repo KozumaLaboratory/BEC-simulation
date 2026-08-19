@@ -72,7 +72,7 @@ function Base.getproperty(r::RunResult, name::Symbol)
         base = Symbol(s[1:(end - length("_rel_drift"))])
         ts = _dynamics_series(r, base)
         absolute = maximum(abs.(ts .- ts[1]))
-        return absolute / max(abs(ts[1]), 1e-30)
+        return absolute / max(abs(ts[1]), COUPLING_TOL)
     end
     if endswith(s, "_drift")
         base = Symbol(s[1:(end - length("_drift"))])

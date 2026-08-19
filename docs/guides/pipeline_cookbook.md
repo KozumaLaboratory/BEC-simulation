@@ -17,7 +17,7 @@ pipeline:
       n_steps: 10000
       tol: 1.0e-7
       initial_state: polar          # or any state_zoo type
-      backend: cuda
+      backend: gpu
 ```
 
 ## Two-stage GS: ITP → LBFGS polish
@@ -85,7 +85,7 @@ scan:
     - {name: seed_c, override: {pipeline.1.noise_seed: 33033}}
 ```
 
-## Multi-step movie (Klaus 2022 style)
+## Multi-step movie (Klaus et al. 2022 style)
 
 ```yaml
 pipeline:
@@ -122,7 +122,7 @@ pipeline:
   - ground_state:
       atom: Eu151
       ...
-      zeeman:
+      B:                      # unified block; step-level `zeeman:` throws
         p_mv: 2.5             # → strong coil → "X Gauss" → bfield_to_p
         coil_mode: strong
         q: 0.1
@@ -138,9 +138,10 @@ pipeline:
   - ground_state:
       atom: Eu151
       grid: {n: [64, 64, 64], box: [30.0, 30.0, 30.0]}
-      interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0, c_lhy: 1135.0}
+      interactions: {N_atoms: 50000, omega_ref: 691.15, c1_ratio: 0.0}
+      lhy: {kind: scalar, c_lhy: 1135.0}   # NOT interactions.c_lhy — moved 2026-07
       ddi: {enabled: true}
-      zeeman: {p: 0.0, q: 0.0}
+      B: {p: 0.0, q: 0.0}                # unified block; step-level `zeeman:` throws
       potential: {type: none}            # ← key: no external trap
       initial_state: polar
       ...

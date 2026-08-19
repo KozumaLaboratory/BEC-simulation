@@ -70,6 +70,8 @@ pinned, project root off `$HOME`, group-volume headroom, `runs/` present, and (f
 
 Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN` emits one metadata op per frame, which stacks. `SPINORBEC_SCRATCH_DIR=$T4_TMPDIR` redirects `.tmp` files to NVMe and copies to Lustre on success.
 
+> ⚠️ **The node-local NVMe default only fits SMALL grids — but keep the scratch on NVMe anyway.** For n ≳ 100 per-dim, ψ snapshots (112³ F32 = 91 MB/frame) overrun node-local NVMe; the `tmp → runs/` (Lustre) move then dies `EXDEV` / `sendfile -122`. **Do NOT "fix" this by moving the scratch to Lustre** — JLD2 writes via mmap and **mmap on Lustre `SIGBUS`es** (`signal 7` at `unsafe_store!`). The correct fix is to **shrink the snapshot volume** so the jld2 fits NVMe: raise `save.every` (measured: n112 needs ~2000, n80 is fine at 300). Also reap leftover multi-GB run dirs and watch the group quota (`lfs quota -g tga-kozuma-kouhi /gs/fs`, ~1 TB) — over-quota silently breaks `git` and `qsub`.
+
 ## Edit-test-submit loop
 
 ```bash
@@ -178,7 +180,7 @@ only needed for ad-hoc one-offs outside the queue.
 pipeline:
   - ground_state:
       grid: {n: [128, 128, 128], box: [20.0, 20.0, 20.0]}
-      backend: cuda
+      backend: gpu
   - dynamics:
       duration: 107.6
       dt: 1.0e-4
@@ -256,7 +258,7 @@ on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
 | `eu151_full_64cube_200ms`      | 64×64×32 | 200 ms  | 3–4h |
 
 All configs use `epsilon: 1.0e-6` per the audit finding (Y6 ε=1e-3
-silently fails for `p·F·dt > 300` in Klaus regime — see
+silently fails for `p·F·dt > 300` in the fast-Larmor regime — see
 `docs/archive/thesis_batch_audit_2026-04-28.md` and the
 `gotcha_K3_routing_pre_2026_05_13` memory note).
 
@@ -283,7 +285,7 @@ julia --project=. -e '
 ### Pre-submit checklist
 
 1. **`dy164_main_eps1e6` parity**: if local ε=1e-6 result still shows
-   m=+F: 1.0→1.0 frozen, the Dy164 Klaus reproduction is real (just
+   m=+F: 1.0→1.0 frozen, the Dy164 magnetostir reproduction is real (just
    deeply adiabatic); fine to submit. If it differs, the original was
    a numerical artifact — investigate before committing TSUBAME hours.
 2. **Project.toml + Manifest.toml** must match TSUBAME's Julia

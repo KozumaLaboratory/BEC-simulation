@@ -9,7 +9,7 @@
 # that say whether a density hole is a vortex or a domain.
 #
 # Everything is streamed frame-by-frame into one JLD2 archive. The renderer
-# (scripts/viz_dynamics_movie.py) is deliberately outside Julia — matplotlib
+# (archived viz_dynamics_movie.py) is deliberately outside Julia — matplotlib
 # writes the mp4, and re-rendering must not mean re-running the physics.
 
 """
@@ -233,7 +233,7 @@ function _mass_current_vortices(psi_slice, n_tot::AbstractMatrix,
     vy = zeros(Float64, nx, ny)
     @inbounds for j in 2:(ny - 1), i in 2:(nx - 1)
         n = n_tot[i, j]
-        n < 1e-30 && continue
+        n < COUPLING_TOL && continue
         jx = 0.0
         jy = 0.0
         for c in 1:D

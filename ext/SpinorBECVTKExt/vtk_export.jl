@@ -107,6 +107,14 @@ function SpinorBEC.export_vtk_series(
                         label = m >= 0 ? "n_p$m" : "n_m$(abs(m))"
                         vti[label] = component_density(psi, 3, c)
                     end
+                else
+                    # The dispatch chain ended with no `else`, so an
+                    # unrecognised name contributed nothing and said nothing:
+                    # the user got a .pvd series missing the field they asked
+                    # for, opened it in ParaView, and saw no error anywhere.
+                    # `export_vtk` above warns for the same vocabulary and the
+                    # same kwarg; only the series form was silent.
+                    @warn "Unknown VTK field: $field"
                 end
             end
             pvd[t] = vti

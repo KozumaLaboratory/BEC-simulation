@@ -52,7 +52,7 @@ function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
         a2 = lhy.a_2d_sq
         lc = lhy.log_const
         E = sum(n) do ni
-            ni < 1e-30 ? zero(ni) : ni * ni * (log(ni * a2) + lc)
+            ni < COUPLING_TOL ? zero(ni) : ni * ni * (log(ni * a2) + lc)
         end
         return lhy.c_lhy_2d * E * dV
     else
@@ -109,12 +109,113 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     # Inactive linear/mean-field terms are skipped: their apply_operator!
     # contributes exactly 0 to the gradient (gate-first), so skipping the
     # energy AND the grad-accumulation is identical to the registry loop.
-    E_kin = op_energy(kin_t, 1.0)
-    E_trap = op_energy(trap_t, 1.0)
-    E_zee = op_energy(zee_t, 1.0)
-    E_c0 = abs(ws.interactions[0]) > 1e-30 ? op_energy(c0_t, 0.5) : 0.0
-    E_c1 = abs(ws.interactions[1]) > 1e-30 ? op_energy(c1_t, 0.5) : 0.0
-    E_ddi = ws.ddi !== nothing ? op_energy(ddi_t, 0.5) : 0.0
+    # Kinetic: per-component FFT reused for BOTH energy (0.5·Σk²|ψ̂|²) and gradient
+    # (ifft(0.5k²·ψ̂)) via the small ctx.fft_buf (36 MB), no out buffer or
+    # dot(ψ,out). (A batched full-field FFT was measured ~9-19% WORSE on H100 —
+    # the 436 MB copy + full-field broadcasts beat the per-component locality.)
+    E_kin = 0.0
+    let fftb = ctx.fft_buf, ksq = SpinorBEC._to_device(ws.backend, ws.grid.k_squared),
+        invn = 1.0 / prod(n_pts)
+
+        for c in 1:n_comp
+            idx = ntuple(_ -> Colon(), Val(N))
+            fftb .= view(psi, idx..., c)
+            ws.fft_plans.forward * fftb
+            E_kin += 0.5 * invn * real(sum(ksq .* abs2.(fftb))) * dV
+            if accumulate
+                fftb .*= (0.5 .* ksq)
+                ws.fft_plans.inverse * fftb
+                view(grad, idx..., c) .+= fftb
+            end
+        end
+    end
+    # Trap: direct energy ∫V|ψ|²·dV (fused reduction, no materialisation) +
+    # gradient accumulated directly. Reads ψ+V but skips the out buffer/fill/dot.
+    accum_grad(trap_t)
+    V_bc = reshape(ws.potential_values, size(ws.potential_values)..., 1)
+    E_trap = real(sum(V_bc .* abs2.(psi))) * dV
+    # Zeeman: diagonal (no transverse) has a direct energy Σ_c coef(m_c)·|ψ_c|²;
+    # transverse needs the D×D matrix expectation → keep out+dot.
+    E_zee = if SpinorBEC._has_transverse(zee_t)
+        op_energy(zee_t, 1.0)
+    else
+        accum_grad(zee_t)
+        Fq = ws.spin_matrices.system.F
+        coefvec = SpinorBEC._to_device(
+            ws.backend,
+            reshape(
+                Float64[SpinorBEC._diag_coef(zee_t, Fq - (c - 1)) for c in 1:n_comp],
+                ntuple(_ -> 1, Val(N))..., n_comp,
+            ),
+        )
+        real(sum(coefvec .* abs2.(psi))) * dV
+    end
+    # Mean-field terms (c0, c1, DDI): DIRECT energy from the small intermediates
+    # (n², |F|², Φ·F) already held in ctx / ddi_bufs — reads ~36-216 MB instead
+    # of the full ψ+Hψ field (872 MB) a dot(ψ,out) would, and skips the per-term
+    # out buffer + fill. Gradient accumulated directly. Matches the CPU direct
+    # energy formulas (bit-close, ~1e-14 reduction reassociation).
+    E_c0 = 0.0
+    if abs(ws.interactions[0]) > COUPLING_TOL
+        accum_grad(c0_t)
+        E_c0 = 0.5 * ws.interactions[0] * sum(abs2, ctx.n_density) * dV
+    end
+    E_c1 = 0.0
+    if abs(ws.interactions[1]) > COUPLING_TOL
+        accum_grad(c1_t)   # (re)computes ctx.fx/fy/fz = spin density
+        E_c1 =
+            0.5 * ws.interactions[1] *
+            (sum(abs2, ctx.fx) + sum(abs2, ctx.fy) + sum(abs2, ctx.fz)) * dV
+    end
+    # DDI energy, from whichever buffers the ACTIVE path fills.
+    #
+    # `ws.ddi_bufs` is written only on the UNPADDED path. Under `ddi_padding` —
+    # `DDI_PADDED_DEFAULT = true`, so the default for every `run_yaml` — both the
+    # propagator and `_grad_ddi!` write `ddi_padded.*_pad` and leave `ddi_bufs`
+    # at its `_zeros`. Measured on CPU 2026-08-07 at 8³: `max|ddi_bufs.Phi_x|`
+    # after a gradient call is 4.8e-3 unpadded and **exactly 0.0** padded, with
+    # the gradient nonzero in both.
+    #
+    # So this returned `E_ddi = 0.0` exactly on the fused path while the gradient
+    # from the same call carried the full padded DDI — and that call IS the
+    # L-BFGS objective (`solvers/lbfgs/energy_gradient.jl:92`). Line search and
+    # the relative-energy convergence test then ran on a functional the descent
+    # direction did not come from. On the energy-only path it instead ran the
+    # UNPADDED convolution, so `energy_decomposition` on GPU reported the
+    # periodic-image energy that padding exists to remove.
+    #
+    # Only the physical corner of a padded array is the field on our grid, and it
+    # must be taken as a Cartesian view: the first `prod(n_pts)` LINEAR elements
+    # walk into the pad region for ndim >= 2.
+    E_ddi = 0.0
+    if ws.ddi !== nothing
+        pad = ws.ddi_padded
+        if accumulate
+            accum_grad(ddi_t)   # fills whichever branch's buffers, and accumulates grad
+        elseif pad === nothing
+            b = ws.ddi_bufs
+            SpinorBEC._compute_spin_density!(
+                b.Fx_r, b.Fy_r, b.Fz_r, psi, ws.spin_matrices, Val(n_comp), N, n_pts
+            )
+            SpinorBEC.compute_ddi_potential!(ws.ddi, b)
+        else
+            SpinorBEC._compute_and_convolve_ddi_padded!(
+                psi, ws.spin_matrices, ws.ddi, pad, Val(n_comp), N, n_pts
+            )
+        end
+        E_ddi = if pad === nothing
+            b = ws.ddi_bufs
+            0.5 * sum(b.Phi_x .* b.Fx_r .+ b.Phi_y .* b.Fy_r .+ b.Phi_z .* b.Fz_r) * dV
+        else
+            c = ntuple(d -> 1:n_pts[d], Val(N))
+            0.5 *
+            sum(
+                view(pad.Phi_x_pad, c...) .* view(pad.Fx_pad, c...) .+
+                view(pad.Phi_y_pad, c...) .* view(pad.Fy_pad, c...) .+
+                view(pad.Phi_z_pad, c...) .* view(pad.Fz_pad, c...),
+            ) * dV
+        end
+    end
     # LHY: energy via device mapreduce (kind-specific power); gradient via the
     # gated apply_operator! face (no FFT — a density-power broadcast).
     accum_grad(lhy_t)

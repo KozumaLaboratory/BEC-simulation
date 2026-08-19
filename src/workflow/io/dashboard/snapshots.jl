@@ -181,7 +181,7 @@ end
 
 """Sub-sample n_samples evenly-spaced snapshots and return the max
 spin-summed total density across them. Full sweep through all 157
-Klaus frames takes ~8 s; sub-sampled to 16 frames it's ~0.8 s,
+157 frames takes ~8 s; sub-sampled to 16 frames it's ~0.8 s,
 within HTTP timeout budget. Always includes the first + last frame.
 
 Returned value is the physically correct normalisation reference

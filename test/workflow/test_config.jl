@@ -157,7 +157,7 @@ using SpinorBEC
         # Flipped 2026-07-29. The bare periodic kernel carries a 2.1e-2 … 4.7e-2
         # dipolar field error against free space, FLAT in resolution (1.91e-2 at
         # 32³, 48³ and 64³ alike), so it is not something a finer grid fixes.
-        # Measured by scripts/ddi_cutoff_geometry_jz_probe.jl.
+        # Measured by ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/).
         atom = SpinorBEC.resolve_atom(:Eu151)
         inter = Dict("N_atoms" => 30000, "omega_ref" => 628.3)
 

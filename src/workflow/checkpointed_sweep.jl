@@ -7,8 +7,8 @@
 # this file adds the loop-over-cells convenience and convergence-gate
 # extension pass that come up repeatedly in parameter sweeps.
 #
-# Lifted from `scripts/sprint5_M1_ITP_omega_sweep_converged.jl` +
-# `scripts/sprint5_M1_extend.jl` (2026-06-04 M1 post-fix sweep). The
+# Lifted from `sprint5_M1_ITP_omega_sweep_converged.jl (archived)` +
+# `sprint5_M1_extend.jl (archived)` (2026-06-04 M1 post-fix sweep). The
 # per-cell pattern was ad-hoc until the 30-cell sweep started taking
 # hours and partial progress was getting lost on every restart.
 

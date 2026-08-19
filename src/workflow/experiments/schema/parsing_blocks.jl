@@ -93,7 +93,7 @@ Parse a YAML `loss:` block into `LossParams`. Supported forms:
 
     loss: false | 0 | null        # no loss
     loss: {gamma_dr: 0.02, K3_per_m_cubic: [0.01, 0.02, ...]}  # dimensionless rates
-    loss: {gamma_dr: 0.02, K3_per_m: [0.01, 0.02, 0.05, ...]}  # alias, dimensionless
+    # (`K3_per_m` was REMOVED 2026-05-24 and now throws — see the check below.)
 
 SI-unit input (lab-friendly, requires atom + N_atoms + omega_ref to derive
 the dimensionless conversion factor):
@@ -108,7 +108,7 @@ with n0 = N_atoms / a_ho³ and a_ho = √(ℏ / (m·ω_ref)).
 Routing:
 - `L3` / `L3_per_m`        → 2-body-shape `LossParams.L3` / `L3_per_m`
                               (dn_m/dt = -γ n n_m, linear in n)
-- `K3_cubic` / `K3_per_m_cubic` / `K3_per_m` / `K3_per_m_si`
+- `K3_cubic` / `K3_per_m_cubic` / `K3_per_m_si`  (bare `K3_per_m` throws)
                             → physically correct 3-body `K3_per_m_cubic`
                               (dn_m/dt = -K_3 n² n_m, quadratic in n)
 """
@@ -264,8 +264,12 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     omega_ref = Float64(ω_raw)
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
 
-    # c_total (always derived — basis for c0/c1)
-    c_total = compute_c_total(atom; N_atoms, omega_ref)
+    # c_total from the registry a_s. This is the value used when the config does
+    # NOT supply one; `_parse_gs_interactions` prefers `interactions.c_total`
+    # when present, so this local is only the fallback and the banner below must
+    # not present it as what the Hamiltonian got.
+    c_total_registry = compute_c_total(atom; N_atoms, omega_ref)
+    c_total = haskey(inter, "c_total") ? Float64(inter["c_total"]) : c_total_registry
 
     # c_dd: derive if not explicitly specified. `apply_schema_defaults!` has
     # already injected `ddi: {}` for ground_state steps (the only context
@@ -309,11 +313,33 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     if verbose
         c_lhy_val = Float64(get(inter, "c_lhy", 0.0))
         l_z_val = ddi_d isa Dict ? Float64(get(ddi_d, "l_z", 0.0)) : 0.0
+        # ε_dd printed here is the DIMENSIONLESS ratio the Hamiltonian runs at,
+        # ε_dd = c_dd·F²/(3·c_total). `eps_dd` above is the atom's intrinsic
+        # a_dd/a_s and is what the LHY auto-derivation keys on; the two differ
+        # whenever a config overrides c_total or c_dd, which is exactly what a
+        # droplet study does. Printing only the intrinsic one reported
+        # ε_dd=0.5402 for a run at 1.3000 (issue #336).
+        eps_dd_eff = c_total > 0 && !isnan(c_dd_val) ?
+                     c_dd_val * atom.F^2 / (3 * c_total) : eps_dd
         println(
             "  Derived: c_total=$(round(c_total; digits=1))" *
+            (
+                if haskey(inter, "c_total")
+                    " (from config; registry a_s gives $(round(c_total_registry; digits=1)))"
+                else
+                    ""
+                end
+            ) *
             " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
             " c_lhy=$(round(c_lhy_val; digits=1))" *
-            " ε_dd=$(round(eps_dd; digits=4))" *
+            " ε_dd=$(round(eps_dd_eff; digits=4))" *
+            (
+                if abs(eps_dd_eff - eps_dd) > 1e-6
+                    " (atom a_dd/a_s = $(round(eps_dd; digits=4)))"
+                else
+                    ""
+                end
+            ) *
             (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""),
         )
     end
@@ -489,7 +515,7 @@ Map a YAML `ddi.trunc_radius` value to the `make_workspace` sentinel:
 absent ⇒ `-1.0` (auto); `"auto"`/`"box_half"` ⇒ `-1.0`; `"none"`/`"off"` ⇒
 `NaN` (the bare periodic kernel); a number ⇒ that value.
 
-Absent used to mean OFF. Measured 2026-07-29 (`scripts/ddi_cutoff_geometry_jz_probe.jl`):
+Absent used to mean OFF. Measured 2026-07-29 (`ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)`):
 the bare periodic kernel carries a 2.1e-2 … 4.7e-2 dipolar field error against
 free space, and the error is FLAT in resolution — 1.91e-2 at 32³, 48³ and 64³
 alike — so no amount of grid refinement touches it. `"none"` keeps the old

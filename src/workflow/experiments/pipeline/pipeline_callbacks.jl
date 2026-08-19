@@ -124,28 +124,92 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
         fz_now = sum((F - (c - 1)) * pops[c] for c in 1:D)
         fz_jump = isnan(fz_prev[]) ? 0.0 : abs(fz_now - fz_prev[])
         fz_prev[] = fz_now
-        data = Dict{String, Any}(
-            "step" => step,
-            "t" => t_now,
-            "energy" => e_now,
-            "norm" => norm_now,
-            "populations" => pops,
-            "updated_ms" => round(Int, time() * 1000),
-            # Read by `is_divergent_status`. `classify` is deliberately NOT
-            # written: the predicate already skips a `nothing` classification,
-            # and inventing one here would be a second classifier competing with
-            # `analysis/phases/`.
-            "norm_drift" => norm_drift,
-            "fz_jump" => fz_jump,
-        )
-        # Atomic write: tmp file + rename so HTTP readers never see partial JSON
-        tmp_path = status_path * ".tmp"
-        open(tmp_path, "w") do f
-            JSON.print(f, data)
-        end
-        mv(tmp_path, status_path; force=true)
-        nothing
+        _emit_live_status(status_path; step, t=t_now, energy=e_now,
+            norm=norm_now, populations=pops, norm_drift, fz_jump)
     end
+end
+
+"""
+    _emit_live_status(status_path; step, t, norm, norm_drift, energy, populations, fz_jump)
+
+Write the run's live status. **The single writer** — every dynamics path emits
+through here, so the keys the reaper reads are defined once.
+
+`norm_drift` is the universal divergence signal and is required. `fz_jump` is
+spinor-specific and omitted where it has no meaning (the binary path has two
+scalar fields, not a spinor); `is_divergent_status` skips an absent key, so the
+norm arm still fires. `classify` is deliberately never written — the predicate
+skips a `nothing` classification, and inventing one here would be a second
+classifier competing with `analysis/phases/`.
+
+Until 2026-08-04 the writer and `is_divergent_status` had an EMPTY key
+intersection and the kill had never fired for any run. Until 2026-08-07 only the
+standard `dynamics:` path called a writer at all, so the other two could not
+fire either. Both are why this is one function and not three.
+"""
+function _emit_live_status(status_path::AbstractString; step::Integer,
+    t::Real, norm::Real, norm_drift::Real,
+    energy::Real=NaN, populations=nothing, fz_jump=nothing)
+    data = Dict{String, Any}(
+        "step" => step,
+        "t" => Float64(t),
+        "energy" => Float64(energy),
+        "norm" => Float64(norm),
+        "updated_ms" => round(Int, time() * 1000),
+        "norm_drift" => Float64(norm_drift),
+    )
+    populations === nothing || (data["populations"] = populations)
+    fz_jump === nothing || (data["fz_jump"] = Float64(fz_jump))
+    # Atomic write: tmp file + rename so HTTP readers never see partial JSON
+    tmp_path = status_path * ".tmp"
+    open(tmp_path, "w") do f
+        JSON.print(f, data)
+    end
+    mv(tmp_path, status_path; force=true)
+    nothing
+end
+
+"""
+    _build_binary_live_callback(node, status_path) -> (s, step) -> nothing
+
+Liveness for the two-component binary path, whose state is `psi_A` / `psi_B`
+rather than a spinor. Emits `norm_drift` — the arm that catches a diverging run
+— and the two component fractions as `populations`. No `fz_jump`: there is no
+F_z here, and writing a placeholder would be a number that means nothing.
+"""
+function _build_binary_live_callback(node, status_path::Union{Nothing, String},
+    dV::Real)
+    every = _live_every(node)
+    (every === nothing || status_path === nothing) && return nothing
+    status_dir = dirname(status_path)
+    isempty(status_dir) || mkpath(status_dir)
+    norm_0 = Ref(NaN)
+    function (s, step)
+        step % every == 0 || return nothing
+        nA = Float64(sum(abs2, s.psi_A))
+        nB = Float64(sum(abs2, s.psi_B))
+        n_total = nA + nB
+        norm_now = n_total * Float64(dV)
+        isnan(norm_0[]) && (norm_0[] = norm_now)
+        norm_drift = norm_0[] == 0 ? 0.0 : abs(norm_now / norm_0[] - 1)
+        _emit_live_status(status_path; step, t=Float64(s.t), norm=norm_now,
+            norm_drift, populations=n_total == 0 ? [0.0, 0.0] :
+                                    [nA / n_total, nB / n_total])
+    end
+end
+
+"Shared `live_monitor:` parsing — `nothing` when liveness is off."
+function _live_every(node)
+    node === nothing && return nothing
+    if node isa Bool
+        node || return nothing
+        return 50
+    end
+    node isa Dict || throw(ArgumentError(
+        "dynamics.live_monitor must be Bool or Dict, got $(typeof(node))"))
+    every = Int(get(node, "every", 50))
+    every >= 1 || throw(ArgumentError("live_monitor.every must be >= 1"))
+    every
 end
 
 """Composed-callback wrapper: tuple-typed so each inner callback is

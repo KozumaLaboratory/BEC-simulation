@@ -31,6 +31,8 @@ include("analysis/currents.jl")
 include("analysis/vorticity.jl")
 include("analysis/superfluid_fraction.jl")  # phase-twist f_s (Leggett bound + relaxed)
 include("analysis/vortex_extraction.jl")
+include("analysis/vortex_stripes.jl")  # Klaus-2022 residual-image hole count + stripe FT
+include("analysis/dipolar_tf_aspect_ratio.jl")  # closed-form magnetostriction anchor
 include("analysis/diagnostics.jl")
 include("analysis/sinatra_diagnostics.jl")  # TWA-validity (Sinatra) per-knob helpers
 include("analysis/grid_resolution.jl")  # planning: suggest_grid + sinatra_check (ATOM_REGISTRY)
@@ -43,6 +45,7 @@ include("analysis/faraday.jl")
 include("analysis/imaging.jl")
 include("analysis/fisher.jl")
 include("analysis/topology.jl")
+include("analysis/observables/spin_scalars.jl")  # needs _spin_expectation_fields (topology)
 include("analysis/synthetic_dimension.jl")
 include("analysis/stability_analysis.jl")
 include("analysis/spin_rotation.jl")
@@ -59,6 +62,8 @@ include("analysis/phases/sign_pattern.jl")  # Paper #3 §VI Sign Pattern Lemma 1
 include("analysis/phases/F6_phase_diagram.jl")  # Paper #2 (g_10, g_12) scan
 include("analysis/phases/polyhedral_classifier.jl")  # σ_S fingerprint classifier + direct ΔE
 include("analysis/phases/spinor_fingerprint.jl")  # gauge/frame-invariant spinor-texture fingerprint
+include("analysis/phases/spinor_phase_classifier.jl")  # fingerprint → phase label (threshold-validated)
+include("analysis/phase_scan_tables.jl")  # per-cell phase/descriptor tables from a GS scan
 include("analysis/sweep_contract.jl")    # SweepResult / SweepAxis / Hypothesis + dominant-m margin
 include("analysis/sweep_colormaps.jl")   # frozen reference LUTs + per-cell hex + positive-clip range
 include("analysis/sweep_golden.jl")      # golden per-cell table + VSUP-lite quality alpha

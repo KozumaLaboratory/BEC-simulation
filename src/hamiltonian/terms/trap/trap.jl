@@ -53,14 +53,9 @@ function apply_step!(::TrapTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # Uses the SAME V_trap as apply_operator (single source).
     V = ws.potential_values
     D = size(psi, ndims(psi))
-    if imaginary_time
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= exp.(.-V .* dt)
-        end
-    else
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= cis.(.-V .* dt)
-        end
+    itv = Val(imaginary_time)
+    for c in 1:D
+        view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= wick_phase.(.-V .* dt, itv)
     end
     return nothing
 end
@@ -92,10 +87,10 @@ end
 Add V_trap(r)·ψ contribution to `grad`. Body used by `energy_gradient!`.
 """
 function _grad_trap!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= ws.potential_values .* view(psi, idx...)
-    end
+    # Whole-array broadcast (V over the component axis): one GPU kernel instead
+    # of D per-component launches. Bit-identical; zero-alloc on CPU.
+    V_bc = reshape(ws.potential_values, size(ws.potential_values)..., 1)
+    grad .+= V_bc .* psi
     nothing
 end
 

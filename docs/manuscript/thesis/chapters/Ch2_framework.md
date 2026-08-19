@@ -279,8 +279,8 @@ SpinorBEC.jl で提供される integrators (Chapter 3 of D-thesis で詳述):
 
 ### 2.6.3 Higher-level pipeline (YAML)
 
-complex experimental protocols (e.g., Klaus 2022 magnetostir) は YAML pipeline で
-記述:
+complex experimental protocols (e.g., Klaus et al. 2022 [arXiv:2206.12265] の
+Dy magnetostir) は YAML pipeline で記述:
 
 ```yaml
 pipeline:
@@ -342,7 +342,7 @@ Theorem framework と直接 connect), 数値 heavy for trap geometries.
 - `hamiltonian/`: interactions (DDI, LHY), potentials, integrators (split-step, Yoshida, FG)
 - `analysis/`: observables, BdG, vorticity, phase classification
 - `solvers/`: ground state (ITP, LBFGS), continuation, simulation, TWA
-- `rotating_basis/`: Klaus-regime path (B̂ rotation, Larmor-eliminated dynamics)
+- `rotating_basis/`: fast-Larmor regime path (B̂ rotation, Larmor-eliminated dynamics)
 - `workflow/`: io, monitoring, experiments (YAML pipeline)
 
 各 sub-module は ~200-400 LOC files に分割 (per CLAUDE.md "small files: 200-400 lines

@@ -92,6 +92,7 @@ end
 function _run_step(
     step::DynamicsStep, psi_prev, grid, atom, ws_prev;
     verbose=true, checkpoint_dir=nothing,
+    pipeline_results::Union{Nothing, Dict}=nothing,
     live_status_path::Union{Nothing, String}=nothing,
 )
     psi_prev !== nothing ||
@@ -127,14 +128,31 @@ function _run_step(
     else
         prev_c_dd
     end
-    # DDI truncation / padding (Tier A/B). Like `secular`, these are NOT carried
-    # on the inherited `DDIParams` (the kernel bakes them in), so the dynamics
-    # kernel is rebuilt from these values rather than inherited from ws_prev.
-    # They therefore default the same way the ground_state block does — before
-    # 2026-07-29 they defaulted OFF here while a config could turn them ON in
-    # `ground_state`, which silently gave a padded GS feeding bare-kernel
-    # dynamics. A config that explicitly opts OUT in `ground_state` still has to
-    # repeat that opt-out here; the inherited DDIParams cannot carry it.
+    # Kernel-shaping DDI knobs. NONE of these are carried on the inherited
+    # `DDIParams` — the kernel bakes them into the Q tensors — so the dynamics
+    # kernel is rebuilt from the step's own `ddi:` block, defaulting the same way
+    # the ground_state block does. A config that explicitly opts OUT in
+    # `ground_state` still has to repeat that opt-out here; the inherited
+    # DDIParams cannot carry it.
+    #
+    # The comment here named `secular` as the exemplar of this class from
+    # 2026-07-29 and the code then did not resolve it — `secular_ddi` was never
+    # passed to `make_workspace`, so it took the `false` default no matter what
+    # the YAML said. Measured 2026-08-19 against the two reference kernels: a
+    # `dynamics:` step declaring `ddi: {secular: true}` built a workspace 0.5
+    # from the secular kernel (i.e. the non-secular one), while the
+    # `ground_state:` step of the SAME config matched the secular kernel
+    # exactly. `runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml` is the
+    # live casualty, and its stated purpose — "Compare against 24_nonsec to
+    # isolate the impact of off-diagonal DDI terms" — is precisely what the drop
+    # defeats: both arms ran the dynamics on the same kernel.
+    #
+    # `quasi_2d` / `l_z` were missing for the same reason and are resolved here
+    # too. They select an entirely different (Q2D) kernel, so a dynamics step
+    # asking for one silently got the 3D one.
+    ddi_secular = ddi_raw isa Dict ? Bool(get(ddi_raw, "secular", false)) : false
+    ddi_q2d = ddi_raw isa Dict ? Bool(get(ddi_raw, "quasi_2d", false)) : false
+    ddi_lz = ddi_raw isa Dict ? Float64(get(ddi_raw, "l_z", 0.0)) : 0.0
     ddi_trunc = if ddi_raw isa Dict
         _parse_ddi_trunc_radius(get(ddi_raw, "trunc_radius", nothing))
     else
@@ -237,6 +255,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         sim_params=sp,
         psi_init=psi_prev,
         enable_ddi, c_dd=c_dd_val, ddi_trunc_radius=ddi_trunc,
+        secular_ddi=ddi_secular, quasi_2d_ddi=ddi_q2d, l_z_ddi=ddi_lz,
         ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
         backend,
         absorbing_boundary,
@@ -348,6 +367,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
             :save_psi_snapshots => traj !== nothing && !isempty(traj.psi_snapshots),
             :snapshot_tmp_path => nothing,
             :snapshot_count => traj === nothing ? 0 : length(traj.psi_snapshots),
+            :dyn_stage_ref => _dyn_stage_ref(pipeline_results, p),
         )
         return (psi_out, grid, atom, ws, step_result)
     end
@@ -379,6 +399,12 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
 
+    # `spin_step:` picks how the V half-step realizes its spin rotations.
+    # Scoped to this step and restored afterwards, so one dynamics phase
+    # choosing `combined` cannot leak the splitting into the next phase or into
+    # another config sharing the session (same discipline as `dealias:`).
+    spin_step_prev = COMBINED_SPIN_STEP_ENABLED[]
+    COMBINED_SPIN_STEP_ENABLED[] = _parse_spin_step(get(p, "spin_step", nothing))
     # Cutover step 2, invariant 4: the RTP loops swallow `InterruptException`
     # exactly as the ITP does (`simulation/run_loops.jl:51`, `:207`) — they
     # record a final snapshot, print, and return normally, so a killed dynamics
@@ -386,13 +412,19 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     # cover it either: there is no GS step in a dynamics-only pipeline, so
     # `run_registry.jl` records `converged = true` unconditionally. This Ref is
     # the only signal, and it is what withholds the completion marker.
+    # Declared OUTSIDE the try: a Julia `try` body is its own local scope, so an
+    # assignment in there would not survive to the caller below.
     rtp_interrupted = Ref(false)
-    result, snap_tmp_path, snap_count = _run_dynamics_with_optional_streaming!(
-        ws, save_psi_snap, save_compress, snap_precision_cf;
-        extra_on_step=extra_cb,
-        stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
-        interrupted=rtp_interrupted,
-    )
+    result, snap_tmp_path, snap_count = try
+        _run_dynamics_with_optional_streaming!(
+            ws, save_psi_snap, save_compress, snap_precision_cf;
+            extra_on_step=extra_cb,
+            stepper=_resolve_dynamics_stepper(get(p, "integrator", nothing)),
+            interrupted=rtp_interrupted,
+        )
+    finally
+        COMBINED_SPIN_STEP_ENABLED[] = spin_step_prev
+    end
 
     if verbose
         println("  $(n_steps) steps, E_final=$(round(result.energies[end]; sigdigits=6))")
@@ -409,8 +441,22 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         :snapshot_tmp_path => snap_tmp_path,
         :snapshot_count => snap_count,
         :interrupted => rtp_interrupted[],
+        :dyn_stage_ref => _dyn_stage_ref(pipeline_results, p),
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+# `nothing` whenever the chain cannot state this step faithfully: no preceding
+# ground-state Stage, or a dynamics block that overrides the model. Recorded
+# either way, so a run says which of the two it was instead of the absence
+# reading as "no dynamics happened".
+@noinline function _dyn_stage_ref(
+    pipeline_results::Union{Nothing, Dict}, p::Dict{String, Any}
+)::Union{Nothing, String}
+    pipeline_results === nothing && return nothing
+    from = get(pipeline_results, :gs_stage, nothing)
+    from isa Stage || return nothing
+    dyn_artifact_id(from, p)
 end
 
 """
@@ -542,4 +588,39 @@ function _run_dynamics_with_optional_streaming!(
     end
 
     return (result, snap_tmp, frame_count[])
+end
+
+"""
+    _parse_spin_step(v) -> Bool
+
+`dynamics.spin_step:` — how the V half-step realizes its spin rotations.
+
+    "sequential"  (default)  SM(dt/4) · DDI(dt/2) · SM(dt/4), three rotations
+    "combined"               exp(-i dt (c₁⟨F⟩ + Φ_DDI)·F̂), one rotation
+
+Both are O(dt²) and share a continuum limit; they differ at O(dt³) because the
+combined form carries no [SM,[SM,DDI]] commutator error. Against `sequential`
+`combined` measured 1.71× faster per step on H100 at 128³ × D=13 with DDI —
+29.99 → 17.51 ms/step (bench/rtp_gpu_ab.jl; table in
+docs/reference/dynamics.md). That bench's own `sp(comb)` column reads 2.84×
+because every column there is against the 5-stage Euler kernel, which this
+knob cannot select: `sequential` already uses the shared Taylor-Horner
+rotation (`_SPIN_TAYLOR_ENABLED` defaults to true), so 2.84× would credit
+this knob with a win `sequential` has too.
+
+It is not the default because the difference is real: a run switching to it
+will not reproduce a previous run's numbers bitwise. The selector silently
+keeps `sequential` for any workspace the combined form cannot represent
+(c₂ ≠ 0, tensor channels, Raman, light shift, spatial or tilted field, padded
+or absent DDI) — see `_rtp_use_combined_step`.
+"""
+function _parse_spin_step(v)
+    v === nothing && return false
+    s = lowercase(String(v))
+    s == "sequential" && return false
+    s == "combined" && return true
+    throw(
+        ArgumentError(
+            "dynamics.spin_step must be \"sequential\" or \"combined\"; got $(repr(v))"),
+    )
 end

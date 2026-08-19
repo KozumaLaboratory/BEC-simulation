@@ -11,7 +11,7 @@ function parse_pipeline(data::Dict)
     # pipeline step's inner block. Step-level entries override defaults.
     # E.g. `defaults: {kind: rotating_basis, save_every: 30, epsilon: 1e-6}`
     # applies to ground_state + every dynamics block. Useful for DRY across
-    # multi-phase Klaus / Berry configs.
+    # multi-phase fast-Larmor / Berry configs.
     defaults = haskey(data, "defaults") ? data["defaults"] : nothing
     if defaults !== nothing
         defaults isa AbstractDict || throw(ArgumentError(
@@ -56,6 +56,35 @@ function _apply_step_defaults(step::Dict, defaults::AbstractDict)
     Dict{Any, Any}(key => seeded)
 end
 
+"""
+Refuse `dynamics:` keys that the schema validates and no step reads.
+
+`adaptive_dt` declared five numeric fields with ranges — `dt_init`, `dt_min`,
+`dt_max`, `tol`, `error_mode` — so a config asking for adaptive stepping
+validated cleanly, and then ran at fixed `dt`. Nothing under `src/workflow`
+constructs `AdaptiveDtParams` or calls `run_simulation_yoshida!` at all; the
+adaptive runners are a Julia-API path only. An accuracy knob that is accepted
+and discarded is worse than one that does not exist, and it is the same defect
+as the rotating handler sizing `dt` for an integrator it would not run.
+
+Unknown keys are only a `:warn`, which is right for a typo and too quiet for
+this: the user gets what they asked for spelled correctly and not honoured. No
+config under `runs/` sets it and `docs/reference/yaml_schema_reference.md` never
+documented it, so refusing breaks nothing in the tree.
+"""
+function _reject_inert_dynamics_keys(params::AbstractDict)
+    haskey(params, "adaptive_dt") && throw(
+        ArgumentError(
+            "`dynamics.adaptive_dt` is validated by the schema but read by " *
+            "nothing — the run would proceed at fixed dt. Adaptive stepping " *
+            "is a Julia-API path: call `run_simulation_yoshida!(ws; " *
+            "adaptive=AdaptiveDtParams(...))` directly. Remove the key to " *
+            "confirm you want fixed-dt dynamics.",
+        ),
+    )
+    nothing
+end
+
 function _parse_step(d::Dict)
     keys_list = collect(keys(d))
     length(keys_list) == 1 || throw(ArgumentError(
@@ -71,17 +100,22 @@ function _parse_step(d::Dict)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisGroundStateStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEGroundStateStep(params)
         else
             GroundStateStep(params)
         end
     elseif key == :dynamics
         params = Dict{String, Any}(string(k) => v for (k, v) in val)
+        _reject_inert_dynamics_keys(params)
         kind = get(params, "kind", nothing)
         if kind == "binary" || kind == :binary
             BinaryDynamicsStep(params)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisDynamicsStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEDynamicsStep(params)
         else
             DynamicsStep(params)
         end
@@ -118,8 +152,16 @@ _is_nan_error(err) =
     err isa DomainError ||
     (err isa ErrorException && occursin(r"NaN|Inf"i, err.msg))
 
+# Matched by type NAME, not by `isa`: CUDA is a weak dependency, so
+# `CUDA.OutOfGPUMemoryError` cannot be referenced from core. It was therefore not
+# recognised at all until 2026-08-07 — a GPU OOM set `oom_killed=false`, was
+# classified PERMANENT rather than RESOURCE_PERMANENT, and `retry.jl` re-queued
+# it at the SAME memory class until the retry budget ran out. Chained with the
+# VRAM estimate that under-sized 16 of 23 atoms, that is a job priced to fail and
+# then paid for again on every attempt.
 _is_oom_error(err) =
     err isa OutOfMemoryError ||
+    occursin(r"OutOfGPUMemory|OutOfMemory"i, string(typeof(err).name.name)) ||
     (err isa ErrorException && occursin(r"out of memory|OOM"i, err.msg))
 
 # W4. The cache's fail-safes were `@warn` and nothing else: no `Record`, no
@@ -308,16 +350,24 @@ end
             verbose, checkpoint_dir, pipeline_results=results)
     elseif step isa BinaryDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, pipeline_results=results)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa RotatingBasisDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, pipeline_results=results)
-    elseif step isa DynamicsStep
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
+    elseif step isa ScalarEGPEDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, live_status_path)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
+    elseif step isa DynamicsStep
+        # `pipeline_results` joined the other three dynamics kinds here on
+        # 2026-08-19: the spinor path needs the preceding `:gs_stage` to build
+        # an `:evolve` Stage `from` it, and that is the only way the real-time
+        # ambient switches reach an artifact id at all.
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa GroundStateStep ||
         step isa BinaryGroundStateStep ||
-        step isa RotatingBasisGroundStateStep
+        step isa RotatingBasisGroundStateStep ||
+        step isa ScalarEGPEGroundStateStep
         _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
     else
         # Defensive: a new PipelineStep subtype must be added explicitly above
@@ -327,7 +377,7 @@ end
         throw(
             ArgumentError(
                 "Unknown PipelineStep subtype $(typeof(step)) in _step_dispatch!. " *
-                "Add an explicit branch in _step_dispatch! (pipeline_runner.jl:123) " *
+                "Add an explicit branch in _step_dispatch! (this file, ~line 293) " *
                 "and a matching _run_step(::$(typeof(step)), ...) method.",
             ),
         )

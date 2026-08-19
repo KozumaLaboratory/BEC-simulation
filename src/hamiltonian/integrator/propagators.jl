@@ -10,11 +10,8 @@ function prepare_kinetic_phase(
     U = dtype === nothing ? T : dtype
     half = U(0.5)
     dt_u = U(dt)
-    if imaginary_time
-        Complex{U}.(@. exp(-half * grid.k_squared * dt_u))
-    else
-        Complex{U}.(@. cis(-half * grid.k_squared * dt_u))
-    end
+    itv = Val(imaginary_time)
+    Complex{U}.(@. wick_phase(-half * grid.k_squared * dt_u, itv))
 end
 
 function apply_kinetic_step!(
@@ -63,37 +60,29 @@ function apply_diagonal_potential_step!(
     #   Skipped in real-time (cis is bounded).
     # See: src/solvers/ground_state.jl `_ITP_EXPONENT_LIMIT` guard
     zee_shift = imaginary_time ? minimum(zeeman_diag) : 0.0
+    # ONE statement of the diagonal Hamiltonian, not four. Until 2026-08-19 this
+    # loop carried the full expression in each of {imaginary, real} × {LHY off,
+    # LHY on}, so the most-executed term in the simulator was written out four
+    # times with nothing checking that the copies agreed. `zee_shift` is 0.0 in
+    # real time, which is what lets the Wick branch collapse; adding `c_lhy` to
+    # the sum when it is zero is a no-op, so the LHY branch collapses too — and
+    # the `c_lhy == 0.0` arm survives only to skip the `sqrt` broadcast.
+    itv = Val(imaginary_time)
     for c in 1:n_components
         idx = _component_slice(ndim, n_pts, c)
         psi_view = view(psi, idx...)
-        if imaginary_time
-            if c_lhy == 0.0
-                @. psi_view *= exp(
-                    -(V_trap + (zeeman_diag[c] - zee_shift) + c0 * density_buf) * dt_frac
-                )
-            else
-                @. psi_view *= exp(
-                    -(
-                        V_trap +
-                        (zeeman_diag[c] - zee_shift) +
-                        c0 * density_buf +
-                        c_lhy * density_buf * sqrt(density_buf)
-                    ) * dt_frac,
-                )
-            end
+        zee_rel = zeeman_diag[c] - zee_shift
+        if c_lhy == 0.0
+            @. psi_view *= wick_phase(
+                -(V_trap + zee_rel + c0 * density_buf) * dt_frac, itv)
         else
-            if c_lhy == 0.0
-                @. psi_view *= cis(-(V_trap + zeeman_diag[c] + c0 * density_buf) * dt_frac)
-            else
-                @. psi_view *= cis(
-                    -(
-                        V_trap +
-                        zeeman_diag[c] +
-                        c0 * density_buf +
-                        c_lhy * density_buf * sqrt(density_buf)
-                    ) * dt_frac,
-                )
-            end
+            @. psi_view *= wick_phase(
+                -(
+                    V_trap +
+                    zee_rel +
+                    c0 * density_buf +
+                    c_lhy * density_buf * sqrt(density_buf)
+                ) * dt_frac, itv)
         end
     end
     nothing
@@ -139,7 +128,7 @@ end
 @inline _lhy_V(::AbstractFloat, ::NoLHY) = 0.0
 @inline _lhy_V(n::AbstractFloat, l::ScalarLHY) = l.c_lhy * n * sqrt(n)
 @inline function _lhy_V(n::AbstractFloat, l::Quasi2DLHY)
-    n < 1e-30 && return zero(n)
+    n < COUPLING_TOL && return zero(n)
     l.c_lhy_2d * n * (2.0 * (log(n * l.a_2d_sq) + l.log_const) + 1.0)
 end
 # Shared eval for all table-based modes (TabulatedLHY subtypes).
@@ -209,7 +198,7 @@ call site serve both.
 """
 @inline _lhy_V(n::AbstractFloat, ::AbstractFloat, l) = _lhy_V(n, l)
 @inline function _lhy_V(n::AbstractFloat, p::AbstractFloat, l::SpatialLHY)
-    n < 1e-30 && return zero(Float64)
+    n < COUPLING_TOL && return zero(Float64)
     e1 = _interpolate_1d(l.polarisations, l.e1_values, clamp(Float64(p), 0.0, 1.0))
     2.5 * e1 * Float64(n) * sqrt(Float64(n))
 end
@@ -248,7 +237,7 @@ the formula stays declared once.
 """
 @inline function _local_polarisation(Pmf, i, n_local::Float64, F::Int,
     fp_coeffs, ::Val{D}) where {D}
-    n_local < 1e-30 && return 0.0
+    n_local < COUPLING_TOL && return 0.0
     @inbounds begin
         fz = 0.0
         for c in 1:D
@@ -294,7 +283,7 @@ function _polarisation_field(::Val{N}, psi_mf, density_buf, lhy, ::Val{D}) where
     end
     out = similar(density_buf)
     out .= ifelse.(
-        density_buf .< RT(1e-30),
+        density_buf .< RT(COUPLING_TOL),
         zero(RT),
         sqrt.(fre .* fre .+ fim .* fim .+ fz .* fz) ./ (density_buf .* RT(F)),
     )
@@ -467,24 +456,20 @@ function _diagonal_step_svec!(
     else
         density_buf
     end
-    zee_shift = RT(minimum(zeeman_diag))
+    # Conditional, so that `zee_c - zee_shift` is the exponent on BOTH branches
+    # and the Wick split has nothing left to duplicate. Real time subtracts
+    # zero, exactly.
+    zee_shift = imaginary_time ? RT(minimum(zeeman_diag)) : zero(RT)
+    itv = Val(imaginary_time)
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        zee_c = RT(zeeman_diag[c])
-        if imaginary_time
-            zee_rel = zee_c - zee_shift
-            if !_has_lhy
-                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf) * dt_t)
-            else
-                @. psi_c *= exp(-(V_trap + zee_rel + c0_t * density_buf + lhy_buf) * dt_t)
-            end
+        zee_rel = RT(zeeman_diag[c]) - zee_shift
+        if !_has_lhy
+            @. psi_c *= wick_phase(-(V_trap + zee_rel + c0_t * density_buf) * dt_t, itv)
         else
-            if !_has_lhy
-                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf) * dt_t)
-            else
-                @. psi_c *= cis(-(V_trap + zee_c + c0_t * density_buf + lhy_buf) * dt_t)
-            end
+            @. psi_c *= wick_phase(
+                -(V_trap + zee_rel + c0_t * density_buf + lhy_buf) * dt_t, itv)
         end
     end
     nothing
@@ -517,32 +502,35 @@ function _diagonal_step_with_ls!(
         density_buf[I] = s
     end
 
-    if imaginary_time
-        zee_shift = minimum(zeeman_diag)
-        @inbounds for I in CartesianIndices(n_pts)
-            n = density_buf[I]
-            p_loc = need_spin ?
-                    _local_polarisation(psi_mf_eff, I, n, F_spin, fp_c, Val(D)) : 0.0
-            V_int = c0 * n + _lhy_V(n, p_loc, c_lhy)
-            exp_base = exp(-(V_trap[I] + V_int) * dt_frac)
-            intensity = ls_profile[I]
-            for c in 1:D
-                psi[I, c] *=
-                    exp_base *
-                    exp(-((zeeman_diag[c] - zee_shift) + ls_amp[c] * intensity) * dt_frac)
-            end
-        end
-    else
-        @inbounds for I in CartesianIndices(n_pts)
-            n = density_buf[I]
-            p_loc = need_spin ?
-                    _local_polarisation(psi_mf_eff, I, n, F_spin, fp_c, Val(D)) : 0.0
-            V_int = c0 * n + _lhy_V(n, p_loc, c_lhy)
-            cis_base = cis(-(V_trap[I] + V_int) * dt_frac)
-            intensity = ls_profile[I]
-            for c in 1:D
-                psi[I, c] *= cis_base * cis(-(zeeman_diag[c] + ls_amp[c] * intensity) * dt_frac)
-            end
+    # Function barrier on `Val(imaginary_time)`: the voxel loop below is scalar,
+    # so the Wick branch must be resolved BEFORE it is entered, not per voxel.
+    # That is also what removes the second copy of the exponent — the two arms
+    # of this function were identical apart from `exp`/`cis` and the ITP shift,
+    # which is zero in real time anyway.
+    zee_shift = imaginary_time ? minimum(zeeman_diag) : 0.0
+    _diagonal_step_with_ls_kernel!(
+        psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf,
+        ls_amp, ls_profile, psi_mf_eff, n_pts, need_spin, F_spin, fp_c,
+        zee_shift, Val(D), Val(imaginary_time))
+    nothing
+end
+
+@noinline function _diagonal_step_with_ls_kernel!(
+    psi, V_trap, zeeman_diag, c0, c_lhy, dt_frac, density_buf,
+    ls_amp, ls_profile, psi_mf_eff, n_pts, need_spin, F_spin, fp_c,
+    zee_shift, ::Val{D}, itv::Val{IT},
+) where {D, IT}
+    @inbounds for I in CartesianIndices(n_pts)
+        n = density_buf[I]
+        p_loc = need_spin ?
+                _local_polarisation(psi_mf_eff, I, n, F_spin, fp_c, Val(D)) : 0.0
+        V_int = c0 * n + _lhy_V(n, p_loc, c_lhy)
+        base = wick_phase(-(V_trap[I] + V_int) * dt_frac, itv)
+        intensity = ls_profile[I]
+        for c in 1:D
+            psi[I, c] *=
+                base * wick_phase(
+                    -((zeeman_diag[c] - zee_shift) + ls_amp[c] * intensity) * dt_frac, itv)
         end
     end
     nothing
@@ -713,19 +701,35 @@ function _update_batched_kinetic_phase!(
     if kp isa Array
         @inbounds for I in CartesianIndices(n_pts)
             arg = -half * k_squared[I] * dt_t
-            kp[I, 1] = (imaginary_time ? complex(exp(arg)) : cis(arg)) * inv_npts
+            kp[I, 1] = complex(wick_phase(arg, imaginary_time)) * inv_npts
         end
     else
         # GPU: `k_squared` is a host Array — broadcasting it into a device
         # kernel is illegal (non-bitstype). Move it to a device array that
         # matches `kp` first, then build the phase on-device.
-        k_sq_dev = similar(kp, RT, size(k_squared))
-        copyto!(k_sq_dev, k_squared)
+        #
+        # CACHED. This used to `similar` + `copyto!` on EVERY call, re-uploading
+        # an immutable array: 16.0 MiB per call at 128³ Float64, and this
+        # function runs once per step under `split_step_midpoint!` and
+        # `rk4ip_step!`, three times per step under the Yoshida cores, and twice
+        # per step in the Richardson adaptive loop. `_to_device_cached`'s own
+        # docstring (`foundation/backend.jl`) names this exact k² re-upload as
+        # the defect it was written to remove — on the OPERATOR face, which was
+        # fixed; the propagator face was not.
+        #
+        # Keyed on `(device array type, RT, k_squared)` and NOT on size: two
+        # grids of equal shape and different box size share a shape and differ
+        # in k², which is the trap `cached_kspace_filter` above documents.
+        # Holding `k_squared` in the key also pins it against GC, so no later
+        # array can reuse its address and inherit the entry.
+        k_sq_dev = scratch_get!(:kinetic_phase_k2, (typeof(kp), RT, k_squared)) do
+            d = similar(kp, RT, size(k_squared))
+            copyto!(d, k_squared)
+            d
+        end
         kp_view = selectdim(kp, ndim + 1, 1)
-        if imaginary_time
-            kp_view .= exp.(-half .* k_sq_dev .* dt_t) .* inv_npts
-        else
-            kp_view .= cis.(-half .* k_sq_dev .* dt_t) .* inv_npts
+        let itv = Val(imaginary_time)
+            kp_view .= wick_phase.(-half .* k_sq_dev .* dt_t, itv) .* inv_npts
         end
     end
     nothing

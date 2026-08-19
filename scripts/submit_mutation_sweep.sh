@@ -23,9 +23,19 @@
 # 2-3 mutant smoke before sizing h_rt for the full catalog — the per-mutant cost
 # is dominated by precompile and by which probe set was chosen, not by the
 # mutation itself.
+#
+# WHY node_q AND NOT gpu_h. `gpu_h` is a MIG half-GPU with FOUR cores, and this
+# script's own `SBEC_WORKERS` default is 12 — it was asking for 3x the cores the
+# directive reserved, so the probe ran three deep on every slot. `node_q` is one
+# FULL H100 with 48 cores (別表3 coef 0.250 against gpu_h's 0.100), and per unit
+# of work it is both faster and cheaper here: the cost formula weights actual
+# wall-clock 0.7 against 0.1 on reserved h_rt, so a 4-core node holding the job
+# open 3x longer loses more on the 0.7 term than it saves on the coefficient.
+# Measured shape at 12 workers: probe makespan ~400 s against ~4542 s of serial
+# work, i.e. the 48 cores are the thing being bought.
 #$ -cwd
 #$ -N sbec_mutation
-#$ -l gpu_h=1
+#$ -l node_q=1
 #$ -l h_rt=8:00:00
 #$ -j y
 
@@ -52,6 +62,12 @@ MUT_PROBE=${SBEC_MUT_PROBE:-grounded_cheap}
 MUT_ARGS=(--probe "${MUT_PROBE//+/,}")
 [ -n "$MUT_IDS" ] && MUT_ARGS+=(--mutants "${MUT_IDS//+/,}")
 [ -n "${SBEC_MUT_MAXCOST:-}" ] && MUT_ARGS+=(--max-cost "$SBEC_MUT_MAXCOST")
+# `k_n` on the wire, `k/n` to the harness — the same substitution the probe and
+# mutant lists get, for the same reason. Without a shard knob the full catalog is
+# one job whose h_rt has to cover every class, and a job that dies at hour 11
+# of 12 leaves nothing: the harness writes its report once, at the end. `k` is
+# ZERO-INDEXED (`--shard` asserts 0 <= k < n), so 4 shards are 0_4 1_4 2_4 3_4.
+[ -n "${SBEC_MUT_SHARD:-}" ] && MUT_ARGS+=(--shard "${SBEC_MUT_SHARD//_//}")
 # Same reasoning as submit_test_tier.sh: each worker is an independent julia
 # process holding SpinorBEC + CUDA, so memory and not the node's 384 cores is
 # what bounds this.

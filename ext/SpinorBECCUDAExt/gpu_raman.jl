@@ -16,8 +16,6 @@ mutable struct GPURamanCache{D, T <: AbstractFloat}
     kr::CuArray{T, 2}                 # (N, 1)  k_eff · r per spatial point
 end
 
-const _GPU_RAMAN_CACHE = Dict{UInt64, Any}()
-
 function _get_gpu_raman_cache(
     psi::CuArray{Complex{T}},
     sm::SpinorBEC.SpinMatrices{D},
@@ -26,9 +24,26 @@ function _get_gpu_raman_cache(
     ndim::Int,
 ) where {D, N, T <: AbstractFloat}
     N_spatial = prod(ntuple(d -> size(psi, d), ndim))
-    key = hash((objectid(sm), raman.k_eff, N_spatial, D, T))
-    cache = get(_GPU_RAMAN_CACHE, key, nothing)
-    cache !== nothing && return cache::GPURamanCache{D, T}
+    # `grid` is IN the key. It was not, and the cached `kr` field below is built
+    # from `grid.x` — so two grids sharing only a total point count collided:
+    # 32x32x16 and 64x16x16 are both 16384, and so are the same shape in two
+    # different boxes. The second Raman workspace was served the first one's
+    # k·r phase.
+    #
+    # Keyed through the shared scratch registry (an `IdDict` whose key tuple
+    # holds the objects) rather than `hash(objectid(...))`, which held no
+    # reference to `sm` and so admitted an id reused after GC.
+    cache = SpinorBEC.scratch_get!(
+        :gpu_raman, (sm, grid, raman.k_eff, N_spatial, D, T)
+    ) do
+        _build_gpu_raman_cache(psi, raman, sm, grid, ndim, T, Val(D))
+    end
+    return cache::GPURamanCache{D, T}
+end
+
+function _build_gpu_raman_cache(psi, raman, sm, grid::SpinorBEC.Grid{N}, ndim,
+    ::Type{T}, ::Val{D}) where {N, D, T <: AbstractFloat}
+    N_spatial = prod(ntuple(d -> size(psi, d), ndim))
 
     F = T(sm.system.F)
     m_vals = T[F - T(c - 1) for c in 1:D]
@@ -55,7 +70,6 @@ function _get_gpu_raman_cache(
         CUDA.zeros(T, N_spatial, 1),
         CuArray(reshape(kr_host, N_spatial, 1)),
     )
-    _GPU_RAMAN_CACHE[key] = cache
     cache
 end
 

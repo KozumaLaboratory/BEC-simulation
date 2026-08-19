@@ -31,6 +31,8 @@ include("solvers/lbfgs/driver.jl")
 include("solvers/ground_state/pinned.jl")  # symmetry-breaking pin + ε→0 extrapolation (soft manifold)
 include("solvers/hessian.jl")  # second-variation HvP + trapped-BdG λ_min
 include("solvers/trapped_bdg.jl")  # dense non-Hermitian trapped BdG (dynamical axis)
+include("solvers/bdg_frequencies.jl")  # trapped spinor excitation ω (D=13 3D; λ is NOT ω)
+include("solvers/bragg_response.jl")  # S(k,ω) by real-time impulse response
 include("solvers/newton_cg.jl")  # trust-region Newton-CG on the gate-2 operator
 include("solvers/ground_state/polished.jl")  # ITP+LBFGS chain over a Preset
 include("solvers/continuation/scan_1d.jl")
@@ -40,7 +42,7 @@ include("solvers/continuation/pseudo_arclength.jl")
 include("solvers/continuation/triple_point.jl")
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
-include("solvers/scalar_egpe.jl")  # adiabatic-elimination scalar GPE (Klaus regime alt)
+include("solvers/scalar_egpe.jl")  # adiabatic-elimination scalar GPE (fast-Larmor alt)
 # 0-D truncated-Boltzmann evaporative-cooling model (thermal-cloud → BEC ramp
 # optimization). Parallel to GP: scalar N(t)/T(t) kinetics, not a wavefunction.
 include("solvers/evaporation/trap_geometry.jl")

@@ -33,6 +33,15 @@ using SpinorBEC: _voxel_index
 # spin algebra.
 using SpinorBEC: SPIN_TAYLOR_ENABLED, SPIN_TAYLOR_TOL, SPIN_TAYLOR_RSAFE,
     SPIN_TAYLOR_RK_MAX, SPIN_TAYLOR_DEGREE_CAP
+# Same reason, for the numerical-zero threshold and the Wick rotation: a device
+# kernel that carried its own `1e-30` or its own `exp`/`cis` branch would be a
+# second declaration on the far side of an extension boundary — the hardest kind
+# to notice, because the CPU tests are green and only a GPU run disagrees.
+# `foundation/thresholds.jl` and `foundation/wick.jl` are the declarations;
+# `test_threshold_single_statement.jl` and
+# `test_wick_phase_single_statement.jl` scan `ext/` as well as `src/` for
+# exactly that reason.
+using SpinorBEC: COUPLING_TOL, wick_phase
 
 include("backend.jl")
 include("gpu_rng.jl")

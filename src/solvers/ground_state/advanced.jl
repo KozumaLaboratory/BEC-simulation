@@ -107,7 +107,7 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
             norms[c] = sum(abs2, view(psi, idx...)) * dV * w^2
         end
         total = sum(norms)
-        total < 1e-30 && break
+        total < COUPLING_TOL && break
 
         Mz = sum((F - (c - 1)) * norms[c] for c in 1:n_components) / total
         abs(Mz - target_Mz) < 1e-12 && break
@@ -117,7 +117,7 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
             m = F - (c - 1)
             dMz += 2 * m * (m - Mz) * norms[c] / total
         end
-        abs(dMz) < 1e-30 && break
+        abs(dMz) < COUPLING_TOL && break
 
         lambda -= (Mz - target_Mz) / dMz
         lambda = clamp(lambda, -10.0, 10.0)

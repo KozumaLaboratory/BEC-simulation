@@ -67,11 +67,11 @@ manual" from "orphaned"). The other 6 had fallen through entirely
   physics gate). Recoverable from git history if a specific one is wanted
   back as a running test.
 - **Relocated out of `test/`**: `validation/test_validation_matrix.jl`
-  was a CSV/Markdown-emitting runner script, not a test — moved to
-  `scripts/validation/run_validation_matrix.jl` (its documented home;
-  `@__DIR__/../..` still resolves to the repo root, so the test paths it
-  loads are unaffected). This also un-breaks the doc links in
-  `docs/validation/*` that already pointed at the `scripts/` path.
+  was a CSV/Markdown-emitting runner script, not a test — moved first to
+  `scripts/validation/run_validation_matrix.jl` and then (2026-08-18)
+  absorbed into the library as `run_validation_matrix`
+  (src/validation/validation_matrix.jl; CLI:
+  `scripts/cli.jl validation-matrix`).
 
 A new FAST meta-test, `test/test_tier_membership.jl`, now enforces that
 every `test_*.jl` under `test/` is in exactly one tier list or this

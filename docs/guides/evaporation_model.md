@@ -119,10 +119,42 @@ evaporation_diagnostics(r, trap, p)
 On the researched euv3 defaults: `collision_ratio_R ≈ 6.4×10³` (good-to-bad collisions
 ≫ the ~10²–10³ runaway threshold), `collisions_per_atom ≈ 6.7×10³` (≫ the few hundred
 needed — not collisionally limited), `γ_el ≈ 12 kHz`, `runaway = true`. The trap is
-**collisionally excellent**; the *only* marginal quantity is `eta_start ≈ 4.5` (the
-loaded depth vs `T₀ = 50 µK`, near the `eta_min = 4` floor). Real setups load at
-η ~ 7–10, so if your `eta_start` comes out near 4.5 the model is likely *under*estimating
-the loaded depth (raise `α`/power or lower `T₀` to match the measured loaded η).
+**collisionally excellent**. The marginal quantity is `eta_start`, and it is **worse than
+this document said until 2026-08-05**: the defaults give `eta_start = 2.07`, not the
+`≈ 4.5` claimed here and in three other places below — it is *under* the `eta_min = 4`
+floor. Measured by the very call this section tells you to make:
+
+```julia
+julia> evaporation_summary(run_euv3_evaporation()).eta_start
+2.0682
+```
+
+**Re-anchoring `T₀` does not fix it, and the first version of this correction said it did
+(2026-08-05, corrected 2026-08-19).** The euv3 ramp is the 2023-11-06 notebook's sequence
+and that notebook's loading temperature is `T₀ ≈ 18 µK`
+([`eu_evaporation_calibration.md`](eu_evaporation_calibration.md)) — but the *trap* here
+is the 2022/thesis one. Measured H-FORT-only depth: **187.6 µK @ 7 W** and 271.9 µK @ 10 W,
+against 66 µK @ 7 W recorded for the 2023 epoch and 350 µK @ 10 W for 2022. So the model's
+trap is **2.84× deeper than the epoch the ramp and `T₀` come from**, and swapping only `T₀`
+mixes epochs — the thing this calibration document's first rule forbids. Correct both sides
+and the effect vanishes:
+
+| self-consistent choice | `η_start` |
+|---|---|
+| 2022 trap + `T₀` = 50 µK (as shipped) | **2.07** |
+| 2023 trap + `T₀` = 18 µK (depth ÷2.84) | **2.02** |
+| *mixed*: 2022 trap + 2023 `T₀` | 5.75 |
+
+Nor is `η ~ 5–10` this apparatus's loading range: the 2023-07 notebook measured
+`η_start` = **3.7** directly (7 W H-only, 66 µK depth, T = 17.8 µK) and called that regime
+"very hard". In that same configuration the model gives 187.6/17.8 = **10.5**, the same
+2.84×, which locates the discrepancy in the trap depth rather than the temperature. (That
+is a single-beam hold and euv3 starts from the crossed trap, so it is not a like-for-like
+target — but it does rule out 5–10 as the yardstick.)
+
+Treat every absolute number downstream of the defaults as suspect. Ratio-type conclusions
+(optimized vs lab ramp) are the ones that survive. The epoch worth optimizing against is
+the 2025 generation, whose ramp is not in this tree.
 
 Optimize the ramp for max `N_BEC`. Three optimizers, increasing in reach:
 
@@ -137,7 +169,8 @@ out.bo.best_p          # [duration_scale, final_power_scale, warp_γ]
 #     ramp's own ratios, so it can only improve. This is the trustworthy optimizer:
 #     a schedule the lab can actually run. On the experiment-matched defaults it finds
 #     N_BEC ≈ 3.2× the lab ramp by evaporating HARDER EARLY (steeper initial power
-#     drop, at high collision rate), η staying in the valid 4.5–11 range throughout.
+#     drop, at high collision rate). The "η stays in a valid 4.5–11 range" this line
+#     used to claim was false: η_start is 2.07 at these defaults (see above).
 trap = euv3_evap_trap(); p = EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1.61e-40)
 out = optimize_ramp_monotone(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6)
 out.ramp               # the optimized, monotone-decreasing FortRamp; out.fracs are the drops
@@ -157,12 +190,28 @@ evaporation works — across `K₃` ×0.5–1, `α` ×1.0–1.15, `τ_bg` 8–30
 *aggressive* schedule sits near two cliffs:
 
 - **Loaded-depth floor.** Evaporation can only start if the loaded `η_start = U/(k_BT₀)`
-  exceeds `eta_min ≈ 4`. At the researched defaults `η_start ≈ 4.5` — marginal (real
-  setups load at η ~ 7–10, so the model likely *under*estimates the loaded depth). If
-  `α` is ~15 % below calibration, `η_start < 4` and **no ramp evaporates at all** —
-  check `evaporation_summary(...).eta_start` before trusting any optimization.
+  exceeds `eta_min ≈ 4`. The defaults give `η_start = 2.07` — **already past the cliff**,
+  not "marginal at ≈ 4.5" as this bullet claimed, and no adverse `α` shift is needed to
+  break it. Both self-consistent epoch choices land at ≈ 2 (see above); re-anchoring `T₀`
+  alone does not lift it, it only mixes epochs. Check
+  `evaporation_summary(...).eta_start` before trusting any optimization; that advice was
+  already here, and running it is what found this.
 - **3-body cliff.** The aggressive ramp reaches high density fast; if `K₃` is ~2× the
   fit, it over-loses and may miss BEC while the gentle lab ramp still reaches it.
+- **No `K₃` in the ab-initio band reproduces the measured endpoint.** Reaching the
+  measured `N_BEC = 5.02×10⁴` needs `K₃ ≈ 2.45×10⁻⁴⁰ m⁶/s` at `T₀ = 50 µK` and
+  `≈ 2.74×10⁻⁴⁰` at `T₀ = 18 µK` — both **2.5× above the top of the universal
+  van-der-Waals band** (`K₃ = 3C ℏa⁴/m`, `C ∈ [0,67]`, `a = 110a₀` ⇒ `≤ 1×10⁻⁴⁰`). The
+  shipped default `1.61×10⁻⁴⁰` is itself already above the band and still over-predicts
+  by 1.31×. So the endpoint gap is a **model deficiency, not a parameter to tune**, and a
+  "parameter-free prediction that brackets the measurement" is not available here. Swept
+  over `K₃ ∈ [10⁻⁴²·³, 10⁻³⁹·³]` at both anchors — `figures/eu_evap_k3_band_exclusion.png`,
+  regenerate with `figures/eu_evap_k3_band_exclusion.jl <outdir>` then its `_plot.py`.
+  The right panel is the same figure's other half: **no anchor is both physical in
+  `η_start` and agreeing at the endpoint**, which is this bullet and the one above it
+  seen together.
+
+  ![K₃ band exclusion](figures/eu_evap_k3_band_exclusion.png)
 
 For a schedule that does **not** sit on a cliff, optimize the **worst case** over the
 calibration-uncertainty set:

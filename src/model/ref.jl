@@ -57,7 +57,7 @@ Its reason is a real systematic, but nothing in the schema distinguished "the
 axis cannot support this" from "we do not like the number", because both were
 spelled `arbitrates = false`.
 
-So `arbitrates` is now DERIVED — `isempty(disqualified_by)` — and the only way
+So `arbitrates` is now DERIVED — `measured && isempty(disqualified_by)` — and the only way
 to make a row non-arbitrating is to name which of these applies. There is no
 longer a field to set while looking at our result.
 
@@ -95,7 +95,7 @@ that `NamedTuple`, pinned.
 | `note` | the argument for it |
 | `dataset` … `window_from` | the measurement recipe; `nothing` unless `provenance == :measured` |
 | `disqualified_by` | which of `REF_DISQUALIFIERS` stop this number deciding anything; empty means none |
-| `arbitrates` | DERIVED, `isempty(disqualified_by)`: whether this number decides a comparison, or is merely quotable |
+| `arbitrates` | DERIVED, `measured && isempty(disqualified_by)`: whether this number decides a comparison, or is merely quotable. **`measured &&` is load-bearing** — see the comment at the computation; a bare `isempty` makes every literal in their Fortran an arbitrating target, `zeeman_q_Hz` included. |
 | `quotable_digits` | how many figures survive the measurement's own sensitivity |
 | `alternative` … `cost_kind` | what was chosen against, and what choosing wrong costs |
 """
@@ -257,7 +257,7 @@ ref_quantities(source::Symbol) = sort!(Symbol.(collect(keys(_ref_doc(source)["qu
 
 # Deliberately the ONLY parser of these fixtures inside `src/`. The same CSV is
 # also read by `test/validation/test_matsui_fig4_dip.jl` and by
-# `scripts/validation/matsui_fig4b_report.jl`; three implementations of one parse
+# `matsui_fig4b_report` (src/validation/matsui_fig4b_report.jl); three implementations of one parse
 # is a parallel declaration of the reference curve, which is the disease one
 # level down. Those two are the next callers to move onto this.
 function _split_quoted(line::AbstractString)
@@ -467,7 +467,7 @@ r = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
 r.value        # 12.838286496502047, measured just now
 r.window       # (-13.0, 9.0) — without which the value is under-determined by 2.2 nT
 r.disqualified_by  # Symbol[] — nothing on the reference side stops it deciding
-r.arbitrates       # true, DERIVED from the line above
+r.arbitrates       # true, DERIVED: `measured && isempty(disqualified_by)`
 ```
 """
 function ref(source::Symbol, quantity::Symbol)

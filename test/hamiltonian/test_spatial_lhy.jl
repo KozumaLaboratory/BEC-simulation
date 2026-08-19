@@ -177,6 +177,28 @@ _uniform(n::Int=8) = (p=zeros(ComplexF64, n, n, n, D_);
         r = spatial_lhy_residual(lhy, psi, F_, IP_; n_probe=2, rtol=1e-3)
         @test isfinite(r)
         @test 0.0 <= r < 0.10
+
+        # THE SAME CHECK AT A PRODUCTION n_atoms. Every case above runs at the
+        # default n_atoms = 1, and that is why this was broken and green for as
+        # long as it was: `compute_spatial_lhy` divides the table by n_atoms
+        # while the reference inside `spatial_lhy_residual` was not divided, so
+        # the residual was ≈ 1 − 1/N for every real config and exactly 0 for
+        # every test. Measured 2026-08-19 on converged Eu ground states at
+        # N = 50000 it read 1.0000, i.e. it reported the approximation as
+        # totally failing when nothing was wrong with the approximation.
+        #
+        # The residual is a RATIO, so it must not depend on n_atoms at all —
+        # which is the assertion, and it is one a scale bug cannot satisfy.
+        lhy_N = compute_spatial_lhy(; psi_init=psi, F=F_, interactions=IP_,
+            n_bins=8, n_atoms=50_000)
+        r_N = spatial_lhy_residual(lhy_N, psi, F_, IP_; n_probe=2, rtol=1e-3)
+        @test isfinite(r_N)
+        @test 0.0 <= r_N < 0.10
+        @test isapprox(r_N, r; rtol=1e-9)
+        @test lhy_N.n_atoms == 50_000
+        # ...and the table itself IS divided, so the invariance above is not the
+        # trivial consequence of n_atoms being ignored everywhere.
+        @test isapprox(lhy_N.e1_values, lhy.e1_values ./ 50_000; rtol=1e-9)
     end
 
     @testset "rejected inputs" begin

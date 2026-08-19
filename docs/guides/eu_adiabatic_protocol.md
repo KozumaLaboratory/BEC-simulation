@@ -2,6 +2,37 @@
 
 > **FROZEN 2026-07-28.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+>
+> ## ⚠ RETRACTED 2026-08-18: the hysteresis reading below does not survive
+>
+> §"Result at κ = 1.8" reports a loop of **[≈27, > 100] µG** and a sharp falling-leg
+> conversion at **27.4 µG**. Re-measured under #335 (PR #352,
+> `docs/guides/eu_kappa_hysteresis_loop.md`): **that is not a hysteresis loop.** A
+> B_z ramp conserves J_z, and the two branches sit in different J_z sectors at every
+> field (polarised −5.750 at 90 µG → −1.262 at 20; flower −4.346 at 65 → −1.088 at
+> 20), so **no ramp at any rate converts between them**. What the ramp does is slide
+> along its own J_z surface, trading S_z for L_z one for one — Einstein–de Haas.
+> With both legs over one window at one pin, no leg converts at any of seven rates
+> from 1.8 ms to 1750 ms, at κ = 1.8 or κ = 0.9.
+>
+> This document states the selection rule itself, for the κ ramp, in
+> §"Why: J_z is conserved and the ground state is in another sector" — including the
+> sentence *"a B_z ramp is no better, since B_z F_z commutes with J_z too."* It was
+> not applied to the field-ramp result in the same document. **That is the specific
+> error to learn from: a selection rule written for one protocol applies to every
+> other protocol in the same document.**
+>
+> Two further numbers here are pin artefacts rather than physics. The 27.4 µG jump
+> reproduces exactly at this document's own pin (ε = 0.001 → ⟨F⊥⟩ 0.800 → 3.577
+> against the 3.58 reported below) and **halves** at ε = 0.002 (0.829 → 2.214), so
+> the conversion amplitude is a strong function of the residual transverse field —
+> at values one to two orders below any lab's. And the "flower survives to 100 µG"
+> reading is not supported: the flower branch **ends at 68.4 ± 0.15 µG**, measured
+> statically; it merely takes longer than a ramp to fall once past its spinodal.
+>
+> What survives: the κ dependence, the static branch structure, and the protocol
+> machinery. What replaces the loop width as the deliverable: a discrete
+> Stern-Gerlach level count, 6–7 populated m_F at κ = 1.8 against 3–4 at κ = 0.9.
 
 The Einstein–de Haas measurement was a quench; this asks the ground-state question.
 Can the chiral/flower phase be *prepared*? Three protocol classes were built and

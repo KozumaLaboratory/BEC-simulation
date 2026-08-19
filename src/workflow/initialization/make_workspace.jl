@@ -77,7 +77,7 @@ function make_workspace(;
     # A/B fixture. Callers building a workspace by hand for production physics
     # want `ddi_padding=true, ddi_trunc_radius=-1.0`: without them the bare
     # periodic kernel carries a 2-5% dipolar field error that is flat in
-    # resolution (scripts/ddi_cutoff_geometry_jz_probe.jl).
+    # resolution (ddi_cutoff_geometry_jz_probe.jl (archived: BEC-simulation-archive/scripts_2026_08_18/)).
     ddi_padding::Bool=false,
     ddi_trunc_radius::Float64=NaN,
     ddi_pad_factor::Union{Real, NTuple{N, Real}}=2,
@@ -190,8 +190,9 @@ function make_workspace(;
         # had the wrong sign and over-confined any rotating-frame ITP /
         # RTP, biasing FL / cyclic / vortex-lattice scans where Ω
         # approaches a non-trivial fraction of ω_⊥. Fixed 2026-04-27
-        # after code review caught it. (Dy Innsbruck 2022 lab-frame magnetostir
-        # runs with rotating_frame_omega = 0 are unaffected.)
+        # after code review caught it. (Klaus et al. 2022 [arXiv:2206.12265]
+        # lab-frame magnetostir runs with rotating_frame_omega = 0 are
+        # unaffected.)
         omega_sq_half = U(0.5 * omega^2)
         @inbounds for I in CartesianIndices(grid.config.n_points)
             r_perp_sq = grid.x[1][I[1]]^2 + grid.x[2][I[2]]^2
@@ -290,7 +291,7 @@ function make_workspace(;
             n_peak_est =
                 sum(abs2, _to_host(psi)) / cell_volume(grid) /
                 max(1, prod(grid.config.n_points))  # rough mean → upper bound on n_peak
-            larmor_ratio = abs(p_now) / max(c_dd_val * n_peak_est, 1e-30)
+            larmor_ratio = abs(p_now) / max(c_dd_val * n_peak_est, DENOM_FLOOR)
             if larmor_ratio > 100.0
                 @info "DDI Larmor regime: ω_L / (c_dd · ⟨n⟩) ≈ $(round(larmor_ratio; sigdigits=3)). " *
                     "Consider `secular_ddi=true` — the Larmor cycle averages the " *

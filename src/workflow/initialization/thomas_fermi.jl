@@ -138,7 +138,7 @@ function init_psi_thomas_fermi_textured(
         for c in 1:D
             local_n += abs2(texture_psi[I, c])
         end
-        local_n > 1e-30 || continue
+        local_n > COUPLING_TOL || continue
         # |ψ(r)|² = n_TF(r), with the per-component ratio set by the
         # supplied texture
         scale = sqrt(n_TF[I] / local_n)

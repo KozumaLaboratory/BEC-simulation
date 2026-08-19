@@ -3,9 +3,15 @@
 # const / ramp / chirp), dispatches the chosen integrator, and records
 # observable history (norms, Lz, ⟨F_z⟩, per-m, optional ψ̃ snapshots).
 
+# What this path actually executes. `strang` is the order-2 key
+# `_dt_from_epsilon` understands, and `split_step_midpoint!` is Strang with a
+# midpoint mean-field predictor — same order, restored (CLAUDE.md).
+const _ROTATING_ACTUAL_INTEGRATOR = "strang"
+
 @noinline function _run_rotating_basis_dynamics_inner(
     p::Dict{String, Any}, grid, pipeline_results::Dict;
     verbose::Bool=true,
+    live_status_path::Union{Nothing, String}=nothing,
 )
     haskey(pipeline_results, :rotating_basis_gs) || throw(
         ArgumentError(
@@ -20,6 +26,16 @@
 
     duration = Float64(p["duration"])
     integrator_name = String(get(p, "integrator", _default_rotating_integrator(duration)))::String
+    # A request this path cannot honour must be said out loud. It was printed as
+    # "requested=" and recorded as `:integrator`, i.e. the artifact claimed a
+    # method that never ran, and a postmortem checking the Larmor-stiff regime
+    # read the wrong order.
+    if integrator_name != _ROTATING_ACTUAL_INTEGRATOR &&
+        integrator_name != "split_step_midpoint"
+        @warn "rotating_basis runs `split_step_midpoint!` (order 2) regardless of " *
+            "`integrator:`; the requested one is not used, and dt from " *
+            "`epsilon:` is computed for order 2." requested = integrator_name
+    end
 
     # dt resolution priority:
     #   1. explicit `dt:` in YAML (override)
@@ -29,14 +45,22 @@
         Float64(p["dt"])
     elseif haskey(p, "epsilon")
         ε = Float64(p["epsilon"])
-        _dt_from_epsilon(ε, duration, integrator_name)
+        # The order of what RUNS, not of what was asked for. This loop always
+        # calls `split_step_midpoint!` (2nd order); `integrator_name` selects
+        # nothing. Passing it here derived dt from the requested method's ORDER,
+        # so `integrator: yoshida4` with `epsilon: 1e-6` over duration 100 gave
+        # dt = 1e-3 where 2nd order needs 1e-5 — 100x too large, and since the
+        # error goes as dt^2 for the method that actually runs, **10^4 times the
+        # requested tolerance**. `yoshida6` gives 2e5 times. The accuracy knob
+        # silently did not deliver.
+        _dt_from_epsilon(ε, duration, _ROTATING_ACTUAL_INTEGRATOR)
     else
         0.005   # default when neither ε nor dt is specified
     end
     n_steps = Int(round(duration / dt_rtp))
 
     # Larmor / Â regime guard: the Y6 ε-formula coefficient (0.1) assumes
-    # commutator scales of O(1). For Klaus regime where p × F or
+    # commutator scales of O(1). For the fast-Larmor regime where p × F or
     # |Â| × |H_DDI| scale 10³–10⁵, ε=1e-3 is empirically too coarse and
     # produces non-physical depolarisation (audit 2026-04-28: p_3000
     # ε=1e-3 → 0.997→0.106 thermal scrambling; ε=1e-6 → 0.997→0.999
@@ -186,8 +210,15 @@
     end
 
     dV = prod(grid.dx)
+    # Liveness for the autopilot's divergence kill. This path wrote no
+    # `_live_status.json` until 2026-08-07, so a diverging rotating_basis run ran
+    # to completion and billed for it — the reaper had nothing to read. Same
+    # writer as the standard path (`_emit_live_status`), so the keys cannot drift
+    # apart again.
+    cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     _record =
         (step, t) -> begin
+            cb_live === nothing || cb_live(ws, step, times_arr, Float64[])
             if step == 1 || step % save_every == 0
                 push!(times_arr, t)
                 push!(norms_arr, sqrt(sum(abs2, ws.state.psi) * dV))
@@ -211,8 +242,16 @@
                 psum > 0 && (pm ./= psum)
                 push!(per_m_arr, pm)
                 push!(Fz_arr, sum((F_val - (c - 1)) * pm[c] for c in 1:length(pm)))
-                push!(Fx_arr, 0.0);
-                push!(Fy_arr, 0.0)
+                # ⟨F_x⟩, ⟨F_y⟩ in the tilde (field-following) frame. These were
+                # literal `0.0` until 2026-08-07 and were written to the jld2 as
+                # `dynamics/Fx` / `dynamics/Fy`, so every rotating-field run
+                # reported "no transverse magnetisation" — a plausible-looking
+                # measurement of exactly the quantity a rotating-field experiment
+                # is about. `sm` and `ψtilde` were already in hand; nothing was
+                # missing but the call.
+                fx_d, fy_d, _ = spin_density_vector(ψtilde, sm, N_dim)
+                push!(Fx_arr, sum(fx_d) * dV)
+                push!(Fy_arr, sum(fy_d) * dV)
                 if save_psi
                     snap = Array{ComplexF64, 4}(undef, size(ψtilde)...)
                     copyto!(snap, ψtilde)
@@ -241,7 +280,10 @@
         # check whether a run was in the Larmor-stiff regime
         # (`p · F · dt > π`) without re-loading the YAML config.
         :dt_used => dt_rtp,
-        :integrator => integrator_name,
+        # What RAN. This recorded the REQUEST until 2026-08-07, so an audit
+        # reading `integrator_meta/integrator` got a method that never executed.
+        :integrator => "split_step_midpoint",
+        :integrator_requested => integrator_name,
         :epsilon_target => Float64(get(p, "epsilon", NaN)),
         :p_zeeman => ws_prev.p,
         :F_atom => F_atom_int,

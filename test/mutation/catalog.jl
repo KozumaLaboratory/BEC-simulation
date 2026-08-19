@@ -353,7 +353,10 @@ const MUTANTS = Mutant[
          data labelled `phase_classify` that a different analyzer produced — \
          the aliased-dispatch silent-bug factory the convention exists to stop."),
     Mutant(:gs_interactions_inherit_over_explicit,
-        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+        # Relocated body, unchanged text: `_resolve_gs_interactions` moved out of
+        # run_step_ground_state.jl into resolve_gs.jl. Retargeting the path is the
+        # whole fix — the anchor still matches once at resolve_gs.jl:75.
+        "src/workflow/experiments/pipeline/resolve_gs.jl",
         r"    if haskey\(p, \"interactions\"\)\n        return _parse_gs_interactions\(p\[\"interactions\"\], atom\)\n    elseif ws_prev !== nothing\n        return ws_prev\.interactions",
         "    if ws_prev !== nothing\n        return ws_prev.interactions\n    elseif haskey(p, \"interactions\")\n        return _parse_gs_interactions(p[\"interactions\"], atom)",
         :path_default, :fatal,
@@ -378,16 +381,30 @@ const MUTANTS = Mutant[
         "Every production run took the bare unpadded kernel: 2-5 % field error, \
          flat in n. A default in the PARSER, invisible to every test that builds \
          a workspace directly — which is what `bench/profile_rtp.jl` did."),
+    # RE-ANCHORED 2026-08-19, and the move is the fix this mutant was written
+    # about. It used to pin the LBFGS call site's own `spinor_lhy=` /
+    # `lhy_opts=` lines in `run_step_ground_state.jl`, because that call site
+    # spelled the physics bundle out by hand and had dropped the pair. All three
+    # call sites in that file now splat `gs_physics_kwargs(r)`, so there is ONE
+    # place to drop the pair from and this anchors there. The mutant is
+    # correspondingly stronger: it now removes the tabulated LHY from the ITP
+    # arm, the LBFGS arm AND the cache-hit workspace at once.
+    #
+    # `spinor_lhy` and `lhy_opts` are deleted TOGETHER, because splitting them
+    # is defect #174 on its own (`lhy_opts` carries `n_atoms`, so a defaulted
+    # one makes every table N_atoms too strong) and this mutant is about the
+    # table being absent, not mis-scaled.
     Mutant(:yaml_lbfgs_drops_lhy_table,
-        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
-        r"                spinor_lhy=spinor_lhy_mode,\n                lhy_opts=gs_lhy_opts,",
-        "                lhy_opts=gs_lhy_opts,",
+        "src/workflow/experiments/pipeline/resolve_gs.jl",
+        r"    spinor_lhy=r\.spinor_lhy,\n    lhy_opts=r\.lhy_opts,\n",
+        "",
         :drop, :fatal,
         "gotcha_lhy_table_dropped_per_path_not_per_sign_2026_07_29 (#179)",
         "`method: lbfgs` ran every ground state with NO tabulated LHY while the \
          ITP arm three lines up was correct. The registry single-declares the \
          SIGN; it does not make the term reach every PATH. Six paths have \
-         dropped `ws.lhy` this way."),
+         dropped `ws.lhy` this way — and the reason the LBFGS arm could differ \
+         from the ITP arm at all was that each transcribed the bundle by hand."),
     Mutant(:yaml_calibration_not_applied,
         "src/workflow/experiments/pipeline/run_registry.jl",
         # Exactly-8-space indentation pins the single-block arm; the
@@ -525,25 +542,43 @@ const MUTANTS = Mutant[
         "The named wrapper stops forwarding `phi`, so every caller asking for an \
          in-plane direction gets phi = 0. `:transverse_x` is exactly this call, and \
          the wrapper's whole contract is that it is `init_psi` with a name."),
+    # Both entries below used to anchor on `_gs_cache_key` — a hand-listed dict
+    # laundered through `_hashable`. Cutover step 3 DELETED that key (see the
+    # essay at run_step_ground_state.jl:191) and split admission in two:
+    # `gs_model(r)` carries the physics, `_gs_stage_params(r, p)` the numerics.
+    # The two CONTRACTS are unchanged, so the mutants are retargeted rather than
+    # retired — one per half, still injecting "id blind to physics" and "id
+    # sensitive to non-physics".
     Mutant(:gs_cache_key_ignores_interactions,
-        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
-        r"        \"c\" => _hashable\(interactions\.c\),",
-        "        # mutant: interaction channels dropped from the cache key",
+        "src/workflow/experiments/pipeline/resolve_gs.jl",
+        # Anchored on c1, NOT on the c4/c6 extra ranks. Blanking `c_extra_*` was
+        # tried first and is a DEGENERATE KNOB: no fixture under test/model/ and no
+        # committed config under runs/ sets `c4:`/`c6:`, so `ranks` is already empty
+        # and the "mutation" changes no byte. It duly reported ESCAPED from a probe
+        # containing test_gs_admission_axes.jl, which would have read as a gap in
+        # the one file whose job is that partition. c1 is live in every fixture
+        # (c1_ratio = -0.01 / -0.02 / 0.0), so a miss here is a real miss.
+        r"        c0=get\(c, 0, 0\.0\),\n        c1=get\(c, 1, 0\.0\),",
+        "        c0=get(c, 0, 0.0),\n        c1=0.0,",
         :drop, :fatal,
-        "the GS stage cache's 'sensitivity to real physics' contract",
-        "Drops the scattering channels from the cache key, so changing c0/c1 hits a \
-         STALE cached ground state. The run reports success and reuses the wrong \
-         physics — the worst shape a cache bug can take, because nothing looks \
-         broken."),
+        "the GS admission id's 'sensitivity to real physics' contract",
+        "Drops the spin-dependent coupling from the artifact id while the SOLVE still \
+         reads it from `GSResolved`, so two configs differing only in c1 address the \
+         same stage artifact. The store is content-addressed and SHARED, so this \
+         serves one config's ground state to a different question. The run reports \
+         success and reuses the wrong physics — the worst shape a cache bug can take, \
+         because nothing looks broken."),
     Mutant(:gs_cache_key_includes_metadata,
         "src/workflow/experiments/pipeline/run_step_ground_state.jl",
-        r"        \"v\" => 1,                                    # key-schema version",
-        "        \"v\" => 1, \"analyze\" => _hashable(get(p, \"analyze\", nothing)),",
+        r"        tol=r\.tol,\n        n_steps=r\.n_steps,",
+        "        tol=r.tol,\n        analyze=string(get(p, \"analyze\", nothing)),\n        n_steps=r.n_steps,",
         :drop, :subtle,
-        "the cache's 'INSENSITIVE to non-physics' contract",
-        "Folds a NON-physics key (the analyze block) into the cache key, so adding an \
-         analyzer invalidates a ground state that is physically identical. Silent: \
-         the answers stay right and only the cost changes."),
+        "the GS admission id's 'INSENSITIVE to non-physics' contract",
+        "Folds a NON-physics key (the analyze block) into the numerics half of the \
+         admission id, so adding an analyzer invalidates a ground state that is \
+         physically identical. Silent: the answers stay right and only the cost \
+         changes. `test/model/test_gs_admission_axes.jl` partitions every GS_SCHEMA \
+         key and is the file that should see this."),
     Mutant(:b_block_cartesian_direction_guard,
         "src/workflow/experiments/schema/B_block.jl",
         r"    has_cartesian && has_direction &&\n        throw\(",
@@ -655,6 +690,95 @@ const MUTANTS = Mutant[
          channel map AND the Sign Pattern Lemma's β_S together. Both would still \
          agree with each other — this is a single declaration two subsystems read, \
          so only an absolute reference can see it."),
+
+    # ── the anomalous (pairing) blocks: conj present or absent ───────
+    #
+    # Added 2026-08-19 after a census of inline `conj` in `src/`. Production
+    # spinor code is well factored — the raw `conj(ψ[I,c])·M[c,cp]·ψ[I,cp]`
+    # contraction survives ONLY in `src/validation/`, where restating it is the
+    # point. The exceptions are the two Nambu subsystems below, which carry 24
+    # of the tree's 115 `conj` calls, and neither had a single catalog entry.
+    #
+    # That is not the same as "untested": the inventory grades both as
+    # differential/exact/metamorphic/order with no pin-only file, and
+    # `test_trapped_bdg_spectrum.jl` diffs the trapped operator against the
+    # homogeneous BdG in the uniform limit. What was never asked is the
+    # mutation question — *would a dropped conj actually turn something red* —
+    # and in a Nambu block a dropped conj is a real, quiet defect: the matrix
+    # stays the right SHAPE, so the ω ↦ −conj(ω) quartet self-check still
+    # passes (its own docstring says it is a property of the block pattern, not
+    # of the entries).
+    Mutant(:bdg_lower_block_conj_dropped,
+        "src/solvers/trapped_bdg.jl",
+        r"    is_u \? \(Le \.- μ \.\* e, \.-conj\.\(Me\)\) : \(Me, \.-conj\.\(Le\) \.\+ μ \.\* e\)",
+        "    is_u ? (Le .- μ .* e, .-Me) : (Me, .-Le .+ μ .* e)",
+        :sign, :fatal,
+        "conj census 2026-08-19 (no prior incident — this is the gap being closed)",
+        "H_BdG = [[L−μ, M], [−conj(M), −conj(L−μ)]]. Dropping both conj keeps the \
+         block PATTERN, so `quartet_residual` — the only runtime self-check — is \
+         still satisfied. Only the uniform-limit diff against the homogeneous \
+         BdG can see it."),
+    Mutant(:bdg_mu_shift_sign,
+        "src/solvers/trapped_bdg.jl",
+        r"    Le = \(hp \.- im \.\* hip\) \./ 4",
+        "    Le = (hp .+ im .* hip) ./ 4",
+        :sign, :fatal,
+        "conj census 2026-08-19",
+        "Swaps the L_op / M_op extraction from the v/iv real representation. \
+         Both blocks are still populated and Hermitian-shaped, so the spectrum \
+         is still a plausible set of frequencies."),
+    Mutant(:tdhfb_nambu_delta_conj_dropped,
+        "src/hamiltonian/tdhfb/strang_step.jl",
+        r"            W\[D \+ c, c_p\] = -conj\(Delta_phi\[c, c_p\]\)",
+        "            W[D + c, c_p] = -Delta_phi[c, c_p]",
+        :sign, :fatal,
+        "conj census 2026-08-19",
+        "W^φ = [[U, Δ], [−conj(Δ), −conj(U)]]. Without the conj the generator \
+         stops being a valid Nambu Hamiltonian, but the step still runs and \
+         still produces a normalised state — `test_tdhfb_conservation.jl` is \
+         what has to catch it."),
+    # Anchored on the U^R arm specifically: the same contraction appears in the
+    # U^φ arm 70 lines up, deliberately (`strang_step.jl:206` — variational
+    # consistency between the two self-energies), and an anchor matching both
+    # would be STALE by the catalog's own exactly-once rule. Mutating one of a
+    # deliberate pair is also the sharper probe: it asks whether anything
+    # notices that the two self-energies have stopped agreeing.
+    Mutant(:tdhfb_pair_density_conj_swapped,
+        "src/hamiltonian/tdhfb/strang_step.jl",
+        r"# \(variational consistency, see strang_step\.jl:206 comment\)\.\n(\s+)uval \+=\n\s+Vk \* \(\n\s+conj\(state_for_gen\.phi\[idx, c2_p\]\) \* state_for_gen\.phi\[idx, c2\]",
+        "# (variational consistency, see strang_step.jl:206 comment).\n\\1uval +=\n\\1    Vk * (\n\\1        state_for_gen.phi[idx, c2_p] * conj(state_for_gen.phi[idx, c2])",
+        :sign, :fatal,
+        "conj census 2026-08-19",
+        "Transposes the pair density ρ[c2_p, c2] → ρ[c2, c2_p] in the U^R \
+         self-energy only, so U^R and U^φ stop agreeing. Real on the diagonal, \
+         so anything that looks only at populations sees nothing; it is the \
+         off-diagonal coherences that move."),
+
+    # ── the SSoT primitives added 2026-08-19 ─────────────────────────
+    #
+    # A primitive that collapses N call sites into one is a bigger blast radius
+    # than any of them was. These two say so.
+    Mutant(:wick_phase_branch_swapped,
+        "src/foundation/wick.jl",
+        r"    imaginary_time \? exp\(arg\) : cis\(arg\)",
+        "    imaginary_time ? cis(arg) : exp(arg)",
+        :sign, :fatal,
+        "the Wick-rotation unification, 2026-08-19",
+        "Every propagator substep in the tree now routes its imaginary-time \
+         branch through this line. Swapping it makes ITP a real-time rotation \
+         (nothing decays) and real time a decay (norm dies) — so if this \
+         survives, the suite is not exercising one of the two directions."),
+    Mutant(:outer_chain_reverse_dropped,
+        "src/hamiltonian/integrator/split_step.jl",
+        r"    _run_outer_chain!\(reverse\(OUTER_CHAIN\), ws, c\)",
+        "    _run_outer_chain!(OUTER_CHAIN, ws, c)",
+        :sign, :fatal,
+        "the outer-chain derivation, 2026-08-19",
+        "Breaks the Strang sandwich's symmetry while leaving every substep \
+         present and every per-term oracle green — the order is the only thing \
+         wrong. Catching it needs a convergence-order or fwd∘bwd=id test, which \
+         is exactly what the old hand-written reversed twin had no equivalent \
+         of."),
 ]
 
 """

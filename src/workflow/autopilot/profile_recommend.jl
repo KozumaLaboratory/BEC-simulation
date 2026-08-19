@@ -75,14 +75,27 @@ end
 
 # ── parsing helpers ──────────────────────────────────────────────────
 
-# Spinor multiplicity by atom name — only a handful are in active use;
-# unknown atoms fall back to F=1 which is the safe lower bound for
-# scalar VRAM estimation.
-const _F_BY_ATOM = Dict{String, Int}(
-    "Rb87" => 1, "Na23" => 1, "Cs133" => 1,    # scalar / single-F
-    "Cr52" => 3, "Er168" => 6, "Dy164" => 8,
-    "Eu151" => 6,
-)
+# Spinor multiplicity comes from `ATOM_REGISTRY`, which is the ONE declaration
+# of F per species. A hand-written table lived here until 2026-08-06 and held 7
+# of the registry's 23 atoms, with `Cs133` wrong in-table (F=1 against the
+# registry's 3).
+#
+# The VRAM estimate scales as `spinor_mult = 2F + 1`, so a missing atom was
+# under-sized by exactly (2F_true+1)/3: Dy162 5.67x, Eu153 and Er166 4.33x,
+# Cs133 2.33x, Rb85 1.67x. `Eu153` at 128^3 was recommended `gpu_1` at 0.94 GB
+# while the identical-F `Eu151` got `default` at 4.06 GB. An under-sized job OOMs
+# on TSUBAME, is classified `:killed_bug`, and `retry.jl` escalates the resource
+# class — so the queue is paid for twice.
+#
+# The comment that stood here called F=1 "the safe lower bound", which inverts
+# the direction: for a RESOURCE estimate, low is the unsafe side.
+
+"Spin quantum number for an atom name, from `ATOM_REGISTRY`; 1 if unparseable."
+function _atom_F(atom::AbstractString)
+    isempty(atom) && return 1
+    sym = Symbol(atom)
+    haskey(ATOM_REGISTRY, sym) ? ATOM_REGISTRY[sym].F : 1
+end
 
 function _largest_grid_and_F(spec::AbstractDict)
     pipeline = get(spec, "pipeline", nothing)
@@ -102,7 +115,9 @@ function _largest_grid_and_F(spec::AbstractDict)
                 0
             end
             atom = String(get(body, "atom", ""))
-            F = get(_F_BY_ATOM, atom, 1)
+            # F=1 only for a spec whose atom does not parse; the registry is
+            # the authority and an unknown name UNDER-estimates.
+            F = _atom_F(atom)
             # Largest voxel count wins (the dominating VRAM consumer);
             # keep the F that came with it.
             if voxels > best_vox

@@ -62,14 +62,14 @@ a typo warning.
 
 | key | type / enum | default | notes |
 |---|---|---|---|
-| `kind` | spinor / binary / rotating_basis | spinor | which solver |
+| `kind` | spinor / binary / rotating_basis / scalar_egpe | spinor | which solver. `scalar_egpe` is the adiabatic-spin-elimination path — see its own section below |
 | `atom` | string | — | Eu151 / Dy164 / Rb87 / Cr52 / Er168 / ... |
 | `dtype` | f32 / f64 | f64 | mixed precision |
 | `backend` | cpu / gpu | cpu | `gpu` requires CUDA-loaded session |
 | `method` | itp / lbfgs | itp | ground-state solver |
 | `dt` | Real [1e-8, 1.0] | 0.001 | imaginary-time step |
 | `n_steps` | Real [0, 1e9] | 100000 | ITP step cap |
-| `tol` | Real [1e-16, 1.0] | 1e-8 | convergence threshold (`grad_norm`) |
+| `tol` | Real [1e-16, 1.0] | 1e-8 | convergence threshold — **meaning depends on `method`**: for `itp` (the default above) it bounds the relative ENERGY change and is tested only every `save_every = max(1, n_steps ÷ 100)` steps, i.e. 1000 apart at the default `n_steps`; for `lbfgs` it is the gradient norm. This cell said `grad_norm` unconditionally until 2026-08-06. Derived form in `docs/STATE.md`. |
 | `m_lbfgs` | Real [1, 100] | 10 | LBFGS history length |
 | `init_m_idx` | Int [1, 25] | — | which m to seed |
 | `init_sigma` | Real [0, 100] | — | Gaussian seed σ |
@@ -119,7 +119,7 @@ a typo warning.
 | `hard_polarize` | Real [-12, 12] | — | force `<F_z>=value` at step start |
 | `noise_seed` | Number | random | RNG seed for thermal / mode noise |
 | `integrator` | standard: strang / midpoint / rk4ip — rotating_basis: strang / yoshida4 / yoshida6 / cfet4 | strang | any other value raises `ArgumentError`; `yoshida` / `adaptive` / `richardson` are NOT implemented on the standard path (`_resolve_dynamics_stepper`, `run_step_dynamics.jl:463`) |
-| `backend` | cpu / gpu | inherited | per-step override |
+| `backend` | cpu / gpu | **inherited from the predecessor workspace** | NOT a per-step override on `dynamics:` — `run_step_dynamics.jl:191` takes `ws_prev.backend` and the step key is validated and discarded. Called a per-step override here until 2026-08-06. |
 | `kind` | binary / rotating_basis | inherited | per-step solver override |
 | `B_direction` | dict | — | rotating_basis only |
 | `epsilon` | Real [1e-15, 1.0] | — | rotating_basis adaptive accuracy |
@@ -351,9 +351,11 @@ Accepts a Number / Bool (scalar shortcut) or a Dict with these keys:
 | `evap_energy_cutoff` | Number | [0, 1e10] — single-particle ε cutoff |
 | `evap_rate` | Number | [0, 1e10] — rate coefficient |
 
-Routing footgun caught 2026-05-13: `K3_per_m` / `K3_per_m_si` now route to
+Routing footgun caught 2026-05-13: `K3_per_m_cubic` / `K3_per_m_si` route to
 `LossParams.K3_per_m_cubic` (quadratic-in-n true 3-body), NOT the legacy
-linear-in-n field. Pre-fix runs need re-verification (see memory).
+linear-in-n field. Pre-fix runs need re-verification (see memory). The bare
+`K3_per_m` alias named here until 2026-08-05 was **removed 2026-05-24** and now
+throws (`parsing_blocks.jl:143`) — see the migration table at the end of this file.
 
 ### `save` (dynamics output sub-block)
 
@@ -362,8 +364,48 @@ linear-in-n field. Pre-fix runs need re-verification (see memory).
 | `every` | Int [0, 1e9] | save every N steps |
 | `n_snapshots` | Int [0, 1e6] | OR fix the snapshot count |
 | `psi` | Bool | include ψ in the snapshot (large) |
+| `column_density` | Bool | `scalar_egpe` only — keep the z-integrated density per save point |
 | `compression` | Bool / String | jld2 compression mode |
 | `precision` | "f32" / "f64" | snapshot precision |
+
+### `kind: scalar_egpe` — adiabatic spin elimination
+
+One-component eGPE with a **time-dependent dipolar polarization axis**, for the
+Larmor-fast limit where `|Ψ(r,t)⟩ = ψ(r,t)·|B̂(t)⟩_F`. Use it when
+`recommend_spin_treatment` returns `:scalar_adiabatic`; the decision is a
+computation over `ω_L` vs the mean field vs the trap, not a preference — see
+`docs/validation/klaus2022_primary_source.md` §4 and
+`spin_treatment_report` in `src/solvers/scalar_egpe.jl`.
+
+Extra `ground_state` keys on this path:
+
+| key | type | notes |
+|---|---|---|
+| `a_s` | Real [0, 1e4] | s-wave scattering length in **Bohr radii**, overriding the `ATOM_REGISTRY` value. Papers quote a_s per magnetic field, and the registry carries one number per isotope |
+| `B_direction` | dict | the stir protocol; see below |
+| `B_magnitude_gauss` | Real [0, 1e4] | recorded for the `spin_treatment_report` only — this path has no Zeeman term, the field enters solely as the polarization DIRECTION |
+| `ddi_pad` | Vector{Int} | per-axis zero-pad factors for the dipolar convolution (`ScalarDDIPad`). Costs `prod(pad)` × the FFT; on the Klaus cell `(2,2,2)` moves the ground-state AR by 1.9 % |
+| `lhy` | dict | `kind: none` or `kind: scalar` only. The spinor closed forms assume a spinor ansatz this path has eliminated, and are refused |
+
+Extra `dynamics` keys:
+
+| key | type | notes |
+|---|---|---|
+| `B_direction` | dict | stir protocol; defaults to the ground state's |
+| `wigner_seed` | dict | `{kT, seed, e_cut_ratio}` — truncated-Wigner seed on the **trap eigenstates**. `kT` is in ℏω_ref. NOT the `noise:` block, which is normalised away before a step sees it |
+
+`B_direction` (a `StirProtocol`), all in reference units:
+
+| key | meaning |
+|---|---|
+| `theta` | polar angle of B̂ from ẑ, radians |
+| `omega` | final Ω/ω_ref of the azimuthal rotation |
+| `ramp_rate` | dΩ/dt in ω_ref²; omit (or 0) for a sudden start at `omega`. Klaus's Ω̇ = 2π×50 Hz/s at ω_ref = 2π×50 Hz is `0.0031831`, which reaches Ω = ω_⊥ in exactly 1 s |
+| `phi0` | initial azimuth |
+| `theta_final`, `theta_ramp_start`, `theta_ramp_time` | spiral B̂ to a new polar angle while still rotating. Setting `theta_final` without `theta_ramp_start` is an `ArgumentError`, not a silent no-op |
+
+φ(t) is integrated in closed form, so the axis is exact at any substep time
+rather than accumulated.
 
 ### `seed_mode` — deterministic single-mode seed
 
@@ -522,7 +564,7 @@ Used by every field that accepts time dependence (`B.{Bx, By, Bz, ...}`,
 | `{sum: [<spec>, ...]}` | additive composition of any of the above |
 | existing `Waveform` | passthrough |
 
-**`frequency` convention** (Klaus-2022 footgun, memory
+**`frequency` convention** (Klaus et al. 2022 footgun, memory
 `gotcha_waveform_frequency_convention.md`): for `sinusoidal`, YAML
 `frequency` is `f_phys / (2π · f_ref)`, not `f_phys / f_ref`. Pass
 `"X Hz"` (string with units) for unambiguous lab-unit input.
@@ -658,8 +700,15 @@ A list of analyzers, each `{<name>: <params>}`. Names include:
 - `bogoliubov` (k_max, n_k, ...)
 - `vortex_detect`, `monopole_charge`, `defect_density`
 - `column_density_movie` (axis, multi_step)
-- `larmor_phase`, `berry_connection`
-- `population_history`
+<!-- `larmor_phase`, `berry_connection` and `population_history` were listed here
+     until 2026-08-06. None has ever been a `_run_analyzer` branch. Analyzer
+     names are not pre-validated, so an unknown one throws only AFTER
+     ground_state and dynamics have run — a reader who copied one paid for the
+     whole simulation and got no point_*.jld2. The nearest real objects are
+     `berry_connection_trajectory` (analyzers/rotating_basis.jl, called
+     directly) and the `larmor_phase_per_step` key of `integrator_meta`;
+     neither is reachable from `analyze:`. Gated by
+     test/workflow/test_docs_teach_real_analyzers.jl. -->
 - `trap_population` (radius, center) — inside-vs-outside-trap norm split; tracks atoms spilling toward the absorbing boundary
 - `cloud_shape` — center of mass, per-axis RMS widths, principal-axis widths, aspect ratio, in-plane tilt; quantifies cloud deformation across a snapshot series
 - `superfluid_fraction` (directions, method) — per-axis $f_s$ from the phase-twist free energy: `leggett` (plane-average bound), `relaxed` (full variational minimum), or `both` (default). Rigid-density, so both are upper bounds; a cloud that does not span the periodic box legitimately reports ≈ 0
@@ -680,7 +729,7 @@ These keys used to be accepted via `[ALIAS]` rescues; they now raise
 | `phi_omega` / `phi_dot` (flat B_hat) | `B: {phi: <waveform>}` or `B_direction: {phi: {rate: ...}}` | `B_block.jl` |
 | `theta_const`, `theta_ramp`, `phi_chirp` (flat B_hat) | `B: {theta: <waveform>}` | same |
 | `initial_state: ferromagnetic` | `m_plus_F` or `m_minus_F` | schema enum |
-| `kind: option_gamma` | `kind: rotating_basis` | schema enum |
+| `kind: option_gamma` | `kind: rotating_basis` | **retired on `dynamics:` ONLY** — `GS_SCHEMA` still accepts it (`schema.jl:266`), `runner.jl:100`/`:112` branch on it and `test/rotating_basis/test_rotating_basis_pipeline_parsing.jl` pins that it works. Listed here as unconditionally removed until 2026-08-06; deleting the GS arms on that reading breaks that test. |
 | `backend: cuda` | `backend: gpu` | `foundation/backend.jl:_resolve_backend` |
 | `B: {level: <0|1|2>}` | (drop the key; coord auto-detects from `p` vs `Bx` vs `B_mag`) | `B_block.jl` |
 | `B: {magnitude: ...}` | `B: {B_mag: ...}` | `B_block.jl` |

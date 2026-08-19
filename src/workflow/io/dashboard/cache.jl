@@ -13,7 +13,7 @@
 # session keeps every frame's pre-packed binary warm even after the ψ
 # cache has fully cycled. Worst-case RAM with all-heavy entries is
 # ~PSI_CACHE_MAX_ENTRIES × 14 MB; with all-derived it's ~PSI_CACHE_MAX_ENTRIES
-# × 1 MB. 200 keeps a 157-frame Klaus run fully warm.
+# × 1 MB. 200 keeps a 157-frame rotating-basis run fully warm.
 const PSI_CACHE_MAX_ENTRIES = 200
 
 const _DERIVED_CACHE_PREFIXES = (
@@ -72,13 +72,16 @@ const _OPEN_JLD_MAX = 32
 #   data_cache             run-level JSON responses (per /api/data/<run>)
 #   psi_cache              ψ + derived binary blobs keyed by fpath[#snap=K]
 #   _OPEN_JLD_HANDLES      persistent JLD2 read handles (mmap'd)
-#   _vector3d_plans_cache  FFT plans per (nx, ny, nz)
+#   _vector3d_plans_cache  FFT plans + grid per ((nx, ny, nz), box_size)
 #   _PREPACK_INFLIGHT      in-flight prepack-warmer task IDs
 #   _DASHBOARD_CACHE_DIRNAME  on-disk atlas blobs (per run dir)
 #
-# Two helpers below are the canonical entry points for invalidation:
-# `clear_all_caches!` (used by /api/refresh) and `invalidate_path!`
-# (used when a single run regenerates).
+# Two helpers below are the invalidation entry points. `clear_all_caches!` is
+# the one in use — /api/refresh calls it. `invalidate_path!` has NO caller
+# today; this comment claimed it was "used when a single run regenerates", in
+# the present tense, and it never has been. It is kept because it is the right
+# primitive for a file watcher, and it is now correct — see its own docstring
+# for the matching bug that made it a no-op even if it had been called.
 
 """Drop every cache layer at once. Used by /api/refresh."""
 function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
@@ -99,10 +102,23 @@ function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
 end
 
 """Drop every cache entry that references `fpath` so the next request
-reads it fresh. Other runs' caches are preserved."""
+reads it fresh. Other runs' caches are preserved.
+
+NO CALLER as of 2026-08-08 — see the comment above. It was also a no-op if
+called: the two loops below used opposite `occursin` argument orders, and the
+`data_cache` one asked whether the whole cache KEY is a substring of the path.
+Those keys are `"<run_name>#<live_count>"` (`routes/misc.jl`), so the `#3`
+suffix is never in a file path and the test could not match — the
+fixing-the-wrong-`occursin`-argument class this repository has hit before. The
+run name is the part before `#`, and that IS a path component, so the
+comparison is made on the prefix.
+
+`psi_cache` keys embed the full path (`"phase_bin:<fpath>#snap=..."`), so that
+loop's direction was already right and is unchanged."""
 function invalidate_path!(data_cache::Dict, psi_cache::Dict, fpath::String)
     for k in collect(keys(data_cache))
-        occursin(k, fpath) && delete!(data_cache, k)
+        run_name = first(split(k, '#'))
+        !isempty(run_name) && occursin(run_name, fpath) && delete!(data_cache, k)
     end
     for k in collect(keys(psi_cache))
         occursin(fpath, k) && delete!(psi_cache, k)
@@ -152,7 +168,7 @@ end
 
 # --- Atlas disk-cache: persist computed atlases between dashboard runs ---
 # The /api/density_atlas pre-build takes ~1.4 s per axis the first time
-# a Klaus-sized run is opened. Writing the resulting blob to a sibling
+# a 157-frame run is opened. Writing the resulting blob to a sibling
 # `_dashboard_cache/` directory means we can re-load it instantly on the
 # next dashboard restart, eliminating the cold path for repeat sessions.
 #
@@ -216,7 +232,7 @@ Why: the cold path for a single frame is dominated by the JLD2 read
 (~30 ms even after OS page cache warm-up). Eagerly walking every frame
 once during the run-open hop turns subsequent scrubbing into a pure cache
 hit (sub-ms). The cache cap is 200 entries — enough for the 157-frame
-Klaus run + room for a few ψ snapshots without eviction churn.
+157-frame run + room for a few ψ snapshots without eviction churn.
 """
 function _warm_density_bin_all(
     fpath::String, n_snapshots::Int, axis::Int, psi_cache::Dict{String, Any},

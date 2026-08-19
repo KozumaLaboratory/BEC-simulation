@@ -19,15 +19,43 @@ S₄(dt) = S₂(w₁·dt) ∘ S₂(w₀·dt) ∘ S₂(w₁·dt)  with w₀ + 2w�
 #   well-defined — but MUST NOT be replaced with abs(w_0); doing so silently
 #   demotes the integrator to 2nd order.
 # See: Yoshida 1990 Phys. Lett. A 150, 262; `_yoshida_core!` below
+# TWO orders per composition, because there are two ways to realise it and this
+# repository uses BOTH.
+#
+#   `order`      — the ABA product `_aba_step!` builds: a[1] K, then alternating
+#                  b[i] V and a[i+1] K. What `test_composer_order_conditions.jl`
+#                  measured before 2026-08-07.
+#   `jump_order` — the un-merged triple jump `_composition_midpoint_core!`
+#                  builds: ∏ᵢ S₂(b[i]·dt) of complete symmetric midpoint cores.
+#                  `_run_yoshida_adaptive!` takes THIS path whenever DDI is on,
+#                  i.e. on every production Eu run.
+#
+# They are not the same number. Measured on the 8×8 spectral (K,V) stand-in:
+#
+#     composition           ABA    triple jump
+#     yoshida4              4.00   3.99
+#     suzuki4               4.00   4.00
+#     omelyan_pefrl         4.00   2.00      <-- demoted
+#     blanes_moan_srkn6b    4.00   2.00      <-- demoted
+#     yoshida6              6.00   6.00
+#
+# The two RKN methods buy their extra order conditions from the a/b INTERLEAVING;
+# their `b` alone is not a triple-jump weight list. Composing S₂ cores at those
+# weights is a consistent 2nd-order method that costs 4 and 6 stages per step —
+# four to six times plain Strang for the order plain Strang already gives. It ran
+# silently: the order gate checked the ABA form only, and the DDI path never uses
+# it. `_run_yoshida_adaptive!` now refuses the combination.
+
 const _YOSHIDA_W1 = 1.0 / (2.0 - 2.0^(1 / 3))
 const _YOSHIDA_W0 = 1.0 - 2.0 * _YOSHIDA_W1
 
 const _COMP_YOSHIDA = let w1 = _YOSHIDA_W1, w0 = _YOSHIDA_W0, wm = (w1 + w0) / 2
-    (a=(w1 / 2, wm, wm, w1 / 2), b=(w1, w0, w1))
+    (a=(w1 / 2, wm, wm, w1 / 2), b=(w1, w0, w1), order=4, jump_order=4)
 end
 
 const _COMP_SUZUKI = let p = 1.0 / (4.0 - 4.0^(1 / 3)), q = 1.0 - 4.0 * p
-    (a=(p / 2, p, (p + q) / 2, (q + p) / 2, p, p / 2), b=(p, p, q, p, p))
+    (a=(p / 2, p, (p + q) / 2, (q + p) / 2, p, p / 2), b=(p, p, q, p, p),
+        order=4, jump_order=4)
 end
 
 # Blanes & Moan (2002) SRKN₆ᵇ. The 6 counts STAGES, not order: this is a
@@ -46,7 +74,8 @@ const _COMP_BLANES_MOAN_SRKN6B = let
     b1 = 0.209515106613362
     b2 = -0.143851773179818
     b3 = 0.5 - b1 - b2
-    (a=(a1, a2, a3, a4, a3, a2, a1), b=(b1, b2, b3, b3, b2, b1))
+    (a=(a1, a2, a3, a4, a3, a2, a1), b=(b1, b2, b3, b3, b2, b1),
+        order=4, jump_order=2)
 end
 
 const _COMP_OMELYAN_PEFRL = let
@@ -55,7 +84,7 @@ const _COMP_OMELYAN_PEFRL = let
     chi = -0.06626458266981849
     a3 = 1.0 - 2.0 * (chi + xi)
     b1 = (1.0 - 2.0 * lam) / 2.0
-    (a=(xi, chi, a3, chi, xi), b=(b1, lam, lam, b1))
+    (a=(xi, chi, a3, chi, xi), b=(b1, lam, lam, b1), order=4, jump_order=2)
 end
 
 # Yoshida 6th-order (Yoshida 1990, "solution A"). 7-stage symplectic
@@ -75,7 +104,7 @@ const _COMP_YOSHIDA_S6 = let
     bs = (w3, w2, w1, w0, w1, w2, w3)
     as_pairs = (w3 / 2, (w2 + w3) / 2, (w1 + w2) / 2, (w0 + w1) / 2,
         (w1 + w0) / 2, (w2 + w1) / 2, (w3 + w2) / 2, w3 / 2)
-    (a=as_pairs, b=bs)
+    (a=as_pairs, b=bs, order=6, jump_order=6)
 end
 
 function _resolve_composition(sym::Symbol)

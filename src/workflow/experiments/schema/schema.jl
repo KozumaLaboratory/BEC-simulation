@@ -124,6 +124,10 @@ const SAVE_SCHEMA = Dict{String, FieldSpec}(
     "every" => FieldSpec(; type=Integer, range=(0.0, 1e9)),
     "n_snapshots" => FieldSpec(; type=Integer, range=(0.0, 1e6)),
     "psi" => FieldSpec(; type=Bool),
+    # scalar_egpe only: keep the z-integrated density at every save point. It is
+    # the observable an absorption image measures and is ~1/n_z the size of ψ,
+    # so a stripe analysis over 100+ frames does not need the full state.
+    "column_density" => FieldSpec(; type=Bool),
     "compression" => FieldSpec(; type=Union{Bool, String}),
     "precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
 )
@@ -259,11 +263,17 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              (species_A, species_B blocks required).
 #   rotating_basis             — B̂(t) rotating-direction frame (Option γ; see docs/design/option_gamma_rotating_basis.md)
 #                              that absorbs Larmor analytically. Use for
-#                              Klaus-style protocols where B direction
+#                              fast-Larmor protocols where B direction
 #                              evolves and p·F·dt would otherwise blow up.
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String,
-        enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
+        enum=["spinor", "binary", "rotating_basis", "option_gamma", "scalar_egpe"]),
+    # scalar_egpe path: adiabatic spin elimination. `a_s` is in BOHR RADII and
+    # overrides the registry value (Klaus quotes 109–112 a₀ for ¹⁶²Dy against a
+    # registry 122 a₀); `B_direction` carries the StirProtocol.
+    "a_s" => FieldSpec(; type=Number, range=(0.0, 1e4)),
+    "ddi_pad" => FieldSpec(; type=Vector),
+    "B_magnitude_gauss" => FieldSpec(; type=Number, range=(0.0, 1e4)),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
@@ -305,7 +315,7 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
             # `from_jld2`: load the initial ψ from a prior run's
             # result.jld2 instead of seeding a Gaussian. Pair with
             # `init_state_params: {path: ..., snap: last|N}`. Used to
-            # continue a long Klaus / EdH run beyond its original
+            # continue a long fast-Larmor / EdH run beyond its original
             # endpoint without re-running the spin-up phase.
             "from_jld2"]),
     "backend" => FieldSpec(; type=String, default="cpu", enum=["cpu", "gpu"]),
@@ -365,6 +375,16 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     # spurious "not valid" rejections of yoshida/adaptive/richardson on
     # the standard path.
     "integrator" => FieldSpec(; type=Union{String, Dict}),
+    # How the V half-step realizes its spin rotations. "sequential" (default)
+    # is SM · DDI · SM; "combined" merges them into one rotation — same order,
+    # different splitting, ~2.8× faster per step on H100 at 128³ × D=13.
+    # See `_parse_spin_step` in pipeline/run_step_dynamics.jl.
+    "spin_step" => FieldSpec(; type=String, enum=["sequential", "combined"]),
+    # Validated and DISCARDED on dynamics: `run_step_dynamics.jl:191` takes
+    # `ws_prev.backend`. Kept in the schema because `runner.jl` seeds
+    # `defaults.backend` into every step, so rejecting it would fail every
+    # config under `runs/`. It is not a per-step override; the reference table
+    # said it was until 2026-08-06.
     "backend" => FieldSpec(; type=String, enum=["cpu", "gpu"]),
     "raman" => FieldSpec(; type=Dict, schema=RAMAN_SCHEMA),
     "absorbing_boundary" => FieldSpec(; type=Dict, schema=ABSORBING_SCHEMA),
@@ -376,14 +396,24 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "projected_gp" => FieldSpec(; type=Union{Dict, Bool}, schema=PROJECTED_GP_SCHEMA),
     "photon_scattering" => FieldSpec(; type=Union{Dict, Bool}, schema=PHOTON_SCATTERING_SCHEMA),
     "loss" => FieldSpec(; type=Union{Dict, Bool, Number}, schema=LOSS_SCHEMA),
+    # KEPT so `inspect_config` does not report this as a typo — but the key is
+    # REFUSED at step construction by `_reject_inert_dynamics_keys`. Nothing
+    # under src/workflow constructs `AdaptiveDtParams`; adaptive stepping is a
+    # Julia-API path only, and this block was validated and discarded.
     "adaptive_dt" => FieldSpec(; type=Dict, schema=ADAPTIVE_DT_SCHEMA),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
-    "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis"]),
+    "kind" => FieldSpec(; type=String,
+        enum=["binary", "rotating_basis", "scalar_egpe"]),
     "couplings" => FieldSpec(; type=Dict),
-    # Option γ rotating-basis dynamics
+    # Option γ rotating-basis dynamics; also the scalar_egpe StirProtocol.
     "B_direction" => FieldSpec(; type=Dict),
     "epsilon" => FieldSpec(; type=Number, range=(1e-15, 1.0)),
+    # scalar_egpe: truncated-Wigner seed for the surface instability. NOT the
+    # `noise:` block — that one is normalised away by `_split_noise_block!`
+    # before a step ever sees it, and reusing the name would make this key
+    # vanish silently.
+    "wigner_seed" => FieldSpec(; type=Dict),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(
@@ -622,7 +652,14 @@ function _validate_ground_state_physics!(step_params::Dict, path::String,
         elseif kind == "icosahedral" && F != 6
             msg = "$path.lhy.kind = icosahedral is F=6 specific (I_h symmetry); got F=$F."
             strict ? throw(ArgumentError(msg)) : @warn msg
-        elseif kind == "full_bdg" && init in ("polar", "ferromagnetic")
+            # `ferromagnetic` was retired from the `initial_state` enum in favour of
+            # `m_plus_F` / `m_minus_F`, and this condition was never updated — so from
+            # that day until 2026-08-06 the advisory was a FALSE NEGATIVE on exactly
+            # the configs it exists for: `runs/eu_lhy_longtime/LHY_full_bdg_*.yaml`
+            # and friends paid the ~100x BdG cost with no hint that a closed form
+            # agrees to ~1e-4. Gated by
+            # `test/workflow/test_full_bdg_advisory_fires.jl`.
+        elseif kind == "full_bdg" && init in ("polar", "m_plus_F", "m_minus_F")
             @info "$path.lhy.kind = full_bdg is the general-spinor BdG path; for the " *
                 "$init ansatz the closed form is ~100× cheaper and agrees to ~1e-4 " *
                 "(gated by test/oracles/test_lhy_full_bdg_closed_form_parity.jl). " *

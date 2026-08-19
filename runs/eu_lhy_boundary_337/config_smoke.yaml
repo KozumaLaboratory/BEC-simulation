@@ -1,0 +1,40 @@
+# SMOKE for the #337 criterion-B measurement. One field, two competing seeds,
+# every LHY arm — enough to prove each arm BUILDS, RUNS and CHANGES the energy,
+# and to time one cell, in a couple of minutes. It answers nothing physical: the
+# step count is far below convergence on purpose.
+#
+# Geometry and knobs are copied from config_texture_bscan.yaml so that the arms
+# differ from the campaign in the LHY block and nothing else.
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "4.4e-5 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 120
+      tol: 1.0e-8
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.B.Bz: ["4.4e-5 Gauss"]
+  comparison_runs:
+    - {name: fm_none,     override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar_none,  override: {pipeline.0.initial_state: polar}}
+    - {name: fm_scalar,   override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: scalar}}}
+    - {name: polar_scalar, override: {pipeline.0.initial_state: polar, pipeline.0.lhy: {kind: scalar}}}
+    - {name: fm_fmdip,    override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: fm_dipolar}}}
+    - {name: polar_polcon, override: {pipeline.0.initial_state: polar, pipeline.0.lhy: {kind: polar_contact}}}
+    - {name: fm_spatial,  override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: spatial}}}
+    - {name: polar_spatial, override: {pipeline.0.initial_state: polar, pipeline.0.lhy: {kind: spatial}}}
+    - {name: fm_ctrl30,   override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: scalar, c_lhy: 177564.0}}}
+    - {name: polar_ctrl30, override: {pipeline.0.initial_state: polar, pipeline.0.lhy: {kind: scalar, c_lhy: 177564.0}}}

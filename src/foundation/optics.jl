@@ -39,7 +39,7 @@ end
 function radius_of_curvature(b::OpticalBeam)
     inv_q = 1.0 / b.q
     r = real(inv_q)
-    abs(r) < 1e-30 ? Inf : 1.0 / r
+    abs(r) < COUPLING_TOL ? Inf : 1.0 / r
 end
 
 function divergence_angle(b::OpticalBeam)

@@ -754,9 +754,13 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 @test a2.category === :nan_cascade
                 @test occursin("2700", a2.summary)
 
-                # 3. stderr.log tail with CUDA missing.
+                # 3. stderr.log tail with CUDA missing. `.autopilot/` is where
+                # `LocalBackend` writes it (`backends.jl:137`) and therefore
+                # where `analyze_failure` reads it; the bare `run_dir/stderr.log`
+                # this used had no producer.
                 rd3, e3 = _mkentry("ana_missdep_aaaa", :dep)
-                open(joinpath(rd3, "stderr.log"), "w") do io
+                mkpath(joinpath(rd3, ".autopilot"))
+                open(joinpath(rd3, ".autopilot", "stderr.log"), "w") do io
                     write(
                         io,
                         "ERROR: ArgumentError: Package CUDA " *

@@ -261,13 +261,23 @@ end
 # hide a user mistake); the RTP loop's selector treats a reason as "keep the
 # sequential path". Two consumers, one list.
 function _combined_step_unusable(ws::Workspace)
-    abs(get_cn(ws.interactions, 2)) < 1e-30 ||
+    abs(get_cn(ws.interactions, 2)) < COUPLING_TOL ||
         return "c2 ≠ 0 (S=0 singlet-pair channel is not of the form n·F̂)"
     ws.tensor_cache === nothing ||
         return "tensor_cache active (rank-4/6 channels are not of the form n·F̂)"
     ws.raman === nothing || return "Raman coupling is not supported yet"
     is_uniform(ws.zeeman) || return "a spatial Zeeman field B(r,t) is not supported"
     ws.light_shift === nothing || return "light_shift is not supported yet"
+    # `_half_potential_step_combined!` never calls `apply_spatial_lhy_spin_step!` —
+    # its only two call sites are in the general chain (split_step.jl:632, :708) —
+    # so a SpatialLHY workspace accepted here loses that substep entirely. The
+    # sibling guard `_spin_chain_reason` (spin_chain.jl) has carried this line
+    # since the substep was added; this one did not, which is what two
+    # independent lists of the same property produce. Measured 2026-08-08 on an
+    # 8^3 Rb87 DDI workspace: `spinor_lhy=:spatial` gave
+    # `_spin_chain_reason` = "a spatial-LHY spin substep sits between them" and
+    # `_combined_step_unusable` = nothing.
+    _lhy_needs_spin(ws.lhy) && return "a spatial-LHY spin substep is not carried"
     ws.ddi_bufs === nothing &&
         return "DDI buffers are required (enable_ddi=true; the spin-density and Φ scratch lives there)"
     nothing
@@ -393,7 +403,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     # standard split_step!. We tried T(dt/2) V(dt) T(dt/2) which gives
     # one fewer Combined call (~30% faster) but bigger leading-order
     # error coefficient because [V_diag, Combined] (which contains
-    # q F_z² × (n·F) in Klaus regime) is then NOT cancelled by an inner
+    # q F_z² × (n·F) in the fast-Larmor regime) is then NOT cancelled by an inner
     # Strang — measured ~30× larger per-step diff vs the standard
     # scheme. Stay with V T V to keep error within the same regime as
     # the existing production runs.

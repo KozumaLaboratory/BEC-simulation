@@ -1,4 +1,62 @@
 """
+Refuse a composition that is missing the weights every path needs.
+
+The signature used to pin `NamedTuple{(:a, :b)}`, which stopped accepting the
+module's own constants the moment they gained `order` / `jump_order`: exactly
+the two keys `_assert_jump_realisable` was added to read. A closed key set on a
+kwarg that the same file then extends is a signature that rejects its own
+defaults, so the requirement is stated here instead — `a` and `b` are needed,
+anything else is optional.
+"""
+function _assert_composition_keys(comp::NamedTuple)
+    (haskey(comp, :a) && haskey(comp, :b)) || throw(
+        ArgumentError(
+            "composition NamedTuple needs both `a` (kinetic weights) and `b` " *
+            "(potential weights); got keys $(keys(comp))",
+        ),
+    )
+    nothing
+end
+
+"""
+Refuse a composition that the DDI path cannot realise at its nominal order.
+
+`use_mid` swaps the merged ABA product for an un-merged triple jump of symmetric
+midpoint cores at the weights `b`. For Yoshida-4/6 and Suzuki those weights ARE
+the S2 sub-step sizes and the order carries over; for the two RKN methods
+(`:omelyan_pefrl`, `:blanes_moan_srkn6b`) the extra order conditions come from
+the a/b interleaving, and the jump collapses to **order 2** — measured, see the
+table in `split_step_composers.jl`. That is four to six stages per step for the
+order one Strang step already delivers, and nothing said so: the order gate
+tested the ABA form, and the DDI path never takes it.
+
+Refusing rather than warning, and rather than silently substituting: an
+integrator that quietly runs a different method than the one named is what the
+`epsilon:`/`integrator:` mismatch in the rotating handler was, fixed the same
+day. No config under `runs/` selects either method.
+"""
+function _assert_jump_realisable(requested, comp, use_mid::Bool)
+    use_mid || return nothing
+    jo = get(comp, :jump_order, nothing)
+    ord = get(comp, :order, nothing)
+    if jo === nothing || ord === nothing
+        @warn "composition has no declared jump_order; on the DDI path it is " *
+            "composed as a triple jump of S2 cores, which does not preserve " *
+            "the order of an RKN method" requested
+        return nothing
+    end
+    jo < ord && throw(
+        ArgumentError(
+            "composition $(requested) is order $(ord) as an ABA product but " *
+            "only order $(jo) as the triple jump of S2 cores that the DDI " *
+            "path builds. Use :yoshida (4), :suzuki (4) or :yoshida_s6 (6), " *
+            "which keep their order in both forms, or disable the midpoint base.",
+        ),
+    )
+    nothing
+end
+
+"""
 Adaptive 4th-order Yoshida integration with embedded Strang error estimator.
 
 Uses S₄(dt) as propagator and ‖S₄(dt)ψ - S₂(dt)ψ‖/‖ψ‖ as error estimate.
@@ -27,11 +85,24 @@ function run_simulation_yoshida!(
     t_end::Float64,
     save_interval::Float64,
     callback::Union{Nothing, Function}=nothing,
-    composition::Union{Symbol, NamedTuple{(:a, :b)}}=:yoshida,
+    composition::Union{Symbol, NamedTuple}=:yoshida,
 ) where {N}
     n_comp = ws.spin_matrices.system.n_components
     sys = ws.spin_matrices.system
     comp = composition isa Symbol ? _resolve_composition(composition) : composition
+    _assert_composition_keys(comp)
+
+    # Checked ONCE, before any stepping: neither `MEANFIELD_MIDPOINT_ENABLED[]`
+    # nor `ws.ddi` changes during the run, so a composition the DDI path cannot
+    # realise should cost nothing rather than fail on the first accepted step.
+    #
+    # `_assert_jump_realisable` was DEFINED and never called — an edit script
+    # aborted before writing, and the gate that should have caught it called the
+    # guard directly instead of going through this entry point. So the DDI path
+    # went on silently running `omelyan_pefrl` / `blanes_moan_srkn6b` at order 2.
+    _assert_jump_realisable(
+        composition, comp, MEANFIELD_MIDPOINT_ENABLED[] && ws.ddi !== nothing
+    )
 
     dt = clamp(adaptive.dt_init, adaptive.dt_min, adaptive.dt_max)
 
@@ -104,7 +175,7 @@ function run_simulation_yoshida!(
         n_accepted += 1
 
         if !is_clamped
-            factor = err > 1e-300 ? min(3.0, 0.9 * (adaptive.tol / err)^0.2) : 3.0
+            factor = err > UNDERFLOW_FLOOR ? min(3.0, 0.9 * (adaptive.tol / err)^0.2) : 3.0
             dt = clamp(dt * factor, adaptive.dt_min, adaptive.dt_max)
         end
 

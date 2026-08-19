@@ -166,7 +166,10 @@ function autopilot_tick!(; config::AutopilotConfig=default_autopilot_config())
             autopilot_pause!(; qr=config.qr)
             append_error_event!("breaker:$(trip)", breaker_details; qr=config.qr)
             try
-                notify_slack("[autopilot] breaker $(trip) tripped — paused. $(breaker_details)")
+                notify_slack(
+                    "[autopilot] breaker $(trip) tripped — paused. $(breaker_details)";
+                    status=:error,
+                )
             catch
             end
         end
@@ -279,7 +282,10 @@ function _autopilot_tick_body!(config::AutopilotConfig, stats::AutopilotStats)
             _record_outcome_safe!(entry, terminal; qr=config.qr)
             if config.notify_slack_on_failure
                 try
-                    notify_slack("[autopilot] $(entry.content_id) → $(terminal): $(reason)")
+                    notify_slack(
+                        "[autopilot] $(entry.content_id) → $(terminal): $(reason)";
+                        status=:error,
+                    )
                 catch err
                     ;
                     @warn "notify_slack threw" exception=err
@@ -370,7 +376,8 @@ function _dispatch_pending_pass!(config::AutopilotConfig,
                 try
                     notify_slack(
                         "[autopilot] pre-flight :warn on " *
-                        "$(entry.content_id): $(join(pre.warn_kinds, ", "))",
+                        "$(entry.content_id): $(join(pre.warn_kinds, ", "))";
+                        status=:warning,
                     )
                 catch err
                     @warn "notify_slack threw" exception=err

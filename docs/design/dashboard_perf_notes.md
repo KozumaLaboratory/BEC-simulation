@@ -7,7 +7,7 @@ The 2D scrubber pipeline is currently bottlenecked by the display refresh rate (
 
 ## Opt-in: bsz=1 atlas compression for slow links
 
-The atlas endpoint accepts `?bsz=1`, which returns a bitshuffle + zstd-3 compressed binary (Klaus 64×64 atlas: 46 MB → 36 MB, ~21 % smaller).
+The atlas endpoint accepts `?bsz=1`, which returns a bitshuffle + zstd-3 compressed binary (64×64 magnetostir atlas: 46 MB → 36 MB, ~21 % smaller).
 
 Useful when the dashboard is reached over LAN / SSH tunnel where the 46 MB raw atlas dominates the load time. Not enabled by default because:
 
@@ -61,7 +61,7 @@ The atlas worker already transfers the `Float32Array` buffers zero-copy via `pos
 
 Atlases are persisted to `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Stale check: if the source `.jld2` mtime is newer than the cache file, the cache is silently rebuilt. To wipe everything, `rm -rf runs/_dashboard_cache` (example).
 
-## Bench targets (Klaus F=8, 64×64×32, 157 snaps)
+## Bench targets (F=8 magnetostir, 64×64×32, 157 snaps)
 
 | metric                         | value         | notes                          |
 |--------------------------------|---------------|--------------------------------|
