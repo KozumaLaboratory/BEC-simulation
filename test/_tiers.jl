@@ -1047,15 +1047,23 @@ const _COST = Dict{String, Float64}(
     "dynamics/test_thermal_cfield.jl" => 2.4,
     "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
-    # 655 s on the CI runner. The 150 here was set from "measured locally
-    # 2026-08-19 (10-core box): 128 s" — a real measurement, on the wrong
-    # machine. This table is calibrated for the 4-vCPU GitHub runner (see the
-    # header below), and a 10-core box is 5x wider, so a local number cannot be
-    # entered here without scaling. It is now the LONGEST file in the whole
-    # per-PR suite and single-handedly sets the `oracles` job's floor: that job
-    # measured makespan 654.9 s against a 586 s perfect-split floor, i.e. the
-    # floor is this one file and no rebalancing can move it.
-    "oracles/test_itp_dt_limited_advisory.jl" => 655.0,
+    # 654.9 s on the CI runner at its old 24³ fixture — the LONGEST file in the
+    # per-PR suite, and on its own the `oracles` job's makespan (654.9 s against
+    # a 586 s perfect-split floor). One file set the floor for every PR.
+    #
+    # The 150 that stood here came from "measured locally 2026-08-19 (10-core
+    # box): 128 s" — a real measurement, on the wrong machine. This table is
+    # calibrated for the 4-vCPU runner (see the header below) and the rule was
+    # already written into it, sixty lines down on
+    # `workflow/test_multi_fidelity_yaml.jl`, because the same mistake killed a
+    # nightly run.
+    #
+    # The fixture is now 20³ (see that file's header for the margin table and
+    # why 16³ does not work): 126.9 s locally, so ~420 s here on the same 3.2x
+    # ratio the 24³ pair measured. Deliberately left at the MEASURED-equivalent
+    # rather than trimmed further — below this the `fast` job binds and further
+    # cuts buy nothing.
+    "oracles/test_itp_dt_limited_advisory.jl" => 420.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.
