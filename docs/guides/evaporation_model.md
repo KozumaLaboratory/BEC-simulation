@@ -121,20 +121,40 @@ On the researched euv3 defaults: `collision_ratio_R ≈ 6.4×10³` (good-to-bad 
 needed — not collisionally limited), `γ_el ≈ 12 kHz`, `runaway = true`. The trap is
 **collisionally excellent**. The marginal quantity is `eta_start`, and it is **worse than
 this document said until 2026-08-05**: the defaults give `eta_start = 2.07`, not the
-`≈ 4.5` claimed here and in three other places below. That is *under* the `eta_min = 4`
-floor, and real setups load at η ~ 5–10, so the loaded depth the model infers is
-unphysical by more than a factor of two. Measured by the very call this section tells you
-to make:
+`≈ 4.5` claimed here and in three other places below — it is *under* the `eta_min = 4`
+floor. Measured by the very call this section tells you to make:
 
 ```julia
 julia> evaporation_summary(run_euv3_evaporation()).eta_start
 2.0682
 ```
 
-Treat every absolute number downstream of the defaults as suspect until the loaded depth
-is re-anchored (`α`/power up, or `T₀` down — the ramp comes from a 2023 notebook whose
-loaded temperature is not the 2022 PRL's 50 µK). Ratio-type conclusions (optimized vs lab
-ramp) are the ones that survive.
+**Re-anchoring `T₀` does not fix it, and the first version of this correction said it did
+(2026-08-05, corrected 2026-08-19).** The euv3 ramp is the 2023-11-06 notebook's sequence
+and that notebook's loading temperature is `T₀ ≈ 18 µK`
+([`eu_evaporation_calibration.md`](eu_evaporation_calibration.md)) — but the *trap* here
+is the 2022/thesis one. Measured H-FORT-only depth: **187.6 µK @ 7 W** and 271.9 µK @ 10 W,
+against 66 µK @ 7 W recorded for the 2023 epoch and 350 µK @ 10 W for 2022. So the model's
+trap is **2.84× deeper than the epoch the ramp and `T₀` come from**, and swapping only `T₀`
+mixes epochs — the thing this calibration document's first rule forbids. Correct both sides
+and the effect vanishes:
+
+| self-consistent choice | `η_start` |
+|---|---|
+| 2022 trap + `T₀` = 50 µK (as shipped) | **2.07** |
+| 2023 trap + `T₀` = 18 µK (depth ÷2.84) | **2.02** |
+| *mixed*: 2022 trap + 2023 `T₀` | 5.75 |
+
+Nor is `η ~ 5–10` this apparatus's loading range: the 2023-07 notebook measured
+`η_start` = **3.7** directly (7 W H-only, 66 µK depth, T = 17.8 µK) and called that regime
+"very hard". In that same configuration the model gives 187.6/17.8 = **10.5**, the same
+2.84×, which locates the discrepancy in the trap depth rather than the temperature. (That
+is a single-beam hold and euv3 starts from the crossed trap, so it is not a like-for-like
+target — but it does rule out 5–10 as the yardstick.)
+
+Treat every absolute number downstream of the defaults as suspect. Ratio-type conclusions
+(optimized vs lab ramp) are the ones that survive. The epoch worth optimizing against is
+the 2025 generation, whose ramp is not in this tree.
 
 Optimize the ramp for max `N_BEC`. Three optimizers, increasing in reach:
 
@@ -171,10 +191,11 @@ evaporation works — across `K₃` ×0.5–1, `α` ×1.0–1.15, `τ_bg` 8–30
 
 - **Loaded-depth floor.** Evaporation can only start if the loaded `η_start = U/(k_BT₀)`
   exceeds `eta_min ≈ 4`. The defaults give `η_start = 2.07` — **already past the cliff**,
-  not "marginal at ≈ 4.5" as this bullet claimed. Real setups load at η ~ 5–10, so the
-  inferred loaded depth is too shallow by >2×, and no adverse `α` shift is needed to break
-  it. Check `evaporation_summary(...).eta_start` before trusting any optimization; that
-  advice was already here, and running it is what found this.
+  not "marginal at ≈ 4.5" as this bullet claimed, and no adverse `α` shift is needed to
+  break it. Both self-consistent epoch choices land at ≈ 2 (see above); re-anchoring `T₀`
+  alone does not lift it, it only mixes epochs. Check
+  `evaporation_summary(...).eta_start` before trusting any optimization; that advice was
+  already here, and running it is what found this.
 - **3-body cliff.** The aggressive ramp reaches high density fast; if `K₃` is ~2× the
   fit, it over-loses and may miss BEC while the gentle lab ramp still reaches it.
 - **No `K₃` in the ab-initio band reproduces the measured endpoint.** Reaching the

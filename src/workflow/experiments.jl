@@ -42,6 +42,7 @@ include("experiments/pipeline/run_step_ground_state.jl")
 include("experiments/pipeline/run_step_dynamics.jl")
 include("experiments/pipeline/run_step_binary.jl")
 include("experiments/pipeline/run_step_rotating.jl")
+include("experiments/pipeline/run_step_scalar_egpe.jl")
 
 # Late-stage runtime helpers (depend on pipeline types).
 include("experiments/runtime/pulse_sequence.jl")

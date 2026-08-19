@@ -54,6 +54,12 @@ const LIVE_DOCS = [
     # `potentials.jl` cite its measurements. A pointer target that is allowed to
     # go stale is the failure mode the split exists to prevent.
     "docs/theory/lhy_scheme_selection_eu_f6.md",
+    # The Klaus 2022 type-C claim's evidence: published parameters per figure,
+    # the systematics, the model-selection numbers, and the pre-registered
+    # thresholds. LIVE rather than dated because the gate reads its thresholds
+    # and one row of it is an OPEN disagreement — a reader has to know it is
+    # maintained.
+    "docs/validation/klaus2022_primary_source.md",
     # Arrived with main 2026-08-04. It calls itself the "single entry point for
     # what this campaign established, excluded, and could not close", and
     # matsui_reproduction_status.md now points readers at it — so it is what a

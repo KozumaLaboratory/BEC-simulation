@@ -1,6 +1,32 @@
 # Klaus / fast-Larmor regime
 
+"Klaus" here is a **regime name, not a citation**: the fast-Larmor regime, where
+`p·F·dt` would exceed π at any usable `dt`. The paper of the same name —
+L. Klaus *et al.*, Nat. Phys. **18**, 1453 (2022), arXiv:2206.12265 — is prior
+art *inside* this regime, not its definition, and is reproduced separately
+(`docs/validation/klaus2022_primary_source.md`). The rest of this page is about
+the regime.
+
 When the linear Zeeman energy `p` dominates everything else (Eu151 at 1 G → p ≈ 26 700; Dy164 at 1 G → p ≈ 28 400), the lab-frame split-step collapses. This page is the one place to read for "how do I run an experiment in this regime in this code".
+
+## Two solutions, and the question that picks between them
+
+`rotating_basis` (below) keeps the spin and removes the `dt` penalty.
+`scalar_egpe` **eliminates the spin entirely**, replacing the spinor by one
+component with a B̂(t)-tilted dipolar kernel.
+
+Which is correct is a computation, not a taste: `spin_treatment_report` /
+`recommend_spin_treatment` (`src/solvers/scalar_egpe.jl`) compare ω_L against
+the mean field, the trap and the drive, and return `:scalar_adiabatic` when the
+neglected non-adiabatic admixture is below 1 %. **Adiabatic elimination is not
+merely cheaper — it is a different model**, and it is the right one only when
+the spin has nothing of its own to do. For ¹⁶²Dy at 5.3 G that ratio is
+6 × 10⁻⁵ and the spinor path would cost ~10⁴× more for the same answer; for
+weak-field ¹⁵¹Eu (the bare-DDI experiments) the same function returns
+`:spinor`, and using the scalar path there would silently delete the physics
+under study.
+
+Everything below is the `rotating_basis` path.
 
 ## The problem in one sentence
 

@@ -100,6 +100,8 @@ function _parse_step(d::Dict)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisGroundStateStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEGroundStateStep(params)
         else
             GroundStateStep(params)
         end
@@ -112,6 +114,8 @@ function _parse_step(d::Dict)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisDynamicsStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEDynamicsStep(params)
         else
             DynamicsStep(params)
         end
@@ -350,12 +354,16 @@ end
     elseif step isa RotatingBasisDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, pipeline_results=results, live_status_path)
+    elseif step isa ScalarEGPEDynamicsStep
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa DynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, live_status_path)
     elseif step isa GroundStateStep ||
         step isa BinaryGroundStateStep ||
-        step isa RotatingBasisGroundStateStep
+        step isa RotatingBasisGroundStateStep ||
+        step isa ScalarEGPEGroundStateStep
         _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
     else
         # Defensive: a new PipelineStep subtype must be added explicitly above

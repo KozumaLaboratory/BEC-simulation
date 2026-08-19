@@ -28,6 +28,7 @@
 
 using Test
 using SpinorBEC
+using TOML   # reads Project.toml for the import-availability gate below
 
 # The runner include()s `_tiers.jl` into global scope before this file, so under
 # `Pkg.test()` these are already bound. Pull them in when they are not, so the
@@ -135,6 +136,59 @@ end
         @info "test files without `using SpinorBEC`" missing_pkg
     @test isempty(missing_test)
     @test isempty(missing_pkg)
+end
+
+# The gate above asks whether the DECLARATIONS are present. It says nothing about
+# whether what is declared can be RESOLVED, and the test environment is not the
+# environment anyone develops in: an interactive `julia --project=.` session finds
+# stdlibs that the `[targets] test` environment does not. So `using Logging` in
+# test/oracles/test_itp_dt_limited_advisory.jl passed every local run and died on
+# the runner with "Package Logging not found in current path" — 2.4 s into a job
+# that had already spent five minutes getting there (2026-08-19).
+#
+# Availability is decidable statically: a package name is resolvable in the test
+# environment iff it is SpinorBEC itself, `Test`, one of Project.toml's `[deps]`,
+# or one of the `[targets] test` extras. `Base.…` / `Core.…` are not packages.
+@testset "Every test file only imports what the test environment provides" begin
+    proj = TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))
+    available = Set{String}(["SpinorBEC", "Test", "Base", "Core", "Main"])
+    union!(available, keys(get(proj, "deps", Dict())))
+    union!(available, get(get(proj, "targets", Dict()), "test", String[]))
+
+    offenders = Dict{String, Vector{String}}()
+    for (root, _, files) in walkdir(@__DIR__), f in files
+        (startswith(f, "test_") && endswith(f, ".jl")) || continue
+        rel = relpath(joinpath(root, f), @__DIR__)
+        for m in eachmatch(r"(?m)^\s*(?:using|import)\s+([A-Za-z_][A-Za-z0-9_]*)",
+            read(joinpath(root, f), String))
+            pkg = m.captures[1]
+            pkg in available && continue
+            push!(get!(offenders, rel, String[]), pkg)
+        end
+    end
+    isempty(offenders) || @info """
+        test files importing packages absent from the test environment — these \
+        resolve interactively and fail on a clean CI runner. Either add the \
+        package to `[extras]` + `[targets] test` in Project.toml, or use the \
+        `Base.…` form (e.g. `using Base.CoreLogging: with_logger, Warn` instead \
+        of `using Logging`).""" offenders
+    @test isempty(offenders)
+
+    # Canary: the check must actually reject something. Without this, a typo in
+    # the regex leaves a gate that passes because it matches nothing.
+    @test !("Logging" in available)
+    @test isempty(
+        collect(
+            eachmatch(r"(?m)^\s*(?:using|import)\s+Logging\b",
+                "using SpinorBEC\nusing Base.CoreLogging: with_logger\n"),
+        ),
+    )
+    @test !isempty(
+        collect(
+            eachmatch(r"(?m)^\s*(?:using|import)\s+([A-Za-z_][A-Za-z0-9_]*)",
+                "using Logging\n"),
+        ),
+    )
 end
 
 # Test files share a worker process (SPINORBEC_TEST_WORKERS > 1) and which files
