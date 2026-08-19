@@ -63,9 +63,12 @@
 > 5. **The other two field rows do not survive, and they fail differently.** At
 >    **1.3 nT there is no operating window at all** (+1.8 % across a flat range),
 >    so `|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT` has **no replacement** — the effect is
->    absent, not relocated. At **5.2 nT** an enhancement exists (+17 %) but the
->    ω_eff dependence is non-monotonic at 7 points, so **no optimum is quoted**
->    and `[0.5, 0.6] at 5.2 nT` is neither confirmed nor replaced.
+>    absent, not relocated. At **5.2 nT** — resolved at 20 points plus two 64³
+>    arms (§11) — there are **TWO BRANCHES**: a global maximum at
+>    ω_⊥,eff ≈ 0.55 ω_⊥ (+17 %), a secondary near 0.77, and a dip at 0.65 that
+>    **survives resolution doubling** with 93 % of its depth. No single optimum
+>    is quoted. `[0.5, 0.6] at 5.2 nT` maps to ω_eff ∈ [0.80, 0.87], a declining
+>    shoulder below *both* maxima, so that row is **refuted**.
 > 6. **It is the radial confinement, not the density.** A density-matched
 >    weakening along z instead lands *below* the baseline.
 >
