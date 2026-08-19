@@ -211,6 +211,57 @@ end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
     end
 
+    @testset "the PROJECTED step conserves N_C, and does not depend on the grid" begin
+        # Gate C above calls `apply_energy_damping_step!` DIRECTLY, so no projector
+        # is in the path and the phase is exactly norm-preserving — the file's own
+        # comment says as much. Production goes through `apply_spgpe_step!`, which
+        # projects, and there the product ψ·e^{iφ} reaches past the cutoff and the
+        # projector removes it.
+        #
+        # Measured 2026-08-19 at the #334 operating point (64³, box 24, D = 13,
+        # T = 5, ℳ̄ = 1.6e-3, µ held at the field's own so the growth drive is ZERO):
+        # N_C fell 11530 → 10199, **11.5 % in 60 ms**, with nothing physical to move
+        # it. The same run with noise off held N to 0.6 %, and with the scattering
+        # reservoir off it GREW as it should. So the loss is the energy-damping
+        # noise passing through the projector, and at that operating point it is
+        # five times the growth it is supposed to be a correction to.
+        #
+        # The gate is written as a RESOLUTION comparison rather than as a
+        # tolerance, because that is the part that decides whether this is physics
+        # or discretisation: a real reservoir process cannot know the grid spacing.
+        # Same box, same physical time, same reservoir — two resolutions.
+        function null_drive_loss(n)
+            SpinorBEC.scratch_clear!()
+            ws = flowing_state!(scalar_ws(; n=(n, n, n)))
+            dV = cell_volume(ws.grid)
+            mu = let hpsi = similar(ws.state.psi)
+                SpinorBEC.apply_operator_via_registry!(hpsi, ws)
+                real(sum(conj(ws.state.psi) .* hpsi)) * dV /
+                (real(sum(abs2, ws.state.psi)) * dV)
+            end
+            # ϵ_cut one thermal energy above µ, the standard C-region depth, and a
+            # cutoff the coarser grid still resolves.
+            T = 1.0
+            k_cut = min(sqrt(2 * (mu + T)), 0.8 * π / (18.0 / n))
+            res = SPGPEReservoir(; T, mu, a_s=0.02, k_cut,
+                eps_cut=0.5 * k_cut^2, number_damping=false)
+            n0 = norm_sq(ws)
+            for s in 1:200
+                apply_spgpe_step!(ws, res, 0.01; t=0.0, seed=4200 + s)
+            end
+            (norm_sq(ws) - n0) / n0
+        end
+        l32, l48 = null_drive_loss(32), null_drive_loss(48)
+        @info "projected energy-damping N_C change at zero drive" l32 l48
+        # A reservoir process cannot depend on the discretisation. If it does, the
+        # noise is not normalised against the grid it is drawn on.
+        @test isapprox(l32, l48; atol=0.01, rtol=0.25)
+        # …and it must be small in absolute terms, or the "number-conserving"
+        # reservoir is the dominant term in the number budget.
+        @test abs(l32) < 0.02
+        @test abs(l48) < 0.02
+    end
+
     @testset "a ramped cutoff does not grow the scratch registry" begin
         # `tracking_cutoff` exists to RAMP k_cut, so it takes a different value
         # every reservoir sub-step. Keying the energy-damping buffers on it gave
