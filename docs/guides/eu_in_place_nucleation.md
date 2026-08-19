@@ -387,9 +387,73 @@ That is a property of the basin boundary at this $f$ and it is exactly why the
 outcome set has three members — a classifier that had been tuned until the mix
 came out "ambiguous" would be a fitted threshold.
 
-### 5.7 The ensemble
+### 5.7 What the reservoir can and cannot be asked to do
 
-*(Pending.)*
+Two measurements changed what the ensemble runs, and both were made on 60 ms
+probes rather than discovered inside a production trajectory.
+
+**The step rate.** 7.7 ms/step at 64³ with D = 13 on an H100 (`figs/eu334/rate_probe_*`),
+so a 4 s trajectory at dt = 0.002 is 2900 s. dt = 0.004 is what the campaign runs;
+against dt = 0.010 the 60 ms endpoint moves 3.5 % in $N_C$ and 4.5 % in
+$\langle F_\perp\rangle$, so dt is not free here and the coarse value is not used.
+
+**The full SPGPE loses atoms faster than it grows them, at this point.** Five arms
+at 60 ms, each differing in one term, seeded from the same $f = 0.2306$ cell:
+
+| arm | µ ramp | noise | scattering | $N_C$: 11530 → | |
+|---|---|---|---|---:|---|
+| A | yes | on | on | **10458** | −9.3 % |
+| B | yes | off | on | 11601 | +0.6 % |
+| C | yes | on | **off** | **12071** | **+4.7 %** |
+| D | **none** | on | on | **10199** | **−11.5 %** |
+| E | **none** | off | on | 11460 | −0.6 % |
+
+Arm D is the one that settles it: with the growth drive **exactly zero**, so that
+nothing physical can move $N_C$, the full SPGPE still loses 11.5 % in 60 ms. The
+channel is the energy-damping noise passing through the caller's projector —
+number-conserving as a *term*, only approximately so as a *step*
+(Rooney, Blakie & Bradley PRE **89**, 013302). Quantified in
+[spgpe.md](spgpe.md): the loss rate is grid-independent (flat to 5 % across a
+2.7× span of $k_\mathrm{max}/k_\mathrm{cut}$, which also refutes an aliasing
+explanation) and runs at ≈ 1.25× the growth rate $2\gamma\mu$.
+
+So **the ensemble runs the growth SPGPE**, Rooney Eq. (20) — a sub-theory in its
+own right, and the one that carries the $M_z$-changing exchange that makes
+nucleation possible where transport is blocked. The scattering reservoir would
+otherwise dominate the number budget of every trajectory, and arm C shows the
+growth-only theory doing what it should.
+
+*This is a limit inherited, not a limit created: the two branch reference states,
+the bifurcation and the classifier are all unaffected, since none of them involves
+a reservoir.*
+
+### 5.8 The quiet controls — criterion 1
+
+`figs/eu334/quiet_from_{polar,flower}` (jobs 8444058/8444059): growth-only, noise
+**off**, $T = 5$, µ ramped 1500 ms then held, one seed each, from **both** branches.
+One arm cannot distinguish "the solver holds the branch it was given" from "the
+solver always ends up here", which is why there are two.
+
+Through the window crossing, each arm stays on its own branch while the condensate
+grows past both $f_{\rm sp}$ and $f_{\rm eq}$:
+
+| $t$ [ms] | 340 | 800 | 1300 | 1800 | 2300 |
+|---|---:|---:|---:|---:|---:|
+| **from polarised**: $f$ | 0.2266 | 0.2332 | 0.2529 | 0.2850 | 0.3132 |
+| $\langle F_\perp\rangle$ | 0.132 | 0.139 | 0.148 | 0.157 | **0.161** |
+| **from flower**: $f$ | 0.3464 | 0.3543 | 0.3716 | 0.3975 | 0.4190 |
+| $\langle F_\perp\rangle$ | 3.703 | 3.752 | 3.830 | 3.928 | **4.004** |
+
+The polarised arm is *inside* the window at $t = 2300$ ms — the flower branch
+exists at $f = 0.313$ and is the lower-energy state past $f_{\rm eq} = 0.343$ —
+and it does not go there. That is the control passing: with no fluctuation there
+is no selection, and the branches stay a factor 25 apart in the order parameter.
+
+### 5.9 The ensemble
+
+*(Pending: 120 trajectories, $T \in \{5, 10\}$ × $\tau \in \{400, 1300, 4000\}$ ms
+× 20 seeds, all held to a common 4000 ms so the cells differ in how fast they
+crossed the window and not in where they stopped.)*
 
 ## 6. The answer to #334
 
