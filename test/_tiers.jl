@@ -413,6 +413,10 @@ const CI_EXTRA = [
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
+    # refusal that follows from it — a paper with no re-measurable record has
+    # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
+    "validation/test_klaus2022_ref.jl",
     # Klaus 2022 magnetostirring: the coefficient chain, the directional
     # magnetostriction oracle (coarse-grid ITP), and the pre-registered
     # thresholds re-applied to the stored production verdicts.
