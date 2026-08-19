@@ -141,6 +141,14 @@ For ¹⁵¹Eu: **type A is achievable now; type C is blocked on atomic-physics i
 anything depending on channel-resolved interactions. Claims resting only on $q$,
 $\epsilon_{dd}$, or geometry are quotable today.
 
+**Per claim, that split is `as_dependency_map.md`.** The boundary is sharper than
+this paragraph implies and it is exact: the one measured input, $a_{12} = 110(4)a_B$,
+IS the constraint $c_0 + 36c_1 = c_\text{total}$, and the stretched pair plus its
+first magnon are pure $S = 2F$ — so a fully polarized cloud's mean field, LHY (FM
+closed form), phonon branch and first magnon cannot be moved by the six unmeasured
+channels at all, while the phase diagram is nothing *but* those channels. Gated by
+`test/oracles/test_stretched_channel_invariance.jl`.
+
 ---
 
 ## 6. Parallel axes
