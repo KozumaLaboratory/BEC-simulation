@@ -125,8 +125,8 @@ checking either.
 - admits: `src/workflow/experiment.jl:253`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:840`
-- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:491`
-- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:548`
+- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
+- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 
 Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated
 migration allowance argued at `src/model/complete.jl`, not an oversight — so
@@ -208,11 +208,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 265 files
-- `CI_EXTRA` — 136 files
+- `FAST_TESTS` — 268 files
+- `CI_EXTRA` — 138 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 89 files
+- `ORACLE_TESTS` — 91 files
 - `INTEGRATION_TESTS` — 53 files
 
 ## Validation ladder — instruments present on disk
@@ -275,7 +275,7 @@ as complete.
 | subtree | files cited | of |
 |---|---|---|
 | `src/hamiltonian/` | 13 | 63 |
-| `src/model/` | 3 | 15 |
+| `src/model/` | 3 | 16 |
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |

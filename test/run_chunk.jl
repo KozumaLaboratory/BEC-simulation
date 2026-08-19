@@ -100,10 +100,23 @@ end
 
 print_timing(timings, get(ENV, "SPINORBEC_TEST_TIER", "?"))
 # Flag files whose measured time has drifted above the _COST estimate — the
-# parent relays this worker's stdout to the CI log, so the ::warning annotation
-# surfaces on the run. With on-demand scheduling a stale estimate no longer
-# costs wall-clock, only the longest-first ordering, so this is now a slow-test
-# signal rather than a balance alarm.
+# parent relays this worker's stdout to the CI log, so the annotation surfaces
+# on the run.
+#
+# This used to say a stale estimate "no longer costs wall-clock, only the
+# longest-first ordering" under on-demand scheduling. Measured 2026-08-19 and
+# false: the ordering IS the wall-clock. A file modelled at 3 s and taking 377 s
+# is handed out last, so a worker picks it up when the others are nearly
+# finished and the makespan becomes that pickup time plus the file. The
+# `integration` job ran 369/450/740/631 s across its four workers against a
+# 548 s perfect-split floor — 35 % of the job was this — while `fast`, whose
+# heavy files have entries, ran 574/571/571/572 s, at its floor. Same runner,
+# same scheduler; the difference is the table.
+#
+# On-demand scheduling removes the penalty for an OVER-estimate (a slot that
+# frees early just takes the next item). It does not remove it for an
+# under-estimate, because nothing can preempt a long file started late. So this
+# is a balance alarm, and 17 of them had been printing on every run unread.
 warn_cost_drift(timings)
 
 exit(failed ? 1 : 0)

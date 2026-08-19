@@ -144,8 +144,25 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
                 "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.yaml",
                 "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.yaml",
             ])
+
+            # RENAMED is not DELETED, and filing one as the other would be a lie
+            # that costs the archive its point. These two moved when the corpus
+            # was retargeted to the anti-aligned preparation: after it they hold
+            # m=-F, so `_mFplus` had become a false name. The recorded PROSE is
+            # deliberately left as harvested — rewriting a record to match a
+            # later rename defeats what the record is for — and only the pointer
+            # is tracked here. The new path must EXIST, so this cannot become a
+            # dumping ground for genuine drift.
+            const_renamed = Dict(
+                "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mFplus.yaml" => "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mirror.yaml",
+                "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mFplus.yaml" => "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml",
+            )
+            for (old, new) in const_renamed
+                @test isfile(joinpath(root, new))
+            end
+
             missing_paths = [p for p in recorded if !isfile(joinpath(root, p))]
-            @test Set(missing_paths) ⊆ const_deleted
+            @test Set(missing_paths) ⊆ union(const_deleted, keys(const_renamed))
 
             # POSITIVE CONTROL: the scan can actually see a `metadata:` block,
             # or `isempty(still)` above is satisfied by a broken reader.

@@ -26,6 +26,63 @@
 #     each cell to its own recon winner with no index coupling. Fails loud when
 #     nothing matches — never silently falls back to a Gaussian seed.
 
+"""
+    _refuse_dropped_physics(r::GSResolved)
+
+Refuse to RUN a ground-state step that declares physics this path discards.
+
+`GSResolved.dropped_physics` has existed since cutover step 1b and only
+`gs_model` consulted it — so a config in that state got no `Model` (loudly) and
+ran anyway (silently). The run is the half that produces numbers, so that was
+the wrong way round.
+
+MEASURED 2026-08-19, over the 455 ground-state steps that resolve: exactly TWO
+configs are affected, both by `B_direction`, and both are already wrong.
+
+`runs/klaus_hybrid/klaus_hybrid_{nostir_control,magnetostir_omega_m0p74}.yaml`
+declare `B: {B_mag: "0.01 Gauss", theta: 3.14159}` — the field along −z — with
+`initial_state: m_minus_F`. That pairing is the ANTI-ALIGNED stretched state,
+which is the whole point of an EdH experiment. What runs is `p = -147.955`, the
+same value `theta: 0` produces: the direction is dropped and the field points
+along +z, i.e. the ALIGNED state.
+
+The two are not a detail. Per
+`gotcha_edh_needs_the_anti_aligned_stretched_state_2026_08_19` the rotation
+enhancement is +16.5 % anti-aligned against −0.45 % aligned — the effect the
+configs exist to measure is absent in the arm that actually runs.
+
+Verified by construction rather than by reading: resolving the same block at
+`theta ∈ {0, 1, π/2, π}` gives `p = -147.955` and `(bx, by) = (0, 0)` every
+time. The GS path takes `B_mag` and ignores the direction entirely.
+
+This does not repair those configs — which spelling the author wants (`Bz:
+-0.01`, or dropping the tilt) is a physics choice — it stops them producing a
+number that looks fine.
+"""
+function _refuse_dropped_physics(r::GSResolved)
+    isempty(r.dropped_physics) && return nothing
+    # The escape hatch the message names. Present because a refusal with no
+    # override turns a forensic re-run of a known-wrong config into a patch, and
+    # because this repo's other provenance refusal
+    # (`SPINORBEC_ALLOW_STALE_POINTS`) is shaped the same way. It WARNS rather
+    # than passing quietly: an override that says nothing is a default.
+    if lowercase(get(ENV, "SPINORBEC_ALLOW_DROPPED_GS_PHYSICS", "0")) in
+        ("1", "true", "on", "yes")
+        @warn "running a ground_state step that declares physics this path drops" dropped =
+            r.dropped_physics
+        return nothing
+    end
+    throw(
+        ArgumentError(
+            "ground_state step declares " * join(r.dropped_physics, ", ") *
+            ", which the spinor ground-state path does not read — the run would " *
+            "silently use different physics from the one declared. Move the block to " *
+            "a step that reads it, delete it, or express the same physics in a key " *
+            "this path does read (a tilted `B_mag`/`theta` is `Bz` with a sign here). " *
+            "Set SPINORBEC_ALLOW_DROPPED_GS_PHYSICS=1 to run anyway."),
+    )
+end
+
 _seed_bz_gauss(x::Real) = Float64(x)
 _seed_bz_gauss(x::AbstractString) = parse(Float64, split(String(x))[1])
 
@@ -402,6 +459,7 @@ function _run_step(
     # THE shared resolution. Every slot below is read off `r`; nothing in this
     # method parses a physics block. `yaml_to_model` consumes the same call.
     r = resolve_gs(p, grid_prev, atom_prev, ws_prev; verbose)::GSResolved
+    _refuse_dropped_physics(r)
     method = r.method
     atom = r.atom
     grid, ndim = r.grid, r.ndim

@@ -93,14 +93,41 @@ end
     @test _cost("test_dealias_2_3.jl") == _COST["test_dealias_2_3.jl"]
     @test _cost("file_with_no_entry.jl") == _DEFAULT_COST
 
-    # Drift guard: flag a gross under-estimate, ignore near-estimate and sub-floor.
-    stale = warn_cost_drift([
-        ("solvers/test_3d.jl", 60.0),   # 60s vs 5s estimate → stale
-        ("test_quality.jl", 42.0),      # 42s vs 40s estimate → within factor
-        ("tiny.jl", 4.0),               # below floor_s → ignored
-    ])
+    # Drift guard: flag a gross under-estimate, ignore the three ways of not
+    # being one. The fixtures are SYNTHETIC names, which all resolve to
+    # `_DEFAULT_COST`, and deliberately so: the previous version used
+    # `solvers/test_3d.jl` at 60 s against its then-5 s entry, so correcting
+    # that entry to its measured 60 s silently disarmed the positive control —
+    # the assertion went 1 → 0 stale and the guard's own canary died of a data
+    # edit. A control must not be reachable from the data it guards.
+    #
+    # All three predicates get a case, which the old fixture did not do: it had
+    # no `abs_gap` arm at all.
+    # `quiet=true`: these fixtures would otherwise print stale-cost annotations
+    # into the CI log naming files that do not exist, in the same stream as the
+    # real ones — which had already gone unread for weeks without help.
+    stale = warn_cost_drift(
+        [
+            ("synthetic_gross.jl", 60.0),   # 60 > 8, > 3x3, gap 57 > 15 → STALE
+            ("synthetic_ratio.jl", 8.5),    # over floor, but 8.5 ≤ 3x3 → not stale
+            ("synthetic_gap.jl", 12.0),     # over floor and ratio, gap 9 ≤ 15 → not stale
+            ("synthetic_tiny.jl", 4.0),     # below floor_s → not stale
+        ]; quiet=true)
     @test length(stale) == 1
-    @test stale[1].file == "solvers/test_3d.jl"
+    @test stale[1].file == "synthetic_gross.jl"
+    @test stale[1].estimate == _DEFAULT_COST
+
+    # And the guard is one-directional: an OVER-estimate never flags. On-demand
+    # scheduling makes an over-estimate free (a slot that frees early takes the
+    # next item), while an under-estimate cannot be preempted — which is the
+    # asymmetry the whole table exists to respect.
+    @test isempty(warn_cost_drift([("synthetic_over.jl", 0.1)]; quiet=true))
+
+    # And `quiet` must not change the VERDICT, only the printing — otherwise
+    # silencing the fixtures would silence the guard.
+    loud = warn_cost_drift([("synthetic_gross.jl", 60.0)]; quiet=true)
+    @test length(loud) == 1
+    @test loud[1].file == "synthetic_gross.jl"
 end
 
 # CLAUDE.md: "Parallel mode requires each test file to stay a dependency-free
