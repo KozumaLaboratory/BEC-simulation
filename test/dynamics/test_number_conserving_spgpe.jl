@@ -47,7 +47,11 @@ using SpinorBEC
         @test r.N_C > 0
         # The whole point: N_C is not the input. It must not equal the total, and it
         # must not be zero either — an open loop with mu below eps_0 gives exactly 0.
-        @test 0 < r.N_C < 600.0
+        # The bound is against the TOTAL, not a fixed number: the constraint now
+        # solves N_0 + n_th,C + N_I = N_total across all three regions, so the C region
+        # can hold a condensate and N_C is no longer a small thermal fraction. It was
+        # `< 600` against a total of 600, written when mu came from a residual.
+        @test 0 < r.N_C
     end
 
     @testset "N_C responds to the TOTAL, which is the control now" begin
@@ -68,11 +72,19 @@ using SpinorBEC
     end
 
     @testset "the counter is not decorative" begin
-        # Positive control for the NaN path: ask for more than the I region can hold
-        # and every callback must count it, leaving mu untouched at its initial value.
-        cap = incoherent_population(eps_cut - 1e-9, T, eps_cut)
-        r = run_closed(10 * cap; steps=200)
+        # Positive control for the NaN path. The I region's capacity is NOT the bound any
+        # more: the LDA constraint lets the condensate absorb what the thermal regions
+        # cannot, so 10x the I capacity is satisfiable and the counter correctly stays at
+        # zero. Asking for more than the whole cloud can hold at any mu below the cutoff
+        # is what must still fail — a total that even a Thomas-Fermi condensate at
+        # mu -> eps_cut cannot reach.
+        r = run_closed(1e13; steps=200)
         @test r.unsat == 200 ÷ 20
         @test r.mu == 0.0                      # never updated
+        # and the negative control: a satisfiable total must NOT trip it, or the test
+        # passes for a controller that has simply stopped working.
+        ok = run_closed(600.0; steps=200)
+        @test ok.unsat == 0
+        @test ok.mu != 0.0
     end
 end
