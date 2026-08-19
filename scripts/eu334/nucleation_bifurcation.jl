@@ -259,6 +259,10 @@ function walk(name, dirn, anchor; init_state=:m_minus_F)
         @printf("  f=%.4f N₀=%6d  E/atom=%.6f  E_tot=%10.2f  ⟨F⊥⟩=%.4f  J_z=%+.4f  |∇E|=%.2e %-9s dfp=%+.1e  %.0fs\n",
             f, r.n_atoms, r.E, r.E * r.n_atoms, r.fperp, r.Jz, r.grad, r.stop,
             r.dfperp_polish, wall)
+        # Block-buffered under a scheduler: without this a 12 h job shows an
+        # empty log until it exits, and there is no way to tell a slow cell from
+        # a hung one.
+        flush(stdout)
         jldsave(joinpath(OUT, @sprintf("%s_f%06.4f.jld2", name, f)); psi=r.psi, f=f,
             n_atoms=r.n_atoms, E_total=r.E, fperp=r.fperp, Jz=r.Jz,
             grid_n_points=(GRID_N, GRID_N, GRID_N), grid_box_size=(BOX, BOX, BOX),
