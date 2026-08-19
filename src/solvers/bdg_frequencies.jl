@@ -84,10 +84,17 @@ function _central_diff(ψ, d::Int, dx::Real)
 end
 
 # (x ∂_y − y ∂_x)ψ — the generator of rotation about z.
-function _lz_action(ψ, grid, ndim::Int)
+#
+# The coordinate arrays are moved to ψ's device. `grid.x` is a host Vector even
+# for a GPU workspace, and broadcasting it against a CuArray does not fall back
+# to the CPU — it fails to compile the kernel ("passing non-bitstype argument"),
+# which is how a 32³ × 13 Eu cell on an H100 found this on the instrument's first
+# real GPU use. Everything else here was already device-agnostic (`circshift`,
+# scalar × array), so this one line was the whole gap.
+function _lz_action(ψ, grid, ndim::Int, backend)
     shp(d) = ntuple(i -> i == d ? length(grid.x[d]) : 1, ndims(ψ))
-    xa = reshape(grid.x[1], shp(1))
-    ya = reshape(grid.x[2], shp(2))
+    xa = _to_device(backend, reshape(collect(grid.x[1]), shp(1)))
+    ya = _to_device(backend, reshape(collect(grid.x[2]), shp(2)))
     xa .* _central_diff(ψ, 2, grid.dx[2]) .- ya .* _central_diff(ψ, 1, grid.dx[1])
 end
 
@@ -119,7 +126,7 @@ function bdg_symmetry_generators(ws, ψ)
     for d in 1:ndim
         push!(gens, Symbol(:translation_, d) => _central_diff(ψ, d, ws.grid.dx[d]))
     end
-    ndim >= 2 && push!(gens, :rotation_z => _lz_action(ψ, ws.grid, ndim))
+    ndim >= 2 && push!(gens, :rotation_z => _lz_action(ψ, ws.grid, ndim, ws.backend))
     gens
 end
 
