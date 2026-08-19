@@ -223,6 +223,22 @@ more seeds is strictly better.
 
 ## 5. Measurements
 
+### 5.0 Which pre-registered axes actually ran, and which did not
+
+§2 is the pre-registration and it is left as written. Three of its axes were **not** run
+as specified, and that is stated here rather than left to be inferred from the absence of
+a table — a campaign that silently drops an axis reads as one that covered it.
+
+| axis | pre-registered | what ran | consequence |
+|---|---|---|---|
+| **grid** | 48³ and 64³ | **16³ (smoke) and 32³** | The FM boundary (§5.4) has **no resolution check**. It is quoted as a bracket, q ∈ [15.6, 29.5], and the collapse *ratio* is a difference of two arms at the same grid, so a common-mode grid error cancels from it — but the absolute bracket is one grid only. |
+| **a_s(¹⁵³Eu)** | ±10 %, ±30 % | **×1.3 on the magnon route only** | The a_S-freedom claim (§5.5) is exact there and is *measured* at +30 %, which is the stronger test; the GS arms never varied a_s, so §5.4's boundary field carries no a_s error bar beyond its c₁ dependence. |
+| **DDI on/off** | both, on the ground state | **both on the magnon route (§5.5); ground state ran secular-on only** | Whether the FM boundary is contact- or dipole-driven is therefore **not decided**, which is why §5.4 attributes q_c to \|c₁\|n without separating the dipolar share. |
+
+None of these touches the deliverable in §6: the magnon ratio is analytic in the modes and
+carries the DDI on/off control and the a_s control that matter to it. They bound §5.4,
+which is already labelled "a drawing of parameter space, not a prediction".
+
 ### 5.1 The isotope map — three numbers, one of them exact
 
 Gated by `test/analysis/test_isotope_q_map.jl`.
