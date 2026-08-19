@@ -547,6 +547,11 @@ const CI_EXTRA = [
     "oracles/test_apply_operator_accumulates.jl",
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
+    # The DDI half of the homogeneous BdG, which nothing gated: the normal block
+    # was the Hartree term (zero for a uniform cloud, since Q(q=0) = 0) instead
+    # of the exchange term, so it was 2x on a polarized state and identically
+    # zero on a polar one (#361).
+    "oracles/test_dipolar_bogoliubov_anchor.jl",
     # What the six unmeasured Eu scattering channels CANNOT move: the stretched
     # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
     # fixed c_total leaves them exact. Each invariance carries a control that
