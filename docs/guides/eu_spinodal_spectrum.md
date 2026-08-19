@@ -134,7 +134,58 @@ minutes is launched without it.
 
 ## 5. Results
 
-*(filled in by the runs; each row names its job)*
+### 5.0 The observable §1 named does not resolve here — and what replaced it
+
+*(TSUBAME jobs 8443596 / 8443679 / 8443719, H100, 32³ × 13, 39–62 s per cell)*
+
+§1 proposed reading the fold off `λ_min`. Measured on the campaign's own cells,
+**it cannot be**:
+
+| instrument | B = 68.25 µG | B = 25 µG |
+|---|---|---|
+| block LOBPCG (nev 8, max_iter 25) | λ_min = +1.68, **width 5.7** | — |
+| Lanczos, 300 iterations, no early stop | λ_min = +6.53e-3, **width 7.3e-2** | +7.06e-3, **width 6.5e-2** |
+
+Zero lies inside both certified intervals and the two fields are
+indistinguishable. This is not a solver being lazy and it is not the Hessian: the
+finite-difference axis came back clean (ε = 3e-5 reproduced ε = 1e-5 to four
+digits, `+6.527e-3` vs `+6.5267e-3`). It is the weak-field Eu **soft manifold**
+(κ ≥ 4.7e3), where the bottom of the spectrum is a dense cluster and λ_min is
+whichever member of it the Krylov space resolves first —
+`trapped_bdg_low_modes` documents this regime and says the kinetic-only
+preconditioner does not capture interaction-dominated stiffness (c₀n ≈ 2343).
+
+Criterion 2 did its job: nothing was quoted from an unconverged eigenvalue.
+
+**What replaced it, and why it is not a weakening.** A fold does not need λ_min.
+At a saddle-node the null direction is TANGENT TO THE BRANCH, and the branch is
+stored — consecutive continuation cells are 0.25 µG apart near the end. So the
+observable is
+
+    R(B) = ⟨t, A t⟩ ,  t = dψ/dB  (tangent-projected, unit norm)
+
+— one Hessian application, no eigensolver, hence no convergence certificate to
+fail, and variationally an **upper bound on λ_min**. `R → 0` is sufficient
+evidence of the fold; `λ_min ≤ R` then says the Hessian has gone soft in exactly
+the direction the branch is about to leave along. The fit of §4 criterion 4 is
+applied to `R²` instead of `λ_min²`, with the same band and the same verdict
+thresholds. λ_min stays in every row as the bound R sits above.
+
+Two things the tangent needs and gets: the stored ψ's global phase is arbitrary,
+so the difference is taken after aligning it (otherwise `ψ₂ − ψ₁` is dominated by
+a gauge rotation); and a pair is used only if it is on the same branch (⟨F⊥⟩
+within 25 %) and within 1.5 µG, so a chord across the fold is never called a
+derivative.
+
+**A defect found on the way.** `bdg_symmetry_generators` built its rotation
+generator from `grid.x`, a host array, which does not fall back to the CPU when
+broadcast against a CuArray — it fails to compile the kernel. The #339 instrument
+therefore could not run on a GPU at all; the oracles are CPU-only and CI has no
+GPU, so the first real GPU use is what found it. Fixed in the same branch.
+
+### 5.1 The fold in the spectrum
+
+*(in flight — job 8443760)*
 
 ## 6. Answer
 
