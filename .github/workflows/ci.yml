@@ -127,9 +127,23 @@ jobs:
     # =auto): the files are split into one independent julia process per CPU
     # thread (see test/runtests.jl). Test wall-time ~8 min serial → ~3-4 min on
     # the 4-vCPU runner; with setup/precompile ~3-5 min the job lands ~6-8 min.
-    # 15 min stays as generous headroom — a bump signals a real regression,
-    # not CI flake.
-    timeout-minutes: 15
+    # "~6-8 min" and "15 min stays as generous headroom" above are both stale,
+    # measured 2026-08-19 over ten consecutive runs: 8.2 / 9.1 / 10.2 / 10.5 /
+    # 10.6 / 10.9 / 11.2 / 11.5 / 12.0 minutes — median 10.6, and one run hit
+    # the ceiling at 15.3 and was killed. Raised 15 → 25 for the same reason as
+    # `oracles` below, and the reason is not "a red went away":
+    #
+    # GitHub reports a timeout as `cancelled`, not `failure`. A killed job
+    # therefore produces no verdict in a status nobody reads as a failure — and
+    # on a POST-MERGE run that is the only look anything ever takes at the
+    # merged tree. The comment above says a bump signals a real regression; it
+    # cannot, if the bump silently deletes the measurement instead of failing.
+    #
+    # Not licence to grow into: if the median passes ~15 the answer is a cheaper
+    # tier, not a third raise. The runner's own `_COST` drift warnings are the
+    # early signal, and they are already firing (test_level0_gpu_cpu_consistency
+    # takes 76 s against a declared 3).
+    timeout-minutes: 25
     env:
       # The steps below honour `docs` as well as `code`, because the FAST tier
       # contains `test_docs_live_set.jl`, whose INPUT is `docs/**.md`. Gating it
@@ -191,7 +205,25 @@ jobs:
     # minutes) so they are a per-PR merge gate. GPU-only oracle assertions
     # (gpu_cpu_per_term_parity) still no-op here — they need a GPU runner
     # (nightly / TSUBAME), not the CPU ubuntu runner.
-    timeout-minutes: 15
+    #
+    # 15 → 25 on 2026-08-19, from measurement rather than to make a red go away.
+    # "a few minutes" above is stale: nine consecutive runs took 7.2 / 7.7 /
+    # 10.0 / 10.7 / 11.0 / 11.6 / 12.4 / 13.4 minutes, i.e. a p95 sitting ON the
+    # old ceiling, and two runs hit it (15m15s, 15m17s).
+    #
+    # WHY THIS IS WORSE THAN A SLOW JOB, and the reason it is worth a number
+    # rather than a retry: GitHub reports a timeout as `cancelled`, NOT
+    # `failure`. Both casualties were POST-MERGE runs on `main` — the only runs
+    # that ever see the merged tree, as the concurrency comment at the top of
+    # this file says — so the evidence was discarded, and discarded in a status
+    # that does not read as a failure. A gate that silently stops producing a
+    # verdict is the failure mode this whole job exists to prevent.
+    #
+    # 25 is ~1.9x the observed median and ~1.5x more headroom than the old
+    # ceiling gave. It is NOT licence to grow into: if the median passes ~15,
+    # the answer is to make the tier cheaper, not to raise this again. The
+    # per-file `_COST` drift warnings the runner prints are the early signal.
+    timeout-minutes: 25
     env:
       SPINORBEC_TEST_TIER: oracles
       SPINORBEC_TEST_WORKERS: auto
