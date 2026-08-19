@@ -33,7 +33,9 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
     )
     k_peak = imap.most_unstable_k
     # Build BdG matrix at k_peak, k̂ = best_direction; diagonalize
-    h_mf, M_anom, zee, _ = SpinorBEC._bdg_contact_matrices(spinor, F, interactions, zeeman)
+    h_contact, M_anom, zee, _ = SpinorBEC._bdg_contact_matrices(spinor, F, interactions,
+        zeeman)
+    h_mf = h_contact
     if is_active(c_dd_val)
         sm_for_ddi = spin_matrices(F)
         k_hat = collect(imap.most_unstable_direction)
@@ -44,7 +46,10 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
         h_mf = h_mf .+ h_ddi
         M_anom = M_anom .+ M_ddi
     end
-    mu = real(sum(c -> (zee[c] + n0 * h_mf[c, c]) * abs2(spinor[c]), 1:D))
+    # Was a diagonal-only μ built from contact+DDI — two independent defects the
+    # single definition removes (#361; the off-diagonal one was fixed in
+    # `phases/bogoliubov.jl` on 2026-04-26 and never reached this copy).
+    mu = SpinorBEC.bdg_chemical_potential(h_contact, zee, spinor, n0)
     ek = k_peak^2 / 2
     L = 2n0 .* h_mf
     for i in 1:D

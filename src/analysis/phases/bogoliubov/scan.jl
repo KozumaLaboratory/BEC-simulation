@@ -92,6 +92,7 @@ function bogoliubov_instability_scan(;
 
     has_ddi = is_active(c_dd)
     sm = has_ddi ? spin_matrices(F) : nothing
+    mu = bdg_chemical_potential(h_contact, zee, spinor, n0)
 
     growth_rates = zeros(Float64, n_k, n_dir)
     k_values = collect(range(0, k_max; length=n_k))
@@ -125,7 +126,9 @@ function bogoliubov_instability_scan(;
             M_anom = M_contact
         end
 
-        _, omega, _ = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+        # μ is direction-independent (contact only), so it is hoisted out of
+        # the per-direction loop rather than recomputed from `h_mf` — #361.
+        _, omega, _ = _bdg_k_scan(h_mf, M_anom, zee, n0, D, mu, k_max, n_k)
 
         for ik in 1:n_k
             max_g = 0.0

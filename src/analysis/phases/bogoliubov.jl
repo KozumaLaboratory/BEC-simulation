@@ -32,7 +32,8 @@ function bogoliubov_spectrum(;
     length(spinor) == D ||
         throw(DimensionMismatch("spinor length $(length(spinor)) != 2F+1 = $D"))
 
-    h_mf, M_anom, zee, D_out = _bdg_contact_matrices(spinor, F, interactions, zeeman)
+    h_contact, M_anom, zee, D_out = _bdg_contact_matrices(spinor, F, interactions, zeeman)
+    h_mf = h_contact
 
     if is_active(c_dd)
         sm = spin_matrices(F)
@@ -45,7 +46,9 @@ function bogoliubov_spectrum(;
         M_anom = M_anom .+ M_ddi
     end
 
-    k_values, omega, max_growth = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+    # μ from the CONTACT matrix — see `bdg_chemical_potential`.
+    mu = bdg_chemical_potential(h_contact, zee, spinor, n0)
+    k_values, omega, max_growth = _bdg_k_scan(h_mf, M_anom, zee, n0, D, mu, k_max, n_k)
     BdGResult(k_values, omega, max_growth, max_growth > 1e-10)
 end
 
@@ -64,17 +67,10 @@ function _bdg_contact_matrices(spinor, F, interactions, zeeman)
     h_mf, M_anom, zee, D
 end
 
-function _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
-    # μ = ⟨ψ|(Z + n0 h_mf)|ψ⟩. The earlier `sum(c -> ...|ψ_c|²)` form
-    # kept only the diagonal of h_mf, which is correct for a single-m
-    # state but drops O(1) off-diagonal terms whenever the spinor is
-    # not aligned with a |m⟩ basis vector (FL, cyclic, biaxial nematic,
-    # any uniformly-rotated polarized state). The diagonal-only μ
-    # systematically biases the roton gap and the long-wavelength sound
-    # speed reported by `bogoliubov_dispersion`. Fixed 2026-04-26.
-    H_mu = Diagonal(zee) .+ n0 .* h_mf
-    mu = real(dot(spinor, H_mu * spinor))
-
+function _bdg_k_scan(h_mf, M_anom, zee, n0, D, mu::Real, k_max, n_k)
+    # `mu` arrives from `bdg_chemical_potential`, which is the only place that
+    # decides what goes into it. It used to be computed here from `h_mf`, i.e.
+    # from contact PLUS the direction-dependent DDI block — see #361.
     k_values = collect(range(0, k_max; length=n_k))
     omega = zeros(ComplexF64, 2D, n_k)
     max_growth = 0.0
@@ -172,35 +168,75 @@ function _q_tensor_direction(k_hat::Vector{Float64})
     Q
 end
 
+"""
+    _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab) → (h_ddi, M_ddi)
+
+The DDI half of the homogeneous BdG blocks, at the wavevector whose direction
+built `Q_ab`. Both blocks are the SAME object — the second variation of
+`E_dd = (c_dd/2)∫∫ M_a Q_ab M_b` with `M_a = ψ†F_aψ` — differing only in which
+of `ψ`/`ψ̄` is differentiated:
+
+    δ²E/δψ̄_m δψ_m'  →  c_dd Q_ab (F_aζ)_m conj((F_bζ)_m')     [exchange]
+    δ²E/δψ̄_m δψ̄_m'  →  c_dd Q_ab (F_aζ)_m      (F_bζ)_m'      [anomalous]
+
+`h_ddi` carries a further ½ because the caller assembles `L = 2n₀·h` against
+`M = n₀·M_anom` — the asymmetry is the contact convention that
+`test_bdg_fd_hessian.jl` measures (`L_op = 2·h_mf`, `M_op = M_anom`).
+
+**There is no Hartree term.** The direct piece is `c_dd (F_a)_{mm'} ∫Q_ab(r−r')
+M_b(r')`, which for a uniform condensate samples `Q(q=0) = 0` — the repository
+convention (`test_ddi_uniform_zero.jl`), and the reason a uniform dipolar gas
+has no mean-field DDI energy. Until 2026-08-19 this function returned that term
+instead, evaluated at the FLUCTUATION direction `Q(k̂)` rather than at `q=0`,
+and omitted the exchange term entirely (#361). Two consequences, and only the
+second was visible:
+
+  * fully polarized: `(F_zζ) = -Fζ`, so the wrong form and the right one differ
+    only by the factor 2, and the DDI part of `L` came out twice too large. The
+    correct blocks give back the textbook dipolar dispersion
+    `ω² = ε_k(ε_k + 2n(g + c_dd F² Q_zz(k̂)))`, gated in
+    `test/oracles/test_dipolar_bogoliubov_anchor.jl`.
+  * polar (`⟨F⟩ = 0`): the wrong form is identically ZERO, so the normal DDI
+    block vanished exactly where the spin-roton lives.
+"""
 function _bdg_ddi_matrices(spinor, F, D, sm, c_dd, Q_ab)
-    Fx_m = Matrix{ComplexF64}(sm.Fx)
-    Fy_m = Matrix{ComplexF64}(sm.Fy)
-    Fz_m = Matrix{ComplexF64}(sm.Fz)
-    F_mats = [Fx_m, Fy_m, Fz_m]
+    F_mats = (Matrix{ComplexF64}(sm.Fx),
+        Matrix{ComplexF64}(sm.Fy),
+        Matrix{ComplexF64}(sm.Fz))
+    fa_zeta = [Fm * spinor for Fm in F_mats]
 
-    f_exp = [real(spinor' * Fm * spinor) for Fm in F_mats]
-
-    # Normal: h^DDI_{mm'} = c_dd Σ_{ab} Q_{ab} <F_b> (F_a)_{mm'}
     h = zeros(ComplexF64, D, D)
-    for a in 1:3
-        for b in 1:3
-            h .+= c_dd * Q_ab[a, b] * f_exp[b] .* F_mats[a]
-        end
-    end
-
-    # Anomalous DDI: outer product of F_a·ζ vectors
-    # M^DDI_{m,m'} = c_dd Σ_{ab} Q_{ab} (F_a·ζ)_m (F_b·ζ)_{m'}
-    fa_zeta = [F_mats[a] * spinor for a in 1:3]
     M_mat = zeros(ComplexF64, D, D)
     for a in 1:3, b in 1:3
         coeff = c_dd * Q_ab[a, b]
         abs(coeff) < COUPLING_TOL && continue
+        va, vb = fa_zeta[a], fa_zeta[b]
         for i in 1:D, j in 1:D
-            M_mat[i, j] += coeff * fa_zeta[a][i] * fa_zeta[b][j]
+            h[i, j] += 0.5 * coeff * va[i] * conj(vb[j])
+            M_mat[i, j] += coeff * va[i] * vb[j]
         end
     end
 
     h, M_mat
+end
+
+"""
+    bdg_chemical_potential(h_contact, zee, spinor, n0) → Float64
+
+`μ = ⟨ζ|(Z + n₀ h_contact)|ζ⟩`, the ONE definition. Two things it must not be,
+both of which were live in this tree until 2026-08-19 (#361):
+
+  * **diagonal-only.** `sum(c -> (zee[c] + n0*h[c,c])*abs2(ζ[c]))` is correct
+    for a single-`m` state and drops O(1) off-diagonal terms for any other —
+    fixed here 2026-04-26 and never propagated to the analyzer copy.
+  * **DDI-inclusive.** μ is a property of the state, not of the probe: feeding
+    it `h_contact + h_ddi(k̂)` makes the chemical potential depend on which
+    direction you look from. For a uniform condensate the DDI contribution to μ
+    is exactly zero because it samples `Q(q=0) = 0`, so passing the contact
+    matrix is not an approximation.
+"""
+function bdg_chemical_potential(h_contact, zee, spinor, n0)
+    real(dot(spinor, (Diagonal(zee) .+ n0 .* h_contact) * spinor))
 end
 
 """
@@ -281,6 +317,8 @@ function instability_angular_map(;
     has_ddi = is_active(c_dd)
     sm = has_ddi ? spin_matrices(F) : nothing
 
+    mu = bdg_chemical_potential(h_contact, zee, spinor, n0)
+
     theta_vals = collect(range(0.0, Float64(π) / 2; length=n_theta))
     phi_vals = collect(range(0.0, 2.0 * Float64(π); length=n_phi + 1)[1:n_phi])
     growth_map = zeros(Float64, n_theta, n_phi)
@@ -304,7 +342,7 @@ function instability_angular_map(;
                 M_anom = M_contact
             end
 
-            _, omega, max_g = _bdg_k_scan(h_mf, M_anom, zee, n0, D, spinor, k_max, n_k)
+            _, omega, max_g = _bdg_k_scan(h_mf, M_anom, zee, n0, D, mu, k_max, n_k)
             growth_map[it, ip] = max_g
         end
     end

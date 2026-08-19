@@ -289,10 +289,10 @@ function _lhy_bdg_stiffness(h_contact, M_contact, zee, spinor, n0, F, c_dd, sm, 
         (h_contact, M_contact)
     end
 
-    # μ = ⟨ψ|(Z + n₀ h)|ψ⟩ — the full quadratic form, not the diagonal
-    # (mirrors the 2026-04-26 fix in phases/bogoliubov.jl). It depends on the
-    # direction through the DDI part of h, so it stays inside the loop.
-    mu = real(dot(spinor, (Diagonal(zee) .+ n0 .* h_mf) * spinor))
+    # μ = ⟨ψ|(Z + n₀ h_contact)|ζ⟩, from the single definition. It is
+    # direction-INDEPENDENT: the DDI part of μ samples Q(q=0) = 0, and the
+    # earlier version's direction dependence was the #361 defect, not physics.
+    mu = bdg_chemical_potential(h_contact, zee, spinor, n0)
 
     C = 2n0 .* h_mf
     @inbounds for i in 1:D

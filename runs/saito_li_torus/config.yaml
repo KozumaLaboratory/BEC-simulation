@@ -1,27 +1,68 @@
 # ─────────────────────────────────────────────────────────────────────
 #  Saito & Li, "Quantum droplets with magnetic vortices in spinor dipolar
 #  Bose-Einstein condensates", arXiv:2402.18885 (2024).
+#  Local copy: docs/refs/Saito_Li_2024_magnetic_vortex_droplets_arXiv2402.18885.pdf
 #
-#  Validation target: Fig. 1(d) F=6 N=15000 ε_dd=1.3 self-bound torus
-#  droplet with magnetic vortex (z-axis symmetry axis).
+#  Target: Fig. 1(d) third panel / Fig. 2(a) cyan curve —
+#  (F, N, ε_dd) = (6, 15000, 1.3), self-bound torus droplet with a magnetic
+#  vortex, B = 0, free space.
 #
-#  Geometry: free space (no trap, B=0), with ω_ref = 2π·110 Hz only as a
-#  unit choice (a_ho ≈ 0.78 μm). Box [3, 3, 3] a_ho ≈ 2.4 μm fits the
-#  ~1 μm torus with buffer.
+#  Digitised anchors from Fig. 2(a) (g3_digitise_fig2a.py; the F=1 curve is
+#  the positive control and reproduces the independent Fig. 1(c) panel to
+#  0.5 % in ρ and 1.4 % in r):
+#      peak ρ/N = 0.509 μm⁻³  at  r = 0.815 μm
+#      FWHM in r = 0.528 … 1.109 μm      ρ(r=0)/N = 0.011
+#  In internal units (∫|ψ|²dV = 1, a_ho = 0.78029 μm):
+#      n_peak = 0.242,  r_torus = 1.044 a_ho,  cloud edge ≈ 1.8 a_ho
 #
-#  The simulator's default Eu151 has a_s=110 a_0 → ε_dd_phys = 0.54.
-#  Saito-Li uses hypothetical smaller a_s for droplet formation; we
-#  override c_total ∝ N·a_s to produce ε_dd_phys = 1.3 at N=15000:
-#    c_total(N=15000, ε_dd=0.54) ≈ 1406    (natural)
-#    c_total target              = 1406 × 0.54/1.3 ≈ 583
+#  ── how ε_dd = 1.3 is reached ────────────────────────────────────────
+#  ε_dd ≡ a_dd/a_s with a_dd = μ₀μ²M/(12πℏ²) fixed by the ATOM (μ = 6.977 μ_B
+#  for ¹⁵¹Eu F=6 ⇒ a_dd = 59.43 a₀). The paper reaches ε_dd > 1 by assuming a
+#  smaller a_s, NOT by inflating the moment — "the scattering lengths for the
+#  other hyperfine spins F and those for ¹⁵³Eu are unknown, for which the
+#  spinor dipolar droplet may be possible."
 #
-#  LHY: scalar Lima-Pelster Q5 (matches paper Eq. 1, χ(ε_dd) = Q5).
-#  After validation, sister run with :polar_dipolar mode tests the
-#  paper-#1 closed form on the same physical setup.
+#  So exactly ONE knob moves: c_total. c_dd keeps its natural derived value.
+#      a_dd = 59.43 a₀,  ε_dd = 1.3  ⇒  a_s = 45.71 a₀
+#      c_total = 4π(a_s/a_ho)N = 584.37       c_dd = 63.31 (derived, natural)
+#      ε_dd = c_dd·F²/(3·c_total) = 1.3000    ← the dimensionless form
 #
-#  Initial state: polar_core_vortex (winding=1, axis=z) seeds the
-#  magnetic-vortex topology so ITP relaxes to the torus (Fig. 1(d))
-#  rather than the cigar (Fig. 3(a)) bistable partner.
+#  Overriding c_dd AS WELL double-counts: it multiplies ε_dd by 2.407 a second
+#  time. The previous revision of this file did that (`c_dd: 152`), and was
+#  saved from a 3.13 answer only by a SECOND defect — its step-level
+#  `interactions:` block silently dropped the mixin's `c_total: 583` (see the
+#  note in the pipeline step below), leaving the natural 1406 and a coincidental
+#  ε_dd = 1.297 at 2.4× the paper's absolute interaction scale.
+#
+#  ── LHY ──────────────────────────────────────────────────────────────
+#  Paper Eq. (1): scalar Lima-Pelster with χ(ε_dd) = Q₅(ε_dd), evaluated at the
+#  ε_dd this run is actually at. `c_lhy` MUST be given explicitly: the schema's
+#  auto-derivation reads the registry a_s (110 a₀) and the registry ε_dd
+#  (0.5402), neither of which this run uses, and supplies 972.56 instead of
+#  276.28 — 3.52× too stiff, which unbinds the droplet.
+#      c_lhy = (128√π/3)·(a_s/a_ho)^{5/2}·N^{3/2}·Q₅(1.3),  Q₅(1.3) = 3.7161
+#
+#  ── initial state ────────────────────────────────────────────────────
+#  The paper's state is Ψ = √ρ_v(r,z)·e^{-iS_zφ}·ζ^(y): fully polarised, spin
+#  circulating azimuthally (n̂ = φ̂, ∇·f = 0 flux closure). Component m carries
+#  winding −m, which is exactly what Fig. 1(b) shows (m=+1 winds −2π, m=0 flat,
+#  m=−1 winds +2π).
+#  `spin_coherent` with θ=π/2, φ-offset=π/2, charge 1 builds that state.
+#  NOT `polar_core_vortex`: its outer region is (|+F⟩e^{iφ}+|−F⟩e^{-iφ})/√2,
+#  which has ⟨F⟩ = 0 — an unmagnetised polar-core vortex carrying no magnetic
+#  vortex, and it violates the fully-polarised assumption Eq. (1) rests on.
+#
+#  ── solver ───────────────────────────────────────────────────────────
+#  method: lbfgs, not ITP. In the free-space droplet regime the imaginary-time
+#  fixed point is set by dt rather than by the Hamiltonian — measured on the
+#  sibling Yan-Li-Saito droplet at 44 % error in peak density while reporting
+#  dpsi = 3e-6, and a grid+box convergence scan CERTIFIES the wrong answer.
+#  See test/oracles/test_itp_dt_limited_advisory.jl.
+#
+#  ── box ──────────────────────────────────────────────────────────────
+#  The cloud reaches r ≈ 1.4 μm. `box: [3,3,3]` a_ho is 2.34 μm FULL width
+#  (grid.jl: dx = box_size/n_points), i.e. half-width 1.17 μm — it cut the
+#  droplet in half. `box: [6,6,6]` gives half-width 2.34 μm.
 # ─────────────────────────────────────────────────────────────────────
 
 defaults:
@@ -31,30 +72,31 @@ defaults:
 mixins:
   saito_li_droplet:
     atom:      Eu151
-    grid:      {n: [64, 64, 64], box: [3, 3, 3]}
-    potential: {type: harmonic, omega: [0.01, 0.01, 0.01]}     # ≈ free space, weak cage to keep cloud near origin
+    grid:      {n: [128, 128, 128], box: [6, 6, 6]}
+    potential: {type: none}                                   # free space, as in the paper
     interactions:
       N_atoms:   15000
-      omega_ref: 691.15                                         # = 2π·110 Hz, defines a_ho ≈ 0.78 μm
-      c1_ratio:  0.0
-      c_total:   583                                            # ε_dd_phys ≈ 1.3 (vs 0.54 natural)
+      omega_ref: 691.15                                       # = 2π·110 Hz, defines a_ho = 0.78029 μm
+      c1_ratio:  0.0                                          # paper: "we ignore the spin-dependent contact interaction"
+      c_total:   584.37                                       # ⇒ a_s = 45.71 a₀ ⇒ ε_dd = 1.3000
 
 pipeline:
   - ground_state:
+      # `use:` layering is SHALLOW (schema/templates_block.jl:_apply_step_mixins)
+      # — a step-level `interactions:` REPLACES the mixin's whole block rather
+      # than merging into it. Do not restate it here; that is how `c_total: 583`
+      # was silently lost before, and the resolved value read back as absent.
       use:           [saito_li_droplet]
-      interactions:
-        N_atoms:   15000
-        omega_ref: 691.15
-        c1_ratio:  0.0
-      ddi:
-        c_dd:      152                                          # 2.4× natural (63.3 × 1.3/0.54) → effective ε_dd ≈ 1.3
-                                                                # (ε_dd is c_dd/c_total ratio in dimensionless units; the
-                                                                # atom-level a_dd/a_s display in "Derived:" line stays at
-                                                                # natural 0.54 but the simulation uses overridden c_dd)
+      ddi:           {}                                       # c_dd derived = 63.31, the natural value
       B:             {Bz: 0}
-      initial_state: polar_core_vortex
-      init_state_params: {init_vortex_charge: 1.0}              # winding=+1 around z (state_dispatch.jl arg name)
-      lhy: {kind: scalar}                                       # paper Eq. 1: scalar Lima-Pelster Q5
-      n_steps:       8000
+      initial_state: spin_coherent
+      init_state_params:
+        init_theta:         1.5707963267948966                # π/2 — spin in the xy-plane
+        init_phi:           1.5707963267948966                # π/2 — spin azimuth = position azimuth + π/2 ⇒ n̂ = φ̂
+        init_vortex_charge: 1                                 # one turn of the spin around z
+      lhy:           {kind: scalar, c_lhy: 276.28}            # Lima-Pelster Q₅(1.3); see header
+      method:        lbfgs
+      n_steps:       4000
       tol:           1.0e-9
-      dt:            0.005
+      # (ψ is written to point_001.jld2 by the ground_state step already; there
+      #  is no `save:` key on this step kind.)
