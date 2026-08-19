@@ -60,6 +60,7 @@ include("model/stage.jl")             # Stage: one computation over one Model
 include("model/identity.jl")          # code_tree_hash + artifact_id
 include("model/ref.jl")               # ref: the published number, re-measured
 include("model/claim.jl")             # Claim: the A/B/C taxonomy, enforced
+include("model/claim_audit.jl")       # ...and the half of "the control must fail" that needs no run
 include("model/complete.jl")          # the completion marker + the one admission decision
 # Separate from complete.jl on purpose: admission is a question about bytes on a
 # filesystem, this is a question about physics at a state. Merging them would

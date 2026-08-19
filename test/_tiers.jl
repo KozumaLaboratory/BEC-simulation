@@ -173,6 +173,7 @@ const FAST_TESTS = [
     # not grow. `src/model.jl` said "still to come" with no number and no
     # consequence for months; this is the number (CLAUDE.md commitment 11).
     "model/test_model_adoption_ratchet.jl",
+    "model/test_claim_audit.jl",
     # `make_workspace(::Model)` must build the SAME workspace as the resolver
     # path. Without this the realisation layer would be a THIRD statement of the
     # physics rather than the inverse of the second one — and it caught two sign
