@@ -1,0 +1,36 @@
+mixins:
+  saito_li_droplet:
+    grid:
+      box:
+        - 6
+        - 6
+        - 6
+      n:
+        - 96
+        - 96
+        - 96
+    atom: "Eu151"
+    potential:
+      type: "none"
+    interactions:
+      omega_ref: 691.15
+      c1_ratio: 0.0
+      N_atoms: 15000
+      c_total: 584.37
+pipeline:
+  - ground_state:
+      B:
+        Bz: 0
+      ddi: {}
+      method: "lbfgs"
+      use:
+        - "saito_li_droplet"
+      tol: 1.0e-9
+      initial_state: "m_plus_F"
+      lhy:
+        kind: "scalar"
+        c_lhy: 276.28
+      n_steps: 4000
+defaults:
+  kind: "spinor"
+  backend: "gpu"
