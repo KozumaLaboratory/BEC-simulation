@@ -479,9 +479,20 @@ $f = 0.5210$ cell's chemical potential then held to a common 4000 ms.
 | 5 | 400 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
 | 5 | 1300 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
 | 5 | 4000 | 7 | 0 | 0 | 7 | 0.000 | [0.000, 0.354] |
-| 10 | 400 | 10 | **10** | 0 | 0 | **1.000** | [0.722, 1.000] |
+| 10 | 400 | 14 | **14** | 0 | 0 | **1.000** | [0.785, 1.000] |
 | 10 | 1300 | 1 | **1** | 0 | 0 | 1.000 | [0.207, 1.000] |
-| 10 | 4000 | 4 | **4** | 0 | 0 | **1.000** | [0.510, 1.000] |
+| 10 | 4000 | 7 | **7** | 0 | 0 | **1.000** | [0.646, 1.000] |
+
+Pooled across the rate axis, which is what the rate scan licenses once no cell
+shows rate dependence:
+
+| | $n$ | flower | polarised | excited | $p$ | 95 % CI |
+|---|---:|---:|---:|---:|---:|---|
+| $T = 10$ | 22 | **22** | 0 | 0 | 1.000 | **[0.851, 1.000]** |
+| $T = 5$ | 21 | 0 | 14 | 7 | 0.000 | **[0.000, 0.155]** |
+| $T = 10$, matched $f$ (§5.10) | 8 | **8** | 0 | 0 | 1.000 | [0.676, 1.000] |
+
+The two intervals are disjoint by a factor of five.
 
 ![selection against ramp rate, at two reservoir temperatures](figures/eu334_selection.png)
 
@@ -578,7 +589,7 @@ arm, and it is recorded because a design that cannot reach its own target produc
 a null that looks like an answer.)*
 
 **What is not in doubt** is that the flower texture is reachable by growth at fixed
-field — 21 trajectories out of 21 across four arms reached it — which is the thing
+field — 30 trajectories out of 30 across four arms reached it — which is the thing
 three protocol classes of transport could not do. #334's question was "does a
 realistic cooling trajectory select it, or does it get caught on the polarised
 branch", and on this evidence the answer is **it selects it, above a threshold in
@@ -593,9 +604,9 @@ per criterion 5, rather than as fractions of a design that did not run.
 
 **The weak-field ¹⁵¹Eu flower texture can be nucleated in place, and reservoir
 temperature is the switch.** Growing a condensate at fixed $(\kappa = 1.8,
-B = 20\ \mu\text{G})$ under the growth SPGPE, **15 trajectories out of 15** end on
+B = 20\ \mu\text{G})$ under the growth SPGPE, **22 trajectories out of 22** end on
 the flower branch at $T = 10\ \hbar\omega_{\rm ref}$ and **0 out of 21** do at
-$T = 5$, across a factor-10 span of ramp rate at each: Wilson bounds $p > 0.80$ and
+$T = 5$, across a factor-10 span of ramp rate at each: Wilson bounds $p > 0.851$ and
 $p < 0.155$, which do not overlap. Ramp rate moves nothing over that span;
 temperature moves everything. That is the question #334 posed, and the answer is
 the opposite of what the transport campaigns made likely — three protocol classes
@@ -632,7 +643,7 @@ must give 2 levels. That is a knob every evaporation sequence already has.
   44 % of the original gap and the verdict did not move.
 - **$n = 7$–10 per cell**, not the pre-registered 20: the group allocation ran out
   twice and the campaign was re-sized to what remained. The $T = 10$ effect is
-  15/15 pooled across three rates (lower bound 0.80); the $T = 5$ null is 0/21
+  22/22 pooled across three rates (lower bound 0.851); the $T = 5$ null is 0/21
   pooled (upper bound 0.155). Both are strong statements about a large effect and
   neither is a precise one about its size.
 - ~~The relaxations at $T = 10$ stopped at `max_steps`~~ — **closed.**
