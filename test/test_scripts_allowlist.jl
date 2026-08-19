@@ -98,6 +98,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu334/nucleation_bifurcation.jl",
     "eu334/nucleate.jl",
     "eu334/classify.jl",
+    "eu334/viz_eu334.py",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
