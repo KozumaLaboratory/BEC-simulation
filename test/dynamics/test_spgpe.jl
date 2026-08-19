@@ -1,6 +1,7 @@
 using Test
 using FFTW
 using LinearAlgebra
+using Printf
 using Random
 using SpinorBEC
 
@@ -226,11 +227,22 @@ end
         # noise passing through the projector, and at that operating point it is
         # five times the growth it is supposed to be a correction to.
         #
-        # The gate is written as a RESOLUTION comparison rather than as a
-        # tolerance, because that is the part that decides whether this is physics
-        # or discretisation: a real reservoir process cannot know the grid spacing.
-        # Same box, same physical time, same reservoir — two resolutions.
-        function null_drive_loss(n)
+        # The gate is a RATE, and it is compared to the growth rate the scattering
+        # term is nominally a correction to. Two earlier framings both failed to
+        # gate the defect and are recorded so they are not tried again:
+        #
+        #  - a TOTAL loss with an absolute bound passes by being short. The first
+        #    version ran 2 internal time units against production's 41.5, so the
+        #    same 0.29 %/τ that cost 11.5 % in production came to 0.6 % here and
+        #    sat under a 2 % bound.
+        #  - `@info` for the measured values is invisible under a job script that
+        #    filters box-drawing characters — which is how the numbers behind the
+        #    first PASS were lost. `@printf` to stdout instead.
+        #
+        # The comparison to 2γµ is the one that means something: a reservoir whose
+        # number-conserving process moves N faster than its number-changing one is
+        # not usable for a growth problem, whatever the absolute rate.
+        function null_drive_rate(n; T=1.0, steps=1000, dt=0.01)
             SpinorBEC.scratch_clear!()
             ws = flowing_state!(scalar_ws(; n=(n, n, n)))
             dV = cell_volume(ws.grid)
@@ -239,27 +251,30 @@ end
                 real(sum(conj(ws.state.psi) .* hpsi)) * dV /
                 (real(sum(abs2, ws.state.psi)) * dV)
             end
-            # ϵ_cut one thermal energy above µ, the standard C-region depth, and a
-            # cutoff the coarser grid still resolves.
-            T = 1.0
             k_cut = min(sqrt(2 * (mu + T)), 0.8 * π / (18.0 / n))
-            res = SPGPEReservoir(; T, mu, a_s=0.02, k_cut,
-                eps_cut=0.5 * k_cut^2, number_damping=false)
+            r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=0.5 * k_cut^2,
+                number_damping=false)
+            γ = spgpe_growth_rate(; T, mu, eps_cut=0.5 * k_cut^2, a_s=0.02)
             n0 = norm_sq(ws)
-            for s in 1:200
-                apply_spgpe_step!(ws, res, 0.01; t=0.0, seed=4200 + s)
+            for s in 1:steps
+                apply_spgpe_step!(ws, r, dt; t=0.0, seed=4200 + s)
             end
-            (norm_sq(ws) - n0) / n0
+            # |d ln N / dt| from the scattering reservoir, against the growth
+            # reservoir's own 2γµ at the same (T, µ, ϵ_cut).
+            (; rate=abs(norm_sq(ws) - n0) / n0 / (steps * dt), growth=2 * γ * mu)
         end
-        l32, l48 = null_drive_loss(32), null_drive_loss(48)
-        @info "projected energy-damping N_C change at zero drive" l32 l48
+        a = null_drive_rate(32)
+        b = null_drive_rate(48)
+        Printf.@printf(
+            "\n  projected energy damping at ZERO drive:\n" *
+                "    32³: |dlnN/dt| = %.3e   48³: %.3e   (growth scale 2γµ = %.3e)\n",
+            a.rate, b.rate, a.growth)
         # A reservoir process cannot depend on the discretisation. If it does, the
         # noise is not normalised against the grid it is drawn on.
-        @test isapprox(l32, l48; atol=0.01, rtol=0.25)
-        # …and it must be small in absolute terms, or the "number-conserving"
-        # reservoir is the dominant term in the number budget.
-        @test abs(l32) < 0.02
-        @test abs(l48) < 0.02
+        @test isapprox(a.rate, b.rate; atol=1e-5, rtol=0.5)
+        # …and it must not outrun the process it corrects.
+        @test a.rate < 0.5 * a.growth
+        @test b.rate < 0.5 * b.growth
     end
 
     @testset "a ramped cutoff does not grow the scratch registry" begin
