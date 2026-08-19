@@ -182,7 +182,7 @@ end
     end
     # `initial_state: from_jld2` short-circuits the Gaussian seed + ITP —
     # the ψ is loaded directly from a prior run's result.jld2 (streamed
-    # snapshot layout), letting the user continue a Klaus / EdH run that
+    # snapshot layout), letting the user continue a fast-Larmor / EdH run that
     # already paid for the spin-up phase. `init_state_params: {path: ...,
     # snap: last|N}` selects the snapshot; grid + D must match.
     initial_state_str = String(get(p, "initial_state", "polar"))::String

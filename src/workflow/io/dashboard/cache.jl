@@ -13,7 +13,7 @@
 # session keeps every frame's pre-packed binary warm even after the ψ
 # cache has fully cycled. Worst-case RAM with all-heavy entries is
 # ~PSI_CACHE_MAX_ENTRIES × 14 MB; with all-derived it's ~PSI_CACHE_MAX_ENTRIES
-# × 1 MB. 200 keeps a 157-frame Klaus run fully warm.
+# × 1 MB. 200 keeps a 157-frame rotating-basis run fully warm.
 const PSI_CACHE_MAX_ENTRIES = 200
 
 const _DERIVED_CACHE_PREFIXES = (
@@ -168,7 +168,7 @@ end
 
 # --- Atlas disk-cache: persist computed atlases between dashboard runs ---
 # The /api/density_atlas pre-build takes ~1.4 s per axis the first time
-# a Klaus-sized run is opened. Writing the resulting blob to a sibling
+# a 157-frame run is opened. Writing the resulting blob to a sibling
 # `_dashboard_cache/` directory means we can re-load it instantly on the
 # next dashboard restart, eliminating the cold path for repeat sessions.
 #
@@ -232,7 +232,7 @@ Why: the cold path for a single frame is dominated by the JLD2 read
 (~30 ms even after OS page cache warm-up). Eagerly walking every frame
 once during the run-open hop turns subsequent scrubbing into a pure cache
 hit (sub-ms). The cache cap is 200 entries — enough for the 157-frame
-Klaus run + room for a few ψ snapshots without eviction churn.
+157-frame run + room for a few ψ snapshots without eviction churn.
 """
 function _warm_density_bin_all(
     fpath::String, n_snapshots::Int, axis::Int, psi_cache::Dict{String, Any},

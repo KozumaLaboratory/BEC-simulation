@@ -11,7 +11,7 @@ function parse_pipeline(data::Dict)
     # pipeline step's inner block. Step-level entries override defaults.
     # E.g. `defaults: {kind: rotating_basis, save_every: 30, epsilon: 1e-6}`
     # applies to ground_state + every dynamics block. Useful for DRY across
-    # multi-phase Klaus / Berry configs.
+    # multi-phase fast-Larmor / Berry configs.
     defaults = haskey(data, "defaults") ? data["defaults"] : nothing
     if defaults !== nothing
         defaults isa AbstractDict || throw(ArgumentError(
