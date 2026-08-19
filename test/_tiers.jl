@@ -423,6 +423,11 @@ const CI_EXTRA = [
     # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
+    # ¹⁵¹Eu ↔ ¹⁵³Eu: the isotope is exactly three numbers (c_total, c_dd, q), the
+    # q ratio is exact from measured hyperfine constants, and the |m| ≥ 2 magnons
+    # of the polar state carry no interaction shift. #341 stage 1's deliverable
+    # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
+    "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     # The `:evolve` Stage producer: the DYNAMICS_SCHEMA partition is total, a
     # model-level key is refused rather than dropped, and the real-time ambient
@@ -571,6 +576,10 @@ const CI_EXTRA = [
     # of the exchange term, so it was 2x on a polarized state and identically
     # zero on a polar one (#361).
     "oracles/test_dipolar_bogoliubov_anchor.jl",
+    # The other half of `test_magnetization_conservation_rtp.jl`: imaginary time
+    # is not unitary, so it leaves the magnetization sector — which is why an
+    # adiabatic ramp need not reach the ITP ground state (#22, #335, #334).
+    "oracles/test_itp_does_not_conserve_magnetization.jl",
     # What the six unmeasured Eu scattering channels CANNOT move: the stretched
     # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
     # fixed c_total leaves them exact. Each invariance carries a control that
