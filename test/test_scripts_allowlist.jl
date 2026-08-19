@@ -88,6 +88,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: Eu in-place nucleation (docs/guides/eu_in_place_nucleation.md, #334) ──
+    "eu334/window.jl",
+    "eu334/nucleation_bifurcation.jl",
+    "eu334/nucleate.jl",
+    "eu334/classify.jl",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
@@ -146,4 +151,84 @@ const _SCRIPTS_ALLOWLIST = Set([
         @test isempty(stale)
         isempty(stale) || @info "allowlist entries with no file" stale
     end
+end
+
+# The allowlist asserts a file EXISTS. It says nothing about whether that file
+# still runs, and on 2026-08-18 the 306→76 absorption deleted
+# `scripts/eu_ramp_common.jl` while two #335 instruments
+# (`eu_hysteresis/branch_{continuation,stability}.jl`) kept including it. Both
+# died on their first line for a month with nothing red: the allowlist was
+# happy, the tier suite does not execute scripts, and the campaign that needed
+# them was already finished. The class is "a tracked artifact points at a path
+# that a later commit removed", and it is checkable in milliseconds.
+@testset "include targets in scripts/ and docs figures resolve" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+
+    # `include(joinpath(@__DIR__, "a", "b.jl"))` and `include("a/b.jl")`.
+    # Anything with an interpolation or a non-literal argument is skipped rather
+    # than guessed at — and the count of skips is reported, so an extractor that
+    # understands nothing cannot pass as a tree with nothing to find.
+    re_dir = r"include\(\s*joinpath\(\s*@__DIR__\s*,\s*((?:\"[^\"]*\"\s*,\s*)*\"[^\"]*\")\s*\)\s*\)"
+    re_lit = r"include\(\s*\"([^\"$]*)\"\s*\)"
+    lit_parts(s) = String[strip(x, ['"', ' ']) for x in split(s, ",")]
+
+    # (file, printable target, [candidate absolute paths]). A `.jl` include is
+    # relative to its own file; the `julia -e '… include("x") …'` lines inside
+    # submit wrappers and usage comments run from the repo root. Both bases are
+    # offered and either one resolving is enough — the gate is looking for a
+    # target that exists NOWHERE, which is what a deletion leaves behind.
+    # `out`, not `refs`: a nested function assigning to a name that is already a
+    # local of the enclosing scope writes to THAT variable, and the first version
+    # of this gate silently replaced the corpus with the two-entry calibration
+    # probe — then reported the probe as the tree's only broken includes.
+    include_refs = function (path)
+        src = read(path, String)
+        out = Tuple{String, String, Vector{String}}[]
+        for m in eachmatch(re_dir, src)
+            t = joinpath(lit_parts(m[1])...)
+            push!(out, (path, t, [normpath(joinpath(dirname(path), t))]))
+        end
+        for m in eachmatch(re_lit, src)
+            t = String(m[1])
+            push!(
+                out,
+                (path, t, [normpath(joinpath(dirname(path), t)),
+                    normpath(joinpath(root, t))]),
+            )
+        end
+        out
+    end
+
+    files = String[]
+    for d in ("scripts", joinpath("docs", "guides", "figures"))
+        isdir(joinpath(root, d)) || continue
+        for (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            (endswith(f, ".jl") || endswith(f, ".sh")) && push!(files, joinpath(dir, f))
+        end
+    end
+    refs = Tuple{String, String, Vector{String}}[]
+    for f in files
+        append!(refs, include_refs(f))
+    end
+
+    # The extractor is the part that can go blind: a regex that matches nothing
+    # reports a clean tree. Prove it recovers both forms from source it will
+    # actually meet, before any count taken with it is used.
+    probe = mktempdir()
+    write(joinpath(probe, "p.jl"),
+        "include(joinpath(@__DIR__, \"sub\", \"there.jl\"))\ninclude(\"flat.jl\")\n")
+    got = Set(r[2] for r in include_refs(joinpath(probe, "p.jl")))
+    @test joinpath("sub", "there.jl") in got
+    @test "flat.jl" in got
+
+    broken = calibrated_scan(refs;
+        match=r -> !any(isfile, r[3]),
+        present=("synthetic", "gone.jl", [joinpath(root, "deleted_by_a_later_commit.jl")]),
+        absent=("synthetic", "Project.toml", [joinpath(root, "Project.toml")]),
+        describe=r -> string(r[1], " → ", r[2]))
+
+    @test isempty(broken)
+    isempty(broken) || @info "include targets that exist under no base" broken
+    @test !isempty(refs)      # nothing to check ⇒ the extractor, not the tree
 end

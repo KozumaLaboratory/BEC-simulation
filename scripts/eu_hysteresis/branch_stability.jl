@@ -67,8 +67,6 @@ using JLD2: jldopen
 using Printf
 using Random
 
-include(joinpath(@__DIR__, "..", "eu_ramp_common.jl"))   # spin_scalars
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 const KAPPA = getf("SB_KAPPA", 1.8)
 const GRID_N = Int(getf("SB_GRID", 32))

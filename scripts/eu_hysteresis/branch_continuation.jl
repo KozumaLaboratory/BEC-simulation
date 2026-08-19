@@ -65,8 +65,6 @@ using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
 
-include(joinpath(@__DIR__, "..", "eu_ramp_common.jl"))   # spin_scalars
-
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 
 """Descending list from an env var, refusing a silent truncation.
