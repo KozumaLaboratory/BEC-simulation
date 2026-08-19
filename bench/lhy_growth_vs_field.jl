@@ -33,7 +33,13 @@ fm_minus_spinor() = (z = zeros(ComplexF64, D); z[D] = 1.0; z)    # m = −F
 # Fields in µG. The campaign's boundary bracket at κ=1 is 42–46 µG
 # (runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml); the texture B-scan runs
 # 50–80 µG.
-const B_UG = (0.0, 1.0, 5.0, 10.0, 20.0, 44.0, 50.0, 60.0, 80.0, 100.0, 500.0, 1000.0)
+const B_UG = (0.0, 1.0, 5.0, 10.0, 20.0, 44.0, 50.0, 60.0, 80.0, 100.0,
+    # Extended 2026-08-19 after the corrected BdG (`7e6770c2`) showed the m = −F
+    # branch reaching EXACTLY zero growth somewhere between 100 and 500 µG. The
+    # pre-fix code had it unstable at every field, and that is what the
+    # "the field is not an escape route" reading rested on. Locating the
+    # threshold is the whole point of the extension, so the grid is dense there.
+    125.0, 150.0, 175.0, 200.0, 225.0, 250.0, 300.0, 400.0, 500.0, 1000.0)
 
 zee_at(B_ug) = begin
     B_T = B_ug * 1e-10                 # µG → Gauss (1e-6) → Tesla (1e-4)
