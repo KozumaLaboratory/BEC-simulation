@@ -91,7 +91,8 @@ scan:
     - {name: polar_none,   override: {pipeline.0.initial_state: polar}}
     # the literature scheme: ONE fully-polarised dipolar functional for both
     # branches (Saito group, arXiv:2402.18885). Identical to the SI-anchored
-    # scalar × Q5 by algebra — gated to 6.6e-16 in bench/lhy_boundary_smoke.jl.
+    # scalar × Q5 by algebra — gated to 6.6e-16 in
+    # test/oracles/test_lhy_fm_dipolar_is_the_scalar_scheme.jl.
     - {name: fm_fmdip,     override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: fm_dipolar}}}
     - {name: polar_fmdip,  override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: fm_dipolar}}}
     # the alternative: each branch in its OWN ansatz. Pairs with fm_fmdip.
