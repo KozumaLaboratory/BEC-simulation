@@ -27,7 +27,25 @@ FFTW.set_num_threads(Threads.nthreads())
 using SpinorBEC
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
-const RESULTS = joinpath(ROOT, "docs", "validation", "klaus2022_results.json")
+
+# Every knob a cluster ensemble needs, and NOTHING that changes what a default
+# invocation does: each default is the value the committed
+# `klaus2022_results.json` was produced with, so re-running bare reproduces the
+# same record rather than a differently-parameterised one.
+#
+# `KLAUS_RESULTS` exists because concurrent jobs must not share an output file.
+# Three seeds writing one JSON is a read-modify-write race that would silently
+# keep whichever finished last.
+const RESULTS = get(ENV, "KLAUS_RESULTS",
+    joinpath(ROOT, "docs", "validation", "klaus2022_results.json"))
+const WIGNER_SEED = parse(Int, get(ENV, "KLAUS_SEED", "20260818"))
+const RESULT_TAG = get(ENV, "KLAUS_TAG", "")
+# Hold time in SECONDS of laboratory time. The paper reads its stripe structure
+# over 700 ms - 1.1 s (Fig. 4c, 115 frames in the rotating frame); the committed
+# 500 ms run under-ran that window, which is §6d's account of why the stripe arm
+# reached 4.67x its null against a pre-registered 5x.
+const HOLD_S = parse(Float64, get(ENV, "KLAUS_HOLD_S", "0.5"))
+const CONTROL_HOLD_S = parse(Float64, get(ENV, "KLAUS_CONTROL_HOLD_S", "0.6"))
 
 # --- Published values and the pre-registered verdict thresholds (§6) ---
 
@@ -120,7 +138,7 @@ function arm_ar_ramp(smoke)
             "kind" => "scalar_egpe", "duration" => dur, "dt" => 0.002,
             "B_direction" => Dict("theta" => THETA35, "omega" => 1.0,
                 "ramp_rate" => RAMP_RATE),
-            "wigner_seed" => Dict("kT" => 8.33, "seed" => 20260818),
+            "wigner_seed" => Dict("kT" => 8.33, "seed" => WIGNER_SEED),
             "save" => Dict("every" => 100))),
     ]
     res, secs = run_arm(steps)
@@ -191,10 +209,11 @@ function stripe_frames(cols, times, stir, dx, dy; k_lo, k_hi, sigma_px)
 end
 
 function arm_stripes(smoke; control::Bool)
-    hold = smoke ? 0.15 * SECOND : (control ? 0.6 * SECOND : 0.5 * SECOND)
+    hold = smoke ? 0.15 * SECOND :
+           (control ? CONTROL_HOLD_S * SECOND : HOLD_S * SECOND)
     dyn = Dict(
         "kind" => "scalar_egpe", "dt" => 0.002,
-        "wigner_seed" => Dict("kT" => 8.33, "seed" => 20260818),
+        "wigner_seed" => Dict("kT" => 8.33, "seed" => WIGNER_SEED),
         "save" => Dict("every" => smoke ? 100 : 500, "column_density" => true),
     )
     bdir = Dict("theta" => THETA35, "omega" => 0.75)
@@ -309,12 +328,14 @@ end
 
 out["published"] = Dict(string(k) => v for (k, v) in pairs(PUBLISHED))
 out["accept"] = Dict(string(k) => v for (k, v) in pairs(ACCEPT))
+out["wigner_seed"] = WIGNER_SEED
+out["hold_s"] = out["arm"] == "control" ? CONTROL_HOLD_S : HOLD_S
 out["git_hash"] = strip(read(`git rev-parse HEAD`, String))
 out["dirty"] = !isempty(strip(read(`git status --porcelain`, String)))
 out["timestamp"] = string(now())
 
 all_results = isfile(RESULTS) ? JSON.parsefile(RESULTS) : Dict{String, Any}()
-key = out["smoke"] ? out["arm"] * "_smoke" : out["arm"]
+key = out["smoke"] ? out["arm"] * "_smoke" : out["arm"] * RESULT_TAG
 all_results[key] = out
 open(RESULTS, "w") do f
     JSON.print(f, all_results, 2)
