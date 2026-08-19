@@ -82,14 +82,15 @@ separate GridSpec fields and 71 committed configs set k_cut explicitly",
         () -> DEALIAS_K_CUTOFF[],
         v -> (DEALIAS_K_CUTOFF[] = v === nothing ? 7.5 : nothing)),
     (:meanfield_midpoint, :blind,
-        "BLIND. Real-time only (`!imaginary_time` guards both `_half_potential` \
-sites), so it belongs in the params of an `:evolve` Stage — and no `:evolve` Stage \
-exists: run_step_dynamics.jl declares none",
+        "BLIND HERE, and correctly so. Real-time only (`!imaginary_time` guards both \
+`_half_potential` sites), so it measures exactly 0.0 under the ITP this file drives and \
+must NOT move the ground-state id. It DOES move the `:evolve` Stage's id since \
+2026-08-19 — `evolve_stage.jl`, asserted in test/model/test_evolve_stage.jl",
         () -> MEANFIELD_MIDPOINT_ENABLED[],
         v -> (MEANFIELD_MIDPOINT_ENABLED[] = !v)),
     (:combined_spin_step, :blind,
-        "BLIND. Same destination and same blocker. combined_spin_step.jl:42-46 \
-already says it is a physics choice the run must make",
+        "BLIND HERE for the same reason, and likewise now in the `:evolve` id. \
+combined_spin_step.jl:42-46 already says it is a physics choice the run must make",
         () -> COMBINED_SPIN_STEP_ENABLED[],
         v -> (COMBINED_SPIN_STEP_ENABLED[] = !v)),
     (:spin_chain_fusion, :blind,

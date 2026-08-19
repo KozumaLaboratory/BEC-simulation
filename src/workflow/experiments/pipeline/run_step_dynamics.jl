@@ -92,6 +92,7 @@ end
 function _run_step(
     step::DynamicsStep, psi_prev, grid, atom, ws_prev;
     verbose=true, checkpoint_dir=nothing,
+    pipeline_results::Union{Nothing, Dict}=nothing,
     live_status_path::Union{Nothing, String}=nothing,
 )
     psi_prev !== nothing ||
@@ -348,6 +349,7 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
             :save_psi_snapshots => traj !== nothing && !isempty(traj.psi_snapshots),
             :snapshot_tmp_path => nothing,
             :snapshot_count => traj === nothing ? 0 : length(traj.psi_snapshots),
+            :dyn_stage_ref => _dyn_stage_ref(pipeline_results, p),
         )
         return (psi_out, grid, atom, ws, step_result)
     end
@@ -421,8 +423,22 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
         :snapshot_tmp_path => snap_tmp_path,
         :snapshot_count => snap_count,
         :interrupted => rtp_interrupted[],
+        :dyn_stage_ref => _dyn_stage_ref(pipeline_results, p),
     )
     (psi_out, grid, atom, ws, step_result)
+end
+
+# `nothing` whenever the chain cannot state this step faithfully: no preceding
+# ground-state Stage, or a dynamics block that overrides the model. Recorded
+# either way, so a run says which of the two it was instead of the absence
+# reading as "no dynamics happened".
+@noinline function _dyn_stage_ref(
+    pipeline_results::Union{Nothing, Dict}, p::Dict{String, Any}
+)::Union{Nothing, String}
+    pipeline_results === nothing && return nothing
+    from = get(pipeline_results, :gs_stage, nothing)
+    from isa Stage || return nothing
+    dyn_artifact_id(from, p)
 end
 
 """
