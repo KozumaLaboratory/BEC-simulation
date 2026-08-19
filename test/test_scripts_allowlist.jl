@@ -89,6 +89,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
     # ── active campaign: Eu in-place nucleation (docs/guides/eu_in_place_nucleation.md, #334) ──
+    "eu334/_preamble.sh",
+    "eu334/launch.sh",
+    "eu334/submit_bifurcation.sh",
+    "eu334/submit_nucleate.sh",
+    "eu334/submit_smoke.sh",
     "eu334/window.jl",
     "eu334/nucleation_bifurcation.jl",
     "eu334/nucleate.jl",
