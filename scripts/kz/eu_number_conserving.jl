@@ -238,6 +238,37 @@ if abspath(PROGRAM_FILE) == @__FILE__
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
 
+    elseif mode == "gammascan2"
+        # Is "the field does not condense" the finite-gamma lag, or another defect?
+        #
+        # The 1.73 s handoff finished and the field's thermal C region tracks equilibrium
+        # while its condensate does not: at the end N_C = 41 against the constraint's
+        # thermal 51, and N_0 = 0.045 against the constraint's 3513. So the machinery is
+        # working — a dead field would miss both — and only the condensate mode fails to
+        # grow. Its growth rate is 2 gamma (mu - eps_0), which is the quantity gamma
+        # scales.
+        #
+        # The FIRST time this scan ran it was meaningless: the N_0 estimator was reading
+        # psi[:,:,:,1] while the seed is in the last component, so N_0 was ~0 at every
+        # gamma by construction. It has since been checked against a known TF state in
+        # every component (1.00000). This run is that check being cashed in.
+        #
+        # gamma is raised through a_s because the rates are DERIVED; pinning them is what
+        # the unphysical-rate gate refuses, and that gate exists because six GPU arms once
+        # ran at gamma 2.4-370x off.
+        for gm in (1.0, 10.0, 100.0)
+            @printf("\n########## gamma multiplier %.0fx ##########\n", gm)
+            o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, t_start_s=1.73,
+                gamma_mult=gm)
+            h = isempty(o.hist) ? nothing : o.hist[end]
+            if h !== nothing
+                g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02, eps_cut=1.5 + 3 * h.T)
+                @printf("  END  N_C=%.4g  field N0=%.4g  eq N0=%.4g  eq Nth_C=%.4g  ratio=%.5f\n",
+                    h.N_C, h.N0, g.N0, g.Nth_C, h.N0 / max(g.N0, 1))
+            end
+            flush(stdout)
+        end
+
     elseif mode == "gammascan"
         # Is N_0 = 0 a finite-gamma LAG or a defect?
         #
