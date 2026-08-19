@@ -551,6 +551,11 @@ const CI_EXTRA = [
     "oracles/test_apply_operator_accumulates.jl",
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
+    # What the six unmeasured Eu scattering channels CANNOT move: the stretched
+    # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
+    # fixed c_total leaves them exact. Each invariance carries a control that
+    # moves (#342, `docs/campaign/as_dependency_map.md`).
+    "oracles/test_stretched_channel_invariance.jl",
     "oracles/test_lhy_analytic.jl",
     "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
