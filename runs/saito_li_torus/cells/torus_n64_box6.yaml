@@ -1,0 +1,40 @@
+mixins:
+  saito_li_droplet:
+    grid:
+      box:
+        - 6
+        - 6
+        - 6
+      n:
+        - 64
+        - 64
+        - 64
+    atom: "Eu151"
+    potential:
+      type: "none"
+    interactions:
+      omega_ref: 691.15
+      c1_ratio: 0.0
+      N_atoms: 15000
+      c_total: 584.37
+pipeline:
+  - ground_state:
+      B:
+        Bz: 0
+      ddi: {}
+      method: "lbfgs"
+      use:
+        - "saito_li_droplet"
+      tol: 1.0e-9
+      initial_state: "spin_coherent"
+      init_state_params:
+        init_theta: 1.5707963267948966
+        init_vortex_charge: 1
+        init_phi: 1.5707963267948966
+      lhy:
+        kind: "scalar"
+        c_lhy: 276.28
+      n_steps: 4000
+defaults:
+  kind: "spinor"
+  backend: "gpu"
