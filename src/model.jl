@@ -54,3 +54,9 @@ include("model/complete.jl")          # the completion marker + the one admissio
 # filesystem, this is a question about physics at a state. Merging them would
 # put a gradient evaluation behind `admit_payload`.
 include("model/verdict_truth.jl")     # is the recorded verdict true of the payload?
+# Spec → runtime: the inverse of `gs_model`'s walk. Last, because it needs every
+# spec type above it. `make_workspace(::Model)` lives in
+# `workflow/initialization/make_workspace.jl` beside the kwarg form — this file
+# cannot reach it (the model layer depends on nothing under `src/workflow/`, by
+# design), and the realisation functions are what it is built from.
+include("model/realise.jl")
