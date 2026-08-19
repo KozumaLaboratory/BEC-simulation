@@ -21,7 +21,7 @@
 # coefficient. Everything else is a legitimate choice and not this test's business.
 #
 # WIDENED 2026-08-19 (#343). The original gate read exactly two spellings —
-# `initial_state: m_{minus,plus}_F` and `B: {Bz: …}` — and the Klaus-Eu series
+# `initial_state: m_{minus,plus}_F` and `B: {Bz: …}` — and the rotation-assisted EdH quench series
 # uses NEITHER: `runs/eu151_klaus_phi_phys/config.yaml` says `init_m_idx: 1`
 # with `B: {p: 26700.0}`, behind a `use:` mixin that hides the atom from a raw
 # YAML read. Three independent reasons for one config to be invisible to its own
@@ -149,7 +149,7 @@ Configs may DECLARE that the seed opposes the field on purpose:
 
     # anti-aligned-seed: <reason>
 
-Measured 2026-08-19 (#343): the Klaus / Einstein-de Haas cascade only exists when
+Measured 2026-08-19 (#343): the Einstein-de Haas cascade only exists when
 the prepared stretched state is the Zeeman-HIGHEST one — rotation contrast
 +16.5 % anti-aligned against −0.45 % aligned — which is the standard EdH
 configuration (Kawaguchi-Saito-Ueda PRL 96, 080405). So "seed opposes field" is
@@ -253,8 +253,8 @@ end
             # of the ladder, and it seeds m=+F. #343 §2 read this as "the only Eu
             # arc on the opposite side"; it is not — comparing m labels across two
             # field parameterisations is what made it look that way. It is ALIGNED
-            # like everything else, and (docs/campaign/klaus_eu_polarisation_decision.md
-            # §4.2) that is the wrong side for the Klaus protocol.
+            # like everything else, and (docs/campaign/edh_quench_polarisation_decision.md
+            # §4.2) that is the wrong side for the EdH quench.
             @test _m_lowest(gs, atom) === :plus_F
             @test _seed_of(gs, atom) === :plus_F
         end
@@ -299,7 +299,7 @@ end
     #
     # 2026-08-19: and a third reading exists, which is why deleting these is
     # wrong — the seed may oppose the field ON PURPOSE. That is the standard
-    # Einstein-de Haas preparation and the only regime in which the Klaus
+    # Einstein-de Haas preparation and the only regime in which the
     # rotation enhancement exists at all (#343 §3.6). Such a config should carry
     # `# anti-aligned-seed: <reason>` and lands in `declared` instead.
     plus = filter(d -> occursin("prepares m=+F", d), r.disagree)

@@ -43,7 +43,7 @@ reads, and the only place the SHAs are declared. The table below is the human-re
 context and deliberately carries no SHAs, so the two cannot drift. It has 15 entries to
 this table's 12: the June integrator row expands into the four propagator paths that
 carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
-`test/campaign/test_fix_list_ancestor_gate.jl` pins the two counts against each other
+`test/test_campaign_fix_list_gate.jl` pins the two counts against each other
 and re-runs the ancestor check over every ref, so neither the drift nor a dead ref is
 left to a reader.
 
@@ -146,7 +146,7 @@ disagreeing human. Note which one a claim rests on.
 
 - **A — code correctness**: units, sign, conservation, bit-identity, GPU = CPU.
 - **B — physics agreement**: closed-form limits, F=1 polar vs FM, polyhedral classification.
-- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus 2022,
+- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus et al. 2022,
   Yan-Li-Saito Barnett).
 
 Every numeric claim a session writes must carry: **type (A/B/C) + producing commit +
@@ -155,6 +155,14 @@ test tier**. "Tests pass" is A. "Matches Matsui" is C. Do not conflate.
 For ¹⁵¹Eu: **type A is achievable now; type C is blocked on atomic-physics inputs** for
 anything depending on channel-resolved interactions. Claims resting only on $q$,
 $\epsilon_{dd}$, or geometry are quotable today.
+
+**Per claim, that split is `as_dependency_map.md`.** The boundary is sharper than
+this paragraph implies and it is exact: the one measured input, $a_{12} = 110(4)a_B$,
+IS the constraint $c_0 + 36c_1 = c_\text{total}$, and the stretched pair plus its
+first magnon are pure $S = 2F$ — so a fully polarized cloud's mean field, LHY (FM
+closed form), phonon branch and first magnon cannot be moved by the six unmeasured
+channels at all, while the phase diagram is nothing *but* those channels. Gated by
+`test/oracles/test_stretched_channel_invariance.jl`.
 
 ---
 

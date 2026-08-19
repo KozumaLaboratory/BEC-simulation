@@ -337,22 +337,25 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]|\]\(([A-Za-z0-9_\-]+)\.md\)")
 def link_targets(text):
     """Every stem this text points at, in EITHER link form.
 
-    Yields the raw stem AND its hyphen-normalised form. The normalisation exists
-    because wikilinks get written with hyphens where the file uses underscores;
-    applying it UNCONDITIONALLY was a defect, since it also rewrites hyphens that
-    are really in the filename. `gotcha_doc_p_q_table_was_computed_at_1e-4_...`
-    became `..._1e_4_...`, matched nothing, and the file was reported as an
-    orphan that will never load — while its index line was present and correct
-    (2026-08-19). Raw first, normalised as a fallback; the caller only keeps
-    stems that exist, so offering both cannot invent a link.
+    Yields the literal stem AND its hyphen->underscore normalisation, because
+    only one of the two can be right and this function cannot tell which: it
+    does not know the file set. Callers already filter with `in texts`.
+
+    Normalising unconditionally was a defect. It exists so a `[[link-with-
+    hyphens]]` finds a file named with underscores, but it also rewrote
+    hyphens that are part of the real name -- `gotcha_doc_p_q_table_was_
+    computed_at_1e-4_of_the_field_2026_08_19` became `..._1e_4_...`, matched
+    nothing, and the file was reported as an orphan while MEMORY.md linked it
+    correctly. That is a FALSE ORPHAN, the same failure class the `reachable`
+    docstring below records being fixed once already, and it points the reader
+    at a healthy file to "repair".
     """
     for wiki, md in _LINK.findall(prose(text)):
         raw = wiki or md
         key = raw[:-3] if raw.endswith(".md") else raw
         yield key
-        alt = key.replace("-", "_")
-        if alt != key:
-            yield alt
+        if "-" in key:
+            yield key.replace("-", "_")
 
 
 def reachable(texts, roots):
@@ -415,6 +418,23 @@ def main():
         print("CALIBRATION FAILED: MEMORY.md reaches nothing; the link graph is "
               "not being parsed and every count below would be fiction.",
               file=sys.stderr)
+        return 2
+
+    # Both link spellings must resolve, on a synthetic pair rather than on
+    # whatever happens to be in the store. `link_targets` used to normalise
+    # every hyphen to an underscore, so a file whose real name contains one
+    # (`..._at_1e-4_of_the_field_...`) was reported as an orphan while the
+    # index linked it correctly -- a FALSE orphan, which sends the reader to
+    # "repair" a healthy file. Asserting both arms is what discriminates:
+    # yielding only the literal stem breaks the second, only the normalised
+    # one breaks the first.
+    _probe = {"a-b_c": "", "d_e_f": "",
+              "root": "see [[a-b_c]] and ](d-e-f.md)"}
+    _got = reachable(_probe, {"root"})
+    if not {"a-b_c", "d_e_f"} <= _got:
+        print("CALIBRATION FAILED: link_targets resolves only one hyphen "
+              f"spelling (reached {sorted(_got)}); orphan counts would be "
+              "fiction in the direction that invents work.", file=sys.stderr)
         return 2
 
     index_text = "".join(prose(texts.get(i, "")) for i in indexes)

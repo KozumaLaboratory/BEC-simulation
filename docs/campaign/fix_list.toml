@@ -14,7 +14,7 @@
 #
 # Every ref was verified an ancestor of main at 2a0075e6 (2026-07-30); the
 # eu-config-field-sign row was added later and verified at b2d746cc (2026-08-19).
-# The verification is not a one-off: `test/campaign/test_fix_list_ancestor_gate.jl`
+# The verification is not a one-off: `test/test_campaign_fix_list_gate.jl`
 # re-runs `git merge-base --is-ancestor <ref> HEAD` over every row on every ci run,
 # so a row naming a ref that is not in this history reddens the suite.
 

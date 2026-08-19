@@ -6,7 +6,7 @@
 function _route_density_max(path::String, base_dir::String, psi_cache::Dict{String, Any})
     # /api/density_max/:run/:file → {"density_max_total": float}
     # Lazy version of the field that used to live in /api/snapshots.
-    # The 16-frame walk takes ~0.8 s on Klaus and stalled the
+    # The 16-frame walk takes ~0.8 s on a 157-frame run and stalled the
     # initial run-open hop; computing it on demand keeps that hop
     # instant. Cached server-side so repeat calls are sub-ms.
     p = _parse_run_file(path, "/api/density_max/")

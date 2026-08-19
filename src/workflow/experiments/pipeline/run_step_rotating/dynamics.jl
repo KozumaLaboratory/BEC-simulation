@@ -60,7 +60,7 @@ const _ROTATING_ACTUAL_INTEGRATOR = "strang"
     n_steps = Int(round(duration / dt_rtp))
 
     # Larmor / Â regime guard: the Y6 ε-formula coefficient (0.1) assumes
-    # commutator scales of O(1). For Klaus regime where p × F or
+    # commutator scales of O(1). For the fast-Larmor regime where p × F or
     # |Â| × |H_DDI| scale 10³–10⁵, ε=1e-3 is empirically too coarse and
     # produces non-physical depolarisation (audit 2026-04-28: p_3000
     # ε=1e-3 → 0.997→0.106 thermal scrambling; ε=1e-6 → 0.997→0.999

@@ -64,10 +64,10 @@ Each declares its sign in one coefficient function in the file named.
 ## The B → p sign
 
 Declared **once**, at `src/workflow/io/units.jl:73`, as `p ≡ -g_F μ_B B` (Kawaguchi-Ueda);
-20 other references delegate to it. **The uniqueness is a GATE, not a
+22 other references delegate to it. **The uniqueness is a GATE, not a
 list** — `test/oracles/test_bfield_sign_declared_once.jl` fails if a second
 expression in `src/` combines `g_F` with the Bohr magneton. This section used to
-enumerate all 20 sites; a derived list cannot rot but only describes,
+enumerate all 22 sites; a derived list cannot rot but only describes,
 whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
@@ -146,7 +146,7 @@ to their own default), and that qualification is judgement, not derived.
 
 | knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |
 |---|---|---|---|
-| `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
+| `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / 4000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
 | `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 (schema `1.0e-8`) |
 | `m_lbfgs` | 20 | 20 | 10 (schema `10`) |
 
@@ -206,12 +206,12 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 257 files
-- `CI_EXTRA` — 116 files
+- `FAST_TESTS` — 258 files
+- `CI_EXTRA` — 124 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 77 files
-- `INTEGRATION_TESTS` — 45 files
+- `ORACLE_TESTS` — 79 files
+- `INTEGRATION_TESTS` — 51 files
 
 ## Validation ladder — instruments present on disk
 
@@ -277,9 +277,9 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 44 |
-| `src/workflow/` | 5 | 171 |
+| `src/workflow/` | 5 | 172 |
 | `src/foundation/` | 1 | 40 |
-| `src/analysis/` | 1 | 49 |
+| `src/analysis/` | 1 | 51 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem
 catalog is a curated summary and carries no staleness gate.

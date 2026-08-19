@@ -1,13 +1,13 @@
-# Klaus-Eu: field sign, polarisation convention, and what gets re-derived
+# Rotation-assisted EdH quench (Eu): field sign, polarisation convention, and what gets re-derived
 
 **Scope.** Issue #343, which posed three things: (1) a **defect** in the config
 corpus fixed on 2026-07-29 whose numbers were never re-derived, (2) a
-**convention difference** in the Klaus-Eu series that is not a defect and was
+**convention difference** in the rotation-assisted EdH quench series that is not a defect and was
 never adjudicated, and (3) the fact that (1) was **not in the machine-readable
 gate** the campaign claims to run.
 
 (1) and (3) hold. **(2) does not, and the measurement replaced it with a
-sharper problem**: the two Klaus families are not on opposite sides of anything
+sharper problem**: the two EdH-quench families are not on opposite sides of anything
 — they are on the *same* side, and it is the wrong side. What looked like a
 convention split was an `m`-label comparison across two different field
 parameterisations. §4.2.
@@ -33,8 +33,8 @@ measurements, not tests).
 | 2 | How many stored runs does the new row disqualify? | **0 marginally.** All 200 gateable runs were already disqualified by older refs; 3 more have no producing commit at all |
 | 3 | Does the field sign move the load-bearing observables? | **Yes, by ×2.2 to ×5.0.** Peak P_{−5,−4} 0.244 → 0.530; peak \|L_z\| 0.020 → 0.101. Nothing depending on either is quotable without re-derivation. §3 |
 | 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is not re-derivable as posed. §3.4 |
-| 4 | Align the Klaus-Eu series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. Klaus/EdH needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
-| 4b | Is `eu151_klaus_phi_phys` really "the one Eu arc on the other side"? | **No.** `p > 0` puts m=+F at the *bottom*, so it is aligned like everything else — and therefore on the wrong side for Klaus. #343 §2's premise was an m-label comparison across two field parameterisations. §4.2 |
+| 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
+| 4b | Is `eu151_klaus_phi_phys` really "the one Eu arc on the other side"? | **No.** `p > 0` puts m=+F at the *bottom*, so it is aligned like everything else — and therefore on the wrong side for the EdH quench. #343 §2's premise was an m-label comparison across two field parameterisations. §4.2 |
 | 5 | Is the stored `(init m × Ω)` "mirror" pair still a mirror? | **No — `bce2068f` broke it.** Repaired here, and the repair is confirmed by measurement to 5 digits (§3.6 arm G). §5 |
 | 6 | Which numbers get re-derived? | Two items, both blocked on regenerating the corpus at the anti-aligned preparation. §6 |
 
@@ -80,7 +80,7 @@ campaign-gate: 15 refs from docs/campaign/fix_list.toml
   unknown provenance: 3   <- not a pass and not a fail
 ```
 
-133 of the 203 have an Eu / Klaus / Matsui / Barnett / EdH name. The producing
+133 of the 203 have an Eu / klaus_quench / Matsui / Barnett / EdH name. The producing
 commits cluster hard: 137 runs at `15a9f1ee` (2026-05-26), 32 at `306ef71a`
 (2026-05-21), 9 at `e8168dcb` (2026-05-23) — i.e. the corpus is a May snapshot,
 and every June–July correction postdates all of it.
@@ -189,7 +189,7 @@ rotation moves the state by 5 % of overlap, at B_z < 0 by 78 %.
 
 Both load-bearing observables — the post-quench m = −5, −4 excitation and L_z —
 are **strongly** field-sign sensitive. Gate 2's question is answered: **nothing
-on the Klaus-Eu sheet that depends on either can be quoted without
+on the EdH-quench sheet that depends on either can be quoted without
 re-derivation.** No row of this table gives permission to skip one.
 
 ### 3.4 The finding that matters more: the rotation enhancement is gone
@@ -277,18 +277,18 @@ enhancement.
 
 ## 4. The polarisation-convention decision
 
-**Decision: do not align the Klaus-Eu series to m = −F, and do not state the
+**Decision: do not align the rotation-assisted EdH quench series to m = −F, and do not state the
 convention in terms of `m` at all.**
 
 The criterion is measured (§3.6) and it is not about the m label:
 
-> **The Klaus-Eu / EdH protocol must prepare the stretched state ANTI-ALIGNED
+> **The rotation-assisted EdH quench must prepare the stretched state ANTI-ALIGNED
 > with B — the Zeeman-highest state. Every other Eu arc in this project (Matsui
 > EdH reproduction, flower / chiral ground states, the #335 κ transition)
 > prepares a GROUND state and is aligned. The two families are not in conflict;
 > they ask different questions.**
 
-Writing it as "Klaus is m=+F, everything else is m=−F" would be the third
+Writing it as "the quench is m=+F, everything else is m=−F" would be the third
 repetition of the mistake this issue is about, because **`m = +F` means the
 opposite thing depending on the sign of B_z**, and every incident here came from
 someone reading an m label without its field. State the relative orientation;
@@ -299,11 +299,11 @@ Under the project-wide convention — B_z > 0, g_F > 0, `H = −p·F_z` with
 
 | family | preparation | field | seed |
 |---|---|---|---|
-| Klaus-Eu / EdH cascade | anti-aligned (Zeeman-highest) | B_z > 0 | **m = +F** |
+| rotation-assisted EdH quench / EdH cascade | anti-aligned (Zeeman-highest) | B_z > 0 | **m = +F** |
 | everything else Eu | aligned (Zeeman ground) | B_z > 0 | **m = −F** |
 
 so **B_z stays positive everywhere** — `bce2068f`'s discipline is kept intact —
-and the Klaus family differs in its *seed*, which is the knob that carries the
+and the EdH-quench family differs in its *seed*, which is the knob that carries the
 physics.
 
 ### 4.1 What this implies about `bce2068f`
@@ -312,7 +312,7 @@ physics.
 "NEGATIVE → m=−F lowest energy", which is false under `Units.bfield_to_p`, so
 the file contradicted itself and something had to move. It moved the field.
 
-Measured consequence: that choice moved the Klaus corpus from the anti-aligned
+Measured consequence: that choice moved the EdH-quench corpus from the anti-aligned
 regime (where the protocol's phenomenon lives) into the aligned one (where it
 does not). Each file became self-consistent and the corpus stopped studying the
 effect it was built for. Whether the original author meant the anti-aligned
@@ -320,17 +320,17 @@ state or wrote the field sign by mistake is **not recoverable and not worth
 arguing** — the physics requirement is now measured either way.
 
 The repair is therefore not "revert `bce2068f`" (that would restore the wrong
-convention along with the right physics). It is: **regenerate the Klaus-Eu
+convention along with the right physics). It is: **regenerate the rotation-assisted EdH quench
 corpus as m = +F at B_z > 0**, keeping positive B_z, declaring the
 anti-alignment in the file so the next reader and the next gate both see it.
 
-### 4.2 Scope check on the other Klaus family
+### 4.2 Scope check on the field-rotation branch
 
 `runs/eu151_klaus_phi_phys/config.yaml` — the config #343 §2 flagged as "the
 only Eu arc on the m=+F side" — specifies `B: {p: 26700.0}` with
 `init_m_idx: 1`. Since `H = −p·F_z`, **p > 0 puts m = +F at the BOTTOM** of the
 ladder. So that config is *aligned*, i.e. it is on the same side as everything
-else in the project and on the **wrong** side for the Klaus protocol. The
+else in the project and on the **wrong** side for the rotation-assisted EdH quench. The
 apparent "opposite convention" was an artefact of comparing m labels across
 different field parameterisations — precisely the failure the decision above is
 worded to prevent.
@@ -387,7 +387,7 @@ should be expected to fail.
 > **and B** — or it is not a mirror. This is the same lesson #338 (Barnett)
 > reached from the other side: `±Ω` alone is not a mirror there either, because
 > `SinusoidalWaveform` is odd, so `B_y` must flip with it. Same rule; the
-> Klaus-quench series happens to have no `B_y`, and its missing partner is `B_z`.
+> `klaus_quench` series happens to have no `B_y`, and its missing partner is `B_z`.
 
 **Corollary for per-file repairs.** A fix applied file-by-file can be right on
 every file and still break a relationship that spans two of them. Nothing in the
@@ -448,7 +448,7 @@ a different measurement.
 Restated here only because a re-derivation session will need them and they are
 already decided elsewhere. Do not re-litigate:
 
-- **ε = 1e-6 in the Klaus regime.** At p ≥ 3000 the Y6 formula
+- **ε = 1e-6 in the fast-Larmor regime.** At p ≥ 3000 the Y6 formula
   `dt = 0.1·(ε/T)^(1/6)` is too loose: `p=3000, ε=1e-3` produced a **spurious**
   thermal scramble (`0.997 → 0.106`) that `ε=1e-6` does not (`0.997 → 0.999`).
   The pipeline runner warns at `|p|·F·dt > π`; the rotating-basis runner hard-errors

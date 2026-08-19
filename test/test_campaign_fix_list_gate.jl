@@ -45,7 +45,7 @@ const _NOT_A_CORRECTION = Dict(
         "the docs commit that MEASURED q at both ends of the band; the " *
         "correction it reports is eu-quadratic-zeeman-geometry, already listed",
     "f2352c7f" => "docs cross-reference of duplicated LHY arms; corrects prose, not code",
-    # klaus_eu_polarisation_decision.md §1.1 — provenance of a MEASUREMENT, and
+    # edh_quench_polarisation_decision.md §1.1 — provenance of a MEASUREMENT, and
     # of the runs it measured. None is a correction anything must descend from.
     "b2d746cc" =>
         "the HEAD the #343 ancestor-gate sweep and the positive control " *

@@ -1,0 +1,141 @@
+# Klaus et al. (2022) — the published numbers this repository quotes.
+#
+# Read by `ref(:klaus2022, :<quantity>)` (`src/model/ref.jl`); gated by
+# `test/validation/test_klaus2022_ref.jl`. Second source in `refs/`, which is
+# what `refs/matsui2025.toml`'s header said to wait for before treating this
+# directory as a registry. No code change was needed: `ref` / `_ref_doc` /
+# `_known_sources` were already source-generic.
+#
+# WHY EVERY ROW HERE IS `read_off`, AND WHAT THAT COSTS.
+#
+# `arbitrates` is DERIVED as `measured && isempty(disqualified_by)`
+# (`ref.jl:554`), so **nothing in this file can arbitrate**, and
+# `Claim(:C, target=ref(:klaus2022, …))` is therefore unconstructible. That is
+# the design working, not a gap to route around:
+#
+#   * Matsui et al. ship a Zenodo record (CC-BY-4.0 CSVs + Fortran), so their
+#     numbers can be a RECIPE — `ref` re-measures the fixture on every call and
+#     refuses the row if the stored value disagrees. The paper cannot drift away
+#     from what we check against it.
+#   * Klaus et al. ship no data record. Every number below is a literal in the
+#     paper's text. There is nothing to re-measure, so the stored value IS the
+#     authority — exactly the "hand-typed authority" `refs/` exists to prevent.
+#
+# So these rows are QUOTABLE and not DECIDING. What registering them still buys,
+# and it is the reason this file exists rather than the constants staying in a
+# script: the schema is closed on both sides (an unknown key is an error, a
+# missing required key is an error), every value carries its `locus` in the
+# published text, and the numbers live in one place a gate reads instead of
+# being retyped per campaign. `scripts/klaus2022_reproduce.jl` had them as a
+# bare `PUBLISHED` NamedTuple with no locus and no schema.
+#
+# WHAT WOULD MAKE THEM ARBITRATE, stated so the next person does not have to
+# rediscover it: a `measured` row needs a committed fixture plus a registered
+# metric. For a paper whose evidence is figures, that means a digitisation
+# committed under `test/fixtures/`, its sha256, and a metric that reads the
+# quantity back off it. That is a real extension of `_REF_PROVENANCES` /
+# `_REF_METRICS` and a decision about whether a digitised figure is admissible
+# evidence — NOT something to slip in under an existing provenance name.
+#
+# A SECOND SCHEMA LIMIT, found while writing this file: `disqualified_by` is in
+# `_REF_KEYS_MEASURED` only, so a `read_off` row has no way to SAY it must not
+# decide. Here that is harmless (no read_off row arbitrates anyway), but it is
+# why `a_s` is not registered below at all: their a_s = 111(9) a0 was
+# "empirically fixed by measuring the magnetic field value at which the
+# supersolid transition occurs and comparing it with the corresponding critical
+# a_s predicted from simulations" (Methods A.3) — a value fitted against
+# simulations of this same family. Registering it with only a prose warning
+# would put it one `ref` call away from being used as an input authority, and
+# the schema currently cannot mark it. It stays out until it can.
+
+format = 1
+
+[paper]
+citation = "L. Klaus, T. Bland, E. Poli, C. Politi, G. Lamporesi, E. Casotti, R. N. Bisset, M. J. Mark, F. Ferlaino, Observation of vortices and vortex stripes in a dipolar Bose-Einstein condensate"
+journal = "Nature Physics"
+year = 2022
+doi = "10.1038/s41567-022-01793-8"
+arxiv = "2206.12265"
+
+# No datasets: the paper ships no re-measurable record. The section is required
+# by the file schema and is deliberately empty — an empty [dataset] is the
+# honest statement that there is nothing to re-measure, and it is what forces
+# every row below to be `read_off`.
+[dataset]
+
+# ---------------------------------------------------------------------------
+# READ_OFF — literals in the published text. `locus` is the section and the
+# sentence, against arXiv:2206.12265v2, which is the version quoted throughout
+# `docs/validation/klaus2022_primary_source.md`.
+# ---------------------------------------------------------------------------
+
+[quantity.omega_c_over_omega_perp]
+provenance = "read_off"
+value = 0.74
+units = "dimensionless (Omega / omega_perp)"
+locus = "main text, Fig. 1c discussion: \"Suddenly, at Omega_c = 0.74 omega_perp, the AR abruptly collapses back to AR = 1\""
+note = """
+The stirring frequency at which the magnetostirred cloud stops following the \
+field and the surface mode goes unstable. Read as the location of the ASPECT- \
+RATIO MAXIMUM, because that is what their sentence describes — the collapse \
+begins there.
+
+Their own 1 s-ramp simulation does NOT reproduce this exactly: "The stability \
+of the 1 s ramp exceeds the experimentally observed critical frequency", which \
+they attribute to rotation asymmetries absent from the simulation. A comparison \
+against this number therefore inherits a theory-vs-experiment gap the authors \
+name themselves, which is the main reason it is quotable rather than deciding \
+even before the `read_off` rule bites.
+"""
+
+[quantity.ar_magnetostricted]
+provenance = "read_off"
+value = 1.03
+units = "dimensionless (sigma_max / sigma_min, in-plane)"
+locus = "Methods A.4: \"For these parameters, the magnetostricted aspect ratio of the cloud is AR = 1.03\"; same value in the main text, \"from 1 up to 1.03\""
+note = """
+In-plane aspect ratio of the cloud at rest, at theta = 35 deg, from THEIR \
+simulations. Stated twice, consistently, and contrasted with the trap \
+anisotropy (AR_trap < 1.006) as the larger of the two.
+
+THIS REPOSITORY DOES NOT REPRODUCE IT: we get 1.16 at their stated parameters \
+(1.127 with the periodic images removed), a factor ~4 in (AR - 1). Five \
+independent instruments rule out our plumbing — see \
+`docs/validation/klaus2022_primary_source.md` section 6b. Registered here \
+BECAUSE it is not reproduced: the number a comparison fails against has to be \
+written down with its locus, or the failure degrades into a memory.
+"""
+
+[quantity.n_vortex_stripes]
+provenance = "read_off"
+value = 3.0
+units = "count"
+locus = "main text, Fig. 4b2 discussion: \"where the vortices align along three stripes\""
+note = """
+Number of stripes the vortices arrange into at Omega = 0.75 omega_perp, \
+a_s = 109 a0, theta = 35 deg, after 500 ms of magnetostirring.
+
+A DISCRETE observable, which is why it is the one to compare: a count carries \
+no error bar and no calibration. Note what it is NOT — the paper's vortex \
+NUMBER (their Fig. 3b) is a detector output on a blurred, noise-added image, \
+benchmarked in Methods A.7 at ~9 detected where ~33 are present. That one is \
+deliberately absent from this file: quoting it against a raw simulation count \
+is a ~3.7x error, and a row here would make that one `ref` call away.
+"""
+
+[quantity.a_dd_dy162]
+provenance = "read_off"
+value = 129.2
+units = "a_0"
+locus = "Methods A.5: \"We always consider 162Dy, such that a_dd = 129.2 a_0\""
+note = """
+Dipolar length of 162Dy, from mu_m and fundamental constants. An atomic \
+constant rather than a result, and the one number here this repository derives \
+independently: `compute_a_dd(ATOM_REGISTRY[:Dy162])` gives 128.9 a_0, within \
+0.25 %.
+
+Registered because the SPECIES is a load-bearing input that has already been \
+got wrong on this path — `test/workflow/test_klaus_validation.jl` runs Dy164, \
+whose mass differs, which moves eps_dd at fixed a_s and with it the entire \
+stripe phase.
+"""

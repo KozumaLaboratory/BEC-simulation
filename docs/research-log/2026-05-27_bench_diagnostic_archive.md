@@ -51,7 +51,7 @@ commit is `04d9c9a` (bench/) / `df1afa2` (diagnostic/).
 | `T_sweep_alpha0.jl` | Falsifier: phase accumulation slope at α=0 | `docs/design/integrator_order_mechanism_tdhfb.md` |
 | `asymmetry_probe.jl` | B-3 substep generator asymmetry probe | same |
 | `intermediate_delta_sweep.jl` | B-3 intermediate-Δ falsifier | same |
-| `klaus_bch_leak_verification.jl` | T57 Klaus BCH-leak verification | `runs/_loop/judge/turn_57.json` (archived) |
+| `klaus_bch_leak_verification.jl` | T57 fast-Larmor BCH-leak verification | `runs/_loop/judge/turn_57.json` (archived) |
 | `matsui_edh_t82_analyze.jl` | T82 Matsui EdH analyzer | `runs/_loop/judge/turn_82.json` (archived) |
 | `order_ladder_full_matrix.jl` | B-2 extended 4×3 order ladder | `docs/design/integrator_order_mechanism_tdhfb.md` |
 | `palindrome_residual_probe.jl` | B-1 palindrome residual probe | same |

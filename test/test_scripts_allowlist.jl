@@ -88,6 +88,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: field-noise shielding spec (docs/guides/eu_shielding_spec.md, #362) ──
+    "eu_noise/noise_hold.jl",
+    "eu_noise/shielding_spec.jl",
+    "eu_noise/submit_noise.sh",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
@@ -110,6 +114,16 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_shape/deploy_tsubame.sh",
     "eu_shape/submit_finite_t.sh",
     "eu_shape/submit_spgpe_evap.sh",
+    # ── Klaus 2022 type-C reproduction (#345), cited by its gate ──
+    # The run driver carries the pre-registered ACCEPT thresholds and applies
+    # them, so it is the criterion rather than a description of one; the
+    # re-analyser re-derives the verdicts from the saved frames without a run
+    # (which is how the θ→0 control's window was corrected without paying
+    # another hour); the figure script emits what
+    # `docs/validation/figures/klaus2022_*.png` are built from.
+    "klaus2022_reproduce.jl",
+    "klaus2022_reanalyse.jl",
+    "klaus2022_figures.py",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",

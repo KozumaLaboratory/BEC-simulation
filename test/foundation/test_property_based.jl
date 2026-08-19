@@ -211,7 +211,7 @@ end
     end
 
     # ── Schema strict mode rejects silently-dropped YAML keys ─────────
-    # Regression for the 2026-04-27 `trap:` incident — Klaus YAMLs ran
+    # Regression for the 2026-04-27 `trap:` incident — magnetostir YAMLs ran
     # in an isotropic trap because `trap:` was not a recognized key and
     # the @warn was easy to miss. Production runner now uses strict=true,
     # which converts the warning to an error.

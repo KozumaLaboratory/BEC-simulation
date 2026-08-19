@@ -1,7 +1,16 @@
-# Klaus 2-phase quench protocol — spec & 10-cell scan
+# Rotation-assisted EdH quench — spec & 10-cell scan
 
 > **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
+> **Renamed 2026-08-19 (issue #344).** This protocol is **this project's own**;
+> no published paper proposed it, and it was previously mislabelled "Klaus
+> 2-phase quench protocol" / "Klaus-I" / "Klaus-II" as if it tracked one. The
+> branches are now named by what rotates: **trap-rotation branch** (mechanical
+> trap rotation, −Ω·L_z Coriolis) and **field-rotation branch** (rotating B̂,
+> so the DDI anisotropy axis rotates). Klaus et al. 2022 (arXiv:2206.12265) is
+> a real paper and is **prior art for the magnetostir technique**, not the
+> source of this protocol. Authority: `docs/conventions/klaus_name_disambiguation.md`.
 
 > **Vintage.** The numbers here — including `|Ω| / ω_⊥ = 0.468`, quoted to three
 > significant figures — predate `bce2068f` (2026-07-29), which reverted the field
@@ -11,7 +20,7 @@
 > (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
 >
 > **Decision, re-derivation list and mirror-arm correction (2026-08-19, #343):**
-> `docs/campaign/klaus_eu_polarisation_decision.md`. In particular the
+> `docs/campaign/edh_quench_polarisation_decision.md`. In particular the
 > `(init m × Ω sign)` reversal-symmetry gate here is **no longer a mirror pair**
 > — `bce2068f` flipped `B_z` on the m=−F arm and not on the m=+F one, so the two
 > now differ by only two of the three axial quantities. Read §5 there before
@@ -133,29 +142,29 @@ shifts the vertex slightly higher (toward 0.5).  Either way, the
 "|Ω|/ω_⊥ ≈ 0.5" rounded claim is consistent with the high-precision
 optimum within ~6%.  See `docs/manuscript/figures/klaus_quench_fig_k14_omega_refine.png`.
 
-## Klaus-II adiabatic result (2026-05-27): still null
+## field-rotation branch adiabatic result (2026-05-27): still null
 
-A 7-stage adiabatic Klaus-II prototype
+A 7-stage adiabatic field-rotation branch prototype
 (`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.yaml`) was
 dispatched to test whether the sudden-tilt null result was just
 an adiabaticity artifact.  Result:
 
 ```
-sudden-tilt Klaus-II (Ω=+0.5, m=+F):  P_{+5,+4} = 0.2191  (baseline)
-adiabatic Klaus-II   (Ω=+0.5, m=+F):  P_{+5,+4} = 0.2258  (≈ baseline)
-Klaus-I keep_rot     (Ω=−0.5, m=−F):  P_{-5,-4} = 0.540   (★ 2.5× enhanced)
+sudden-tilt field-rotation branch (Ω=+0.5, m=+F):  P_{+5,+4} = 0.2191  (baseline)
+adiabatic field-rotation branch   (Ω=+0.5, m=+F):  P_{+5,+4} = 0.2258  (≈ baseline)
+trap-rotation branch keep_rot     (Ω=−0.5, m=−F):  P_{-5,-4} = 0.540   (★ 2.5× enhanced)
 ```
 
-Adiabatic tilt-up improves Klaus-II by only 3% over the sudden tilt
+Adiabatic tilt-up improves field-rotation branch by only 3% over the sudden tilt
 — well within the no-rotation baseline range (0.219–0.226 across all
-Klaus-I free-hold Ω points).  **Klaus-II rotating-B-direction does
+trap-rotation branch free-hold Ω points).  **field-rotation branch rotating-B-direction does
 NOT drive short-time spin excitation, even with adiabatic preparation.**
 
-Conclusion: **Klaus-I and Klaus-II probe different physics.**
-- Klaus-I (`rotating_frame_omega` = mechanical trap rotation): drives
+Conclusion: **trap-rotation branch and field-rotation branch probe different physics.**
+- trap-rotation branch (`rotating_frame_omega` = mechanical trap rotation): drives
   spin excitation via the rotating-frame H − ΩL_z bias.
-- Klaus-II (rotating B-field direction): does not drive short-time
-  spin excitation; needs the long-duration high-B regime (Klaus's
+- field-rotation branch (rotating B-field direction): does not drive short-time
+  spin excitation; needs the long-duration high-B regime (the magnetostir
   magnetostriction) to produce orbital effects, which may then be
   read out at weak field via a hybrid protocol (see next section).
 
@@ -213,7 +222,7 @@ polarisation, the dynamical-instability sequence is
 At the Matsui Eu scale ω_⊥ = 2π · 110 Hz, these correspond to
 t ≈ 145 ms, 510 ms, and 7.2 s respectively.
 
-**Our 34-cell Klaus-I scan used hold = 6.9 ω_⊥⁻¹ ≈ 10 ms — a factor
+**Our 34-cell trap-rotation branch scan used hold = 6.9 ω_⊥⁻¹ ≈ 10 ms — a factor
 ~50 shorter than the Prasad vortex-entry timescale.**  Therefore the
 plaquette-vortex-count = 0 finding (Fig K10v) is **expected** at this
 duration; it is not a refutation of vortex-formation physics, only a
@@ -223,7 +232,7 @@ The protocol therefore splits cleanly:
 
 | branch       | hold timescale     | observable                                  | status                       |
 |--------------|--------------------|---------------------------------------------|------------------------------|
-| **short-time** | t ≲ 10 ω_⊥⁻¹ (≈ 14 ms) | spin excitation P_{adj}, P_exc, integrated L_z^{(m)} | 6 gates PASS, mechanism via J_z-conservation L_z (Klaus-I) |
+| **short-time** | t ≲ 10 ω_⊥⁻¹ (≈ 14 ms) | spin excitation P_{adj}, P_exc, integrated L_z^{(m)} | 6 gates PASS, mechanism via J_z-conservation L_z (trap-rotation branch) |
 | **long-time**  | t ≳ 100 ω_⊥⁻¹ (≈ 145 ms) | vortex entry, vorticity, eventual Abrikosov lattice | dispatched as `runs/klaus_quench_long_time/` (2026-05-27) |
 
 The presentation framing should report both — the short-time branch is
@@ -281,7 +290,7 @@ couple immediately into orbital modes.
 
 ### Dual signature for the experimentalist
 
-The Klaus protocol now has **two independent predicted signatures**:
+The protocol now has **two independent predicted signatures**:
 
 ```
 Signature A (short time, ~10 ms):
@@ -341,33 +350,33 @@ panel.
 
 ## Scope correction (2026-05-27, anko)
 
-**The results in this document so far are Klaus-I (rotating-frame
-bias model), NOT Klaus-II (rotating B-field / DDI anisotropy
+**The results in this document so far are trap-rotation branch (rotating-frame
+bias model), NOT field-rotation branch (rotating B-field / DDI anisotropy
 stirrer).**  This distinction is load-bearing for how the result
 should be reported.
 
 | label       | mechanism                                              | implementation                                          | what changes in time                                                |
 |-------------|--------------------------------------------------------|---------------------------------------------------------|---------------------------------------------------------------------|
-| **Klaus-I** | Uniform rotating-frame bias  H → H − Ω L_z              | YAML `rotating_frame_omega: Ω` per dynamics step        | Only the rotating-frame Coriolis term (orbital). B(t) static, DDI kernel static. |
-| **Klaus-II**| Magnetic-stirrer:  rotating B̂(t) → rotating DDI anisotropy | YAML `B: {Bz: <mag>, theta: θ, phi: {rate: Ω}}`         | B direction rotates → DDI kernel V_dd ∝ (1−3(B̂·r̂)²)/r³ rotates → cloud ellipticity rotates. |
+| **trap-rotation branch** | Uniform rotating-frame bias  H → H − Ω L_z              | YAML `rotating_frame_omega: Ω` per dynamics step        | Only the rotating-frame Coriolis term (orbital). B(t) static, DDI kernel static. |
+| **field-rotation branch**| Magnetic-stirrer:  rotating B̂(t) → rotating DDI anisotropy | YAML `B: {Bz: <mag>, theta: θ, phi: {rate: Ω}}`         | B direction rotates → DDI kernel V_dd ∝ (1−3(B̂·r̂)²)/r³ rotates → cloud ellipticity rotates. |
 
-The 34-cell Klaus-I scan documented below is fully valid and the
-publication-grade conclusion stands for the Klaus-I model:
+The 34-cell trap-rotation branch scan documented below is fully valid and the
+publication-grade conclusion stands for the trap-rotation branch model:
 "Sustained rotating-frame bias during the weak-field EdH-active hold
 enhances spin excitation."  But Fig K5 (z=0 density slices) shows
 circularly-symmetric clouds — there is **no elliptical density
 deformation**, which would be the physical hallmark of the
-Klaus magnetic-stirrer picture.  The orbital winding observed in
+magnetic-stirrer picture.  The orbital winding observed in
 Fig K10 is generated by Jz conservation under the Coriolis term,
 not by physical rotation of the cloud shape.
 
-A separate Klaus-II batch (rotating B-field) is dispatched in
+A separate field-rotation branch batch (rotating B-field) is dispatched in
 parallel (see `runs/magnetic_stirrer/`) to test whether the
-Klaus-experimental mechanism — rotating DDI anisotropy creating
+magnetostir mechanism — rotating DDI anisotropy creating
 mass flow that then couples into post-quench spin excitation —
 gives a comparable or stronger signal.
 
-### Klaus-II definitive result (6/6 cells, 2026-05-27)
+### field-rotation branch definitive result (6/6 cells, 2026-05-27)
 
 Full 6-cell scan (m=+F init, hold-only B-rotation, θ=π/4 tilt at hold-start):
 
@@ -383,11 +392,11 @@ Full 6-cell scan (m=+F init, hold-only B-rotation, θ=π/4 tilt at hold-start):
 **Null result**: all 3 Ω points (+0.3, +0.5, +0.7) AND the static-B
 control give **identical** P_{+5,+4} = 0.2191 to four decimal places.
 The phi rotation of B-direction is doing nothing in the spin sector.
-The DDI-off and no-quench controls match Klaus-I (collapse to zero),
+The DDI-off and no-quench controls match trap-rotation branch (collapse to zero),
 confirming the only mechanism here is the natural Matsui-like B-quench
 EdH cascade — independent of B-rotation.
 
-### Why Klaus-II is null in this regime
+### Why field-rotation branch is null in this regime
 
 Scale comparison at B_hold = 2.6 nT and ω_⊥ = 2π · 110 Hz (Matsui):
 
@@ -405,9 +414,9 @@ spin sector to couple to.  After averaging over the fast rotation
 period, the spin effectively sees the time-averaged ⟨B⟩ which is
 along z — exactly the static-B baseline.
 
-### What would actually make Klaus-II work
+### What would actually make field-rotation branch work
 
-A proper Klaus-II protocol needs **adiabatic spin-following**:
+A proper field-rotation branch protocol needs **adiabatic spin-following**:
 
 ```
 1. GS               z-aligned strong B,  m=±F polarised along z
@@ -427,32 +436,32 @@ the B quench (stage 5), the spinor has a coherent rotating polarisation
 that the DDI kernel can interact with as it carries through the weak-
 field EdH-active hold.
 
-This 7-stage Klaus-II-adiabatic protocol is not yet dispatched.  It
+This 7-stage field-rotation branch-adiabatic protocol is not yet dispatched.  It
 is the natural follow-up to the present null result.
 
-### Klaus-I status unaffected
+### trap-rotation branch status unaffected
 
-The Klaus-I keep_rot finding (6 gates PASS, mechanism via
+The trap-rotation branch keep_rot finding (6 gates PASS, mechanism via
 L_z^{(m)} ∝ N_{m_init ∓ k} · k ℏ) remains a **valid
 rotation-protocol prediction** in its own right.  The interpretation
 shifts:
 
-- The Klaus-I `rotating_frame_omega` term implements a uniform
+- The trap-rotation branch `rotating_frame_omega` term implements a uniform
   −Ω L_z bias on the spatial wavefunction.  In a real experiment
   this corresponds to **physically rotating the trap potential**
   (mechanical rotation of an anisotropic trap, NOT rotating the
   magnetic field direction).
-- An experimentalist who implements the Klaus-I protocol by
+- An experimentalist who implements the trap-rotation branch protocol by
   rotating the optical trap should see the keep_rot enhancement
   (P_{adj} up to 0.626 at the optimal delay).
-- The Klaus magnetic-stirrer picture (rotating B → rotating DDI
-  axis → mass flow) requires adiabatic spin-following (Klaus-II
+- The magnetic-stirrer picture (rotating B → rotating DDI
+  axis → mass flow) requires adiabatic spin-following (field-rotation branch
   with proper preparation) and is a separate open question.
 
 **Dispatch context:** anko 2026-05-26 evening "Barnett protocol pivot".
 The previous Barnett window scan (`runs/barnett_eu_window/`, 14 cells,
 32³, single-stage rotation) measured **bare ⟨F_z⟩ response under
-sustained rotation**.  The Klaus experiment as anko explained it does
+sustained rotation**.  The target Eu experiment as anko explained it does
 *not* measure that quantity; it measures **post-quench spin excitation**
 into m=−5, m=−4 components after the strong-field rotation prep is
 dropped to the weak-field regime.
@@ -496,7 +505,7 @@ Derived metrics:
 - N_final_ratio = N(T) / N(0)
 - ΔF_z / N final = F_z(T)/N(T) − F_z(0)/N(0)
 
-The Klaus score is
+The protocol score is
 
 ```
 S_spin(Ω) = max_t [N_{-5}(t) + N_{-4}(t)] / N(t)
@@ -526,7 +535,7 @@ above the no-rotation baseline.
 The bare-⟨F_z⟩ Barnett scan gave Ω/ω_⊥ ≈ −0.3 to −0.5 as the
 signal-rich window.  That recommendation is **mechanically real**
 (DDI-mediated chirality response) but not **experimentally
-load-bearing** — Klaus does not measure ⟨F_z⟩ under sustained rotation
+load-bearing** — the target experiment does not measure ⟨F_z⟩ under sustained rotation
 in the strong-field state.
 
 The protocol-relevant question is which Ω gives the largest
@@ -677,7 +686,7 @@ Zeeman pinning that gaps out the m=−5, m=−4 channels is removed by
 the B quench.  In presentations and manuscript text prefer:
 
 - "rotation-assisted EdH spin excitation"
-- "Klaus rotation protocol"  
+- "rotation-assisted EdH quench"  
 - "Barnett-like" (with the qualifier "-like" when not in a strict
   equilibrium-Barnett context)
 
@@ -747,7 +756,7 @@ will be resolved when batch 3 lands.
 **PASS → headline upgrade:**
 
 - All 6 PASS: claim hardens from "we observe X" to
-  "**X is the Klaus experimental protocol**".
+  "**X is the target experimental protocol**".
 - Gate 4 fail: lab-sign convention or rotation-term sign needs audit
   (re-derive ΩL_z sign or initial-spin label).  Demote to "preliminary
   observation, pending sign-convention verification".
@@ -833,7 +842,7 @@ mismatched chirality pair (weak response):
   (m=+F, Ω=−0.5):  P_adj = 0.066,  Fz drift = −0.03   ←  3-digit mirror
 ```
 
-This is the key result that lifts the Klaus finding out of any
+This is the key result that lifts the finding out of any
 sign-convention ambiguity.
 
 ## Final headline (post batch-3 Q1+Q2, 2026-05-26 evening)
@@ -844,11 +853,11 @@ slide-ready claim is:
 > **Pre-rotation is null; sustained rotation during the weak-field
 > EdH-active hold drives the excitation.**
 >
-> Klaus spin excitation is controlled by the **relative chirality of
+> Spin excitation is controlled by the **relative chirality of
 > spin polarization and trap rotation during the weak-field
 > EdH-active hold** (NOT by the absolute Ω sign).
 
-## Klaus experimental protocol — final form (all 6 gates PASS)
+## Rotation-assisted EdH quench — final form (all 6 gates PASS)
 
 A self-contained, publication-grade protocol independent of the lab
 Ω sign convention:
@@ -1040,7 +1049,7 @@ Step 4 (start delay ≈ 2 ms) is the new refinement from Fig K12.
 
 ## Fig K1 official caption (manuscript / poster)
 
-> **Figure K1.** Klaus 2-phase rotation/quench protocol Ω scan in the
+> **Figure K1.** Two-phase rotation/quench protocol Ω scan in the
 > Eu-151 F=6 near-isotropic trap (N = 10⁴, ω_⊥ = 2π · 110 Hz, t_total
 > ≈ 21 ms).  Rotation preparation alone leaves the post-quench spin
 > excitation unchanged across Ω (blue dashed curve, flat at
