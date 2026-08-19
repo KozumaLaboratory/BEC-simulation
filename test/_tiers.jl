@@ -19,6 +19,15 @@ const FAST_TESTS = [
     "test_scripts_allowlist.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    # CAMPAIGN.md §4 guard 1 executed rather than described: every fix_list ref
+    # is a live ancestor, the two documents' counts cannot drift, red is proved
+    # reachable, and every commit cited in campaign/manuscript prose is either a
+    # listed correction or an explicitly-reasoned non-correction (#343).
+    "test_campaign_fix_list_gate.jl",
+    # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
+    # bce2068f repaired two configs correctly one at a time and broke the mirror
+    # relationship between them; nothing recorded that they were a pair (#343).
+    "workflow/test_mirror_pairs_flip_every_axial_quantity.jl",
     "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",

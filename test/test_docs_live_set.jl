@@ -31,6 +31,10 @@ const LIVE_DOCS = [
     "docs/archive/README.md",
     "docs/campaign/CAMPAIGN.md",
     "docs/campaign/fix_list.toml",
+    # The single place the Klaus-Eu polarisation convention is decided (#343).
+    # LIVE rather than dated on purpose: a convention document that is allowed to
+    # go stale is worse than none, because the thesis reads it as current.
+    "docs/campaign/klaus_eu_polarisation_decision.md",
     "docs/conventions/testing_strategy.md",
     "docs/design/hamiltonian_layered_architecture.md",
     "docs/design/research_spec_and_provenance_architecture.md",

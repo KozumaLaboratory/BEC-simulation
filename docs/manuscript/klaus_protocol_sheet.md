@@ -22,6 +22,20 @@
 > "Publication-grade, all 6 acceptance gates PASS" below is a statement about
 > **2026-05-26's gates and 2026-05-26's field convention**. It is left as
 > written because it is what the record said; it is not a claim about today.
+>
+> **One of those gates is now known to be un-re-runnable as written** (2026-08-19,
+> #343). The "(init m × Ω sign) reversal symmetry — 3-digit match" row in the
+> validation chain below compared `klaus_quench_omm0p5_keeprot` against
+> `klaus_quench_omp0p5_keeprot_mFplus`. At the time those two flipped all three
+> axial quantities — m, Ω **and B_z** — so they were a genuine mirror pair.
+> `bce2068f` flipped the field on the first and (deliberately) not on the second,
+> so both now sit at `B_z = +0.01 G`: only two of the three flip, and the pair is
+> no longer a mirror. Re-running that gate today compares an uphill Zeeman
+> cascade against a downhill one and should be expected to fail. Constructing the
+> mirror arm correctly means flipping **B as well** — see
+> `docs/campaign/klaus_eu_polarisation_decision.md` §5, which is also where the
+> polarisation convention for this series is decided and where the
+> re-derivation list lives.
 
 **Status (2026-05-26):** publication-grade.  All 6 acceptance gates
 PASS; mechanism (Fig K10) verified to be Jz-conservation-driven

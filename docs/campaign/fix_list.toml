@@ -12,7 +12,11 @@
 #
 # Adding a row disqualifies past runs by construction. That is the intended behaviour.
 #
-# Every ref was verified an ancestor of main at 2a0075e6 (2026-07-30).
+# Every ref was verified an ancestor of main at 2a0075e6 (2026-07-30); the
+# eu-config-field-sign row was added later and verified at b2d746cc (2026-08-19).
+# The verification is not a one-off: `test/campaign/test_fix_list_ancestor_gate.jl`
+# re-runs `git merge-base --is-ancestor <ref> HEAD` over every row on every ci run,
+# so a row naming a ref that is not in this history reddens the suite.
 
 schema_version = 1
 
@@ -113,6 +117,26 @@ pr = 158
 merged = 2026-07-29
 summary = "the closed-form spinor tables were exactly N_atoms too large"
 effect = "caused a spurious 15x arrest"
+
+[[fix]]
+id = "eu-config-field-sign"
+ref = "bce2068f"
+pr = 168
+merged = 2026-07-29
+summary = "211 Eu configs pinned m=-F under a field that prefers m=+F"
+effect = "the dynamics ran in a field whose sign opposed the prepared polarisation"
+note = """
+The only entry here that corrects CONFIGS rather than code, so read the gate \
+carefully: descending from this ref does not by itself mean a run used a repaired \
+config — it means the repaired config was available. A run whose YAML is not one \
+of the 211 (or is not committed at all) is not addressed by this row either way. \
+Nothing errored: m=-F is a Zeeman eigenstate, so ITP holds it and the run completes \
+with a plausible result for the opposite polarisation. Largest affected groups: \
+57 verification_suite, 52 klaus_quench, 16 barnett_eu_window, 12 l4_k3_ladder. \
+Class gate: test/workflow/test_config_zeeman_seed_agreement.jl. \
+Still open, and deliberately not repaired here: configs pinning m_plus_F under a \
+POSITIVE B_z, where flipping the field and flipping the seed are both consistent \
+and are physical mirror images, so the intent is not recoverable from the file."""
 
 [[fix]]
 id = "dynamics-phase-lhy-block"

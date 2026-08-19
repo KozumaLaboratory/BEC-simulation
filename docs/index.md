@@ -69,6 +69,7 @@ docs/
 | Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
 | Whether a stored `runs/` result can still be quoted | `validation/stored_results_vintage_audit.md` |
 | Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
+| Which polarisation a Klaus / EdH run must prepare, and why the m label alone is not the answer | `campaign/klaus_eu_polarisation_decision.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
 | Closed-form theory derivations | `theory/*.md` |
 

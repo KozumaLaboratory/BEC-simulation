@@ -8,6 +8,9 @@
 #   DDI in dynamics       : true
 #   B quench applied      : true
 #   rotation kept in hold : true
+#
+# mirror-pair: klaus_quench_omm0p5_keeprot_mFplus.yaml
+#   (the chirality mirror flips Omega, m AND B_z — see that file's header)
 
 defaults:
   kind: spinor

@@ -335,11 +335,24 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]|\]\(([A-Za-z0-9_\-]+)\.md\)")
 
 
 def link_targets(text):
-    """Every stem this text points at, in EITHER link form."""
+    """Every stem this text points at, in EITHER link form.
+
+    Yields the raw stem AND its hyphen-normalised form. The normalisation exists
+    because wikilinks get written with hyphens where the file uses underscores;
+    applying it UNCONDITIONALLY was a defect, since it also rewrites hyphens that
+    are really in the filename. `gotcha_doc_p_q_table_was_computed_at_1e-4_...`
+    became `..._1e_4_...`, matched nothing, and the file was reported as an
+    orphan that will never load — while its index line was present and correct
+    (2026-08-19). Raw first, normalised as a fallback; the caller only keeps
+    stems that exist, so offering both cannot invent a link.
+    """
     for wiki, md in _LINK.findall(prose(text)):
         raw = wiki or md
         key = raw[:-3] if raw.endswith(".md") else raw
-        yield key.replace("-", "_")
+        yield key
+        alt = key.replace("-", "_")
+        if alt != key:
+            yield alt
 
 
 def reachable(texts, roots):
