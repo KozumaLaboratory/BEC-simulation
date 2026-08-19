@@ -65,9 +65,22 @@ done
 # UNKNOWN -- never into "nothing pending, therefore done".
 
 # --- GitHub Actions ---------------------------------------------------------
+# A run that has not been picked up yet has an EMPTY `.jobs[]`, and an empty
+# poll means UNKNOWN ("absence is not health") -- so watching a freshly-pushed PR
+# exited 3 within a second, every time, before the first job existed. That is a
+# false UNKNOWN: the run IS observable, it is queued. Fall back to the run-level
+# status so the queued window reads as pending. A run id that does not exist
+# still yields nothing, so genuine unobservability is unaffected.
 poll_gh_run() {
-    gh run view "$1" --json jobs \
-        -q '.jobs[] | "\(.status)|\(.conclusion // "")|\(.name)"' 2>/dev/null
+    local jobs
+    jobs=$(gh run view "$1" --json jobs \
+        -q '.jobs[] | "\(.status)|\(.conclusion // "")|\(.name)"' 2>/dev/null)
+    if [ -n "$jobs" ]; then
+        printf '%s\n' "$jobs"
+        return
+    fi
+    gh run view "$1" --json status,conclusion,name \
+        -q '"\(.status)|\(.conclusion // "")|\(.name) (no jobs yet)"' 2>/dev/null
 }
 
 # --- TSUBAME 4 (UGE, not Slurm) ---------------------------------------------
