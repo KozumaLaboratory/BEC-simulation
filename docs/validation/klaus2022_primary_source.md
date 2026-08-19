@@ -62,6 +62,20 @@ Common to all:
 
 ### The numbers to be reproduced
 
+**Registered, as of 2026-08-19, in `refs/klaus2022.toml`** — the second source
+in a directory whose first file said to wait for one before treating it as a
+registry. `ref(:klaus2022, :omega_c_over_omega_perp)` and friends are what
+`scripts/klaus2022_reproduce.jl` now reads; the values below are the same
+numbers with their prose. Gated by `test/validation/test_klaus2022_ref.jl`.
+
+One consequence worth stating here rather than only in the TOML: every Klaus row
+is `read_off`, because the paper ships no re-measurable data record. `arbitrates`
+is derived as `measured && isempty(disqualified_by)`, so **none of these numbers
+can arbitrate, and a type-C `Claim` against them is unconstructible.** This
+document therefore records a *reproduction*, not a `Claim(:C)`. The distinction
+is now enforced by a constructor instead of resting on how the sentence is
+phrased.
+
 | Quantity | Published value | Figure |
 |---|---|---|
 | Magnetostricted aspect ratio, no rotation | AR = 1.03 | Methods A.4 |
