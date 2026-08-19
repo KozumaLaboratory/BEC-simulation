@@ -355,6 +355,19 @@ The inversion recovers q₁₅₁ to **0.00 %** at every field and every c₂ te
 the cells where the naive ratio is 12 % off. It fails only where q + δ < 0 for one isotope
 (c₂ = c₁ at 0.01 G), and the instrument reports that as −119 % rather than absorbing it.
 
+**Relation to #342, which landed the same day and from the other side.**
+`docs/campaign/as_dependency_map.md` §5 derives the magnon Hartree shift on a **stretched**
+(m = −F) condensate, `h_mm = Σ_S A_{m,S} g_S`, and makes the same structural observation
+this section reaches from the **polar** state: *at uniform g_S the background is exactly
+zero, so the RF ladder is exactly the Zeeman ladder and any deviation from it is the
+channel spread.* Its §4 independently lists "every isotope-shift prediction built from
+a_hf (#341)" as a_S-invariant. The two are complementary rather than redundant — #342's
+map is **triangular**, admitting one new channel every two rungs, so it inverts the
+channels **one at a time** from a single isotope; the isotope pair here measures **one
+combination** δ, but does so **without needing the field to be known**, because r_q
+supplies the second equation. Use #342's ladder to resolve the channels and this pair to
+calibrate the field the ladder is read at.
+
 ### 5.6 Two instrument findings that cost time and are worth the space
 
 **The quadratic Zeeman follows the field axis.** The implemented operator is
