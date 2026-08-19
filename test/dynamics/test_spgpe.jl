@@ -260,13 +260,14 @@ end
         function null_drive_rate(n; k_cut=kcut_fixed, T=1.0, steps=1000, dt=0.01)
             SpinorBEC.scratch_clear!()
             ws = flowing_state!(scalar_ws(; n=(n, n, n)))
-            dV = cell_volume(ws.grid)
-            mu = let hpsi = similar(ws.state.psi)
-                SpinorBEC.apply_operator_via_registry!(hpsi, ws)
-                real(sum(conj(ws.state.psi) .* hpsi)) * dV /
-                (real(sum(abs2, ws.state.psi)) * dV)
-            end
+            # µ is the RESERVOIR's, one thermal energy below the cutoff — the
+            # standard n_T = 1 C-region depth. Deliberately NOT the field's own:
+            # number damping is off, so µ enters only through (ϵ_cut − µ)/T in ℳ̄,
+            # and the field's µ here is 9.26, above ϵ_cut, where
+            # `spgpe_growth_rate` correctly refuses. Deriving the cutoff from the
+            # field would also have moved the scan's own axis with it.
             ec = 0.5 * k_cut^2
+            mu = ec - T
             r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=ec,
                 number_damping=false)
             γ = spgpe_growth_rate(; T, mu, eps_cut=ec, a_s=0.02)
