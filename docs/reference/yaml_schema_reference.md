@@ -62,7 +62,7 @@ a typo warning.
 
 | key | type / enum | default | notes |
 |---|---|---|---|
-| `kind` | spinor / binary / rotating_basis | spinor | which solver |
+| `kind` | spinor / binary / rotating_basis / scalar_egpe | spinor | which solver. `scalar_egpe` is the adiabatic-spin-elimination path — see its own section below |
 | `atom` | string | — | Eu151 / Dy164 / Rb87 / Cr52 / Er168 / ... |
 | `dtype` | f32 / f64 | f64 | mixed precision |
 | `backend` | cpu / gpu | cpu | `gpu` requires CUDA-loaded session |
@@ -364,8 +364,48 @@ throws (`parsing_blocks.jl:143`) — see the migration table at the end of this 
 | `every` | Int [0, 1e9] | save every N steps |
 | `n_snapshots` | Int [0, 1e6] | OR fix the snapshot count |
 | `psi` | Bool | include ψ in the snapshot (large) |
+| `column_density` | Bool | `scalar_egpe` only — keep the z-integrated density per save point |
 | `compression` | Bool / String | jld2 compression mode |
 | `precision` | "f32" / "f64" | snapshot precision |
+
+### `kind: scalar_egpe` — adiabatic spin elimination
+
+One-component eGPE with a **time-dependent dipolar polarization axis**, for the
+Larmor-fast limit where `|Ψ(r,t)⟩ = ψ(r,t)·|B̂(t)⟩_F`. Use it when
+`recommend_spin_treatment` returns `:scalar_adiabatic`; the decision is a
+computation over `ω_L` vs the mean field vs the trap, not a preference — see
+`docs/validation/klaus2022_primary_source.md` §4 and
+`spin_treatment_report` in `src/solvers/scalar_egpe.jl`.
+
+Extra `ground_state` keys on this path:
+
+| key | type | notes |
+|---|---|---|
+| `a_s` | Real [0, 1e4] | s-wave scattering length in **Bohr radii**, overriding the `ATOM_REGISTRY` value. Papers quote a_s per magnetic field, and the registry carries one number per isotope |
+| `B_direction` | dict | the stir protocol; see below |
+| `B_magnitude_gauss` | Real [0, 1e4] | recorded for the `spin_treatment_report` only — this path has no Zeeman term, the field enters solely as the polarization DIRECTION |
+| `ddi_pad` | Vector{Int} | per-axis zero-pad factors for the dipolar convolution (`ScalarDDIPad`). Costs `prod(pad)` × the FFT; on the Klaus cell `(2,2,2)` moves the ground-state AR by 1.9 % |
+| `lhy` | dict | `kind: none` or `kind: scalar` only. The spinor closed forms assume a spinor ansatz this path has eliminated, and are refused |
+
+Extra `dynamics` keys:
+
+| key | type | notes |
+|---|---|---|
+| `B_direction` | dict | stir protocol; defaults to the ground state's |
+| `wigner_seed` | dict | `{kT, seed, e_cut_ratio}` — truncated-Wigner seed on the **trap eigenstates**. `kT` is in ℏω_ref. NOT the `noise:` block, which is normalised away before a step sees it |
+
+`B_direction` (a `StirProtocol`), all in reference units:
+
+| key | meaning |
+|---|---|
+| `theta` | polar angle of B̂ from ẑ, radians |
+| `omega` | final Ω/ω_ref of the azimuthal rotation |
+| `ramp_rate` | dΩ/dt in ω_ref²; omit (or 0) for a sudden start at `omega`. Klaus's Ω̇ = 2π×50 Hz/s at ω_ref = 2π×50 Hz is `0.0031831`, which reaches Ω = ω_⊥ in exactly 1 s |
+| `phi0` | initial azimuth |
+| `theta_final`, `theta_ramp_start`, `theta_ramp_time` | spiral B̂ to a new polar angle while still rotating. Setting `theta_final` without `theta_ramp_start` is an `ArgumentError`, not a silent no-op |
+
+φ(t) is integrated in closed form, so the axis is exact at any substep time
+rather than accumulated.
 
 ### `seed_mode` — deterministic single-mode seed
 
@@ -524,7 +564,7 @@ Used by every field that accepts time dependence (`B.{Bx, By, Bz, ...}`,
 | `{sum: [<spec>, ...]}` | additive composition of any of the above |
 | existing `Waveform` | passthrough |
 
-**`frequency` convention** (Klaus-2022 footgun, memory
+**`frequency` convention** (Klaus et al. 2022 footgun, memory
 `gotcha_waveform_frequency_convention.md`): for `sinusoidal`, YAML
 `frequency` is `f_phys / (2π · f_ref)`, not `f_phys / f_ref`. Pass
 `"X Hz"` (string with units) for unambiguous lab-unit input.

@@ -159,7 +159,7 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
     @testset "YAML round-trip: Cartesian Bz in ground_state" begin
         _SKIP_HEAVY_YAML_ZEEMAN && (@test_skip false; return nothing)
         # Tiny Bz to avoid ITP exp-V underflow at large dimensionless p.
-        # Real experimental values (e.g. Klaus 2022 Bz=0.819G) give p≈3e4 which
+        # Real experimental values (e.g. Klaus et al. 2022, Bz=0.819G) give p≈3e4 which
         # requires matching small dt and physics-aware setup — not a plumbing test.
         cfg = SpinorBEC.load_config_from_string("""
 pipeline:

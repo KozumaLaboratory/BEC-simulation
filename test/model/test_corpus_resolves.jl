@@ -56,7 +56,9 @@ const CD_MU_0 = 1.25663706212e-6
 # ---------------------------------------------------------------------------
 # The configs `yaml_to_model` does NOT resolve, by name and reason.
 #
-# Measured 2026-08-02 over 429 YAML files under `runs/`; 351 resolve.
+# Measured 2026-08-19 over 488 YAML files under `runs/`; 432 resolve.
+# (2026-08-02: 351 of 429. The 23 `:lhy_n_max` exclusions closed together when
+#  `_resolve_lhy_n_max` landed; the rest of the growth is new configs.)
 #
 # Categories:
 #
@@ -95,68 +97,19 @@ const CD_MU_0 = 1.25663706212e-6
 # purpose — deriving them from the source that produces them would make this
 # gate agree with itself.
 const CORPUS_UNRESOLVED = [
-    # --- :lhy_n_max (23) ---
-    # Three arrived with origin/main (`#--`, the LHY-mode ablation). Refused for
-    # exactly the documented reason and not by this branch: a tabulated kind with
-    # no `n_max` resolves to `LHYTableOpts.n_max = NaN` ("3 x max|psi_init|^2"),
-    # which would make the table a function of WHICH psi built it, and `LHYSpec`
-    # refuses that. `LHY_none` and `LHY_scalar` in the same directory resolve,
-    # which is the control: the refusal tracks the LHY kind, not the directory.
-    (
-        "runs/lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/lhy_mode_ablation_reconstructed/LHY_polar_contact.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/lhy_mode_ablation_reconstructed/LHY_polar_dipolar.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_smoke.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/eu_gs_phase_c1_B_kappa/config_texture_quench_movie.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/eu_gs_phase_c1_B_kappa/config_texture_quench_movie_smoke.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    (
-        "runs/eu_gs_phase_c1_B_kappa/config_texture_stir_movie.yaml",
-        :lhy_n_max,
-        "needs a resolved n_max",
-    ),
-    ("runs/eu_k3_lhy/LHY_fm_dipolar.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_k3_lhy/LHY_full_bdg.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_k3_lhy/LHY_polar_contact.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_k3_lhy_control/LHY_fm_dipolar_K0.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_k3_lhy_control/LHY_full_bdg_K0.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_k3_lhy_control/LHY_polar_contact_K0.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_fm_dipolar_100ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_fm_dipolar_200ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_fm_dipolar_50ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_full_bdg_100ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_full_bdg_200ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_full_bdg_50ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_polar_contact_100ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_polar_contact_200ms.yaml", :lhy_n_max, "needs a resolved n_max"),
-    ("runs/eu_lhy_longtime/LHY_polar_contact_50ms.yaml", :lhy_n_max, "needs a resolved n_max"),
+    # --- :lhy_n_max — RESOLVED 2026-08-19, all 23 ---
+    #
+    # Refused because a tabulated kind with no `n_max` left
+    # `LHYTableOpts.n_max = NaN` ("3 x max|psi_init|^2"), making the table a
+    # function of WHICH psi built it. `resolve_gs` now pins it to the DECLARED
+    # seed (`_resolve_lhy_n_max`), so it is a function of the config and
+    # `LHYSpec` accepts it.
+    #
+    # The refusal was pointing at a live defect, not only a modelling gap: the
+    # two GS entry points hand `_lhy_n_max` different psi — the fresh solve the
+    # seed, the CACHE HIT the converged state — so a cache hit built a table
+    # 1.67x wider than the solve that produced the cached state (measured, Eu
+    # F=6 fm_dipolar at 16^3: n_max 0.4466 against 0.7471).
     # --- :no_N_atoms (16) — two copies of the same eight-config suite ---
     (
         "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/00_scalar_free_uniform_stationary.yaml",
@@ -383,10 +336,16 @@ const CORPUS_UNRESOLVED = [
     ("runs/verification_suite/manifest.yaml", :yaml_unparseable, "invalid base 8 digit"),
 ]
 
-# Measured 2026-08-02. A floor, not an equality: adding a config that resolves
-# must not redden the suite, while a config that STOPS resolving is caught by the
-# census arm naming it.
-const CORPUS_RESOLVED_FLOOR = 351
+# A floor, not an equality: adding a config that resolves must not redden the
+# suite, while a config that STOPS resolving is caught by the census arm naming
+# it.
+#
+# 2026-08-02: 351 of 429.
+# 2026-08-19: raised to 432 after `_resolve_lhy_n_max` pinned a tabulated LHY's
+#   `n_max` to the declared seed, which is what the 23 `:lhy_n_max` exclusions
+#   were waiting for. Raised WITH the exclusions deleted in the same commit —
+#   a floor left low while the list shrinks is a gate that has stopped measuring.
+const CORPUS_RESOLVED_FLOOR = 432
 
 const NON_SPINOR_GS_KINDS = ("binary", "rotating_basis", "option_gamma")
 
@@ -791,15 +750,36 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         @test c.zeeman.bx ≈ -2799.3315483654897 atol = 1e-9
         @test c.zeeman.by == 0.0
 
-        # An EXPLICIT c_dd in the YAML overrides the atom-derived one: 152 is
-        # 2.4x natural (63.3 x 1.3/0.54), and the model must carry what was
-        # asked for, not what the atom implies.
+        # An EXPLICIT c_dd in the YAML overrides the atom-derived one, and the
+        # model must carry what was asked for rather than what the atom implies.
+        # Asserted as a PROPERTY (equals the YAML literal, and differs from the
+        # derived value) rather than as a bare pinned number, so it cannot pass
+        # by coincidence if the derivation drifts onto the same value.
+        dy = resolved["runs/twa_eps_dd_scan/Dy_eps1.39.yaml"]
+        @test dy.ddi.c_dd == 106.6                       # the YAML literal
+        @test dy.ddi.c_dd != compute_c_dd_dimless(       # ... not the atom's
+            ATOM_REGISTRY[:Eu151]; N_atoms=10000, omega_ref=691.15)
+
+        # Saito & Li arXiv:2402.18885 Fig. 1(d)/2(a) at F=6 (#336). This config
+        # previously pinned c_dd=152, box 3, a harmonic cage and c_lhy=972.56 —
+        # all four of which were DEFECTS, and the pin was holding them in place:
+        #   * eps_dd is reached by lowering a_s, so c_dd must stay the atom's
+        #     derived 63.31; overriding it too double-counted the ratio;
+        #   * box 3 a_ho is a HALF-width of 1.17 um against a cloud reaching
+        #     1.4 um, i.e. the droplet was cut in half;
+        #   * the paper's geometry is free space, not a weak harmonic cage;
+        #   * 972.56 is the schema's auto-derivation from the REGISTRY a_s and
+        #     eps_dd=0.5402, neither of which this run uses.
+        # The corrected cell reproduces the published profile to 1.3 %.
         s = resolved["runs/saito_li_torus/config.yaml"]
-        @test s.ddi.c_dd == 152.0
-        @test s.grid.n_points == (64, 64, 64) && s.grid.box == (3.0, 3.0, 3.0)
-        @test s.potential.harmonic[1].omega == (0.01, 0.01, 0.01)
+        @test s.ddi.c_dd ≈ 63.306415527088 atol = 1e-10   # derived, NOT overridden
+        @test s.grid.n_points == (128, 128, 128) && s.grid.box == (6.0, 6.0, 6.0)
+        @test isempty(s.potential.harmonic)               # free space
+        @test s.interactions.c0 == 584.37 && s.interactions.c1 == 0.0
         @test s.lhy.kind === :scalar
-        @test s.lhy.c_lhy ≈ 972.5577760865442 atol = 1e-10
+        @test s.lhy.c_lhy == 276.28
+        # eps_dd = c_dd F^2 / (3 c0) is the ratio the Hamiltonian runs at.
+        @test s.ddi.c_dd * 36 / (3 * s.interactions.c0) ≈ 1.3 atol = 2e-4
 
         # `secular: true`. Same c_dd / c0 / c1 / p as LHY_scalar above, which is
         # what makes the flag the only difference between the two models.

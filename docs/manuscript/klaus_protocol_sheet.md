@@ -1,7 +1,13 @@
-# Klaus rotation-assisted EdH protocol — experimentalist sheet
+# Rotation-assisted EdH quench — experimentalist sheet
 
 > **FROZEN 2026-05-26.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
+
+> **Renamed 2026-08-19 (issue #344).** The protocol on this sheet is **this
+> project's own**, not Klaus et al. 2022's. The two branches are named by what
+> rotates: **trap-rotation branch** (mechanical trap rotation, −Ω·L_z Coriolis)
+> and **field-rotation branch** (rotating B̂ / magnetic stirrer). Authority:
+> `docs/conventions/klaus_name_disambiguation.md`.
 
 > ## Vintage — read before using any number on this sheet
 >
@@ -22,6 +28,63 @@
 > "Publication-grade, all 6 acceptance gates PASS" below is a statement about
 > **2026-05-26's gates and 2026-05-26's field convention**. It is left as
 > written because it is what the record said; it is not a claim about today.
+>
+> ## RE-DERIVED 2026-08-19 — three of this sheet's central claims do not survive
+>
+> The corpus was retargeted to the ANTI-ALIGNED preparation (the EdH cascade only
+> runs from the Zeeman-HIGHEST stretched state) and the Ω scan re-run. Full
+> record and criteria: `docs/campaign/edh_quench_polarisation_decision.md` §9.
+>
+> 1. **`|Ω|/ω_⊥ = 0.468 ± 0.003` → `|Ω*|/ω_⊥ = 0.68 ± 0.04`.** The optimum moves
+>    and the third significant figure is not supportable at one seed. The
+>    "Three-regime Ω operating window" table below, and every 0.5 / 0.3 / 0.7
+>    recommendation in it, is superseded.
+> 2. **Chirality does not matter.** The response is **even in Ω** to ≤ 0.124 %
+>    (±0.1, ±0.3, ±0.5 all agree), and Ω = 0 is the *minimum*. So step 5's
+>    "chirality opposite to the initial spin polarisation", the Mechanism
+>    one-liner's `Ω·sign(m_init) < 0`, and the falsification row "rotation
+>    chirality may be wrong — try the opposite trap rotation" are all wrong: both
+>    senses enhance identically.
+> 3. **You do not need to rotate the trap at all.** A *static* radial trap
+>    weakened to ω_eff = √(ω_⊥² − Ω²) reproduces the entire enhancement to
+>    **0.06–0.19 %**. The effect is CENTRIFUGAL, not Coriolis. The lab
+>    prescription becomes **weaken the radial trap to ≈ 0.73 ω_⊥** — no rotating
+>    anisotropic trap, and the "sign-convention mapping from simulation Ω to lab
+>    rotation direction" caveat disappears with it.
+>
+> The upper bound also has a physical origin rather than a resonance: the cascade
+> collapses as |Ω| → ω_⊥, where the effective radial trap vanishes.
+>
+> **Scanned directly 2026-08-19 (§10 of the same document), 34 further arms:**
+>
+> 4. **The lab prescription at 2.6 nT is `ω_⊥,eff / ω_⊥ = 0.71`** — a static trap,
+>    no rotation. The static scan reproduces the rotating one to **0.06 %** at
+>    every matched point, so the substitution is not a coincidence of two points.
+> 5. **The other two field rows do not survive, and they fail differently.** At
+>    **1.3 nT there is no operating window at all** (+1.8 % across a flat range),
+>    so `|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT` has **no replacement** — the effect is
+>    absent, not relocated. At **5.2 nT** an enhancement exists (+17 %) but the
+>    ω_eff dependence is non-monotonic at 7 points, so **no optimum is quoted**
+>    and `[0.5, 0.6] at 5.2 nT` is neither confirmed nor replaced.
+> 6. **It is the radial confinement, not the density.** A density-matched
+>    weakening along z instead lands *below* the baseline.
+>
+> Five seeds agree to five decimals with the seed proved live, so none of this is
+> seed noise; the live uncertainty is resolution (32³ ↔ 64³ = 2.5 %).
+>
+> **One of the 6 acceptance gates is now known to be un-re-runnable as written**
+> (2026-08-19, #343). The "(init m × Ω sign) reversal symmetry — 3-digit match" row in the
+> validation chain below compared `klaus_quench_omm0p5_keeprot` against
+> `klaus_quench_omp0p5_keeprot_mFplus`. At the time those two flipped all three
+> axial quantities — m, Ω **and B_z** — so they were a genuine mirror pair.
+> `bce2068f` flipped the field on the first and (deliberately) not on the second,
+> so both now sit at `B_z = +0.01 G`: only two of the three flip, and the pair is
+> no longer a mirror. Re-running that gate today compares an uphill Zeeman
+> cascade against a downhill one and should be expected to fail. Constructing the
+> mirror arm correctly means flipping **B as well** — see
+> `docs/campaign/edh_quench_polarisation_decision.md` §5, which is also where the
+> polarisation convention for this series is decided and where the
+> re-derivation list lives.
 
 **Status (2026-05-26):** publication-grade.  All 6 acceptance gates
 PASS; mechanism (Fig K10) verified to be Jz-conservation-driven
@@ -78,7 +141,7 @@ dipolar-BEC theory (Prasad *et al.*, arXiv:1906.08664) predicts
 vortex entry at t ≈ 350 ω⊥⁻¹ ≈ 510 ms and Abrikosov-lattice
 formation at t ≈ 5000 ω⊥⁻¹ ≈ 7 s.  Our long-time probe
 (`runs/klaus_quench_long_time/`) is dispatched to test whether the
-Klaus-I protocol with mechanical trap rotation enters that regime;
+trap-rotation branch protocol with mechanical trap rotation enters that regime;
 results to be added when the simulation completes.
 
 If both branches reproduce — short-time spin excitation + long-time
@@ -111,7 +174,7 @@ A separate "magnetic stirrer" picture (rotating B-field direction
 instantaneous B tilt at the hold start and gave a **null result** —
 no Ω dependence at all.  In the ω_L ~ Ω regime at B_hold = 2.6 nT,
 the spin polarisation does not adiabatically follow the rotating B,
-so DDI sees a static spin axis.  A proper Klaus-II protocol would
+so DDI sees a static spin axis.  A proper field-rotation branch protocol would
 need an adiabatic tilt-up stage at strong B before the quench
 (7-stage pipeline; not yet dispatched).  Below assumes the
 physical-trap-rotation implementation.
@@ -125,7 +188,7 @@ preparation regime (strong B, ~G to ~mG):
   Zeeman energy ≫ DDI energy → spin manifold gapped, EdH frozen
   use this regime for: stretched-state preparation, calibration,
   Feshbach tuning, optical pumping
-  rotation here is null for spin excitation (Klaus-I prep_only verified:
+  rotation here is null for spin excitation (trap-rotation branch prep_only verified:
   P_{-5,-4} = 0.225 ≈ 0.219 baseline)
 
 EdH-active regime (weak B, ~1–5 nT = 10⁻⁵ G):
@@ -238,7 +301,7 @@ that orbital mode by ΔE = −Ω · ℓ; matched chirality (Ω · sign(m_init)
 ## Caveats
 
 - Effective LHY closure not active in these runs (`lhy: none`).  If
-  high-density LHY effects are physically relevant in the Klaus
+  high-density LHY effects are physically relevant in the target Eu
   experiment, the protocol should be re-tested with polar / icosahedral
   LHY closures (existing infrastructure).
 - The protocol simulation models trap rotation by the rotating-frame

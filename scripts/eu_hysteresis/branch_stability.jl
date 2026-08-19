@@ -58,7 +58,7 @@
 
 import CUDA
 using SpinorBEC
-using SpinorBEC: Units, eu151_preset, SpinSystem, make_workspace, SimParams,
+using SpinorBEC: spin_scalars, Units, eu151_preset, SpinSystem, make_workspace, SimParams,
     TimeDependentZeeman, ConstantWaveform, split_step_midpoint!, static_zeeman,
     find_ground_state_lbfgs, total_norm, total_energy,
     magnetization, orbital_angular_momentum, CUDABackend, CPUBackend
@@ -66,6 +66,11 @@ using DelimitedFiles: writedlm
 using JLD2: jldopen
 using Printf
 using Random
+
+# `spin_scalars` comes from `src` (exported). It used to be include()d from
+# `scripts/eu_ramp_common.jl`, which `99a876e3` absorbed into
+# `src/analysis/observables/spin_scalars.jl` and deleted — leaving this
+# include pointing at a file that is no longer in the repository.
 
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 const KAPPA = getf("SB_KAPPA", 1.8)

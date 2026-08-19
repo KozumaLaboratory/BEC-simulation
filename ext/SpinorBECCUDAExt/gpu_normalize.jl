@@ -64,7 +64,7 @@ function SpinorBEC._normalize_psi_constrained!(
             norms[c] = base_norms[c] * w^2
         end
         total = sum(norms)
-        total < 1e-30 && break
+        total < COUPLING_TOL && break
 
         Mz = sum(m_vals[c] * norms[c] for c in 1:D) / total
         abs(Mz - target_Mz) < 1e-12 && break
@@ -73,7 +73,7 @@ function SpinorBEC._normalize_psi_constrained!(
         for c in 1:D
             dMz += 2 * m_vals[c] * (m_vals[c] - Mz) * norms[c] / total
         end
-        abs(dMz) < 1e-30 && break
+        abs(dMz) < COUPLING_TOL && break
 
         lambda -= (Mz - target_Mz) / dMz
         lambda = clamp(lambda, -10.0, 10.0)

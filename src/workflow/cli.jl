@@ -19,6 +19,10 @@ function _print_help(io::IO=stdout)
     println(io, "  catalog   {index | reindex [--force]}            navigable run index")
     println(io, "  gs-library {index <dir> | merge [src] [dest]}    converged-GS library ops")
     println(io, "  validation-matrix [output_dir]                   run the validation ladder")
+    println(io, "  campaign-gate [--head=R] [--runs=D] [--match=S] [--list]")
+    println(
+        io, "                                                   CAMPAIGN.md §4 guard 1, executed"
+    )
     println(io, "  tsubame   {build-sysimage}                       cluster helper(s)")
     println(io, "  help                                            this message")
     println(io)
@@ -344,6 +348,69 @@ function _cmd_validation_matrix(args)
     return (s.n_fail == 0 && s.n_error == 0) ? 0 : 1
 end
 
+# ── campaign ancestor gate (CAMPAIGN.md §4 guard 1) ──────────────────
+
+"""
+    cli.jl campaign-gate [--head=<rev>] [--runs=<root>] [--match=<substr>] [--list]
+
+Executes guard 1 rather than describing it. With no `--runs`, checks the working
+tree's HEAD against every ref in `docs/campaign/fix_list.toml`. With `--runs`,
+sweeps stored run directories and reports the three-way split.
+
+Exit code is 0 only when nothing is disqualified AND nothing is unresolvable —
+`:unknown_provenance` is a red, not a shrug, because "no producing commit" is the
+condition the whole campaign was opened over.
+"""
+function _cmd_campaign_gate(args)
+    repo = normpath(joinpath(@__DIR__, "..", ".."))
+    fixes = campaign_fix_list()
+    missing_refs = [f.id for f in fixes if !_rev_exists(f.ref; repo)]
+    if !isempty(missing_refs)
+        println(
+            stderr,
+            "campaign-gate: fix_list refs absent from this clone: " *
+            join(missing_refs, ", "),
+        )
+        println(stderr, "  every verdict below would be vacuous; fix the list first.")
+        return 3
+    end
+    println("campaign-gate: $(length(fixes)) refs from docs/campaign/fix_list.toml")
+
+    runs_root = _kv(args, "runs", "")
+    if isempty(runs_root)
+        head = _kv(args, "head", "HEAD")
+        v = campaign_gate_verdict(head; fixes, repo)
+        if v.verdict === :pass
+            println("  $head: PASS — descends from all $(length(fixes)) refs")
+            return 0
+        end
+        println(stderr, "  $head: $(uppercase(string(v.verdict)))")
+        for id in v.missing
+            println(stderr, "    missing: $id")
+        end
+        return 1
+    end
+
+    m = _kv(args, "match", "")
+    filt = isempty(m) ? nothing : (b -> occursin(m, b))
+    r = campaign_gate_report(; runs_root, repo, fixes, filter=filt)
+    println("  runs_root  : $runs_root" * (isempty(m) ? "" : "  (match: $m)"))
+    println("  runs found : $(r.total)")
+    println("  pass       : $(r.pass)")
+    println("  disqualified: $(r.disqualified)")
+    println("  unknown provenance: $(r.unknown)   <- not a pass and not a fail")
+    if "--list" in args
+        for row in r.rows
+            row.verdict === :pass && continue
+            println(
+                "    $(basename(row.dir))  $(row.verdict)  commit=$(something(row.commit, "-"))" *
+                (isempty(row.missing) ? "" : "  missing=" * join(row.missing, ",")),
+            )
+        end
+    end
+    (r.disqualified == 0 && r.unknown == 0) ? 0 : 1
+end
+
 # ── tsubame helpers ──────────────────────────────────────────────────
 
 function _cmd_tsubame(args)
@@ -423,6 +490,7 @@ function cli_main(args)
     sub == "catalog" && return _cmd_catalog(rest)
     sub == "gs-library" && return _cmd_gs_library(rest)
     sub == "validation-matrix" && return _cmd_validation_matrix(rest)
+    sub == "campaign-gate" && return _cmd_campaign_gate(rest)
     sub == "tsubame" && return _cmd_tsubame(rest)
     println(stderr, "cli.jl: unknown subcommand '$sub'")
     _print_help(stderr)

@@ -283,8 +283,11 @@ end
 
         @test sum(length(s) for (_, s) in AX_BUCKETS) == length(all_keys)
         # The bucket the SOURCE owns, pinned so moving a key out of it costs a
-        # deliberate edit here as well.
-        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman", "B_direction"])
+        # deliberate edit here as well. `a_s`, `ddi_pad` and `B_magnitude_gauss`
+        # joined 2026-08-18 with `kind: scalar_egpe` — declared in GS_SCHEMA and
+        # read only by that path, so the spinor runner drops them silently.
+        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman",
+            "B_direction", "a_s", "ddi_pad", "B_magnitude_gauss"])
     end
 
     # ---------------------------------------------------------------
@@ -659,10 +662,25 @@ end
         # because calling `ax_id` here would register the warning outside the
         # logger and the arm below would measure zero for the wrong reason
         # (it did, on the first run of this file).
-        other = ax_base(; lhy=Dict{String, Any}("kind" => "full_bdg"))   # no n_max
+        # CHANGED 2026-08-19. This was `lhy: {kind: full_bdg}` with no `n_max`,
+        # which used to be a second reason and no longer is: `resolve_gs` pins a
+        # tabulated `n_max` to the declared seed, so that config now resolves.
+        #
+        # The replacement is `raman:` — declared by GS_SCHEMA, read by nothing on
+        # this path, and so in `GS_KEYS_DROPPED_PHYSICS`. Chosen by MEASURING
+        # which reasons are still live rather than by picking a plausible one:
+        # `B_direction` was tried first and gives `why == nothing` here, because
+        # it is written by `apply_B_block_normalize!` during `_run_yaml_prepare`
+        # and a hand-built step dict never goes through that.
+        other = ax_base(;
+            raman=Dict{String, Any}("Omega_R" => 0.3, "delta" => 0.0,
+                "k_eff" => [1.0, 0.0, 0.0]))
         why_other = ax_why(other)
         @test why_other !== nothing        # else `occursin` errors on `nothing`
-        @test why_other !== nothing && occursin("n_max", why_other)
+        @test why_other !== nothing && occursin("raman", why_other)
+        # …and it really is a DIFFERENT reason from `unresolvable()`'s, or the
+        # arm below would be measuring "warns once" against the same cause.
+        @test !occursin("raman", ax_why(unresolvable()))
         logger2 = Test.TestLogger(; min_level=Warn)
         with_logger(logger2) do
             ax_id(unresolvable())        # already warned: silent

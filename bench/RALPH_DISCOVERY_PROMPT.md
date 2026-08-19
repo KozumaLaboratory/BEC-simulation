@@ -38,7 +38,7 @@ stability boundaries" — same as the per-iteration guardrails.
    (whichever is most relevant to recent commits):
 
    ```julia
-   # Workload A: rotating-basis split-step (Klaus / Berry / phi_omega)
+   # Workload A: rotating-basis split-step (fast-Larmor / Berry / phi_omega)
    using SpinorBEC, Profile
    config = SpinorBEC.load_config("runs/phi_omega_scan/eu151_phi1_0_500ms/config.yaml")
    # Build workspace from ground_state phase (cheap), then profile

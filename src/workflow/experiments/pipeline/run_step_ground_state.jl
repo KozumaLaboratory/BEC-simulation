@@ -26,6 +26,63 @@
 #     each cell to its own recon winner with no index coupling. Fails loud when
 #     nothing matches — never silently falls back to a Gaussian seed.
 
+"""
+    _refuse_dropped_physics(r::GSResolved)
+
+Refuse to RUN a ground-state step that declares physics this path discards.
+
+`GSResolved.dropped_physics` has existed since cutover step 1b and only
+`gs_model` consulted it — so a config in that state got no `Model` (loudly) and
+ran anyway (silently). The run is the half that produces numbers, so that was
+the wrong way round.
+
+MEASURED 2026-08-19, over the 455 ground-state steps that resolve: exactly TWO
+configs are affected, both by `B_direction`, and both are already wrong.
+
+`runs/klaus_hybrid/klaus_hybrid_{nostir_control,magnetostir_omega_m0p74}.yaml`
+declare `B: {B_mag: "0.01 Gauss", theta: 3.14159}` — the field along −z — with
+`initial_state: m_minus_F`. That pairing is the ANTI-ALIGNED stretched state,
+which is the whole point of an EdH experiment. What runs is `p = -147.955`, the
+same value `theta: 0` produces: the direction is dropped and the field points
+along +z, i.e. the ALIGNED state.
+
+The two are not a detail. Per
+`gotcha_edh_needs_the_anti_aligned_stretched_state_2026_08_19` the rotation
+enhancement is +16.5 % anti-aligned against −0.45 % aligned — the effect the
+configs exist to measure is absent in the arm that actually runs.
+
+Verified by construction rather than by reading: resolving the same block at
+`theta ∈ {0, 1, π/2, π}` gives `p = -147.955` and `(bx, by) = (0, 0)` every
+time. The GS path takes `B_mag` and ignores the direction entirely.
+
+This does not repair those configs — which spelling the author wants (`Bz:
+-0.01`, or dropping the tilt) is a physics choice — it stops them producing a
+number that looks fine.
+"""
+function _refuse_dropped_physics(r::GSResolved)
+    isempty(r.dropped_physics) && return nothing
+    # The escape hatch the message names. Present because a refusal with no
+    # override turns a forensic re-run of a known-wrong config into a patch, and
+    # because this repo's other provenance refusal
+    # (`SPINORBEC_ALLOW_STALE_POINTS`) is shaped the same way. It WARNS rather
+    # than passing quietly: an override that says nothing is a default.
+    if lowercase(get(ENV, "SPINORBEC_ALLOW_DROPPED_GS_PHYSICS", "0")) in
+        ("1", "true", "on", "yes")
+        @warn "running a ground_state step that declares physics this path drops" dropped =
+            r.dropped_physics
+        return nothing
+    end
+    throw(
+        ArgumentError(
+            "ground_state step declares " * join(r.dropped_physics, ", ") *
+            ", which the spinor ground-state path does not read — the run would " *
+            "silently use different physics from the one declared. Move the block to " *
+            "a step that reads it, delete it, or express the same physics in a key " *
+            "this path does read (a tilted `B_mag`/`theta` is `Bz` with a sign here). " *
+            "Set SPINORBEC_ALLOW_DROPPED_GS_PHYSICS=1 to run anyway."),
+    )
+end
+
 _seed_bz_gauss(x::Real) = Float64(x)
 _seed_bz_gauss(x::AbstractString) = parse(Float64, split(String(x))[1])
 
@@ -359,6 +416,20 @@ end
 # explosion CLAUDE.md §"Type stability boundaries" exists to prevent. The
 # `NamedTuple` inside `_gs_stage_params` has a per-call type by construction, so
 # the narrowing has to happen here.
+# Same fail-safe as `_gs_artifact_id`, one level earlier: a config `gs_model`
+# cannot resolve has no Stage, so a following `:evolve` stage has no `from` and
+# gets no id either. The chain fails safe end to end rather than inventing a
+# root for itself.
+@noinline function _gs_stage_or_nothing(
+    r::GSResolved, p::Dict{String, Any}
+)::Union{Nothing, Stage}
+    try
+        gs_stage(r, p)
+    catch
+        nothing
+    end
+end
+
 @noinline function _gs_artifact_id(r::GSResolved, p::Dict{String, Any})::Union{Nothing, String}
     try
         artifact_id(gs_stage(r, p))
@@ -388,6 +459,7 @@ function _run_step(
     # THE shared resolution. Every slot below is read off `r`; nothing in this
     # method parses a physics block. `yaml_to_model` consumes the same call.
     r = resolve_gs(p, grid_prev, atom_prev, ws_prev; verbose)::GSResolved
+    _refuse_dropped_physics(r)
     method = r.method
     atom = r.atom
     grid, ndim = r.grid, r.ndim
@@ -412,21 +484,21 @@ function _run_step(
     # already carries all four. Re-parsing here would be a second declaration of
     # the same thing, which is precisely what `test_resolve_gs_is_shared.jl` arm
     # B forbids, and it reddened on this merge.
-    # `_resolve_lhy_block!` writes the resolved LHY mode (from the user-facing
-    # `lhy: {kind: ...}` block) into the internal `lhy_kind` slot. Prior to
-    # 2026-05-22 this read `p["spinor_lhy"]` — a stale reference to the old
-    # YAML key — which was never written by the new resolver, silently
-    # disabling non-scalar LHY modes (polar_contact / icosahedral / ...)
-    # for every YAML pipeline run.
-    spinor_lhy_mode = let v = get(p, "lhy_kind", nothing)
-        v === nothing ? nothing : Symbol(String(v))
-    end
-    # `::LHYTableOpts` narrows the `Any` a Dict lookup yields — CLAUDE.md
-    # "type stability boundaries": an Any-typed local reaching make_workspace
-    # is what turns into a multi-minute JIT hang with no stack trace.
-    gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
-
-    gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
+    #
+    # And until 2026-08-19 the three lines DIRECTLY BELOW this comment did
+    # exactly that: `spinor_lhy_mode`, `gs_lhy_opts` and `gs_rf_omega` were
+    # assigned from `r` above and then immediately overwritten by
+    # `get(p, "lhy_kind", …)` / `get(p, "lhy_opts", …)` /
+    # `get(p, "rotating_frame_omega", …)` — the same three expressions
+    # `resolve_gs.jl:299-306` already evaluates, verbatim. No behaviour differed
+    # (they agreed because they were copies), so nothing was ever going to find
+    # it by running: it was a drift surface waiting for one side to be edited.
+    #
+    # Arm B did not catch it because arm B scans for named parser FUNCTIONS
+    # (`_parse_*`, `_resolve_*`) appearing in the runner, and a second reader
+    # spelled as a bare `get(p, "…")` contains none. "No parser is called here"
+    # and "no physics is re-read here" are different claims, and only the first
+    # was being checked. Arm B2 in that file now checks the second.
 
     # --- Cache: skip ITP/LBFGS if file exists, but build a workspace so
     #     downstream analyzers (e.g. bogoliubov) can inspect the system ---
@@ -510,22 +582,15 @@ function _run_step(
         # converged ψ here and from the seed in the solve that wrote the file.
         # `rotating_frame_omega` is a `SimParams` field, not a `make_workspace`
         # kwarg — it is what builds the Coriolis cache (`make_workspace.jl:396`).
+        # One copy — see `gs_physics_kwargs`. The seventeen physics kwargs were
+        # written out longhand at this site and at both solver calls below, and
+        # a merge duplicating three of them here is what stopped the package
+        # parsing on 2026-08-02. A merge cannot duplicate a function call.
         ws_cached = make_workspace(;
-            grid, atom, interactions, zeeman, potential,
+            gs_physics_kwargs(r)...,
             sim_params=SimParams(; dt, n_steps=1, save_every=1,
                 rotating_frame_omega=gs_rf_omega),
             psi_init=psi_out,
-            enable_ddi, c_dd=c_dd_val,
-            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
-            ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
-            backend,
-            # Both sides of the merge independently closed the step-1b
-            # [KNOWN-GAP] here — main and this branch each added these three,
-            # and git took both copies without reporting a conflict, which is
-            # why the package stopped parsing. One copy.
-            light_shift=gs_light_shift,
-            spinor_lhy=spinor_lhy_mode,
-            lhy_opts=gs_lhy_opts,
         )
         # Is the verdict TRUE of what was just loaded? Everything above this
         # line trusts the marker; `admit_payload` checked that it exists, was
@@ -554,6 +619,7 @@ function _run_step(
                 :ground_state_provenance => String(gs_admission.provenance),
                 :workspace => ws_cached,
                 :gs_stage_ref => stage_ref,
+                :gs_stage => _gs_stage_or_nothing(r, p),
             )
             # The other three quarters of the verdict. The marker carries
             # `stop_reason`, `floor_limited` and `grad_norm`; until this commit a
@@ -636,7 +702,11 @@ function _run_step(
             c_dd_from = Float64(get(c_dd_spec, "from", 0.0))
             c_dd_step = Float64(get(c_dd_spec, "step", (c_dd_target - c_dd_from) / 100))
             dE_threshold = Float64(get(c_dd_spec, "threshold", 0.01))
-            save_every_local = max(1, Int(get(p, "n_steps", 100000)) ÷ 100)
+            # `n_steps` off `r`, not a second `get(p, "n_steps", 100000)`. The
+            # duplicate carried its own default — 100000 against the schema's,
+            # which the resolver applies — so a config that omitted `n_steps`
+            # got a save_every computed from a step count it was not running.
+            save_every_local = max(1, n_steps ÷ 100)
             c_dd_current = Ref(c_dd_from)
             E_prev_ramp = Ref(NaN)
             push!(
@@ -681,18 +751,12 @@ function _run_step(
     tol_drho_val = Float64(get(p, "tol_drho", 0.0))
     gs = if method === :itp
         find_ground_state(;
-            grid, atom, interactions, zeeman, potential,
+            gs_physics_kwargs(r)...,
             dt, n_steps, tol, tol_drho=tol_drho_val,
             initial_state, init_state_params, psi_init,
-            enable_ddi, c_dd=c_dd_val,
-            secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
-            ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
-            target_magnetization=target_mz, backend, on_step,
+            target_magnetization=target_mz, on_step,
             checkpoint_dir=checkpoint_dir,
             save_every=max(1, n_steps ÷ 100),
-            light_shift=gs_light_shift,
-            spinor_lhy=spinor_lhy_mode,
-            lhy_opts=gs_lhy_opts,
             rotating_frame_omega=gs_rf_omega,
             verbose=verbose,
         )
@@ -720,17 +784,22 @@ function _run_step(
             )
         else
             find_ground_state_lbfgs(;
-                grid, atom, interactions, zeeman, potential,
+                gs_physics_kwargs(r)...,
                 n_steps, tol, m_lbfgs, newton_polish, initial_state, init_state_params,
                 psi_init,
-                enable_ddi, c_dd=c_dd_val,
-                secular_ddi=secular, quasi_2d_ddi=q2d, l_z_ddi=lz, ddi_trunc_radius=ddi_trunc,
-                ddi_padding=ddi_padded_b, ddi_pad_factor=ddi_pf,
-                target_magnetization=target_mz, backend,
+                target_magnetization=target_mz,
                 verbose,
-                light_shift=gs_light_shift,
-                spinor_lhy=spinor_lhy_mode,
-                lhy_opts=gs_lhy_opts,
+                # FIXED 2026-08-19: this call did not forward the rotating
+                # frame, while the ITP arm twenty lines up did. Both solvers
+                # accept it (`lbfgs/driver.jl:148`, plumbed 2026-06-02 together
+                # with the Coriolis term in `energy_gradient!`), so a
+                # `ground_state:` step carrying `rotating_frame_omega:` was
+                # solved in the ROTATING frame under `method: itp` and in the
+                # LAB frame under `method: lbfgs` — same config, same file, two
+                # different Hamiltonians, no warning. Exactly the shape the
+                # bundle above exists to prevent, surviving in the one kwarg
+                # that was not part of it.
+                rotating_frame_omega=gs_rf_omega,
                 pin=pin_closure, epsilon_ramp=pin_eps,
                 residual_polish,
             )
@@ -870,6 +939,12 @@ function _run_step(
         :ground_state_grad_norm => gs_v.grad_norm,
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,
+        # The Stage itself, not just its id. A following `:evolve` stage needs
+        # it as `from` — `artifact_id` recurses into the chain, so the dynamics
+        # id carries the ground state that produced ψ. Built unconditionally
+        # (it is pure and cheap) rather than only when the stage cache is on,
+        # because the dynamics id is not a caching question.
+        :gs_stage => _gs_stage_or_nothing(r, p),
     )
     (psi_out, grid, atom, gs.workspace, step_result)
 end

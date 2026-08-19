@@ -127,7 +127,7 @@ function _route_physics_summary(path::String, base_dir::String, psi_cache::Dict{
         # Larmor regime classification — same threshold as the Larmor
         # guard warning in pipeline_runner. Audit 2026-04-28 showed
         # ε=1e-3 fails for `p·F·dt > 300`; ε=1e-6 brings it down to
-        # ~90 for the Klaus-equivalent runs. Frontend can colour-code
+        # ~90 for the magnetostir runs. Frontend can colour-code
         # the gauge from this field.
         larmor = get(out, "larmor_phase_per_step", NaN)
         out["larmor_regime"] = if !isfinite(larmor) || larmor == 0

@@ -22,11 +22,13 @@
 
 ## Split-step: the forward outer-potential chain
 
-Read from `_outer_operators_fwd!` (`src/hamiltonian/integrator/split_step.jl:600`), in source order.
-**9 substeps.** Each auto-skips when its coupling is ≈ 0.
+Read from `OUTER_CHAIN` (`src/hamiltonian/integrator/split_step.jl:622`), the Tuple both directions derive from:
+`_outer_operators_fwd!` runs it as declared, `_outer_operators_bwd!` runs
+`reverse` of it. **9 substeps.** Each auto-skips when its
+coupling is ≈ 0.
 
 1. `diagonal`
-2. `light_shift`
+2. `light_shift_offdiag`
 3. `spin_mixing`
 4. `spatial_lhy_spin`
 5. `singlet_pair`
@@ -48,12 +50,12 @@ Each declares its sign in one coefficient function in the file named.
 |---|---|---|---|
 | 1 | `kinetic` | `KineticTerm` | `src/hamiltonian/terms/kinetic.jl:13` |
 | 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl:7` |
-| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:216` |
+| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:227` |
 | 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl:33` |
-| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:150` |
+| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:147` |
 | 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl:8` |
 | 7 | `lhy` | `LHYTerm` | `src/hamiltonian/terms/lhy/lhy_term.jl:7` |
-| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:297` |
+| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:294` |
 | 9 | `raman` | `RamanTerm` | `src/hamiltonian/terms/raman.jl:78` |
 | 10 | `light_shift` | `LightShiftTerm` | `src/hamiltonian/terms/light_shift/light_shift_term.jl:8` |
 | 11 | `coriolis` | `CoriolisTerm` | `src/hamiltonian/terms/coriolis.jl:11` |
@@ -64,10 +66,10 @@ Each declares its sign in one coefficient function in the file named.
 ## The B → p sign
 
 Declared **once**, at `src/workflow/io/units.jl:73`, as `p ≡ -g_F μ_B B` (Kawaguchi-Ueda);
-20 other references delegate to it. **The uniqueness is a GATE, not a
+22 other references delegate to it. **The uniqueness is a GATE, not a
 list** — `test/oracles/test_bfield_sign_declared_once.jl` fails if a second
 expression in `src/` combines `g_F` with the Bohr magneton. This section used to
-enumerate all 20 sites; a derived list cannot rot but only describes,
+enumerate all 22 sites; a derived list cannot rot but only describes,
 whereas the gate refuses the violation. `linear_zeeman_p` carried the opposite
 sign for two months because eight test files checked the VALUE and none checked
 that there was only one of them.
@@ -76,7 +78,7 @@ that there was only one of them.
 
 **Subdirectories (.jl count):** `continuation/ (5)`, `evaporation/ (9)`, `ground_state/ (6)`, `lbfgs/ (4)`, `simulation/ (4)`
 
-**Top-level files:** `adaptive.jl`, `binary_simulation.jl`, `convergence_metrics.jl`, `ground_state.jl`, `hessian.jl`, `newton_cg.jl`, `photon_heating.jl`, `preconditioner.jl`, `projected_gp.jl`, `scalar_egpe.jl`, `sgpe.jl`, `simulation.jl`, `spgpe.jl`, `thermal_cfield.jl`, `trapped_bdg.jl`, `twa.jl`
+**Top-level files:** `adaptive.jl`, `bdg_frequencies.jl`, `binary_simulation.jl`, `bragg_response.jl`, `convergence_metrics.jl`, `ground_state.jl`, `hessian.jl`, `newton_cg.jl`, `photon_heating.jl`, `preconditioner.jl`, `projected_gp.jl`, `scalar_egpe.jl`, `sgpe.jl`, `simulation.jl`, `spgpe.jl`, `thermal_cfield.jl`, `trapped_bdg.jl`, `twa.jl`
 
 `CLAUDE.md` restated this directory twice and the two restatements disagreed
 with each other; both omitted `evaporation/` and five top-level files, and one
@@ -123,8 +125,8 @@ checking either.
 - admits: `src/workflow/experiment.jl:253`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:840`
-- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:477`
-- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:541`
+- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
+- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 
 Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated
 migration allowance argued at `src/model/complete.jl`, not an oversight — so
@@ -146,7 +148,7 @@ to their own default), and that qualification is judgement, not derived.
 
 | knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |
 |---|---|---|---|
-| `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
+| `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / 4000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
 | `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 (schema `1.0e-8`) |
 | `m_lbfgs` | 20 | 20 | 10 (schema `10`) |
 
@@ -206,12 +208,12 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 257 files
-- `CI_EXTRA` — 116 files
+- `FAST_TESTS` — 267 files
+- `CI_EXTRA` — 139 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 77 files
-- `INTEGRATION_TESTS` — 45 files
+- `ORACLE_TESTS` — 92 files
+- `INTEGRATION_TESTS` — 53 files
 
 ## Validation ladder — instruments present on disk
 
@@ -272,14 +274,14 @@ as complete.
 
 | subtree | files cited | of |
 |---|---|---|
-| `src/model/` | 3 | 14 |
 | `src/hamiltonian/` | 13 | 63 |
+| `src/model/` | 3 | 16 |
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
-| `src/solvers/` | 2 | 44 |
-| `src/workflow/` | 5 | 171 |
-| `src/foundation/` | 1 | 40 |
-| `src/analysis/` | 1 | 49 |
+| `src/solvers/` | 2 | 46 |
+| `src/workflow/` | 5 | 174 |
+| `src/foundation/` | 1 | 41 |
+| `src/analysis/` | 1 | 51 |
 
 Where the ratio is low the code is the only authority; `CLAUDE.md`'s subsystem
 catalog is a curated summary and carries no staleness gate.

@@ -155,10 +155,15 @@ the only F=6+DDI+3D public spinor BEC simulator known as of 2026-05.
 - No published numerical benchmark of secular vs full DDI as a function
   of ω_L / (c_dd ⟨n⟩). The criterion `> 100` in CLAUDE.md is internal
   engineering policy, not literature.
-- Klaus 2022 magnetostir paper reference in project memory was NOT
-  located via this 2026-05-26 search. The paper may exist (memory
-  cites it) but the precise arXiv/DOI is not in our records — open
-  to the user to supply.
+- ~~Klaus 2022 magnetostir paper reference in project memory was NOT
+  located via this 2026-05-26 search.~~ **CLOSED 2026-08-07, recorded
+  here 2026-08-19 (#344).** It was a search failure, not a gap. The
+  paper is L. Klaus *et al.*, *"Observation of vortices and vortex
+  stripes in a dipolar Bose-Einstein condensate"*, Nat. Phys. **18**,
+  1453 (2022), arXiv:2206.12265, doi:10.1038/s41567-022-01793-8. A
+  2026-06-02 "correction" turned this unsuccessful search into the
+  assertion that no such paper exists; that assertion was false and is
+  retracted — see `docs/conventions/klaus_name_disambiguation.md`.
 
 ## References
 

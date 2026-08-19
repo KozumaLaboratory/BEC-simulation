@@ -29,7 +29,7 @@
 # here for the same reason it is in `run_step_ground_state.jl` — see that file's
 # header and CLAUDE.md §"Type stability boundaries".
 
-export resolve_gs, gs_model, yaml_to_model, GSResolved
+export resolve_gs, gs_model, yaml_to_model, GSResolved, gs_physics_kwargs
 
 # ---------------------------------------------------------------------------
 # The per-slot resolvers (moved verbatim from run_step_ground_state.jl)
@@ -134,11 +134,24 @@ end
 #                     `B.phi`; ONLY the rotating-basis path reads it
 #                     (`run_step_rotating/ground_state.jl:147`), so on this path
 #                     a tilted field silently runs along +z.
+#   a_s             — scattering length in BOHR RADII, read only by
+#                     `_scalar_egpe_couplings` (`kind: scalar_egpe`). On the
+#                     spinor path the run silently uses the ATOM_REGISTRY value
+#                     instead, which for ¹⁶²Dy is 122 a₀ against the 109-112 a₀
+#                     a dipolar-vortex paper works at — a 10 % error in ε_dd
+#                     that nothing would print.
+#   ddi_pad         — per-axis zero-pad factors for the SCALAR dipolar
+#                     convolution (`ScalarDDIPad`). The spinor path has its own
+#                     `ddi.padded` / `ddi.pad_factor`; this key does not reach it.
+#   B_magnitude_gauss — carried for `spin_treatment_report` only. The scalar
+#                     path has no Zeeman term at all; the field enters solely as
+#                     a direction, so this is provenance, not physics.
 #
 # The partition of GS_SCHEMA into {reaches a Model slot, reaches Stage/Initial,
 # dropped} is pinned in `test/model/test_yaml_to_model.jl`; adding a schema key
 # without classifying it is red there.
-const GS_KEYS_DROPPED_PHYSICS = ("quasi_2d", "l_z", "raman", "B_direction")
+const GS_KEYS_DROPPED_PHYSICS = ("quasi_2d", "l_z", "raman", "B_direction",
+    "a_s", "ddi_pad", "B_magnitude_gauss")
 
 """
     GSResolved
@@ -195,6 +208,47 @@ struct GSResolved
     dropped_physics::Vector{String}
 end
 
+"""
+    gs_physics_kwargs(r::GSResolved) -> NamedTuple
+
+The seventeen physics kwargs, spelled with the names `make_workspace`,
+`find_ground_state` and `find_ground_state_lbfgs` all three accept.
+
+`run_step_ground_state.jl` called those three functions with this bundle written
+out LONGHAND at each site. Seventeen kwargs, three copies, one function — and on
+2026-08-02 two branches independently added the same three entries to one of the
+copies, git merged both without a conflict, and the package stopped parsing
+(`fix: the merge duplicated three make_workspace kwargs`). The copies are what
+made a textual merge plausible; a merge cannot duplicate a function call.
+
+Runtime and solver knobs are NOT here: `sim_params`, `psi_init`, `n_steps`,
+`tol`, `dt`, `verbose`, and the LBFGS/ITP-specific options differ per call site
+because they genuinely differ. This bundle is exactly the part that must not.
+
+Concretely typed throughout (every `GSResolved` field is declared), so splatting
+it into a kwarg call keeps the inference fence `run_step_ground_state.jl`'s
+header describes — CLAUDE.md §"Type stability boundaries".
+"""
+gs_physics_kwargs(r::GSResolved) = (
+    grid=r.grid,
+    atom=r.atom,
+    interactions=r.interactions,
+    zeeman=r.zeeman,
+    potential=r.potential,
+    enable_ddi=r.enable_ddi,
+    c_dd=r.c_dd,
+    secular_ddi=r.secular,
+    quasi_2d_ddi=r.quasi_2d_ddi,
+    l_z_ddi=r.l_z_ddi,
+    ddi_trunc_radius=r.ddi_trunc,
+    ddi_padding=r.ddi_padded,
+    ddi_pad_factor=r.ddi_pad_factor,
+    backend=r.backend,
+    light_shift=r.light_shift,
+    spinor_lhy=r.spinor_lhy,
+    lhy_opts=r.lhy_opts,
+)
+
 # `gs_ddi_tuple(r)` — the eight DDI values as the positional tuple
 # `_parse_gs_ddi` returns — lived here to feed `_gs_cache_key`, which hashed
 # them. Cutover step 3 deleted that key: the DDI half of the id is `DDISpec` now,
@@ -215,6 +269,62 @@ function _light_shift_spec(raw)
         eta_tensor=Float64(raw["eta_tensor"]),
         eta_vector=Float64(get(raw, "eta_vector", 0.0)),
         polarization=NTuple{3, Float64}(Tuple(Float64.(get(raw, "polarization", [0, 0, 1])))))
+end
+
+"""
+    _resolve_lhy_n_max(opts, kind, grid, atom, p) -> LHYTableOpts
+
+Pin a tabulated LHY's `n_max` to the DECLARED SEED, once, instead of leaving it
+`NaN` for `make_workspace` to derive from whatever ψ it is handed.
+
+`_lhy_n_max(psi) = 3 × max|ψ|²` and the two GS entry points hand it different ψ:
+
+    fresh solve   `find_ground_state` builds the seed from `initial_state`
+    cache hit     `run_step_ground_state.jl:593` passes the CONVERGED ψ
+
+Measured on an Eu F=6 `fm_dipolar` fixture at 16³: the seed gives
+`n_max = 0.4466` and a converged-shaped ψ gives `0.7471` — the density grid the
+table is built on is **1.67× wider on a cache hit than in the solve that
+produced the cached state**. `V_LHY` agrees to 4e-5 where both tables cover, so
+this is a resolution difference rather than a different functional; it is still
+two tables for one config, and the energy reported from a cache hit is not the
+one the solve minimised.
+
+Pinning it here fixes that (both paths now read the same number) and is also
+what lets these configs have a `Model` at all: `LHYSpec` refuses a non-positive
+`n_max` precisely because a seed-derived one makes the functional depend on
+something the Model does not carry. Resolving it from the DECLARED seed makes it
+a function of the config, which is what a Model slot has to be.
+
+The seed is built by the SAME call `find_ground_state` uses
+(`solvers/ground_state.jl:211`) — `init_psi(grid, sys; state, init_kwargs...)`.
+Re-deriving the peak density analytically would be a second implementation of
+the state zoo, which is the defect class this file exists to close.
+
+Costs one `init_psi` per resolve, and only for a tabulated kind with no explicit
+`n_max`: every other shape returns `opts` untouched.
+"""
+function _resolve_lhy_n_max(opts::LHYTableOpts, kind, grid, atom, p::Dict{String, Any})
+    kind === nothing && return opts
+    k = kind::Symbol
+    (k === :none || k in LHY_CLOSED_SCALAR_KINDS) && return opts
+    isnan(opts.n_max) || return opts        # explicit `lhy: {n_max: …}` wins
+    seed = _declared_seed(grid, atom, p)
+    LHYTableOpts(; n_max=_lhy_n_max(seed), n_points=opts.n_points,
+        n_bins=opts.n_bins, n_atoms=opts.n_atoms)
+end
+
+"The ψ this step's `initial_state` declares, built the way the solver builds it."
+@noinline function _declared_seed(grid, atom, p::Dict{String, Any})
+    sys = SpinSystem(atom.F)
+    state = Symbol(get(p, "initial_state", "polar"))
+    isp = get(p, "init_state_params", nothing)
+    params = if isp isa AbstractDict
+        Dict{Symbol, Float64}(Symbol(k) => Float64(v) for (k, v) in isp)
+    else
+        Dict{Symbol, Float64}()
+    end
+    init_psi(grid, sys; state=state, pairs(params)...)
 end
 
 _is_trivial_direction(d) =
@@ -290,6 +400,7 @@ Idempotent in effect: `_resolve_derived_params!` guards `ddi["c_dd"]` with
     # "type stability boundaries": an Any-typed local reaching make_workspace
     # is what turns into a multi-minute JIT hang with no stack trace.
     gs_lhy_opts = get(p, "lhy_opts", LHYTableOpts())::LHYTableOpts
+    gs_lhy_opts = _resolve_lhy_n_max(gs_lhy_opts, spinor_lhy_mode, grid, atom, p)
     gs_rf_omega = Float64(get(p, "rotating_frame_omega", 0.0))
 
     # --- model-only reads, all of them here so `gs_model` touches no dict ---

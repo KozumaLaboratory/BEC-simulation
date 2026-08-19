@@ -5,7 +5,7 @@ using SpinorBEC
 #
 # CLAUDE.md defines the verification-type split and requires a report to say
 # which type a claim falls under: "A: code correctness … B: physics agreement …
-# **C: model fidelity** — comparison to published experimental data (Klaus 2022,
+# **C: model fidelity** — comparison to published experimental data (Klaus et al. 2022,
 # Matsui Eu Bogoliubov cascade, Prasad 2019 vortex, Yan-Li-Saito Barnett)."
 #
 # Nothing enumerated the type-C claims, so the question could only be answered
@@ -68,22 +68,32 @@ const TYPE_C_CLAIMS = TypeCClaim[
         "Knoop et al., PRA 2011", "Na23 singlet/quintet scattering lengths",
         "a₀ = 47.36 a₀, a₂ = 52.98 a₀", "foundation/test_atoms.jl",
         "input constants, not model output"),
+    TypeCClaim(
+        "Klaus et al. 2022", "magnetostirring: Ω_c, vortex-stripe axis and count",
+        "Ω_c ≈ 0.74 ω_⊥; vortices in 3 stripes along B̂; ring at θ = 0",
+        "validation/test_klaus2022_vortex_stripes.jl",
+        "OUR numbers, on the scalar eGPE path this closed (`kind: scalar_egpe`): " *
+        "Ω_c = 0.751 (1.5 %), stripe axis within 5.9° of B̂ at 4.0× the " *
+        "vortex-free baseline, 3.43 stripes, and the θ→0 control at 1.04× its " *
+        "isotropic null. **One published number is NOT reproduced**: the " *
+        "magnetostricted AR is 1.16 against their 1.03, and five independent " *
+        "instruments say that is not our plumbing. Both pre-registered " *
+        "composite verdicts are REJECT and the gate pins them as failed — a " *
+        "gated claim means a test computes and compares our side, not that it " *
+        "agrees. Full account: docs/validation/klaus2022_primary_source.md"),
 
     # ── Ungated: named as a target, nothing computes our side ────────────
     TypeCClaim(
         "Matsui et al. 2025, Fig. 4B", "EdH dip centre and width",
         "their sim −2.5495 / 13.07 nT; their exp −2.5 / 12.84 nT", nothing,
-        "test_matsui_fig4_dip.jl pins THEIR curve only. Ours (−2.138 / 14.62) " *
-        "lives in a memory note and a PR body, not in a gate. The exp abscissa " *
+        "test_matsui_fig4_dip.jl pins THEIR curve only. Ours is −2.5099 / 12.740 " *
+        "at N = 3.5e4 (per-field rms 1.1 %, width 0.10 % — #299/#323, recorded in " *
+        "docs/validation/matsui_residual_root_cause.md and matsui_campaign_report.md), " *
+        "and lives in those documents, not in a gate. This row carried " *
+        "−2.138 / 14.62 until 2026-08-19; that number predates #299/#323 and was " *
+        "superseded when the atom number was corrected, so the registry was " *
+        "ratcheting a value the campaign had already retired. The exp abscissa " *
         "carries a ±10 nT offset, so only the WIDTH arbitrates."),
-    TypeCClaim(
-        "Klaus et al. 2022", "magnetostirring vortex nucleation", "—", nothing,
-        "workflow/test_klaus_validation.jl now RUNS (2026-08-01 — it was not a " *
-        "schema problem, its `initial_state` was inverted against the field sign) " *
-        "and is in CI_EXTRA. It stays ungated here because its own header says " *
-        "what it is: a plumbing smoke for the magnetostir path, NOT a physics " *
-        "validation of the published vortex-stripe count, which needs the full " *
-        "64x64x32 + 1 s stir"),
     TypeCClaim(
         "Matsui et al. (Eu Bogoliubov cascade)", "spin-excitation cascade", "—", nothing,
         "no test"),
@@ -122,11 +132,14 @@ const TYPE_C_CLAIMS = TypeCClaim[
         # land here; closing a gap must delete its entry.
         @test Set(c.source for c in ungated) == Set([
             "Matsui et al. 2025, Fig. 4B",
-            "Klaus et al. 2022",
             "Matsui et al. (Eu Bogoliubov cascade)",
             "Prasad et al. 2019",
             "Yan, Li & Saito (Barnett)",
         ])
+        # Klaus et al. 2022 was closed 2026-08-18 (#345) and moved to the gated
+        # set. The ratchet is what forced this edit: leaving the entry here
+        # after wiring its gate turns the suite red.
+        @test !any(c -> occursin("Klaus", c.source), ungated)
     end
 
     @testset "every target CLAUDE.md names appears in the registry" begin
@@ -136,7 +149,10 @@ const TYPE_C_CLAIMS = TypeCClaim[
         line = only(filter(l -> occursin("C: model fidelity", l), split(claude, '\n')))
         # (what CLAUDE.md writes, what the registry calls it)
         for (doc_name, registry_key) in (
-            ("Klaus 2022", "Klaus"),
+            # "Klaus et al. 2022", not "Klaus 2022" and never bare "Klaus":
+            # the word alone also named the fast-Larmor regime and this
+            # project's own protocol. docs/conventions/klaus_name_disambiguation.md.
+            ("Klaus et al. 2022", "Klaus"),
             ("Matsui", "Matsui"),
             ("Prasad 2019", "Prasad"),
             ("Yan-Li-Saito", "Saito"),
@@ -149,8 +165,13 @@ const TYPE_C_CLAIMS = TypeCClaim[
     @testset "the registry is not silently empty" begin
         # Positive control: a table nobody maintains degrades to zero rows, and
         # every assertion above would still pass.
-        @test length(gated) >= 7
-        @test length(ungated) >= 5
+        @test length(gated) >= 8
+        # 5 → 4 on 2026-08-18: Klaus et al. 2022 was closed (#345). This floor
+        # exists to catch the table DEGRADING to zero rows, not to freeze the
+        # gap count — so closing a gap legitimately lowers it, and the gated
+        # floor above rises by the same one. Both move together or something is
+        # being deleted rather than closed.
+        @test length(ungated) >= 4
         @test all(!isempty(c.quantity) for c in TYPE_C_CLAIMS)
     end
 end

@@ -85,14 +85,11 @@ end
 function apply_step!(term::DensityC0Term, psi, dt::Real, imaginary_time::Bool, ws)
     n = total_density(psi, ndims(psi) - 1)
     D = size(psi, ndims(psi))
-    if imaginary_time
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= exp.(.-(term.c0 .* n) .* dt)
-        end
-    else
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= cis.(.-(term.c0 .* n) .* dt)
-        end
+    itv = Val(imaginary_time)
+    for c in 1:D
+        view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= wick_phase.(
+            .-(term.c0 .* n) .* dt, itv
+        )
     end
     return nothing
 end

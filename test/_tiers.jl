@@ -10,6 +10,12 @@ const FAST_TESTS = [
     # at. Three src comments said it was inert there, from an R three orders
     # too small; nothing checked them.
     "hamiltonian/test_taylor_tolerance_binds.jl",
+    # The mutation catalog's self-check, moved OUT of the nightly harness it was
+    # buried in. `check_anchors` is a regex over ~40 files (0.5 s) but ran only
+    # inside the hour-scale mutation job — which was producing nothing (#275) —
+    # so three mutants had rotted with nothing to say so. An instrument's
+    # self-check must not be gated behind running the instrument.
+    "mutation/test_catalog_anchors_resolve.jl",
     "test_quality.jl",
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
@@ -19,6 +25,19 @@ const FAST_TESTS = [
     "test_scripts_allowlist.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    # CAMPAIGN.md §4 guard 1 executed rather than described: every fix_list ref
+    # is a live ancestor, the two documents' counts cannot drift, red is proved
+    # reachable, and every commit cited in campaign/manuscript prose is either a
+    # listed correction or an explicitly-reasoned non-correction (#343).
+    "test_campaign_fix_list_gate.jl",
+    # A retracted number may not appear without its replacement IN THE SAME FILE.
+    # `0.468` survived weeks in an experimentalist sheet that carried its own
+    # retraction at the top — documents are read by section, not from the top.
+    "test_retracted_numbers_carry_their_replacement.jl",
+    # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
+    # bce2068f repaired two configs correctly one at a time and broke the mirror
+    # relationship between them; nothing recorded that they were a pair (#343).
+    "workflow/test_mirror_pairs_flip_every_axial_quantity.jl",
     "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
@@ -35,6 +54,12 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    # A spin-F magnetic vortex has component windings v_m = -m, i.e. up to
+    # ±6 for Eu. The plaquette detector caps at ±1 and non_abelian_holonomy
+    # returns cis(phase), ~1 for every integer; this pins the detector that
+    # reads them, and that it REFUSES when under-sampled rather than
+    # returning a clean wrong integer (#336).
+    "analysis/test_component_phase_winding.jl",
     # The #335 loop-width extractor refuses to report until its controls pass;
     # that refusal is the guarantee, so it is gated rather than left to --selftest.
     "analysis/test_hysteresis_conversion_depth.jl",
@@ -147,6 +172,25 @@ const FAST_TESTS = [
     "model/test_yaml_to_model.jl",
     "model/test_resolve_gs_is_shared.jl",
     "model/test_ddi_trunc_radius_three_states.jl",
+    # The Model migration's ratchet: the count of call sites still transcribing
+    # a config's physics into `make_workspace` kwargs by hand may shrink and may
+    # not grow. `src/model.jl` said "still to come" with no number and no
+    # consequence for months; this is the number (CLAUDE.md commitment 11).
+    "model/test_model_adoption_ratchet.jl",
+    "model/test_claim_audit.jl",
+    # `make_workspace(::Model)` must build the SAME workspace as the resolver
+    # path. Without this the realisation layer would be a THIRD statement of the
+    # physics rather than the inverse of the second one — and it caught two sign
+    # flips (`c1`, `p`) on its first run.
+    "model/test_realise_matches_resolver.jl",
+    # …and the BREADTH half. The file above builds a real Workspace, which costs
+    # FFT plans and an LHY table per config, so it runs over three; three of 414
+    # was the realisation layer's honest coverage. This one drops the Workspace
+    # and compares the two kwarg BUNDLES over every config that resolves to a
+    # Model — 414 of them, agreeing, with a per-class negative control so the
+    # clean result is not the four inert-field false positives the first
+    # measurement produced.
+    "model/test_realise_agrees_over_corpus.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
@@ -232,6 +276,11 @@ const FAST_TESTS = [
     # itself against, and — the load-bearing half — which of the targets
     # CLAUDE.md names have no gate at all. Pure table + file/tier lookups.
     "validation/test_type_c_claims.jl",
+    # One word ("Klaus") named the paper, the fast-Larmor regime and this
+    # project's own protocol at once, and a "correction" denying the paper's
+    # existence sat above a citation to it (#344). Pure text scan over the
+    # maintained tree, every arm through `calibrated_scan`.
+    "validation/test_klaus_name_disambiguation.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
@@ -412,7 +461,39 @@ const CI_EXTRA = [
     # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
+    # ¹⁵¹Eu ↔ ¹⁵³Eu: the isotope is exactly three numbers (c_total, c_dd, q), the
+    # q ratio is exact from measured hyperfine constants, and the |m| ≥ 2 magnons
+    # of the polar state carry no interaction shift. #341 stage 1's deliverable
+    # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
+    "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # The `:evolve` Stage producer: the DYNAMICS_SCHEMA partition is total, a
+    # model-level key is refused rather than dropped, and the real-time ambient
+    # switches finally move an artifact id.
+    "model/test_evolve_stage.jl",
+    # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
+    # refusal that follows from it — a paper with no re-measurable record has
+    # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
+    "validation/test_klaus2022_ref.jl",
+    # Klaus 2022 magnetostirring: the coefficient chain, the directional
+    # magnetostriction oracle (coarse-grid ITP), and the pre-registered
+    # thresholds re-applied to the stored production verdicts.
+    "validation/test_klaus2022_vortex_stripes.jl",
+    # Why that reproduction runs on the scalar eGPE and not the spinor solver,
+    # as a computation over the scale hierarchy rather than a paragraph.
+    "validation/test_klaus_model_selection.jl",
+    # Calibration of the Klaus residual-image hole/stripe detector: every
+    # assertion paired with the pattern that must NOT be found.
+    "analysis/test_vortex_stripes.jl",
+    # The truncated-Wigner seed and its basis. Pins the seeded atom fraction:
+    # drawn on plane waves instead of trap eigenstates it came out at 102 % of N.
+    "solvers/test_scalar_thermal_seed.jl",
+    # Magnitude oracle for the dipolar kernel. The existing kernel test pins
+    # symmetry and direction only — a kernel scaled by any constant passes it.
+    "oracles/test_dipolar_magnetostriction_magnitude.jl",
+    # The `kind: scalar_egpe` YAML wiring: parse, step types, refusals, one
+    # end-to-end run. The solver existed for two months with no way to reach it.
+    "workflow/test_scalar_egpe_yaml.jl",
     # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
     # so the type-C target cannot drift when the fixture or the metric changes.
     # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
@@ -470,7 +551,7 @@ const CI_EXTRA = [
     # being true and nobody had checked.
     "workflow/test_active_learning_yaml.jl",
     "workflow/test_multi_fidelity_yaml.jl",
-    # Klaus 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
+    # Klaus et al. 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",
@@ -528,6 +609,20 @@ const CI_EXTRA = [
     "oracles/test_apply_operator_accumulates.jl",
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
+    # The DDI half of the homogeneous BdG, which nothing gated: the normal block
+    # was the Hartree term (zero for a uniform cloud, since Q(q=0) = 0) instead
+    # of the exchange term, so it was 2x on a polarized state and identically
+    # zero on a polar one (#361).
+    "oracles/test_dipolar_bogoliubov_anchor.jl",
+    # The other half of `test_magnetization_conservation_rtp.jl`: imaginary time
+    # is not unitary, so it leaves the magnetization sector — which is why an
+    # adiabatic ramp need not reach the ITP ground state (#22, #335, #334).
+    "oracles/test_itp_does_not_conserve_magnetization.jl",
+    # What the six unmeasured Eu scattering channels CANNOT move: the stretched
+    # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
+    # fixed c_total leaves them exact. Each invariance carries a control that
+    # moves (#342, `docs/campaign/as_dependency_map.md`).
+    "oracles/test_stretched_channel_invariance.jl",
     "oracles/test_lhy_analytic.jl",
     "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
@@ -547,6 +642,44 @@ const CI_EXTRA = [
     # gradient to `fp_ladder_coeff` / `singlet_pair_sign`, so the formula can no
     # longer drift independently across c₁ / Raman / spatial-Zeeman / DDI sites.
     "oracles/test_spin_ladder_single_source.jl",
+    # Same shape, for the imaginary-time ↔ real-time branch. 14 of the tree's 32
+    # `if imaginary_time` blocks carried a full copy of their exponent in each
+    # arm — including the diagonal Hamiltonian, four times. `wick_phase` is the
+    # one statement; this is the gate that makes the next hand-written branch
+    # red on the day it lands (CLAUDE.md commitment 11).
+    "oracles/test_wick_phase_single_statement.jl",
+    # And for the numerical-zero thresholds. `COUPLING_TOL` lost 7:121 to the
+    # bare `1e-30` precisely because it shipped without this file.
+    "oracles/test_threshold_single_statement.jl",
+    # The split-step outer chain is one value (`OUTER_CHAIN`), both directions
+    # derive from it, and the substep → registry-term map is TOTAL: a new
+    # HamTerm that no propagator applies is red here. Also pins that
+    # fwd(+dt)·bwd(−dt) = id, which is what makes the derived reversal a
+    # checked property rather than a claim.
+    "oracles/test_outer_chain_registry_mapping.jl",
+    # A `dynamics:` step must build the kernel its own `ddi:` block declares.
+    # `secular` / `quasi_2d` / `l_z` are baked into the Q tensors so they cannot
+    # ride the inherited DDIParams, and the handler re-resolved neither — a
+    # dynamics step asking for the secular kernel silently got the full one,
+    # which is the PATH-GAP class this campaign found to be the commonest.
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
+    # The BROAD version of the same question: one probe per DYNAMICS_SCHEMA key,
+    # checking only that the knob is not inert. The file above is the DEEP one
+    # for the DDI three. `ddi.secular` was found by reading; this is what finds
+    # the next sibling by running.
+    "oracles/test_dynamics_forwards_every_schema_knob.jl",
+    # The same class one layer down: a physics kwarg a SOLVER accepts must reach
+    # the workspace it builds. Behavioural (build twice, require a difference),
+    # because the source-scan version of this question was a regex
+    # re-implementation of Julia's signature grammar and read two of the four
+    # entry points as accepting nothing.
+    "oracles/test_solver_forwards_every_knob.jl",
+    # A ground_state step that declares physics this path drops must REFUSE
+    # rather than run. `dropped_physics` existed since cutover 1b and only
+    # `gs_model` read it, so such a config got no Model loudly and ran silently —
+    # the run being the half that produces numbers. Two committed configs are
+    # affected and both were running a +z field where they declare −z.
+    "oracles/test_gs_refuses_dropped_physics.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
@@ -604,11 +737,25 @@ const CI_EXTRA = [
     # Magnitude sibling of the above: the closed forms had a consistency oracle
     # and no SI anchor, and were exactly N_atoms too large in that gap.
     "oracles/test_lhy_magnitude_si_anchor.jl",
+    # The same anchor at production couplings. The one above holds only at
+    # uniform g_S (c₁ = 0) and no DDI, and neither is true of any Eu run —
+    # c1_ratio is +1/36 or −0.005 and ε_dd = 0.54. This pins the identity that
+    # licenses #337's scheme choice (fm_dipolar IS the fully-polarised dipolar
+    # LHY of the literature) plus the c_dd → ε_dd conversion nothing asserted.
+    "oracles/test_lhy_fm_dipolar_is_the_scalar_scheme.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
     # classifier candidates, spin_texture_xy Fx/Fy orientation).
     "oracles/test_redundancy_gates.jl",
+    # Second catcher for three schema guards the 2026-08-19 mutation sweep found
+    # had exactly ONE in the whole per-PR surface — and in each case a `:pin` or
+    # `:api` one, i.e. evidence that the parser throws, not that it throws in the
+    # right place. Grounds each boundary in the machinery it protects: the
+    # c1_ratio bound against the root of `interaction_params_from_constraint`'s
+    # denominator, the B-form exclusion against the two readings actually
+    # disagreeing, and GS interaction precedence against the resolved coupling.
+    "oracles/test_schema_guards_are_grounded.jl",
     # BdG / Bogoliubov analytic-dispersion anchor: the linearize/Hessian
     # functor every stability (saddle-rejection) verdict rides on, pinned
     # to the known Ueda F=1 polar/FM closed forms + universal polar
@@ -628,6 +775,17 @@ const CI_EXTRA = [
     # ≡ bare Lanczos (trapped_bdg_lowest_eigenvalue) on λ_min, + Kato–Temple
     # two-sided certificate bracket.
     "oracles/test_bdg_low_modes_lobpcg.jl",
+    # Trapped spinor excitation FREQUENCIES (trapped_bdg_frequencies): the
+    # uniform-limit ω anchor against the homogeneous BdG + the analytic F=1
+    # polar density/magnon closed forms, the `λ is NOT ω` category pin
+    # (ω = √(λ₋λ₊)/2, and λ₋ ∝ k² where ω ∝ k), the Goldstone-vs-gauge
+    # classification, and the spurious-null-space regression (the projector's
+    # own null space leaking into the LOBPCG basis as a converged fake zero).
+    "oracles/test_trapped_bdg_frequencies.jl",
+    # S(k,ω) by real-time impulse response (bragg_response): peak ≡ the
+    # Bogoliubov branch per channel, + the three controls a spectrum needs
+    # (channel selectivity, linearity in the kick, zero-kick ⇒ no line).
+    "oracles/test_bragg_response_spectrum.jl",
     # StabilitySpec three-valued gate: replays the non-stationary /
     # non-converged false-verdict class (mistake_stability_verdict_from_
     # nonstationary_point) — gate returns :indeterminate, not a confident
@@ -891,6 +1049,14 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Three coarse-grid scalar-eGPE ITP solves for the magnetostriction
+    # direction oracle; the rest is table lookups against a stored JSON.
+    "validation/test_klaus2022_vortex_stripes.jl" => 25.0,
+    # Three coarse ITP solves against the dipolar Thomas-Fermi closed form.
+    # 369 s measured on the CI runner (was 100).
+    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
+    # One 24³ ground state + 100 dynamics steps through the YAML entry point.
+    "workflow/test_scalar_egpe_yaml.jl" => 40.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
     # against the 3.0 s default it had been taking. The default made it the
     # LAST file handed out, which is the worst possible order for the one
@@ -905,10 +1071,23 @@ const _COST = Dict{String, Float64}(
     "dynamics/test_thermal_cfield.jl" => 2.4,
     "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
-    # Measured locally 2026-08-19 (10-core box): 128 s of solver time for the
-    # ITP-vs-L-BFGS pair plus one L-BFGS control. Registered so it goes out
-    # early rather than last.
-    "oracles/test_itp_dt_limited_advisory.jl" => 150.0,
+    # 654.9 s on the CI runner at its old 24³ fixture — the LONGEST file in the
+    # per-PR suite, and on its own the `oracles` job's makespan (654.9 s against
+    # a 586 s perfect-split floor). One file set the floor for every PR.
+    #
+    # The 150 that stood here came from "measured locally 2026-08-19 (10-core
+    # box): 128 s" — a real measurement, on the wrong machine. This table is
+    # calibrated for the 4-vCPU runner (see the header below) and the rule was
+    # already written into it, sixty lines down on
+    # `workflow/test_multi_fidelity_yaml.jl`, because the same mistake killed a
+    # nightly run.
+    #
+    # The fixture is now 20³ (see that file's header for the margin table and
+    # why 16³ does not work): 126.9 s locally, so ~420 s here on the same 3.2x
+    # ratio the 24³ pair measured. Deliberately left at the MEASURED-equivalent
+    # rather than trimmed further — below this the `fast` job binds and further
+    # cuts buy nothing.
+    "oracles/test_itp_dt_limited_advisory.jl" => 420.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.
@@ -978,6 +1157,19 @@ const _COST = Dict{String, Float64}(
     # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
     # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
     "model/test_corpus_resolves.jl" => 22.0,
+    # Same walk as above plus `gs_model` and both kwarg bundles per config, and a
+    # four-class negative control. No workspace and no solve. Measured 23.4 s in
+    # CI (23 s locally) — the default 3.0 s estimate reddened the cost-model gate,
+    # which is that gate doing its job on a new file.
+    "model/test_realise_agrees_over_corpus.jl" => 24.0,
+    # Builds a ground state per perturbation, over BOTH fixtures (3-D and the new
+    # 2-D one) and both solvers: ~20 solves at 8³/8². Measured 59 s. It landed in
+    # #386 with no entry at all, which is the same omission #389 hit one PR later
+    # — unnoticed there only because `test_state_doc_is_current.jl` failed first.
+    "oracles/test_solver_forwards_every_knob.jl" => 60.0,
+    # Two 8³ pipeline steps (the refusal and the override arms) plus four
+    # resolutions for the premise assertion. Measured 34 s.
+    "oracles/test_gs_refuses_dropped_physics.jl" => 34.0,
     # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
     "model/test_no_ambient_module_refs.jl" => 1.0,
     # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
@@ -1021,6 +1213,8 @@ const _COST = Dict{String, Float64}(
     "manuscript/test_f9_f11_polyhedral.jl" => 10.7,
     "analysis/test_paper3_validation.jl" => 10.6,
     "oracles/test_trapped_bdg_spectrum.jl" => 10.6,
+    "oracles/test_trapped_bdg_frequencies.jl" => 78.0,  # 6 LOBPCG fixtures + dense
+    "oracles/test_bragg_response_spectrum.jl" => 133.0,  # 7 real-time runs
     "oracles/test_apply_operator_accumulates.jl" => 10.3,
     "oracles/test_stability_sneaky_prover.jl" => 10.3,
     "oracles/test_path_coverage.jl" => 10.0,
@@ -1079,28 +1273,69 @@ const _COST = Dict{String, Float64}(
     "workflow/test_triple_point.jl" => 127.0,
     "test_dealias_2_3.jl" => 76.0,
     "solvers/test_continuation.jl" => 58.0,
-    "workflow/test_pipeline.jl" => 17.0,
+    "workflow/test_pipeline.jl" => 199.0,
     "workflow/test_infrastructure.jl" => 15.0,
     # Was 13.0 when it only built tables; #179 added a run_yaml A/B
     # (`method: lbfgs` reaches the tabulated LHY), which dominates. Now the
     # heaviest single file in the fast tier — measured 255.9 s.
     "workflow/test_lhy_block_wiring.jl" => 255.9,
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
-    "test_level4_general_F_phase_emergence.jl" => 13.0,
-    "analysis/test_tof_multiframe.jl" => 9.5,
+    "test_level4_general_F_phase_emergence.jl" => 101.0,
+    "analysis/test_tof_multiframe.jl" => 44.0,
     "gpu/test_mixed_precision.jl" => 9.0,
-    "analysis/test_physics_invariants.jl" => 8.0,
-    "solvers/test_simulation.jl" => 8.0,
+    "analysis/test_physics_invariants.jl" => 55.0,
+    "solvers/test_simulation.jl" => 58.0,
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "solvers/test_lbfgs_history_precision.jl" => 8.0,
     "solvers/test_lbfgs_line_search_fused_gradient.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
-    "solvers/test_3d.jl" => 5.0,
+    "solvers/test_3d.jl" => 60.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
-    "solvers/test_lbfgs_line_search_and_de.jl" => 15.0,
+    "solvers/test_lbfgs_line_search_and_de.jl" => 66.0,
+
+    # ── The ten below had NO entry, so they were modelled at _DEFAULT_COST =
+    # 3.0 s while measuring 22–377 s. Handed out last by a heaviest-first
+    # queue, a 377 s file starts when the other workers are nearly done, and
+    # the makespan becomes that pickup time plus the file.
+    #
+    # Measured 2026-08-19 on the 4-vCPU GitHub runner these estimates are
+    # calibrated for (run 32217501709). CI had been emitting the annotation for
+    # every one of them on EVERY run — 17 distinct entries across the two jobs,
+    # up to 126x — so this is acting on a warning the suite already produced,
+    # not a new discovery.
+    #
+    # Effect, from the per-worker totals in that run: `integration` finished at
+    # 740 s against a 548 s floor (its four workers ran 369/450/740/631), i.e.
+    # 35 % of that job was the ordering. `fast`, whose heavy files DO have
+    # entries, came in at 574/571/571/572 — at its floor. Same runner, same
+    # scheduler, and the difference is this table.
+    "dynamics/test_spgpe.jl" => 377.0,
+    "validation/test_dipolar_supersolid_tube.jl" => 372.0,
+    "workflow/test_spinor_gs_from_jld2.jl" => 149.0,
+    "solvers/test_evaporation_tools.jl" => 144.0,
+    "model/test_gs_step_returns_one_state.jl" => 94.0,
+    "workflow/test_yaml_physics_reaches_workspace.jl" => 74.0,
+    "hamiltonian/test_rk4ip_convergence_order.jl" => 30.0,
+    "test_level4_f1_phase_emergence.jl" => 28.0,
+    "hamiltonian/test_taylor_tolerance_criterion.jl" => 23.0,
+    "workflow/test_pipeline_name_and_precedence.jl" => 22.0,
+
+    # ── Second harvest. The first pass read the annotations out of the `fast`
+    # and `integration` job logs only, which is two thirds of the per-PR suite,
+    # and `oracles` is the third — the one that BINDS once the other two are
+    # packed (measured makespan 654.9 s against fast 544.6 s and integration
+    # 384.9 s). Its remaining nine annotations, all from run 32237847445:
+    "oracles/test_jz_conservation_ddi.jl" => 204.0,
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl" => 78.0,
+    # One two-step pipeline run per probe, 16 probes plus the control, at 8³.
+    # Measured 102 s.
+    "oracles/test_dynamics_forwards_every_schema_knob.jl" => 102.0,
+    "oracles/test_solver_forwards_every_knob.jl" => 67.0,
+    "oracles/test_term_consistency.jl" => 22.0,
+    "oracles/test_flux_closure_ddi_identity.jl" => 20.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)
@@ -1116,7 +1351,8 @@ hurt makespan; an over-estimate merely over-reserves a slot. Returns the stale
 entries (for tests).
 """
 function warn_cost_drift(
-    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0
+    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0,
+    quiet::Bool=false,
 )
     stale = NamedTuple{(:file, :measured, :estimate), Tuple{String, Float64, Float64}}[]
     for (f, t) in timings
@@ -1125,7 +1361,13 @@ function warn_cost_drift(
             push!(stale, (file=f, measured=t, estimate=est))
         end
     end
-    isempty(stale) && return stale
+    # `quiet` is for the meta-test, which calls this with synthetic fixtures to
+    # check the arithmetic. Without it those fixtures print real-looking
+    # annotations into the CI log on every run — a stale-cost line naming a file
+    # that does not exist and therefore can never be actioned, sitting in the
+    # same stream as the ones that can. Nine genuine annotations went unread for
+    # weeks; adding permanent noise to that stream is the wrong direction.
+    (isempty(stale) || quiet) && return stale
     ci = lowercase(get(ENV, "GITHUB_ACTIONS", "")) == "true"
     for s in stale
         msg = string(

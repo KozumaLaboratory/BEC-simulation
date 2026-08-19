@@ -13,8 +13,8 @@
 # This file gates three separate claims, because they can fail independently:
 #
 #  1. The FIXED POINT moves with dt while `dpsi` reports convergence. On this
-#     fixture: ITP lands +65 % above the L-BFGS energy at dt = 2e-3 and +26 % at
-#     dt = 5e-4, while `dpsi` improves 426x (3.1e-3 -> 7.4e-6) across those two
+#     fixture: ITP lands +64 % above the L-BFGS energy at dt = 2e-3 and +19 % at
+#     dt = 5e-4, while `dpsi` improves 4.9e6x (5.8e-3 -> 1.2e-9) across those two
 #     runs. So `dpsi` measures how still the map has become, not how right it is.
 #     That the error shrinks with dt is what makes it a splitting artifact rather
 #     than a propagator/energy mismatch, which no dt could refine away.
@@ -27,6 +27,28 @@
 # R = 0.0038…0.0118 and trapped gases at R = 0.678…1.000, a 57× gap
 # (`runs/yls_barnett_f6/g_calibrate_stiffness_ratio.jl`). Claims 2 and 3 pin that
 # the two populations stay on their own sides of it.
+#
+# GRID SIZE — measured 2026-08-19, and n = 20 is the smallest that works.
+# At 24³ this file took 654.9 s on the CI runner, which was the LONGEST file in
+# the whole per-PR suite and, on its own, the `oracles` job's makespan (654.9 s
+# against a 586 s perfect-split floor): one file set the floor for every PR, and
+# no rebalancing could move it. Re-run at 16/20/24 with every margin recorded:
+#
+#      n     cost      R_soft/R_stiff   err(2e-3, 5e-4)    dpsi ratio   |ITP-LBFGS|
+#     16     52 s          90.2         0.419, 0.0763       1.4e5         1.54e-5
+#     20    134 s          95.0         0.638, 0.1938       4.9e6         1.52e-5
+#     24    206 s          97.9         0.672, 0.2629       4.3e2         1.52e-5
+#
+# n = 16 FAILS claim 1(d) — err[2] = 0.076 against the 0.1 the assertion needs —
+# so the choice is 20, not "as small as possible". Note what that table also
+# says: on THIS fixture err[2] is grid-dependent (0.076 / 0.194 / 0.263, a 3.4×
+# spread), unlike the production droplet in the note above, which was
+# grid-independent to 0.4 %. So the 2× margin at n = 20 is the real headroom and
+# shrinking further is not available.
+#
+# Going below 20 would also buy nothing. At 20 the `oracles` job lands ~529 s and
+# `fast` (544.6 s, already at its own floor) becomes the binding job, so further
+# cuts here do not move the per-PR wall-clock at all.
 
 using SpinorBEC
 using Test
@@ -46,7 +68,7 @@ Stiff, free-space configuration: contact and DDI nearly cancel, LHY stabilises.
 The couplings are scaled to a torus seed on a small grid so the cancellation
 ratio lands in the droplet population without needing a physical droplet.
 """
-function _stiff_case(; n=24, box=10.0)
+function _stiff_case(; n=20, box=10.0)
     grid = make_grid(GridConfig{3}((n, n, n), (box, box, box)))
     psi0 = _torus_seed(grid, 1)
     (; grid, atom=_DT_ATOM,
@@ -57,7 +79,7 @@ function _stiff_case(; n=24, box=10.0)
 end
 
 "Trapped, non-cancelling configuration with the same terms active."
-function _soft_case(; n=24, box=12.0)
+function _soft_case(; n=20, box=12.0)
     grid = make_grid(GridConfig{3}((n, n, n), (box, box, box)))
     psi0 = init_psi(grid, SpinSystem(1); state=:spin_coherent, init_theta=π / 2,
         init_phi=π / 2, init_vortex_charge=1)
@@ -109,13 +131,13 @@ end
         @test R_stiff < ITP_CANCELLATION_WARN
         @test R_soft > ITP_CANCELLATION_WARN
         @test R_soft / R_stiff > 10         # the separation is what licenses a threshold
-        #                                     (measured 98x: 0.0087 vs 0.853)
+        #                                     (measured 95x: 0.0090 vs 0.853)
     end
 
     @testset "1. the fixed point moves with dt, and `dpsi` does not notice" begin
         lb = find_ground_state(; stiff..., method=:lbfgs, n_steps=800, tol=1e-10,
             verbose=false)
-        @test lb.grad_norm < 1e-4                      # measured 1.3e-5
+        @test lb.grad_norm < 1e-4                      # measured 2.5e-6
         E_star = lb.energy
 
         # Same seed, same everything, only dt differs.
@@ -124,8 +146,8 @@ end
                 tol=1e-10, save_every=500, verbose=false)
         end
         err = [(r.energy - E_star) / abs(E_star) for r in res]
-        # measured on this fixture: err = +0.672 (dt=2e-3), +0.263 (dt=5e-4);
-        #                           dpsi = 3.1e-3, 7.4e-6
+        # measured on this fixture: err = +0.638 (dt=2e-3), +0.194 (dt=5e-4);
+        #                           dpsi = 5.8e-3, 1.2e-9
 
         # (a) neither ITP fixed point reaches the minimiser; both sit ABOVE it.
         @test all(>(0.05), err)

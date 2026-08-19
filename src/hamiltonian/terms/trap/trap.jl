@@ -53,14 +53,9 @@ function apply_step!(::TrapTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # Uses the SAME V_trap as apply_operator (single source).
     V = ws.potential_values
     D = size(psi, ndims(psi))
-    if imaginary_time
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= exp.(.-V .* dt)
-        end
-    else
-        for c in 1:D
-            view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= cis.(.-V .* dt)
-        end
+    itv = Val(imaginary_time)
+    for c in 1:D
+        view(psi, ntuple(_ -> :, Val(ndims(psi) - 1))..., c) .*= wick_phase.(.-V .* dt, itv)
     end
     return nothing
 end

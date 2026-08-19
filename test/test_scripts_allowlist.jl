@@ -100,6 +100,18 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu334/nucleate.jl",
     "eu334/classify.jl",
     "eu334/viz_eu334.py",
+    # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
+    # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
+    # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/branch_spectrum.jl",
+    "eu_spectrum/submit_spectrum.sh",
+    # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
+    "eu_isotope_q/q_boundary.jl",
+    "eu_isotope_q/magnon_gap.jl",
+    # ── active campaign: field-noise shielding spec (docs/guides/eu_shielding_spec.md, #362) ──
+    "eu_noise/noise_hold.jl",
+    "eu_noise/shielding_spec.jl",
+    "eu_noise/submit_noise.sh",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
@@ -122,6 +134,20 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_shape/deploy_tsubame.sh",
     "eu_shape/submit_finite_t.sh",
     "eu_shape/submit_spgpe_evap.sh",
+    # ── Klaus 2022 type-C reproduction (#345), cited by its gate ──
+    # The run driver carries the pre-registered ACCEPT thresholds and applies
+    # them, so it is the criterion rather than a description of one; the
+    # re-analyser re-derives the verdicts from the saved frames without a run
+    # (which is how the θ→0 control's window was corrected without paying
+    # another hour); the figure script emits what
+    # `docs/validation/figures/klaus2022_*.png` are built from.
+    "klaus2022_reproduce.jl",
+    "klaus2022_reanalyse.jl",
+    "klaus2022_figures.py",
+    # The ensemble re-measurement at the paper's own analysis window
+    # (700 ms - 1.1 s, Fig. 4c), one seed per job. A cluster submit wrapper —
+    # category 3, same as the other `submit_*.sh` above.
+    "klaus2022/submit_stripes.sh",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",

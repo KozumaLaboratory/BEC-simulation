@@ -36,3 +36,4 @@ include("validation/show.jl")                   # Base.show pretty printing for 
 include("validation/twin_audit.jl")             # Level-12 production audit (twin control check)
 include("validation/run_observables.jl")        # snapshot trajectories + collapse classifier
 include("validation/scalar_summary.jl")          # run_scalar_summary + write_run_summary (catalog fuel)
+include("validation/campaign_gate.jl")          # CAMPAIGN.md §4 guard 1, executed rather than described

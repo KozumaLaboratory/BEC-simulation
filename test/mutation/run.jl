@@ -68,6 +68,17 @@ function _probe_spec(spec::AbstractString)
         copy(ORACLE_TESTS)
     elseif spec == "fast"
         select_tests("fast")
+    elseif spec in ("ci", "integration")
+        # The per-PR surface. `fast` + `oracles` + `integration` is what the three
+        # PR jobs run between them, so "which of these files earns the 14 minutes
+        # it costs" is a question about `ci` and cannot be asked with any narrower
+        # spec. Delegated to `select_tests` rather than listed: a second copy of a
+        # tier is a second declaration of it.
+        #
+        # Not expressible as a file list on the qsub side either — `-v` splits on
+        # commas AND spaces, and `ci` is 382 files, so the wire format that works
+        # for a handful of paths does not reach here at all.
+        select_tests(spec)
     elseif startswith(spec, "dir:")
         # Every tier-listed file under a subdirectory. The question "which of
         # test/workflow/ earns its runtime?" needs the whole directory in the

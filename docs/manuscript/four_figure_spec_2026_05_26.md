@@ -290,10 +290,10 @@ material; do not include in the 4-figure manuscript layout.
 > of the atom cloud.  Fig 2 makes Fig 3 obsolete as a *primary* arrest
 > mechanism story.
 
-## Figure 4 — Klaus rotation protocol: sustained-rotation experimental window (MAIN, post-pivot 2026-05-26 evening)
+## Figure 4 — rotation-assisted EdH quench: sustained-rotation experimental window (MAIN, post-pivot 2026-05-26 evening)
 
 **Replaces** the prior "bare-⟨F_z⟩ Barnett window" version of Fig 4.
-After the 2026-05-26 evening Klaus quench protocol scan (17 cells,
+After the 2026-05-26 evening rotation-assisted EdH quench scan (17 cells,
 `docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md`), the
 experimental-recommendation figure is the **free-hold vs keep-rotation
 Ω scan**, not the bare-⟨F_z⟩ vs Ω curve.
@@ -305,9 +305,9 @@ experimental-recommendation figure is the **free-hold vs keep-rotation
 | (a)   | P_{-5,-4} vs Ω, two curves: free-hold (flat) + keep_rot (peaked at Ω=−0.5) | `klaus_quench_fig_k1.png` panel (a) |
 | (b)   | P_exc = max_t (1 − N_{-6}/N) vs Ω, same two-curve overlay   | `klaus_quench_fig_k1.png` panel (b) |
 
-**Official caption (= the Klaus-spec Fig K1 caption, verbatim):**
+**Official caption (= the protocol-spec Fig K1 caption, verbatim):**
 
-> **Figure 4.** Klaus 2-phase rotation/quench protocol Ω scan in the
+> **Figure 4.** Two-phase rotation/quench protocol Ω scan in the
 > Eu-151 F=6 near-isotropic trap (N = 10⁴, ω_⊥ = 2π · 110 Hz, t_total
 > ≈ 21 ms).  Rotation preparation alone leaves the post-quench spin
 > excitation unchanged across Ω (blue dashed curve, flat at P_{-5,-4}
@@ -325,7 +325,7 @@ experimental-recommendation figure is the **free-hold vs keep-rotation
 
 > **The experimental knob is sustained rotation during the weak-field
 > hold, not pre-rotation.** Under the current code sign convention and
-> initial m=−F state, the Klaus protocol window is Ω/ω_⊥ ∈ [−0.5, −0.3].
+> initial m=−F state, the protocol window is Ω/ω_⊥ ∈ [−0.5, −0.3].
 
 **Caveats:**
 
@@ -340,7 +340,7 @@ experimental-recommendation figure is the **free-hold vs keep-rotation
 supplementary / appendix figure S1.  It is a legitimate magnetization-
 style measurement under sustained rotation and IS a Barnett effect in
 the conventional sense; it just is not the experimentally load-bearing
-quantity Klaus measures.
+quantity the target Eu experiment measures.
 
 ### Legacy bare-⟨F_z⟩ panels (now supplementary S1)
 
@@ -364,7 +364,7 @@ quantity Klaus measures.
 
 **Caption (draft, post-dispatch):**
 
-> Klaus / Barnett parameter scan in the Eu near-isotropic trap
+> Rotation-assisted-EdH / Barnett parameter scan in the Eu near-isotropic trap
 > (ω/2π = (110, 110, 130) Hz, t = 14.5 ms, m=−F initial).
 > DDI-off controls give Δ⟨F_z⟩/N ≈ 10⁻¹² at every Ω — Barnett origin
 > verified as DDI-driven.  DDI-on response is strongly chirality-
@@ -376,7 +376,7 @@ quantity Klaus measures.
 **Talking-point claim (== Slide 6, with new run additions):**
 
 > Under the current code's Ω sign convention and initial m = −F
-> state, the Klaus / Barnett experimental window is Ω/ω_⊥ ∈ [−0.5,
+> state, the rotation-assisted-EdH / Barnett experimental window is Ω/ω_⊥ ∈ [−0.5,
 > −0.3], at the Eu near-isotropic trap, B = 2.6 nT, N = 5e4.
 > Translation to lab convention requires the sign mapping to be
 > verified per-experiment.
@@ -462,7 +462,7 @@ slide-deck rendering.
    (if SI permits) and add a quantitative-deviation panel; currently
    only qualitative-shape agreement is claimed.
 
-5. **NEW** — Klaus 2-phase protocol Ω scan, 10 cells dispatched
+5. **NEW** — two-phase quench protocol Ω scan, 10 cells dispatched
    2026-05-26 evening, ETA ~80 min. Will produce Fig K1 / K2 / K3 /
    K4 under `docs/manuscript/figures/klaus_quench_fig_k{1..4}.png`.
    These supersede manuscript Fig 4 if the protocol-relevant spin

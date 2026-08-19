@@ -234,7 +234,12 @@ end
         @test isempty(stale)
         # The refusal list is the one part of the partition the SOURCE carries;
         # pinned here so moving a key out of it costs a deliberate edit.
-        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman", "B_direction"])
+        # `a_s`, `ddi_pad` and `B_magnitude_gauss` joined 2026-08-18 with
+        # `kind: scalar_egpe`: declared in GS_SCHEMA, read only by that path,
+        # and therefore SILENTLY IGNORED on a spinor ground_state — `a_s` most
+        # sharply, since the run would fall back to the registry value.
+        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman",
+            "B_direction", "a_s", "ddi_pad", "B_magnitude_gauss"])
 
         # Nothing in `to_model` names raman / geometry / reservoir / loss /
         # magnetic_gradient, so a ground-state model must hold their inactive
@@ -294,16 +299,41 @@ end
         @test occursin("omega_ref", msg)
     end
 
-    @testset "tabulated LHY with no resolved n_max" begin
+    @testset "tabulated LHY with no explicit n_max takes it from the seed" begin
+        # CHANGED 2026-08-19. This arm asserted that such a config is REFUSED,
+        # and `LHYSpec` still refuses a non-positive `n_max` — but the resolver
+        # no longer hands it one. `_resolve_lhy_n_max` pins it to the DECLARED
+        # seed, which is what makes it a function of the config rather than of
+        # whichever ψ `make_workspace` happens to hold.
+        #
+        # Measured before the change (Eu F=6 `fm_dipolar`, 16³): the fresh solve
+        # built the table from the seed at `n_max = 0.4466` and the CACHE-HIT
+        # path from the converged state at `0.7471`, 1.67× wider, for one config.
+        # `V_LHY` agreed to 4e-5 where both covered — a resolution difference,
+        # not a different functional, and still two tables where there should be
+        # one. 23 committed configs were in this state and none had a Model.
         p = ytm_write(
             "lhy.yaml",
             replace(YTM_BASE,
                 "      method: itp" => "      lhy: {kind: full_bdg}\n      method: itp"),
         )
-        msg = ytm_why(p)
-        @test msg !== nothing
-        @test occursin("n_max", msg)
-        # ... and giving it one resolves.
+        m0 = ytm_model(p)
+        @test m0.lhy.kind === :full_bdg
+        # A real, positive number, taken from the seed — not the `NaN` sentinel
+        # and not a default someone picked.
+        @test m0.lhy.n_max > 0
+        @test isfinite(m0.lhy.n_max)
+        # …and it IS the seed's `3·max|ψ|²`, not an arbitrary constant. Asserted
+        # against the value recomputed here from the same `init_psi` the solver
+        # calls (`solvers/ground_state.jl:211`), so the claim is the DERIVATION
+        # rather than "the number is positive".
+        let g = make_grid(GridConfig((8, 8, 8), (6.0, 6.0, 6.0))),
+            seed = SpinorBEC.init_psi(g, SpinorBEC.SpinSystem(Eu151.F); state=:polar)
+
+            @test m0.lhy.n_max ≈ 3.0 * maximum(sum(abs2, seed; dims=4))
+        end
+
+        # An EXPLICIT n_max still wins over the derived one.
         p2 = ytm_write(
             "lhy_ok.yaml",
             replace(YTM_BASE,

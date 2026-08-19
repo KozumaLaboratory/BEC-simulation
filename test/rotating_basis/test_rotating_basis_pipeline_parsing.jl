@@ -86,12 +86,12 @@ using SpinorBEC
     @testset "Integrator default" begin
         # Default = Yoshida6 (order 6) for all RTP durations
         @test SpinorBEC._default_rotating_integrator(0.1) == "yoshida6"
-        @test SpinorBEC._default_rotating_integrator(31.4) == "yoshida6"  # Klaus 100ms
-        @test SpinorBEC._default_rotating_integrator(314.0) == "yoshida6" # Klaus 1s
+        @test SpinorBEC._default_rotating_integrator(31.4) == "yoshida6"  # 100 ms magnetostir
+        @test SpinorBEC._default_rotating_integrator(314.0) == "yoshida6" # 1 s magnetostir
     end
 
     @testset "dt from epsilon" begin
-        # ε=1e-3 over T=100 (Klaus 1 sec analog) with various integrators
+        # ε=1e-3 over T=100 (1 s magnetostir analog) with various integrators
         # dt = 0.1 · (ε/T)^(1/p)
         ε = 1e-3;
         T = 100.0

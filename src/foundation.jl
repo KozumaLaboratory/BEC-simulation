@@ -34,6 +34,7 @@ include("foundation/voxel_index.jl")   # _voxel_index: contiguous vs zero-padded
 include("foundation/fft_planning.jl")   # default_fft_flags: MEASURE is not reproducible
 include("foundation/elapsed.jl")   # elapsed_s: durations come from the MONOTONIC clock
 include("foundation/thresholds.jl")
+include("foundation/wick.jl")           # wick_phase: the ONE imaginary-time ↔ real-time branch
 include("foundation/spin_matrices.jl")
 include("foundation/spinor_utils.jl")
 include("foundation/clebsch_gordan.jl")

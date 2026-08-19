@@ -261,7 +261,7 @@ end
 # hide a user mistake); the RTP loop's selector treats a reason as "keep the
 # sequential path". Two consumers, one list.
 function _combined_step_unusable(ws::Workspace)
-    abs(get_cn(ws.interactions, 2)) < 1e-30 ||
+    abs(get_cn(ws.interactions, 2)) < COUPLING_TOL ||
         return "c2 ≠ 0 (S=0 singlet-pair channel is not of the form n·F̂)"
     ws.tensor_cache === nothing ||
         return "tensor_cache active (rank-4/6 channels are not of the form n·F̂)"
@@ -403,7 +403,7 @@ function split_step_combined!(ws::Workspace{N}) where {N}
     # standard split_step!. We tried T(dt/2) V(dt) T(dt/2) which gives
     # one fewer Combined call (~30% faster) but bigger leading-order
     # error coefficient because [V_diag, Combined] (which contains
-    # q F_z² × (n·F) in Klaus regime) is then NOT cancelled by an inner
+    # q F_z² × (n·F) in the fast-Larmor regime) is then NOT cancelled by an inner
     # Strang — measured ~30× larger per-step diff vs the standard
     # scheme. Stay with V T V to keep error within the same regime as
     # the existing production runs.

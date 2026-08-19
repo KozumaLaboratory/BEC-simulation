@@ -10,6 +10,12 @@
 #   B_rot / B_final       : 0.01 G  /  0.0001 G  (10.0 nT magnitude)
 #   dt scale              : 1.0
 #   N_atoms               : 10000
+#
+# anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
+#   state. Measured 2026-08-19 (#343): rotation contrast +16.5 % anti-aligned
+#   against -0.45 % aligned, and peak P_adj 0.53 against 0.24. This is the
+#   standard Einstein-de Haas preparation (Kawaguchi-Saito-Ueda PRL 96, 080405).
+#   Authority: docs/campaign/edh_quench_polarisation_decision.md
 
 defaults:
   kind: spinor
@@ -29,7 +35,7 @@ pipeline:
       lhy: {kind: none}
       B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
-      initial_state: m_minus_F
+      initial_state: m_plus_F
       init_sigma: 1.5
       dt: 0.005
       n_steps: 3000
