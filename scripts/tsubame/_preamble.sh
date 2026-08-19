@@ -8,8 +8,17 @@
 # run. Both came back green and neither result was about my code. One `cd` line,
 # one guard, one place to change them.
 #
-# Usage, after the UGE directives:
-#     source "$(dirname "$0")/_preamble.sh"
+# Usage, after the UGE directives — by ABSOLUTE path, rooted on an env var:
+#     source "${SPINORBEC_BENCH_ROOT:-/gs/.../bec-gapbench}/scripts/tsubame/_preamble.sh"
+#
+# NOT `source "$(dirname "$0")/_preamble.sh"`, which is what this line advised
+# until 2026-08-19 and which no caller has ever used. UGE COPIES THE JOB SCRIPT
+# INTO A SPOOL DIRECTORY before running it, so `$0` is
+# `/var/spool/age/<node>/job_scripts/<jobid>` and `dirname $0` is nowhere near
+# the repo. Job 8445113 died in 0.34 s proving it — `No such file or directory`,
+# then `unbound variable` from the guard that had not been set. The five
+# `eu_*/submit_*.sh` callers all use the absolute form; the advice here was the
+# only copy of the broken one.
 
 set -u
 export JULIA_DEPOT_PATH="${JULIA_DEPOT_PATH:-$HOME/.julia}"

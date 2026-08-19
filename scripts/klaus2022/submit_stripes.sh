@@ -57,16 +57,6 @@ if [ "$(git status --porcelain -- src test | wc -l)" -ne 0 ]; then
     exit 2
 fi
 
-# Julia's GC heap target comes from the NODE's 755 GB, not from this job's
-# 36.8 GB grant, and job 8445105 died at exactly the grant with a 1.1 GB working
-# set. Sourced rather than inlined: the derivation belongs in one place because
-# every TSUBAME julia job in this repo has the same exposure, and this script is
-# only the one that found it. It prints where its number came from — see the
-# file's header for why a heap hint from a guess and one from the cgroup are
-# otherwise indistinguishable.
-source "$(dirname "$0")/../tsubame/_julia_heap_hint.sh"
-echo "heap_hint=$HEAP_HINT_SRC"
-
 export KLAUS_SEED="${KLAUS_SEED:-1}"
 export KLAUS_HOLD_S="${KLAUS_HOLD_S:-1.1}"
 export KLAUS_TAG="${KLAUS_TAG:-_s${KLAUS_SEED}}"
@@ -94,17 +84,36 @@ echo "results=$KLAUS_RESULTS"
 # unless `KLAUS_FFTW_THREADS` overrides. The dynamics is FFT-bound, so this is
 # the knob that matters.
 #
-# Both are overridable ONLY because job 8444494 segfaulted inside FFTW's
-# threaded spawn loop here (see the header of scripts/klaus2022_reproduce.jl).
-# The defaults are unchanged, so a plain submit runs what it always ran; the
-# knobs let three arms — `-t 16` as-is, `-t 16` with FFTW single-threaded, and
-# `-t 1` — go into the queue TOGETHER and come back as one wait instead of
-# three. Which of them is green is the measurement; none of them is a fix.
-export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-}"
+# FFTW THREADS DEFAULT TO 1 HERE, AND THAT IS THE FIX — measured, three arms,
+# one variable (2026-08-19, all `--smoke`, same commit, same node class):
+#
+#   arm  julia -t   FFTW threads   ru_maxrss   outcome
+#   A       16          16          36.9 GB    SIGKILL at 55 s   (job 8445105)
+#   B       16           1           1.08 GB   exit 0, 343 s     (job 8445106)
+#   C        1           1           1.27 GB   exit 0, 341 s     (job 8445107)
+#
+# A and B differ in NOTHING but the FFTW thread count and their peak RSS differs
+# by 34x. B against C also says the threading buys no wall time on this problem
+# (343 s vs 341 s), so 1 is not a sacrifice here — but that is measured on the
+# SMOKE grid, and the production grid is bigger. Raise it with
+# KLAUS_FFTW_THREADS and measure rather than inheriting this number.
+#
+# NOT EXPLAINED, and left unexplained rather than guessed: the same `-t 16` with
+# FFTW at 16 peaks at 1.12 GB locally (/usr/bin/time -v, 10-core box) and
+# completes in 159 s. So it is not the thread count alone. The obvious candidate
+# is FFTW sizing work by the CPUs it can SEE — the node has 384 — rather than by
+# the threads it was asked for, which would make this the same class as every
+# other library that reads /proc/cpuinfo instead of its cgroup. That is a
+# hypothesis; nothing here tested it.
+#
+# The first failure was a SIGSEGV inside FFTW's threaded spawn loop (job
+# 8444494) and the stack trace pointed at FFTW as a bug. It was the same
+# exhaustion landing in a worker task. TWO FAILURE MODES FROM ONE CONFIGURATION
+# — SIGSEGV at 3m14s, then SIGKILL at 55 s — is what said "resource", not "bug".
+export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-1}"
 JT="${KLAUS_JULIA_THREADS:-16}"
 echo "julia_threads=$JT fftw_threads=${KLAUS_FFTW_THREADS:-<follows julia>}"
-time "$JULIA" --project=. -t "$JT" $HEAP_HINT_FLAG \
-    scripts/klaus2022_reproduce.jl stripes $EXTRA
+time "$JULIA" --project=. -t "$JT" scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
 exit $rc
