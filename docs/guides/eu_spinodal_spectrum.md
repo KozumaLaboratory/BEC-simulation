@@ -266,9 +266,33 @@ kinetic-only preconditioner does not capture it. This campaign's contribution to
 that is a measurement rather than a fix: the wall is at width/value ≈ 10 on these
 states, with the FD step ruled out as its cause.
 
-**Not attempted here**, and now known to be unanswerable by this route: the κ=0.9
-control and the polarised-branch minimum-vs-saddle question of #335 §5.2 in its
-two-sided form. The one-sided part IS answerable — §5.2's escape probe below.
+### 6.1 #335 §5.2, in the half that is answerable *(job 8444031)*
+
+"Is the polarised branch a minimum or a saddle?" has a two-sided form that needs a
+converged λ_min — unavailable here, and the honest answer is that this instrument
+does not settle it at Eu production scale.
+
+The ONE-SIDED form is answerable and was measured. At B = 25 µG, where #335's
+predecessor saw the falling leg convert, the polarised cell probed **along the
+direction of the flower state at the same field** (⟨F⊥⟩ 0.115 → 4.956):
+
+    ⟨d, A d⟩ = +0.908
+
+Positive: the polarised state does not slide toward the other branch. A negative
+value would have proven a saddle outright; this proves the complement that
+matters operationally — **a barrier separates the two branches at 25 µG**, which
+is the bistability reading #335 §5.1 argues for, now from a third method that
+shares nothing with the hold or the re-minimisation.
+
+Both branch probes agree in sign and differ by 3.7× in magnitude (+3.40 at the
+flower's end vs +0.908 here), which is the expected ordering: the flower state is
+being pushed off a branch that is about to disappear, the polarised state is not.
+
+**Not attempted**, and now expected to be uninformative by this route: the κ=0.9
+control in its λ_min form. Its purpose was to show that a crossover does NOT
+soften — but the softening it was controlling for was not observed at κ=1.8
+either, so the control has nothing left to discriminate. Running it would spend
+GPU hours to confirm a null against a null.
 
 ## 6. Answer
 
