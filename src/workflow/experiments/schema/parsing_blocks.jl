@@ -264,8 +264,13 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     omega_ref = Float64(ω_raw)
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
 
-    # c_total (always derived — basis for c0/c1)
-    c_total = compute_c_total(atom; N_atoms, omega_ref)
+    # c_total: the atom's natural value UNLESS the config overrode it. The
+    # override is the supported way to say "this run uses a scattering length
+    # the atom does not have" (Li–Saito's hypothetical droplet-forming a_s, a
+    # Feshbach-tuned cell, a pinned sweep), so everything derived from a_s below
+    # must read the override — see `_resolve_lhy_block!`.
+    c_total_natural = compute_c_total(atom; N_atoms, omega_ref)
+    c_total = haskey(inter, "c_total") ? Float64(inter["c_total"]) : c_total_natural
 
     # c_dd: derive if not explicitly specified. `apply_schema_defaults!` has
     # already injected `ddi: {}` for ground_state steps (the only context
@@ -287,13 +292,24 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
         end
     end
 
-    # ε_dd
-    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    # ε_dd of the run as configured. This read `compute_a_dd(atom)/atom.a_s`
+    # until 2026-08-19 — the ATOM's pair, blind to a `c_total` / `ddi.c_dd`
+    # override. `runs/saito_li_torus/config.yaml` overrides both to reach
+    # ε_dd = 1.3 and was reported (and LHY-coupled) at the atom's 0.54.
+    # `effective_eps_dd` inverts the same two coupling formulas, so it returns
+    # the atom's own ratio whenever nothing is overridden.
+    eps_dd = if isnan(c_dd_val)
+        atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    else
+        effective_eps_dd(atom.F, c_total, c_dd_val)
+    end
+    a_s_over_a_ho = effective_a_s_over_a_ho(c_total, N_atoms)
 
     # LHY config — preferred path is the `lhy:` block (added in C5). Legacy
     # The resolver normalises the user-facing `lhy:` block into the internal fields
     # so downstream make_workspace / run_step plumbing is unchanged.
-    _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho)
+    _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho;
+        a_s_over_a_ho)
 
     # l_z: derive from trap ratio if quasi_2d and not specified
     pot = get(p, "potential", nothing)
@@ -309,8 +325,18 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     if verbose
         c_lhy_val = Float64(get(inter, "c_lhy", 0.0))
         l_z_val = ddi_d isa Dict ? Float64(get(ddi_d, "l_z", 0.0)) : 0.0
+        overridden = !isapprox(c_total, c_total_natural; rtol=1e-9)
         println(
             "  Derived: c_total=$(round(c_total; digits=1))" *
+            (
+                if overridden
+                    " [OVERRIDE; natural $(round(c_total_natural; digits=1)), " *
+                    "a_s=$(round(a_s_over_a_ho * a_ho / Units.BOHR_RADIUS; digits=2))a₀ " *
+                    "vs atom $(round(atom.a_s / Units.BOHR_RADIUS; digits=2))a₀]"
+                else
+                    ""
+                end
+            ) *
             " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
             " c_lhy=$(round(c_lhy_val; digits=1))" *
             " ε_dd=$(round(eps_dd; digits=4))" *
@@ -327,7 +353,8 @@ end
 # run_step continues to read — these slots are no longer user-visible because
 # the schema rejects them.
 function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
-    eps_dd::Float64, N_atoms::Int, a_ho::Float64)
+    eps_dd::Float64, N_atoms::Int, a_ho::Float64;
+    a_s_over_a_ho::Float64=NaN)
     lhy_block = get(p, "lhy", nothing)
     lhy_block isa Dict || return nothing
 
@@ -353,11 +380,22 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces the
     # textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
     # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
+    #
+    # `a_s_over_a_ho` is the run's EFFECTIVE ratio, inverted from the c_total
+    # actually in force. It read `atom.a_s / a_ho` until 2026-08-19, so a config
+    # that overrode `interactions.c_total` got an LHY coefficient built from a
+    # different scattering length than its own contact term — for
+    # `runs/saito_li_torus/config.yaml` (a_s 110 a₀ → 45.7 a₀ for ε_dd = 1.3)
+    # that was 8.98× in `(a_s/a_ho)^{5/2}` alone, 3.52× after the Q₅ factor, on
+    # the one term the droplet's existence depends on. The 6 other c_total-
+    # overriding configs in `runs/` pin at the natural value (verified to
+    # ≤ 6.6e-6), so they are unaffected.
     if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
         ddi_active = !isnan(c_dd_val) && c_dd_val > 0
+        ratio = isfinite(a_s_over_a_ho) ? a_s_over_a_ho : atom.a_s / a_ho
         if N_atoms > 0 && isfinite(a_ho) && a_ho > 0
             lhy_block["c_lhy"] = scalar_lhy_coefficient(
-                atom.a_s / a_ho, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
+                ratio, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
             )
         else
             # Cannot derive without N and a_ho. Must not be silent — that is the
