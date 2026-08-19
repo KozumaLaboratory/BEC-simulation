@@ -494,11 +494,27 @@ The margins are not marginal:
 
 The $T = 10$ endpoints are **below** the polarised branch by $5.5\times10^{-2}$ per
 atom — a polarised state cannot be — and above the flower branch by
-$3.1\times10^{-3}$, which is the residual of a relaxation that stopped at
-`max_steps`. Their relaxed $\langle F_\perp\rangle$ is 4.62–4.66 across all eight,
-against the flower branch's 4.44 at $f = 0.521$ and rising; the polarised branch
-there is 0.09. Three independent readings — energy, order parameter, and the
+$3.1\times10^{-3}$. Their relaxed $\langle F_\perp\rangle$ is 4.62–4.66 across all
+eight, against the flower branch's 4.44 at $f = 0.521$ and rising; the polarised
+branch there is 0.09. Three independent readings — energy, order parameter, and the
 Stern-Gerlach count (**4 levels vs 2** at $T = 5$) — agree.
+
+**And the verdict survives certification.** Those relaxations first stopped at
+`max_steps` with $|\nabla E|$ up to $1.7\times10^{-2}$, so the energy comparison
+was a bound rather than a measurement — L-BFGS accepts steps by an energy
+comparison and floors at $\sqrt{\epsilon}\|g\|$. Re-run with `residual_polish`,
+which drives $(H-\mu)\psi \to 0$ and is not energy-gated:
+
+| $T$, $\tau$ | $n$ | $|\nabla E|$ | $E-E_{\rm flower}$ | $E-E_{\rm polar}$ | sep | verdict |
+|---|---:|---:|---:|---:|---:|---|
+| 10, 400 | 7 | $8.2\times10^{-6}$ | $+3.1\times10^{-3}$ | $-5.5\times10^{-2}$ | $5.8\times10^{-2}$ | **flower** |
+| 10, 1300 | 1 | $8.0\times10^{-6}$ | $+4.9\times10^{-3}$ | $-5.1\times10^{-2}$ | $5.6\times10^{-2}$ | **flower** |
+| 5, 1300 | 6 | $8.6\times10^{-6}$ | $+2.4\times10^{-2}$ | $+3.8\times10^{-3}$ | $2.0\times10^{-2}$ | **polarised** |
+
+$|\nabla E|$ falls by three orders to the library gate and **every label is
+unchanged**. The $+3.1\times10^{-3}$ persists at $|\nabla E| = 8\times10^{-6}$, so
+it is not relaxation residual — it is a real 5 % of the branch separation, on a
+state 18× closer to flower than to polarised.
 
 The $T = 5$, $\tau = 4000$ cell reads `excited` rather than `polarised`, and that
 is the third outcome earning its place rather than a failure: that arm ends at
@@ -507,11 +523,34 @@ $1.7\times10^{-3}$ apart. Sitting $5\times10^{-3}$ above both is genuinely on
 neither. Its relaxed $\langle F_\perp\rangle$ is 0.109 — polarised in texture, and
 the honest label is that the energy test does not resolve it there.
 
-**The confound, stated because it is not yet closed.** $\gamma \propto T$, so the
-hotter reservoir also grows the condensate *further*: the $T = 10$ arms end at
-$f = 0.60$ and the $T = 5$ arms at 0.35–0.44. Temperature and final condensate
-fraction moved together, and this design cannot separate them. A $T = 5$ arm
-carried to $f = 0.60$ by a longer hold is running and is what settles it.
+### 5.10 Separating temperature from condensate fraction
+
+$\gamma \propto T$, so the hotter reservoir also grows the condensate *further*:
+the $T = 10$ arms end at $f = 0.60$ and the $T = 5$ arms at 0.35–0.44. Temperature
+and final fraction moved together and the endpoint comparison alone cannot say
+which one selected the texture.
+
+**Half of it is already answered by the trajectories themselves**, at no extra
+cost, by reading $\langle F_\perp\rangle$ at *matched* $f$ rather than at the end:
+
+| $f$ | 0.35 | 0.40 |
+|---|---:|---:|
+| $T = 5$ | 0.37 | 0.39 |
+| $T = 10$ | 0.58 | 0.65 |
+
+At the same condensate fraction the hotter field carries **1.6×** the transverse
+spin, so the difference is present at fixed $f$ and is not an artefact of where
+each arm stopped. What this cannot say is whether 0.65 against 0.39 is enough to
+change the *basin*, because that question is answered by relaxing, and the
+relaxations exist only at the endpoints.
+
+**The closing measurement**, running: $T = 10$ carried only to $f = 0.4250$ — the
+$T = 5$ arms' own endpoint fraction — so temperature is the single difference
+between two verdicts. It is done from this side rather than by pushing $T = 5$ up
+to $f = 0.60$ because a reservoir at $\mu = 11.72$ *equilibrates* near
+$f \approx 0.52$: a longer hold at $T = 5$ asymptotes there and never reaches 0.60,
+which is a design error in the first version of this arm and is why it was
+replaced.
 
 **What is not in doubt** is that the flower texture is reachable by growth at fixed
 field — 8 trajectories out of 8 reached it — which is the thing three protocol
@@ -558,16 +597,16 @@ must give 2 levels. That is a knob every evaporation sequence already has.
 
 ### What is not settled
 
-- **Temperature and final condensate fraction moved together** ($\gamma \propto T$),
-  so "temperature is the switch" is not yet separated from "the $T = 10$ arms went
-  further". The $T = 5$-to-$f = 0.60$ arm is the discriminator and is running.
+- **Temperature and final condensate fraction moved together** ($\gamma \propto T$).
+  Half of it is closed by the trajectories at matched $f$ (§5.10: 1.6× the
+  transverse spin at the same $f$); the basin question is closed by the $T = 10$
+  arm carried only to $f = 0.425$, which is running.
 - **$n = 7$ per cell**, not the pre-registered 20: the allocation ran out. The
   $T = 10$ result is $8/8$ with a 95 % lower bound of 0.65, which is a strong
   statement about a large effect and not a precise one about its size.
-- **The relaxations at $T = 10$ stopped at `max_steps`**, so the $+3.1\times10^{-3}$
-  above the flower branch is a bound on the residual, not a measured excess. The
-  sign of the *other* comparison — $5.5\times10^{-2}$ **below** the polarised
-  branch — is what carries the verdict, and it is not a small number.
+- ~~The relaxations at $T = 10$ stopped at `max_steps`~~ — **closed.**
+  `residual_polish` takes $|\nabla E|$ to $8\times10^{-6}$, three orders down and at
+  the library gate, and every label is unchanged (§5.9).
 - **LHY off**, unpadded DDI, one pin, mean-field references (§7).
 
 ## 7. Limits
