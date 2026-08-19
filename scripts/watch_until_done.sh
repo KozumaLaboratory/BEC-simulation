@@ -29,6 +29,12 @@
 #   exit 2  TIMEOUT  deadline hit with units unfinished -- NOT green, result unknown
 #   exit 3  UNKNOWN  the subject could not be observed, or finished without recording
 #
+# UNKNOWN means "could not look", never "nothing to look at yet". A `gh-run`
+# polled in the seconds after a push has no jobs and is PENDING, not
+# unobservable -- see `poll_gh_run`. Conflating the two made the script return
+# UNKNOWN on healthy runs if you started it promptly, which is precisely when
+# you want to start it.
+#
 # Run it backgrounded. Foregrounding it defeats point 1.
 #
 # `local-pid` needs `--rc-file` because **a PID disappearing says nothing about
@@ -65,22 +71,28 @@ done
 # UNKNOWN -- never into "nothing pending, therefore done".
 
 # --- GitHub Actions ---------------------------------------------------------
-# A run that has not been picked up yet has an EMPTY `.jobs[]`, and an empty
-# poll means UNKNOWN ("absence is not health") -- so watching a freshly-pushed PR
-# exited 3 within a second, every time, before the first job existed. That is a
-# false UNKNOWN: the run IS observable, it is queued. Fall back to the run-level
-# status so the queued window reads as pending. A run id that does not exist
-# still yields nothing, so genuine unobservability is unaffected.
+# An empty job list has TWO causes and they must not share a verdict:
+#
+#   the run cannot be read at all (bad id, gh failure)  -> unobservable, UNKNOWN
+#   the run exists and is queued, jobs not created yet   -> PENDING, keep watching
+#
+# Emitting nothing for both was this script's own failure mode turned inward. It
+# never said green, so the safety property held -- but it stopped watching a
+# perfectly healthy run and reported "absence is not health" about a run that was
+# merely young, which makes it unusable in the first seconds after a push. The
+# canary below had a comment conceding the behaviour and routed AROUND it
+# ("a queued run ... answers with an empty list, so that leg raced") instead of
+# treating it as the defect it was.
 poll_gh_run() {
-    local jobs
+    local jobs status
     jobs=$(gh run view "$1" --json jobs \
         -q '.jobs[] | "\(.status)|\(.conclusion // "")|\(.name)"' 2>/dev/null)
-    if [ -n "$jobs" ]; then
-        printf '%s\n' "$jobs"
-        return
-    fi
-    gh run view "$1" --json status,conclusion,name \
-        -q '"\(.status)|\(.conclusion // "")|\(.name) (no jobs yet)"' 2>/dev/null
+    if [ -n "$jobs" ]; then printf '%s\n' "$jobs"; return 0; fi
+    # No jobs. Ask the RUN itself which of the two cases this is.
+    status=$(gh run view "$1" --json status -q '.status' 2>/dev/null)
+    [ -n "$status" ] || return 0              # cannot observe        -> UNKNOWN
+    [ "$status" != "completed" ] || return 0  # finished, recorded 0  -> UNKNOWN
+    echo "$status||run $1 is $status, no jobs created yet"
 }
 
 # --- TSUBAME 4 (UGE, not Slurm) ---------------------------------------------
@@ -210,9 +222,33 @@ canary() {
     echo "[gh-run] UNKNOWN from an id that does not exist"
     _leg "nonexistent run id" 3 gh-run 999999999999
 
-    # TIMEOUT against a live LOCAL process, not a CI run: a queued run whose jobs
-    # have not materialised yet answers with an empty list, so that leg raced
-    # between TIMEOUT and UNKNOWN. A sleeping pid is pending by construction.
+    # The two causes of an empty job list must land on DIFFERENT verdicts. A real
+    # queued run cannot be summoned on demand and the window is seconds wide, so
+    # stub `gh` and drive `poll_gh_run` directly -- the function under test is the
+    # real one, only its dependency is faked.
+    echo "[gh-run] a queued run with no jobs yet is PENDING, not UNKNOWN"
+    mkdir -p "$tmp/bin"
+    cat > "$tmp/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$*" in
+  *"--json jobs"*)   exit 0 ;;          # run is real; no jobs materialised yet
+  *"--json status"*) echo "queued" ;;
+esac
+STUB
+    chmod +x "$tmp/bin/gh"
+    local got_pending got_unobs
+    got_pending=$( PATH="$tmp/bin:$PATH"; poll_gh_run 12345 )
+    # Negative control: gh cannot answer at all -> still empty -> still UNKNOWN.
+    printf '#!/usr/bin/env bash\nexit 1\n' > "$tmp/bin/gh"; chmod +x "$tmp/bin/gh"
+    got_unobs=$( PATH="$tmp/bin:$PATH"; poll_gh_run 12345 )
+    if [ -n "$got_pending" ] && [ -z "$got_unobs" ]; then
+        echo "  ok   queued -> pending; unreadable -> empty (UNKNOWN preserved)"
+    else
+        echo "  FAIL: queued gave '$got_pending', unreadable gave '$got_unobs'"; fails=1
+    fi
+
+    # TIMEOUT against a live LOCAL process rather than a CI run: a sleeping pid is
+    # pending by construction, with no scheduler latency to race.
     echo "[local-pid] TIMEOUT without waiting for one"
     ( sleep 30 ) & local p_slow=$!
     TIMEOUT_OVERRIDE=0 _leg "live pid, 0 s budget" 2 local-pid "$p_slow"

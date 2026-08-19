@@ -105,6 +105,20 @@ claim must carry a machine-checkable predicate (a test name or a grep assertion)
 set-equivalence meta-test. Four rows discharging themselves within three days,
 silently, is the argument for it: nothing told anyone.
 
+**And a `KNOWN-LIMIT` that says a coefficient is gated by NOTHING is a defect
+report, not a caveat.** `test_bogoliubov_anchor.jl` carried exactly that sentence
+about the DDI block of the homogeneous BdG. When the block was finally derived
+(#361, 2026-08-19) it was wrong in two independent ways at once — the normal term
+was the Hartree piece, which is identically zero for a uniform cloud, so it was
+2× on a polarized state and structurally absent on a polar one — and the μ it fed
+depended on the probe direction, in four hand-written copies of one assembly.
+Neither could have survived a single gate. The rule that follows is cheap:
+**when a header names an ungated coefficient, treat that sentence as the work
+item, and do not read the absence of red as agreement.** The correction moved the
+most-unstable direction of a production Eu fixture from 15° to 90°
+(`docs/validation/bdg_ddi_verdict_delta_361.md`) while every gated verdict stayed
+green — which is what "gated by nothing" means in numbers.
+
 ---
 
 ## 4. Guards — fail-closed, on every campaign job
