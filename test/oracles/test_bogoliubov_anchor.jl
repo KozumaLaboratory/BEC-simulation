@@ -21,12 +21,15 @@
 #   FM     ζ = e_{+F}: density  ω = √(εk(εk + 2(c₀+c₁)n))
 #                      + a free-particle magnon branch ω = εk
 #
-# KNOWN-LIMIT: this gates the CONTACT BdG at F=1 (the cleanest,
-# unambiguous closed forms) + the universal free-particle limit at
-# general F. The F=6 + DDI operator the Eu sweep actually uses is
-# anchored by the FD-Hessian gate (L(k=0) = finite-difference of the
-# already-gated energy_gradient! on a uniform grid) — its own unit, the
-# chains-off-the-gated-gradient counterpart.
+# SCOPE: this gates the CONTACT BdG at F=1 (the cleanest, unambiguous
+# closed forms) + the universal free-particle limit at general F. The
+# FD-Hessian gate anchors the operator at k=0, where Q(k)=0 leaves the
+# DDI out by construction. The DDI block has its own unit since
+# 2026-08-19 — `test_dipolar_bogoliubov_anchor.jl`, against the
+# polarized closed form ω² = ε(ε + 2n(g + c_dd F² Q_zz(k̂))) and against
+# zero on a polar state. Until then it was gated by nothing, and it was
+# wrong in both places (#361), which is what this KNOWN-LIMIT had been
+# quietly recording.
 
 using Test
 using LinearAlgebra

@@ -157,7 +157,7 @@ function _struct_peak(field, dens, dx)
     S = abs.(fft(field)) .^ 2
     beyond = kg .> 3 * kenv
     tot = sum(S)
-    (any(beyond) && tot > 1e-30) || return (0.0, 0.0)
+    (any(beyond) && tot > COUPLING_TOL) || return (0.0, 0.0)
     (maximum(S[beyond]) / tot, kg[argmax(S .* beyond)])
 end
 

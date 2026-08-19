@@ -206,7 +206,7 @@ added by the caller.
     if p.noneq_scale > 0
         γev = γel * p.evap_scale * evap_factor
         ramp = 2.0 * abs(dlnω_dt)
-        ξ = γev / (γev + p.noneq_scale * ramp + 1e-30)
+        ξ = γev / (γev + p.noneq_scale * ramp + COUPLING_TOL)
         L = ξ * L + (1 - ξ) * ((η - 3.0) / 3.0)
     end
     dN_evap = -Nev * γel * p.evap_scale * evap_factor

@@ -358,8 +358,12 @@ end
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa DynamicsStep
+        # `pipeline_results` joined the other three dynamics kinds here on
+        # 2026-08-19: the spinor path needs the preceding `:gs_stage` to build
+        # an `:evolve` Stage `from` it, and that is the only way the real-time
+        # ambient switches reach an artifact id at all.
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, live_status_path)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa GroundStateStep ||
         step isa BinaryGroundStateStep ||
         step isa RotatingBasisGroundStateStep ||

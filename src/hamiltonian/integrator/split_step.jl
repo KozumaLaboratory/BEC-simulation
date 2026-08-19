@@ -538,17 +538,26 @@ end
 # `_half_potential_step!` (RTP) delegate to these helpers. Adding a new
 # operator → both paths pick it up automatically.
 #
-# Canonical order (forward):
-#   diag → light_shift_offdiag → spin_mixing → spatial_lhy_spin → singlet_pair
-#        → tensor → transverse_zeeman → spatial_zeeman → raman
-# Backward direction reverses this for the symmetric Strang sandwich.
+# The canonical order is `OUTER_CHAIN`, twenty lines below. There is no prose
+# copy of it in this file any more, and there must not be one again: the comment
+# that used to sit here listed seven of the nine substeps from 2026-06-02 until
+# 2026-08-05 (it omitted `spatial_lhy_spin` and `spatial_zeeman`), CLAUDE.md
+# copied the short list from here, and both were corrected twice from each other
+# rather than from the code.
 #
-# This comment is a HAND-MAINTAINED COPY of the body of `_outer_operators_fwd!`
-# below, and it has already rotted once: it listed seven of these nine from
-# 2026-06-02 until 2026-08-05, omitting `spatial_lhy_spin` and `spatial_zeeman`,
-# and CLAUDE.md:130 faithfully copied the short list from here. If you add a
-# substep to the function, add it here — or better, read the function. The
-# authority is the code twenty lines down, not this list.
+# `_outer_operators_fwd!` and `_outer_operators_bwd!` were ALSO two hand-written
+# copies of that order, one reversed, so adding a substep meant editing the list
+# in three places and getting the reversal right by eye. They are now both
+# derived from `OUTER_CHAIN` by `_run_outer_chain!`, which makes the Strang
+# symmetry a property of the code rather than of the author's care.
+#
+# What is NOT derived, deliberately: this chain is not the HamTerm registry
+# unrolled. The `:diagonal` substep FUSES trap + diagonal Zeeman + c₀ density +
+# LHY into one per-voxel kernel (one transcendental instead of D), which is the
+# reason it is fast, and `magnetic_gradient` rides it by mutating V around the
+# call. `test_outer_chain_registry_mapping.jl` is what keeps that fusion honest:
+# it pins the substep → registry-term map and fails if a term ends up in no
+# substep at all.
 #
 # History: pre-2026-06-02 ITP and RTP had divergent chains — RTP added the
 # transverse Zeeman step but ITP did not, silently dropping bx_wf/by_wf in
@@ -597,6 +606,183 @@ end
     nothing
 end
 
+"""
+    OUTER_CHAIN
+
+The V(dt/2) outer operator order, forward, declared ONCE. `_outer_operators_fwd!`
+runs it as written and `_outer_operators_bwd!` runs `reverse(OUTER_CHAIN)`, so the
+Strang sandwich is symmetric by construction.
+
+Adding a substep means: add a symbol here, add its `_outer_substep!` method, and
+classify it in `OUTER_CHAIN_TERMS`. Nothing else in this file, and no prose list
+anywhere, needs to change — which is the point. Three separate hand-maintained
+copies of this order (two function bodies and a comment) rotted between
+2026-06-02 and 2026-08-05.
+"""
+const OUTER_CHAIN = (
+    :diagonal,
+    :light_shift_offdiag,
+    :spin_mixing,
+    :spatial_lhy_spin,
+    :singlet_pair,
+    :tensor,
+    :transverse_zeeman,
+    :spatial_zeeman,
+    :raman,
+)
+
+"""
+    OUTER_CHAIN_TERMS
+
+Which `H_TERMS_CANONICAL_ORDER` slots each substep propagates.
+
+This is the map the fusion makes non-obvious: `:diagonal` carries FOUR terms in
+one per-voxel kernel, and `magnetic_gradient` rides it by mutating `V` around
+the call rather than as a substep of its own. Written down so that
+`test_outer_chain_registry_mapping.jl` can check the map is total — every
+registry term is propagated by some substep, by the K half-step, by the inner
+DDI step, or by the real-time epilogue, and none is propagated by nothing.
+"""
+const OUTER_CHAIN_TERMS = (
+    diagonal=(:trap, :zeeman, :density_c0, :lhy, :magnetic_gradient),
+    light_shift_offdiag=(:light_shift,),
+    spin_mixing=(:spin_c1,),
+    spatial_lhy_spin=(:lhy,),
+    singlet_pair=(:tensor,),
+    tensor=(:tensor,),
+    transverse_zeeman=(:zeeman,),
+    spatial_zeeman=(:spatial_zeeman,),
+    raman=(:raman,),
+)
+
+"""
+Registry slots propagated OUTSIDE the outer chain, with where. Each is a claim a
+test can check, not a note — `:loss` in particular was dead on every RTP driver
+for a month (`test_path_coverage.jl` invariant A exists because of it).
+"""
+const OUTER_CHAIN_EXTERNAL_TERMS = (
+    kinetic="the K(dt) half-step of the Strang sandwich",
+    coriolis="the Coriolis 3-shear either side of K(dt)",
+    ddi="the inner DDI step, between the fwd and bwd outer halves",
+    loss="the real-time dissipative epilogue (`apply_rt_dissipation!`)",
+)
+
+"""
+Everything one traversal of the outer chain needs, as ONE concrete value.
+
+Parameterised on the argument types rather than typed abstractly: this is passed
+through an unrolled recursion, and an `Any` field here would widen every substep
+call. It does not reach `make_workspace`, so it is outside the Workspace
+specialisation blast radius (CLAUDE.md commitment 8).
+"""
+struct OuterChainCtx{IP, ZD, PM}
+    dt::Float64
+    ndim::Int
+    imaginary_time::Bool
+    t_eval::Float64
+    ip::IP
+    zd::ZD
+    psi_mf::PM
+    mg_active::Bool
+end
+
+# Unrolled traversal. Recursion on a Tuple rather than `for op in chain` so the
+# specialisation is guaranteed rather than dependent on const-prop, the same
+# reason `build_h_terms_registry` returns an NTuple.
+@inline _run_outer_chain!(::Tuple{}, ::Workspace, ::OuterChainCtx) = nothing
+@inline function _run_outer_chain!(chain::Tuple, ws::Workspace, c::OuterChainCtx)
+    _outer_substep!(Val(first(chain)), ws, c)
+    _run_outer_chain!(Base.tail(chain), ws, c)
+end
+
+# --- the substeps themselves; each gates itself, exactly as before ---
+
+@inline function _outer_substep!(::Val{:diagonal}, ws::Workspace{N}, c) where {N}
+    c.mg_active && _apply_mg_to_V!(ws, c.t_eval)
+    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
+        ws, Val(N), c.zd, c.dt, c.imaginary_time, c.ip; psi_mf=c.psi_mf
+    )
+    c.mg_active && _remove_mg_from_V!(ws, c.t_eval)
+    nothing
+end
+
+@inline function _outer_substep!(::Val{:light_shift_offdiag}, ws::Workspace, c)
+    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
+        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
+            ws.state.psi, ws.light_shift, c.dt, c.ndim; imaginary_time=c.imaginary_time
+        )
+    end
+    nothing
+end
+
+@inline function _outer_substep!(::Val{:spin_mixing}, ws::Workspace, c)
+    if is_active(c.ip[1])
+        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
+            ws.state.psi, ws.spin_matrices, c.ip[1], c.dt, c.ndim;
+            imaginary_time=c.imaginary_time, psi_mf=c.psi_mf,
+        )
+    end
+    nothing
+end
+
+# The spin half of a spatially-varying LHY (issue #131). No-op for every other
+# LHY — `_lhy_needs_spin` is a compile-time trait, so nothing else pays for it.
+@inline function _outer_substep!(::Val{:spatial_lhy_spin}, ws::Workspace, c)
+    if _lhy_needs_spin(ws.lhy)
+        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
+            ws.state.psi, ws.lhy, ws.spin_matrices, c.dt, c.ndim;
+            imaginary_time=c.imaginary_time, psi_mf=c.psi_mf,
+        )
+    end
+    nothing
+end
+
+@inline function _outer_substep!(::Val{:singlet_pair}, ws::Workspace, c)
+    if is_active(get_cn(c.ip, 2))
+        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
+            ws.state.psi, c.ip, ws.spin_matrices.system.F, c.dt, c.ndim;
+            imaginary_time=c.imaginary_time, psi_mf=c.psi_mf,
+        )
+    end
+    nothing
+end
+
+@inline function _outer_substep!(::Val{:tensor}, ws::Workspace, c)
+    if ws.tensor_cache !== nothing
+        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
+            ws.state.psi, ws.tensor_cache, ws.spin_matrices, c.dt, c.ndim;
+            imaginary_time=c.imaginary_time, psi_mf=c.psi_mf,
+        )
+    end
+    nothing
+end
+
+@inline _outer_substep!(::Val{:transverse_zeeman}, ws::Workspace, c) =
+    _apply_transverse_zeeman_step!(ws, c.t_eval, c.dt, c.ndim, c.imaginary_time)
+
+@inline _outer_substep!(::Val{:spatial_zeeman}, ws::Workspace, c) =
+    _apply_spatial_zeeman_step!(ws, c.t_eval, c.dt, c.imaginary_time)
+
+@inline function _outer_substep!(::Val{:raman}, ws::Workspace, c)
+    if ws.raman !== nothing
+        raman_now = raman_at(ws.raman, c.t_eval)
+        @timeit_debug TIMER "raman" apply_raman_step!(
+            ws.state.psi, ws.spin_matrices, raman_now, ws.grid, c.dt;
+            imaginary_time=c.imaginary_time,
+        )
+    end
+    nothing
+end
+
+@inline function _outer_chain_ctx(
+    ws::Workspace, dt_outer, ndim, imaginary_time, t_eval, ip, zeeman_diag, psi_mf, mg_active
+)
+    zd = zeeman_diag === nothing ? _resolve_zeeman_diag(ws, t_eval) : zeeman_diag
+    OuterChainCtx(
+        Float64(dt_outer), Int(ndim), imaginary_time, t_eval, ip, zd, psi_mf, mg_active
+    )
+end
+
 function _outer_operators_fwd!(
     ws::Workspace{N}, dt_outer, ndim, imaginary_time;
     t_eval::Float64=ws.state.t,
@@ -605,60 +791,9 @@ function _outer_operators_fwd!(
     psi_mf::Union{Nothing, AbstractArray}=nothing,
     mg_active::Bool=false,
 ) where {N}
-    zd = zeeman_diag === nothing ? _resolve_zeeman_diag(ws, t_eval) : zeeman_diag
-
-    mg_active && _apply_mg_to_V!(ws, t_eval)
-    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zd, dt_outer, imaginary_time, ip; psi_mf
-    )
-    mg_active && _remove_mg_from_V!(ws, t_eval)
-
-    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
-            ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time
-        )
-    end
-
-    if is_active(ip[1])
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    # The spin half of a spatially-varying LHY (issue #131). No-op for every
-    # other LHY — `_lhy_needs_spin` is a compile-time trait, so nothing else
-    # pays for it. Mirrored in the reverse half below to keep Strang symmetric.
-    if _lhy_needs_spin(ws.lhy)
-        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
-            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    c2 = get_cn(ip, 2)
-    if is_active(c2)
-        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
-
-    _apply_spatial_zeeman_step!(ws, t_eval, dt_outer, imaginary_time)
-
-    if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, t_eval)
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_outer; imaginary_time
-        )
-    end
+    c = _outer_chain_ctx(
+        ws, dt_outer, ndim, imaginary_time, t_eval, ip, zeeman_diag, psi_mf, mg_active)
+    _run_outer_chain!(OUTER_CHAIN, ws, c)
     nothing
 end
 
@@ -679,57 +814,12 @@ function _outer_operators_bwd!(
     psi_mf::Union{Nothing, AbstractArray}=nothing,
     mg_active::Bool=false,
 ) where {N}
-    if ws.raman !== nothing
-        raman_now = raman_at(ws.raman, t_eval)
-        @timeit_debug TIMER "raman" apply_raman_step!(
-            ws.state.psi, ws.spin_matrices, raman_now, ws.grid, dt_outer; imaginary_time
-        )
-    end
-
-    _apply_spatial_zeeman_step!(ws, t_eval, dt_outer, imaginary_time)
-
-    _apply_transverse_zeeman_step!(ws, t_eval, dt_outer, ndim, imaginary_time)
-
-    if ws.tensor_cache !== nothing
-        @timeit_debug TIMER "tensor" apply_tensor_interaction_step!(
-            ws.state.psi, ws.tensor_cache, ws.spin_matrices, dt_outer, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    c2 = get_cn(ip, 2)
-    if is_active(c2)
-        @timeit_debug TIMER "singlet_pair" apply_singlet_pair_step!(
-            ws.state.psi, ip, ws.spin_matrices.system.F, dt_outer, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    if _lhy_needs_spin(ws.lhy)
-        @timeit_debug TIMER "spatial_lhy_spin" apply_spatial_lhy_spin_step!(
-            ws.state.psi, ws.lhy, ws.spin_matrices, dt_outer, ndim;
-            imaginary_time, psi_mf,
-        )
-    end
-
-    if is_active(ip[1])
-        @timeit_debug TIMER "spin_mixing" apply_spin_mixing_step!(
-            ws.state.psi, ws.spin_matrices, ip[1], dt_outer, ndim; imaginary_time, psi_mf
-        )
-    end
-
-    if ws.light_shift !== nothing && !ws.light_shift.is_diagonal
-        @timeit_debug TIMER "light_shift" apply_light_shift_step!(
-            ws.state.psi, ws.light_shift, dt_outer, ndim; imaginary_time
-        )
-    end
-
-    zd = zeeman_diag === nothing ? _resolve_zeeman_diag(ws, t_eval) : zeeman_diag
-
-    mg_active && _apply_mg_to_V!(ws, t_eval)
-    @timeit_debug TIMER "diagonal" _dispatch_diagonal_step!(
-        ws, Val(N), zd, dt_outer, imaginary_time, ip; psi_mf
-    )
-    mg_active && _remove_mg_from_V!(ws, t_eval)
+    c = _outer_chain_ctx(
+        ws, dt_outer, ndim, imaginary_time, t_eval, ip, zeeman_diag, psi_mf, mg_active)
+    # `reverse` of a Tuple is a compile-time constant, so this unrolls to the
+    # mirrored sequence with no runtime cost — and cannot drift from the forward
+    # one, which is the whole reason the chain is a value.
+    _run_outer_chain!(reverse(OUTER_CHAIN), ws, c)
     nothing
 end
 

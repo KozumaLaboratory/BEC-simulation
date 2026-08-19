@@ -529,23 +529,27 @@ end
     end
 end
 
-@testset "Matsui Fig. 4B as a Claim — as far as the tree allows" begin
+@testset "Matsui Fig. 4B as a Claim" begin
     # WHAT IS REAL TODAY, and what is not.
     #
-    # The type-C claim Fig. 4B is — "our simulated dip width reproduces theirs"
-    # — needs 45 `:evolve` cells over a 5 ms hold plus a `c_dd = 0` control.
-    # ZERO of those 46 stages are constructible: `gs_stage`
-    # (`run_step_ground_state.jl:310`) is the only `Stage` producer in `src/`,
-    # and `:evolve` appears there only as a member of `STAGE_KINDS`.
-    # `run_step_dynamics.jl` declares none — the same blocker two committed
-    # tests in `test/model/` already name.
+    # UNTIL 2026-08-19 this read: the type-C claim needs `:evolve` cells plus a
+    # `c_dd = 0` control, and ZERO of them are constructible because `gs_stage`
+    # is the only `Stage` producer in `src/` — so the file built the type-A
+    # claim instead and left a tripwire for the day a producer appeared.
+    # `evolve_stage.jl` is that day; the tripwire fired and the type-C claim
+    # below is built rather than described.
     #
-    # So this file does NOT construct a green type-C Fig. 4B claim. Offering the
-    # ground-state stage as evidence for a dip-width claim would be restating a
-    # different observable, which is the failure mode the control field exists
-    # to name. What it does instead: (a) assert the TARGET is real and available
-    # now, (b) build the type-A claim the resolved config genuinely supports,
-    # and (c) leave a tripwire that fires the day an `:evolve` producer appears.
+    # What has NOT changed is the reason the ground-state stage was refused as
+    # evidence: a dip width is a property of a real-time scan, so offering a
+    # `:relax` stage would restate a different observable — the failure mode the
+    # `control` field exists to name.
+    #
+    # And constructing a claim is not running one. `Claim`'s constructor cannot
+    # check that the evidence was computed (`evidence = Stage[]` constructs, as
+    # the testset above pins), so what the type-C block establishes is that the
+    # PIECES exist and fit: the right kind of evidence, a control that is the
+    # physics switched off, and a target that arbitrates. Our measured numbers
+    # against theirs live in `docs/validation/matsui_campaign_report.md`.
 
     @testset "the target is available and arbitrating" begin
         t = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
@@ -557,18 +561,70 @@ end
         @test !ref(:matsui2025, :dip_centre_exp_nT).arbitrates
     end
 
-    @testset "tripwire — no :evolve Stage producer exists yet" begin
-        # When this goes red, the Fig. 4B type-C claim above becomes
-        # constructible and should be built here rather than described.
+    @testset "type-C: the Fig. 4B claim, now that it is constructible" begin
+        # This was a tripwire asserting NO `:evolve` producer existed, with the
+        # instruction "when this goes red, the Fig. 4B type-C claim above
+        # becomes constructible and should be built here rather than
+        # described". `evolve_stage.jl` landed 2026-08-19; this is the claim.
+        #
+        # WHAT CONSTRUCTING IT DOES AND DOES NOT ESTABLISH. It establishes that
+        # the pieces exist and fit: an `:evolve` stage as evidence (the right
+        # KIND of observable — a dip width is a property of a real-time scan,
+        # which is why the ground-state stage was refused as evidence), a
+        # control that is the physics switched off, and a target that
+        # arbitrates. It does NOT establish that the claim is TRUE: the
+        # constructor cannot run anything, and `evidence = Stage[]` would
+        # construct too. Our measured −2.5099 / 12.740 against their
+        # −2.5 / 12.84 lives in `docs/validation/matsui_campaign_report.md`.
+        cfg = joinpath(dirname(dirname(@__DIR__)), "runs", "matsui_fig4b",
+            "fig4b_scan_n32.yaml")
+        m = yaml_to_model(cfg)
+        gs = stage(:relax; model=m, method=:itp, dt=0.005, n_steps=20_000)
+        ev = evolve_stage(gs, Dict{String, Any}("duration" => 5.0, "dt" => 0.001))
+        @test ev isa Stage
+        @test ev.kind === :evolve          # the kind the tripwire was waiting for
+        @test ev.from === gs               # …and it carries the state it started from
+
+        # The control is the DDI switched off, not a tolerance loosened: the
+        # dip is a dipolar effect, so `c_dd = 0` is the arm that must fail.
+        m0 = with(m; ddi=DDISpec())
+        @test m0 != m                      # the control really is different physics
+        gs0 = stage(:relax; model=m0, method=:itp, dt=0.005, n_steps=20_000)
+        ev0 = evolve_stage(gs0, Dict{String, Any}("duration" => 5.0, "dt" => 0.001))
+        @test ev0 isa Stage
+        @test artifact_id(ev0) != artifact_id(ev)
+
+        tgt = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
+        c = claim(
+            "our Fig. 4B EdH dip WIDTH reproduces Matsui et al. over their " *
+            "scan window";
+            kind=:C, evidence=[ev], control=ev0, target=tgt)
+        @test c.kind === :C
+        @test c.evidence[1].kind === :evolve
+        @test c.control.kind === :evolve
+        @test c.target.arbitrates
+
+        # The refusals still bite on this exact claim, so `:C` is enforced and
+        # not merely spelled: no control, and a target that does not arbitrate.
+        @test_throws ArgumentError Claim("x", :C, Stage[ev], nothing, tgt)
+        @test_throws ArgumentError Claim("x", :C, Stage[ev], ev0,
+            ref(:matsui2025, :dip_centre_exp_nT))
+    end
+
+    @testset "the :evolve producer stays" begin
+        # The inverse of the tripwire this replaced. Deleting the producer would
+        # make the claim above unconstructible again, and a ratchet in this
+        # direction is what stops that being a silent regression.
         src = joinpath(dirname(dirname(@__DIR__)), "src")
         producers = String[]
         for (root, _, files) in walkdir(src), f in files
             endswith(f, ".jl") || continue
-            p = joinpath(root, f)
-            occursin(r"Stage\(\s*:evolve|stage\(\s*:evolve", read(p, String)) &&
-                push!(producers, relpath(p, src))
+            fp = joinpath(root, f)
+            occursin(r"Stage\(\s*:evolve|stage\(\s*:evolve", read(fp, String)) &&
+                push!(producers, relpath(fp, src))
         end
-        @test isempty(producers)
+        @test !isempty(producers)
+        @test "workflow/experiments/pipeline/evolve_stage.jl" in producers
     end
 
     # The claim the tree DOES support: that the production config resolves to

@@ -129,5 +129,5 @@ function _per_m_top_fractions(d::AbstractDict)
     T = size(pm, 2)
     col1 = sum(view(pm, :, 1))
     colT = sum(view(pm, :, T))
-    (init=pm[1, 1] / max(col1, 1e-30), final=pm[1, T] / max(colT, 1e-30))
+    (init=pm[1, 1] / max(col1, DENOM_FLOOR), final=pm[1, T] / max(colT, DENOM_FLOOR))
 end

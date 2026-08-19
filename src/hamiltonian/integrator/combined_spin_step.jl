@@ -261,7 +261,7 @@ end
 # hide a user mistake); the RTP loop's selector treats a reason as "keep the
 # sequential path". Two consumers, one list.
 function _combined_step_unusable(ws::Workspace)
-    abs(get_cn(ws.interactions, 2)) < 1e-30 ||
+    abs(get_cn(ws.interactions, 2)) < COUPLING_TOL ||
         return "c2 ≠ 0 (S=0 singlet-pair channel is not of the form n·F̂)"
     ws.tensor_cache === nothing ||
         return "tensor_cache active (rank-4/6 channels are not of the form n·F̂)"

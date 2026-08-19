@@ -36,6 +36,10 @@ const LIVE_DOCS = [
     # registries this file reads (#342).
     "docs/campaign/as_dependency_map.md",
     "docs/campaign/fix_list.toml",
+    # The single place the EdH-quench polarisation convention is decided (#343).
+    # LIVE rather than dated on purpose: a convention document that is allowed to
+    # go stale is worse than none, because the thesis reads it as current.
+    "docs/campaign/edh_quench_polarisation_decision.md",
     # Which of the three things "Klaus" named is meant where (#344). LIVE
     # because it is a naming rule people are told to follow, and it has its
     # own gate: test/validation/test_klaus_name_disambiguation.jl.
@@ -56,7 +60,17 @@ const LIVE_DOCS = [
     "docs/reference/yaml_schema_reference.md",
     "docs/validation/config_metadata_blocks.toml",
     "docs/validation/config_prose_harvest.toml",
-    "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
+    # The #337 answer, and the REPLACEMENT for
+    # `docs/validation/full_bdg_scheme_dependence_eu_f6.md`, which was LIVE until
+    # 2026-08-19 and is now dated: its headline verdict ("NOT ANSWERABLE with the
+    # current machinery") was overturned by measurement and its q-table was
+    # computed at 1e-4 of the campaign's field. A document whose main conclusion
+    # no longer holds must not advertise itself as maintained — so this is a
+    # SWAP, not a +1, and the budget below is unchanged.
+    #
+    # LIVE because it is what a reader is sent to: the frozen document opens by
+    # pointing here, and `spatial.jl` / `potentials.jl` cite its measurements.
+    "docs/theory/lhy_scheme_selection_eu_f6.md",
     # The Klaus 2022 reproduction's evidence: published parameters per figure,
     # the systematics, the model-selection numbers, and the pre-registered
     # thresholds. LIVE rather than dated because the gate reads its thresholds
@@ -110,7 +124,17 @@ _frozen(path) = occursin(_FROZEN_MARK, first(read(joinpath(_REPO, path), String)
         # If LIVE grows without anyone noticing, the gate silently becomes the
         # thing it replaced. 30 is not sacred; exceeding it deliberately means
         # editing this number and saying why in the commit.
-        @test length(LIVE_DOCS) <= 30
+        #
+        # 30 → 31 on 2026-08-19. Three LIVE documents landed the same day, all
+        # from the same tangle: `as_dependency_map.md` (#342),
+        # `klaus_name_disambiguation.md` (#344) and
+        # `edh_quench_polarisation_decision.md` (#343). The third is a CONVENTION
+        # the thesis must not contradict, so dating it would defeat its purpose —
+        # a stale convention doc is worse than none, because it still reads as
+        # current. If this number is raised again soon, the question to ask is
+        # whether the three should be one document rather than whether the
+        # budget should be four.
+        @test length(LIVE_DOCS) <= 31
         @test length(LIVE_DOCS) == length(unique(LIVE_DOCS))
     end
 

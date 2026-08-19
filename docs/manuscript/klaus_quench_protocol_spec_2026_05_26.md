@@ -18,6 +18,13 @@
 > carries the full argument is `docs/manuscript/klaus_protocol_sheet.md`; the 11x
 > quadratic-Zeeman correction is measured NOT to apply in this nT band
 > (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
+>
+> **Decision, re-derivation list and mirror-arm correction (2026-08-19, #343):**
+> `docs/campaign/edh_quench_polarisation_decision.md`. In particular the
+> `(init m × Ω sign)` reversal-symmetry gate here is **no longer a mirror pair**
+> — `bce2068f` flipped `B_z` on the m=−F arm and not on the m=+F one, so the two
+> now differ by only two of the three axial quantities. Read §5 there before
+> re-running that gate.
 
 ## Matsui K_3 calibration (2026-05-27, 5-cell fine bracket)
 

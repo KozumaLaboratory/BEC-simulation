@@ -192,7 +192,7 @@ function _save_dynamics_timeseries!(f, result)
                 peak_density[s] = Float64(maximum(n_tot))
                 for c in 1:D
                     idx = ntuple(d -> d <= ndim ? (1:n_pts_v[d]) : c, ndim + 1)
-                    pops[s, c] = sum(abs2, view(frame, idx...)) / max(total, 1e-30)
+                    pops[s, c] = sum(abs2, view(frame, idx...)) / max(total, DENOM_FLOOR)
                 end
             end
             f["dynamics/component_populations"] = pops
@@ -213,7 +213,7 @@ function _save_dynamics_timeseries!(f, result)
             total = sum(abs2, psi)
             for c in 1:D
                 idx = ntuple(d -> d <= ndim ? (1:n_pts[d]) : c, ndim + 1)
-                pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, 1e-30)
+                pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, DENOM_FLOOR)
             end
         end
         f["dynamics/component_populations"] = pops
@@ -320,7 +320,7 @@ function _save_dynamics_timeseries_multi!(f, history, result)
                 row = Vector{Float64}(undef, D)
                 for c in 1:D
                     idx = ntuple(d -> d <= ndim ? (1:n_pts_v[d]) : c, ndim + 1)
-                    row[c] = sum(abs2, view(frame, idx...)) / max(total, 1e-30)
+                    row[c] = sum(abs2, view(frame, idx...)) / max(total, DENOM_FLOOR)
                 end
                 push!(pops_rows, row)
             end

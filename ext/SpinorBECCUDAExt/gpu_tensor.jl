@@ -72,13 +72,10 @@ function SpinorBEC.apply_tensor_interaction_step!(
 
     if offdiag_max * abs(dt_t) < T(1e-6)
         # Diagonal-only fast path (all on GPU, no transfer)
+        itv = Val(imaginary_time)
         for c in 1:D
             if h_fields[c, c] !== nothing
-                if imaginary_time
-                    view(psi_2d, :, c) .*= exp.(.-real.(h_fields[c, c]) .* dt_t)
-                else
-                    view(psi_2d, :, c) .*= cis.(.-real.(h_fields[c, c]) .* dt_t)
-                end
+                view(psi_2d, :, c) .*= wick_phase.(.-real.(h_fields[c, c]) .* dt_t, itv)
             end
         end
         return nothing
@@ -97,12 +94,9 @@ function SpinorBEC.apply_tensor_interaction_step!(
     # heevjBatched! returns (eigenvalues::(D, N), eigenvectors::(D, D, N))
     W, V = CUDA.CUSOLVER.heevjBatched!('V', 'U', H_batch)
 
-    # Per-eigenvalue phase exp(-i Λ dt) (or real exp for ITP)
-    if imaginary_time
-        phases = exp.(.-W .* dt_t)                  # (D, N) Real
-    else
-        phases = cis.(.-W .* dt_t)                  # (D, N) Complex
-    end
+    # Per-eigenvalue phase exp(-i Λ dt) (or real exp for ITP). Real on the ITP
+    # branch, Complex on the real-time one — `phases_c` unifies for the gemm.
+    phases = wick_phase(.-W .* dt_t, imaginary_time)
     phases_c = Complex{T}.(phases)                   # unify type for gemm
 
     # ψ as (D, 1, N) so it slots into batched gemm

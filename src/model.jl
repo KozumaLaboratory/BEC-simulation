@@ -16,8 +16,31 @@
 # resolves all 429 configs under `runs/` (351 succeed) and lists every one that
 # does not, by name and reason, so step 3's scope can only change deliberately.
 #
-# Still to come: `make_workspace(::Model)` and the retirement of the fifteen
-# YAML normalisation passes.
+# Step 1c (2026-08-19) added the OTHER DIRECTION. `model/realise.jl` walks a
+# `Model` back to the runtime objects `make_workspace` takes — `GridSpec` →
+# `Grid`, `PotentialSpec` → its trap terms, `ZeemanSpec` →
+# `ZeemanParams`/`ZeemanField`, `DDISpec` → the eight DDI kwargs, `LHYSpec` →
+# `(spinor_lhy, lhy_opts)` — and `make_workspace(::Model)` is built on it. The
+# layer can now DRIVE a solve, not only describe one.
+#
+# It is gated against the path that runs, not merely tested:
+# `test/model/test_realise_matches_resolver.jl` requires the two to build the
+# same workspace, which is what keeps this an inverse rather than a third
+# statement of the physics. It caught two sign flips on its first run.
+#
+# STILL TO COME, with the blocker named. Pointing the pipeline at
+# `make_workspace(::Model)` is not yet possible: `gs_model` is not total over the
+# corpus — 351 of 429 configs under `runs/` resolve, and the other 78 run fine
+# today (`test_corpus_resolves.jl` lists each with its reason). The remaining
+# work is model COVERAGE, on that list; it is not transcription discipline at the
+# call sites. Also outstanding: the retirement of the fifteen YAML normalisation
+# passes.
+#
+# "Still to come" with no number is how a migration does not finish, so it is
+# also a number: `test/model/test_model_adoption_ratchet.jl` counts the sites
+# that still transcribe a config's physics by hand — THREE — and fails if that
+# grows. See CLAUDE.md commitment 11 for why a promise without a gate is not a
+# plan.
 #
 # Loaded after `hamiltonian.jl` because `GaussianBeam`
 # (`hamiltonian/terms/trap/optical_trap.jl`) is the one physics type outside
@@ -42,3 +65,9 @@ include("model/complete.jl")          # the completion marker + the one admissio
 # filesystem, this is a question about physics at a state. Merging them would
 # put a gradient evaluation behind `admit_payload`.
 include("model/verdict_truth.jl")     # is the recorded verdict true of the payload?
+# Spec → runtime: the inverse of `gs_model`'s walk. Last, because it needs every
+# spec type above it. `make_workspace(::Model)` lives in
+# `workflow/initialization/make_workspace.jl` beside the kwarg form — this file
+# cannot reach it (the model layer depends on nothing under `src/workflow/`, by
+# design), and the realisation functions are what it is built from.
+include("model/realise.jl")

@@ -323,24 +323,13 @@ function apply_diagonal_step_scalar!(
 ) where {T, N}
     g = ws.g_contact
     γ = ws.gamma_lhy
-    if imaginary_time
-        @inbounds for I in eachindex(ws.psi)
-            ρ = ws.rho[I]
-            V_local = ws.V_trap[I] + g * ρ + ws.V_dd[I]
-            if γ != zero(T)
-                V_local += γ * ρ * sqrt(ρ)
-            end
-            ws.psi[I] *= exp(-V_local * dt)
+    @inbounds for I in eachindex(ws.psi)
+        ρ = ws.rho[I]
+        V_local = ws.V_trap[I] + g * ρ + ws.V_dd[I]
+        if γ != zero(T)
+            V_local += γ * ρ * sqrt(ρ)
         end
-    else
-        @inbounds for I in eachindex(ws.psi)
-            ρ = ws.rho[I]
-            V_local = ws.V_trap[I] + g * ρ + ws.V_dd[I]
-            if γ != zero(T)
-                V_local += γ * ρ * sqrt(ρ)
-            end
-            ws.psi[I] *= cis(-V_local * dt)
-        end
+        ws.psi[I] *= wick_phase(-V_local * dt, imaginary_time)
     end
     nothing
 end
@@ -351,14 +340,8 @@ function apply_kinetic_step_scalar!(
     ws::ScalarSimWS{T, N}, dt::T; imaginary_time::Bool=false
 ) where {T, N}
     ws.fft_fwd * ws.psi
-    if imaginary_time
-        @inbounds for I in eachindex(ws.psi)
-            ws.psi[I] *= exp(-T(dt) * ws.grid.k_squared[I] / 2)
-        end
-    else
-        @inbounds for I in eachindex(ws.psi)
-            ws.psi[I] *= cis(-T(dt) * ws.grid.k_squared[I] / 2)
-        end
+    @inbounds for I in eachindex(ws.psi)
+        ws.psi[I] *= wick_phase(-T(dt) * ws.grid.k_squared[I] / 2, imaginary_time)
     end
     ws.fft_inv * ws.psi
     nothing

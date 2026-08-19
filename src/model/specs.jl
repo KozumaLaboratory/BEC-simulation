@@ -175,9 +175,9 @@ cache). Odd ranks ≥ 3 are rejected, matching `InteractionParams`' own inner
 constructor. Parallel sorted vectors rather than a `Dict{Int,Float64}` because a
 `Dict` has no canonical iteration order, and a serialised model whose byte order
 depends on hash insertion order is not content-addressable. Sorted rank vectors
-also make `even_c_extra`'s documented misindexing footgun for F ≥ 3
-(a bare `[c2, c4, c6]` list) unrepresentable: the rank is written next to its
-value.
+also make the historical misindexing footgun for F ≥ 3 (a bare `[c2, c4, c6]`
+positional list, which the deleted `even_c_extra` helper existed to guard)
+unrepresentable: the rank is written next to its value.
 """
 struct InteractionSpec <: ModelValue
     n_atoms::Int

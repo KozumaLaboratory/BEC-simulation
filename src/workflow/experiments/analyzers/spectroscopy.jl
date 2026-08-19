@@ -40,7 +40,7 @@ function _analyze_correlation_length(psi, grid, atom, params, ws_prev)
     fz_line = zeros(Float64, n_along)
     for i in 1:n_along
         idx = ntuple(d -> d == direction ? i : center[d], ndim)
-        fz_line[i] = n[idx...] > threshold ? fz[idx...] / max(n[idx...], 1e-30) : 0.0
+        fz_line[i] = n[idx...] > threshold ? fz[idx...] / max(n[idx...], DENOM_FLOOR) : 0.0
     end
     dx = grid.config.box_size[direction] / n_along
     corr = zeros(Float64, n_along ÷ 2)
@@ -53,7 +53,7 @@ function _analyze_correlation_length(psi, grid, atom, params, ws_prev)
         fz_var += d * d
     end
     fz_var /= n_along
-    if fz_var > 1e-30
+    if fz_var > COUPLING_TOL
         for lag in 0:(n_along ÷ 2 - 1)
             c = 0.0
             for i in 1:(n_along - lag)
@@ -130,6 +130,21 @@ function _analyze_kibble_zurek_stats(psi, grid, atom, params, ws_prev)
     (defect_count=defect_count, defect_density=defect_count / volume, n_samples=1)
 end
 
+"""
+    _analyze_bragg_spectroscopy(psi, grid, atom, params, ws_prev) -> (; structure_factor)
+
+STATIC structure factor `S(k) = |δn_k|²` of one snapshot. It is the ω-INTEGRAL of
+the dynamic structure factor, so it says how much weight sits at each k and
+nothing about where in ω that weight is.
+
+**A roton cannot be read off this.** A roton is a minimum of `ω(k)`; `S(k)` has
+had the ω axis summed away, and two states whose spin branch differs by a factor
+of two can return the same `S(k)`. For a Bragg-spectroscopy prediction use
+`bragg_response` (real-time impulse response → `S(k,ω)`), or
+`trapped_bdg_frequencies` for the soft end of the spectrum. This analyzer stays
+because a static `S(k)` is the right thing for density-modulation / supersolid
+contrast, which is what it was added for.
+"""
 function _analyze_bragg_spectroscopy(psi, grid, atom, params, ws_prev)
     F = atom.F
     ndim = length(grid.config.n_points)
