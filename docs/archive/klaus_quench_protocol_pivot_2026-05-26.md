@@ -9,32 +9,61 @@
 > (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
 
 <!-- promoted from agent memory `klaus_quench_protocol_pivot_2026_05_26.md` on 2026-07-31; historical record, not an SSoT -->
-<!-- Eu spinor rotation+quench protocol — 2-phase rotation-prep+weak-field-quench scan. Load-bearing observable is post-quench m=-5,-4 excitation, not bare ⟨F_z⟩. Previously called "Klaus protocol" based on a confabulated paper attribution; the protocol design is original to this project. -->
+<!-- Eu spinor rotation+quench protocol — 2-phase rotation-prep+weak-field-quench scan. Load-bearing observable is post-quench m=-5,-4 excitation, not bare ⟨F_z⟩. Called the "rotation-assisted EdH quench" since 2026-08-19; the protocol design is original to this project and was never proposed by any published paper. -->
 
-**Attribution correction 2026-06-02:** This memory previously named the
-protocol "Klaus 2-phase quench protocol" / "Klaus-I" / "Klaus-II" as if
-tracking a Klaus-authored paper. anko verified externally on 2026-06-02
-night that **no such paper exists** in the magnetostir / dipolar-BEC
-literature; the Klaus attribution was confabulation by the assistant.
-The protocol design, scan data, and 6-gate verification recorded below
-are **original project work** and stand independent of any external
-anchor. Real external benchmarks for this regime:
+**Attribution correction 2026-06-02 — ITSELF FALSE, RETRACTED 2026-08-19.**
+The paragraph that stood here said the assistant had confabulated a
+Klaus-authored paper and that **"no such paper exists"** in the
+magnetostir / dipolar-BEC literature. That sentence is wrong, and it
+sat eight lines above a citation to the very paper it denied.
 
+**Klaus et al. 2022 exists.** L. Klaus, T. Bland, E. Poli, C. Politi,
+G. Lamporesi, E. Casotti, R. N. Bisset, M. J. Mark, F. Ferlaino,
+*"Observation of vortices and vortex stripes in a dipolar Bose-Einstein
+condensate"*, Nat. Phys. **18**, 1453 (2022), arXiv:2206.12265,
+doi:10.1038/s41567-022-01793-8. Klaus is the **first author** and it is
+a **Ferlaino-group (Innsbruck) paper** — both statements are true of the
+same paper, and the 2026-06-02 correction read them as alternatives.
+
+**What actually needed correcting** was the *attribution of the
+protocol*: this document's two-phase Eu rotation-prep + weak-field-quench
+scan was described as if Klaus et al. had proposed it. They did not. The
+protocol design, the scan data and the 6-gate verification recorded below
+are original project work. The correction overshot from "they did not
+propose this protocol" to "they do not exist", which is a different and
+false claim. Tracked and fixed as issue #344; the same retraction is
+recorded in `memory/reference_klaus_adiabatic_elimination.md`.
+
+External anchors for this regime:
+
+  * **Magnetostir technique prior art:** Klaus et al. 2022,
+    arXiv:2206.12265 — Dy BEC, field tilted and rotated near the radial
+    trap frequency, vortices ordering into stripes along B̂. See
+    `memory/reference_klaus_adiabatic_elimination.md` for why that regime
+    needs the scalar eGPE path rather than the spinor solver.
   * **Vortex-side (long-time branch):** Prasad et al. 2019, arXiv:1906.08664.
-    See `memory/prasad_2019_long_time_vortex_anchor.md`.
-  * **Magnetostir technique prior art:** Innsbruck Ferlaino-group Dy
-    paper, arXiv:2206.12265. See `memory/klaus_adiabatic_elimination.md` (file
-    name retained for git continuity; content corrected).
+    See `memory/reference_prasad_2019_long_time_vortex_anchor.md`.
   * **Ω_c threshold for rotation-driven vortex nucleation:** Madison &
     Dalibard, cond-mat/0101051. See
-    `memory/madison_dalibard_omega_c_attribution.md`.
+    `memory/reference_madison_dalibard_omega_c_attribution.md`.
 
-In the body below, "Klaus" refers to the project's own protocol name,
-not to a paper. "Klaus-I" = mechanical-trap-rotation branch (−Ω·L_z
-Coriolis drives spin excitation); "Klaus-II" = rotating-B-direction
-branch. Both should ideally be renamed in future work; the existing
-labels are retained here for incident-archeology continuity with
-manuscript drafts already using these names.
+**Naming (2026-08-19, issue #344).** The body below has been renamed to
+say what it computes; `docs/conventions/klaus_name_disambiguation.md` is
+the live authority. The protocol family is the **rotation-assisted EdH
+quench**, and its two branches are named by *what rotates*:
+
+  * **trap-rotation branch** (was "Klaus-I") — mechanical rotation of the
+    anisotropic trap, entering as the −Ω·L_z Coriolis term; B̂ and the DDI
+    kernel are static.
+  * **field-rotation branch** (was "Klaus-II") — rotating B̂ direction, so
+    the DDI anisotropy axis rotates; the trap is static. Also called the
+    magnetic stirrer, which is what `runs/magnetic_stirrer/` holds.
+
+The retired labels are **deleted** here rather than aliased, per the
+repo's naming convention. They survive verbatim only in
+`docs/validation/config_{prose_harvest,metadata_blocks}.toml`, which are
+records of what the configs said and must not be rewritten, and in
+`runs/**.yaml`, whose bytes key the content-addressed output directories.
 
 `docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md` — anko 2026-05-26
 evening pivot.
@@ -44,7 +73,7 @@ evening pivot.
 The bare-⟨F_z⟩ Barnett window scan (`runs/barnett_eu_window/`, 14 cells)
 gave Ω/ω_⊥ ≈ −0.3 to −0.5 as the signal-rich window for sustained-rotation
 DDI-mediated spin response.  That signal is mechanically real but **not what
-the Klaus experiment measures**.  The Klaus experiment measures post-quench
+the target Eu experiment measures**.  That experiment measures post-quench
 m=−5, m=−4 excitation after dropping from strong-field rotation prep into
 the weak-field regime.
 
@@ -58,10 +87,11 @@ GS → rotation_prep (10 ms, B=-0.01 G, Ω)
 
 ## Why this is project memory, not just a script artifact
 
-- It's the canonical scan generator pattern for any future Klaus-style
-  protocol question. (DDI quench protocols, multi-stage B ramps, rotation
+- It's the canonical scan generator pattern for any future rotation-assisted
+  EdH quench question. (DDI quench protocols, multi-stage B ramps, rotation
   prep + measurement separation.)
-- It defines the load-bearing observable for Klaus recommendations:
+- It defines the load-bearing observable for rotation-assisted EdH quench
+  recommendations:
   **max_t (N_{-5}+N_{-4}) / N**, NOT ⟨F_z⟩.
 - It supersedes the manuscript Fig 4 (bare-Fz Barnett window) as the
   experimental recommendation. The bare-Fz finding remains true but is
@@ -75,7 +105,7 @@ Coriolis gotcha.
 
 ## How to apply
 
-- Whenever a Klaus / Barnett-style experimental recommendation is
+- Whenever a rotation-assisted-EdH / Barnett-style recommendation is
   being made: the load-bearing observable is post-quench m=−5, m=−4
   excitation, computed via the 2-phase protocol — NOT bare ⟨F_z⟩
   under sustained rotation.
@@ -104,7 +134,7 @@ no phase imprint that survives the quench.
 through the weak-field hold drives P_{-5,-4} from 0.22 → 0.54 (2.5×)
 and P_exc from 0.23 → 0.82 (3.6×) at Ω = −0.5.
 
-This is the recommendation. Whenever a Klaus protocol is proposed,
+This is the recommendation. Whenever a rotation-assisted EdH quench is proposed,
 "rotation throughout including the measurement window" is the
 load-bearing parameter, not "rotation prep then off".
 
@@ -266,7 +296,7 @@ Vortex sign asymmetry weakens with |Ω|: 91% neg at 0.42 → 75% at 0.5
 
 ### Long-time vortex result (2026-05-27, 3 cells)
 
-`runs/klaus_quench_long_time/` extending Klaus-I matched-keep_rot to
+`runs/klaus_quench_long_time/` extending trap-rotation branch matched-keep_rot to
 Prasad-anchored timescales:
 
 ```
@@ -315,34 +345,34 @@ The publication-grade short-time protocol optimum is therefore:
 
 Fig: `klaus_quench_fig_k14_omega_refine.png`.
 
-### Klaus-II adiabatic also null (2026-05-27)
+### field-rotation branch adiabatic also null (2026-05-27)
 
 ```
-sudden-tilt Klaus-II (Ω=+0.5, m=+F):   P_{+5,+4} = 0.2191
-adiabatic   Klaus-II (Ω=+0.5, m=+F):   P_{+5,+4} = 0.2258  (still ≈ baseline)
-Klaus-I keep_rot     (Ω=-0.5, m=-F):   P_{-5,-4} = 0.540    (★ 2.5×)
+sudden-tilt field-rotation branch (Ω=+0.5, m=+F):   P_{+5,+4} = 0.2191
+adiabatic   field-rotation branch (Ω=+0.5, m=+F):   P_{+5,+4} = 0.2258  (still ≈ baseline)
+trap-rotation branch keep_rot     (Ω=-0.5, m=-F):   P_{-5,-4} = 0.540    (★ 2.5×)
 ```
 
 Even with adiabatic theta tilt-up at strong B, the rotating-B-direction
-protocol does NOT drive short-time spin excitation.  **Klaus-I and
-Klaus-II are different physics**: Klaus-I = mechanical trap rotation
-(via -ΩL_z Coriolis term) drives spin excitation; Klaus-II = rotating
-B-field direction needs the long-duration Klaus-magnetostriction
+protocol does NOT drive short-time spin excitation.  **trap-rotation branch and
+field-rotation branch are different physics**: trap-rotation branch = mechanical trap rotation
+(via -ΩL_z Coriolis term) drives spin excitation; field-rotation branch = rotating
+B-field direction needs the long-duration magnetostirring
 regime (high B, ~314 ms+, tested separately in `runs/klaus_hybrid/`).
 
-### Klaus-II rotating-B null result (2026-05-27)
+### field-rotation branch rotating-B null result (2026-05-27)
 
 6-cell scan at `runs/magnetic_stirrer/` with hold-only B-direction
 rotation (θ=π/4 tilt at hold start, phi rate = Ω): **null effect**.
 All 3 Ω points (0.3, 0.5, 0.7) and the static-B control give
-**identical** P_{+5,+4} = 0.2191 — the Klaus-I no-rotation baseline.
+**identical** P_{+5,+4} = 0.2191 — the trap-rotation branch no-rotation baseline.
 
 Reason: ω_L ~ Ω at B_hold = 2.6 nT, so sudden θ jump at hold-start
 breaks adiabatic spin-following.  The spin doesn't track rotating B,
 DDI sees a static spin axis, time-averaged effect = baseline.
 
-Implication: Klaus-I result corresponds to **physical trap rotation**
-(mechanical), NOT rotating B-field.  A proper Klaus-II would need a
+Implication: trap-rotation branch result corresponds to **physical trap rotation**
+(mechanical), NOT rotating B-field.  A proper field-rotation branch would need a
 7-stage pipeline (GS → adiabatic tilt-up → spin-up → steady stir →
 quench → weak-field hold → analyze) with strong B during tilt to
 ensure spin-following.  Not yet dispatched.

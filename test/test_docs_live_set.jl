@@ -36,11 +36,15 @@ const LIVE_DOCS = [
     # registries this file reads (#342).
     "docs/campaign/as_dependency_map.md",
     "docs/campaign/fix_list.toml",
+    # Which of the three things "Klaus" named is meant where (#344). LIVE
+    # because it is a naming rule people are told to follow, and it has its
+    # own gate: test/validation/test_klaus_name_disambiguation.jl.
+    "docs/conventions/klaus_name_disambiguation.md",
     "docs/conventions/testing_strategy.md",
     "docs/design/hamiltonian_layered_architecture.md",
     "docs/design/research_spec_and_provenance_architecture.md",
     "docs/design/unified_spec_architecture.md",
-    "docs/guides/klaus_regime.md",
+    "docs/guides/fast_larmor_regime.md",
     "docs/guides/lab_user_tutorial.md",
     "docs/guides/pipeline_cookbook.md",
     "docs/guides/spgpe.md",
@@ -53,16 +57,16 @@ const LIVE_DOCS = [
     "docs/validation/config_metadata_blocks.toml",
     "docs/validation/config_prose_harvest.toml",
     "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
-    # Arrived with main 2026-08-04. It calls itself the "single entry point for
-    # what this campaign established, excluded, and could not close", and
-    # matsui_reproduction_status.md now points readers at it — so it is what a
-    # reader is sent to, which is the LIVE test.
-    # The Klaus 2022 type-C claim's evidence: published parameters per figure,
+    # The Klaus 2022 reproduction's evidence: published parameters per figure,
     # the systematics, the model-selection numbers, and the pre-registered
     # thresholds. LIVE rather than dated because the gate reads its thresholds
     # and one row of it is an OPEN disagreement — a reader has to know it is
     # maintained.
     "docs/validation/klaus2022_primary_source.md",
+    # Arrived with main 2026-08-04. It calls itself the "single entry point for
+    # what this campaign established, excluded, and could not close", and
+    # matsui_reproduction_status.md now points readers at it — so it is what a
+    # reader is sent to, which is the LIVE test.
     "docs/validation/matsui_campaign_report.md",
     "docs/validation/parameter_contract_with_Ueda.md",
     "docs/validation/step6_ueda_reference_state/reference_state.yaml",

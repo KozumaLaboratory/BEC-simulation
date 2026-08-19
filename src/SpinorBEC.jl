@@ -52,7 +52,7 @@ include("solvers/photon_heating.jl")
 include("solvers/sgpe.jl")
 include("solvers/thermal_cfield.jl")  # classical-field HF equilibrium + thermal seed
 include("solvers/spgpe.jl")   # full SPGPE: growth + energy-damping reservoirs (Rooney PRA 86 053634)
-# Klaus-regime rotating-basis + scalar-eGPE used to live as a vertical
+# Fast-Larmor rotating-basis + scalar-eGPE used to live as a vertical
 # slice at src/rotating_basis/; 2026-06-02 dispersed into proper layers
 # (foundation/, hamiltonian/integrator/, analysis/, solvers/,
 # workflow/experiments/analyzers/). See docs/architecture/rotating_basis.md.
