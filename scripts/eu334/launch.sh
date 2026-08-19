@@ -118,7 +118,10 @@ ensemble)
             s0=1
             while [ "$s0" -le "$NSEED" ]; do
                 n=$(( NSEED - s0 + 1 )); [ "$n" -gt "$SHARD" ] && n=$SHARD
-                q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=12:00:00 \
+                # h_rt is 6 h against a measured 4.5 h for a 3-seed shard. The
+                # reserved term is billed at 0.1 x h_rt against 0.7 x actual, so a
+                # 12 h slot on a 4.5 h job pays 25 % more for nothing.
+                q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=6:00:00 \
                   -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_NO_ED=1,NU_SEEDS_N=$n,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
                   scripts/eu334/submit_nucleate.sh
                 s0=$(( s0 + n ))
