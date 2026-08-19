@@ -146,6 +146,12 @@ size. `bragg_response` returned peak `0.838621` at ALL THREE grids — identical
 against the analytic 0.843787 with `Δω = 0.06283`, i.e. 0.08 bins off and
 grid-independent (norm drift 2.1e-14 at 8³ to 1.1e-12 at 24³).
 
+**These numbers are a MEASUREMENT, not a gate.** The CI oracles run at F=1 in 1D;
+nothing in the suite exercises D=13 in 3D for either instrument, so the scale
+claim rests on the table above and re-measuring it is a manual step. Gating it
+would cost ~18 s (8³) for `bragg_response`, and for the eigen path it also needs
+the F=6 null manifold dealt with first — which is the next paragraph.
+
 **And the eigen path found a physics obstacle worth stating.** At F=6 the polar
 `e₀` state has a LARGE k=0 Hessian null manifold — far larger than F=1's
 two-dimensional one — so `nev=6` lands entirely inside it: six modes at ω < 1e-5
