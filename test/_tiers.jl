@@ -621,6 +621,12 @@ const CI_EXTRA = [
     # fwd(+dt)·bwd(−dt) = id, which is what makes the derived reversal a
     # checked property rather than a claim.
     "oracles/test_outer_chain_registry_mapping.jl",
+    # A `dynamics:` step must build the kernel its own `ddi:` block declares.
+    # `secular` / `quasi_2d` / `l_z` are baked into the Q tensors so they cannot
+    # ride the inherited DDIParams, and the handler re-resolved neither — a
+    # dynamics step asking for the secular kernel silently got the full one,
+    # which is the PATH-GAP class this campaign found to be the commonest.
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
