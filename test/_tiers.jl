@@ -164,6 +164,11 @@ const FAST_TESTS = [
     # not grow. `src/model.jl` said "still to come" with no number and no
     # consequence for months; this is the number (CLAUDE.md commitment 11).
     "model/test_model_adoption_ratchet.jl",
+    # `make_workspace(::Model)` must build the SAME workspace as the resolver
+    # path. Without this the realisation layer would be a THIRD statement of the
+    # physics rather than the inverse of the second one — and it caught two sign
+    # flips (`c1`, `p`) on its first run.
+    "model/test_realise_matches_resolver.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
@@ -636,6 +641,12 @@ const CI_EXTRA = [
     # dynamics step asking for the secular kernel silently got the full one,
     # which is the PATH-GAP class this campaign found to be the commonest.
     "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
+    # The same class one layer down: a physics kwarg a SOLVER accepts must reach
+    # the workspace it builds. Behavioural (build twice, require a difference),
+    # because the source-scan version of this question was a regex
+    # re-implementation of Julia's signature grammar and read two of the four
+    # entry points as accepting nothing.
+    "oracles/test_solver_forwards_every_knob.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
