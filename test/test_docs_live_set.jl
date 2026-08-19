@@ -48,6 +48,12 @@ const LIVE_DOCS = [
     "docs/validation/config_metadata_blocks.toml",
     "docs/validation/config_prose_harvest.toml",
     "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
+    # The #337 answer. LIVE rather than dated because it is what a reader is
+    # sent to: `full_bdg_scheme_dependence_eu_f6.md` (itself LIVE) now opens by
+    # pointing here for the current statement, and `spatial.jl` /
+    # `potentials.jl` cite its measurements. A pointer target that is allowed to
+    # go stale is the failure mode the split exists to prevent.
+    "docs/theory/lhy_scheme_selection_eu_f6.md",
     # Arrived with main 2026-08-04. It calls itself the "single entry point for
     # what this campaign established, excluded, and could not close", and
     # matsui_reproduction_status.md now points readers at it — so it is what a
