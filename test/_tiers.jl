@@ -666,6 +666,11 @@ const CI_EXTRA = [
     # dynamics step asking for the secular kernel silently got the full one,
     # which is the PATH-GAP class this campaign found to be the commonest.
     "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
+    # The BROAD version of the same question: one probe per DYNAMICS_SCHEMA key,
+    # checking only that the knob is not inert. The file above is the DEEP one
+    # for the DDI three. `ddi.secular` was found by reading; this is what finds
+    # the next sibling by running.
+    "oracles/test_dynamics_forwards_every_schema_knob.jl",
     # The same class one layer down: a physics kwarg a SOLVER accepts must reach
     # the workspace it builds. Behavioural (build twice, require a difference),
     # because the source-scan version of this question was a regex
@@ -1328,6 +1333,9 @@ const _COST = Dict{String, Float64}(
     # 384.9 s). Its remaining nine annotations, all from run 32237847445:
     "oracles/test_jz_conservation_ddi.jl" => 204.0,
     "oracles/test_dynamics_honours_kernel_ddi_knobs.jl" => 78.0,
+    # One two-step pipeline run per probe, 16 probes plus the control, at 8³.
+    # Measured 102 s.
+    "oracles/test_dynamics_forwards_every_schema_knob.jl" => 102.0,
     "oracles/test_solver_forwards_every_knob.jl" => 67.0,
     "oracles/test_term_consistency.jl" => 22.0,
     "oracles/test_flux_closure_ddi_identity.jl" => 20.0,
