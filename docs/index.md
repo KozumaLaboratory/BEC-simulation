@@ -31,6 +31,7 @@ docs/
 | Klaus 2022 / Eu fast-Larmor production path | `guides/klaus_regime.md` |
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) — **its hysteresis reading is RETRACTED, see the next row** | `guides/eu_adiabatic_protocol.md` |
 | The κ-dependent transition, re-measured: the "loop" is a J_z slide; the deliverable is a Stern-Gerlach level count | `guides/eu_kappa_hysteresis_loop.md` |
+| Nucleating that state in place instead of transporting it — the C-region window, the minimum atom number the flower texture needs, and what a cooling trajectory selects | `guides/eu_in_place_nucleation.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |
