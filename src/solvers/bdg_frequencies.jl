@@ -216,6 +216,11 @@ Returns:
 - `hessian_lambda`, `hessian_residuals`, `hessian_converged` — the underlying
   Hessian block, per mode. **An unconverged Hessian mode makes every frequency
   built from it suspect**; the reduction cannot repair a subspace it was handed.
+- `spectrum_reached` — false when EVERY returned mode is a zero mode, i.e. the
+  block never left the null manifold and this is not an excitation spectrum at
+  all (it also `@warn`s). Measured at F=6 polar with `nev=6`: six ω < 1e-5 modes,
+  every number honest and none of them an excitation. Check this before reading
+  `omega`.
 - `j_min` — smallest singular value of the reduced symplectic form. `≈ 1` means
   the subspace is J-closed and the reduction is faithful; `≈ 0` means it is
   not, and the frequencies from it are not to be trusted.
@@ -388,12 +393,26 @@ function trapped_bdg_frequencies(
     blocks, overlaps, labels = _label_modes(
         omega, planes, gens_proj, ipR; omega_zero_tol, label_tol)
 
+    # Did the block get PAST the zero modes? A state with a large null manifold
+    # spends the whole `nev` inside it and returns nothing but ω ≈ 0 — measured
+    # at F=6 polar, where `nev=6` came back as six ω < 1e-5 modes. Every number
+    # in that return is honest and none of them is an excitation, which is the
+    # kind of result that reads as "the spectrum is gapless". Say it instead.
+    spectrum_reached = any(>(omega_zero_tol), omega)
+    spectrum_reached || @warn(
+        "trapped_bdg_frequencies: every returned mode is a zero mode — the block " *
+            "never left the null manifold, so this is NOT an excitation spectrum. " *
+            "Raise nev past the manifold, deflate it with extra_nullspace, or gap it " *
+            "(e.g. q > 0). The F=6 polar state has a large k=0 null manifold.",
+        nev, n_zero_modes=count(<=(omega_zero_tol), omega), omega_zero_tol,
+    )
+
     (;
         omega, growth, residuals, labels, overlaps, blocks,
         generators=[name for (name, _) in gens_proj],
         hessian_lambda=lm.λ, hessian_residuals=lm.residuals,
         hessian_converged=lm.converged_modes,
-        j_min, pair_residual, hessian_symmetry_defect, omega_scale,
+        j_min, pair_residual, hessian_symmetry_defect, omega_scale, spectrum_reached,
         lhy_active=_lhy_is_active(ws.lhy),
         mu=p.μ, subspace_dim=m, n_hessian=nh,
     )

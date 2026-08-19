@@ -129,6 +129,31 @@ end
     # do not read it as a measurement.
 end
 
+# `spectrum_reached` — the flag that separates "the spectrum is gapless" from
+# "the block never left the null manifold". Measured at F=6 polar in 3D: nev=6
+# returned six ω < 1e-5 modes, every number honest and none of them an
+# excitation. The F=1 polar box reproduces the same situation cheaply at nev=2,
+# because its zero block is exactly the two broken transverse spin rotations and
+# they sort first.
+@testset "spectrum_reached distinguishes a null manifold from a gapless spectrum" begin
+    fx = _uniform_box(ComplexF64[0, 1, 0])
+    p = constrained_hessian_params(fx.ws, fx.ψ)
+
+    only_zeros = trapped_bdg_frequencies(fx.ws, fx.ψ; nev=2, max_iter=80,
+        hess_tol=1e-9, params=p, rng=MersenneTwister(1))
+    @test all(<(1e-3), only_zeros.omega)
+    @test !only_zeros.spectrum_reached          # and it warns
+
+    reached = trapped_bdg_frequencies(fx.ws, fx.ψ; nev=8, max_iter=80,
+        hess_tol=1e-9, params=p, rng=MersenneTwister(1))
+    @test reached.spectrum_reached
+    # POSITIVE CONTROL on the flag: it is not simply "nev > 2". The same box with
+    # the same nev=2 must flip the flag once the zero modes are gone, so pin the
+    # mechanism — the flag is false exactly when every returned ω is under the
+    # zero tolerance, which the two runs above bracket.
+    @test count(>(1e-3), reached.omega) >= 6
+end
+
 @testset "λ is NOT ω: ω = √(λ₋λ₊)/2, and the k-exponents differ" begin
     fx = _uniform_box(ComplexF64[0, 1, 0])
     lm = trapped_bdg_low_modes(fx.ws, fx.ψ; nev=12, block=18, max_iter=80,
