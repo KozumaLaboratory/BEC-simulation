@@ -18,6 +18,11 @@
 using Test
 # parallel-runner contract: every test file loads the package (plain form)
 using SpinorBEC
+# `Meta.lower` expands macros in THIS module, so a macro the corpus uses has to be
+# resolvable here or every file "lowers" by failing to see the macro at all — which
+# silently disarms the gate below. `calibrated_scan` caught exactly that: its
+# positive control stopped matching when Printf was absent from Main.
+using Printf
 
 const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
@@ -272,31 +277,67 @@ end
 # apostrophe inside it took a launcher down. `bash -n` parses without running,
 # which is exactly the distinction that makes this safe to gate.
 # Parsing is not enough for Julia either. `@printf("a" * "b", x)` PARSES — `*` of
-# two literals is an ordinary expression — and dies at macro-expansion with
+# two literals is an ordinary expression — and dies at MACRO EXPANSION with
 # "First argument to `@printf` after `io` must be a format string". Hit twice on
-# 2026-08-19, once in a driver and once in a test, each time discovered by a
-# scheduler after minutes of queue and JIT.
+# 2026-08-19, once in a driver and once in a test written to close a different
+# hole, each time discovered by a scheduler after minutes of queue and JIT.
 #
-# `Meta.lower` expands macros WITHOUT executing anything, which is the distinction
-# that makes this affordable: the file's body never runs, so a test file costs
-# milliseconds instead of its own runtime.
-@testset "test and script .jl files expand their macros" begin
+# The obvious gate — `Meta.lower` the whole file, which expands macros without
+# executing anything — DOES NOT WORK, and the way that was found is the point.
+# `Meta.parseall` returns a `:toplevel` block, and lowering a `:toplevel` does not
+# recurse into its forms: each is lowered when it is evaluated. So the check
+# returned "ok" for every file including the planted defect. `calibrated_scan`
+# refused to report, naming the positive control, instead of printing a clean zero.
+#
+# So the gate reads the AST for the defect directly. That is narrower — it knows
+# about `@printf`/`@sprintf` and nothing else — and the narrowness is stated rather
+# than papered over: this catches the format-string class, not "macros expand".
+@testset "@printf format strings are literals, not concatenations" begin
     root = normpath(joinpath(@__DIR__, ".."))
     include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
 
-    """`nothing` if the file lowers, else the error message.
+    _concat(x) = x isa Expr && x.head === :call && !isempty(x.args) && x.args[1] === :*
 
-    A parse failure is reported too — it is the same defect one stage earlier —
-    but named separately so the two are not confused."""
-    function lower_error(path)
+    """Every `@printf`/`@sprintf` in `ex` whose FORMAT SLOT is a concatenation.
+
+    Only the format slot. Checking the first two argument positions blindly was the
+    first version and it flagged `@printf("… %4.0f%% …\n", 100thr, …)` in
+    `kz_toroidal_winding.jl` — `100thr` is juxtaposition multiplication, an
+    ordinary VALUE argument, and perfectly fine. A gate that cries wolf on correct
+    code gets switched off.
+
+    So: args[3] is the format unless it is an IO, in which case args[4] is. A
+    String literal in args[3] settles it without needing to know what an IO looks
+    like."""
+    function bad_formats(ex, out=String[])
+        if ex isa Expr
+            if ex.head === :macrocall && length(ex.args) >= 3 &&
+                ex.args[1] in (Symbol("@printf"), Symbol("@sprintf"))
+                # args[3] is the format UNLESS it is a bare symbol, which is the
+                # `@printf(io, fmt, …)` form. A String literal there is the format;
+                # so is a concatenation, which is exactly the defect — an earlier
+                # rule that fell through to args[4] whenever args[3] was not a
+                # String therefore skipped past the bad format and inspected a
+                # value, and the positive control caught it.
+                fmt = (ex.args[3] isa Symbol && length(ex.args) >= 4) ?
+                      ex.args[4] : ex.args[3]
+                _concat(fmt) && push!(out, string(ex.args[1], " at ", ex.args[2]))
+            end
+            for a in ex.args
+                bad_formats(a, out)
+            end
+        end
+        out
+    end
+
+    function offenders(path)
         src = read(path, String)
         ex = try
             Meta.parseall(src)
         catch e
-            return "parse: " * sprint(showerror, e)
+            return ["parse: " * sprint(showerror, e)]
         end
-        r = Meta.lower(Main, ex)
-        (r isa Expr && r.head === :error) ? "lower: " * string(r.args[1]) : nothing
+        bad_formats(ex)
     end
 
     files = String[]
@@ -307,23 +348,28 @@ end
         end
     end
 
-    # The probes carry the ACTUAL defect, not a stand-in: a concatenated `@printf`
-    # format, against a literal one. A checker that only caught syntax errors would
-    # pass the positive control and miss every instance of this.
+    # The probes carry the ACTUAL defect and its innocent twin, in the two argument
+    # shapes the extractor has to tell apart.
     probe = mktempdir()
     bad = joinpath(probe, "bad.jl")
     good = joinpath(probe, "good.jl")
     write(bad, "using Printf\n@printf(\"a\" * \"%d\\n\", 1)\n")
-    write(good, "using Printf\n@printf(\"a%d\\n\", 1)\n")
+    # The negative control carries the three innocent shapes, including the one the
+    # first version got wrong: a juxtaposition-multiplied VALUE argument.
+    write(
+        good,
+        "using Printf\n@printf(\"a%d\\n\", 1)\n@printf(stderr, \"b%d\\n\", 2)\n" *
+        "x = 3\n@printf(\"c%.0f%%\\n\", 100x)\n",
+    )
 
     broken = calibrated_scan(files;
-        match=p -> lower_error(p) !== nothing,
+        match=p -> !isempty(offenders(p)),
         present=bad, absent=good,
         describe=p -> relpath(p, root))
 
     @test isempty(broken)
     for p in broken
-        @info "does not expand" file = relpath(p, root) err = lower_error(p)
+        @info "concatenated @printf format" file = relpath(p, root) what = offenders(p)
     end
     @test !isempty(files)
 end
