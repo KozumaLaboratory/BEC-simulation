@@ -550,8 +550,14 @@ function _energy_damping_buffers(
         Ref(NaN)
     end
     if last_kc[] != k_cut
-        kc2 = real(eltype(psi))(k_cut^2)
-        @. kinv = ifelse((ksq > 0) & (ksq <= kc2), 1 / sqrt(max(ksq, eps(kc2))), 0)
+        RTk = real(eltype(psi))
+        # k_cut = Inf is the DEFAULT and eps(Inf) is NaN, so the guard has to be a
+        # finite floor. With eps(kc2) the whole buffer went NaN whenever the cutoff was
+        # unrestricted, which is one of the two NaNs in the projector-composition gate —
+        # and I attributed the other to the increment form without isolating it.
+        kc2 = isfinite(k_cut) ? RTk(k_cut^2) : RTk(Inf)
+        floor_k = eps(one(RTk))
+        @. kinv = ifelse((ksq > 0) & (ksq <= kc2), 1 / sqrt(max(ksq, floor_k)), 0)
         last_kc[] = k_cut
     end
     (divj, phase_k, ksq, kinv)
