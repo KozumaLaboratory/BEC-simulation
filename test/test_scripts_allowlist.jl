@@ -88,6 +88,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
+    # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
+    # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/branch_spectrum.jl",
+    "eu_spectrum/submit_spectrum.sh",
     # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
     "eu_isotope_q/q_boundary.jl",
     "eu_isotope_q/magnon_gap.jl",

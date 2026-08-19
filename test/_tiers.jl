@@ -173,6 +173,19 @@ const FAST_TESTS = [
     # not grow. `src/model.jl` said "still to come" with no number and no
     # consequence for months; this is the number (CLAUDE.md commitment 11).
     "model/test_model_adoption_ratchet.jl",
+    # `make_workspace(::Model)` must build the SAME workspace as the resolver
+    # path. Without this the realisation layer would be a THIRD statement of the
+    # physics rather than the inverse of the second one — and it caught two sign
+    # flips (`c1`, `p`) on its first run.
+    "model/test_realise_matches_resolver.jl",
+    # …and the BREADTH half. The file above builds a real Workspace, which costs
+    # FFT plans and an LHY table per config, so it runs over three; three of 414
+    # was the realisation layer's honest coverage. This one drops the Workspace
+    # and compares the two kwarg BUNDLES over every config that resolves to a
+    # Model — 414 of them, agreeing, with a per-class negative control so the
+    # clean result is not the four inert-field false positives the first
+    # measurement produced.
+    "model/test_realise_agrees_over_corpus.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
@@ -645,6 +658,12 @@ const CI_EXTRA = [
     # dynamics step asking for the secular kernel silently got the full one,
     # which is the PATH-GAP class this campaign found to be the commonest.
     "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
+    # The same class one layer down: a physics kwarg a SOLVER accepts must reach
+    # the workspace it builds. Behavioural (build twice, require a difference),
+    # because the source-scan version of this question was a regex
+    # re-implementation of Julia's signature grammar and read two of the four
+    # entry points as accepting nothing.
+    "oracles/test_solver_forwards_every_knob.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
@@ -1100,6 +1119,11 @@ const _COST = Dict{String, Float64}(
     # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
     # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
     "model/test_corpus_resolves.jl" => 22.0,
+    # Same walk as above plus `gs_model` and both kwarg bundles per config, and a
+    # four-class negative control. No workspace and no solve. Measured 23.4 s in
+    # CI (23 s locally) — the default 3.0 s estimate reddened the cost-model gate,
+    # which is that gate doing its job on a new file.
+    "model/test_realise_agrees_over_corpus.jl" => 24.0,
     # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
     "model/test_no_ambient_module_refs.jl" => 1.0,
     # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
