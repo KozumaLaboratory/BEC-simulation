@@ -116,7 +116,13 @@ isapprox(last(LADDER), PIN; rtol=1e-12) || error("NB_LADDER must end at NB_PIN=$
 # interaction (∝ N₀) to the Zeeman term (fixed), so the interesting structure is
 # at small f and a linear ladder would spend most of its cells where nothing
 # happens.
-const F_LADDER = collect(exp.(range(log(FMIN), log(FMAX); length=NF)))
+#
+# ROUNDED to the 4 decimals the cell filenames carry, so that the name and the
+# value are the same number. Without it a refinement walk asked for FMAX=0.2714
+# and was handed a cell recording 0.27144176, and the anchor check — correctly —
+# refused it: a file named after a rounded f is a lossy key, and the fix is to
+# make the key exact rather than to loosen the check.
+const F_LADDER = round.(collect(exp.(range(log(FMIN), log(FMAX); length=NF))); digits=4)
 
 # The f = 1 preset IS #335's, and its couplings are the thing every anchor is
 # checked against.

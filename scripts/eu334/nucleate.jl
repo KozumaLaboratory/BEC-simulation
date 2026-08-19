@@ -141,7 +141,11 @@ const HOLD = HOLD_MS / MS_PER_TAU
 they are N₀ times the per-atom value the #335 references are quoted in. Dividing
 here, once, is the whole conversion — and `assert_seed_epoch_scalars` checks it
 against a stored unit-norm cell before any trajectory runs."""
-function per_atom(psi, grid, plans)
+function per_atom(psi_dev, grid, plans)
+    # Host-side once: `_spin_expectation_fields` walks voxels, so a device array
+    # reaches it as scalar indexing — which CUDA.jl refuses rather than silently
+    # running 10⁵ kernel launches.
+    psi = psi_dev isa Array ? psi_dev : Array(psi_dev)
     n = total_norm(psi, grid)
     s = spin_scalars(psi, grid)          # already ∫f dV / ∫n dV
     Lz = orbital_angular_momentum(psi, grid, plans) / n
