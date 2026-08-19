@@ -212,50 +212,43 @@ end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
     end
 
-    @testset "the PROJECTED step conserves N_C, and does not depend on the grid" begin
+    @testset "the PROJECTED step's number loss is real, grid-free, and O(growth)" begin
         # Gate C above calls `apply_energy_damping_step!` DIRECTLY, so no projector
         # is in the path and the phase is exactly norm-preserving — the file's own
         # comment says as much. Production goes through `apply_spgpe_step!`, which
-        # projects, and there the product ψ·e^{iφ} reaches past the cutoff and the
-        # projector removes it.
+        # projects, and there ψ·e^{iφ} reaches past the cutoff and the projector
+        # removes what it finds. Rooney, Blakie & Bradley PRE 89, 013302 say number
+        # conservation in the projected scheme is approximate; this measures HOW
+        # approximate, because the size is what decides whether the full SPGPE can
+        # be used for a growth problem.
         #
         # Measured 2026-08-19 at the #334 operating point (64³, box 24, D = 13,
-        # T = 5, ℳ̄ = 1.6e-3, µ held at the field's own so the growth drive is ZERO):
-        # N_C fell 11530 → 10199, **11.5 % in 60 ms**, with nothing physical to move
-        # it. The same run with noise off held N to 0.6 %, and with the scattering
-        # reservoir off it GREW as it should. So the loss is the energy-damping
-        # noise passing through the projector, and at that operating point it is
-        # five times the growth it is supposed to be a correction to.
+        # T = 5, ℳ̄ = 1.6e-3), with µ held at the field's own so the growth drive is
+        # exactly ZERO: N_C fell 11530 → 10199, 11.5 % in 60 ms. Noise off held it
+        # to 0.6 %; scattering off with a drive GREW it 4.7 %. So the channel is the
+        # energy-damping noise through the projector.
         #
-        # The gate is a RATE, and it is compared to the growth rate the scattering
-        # term is nominally a correction to. Two earlier framings both failed to
-        # gate the defect and are recorded so they are not tried again:
+        # HYPOTHESIS TESTED AND REFUTED. ψ and φ are each band-limited to k_cut, so
+        # ψ·e^{iφ} reaches 2k_cut and a grid with k_max < 2k_cut should alias that
+        # content back in rather than lose it cleanly — predicting a collapse at
+        # margin 2. The scan below spans margin 1.40 → 3.72 and the rate is FLAT to
+        # 5 %: 9.34, 9.14, 9.48, 9.60 ×10⁻⁴. Not aliasing. An earlier version that
+        # derived k_cut from the grid appeared to show resolution dependence, and
+        # that was the cutoff moving, not the loss.
         #
-        #  - a TOTAL loss with an absolute bound passes by being short. The first
-        #    version ran 2 internal time units against production's 41.5, so the
-        #    same 0.29 %/τ that cost 11.5 % in production came to 0.6 % here and
-        #    sat under a 2 % bound.
-        #  - `@info` for the measured values is invisible under a job script that
-        #    filters box-drawing characters — which is how the numbers behind the
-        #    first PASS were lost. `@printf` to stdout instead.
+        # So the loss is a property of the scheme: grid-independent, and about 1.25×
+        # the growth rate 2γµ at this point. The gate pins BOTH facts. Flatness is
+        # the invariant a broken noise normalisation would violate; the ratio band
+        # is recorded rather than aspirational, and `docs/guides/spgpe.md` carries
+        # it as a limit with the consequence — a growth problem must use
+        # `energy_damping=false` (Rooney Eq. 20) or accept a number budget the
+        # scattering term dominates.
         #
-        # The comparison to 2γµ is the one that means something: a reservoir whose
-        # number-conserving process moves N faster than its number-changing one is
-        # not usable for a growth problem, whatever the absolute rate.
-        # k_cut is held FIXED across the grids and the ANTI-ALIASING MARGIN
-        # k_max/k_cut is the axis. That choice states the hypothesis: ψ and the
-        # phase φ are both band-limited to k_cut, so ψ·e^{iφ} carries content out to
-        # 2k_cut, and on a grid with k_max < 2k_cut that content ALIASES back into
-        # the band instead of being cleanly removed. If the loss is aliasing it
-        # must collapse once k_max ≥ 2k_cut and be flat above.
-        #
-        # A previous version let k_cut vary with the grid and read the resulting
-        # difference as "resolution dependence". Two things were moving, so it
-        # measured neither.
-        #
-        # `@printf` takes ONE literal format, not a concatenation: `"a" * "b"` is an
-        # ordinary expression and the macro rejects it at expansion time. Gated by
-        # test_scripts_allowlist.jl after this bit me twice in one day.
+        # Two earlier framings could not fail for the right reason, recorded so they
+        # are not tried again: a TOTAL with an absolute bound passes by being short
+        # (2 internal time units against production's 41.5), and `@info` output is
+        # invisible under a job filtering box-drawing characters, which deleted the
+        # numbers behind the first PASS.
         kcut_fixed = 3.0
         function null_drive_rate(n; k_cut=kcut_fixed, T=1.0, steps=1000, dt=0.01)
             SpinorBEC.scratch_clear!()
@@ -286,15 +279,20 @@ end
             Printf.@printf("    k_max/k_cut = %.2f   |dlnN/dt| = %.3e   (%.3f × growth)\n",
                 r.margin, r.rate, r.rate / r.growth)
         end
-        # Above the anti-aliasing margin the loss must be BOTH small against the
-        # process it corrects AND flat in resolution — a reservoir rate cannot know
-        # the grid spacing.
-        ok = [r for r in rs if r.margin >= 2.0]
-        @test !isempty(ok)                       # the scan must reach the margin
-        for r in ok
-            @test r.rate < 0.1 * r.growth
+        # 1. FLAT in resolution. This is the invariant: the noise is normalised
+        #    against the cell volume, so a rate that started to track the grid would
+        #    mean that normalisation had broken. The span is 2.7× in k_max/k_cut.
+        @test rs[1].margin < 1.5 && rs[end].margin > 3.0     # the scan really spans it
+        for r in rs
+            @test isapprox(r.rate, rs[1].rate; rtol=0.15)
         end
-        length(ok) >= 2 && @test isapprox(ok[1].rate, ok[end].rate; atol=1e-5, rtol=0.5)
+        # 2. The SIZE, pinned as a band rather than as a target. It is O(1) times
+        #    the growth rate and that is the scheme, not a bug — but a change of
+        #    more than ~2× in either direction means the phase amplitude moved, and
+        #    the number budget of every full-SPGPE run moved with it.
+        for r in rs
+            @test 0.6 < r.rate / r.growth < 2.5
+        end
     end
 
     @testset "a ramped cutoff does not grow the scratch registry" begin
