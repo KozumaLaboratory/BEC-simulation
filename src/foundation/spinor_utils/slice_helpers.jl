@@ -48,11 +48,7 @@ function _exp_i_hermitian(
     eig = eigen(Hermitian(H))
     V = eig.vectors
 
-    if imaginary_time
-        expD = SVector{D, ComplexF64}(exp.(-eig.values .* dt))
-    else
-        expD = SVector{D, ComplexF64}(cis.(-eig.values .* dt))
-    end
+    expD = SVector{D, ComplexF64}(wick_phase(-eig.values .* dt, imaginary_time))
 
     V * Diagonal(expD) * V'
 end

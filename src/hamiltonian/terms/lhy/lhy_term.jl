@@ -25,7 +25,7 @@ function apply_step!(::LHYTerm, psi, dt::Real, imaginary_time::Bool, ws)
     # the table once per objectid, O(1) uniform-grid lookup); the CPU method is
     # exactly the broadcast this replaces, so CPU behaviour is unchanged.
     V = _lhy_potential_field(lhy, n, real(eltype(psi)))
-    phase = imaginary_time ? exp.(.-V .* dt) : cis.(.-V .* dt)
+    phase = wick_phase(.-V .* dt, imaginary_time)
     D = size(psi, N + 1)
     idx = ntuple(_ -> :, Val(N))
     for c in 1:D
@@ -146,7 +146,7 @@ function _lhy_energy(psi, lhy::Quasi2DLHY, n_comp, ndim, n_pts, dV)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
         ni = n[I]
-        ni < 1e-30 && continue
+        ni < COUPLING_TOL && continue
         E += ni * ni * (log(ni * lhy.a_2d_sq) + lhy.log_const)
     end
     lhy.c_lhy_2d * E * dV
@@ -172,7 +172,7 @@ function _lhy_energy(psi, lhy::SpatialLHY, n_comp, ndim, n_pts, dV)
         for c in 1:D
             s += abs2(P[i, c])
         end
-        s < 1e-30 && continue
+        s < COUPLING_TOL && continue
         p = _local_polarisation(P, i, s, F, fp, Val(D))
         e1 = _interpolate_1d(lhy.polarisations, lhy.e1_values, clamp(p, 0.0, 1.0))
         E += e1 * s * s * sqrt(s)          # n^(5/2)
@@ -197,7 +197,7 @@ function _lhy_energy(psi, lhy::TabulatedLHY, n_comp, ndim, n_pts, dV)
     E = 0.0
     @inbounds for I in CartesianIndices(n_pts)
         ni = n[I]
-        ni < 1e-30 && continue
+        ni < COUPLING_TOL && continue
         E += _lhy_energy_density(lhy.densities, lhy.potential_values, cum, ni)
     end
     E * dV
@@ -327,7 +327,7 @@ function _grad_lhy_spatial!(grad, psi, lhy::SpatialLHY, n_pts, D, ::Val{N}) wher
             n += a
             fz += (F - (c - 1)) * a
         end
-        n < 1e-30 && continue
+        n < COUPLING_TOL && continue
         sp = zero(ComplexF64)
         for c in 2:D
             sp += fp[c] * conj(P[i, c - 1]) * P[i, c]
@@ -341,7 +341,7 @@ function _grad_lhy_spatial!(grad, psi, lhy::SpatialLHY, n_pts, D, ::Val{N}) wher
         end
 
         de1 = _lhy_de1_dp(lhy, clamp(p, 0.0, 1.0))
-        (de1 == 0.0 || smag < 1e-30) && continue
+        (de1 == 0.0 || smag < COUPLING_TOL) && continue
         pref = n * sqrt(n) * de1
         for c in 1:D
             sf = fz * (F - (c - 1)) * P[i, c]
