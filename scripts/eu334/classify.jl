@@ -118,10 +118,25 @@ function branch_table()
         hdr = String.(raw[1, :])
         col(c) = raw[2:end, findfirst(==(c), hdr)]
         ord = sortperm(Float64.(col("f")))
-        tabs[k] = (; f=Float64.(col("f"))[ord], E=Float64.(col("E_atom"))[ord],
-            fperp=Float64.(col("fperp"))[ord], Jz=Float64.(col("Jz"))[ord],
-            conv=col("conv")[ord])
+        f = Float64.(col("f"))[ord]
+        fp = Float64.(col("fperp"))[ord]
+        # The flower WALK keeps going after the flower BRANCH ends: below f_sp it
+        # has fallen onto the polarised branch, and those rows wear the flower
+        # walk's filename while holding polarised energies. Interpolating them
+        # would compare a polarised state against a polarised reference labelled
+        # "flower" and return FLOWER — which is what it did, on every 60 ms probe
+        # endpoint seeded below f_sp.
+        #
+        # ⟨F⊥⟩ separates the two by a factor 20 here (0.12 against 3.5), so a cut
+        # at 1.0 is not a fitted threshold; it is the gap.
+        keep = k === :flower ? fp .> 1.0 : trues(length(f))
+        tabs[k] = (; f=f[keep], E=Float64.(col("E_atom"))[ord][keep],
+            fperp=fp[keep], Jz=Float64.(col("Jz"))[ord][keep],
+            f_min=isempty(f[keep]) ? Inf : minimum(f[keep]))
     end
+    isempty(tabs[:flower].f) && error("""
+        the flower branch table is empty after masking to ⟨F⊥⟩ > 1 — the walk in
+        $BIF never held the flower branch, so there is nothing to classify against.""")
     tabs
 end
 
@@ -173,6 +188,14 @@ end
 `excited` is a real outcome: a state above BOTH branches by more than their
 separation is not on either, and #335's adiabatic endpoints were exactly that."""
 function assign(E, tabs, f)
+    # BELOW the flower branch's own start there is no second basin to be in, so
+    # there is nothing to classify: the state is polarised because that is the
+    # only thing it can be. Returning `:polarised` there would be true but would
+    # also inflate a "0 % flower" statistic with cells where the question was not
+    # posed, so it is labelled separately.
+    f < tabs[:flower].f_min && return (; label=:below_branch,
+        E_flower=NaN, E_polar=interp(tabs[:polar], f, :E), sep=NaN,
+        dE_flower=NaN, dE_polar=E - interp(tabs[:polar], f, :E))
     Ef = interp(tabs[:flower], f, :E)
     Ep = interp(tabs[:polar], f, :E)
     sep = abs(Ep - Ef)

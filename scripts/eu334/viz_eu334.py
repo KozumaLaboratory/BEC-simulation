@@ -117,6 +117,11 @@ def collect_selection(root: Path, glob: str = "nucleate_k1.8_T*/class/class_*.cs
         key = (float(t["T"][0]), float(t["tau_ms"][0]))
         c = cells.setdefault(key, [0, 0, 0])
         lab = str(t["branch"][0])
+        if lab == "below_branch":
+            # the question was not posed there: the flower branch does not exist
+            # at that condensate fraction, so counting it as "not selected" would
+            # inflate the statistic with cells that could not have gone either way
+            continue
         c[{"flower": 0, "polarised": 1}.get(lab, 2)] += 1
     return cells
 
