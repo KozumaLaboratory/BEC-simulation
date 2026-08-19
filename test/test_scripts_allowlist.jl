@@ -244,6 +244,63 @@ end
 # first second after queueing — `${2:?… stage A's …}` is parsed, and the
 # apostrophe inside it took a launcher down. `bash -n` parses without running,
 # which is exactly the distinction that makes this safe to gate.
+# Parsing is not enough for Julia either. `@printf("a" * "b", x)` PARSES — `*` of
+# two literals is an ordinary expression — and dies at macro-expansion with
+# "First argument to `@printf` after `io` must be a format string". Hit twice on
+# 2026-08-19, once in a driver and once in a test, each time discovered by a
+# scheduler after minutes of queue and JIT.
+#
+# `Meta.lower` expands macros WITHOUT executing anything, which is the distinction
+# that makes this affordable: the file's body never runs, so a test file costs
+# milliseconds instead of its own runtime.
+@testset "test and script .jl files expand their macros" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+
+    """`nothing` if the file lowers, else the error message.
+
+    A parse failure is reported too — it is the same defect one stage earlier —
+    but named separately so the two are not confused."""
+    function lower_error(path)
+        src = read(path, String)
+        ex = try
+            Meta.parseall(src)
+        catch e
+            return "parse: " * sprint(showerror, e)
+        end
+        r = Meta.lower(Main, ex)
+        (r isa Expr && r.head === :error) ? "lower: " * string(r.args[1]) : nothing
+    end
+
+    files = String[]
+    for d in ("test", "scripts", joinpath("docs", "guides", "figures"))
+        isdir(joinpath(root, d)) || continue
+        for (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            endswith(f, ".jl") && push!(files, joinpath(dir, f))
+        end
+    end
+
+    # The probes carry the ACTUAL defect, not a stand-in: a concatenated `@printf`
+    # format, against a literal one. A checker that only caught syntax errors would
+    # pass the positive control and miss every instance of this.
+    probe = mktempdir()
+    bad = joinpath(probe, "bad.jl")
+    good = joinpath(probe, "good.jl")
+    write(bad, "using Printf\n@printf(\"a\" * \"%d\\n\", 1)\n")
+    write(good, "using Printf\n@printf(\"a%d\\n\", 1)\n")
+
+    broken = calibrated_scan(files;
+        match=p -> lower_error(p) !== nothing,
+        present=bad, absent=good,
+        describe=p -> relpath(p, root))
+
+    @test isempty(broken)
+    for p in broken
+        @info "does not expand" file = relpath(p, root) err = lower_error(p)
+    end
+    @test !isempty(files)
+end
+
 @testset "shell scripts under scripts/ parse" begin
     root = normpath(joinpath(@__DIR__, ".."))
     include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))

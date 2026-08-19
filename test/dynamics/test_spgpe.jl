@@ -265,9 +265,12 @@ end
         end
         a = null_drive_rate(32)
         b = null_drive_rate(48)
+        # One literal, not a concatenation: `@printf` needs its format string at
+        # macro-expansion time, and `*` of two literals is still an expression to
+        # it. That is a parse error, i.e. the whole file fails to load — cheap to
+        # find, but only if something actually runs the file.
         Printf.@printf(
-            "\n  projected energy damping at ZERO drive:\n" *
-                "    32³: |dlnN/dt| = %.3e   48³: %.3e   (growth scale 2γµ = %.3e)\n",
+            "\n  projected energy damping at ZERO drive: 32³ |dlnN/dt| = %.3e   48³ = %.3e   (growth scale 2γµ = %.3e)\n",
             a.rate, b.rate, a.growth)
         # A reservoir process cannot depend on the discretisation. If it does, the
         # noise is not normalised against the grid it is drawn on.
