@@ -10,6 +10,15 @@
 #   B_rot / B_final       : 0.01 G  /  2.6000000000000002e-5 G  (2.6 nT magnitude)
 #   dt scale              : 1.0
 #   N_atoms               : 10000
+#
+# mirror-pair: klaus_quench_omm0p5_keeprot.yaml
+#
+# B_z is NEGATIVE here and positive in the partner, deliberately: the
+# chirality-reversing mirror flips every AXIAL quantity — Omega, m, and B_z —
+# and B is axial. See the sibling file
+# klaus_quench_omm0p5_keeprot_mFplus.yaml for the full note on how bce2068f
+# broke this pair while repairing each file correctly (#343, 2026-08-19).
+# Gated by test/workflow/test_mirror_pairs_flip_every_axial_quantity.jl.
 
 defaults:
   kind: spinor
@@ -27,7 +36,7 @@ pipeline:
         c1_ratio: 0.02778
       ddi: {enabled: true, secular: true}
       lhy: {kind: none}
-      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
       initial_state: m_plus_F
       init_sigma: 1.5
@@ -39,7 +48,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.5
-      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       seed_amplitude: 1.0e-6
@@ -53,7 +62,7 @@ pipeline:
       duration: 0.69115
       dt: 0.001
       rotating_frame_omega: 0.5
-      B: {Bz: {from: 0.01, to: 2.6000000000000002e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      B: {Bz: {from: -0.01, to: -2.6000000000000002e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:
@@ -65,7 +74,7 @@ pipeline:
       duration: 6.9115
       dt: 0.005
       rotating_frame_omega: 0.5
-      B: {Bz: "2.6000000000000002e-5 Gauss", theta: 0.0, phi: 0.0}
+      B: {Bz: "-2.6000000000000002e-5 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
       save:
