@@ -124,6 +124,10 @@ const SAVE_SCHEMA = Dict{String, FieldSpec}(
     "every" => FieldSpec(; type=Integer, range=(0.0, 1e9)),
     "n_snapshots" => FieldSpec(; type=Integer, range=(0.0, 1e6)),
     "psi" => FieldSpec(; type=Bool),
+    # scalar_egpe only: keep the z-integrated density at every save point. It is
+    # the observable an absorption image measures and is ~1/n_z the size of ψ,
+    # so a stripe analysis over 100+ frames does not need the full state.
+    "column_density" => FieldSpec(; type=Bool),
     "compression" => FieldSpec(; type=Union{Bool, String}),
     "precision" => FieldSpec(; type=String, enum=["f32", "f64"]),
 )
@@ -263,7 +267,13 @@ const DDI_SCHEMA = Dict{String, FieldSpec}(
 #                              evolves and p·F·dt would otherwise blow up.
 const GS_SCHEMA = Dict{String, FieldSpec}(
     "kind" => FieldSpec(; type=String,
-        enum=["spinor", "binary", "rotating_basis", "option_gamma"]),
+        enum=["spinor", "binary", "rotating_basis", "option_gamma", "scalar_egpe"]),
+    # scalar_egpe path: adiabatic spin elimination. `a_s` is in BOHR RADII and
+    # overrides the registry value (Klaus quotes 109–112 a₀ for ¹⁶²Dy against a
+    # registry 122 a₀); `B_direction` carries the StirProtocol.
+    "a_s" => FieldSpec(; type=Number, range=(0.0, 1e4)),
+    "ddi_pad" => FieldSpec(; type=Vector),
+    "B_magnitude_gauss" => FieldSpec(; type=Number, range=(0.0, 1e4)),
     "dtype" => FieldSpec(; type=String, default="f64", enum=["f32", "f64"]),
     "species_A" => FieldSpec(; type=Dict),    # binary path
     "species_B" => FieldSpec(; type=Dict),    # binary path
@@ -393,11 +403,17 @@ const DYNAMICS_SCHEMA = Dict{String, FieldSpec}(
     "adaptive_dt" => FieldSpec(; type=Dict, schema=ADAPTIVE_DT_SCHEMA),
     "live_monitor" => FieldSpec(; type=Union{Bool, Dict}, schema=LIVE_MONITOR_SCHEMA),
     # Two-component / binary GP path (Phase 4/5 #51 scaffold).
-    "kind" => FieldSpec(; type=String, enum=["binary", "rotating_basis"]),
+    "kind" => FieldSpec(; type=String,
+        enum=["binary", "rotating_basis", "scalar_egpe"]),
     "couplings" => FieldSpec(; type=Dict),
-    # Option γ rotating-basis dynamics
+    # Option γ rotating-basis dynamics; also the scalar_egpe StirProtocol.
     "B_direction" => FieldSpec(; type=Dict),
     "epsilon" => FieldSpec(; type=Number, range=(1e-15, 1.0)),
+    # scalar_egpe: truncated-Wigner seed for the surface instability. NOT the
+    # `noise:` block — that one is normalised away by `_split_noise_block!`
+    # before a step ever sees it, and reusing the name would make this key
+    # vanish silently.
+    "wigner_seed" => FieldSpec(; type=Dict),
 )
 
 const STEP_SCHEMAS = Dict{String, Dict{String, FieldSpec}}(
