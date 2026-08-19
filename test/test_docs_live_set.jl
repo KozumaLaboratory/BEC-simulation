@@ -36,6 +36,10 @@ const LIVE_DOCS = [
     # registries this file reads (#342).
     "docs/campaign/as_dependency_map.md",
     "docs/campaign/fix_list.toml",
+    # The single place the EdH-quench polarisation convention is decided (#343).
+    # LIVE rather than dated on purpose: a convention document that is allowed to
+    # go stale is worse than none, because the thesis reads it as current.
+    "docs/campaign/edh_quench_polarisation_decision.md",
     # Which of the three things "Klaus" named is meant where (#344). LIVE
     # because it is a naming rule people are told to follow, and it has its
     # own gate: test/validation/test_klaus_name_disambiguation.jl.
@@ -120,7 +124,17 @@ _frozen(path) = occursin(_FROZEN_MARK, first(read(joinpath(_REPO, path), String)
         # If LIVE grows without anyone noticing, the gate silently becomes the
         # thing it replaced. 30 is not sacred; exceeding it deliberately means
         # editing this number and saying why in the commit.
-        @test length(LIVE_DOCS) <= 30
+        #
+        # 30 → 31 on 2026-08-19. Three LIVE documents landed the same day, all
+        # from the same tangle: `as_dependency_map.md` (#342),
+        # `klaus_name_disambiguation.md` (#344) and
+        # `edh_quench_polarisation_decision.md` (#343). The third is a CONVENTION
+        # the thesis must not contradict, so dating it would defeat its purpose —
+        # a stale convention doc is worse than none, because it still reads as
+        # current. If this number is raised again soon, the question to ask is
+        # whether the three should be one document rather than whether the
+        # budget should be four.
+        @test length(LIVE_DOCS) <= 31
         @test length(LIVE_DOCS) == length(unique(LIVE_DOCS))
     end
 

@@ -526,6 +526,15 @@ end
         # The control is also not required to DIFFER from the evidence, so an
         # arm that must fail may be an arm that must pass.
         @test Claim("x", :B, Stage[s], s, nothing).control == s
+
+        # ...and BOTH holes are now caught one layer out, by `verify_claim`.
+        # The division of labour is the point and is why the constructor was
+        # left alone: BUILDING a claim to hold a plan stays legal, AUDITING one
+        # insists the computation exists and that the control switches something
+        # off. Closing either in the constructor would still turn the two
+        # assertions above red, which is what that note asks for.
+        @test !verify_claim(vacuous).ok
+        @test !verify_claim(Claim("x", :B, Stage[s], s, nothing)).ok
     end
 end
 
@@ -603,6 +612,19 @@ end
         @test c.evidence[1].kind === :evolve
         @test c.control.kind === :evolve
         @test c.target.arbitrates
+
+        # The one real `Claim` in the tree, put through the structural audit —
+        # otherwise `verify_claim` is a layer with a test and no subject, which
+        # is the shape CLAUDE.md commitment 11 names as the defect. The control
+        # bites in the MODEL and through the ancestor it was seeded from, and
+        # naming both is the useful part: `evolve_stage` inherits `from.model`,
+        # so switching off the DDI at the ground state propagates.
+        a = verify_claim(c)
+        @test a.ok
+        @test "model.ddi" in a.differences[1]
+        @test "from" in a.differences[1]
+        # …and the audit still refuses to be read as a result.
+        @test a.checked_by_running === false
 
         # The refusals still bite on this exact claim, so `:C` is enforced and
         # not merely spelled: no control, and a target that does not arbitrate.

@@ -493,6 +493,96 @@ function make_workspace(;
     )
 end
 
+# ============================================================================
+# make_workspace(::Model) — the Model-driven entry point
+# ============================================================================
+#
+# `src/model.jl` promised this and called it "still to come" for months. What it
+# needed was `src/model/realise.jl`, the inverse of `gs_model`'s runtime→spec
+# walk; this is the thin part on top.
+#
+# It is thin ON PURPOSE. Every physics decision is in `model_physics_kwargs`,
+# and this method's whole job is to supply the three things a Model deliberately
+# does NOT carry — because they are method, not physics, and a Model that hashed
+# them would make the artifact id move with how a state was reached:
+#
+#   sim_params   dt / n_steps / imaginary_time
+#   psi_init     the seed
+#   backend      where it runs
+#
+# plus the one thing that cannot be realised before the potential exists:
+# `light_shift`, whose `profile_source = :trap` envelope is `abs.(V_trap)`.
+
+"""
+    make_workspace(m::Model; sim_params, grid=realise_grid(m.grid), psi_init=nothing,
+                   backend=nothing, fft_flags=default_fft_flags(),
+                   time_dep_interactions=nothing) -> Workspace
+
+Build a `Workspace` from a resolved `Model`.
+
+This is the form to prefer. The kwarg form above is the library primitive and
+takes 33 arguments; every call site that transcribes a config into those by hand
+is a place the transcription can lose one, which is a defect class this
+repository has hit repeatedly — `method: lbfgs` ran every ground state with no
+tabulated LHY (#186), a merge duplicated three kwargs and stopped the package
+parsing, and the LBFGS arm silently dropped `rotating_frame_omega` while the ITP
+arm kept it. `test/model/test_model_adoption_ratchet.jl` counts what is left.
+
+`grid` is a kwarg with a default rather than derived unconditionally: every
+pipeline step already holds one, and rebuilding it allocates the coordinate
+vectors and FFT-shaped buffers again. Passing a grid that disagrees with
+`m.grid` is refused rather than silently preferred — two declarations of the
+grid is the shape this layer exists to delete.
+
+`imaginary_time`, `save_every` and the rest of `SimParams` come in through
+`sim_params`; `realise_sim_params(m; dt, n_steps, …)` is the convenience that
+folds the model's frame into one.
+"""
+function make_workspace(
+    m::Model;
+    sim_params::SimParams,
+    grid::Union{Nothing, Grid}=nothing,
+    psi_init::Union{Nothing, AbstractArray{<:Complex}}=nothing,
+    backend::Union{Nothing, AbstractBackend}=nothing,
+    fft_flags=default_fft_flags(),
+    time_dep_interactions::Union{Nothing, TimeDependentInteractions}=nothing,
+)
+    g = grid === nothing ? realise_grid(m.grid) : grid
+    _assert_grid_matches_model(g, m.grid)
+    kw = model_physics_kwargs(m, g)
+    # The light shift needs the EVALUATED trap, so it is resolved here rather
+    # than in the bundle. `evaluate_potential` is called once for this and again
+    # inside the kwarg `make_workspace`; that second evaluation is the price of
+    # keeping this method a wrapper instead of a fork of the 400-line body, and
+    # it is a one-off O(grid) pass against a function whose own cost is dominated
+    # by FFT planning and the LHY table build.
+    ls = if active(m.light_shift)
+        realise_light_shift(m.light_shift, evaluate_potential(kw.potential, g), m.atom.F,
+            _resolve_backend(backend, g))
+    else
+        nothing
+    end
+    make_workspace(; grid=g, sim_params, psi_init, backend, fft_flags,
+        light_shift=ls, time_dep_interactions, kw...)
+end
+
+# A grid handed in must BE the model's grid. Silently preferring one over the
+# other would make "the Model is the physics" false in the one slot every other
+# slot is dimensioned by.
+function _assert_grid_matches_model(g::Grid, s::GridSpec)
+    n = g.config.n_points
+    box = g.config.box_size
+    length(n) == s.ndim && ntuple(d -> n[d], s.ndim) == ntuple(d -> s.n_points[d], s.ndim) &&
+    all(d -> box[d] ≈ s.box[d], 1:(s.ndim)) || throw(
+        ArgumentError(
+            "the `grid` passed to make_workspace(::Model) is not the model's grid: " *
+            "got n_points=$(n), box=$(box) against GridSpec ndim=$(s.ndim), " *
+            "n_points=$(s.n_points), box=$(s.box). Pass the model's grid, or omit the " *
+            "kwarg and let it be realised."),
+    )
+    nothing
+end
+
 """
     _rebuild_workspace(ws; field=value, ...)
 
