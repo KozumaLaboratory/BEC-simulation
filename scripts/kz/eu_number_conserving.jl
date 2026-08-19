@@ -71,7 +71,7 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_nT::Float64=3.0, seed::Int=9001, dt::Float64=0.02,
     t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend(),
     number_damping::Bool=true, energy_damping::Bool=true,
-    gamma_mult::Float64=1.0)
+    gamma_mult::Float64=1.0, cayley_iters::Int=2)
     traj = zero_d_trajectory(; K3)
     r = traj.r
     # Internal units: the 0-D model is in SI, the field is in units of omega_ref.
@@ -175,7 +175,15 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     N_seed = thermal_cfield!(host, grid, hplans; T=T_hot, mu=1.5, c0=0.02,
         k_cut, seed)
     copyto!(ws.state.psi, host)
-    @printf("  seeded with the handoff equilibrium: N_seed = %.4g\n", N_seed)
+    # INTO C before the run starts. thermal_cfield! low-passes at k_cut and then applies
+    # the density envelope in REAL space, which broadens the spectrum past the cutoff —
+    # over half the seed can sit outside C — and the first projection would otherwise
+    # remove it in one step and be read as a loss rate. That confound is what made the
+    # energy-damping loss look independent of dt for most of this arc.
+    apply_projected_gp!(ws, k_cut)
+    N_seed_C = real(sum(abs2, ws.state.psi)) * cell_volume(grid)
+    @printf("  seeded with the handoff equilibrium: N_seed = %.4g -> %.4g in C (%.1f%%)\n",
+        N_seed, N_seed_C, 100 * N_seed_C / max(N_seed, 1))
 
     mu_ref = Ref(0.0);
     bad = Ref(0)
@@ -194,7 +202,8 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     for s in 1:n_steps
         split_step!(ws)
         # Absolute ramp time: N_of and T_of must be read where the run actually is.
-        apply_spgpe_step!(ws, res, dt; t=t0_int + s * dt, seed=seed + s)
+        apply_spgpe_step!(ws, res, dt; t=t0_int + s * dt, seed=seed + s,
+            cayley_iters=cayley_iters)
         cb(ws, s)
         if s in marks
             NC = real(sum(abs2, ws.state.psi)) * dV
