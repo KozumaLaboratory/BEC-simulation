@@ -43,6 +43,7 @@ using SpinorBEC
 using SpinorBEC: Units, eu151_preset, make_workspace, SimParams,
     static_zeeman, find_ground_state_lbfgs, cell_volume, energy_gradient!,
     constrained_hessian_params, trapped_bdg_low_modes, trapped_bdg_frequencies,
+    trapped_bdg_lowest_eigenvalue,
     CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldopen
@@ -57,6 +58,15 @@ const PIN = getf("SP_PIN", 0.002)
 const NEV = Int(getf("SP_NEV", 6))
 const BLOCK = Int(getf("SP_BLOCK", NEV + 6))
 const MAXITER = Int(getf("SP_MAXITER", 40))
+# λ_min comes from the bare LANCZOS, not from the block. `trapped_bdg_low_modes`
+# says so in its own VALIDITY REGIME: at Eu production the stiffness is
+# interaction-dominated (c₀n ≈ 2343) and the kinetic-only preconditioner does not
+# capture it. Measured here on the 68.25 µG cell, block LOBPCG at max_iter=25
+# returned λ_min = 1.68 with a Kato–Temple width of 5.7 — an unresolved number,
+# correctly refused by the convergence gate. Lanczos with full reorthogonalisation
+# early-stops on the same certificate and costs ~2 gradient evals per iteration.
+const LANCZOS_NITER = Int(getf("SP_LANCZOS_NITER", 300))
+const LANCZOS_ATOL = getf("SP_LANCZOS_ATOL", 1e-6)
 const HESS_TOL = getf("SP_HESS_TOL", 1e-6)
 const FD_EPS = getf("SP_FD_EPS", 1e-5)
 const FD_EPS2 = haskey(ENV, "SP_FD_EPS2") && !isempty(ENV["SP_FD_EPS2"]) ?
@@ -138,12 +148,20 @@ function measure(ws, ψ; nev=NEV, block=BLOCK, max_iter=MAXITER, fd=FD_EPS, seed
     dV = cell_volume(ws.grid)
     stat = sqrt(real(sum(abs2, g .- 2p.μ .* ψ)) * dV)
 
+    # ENERGETIC axis — the campaign's observable. Lanczos, because it converges
+    # here and the block does not (see LANCZOS_NITER).
+    lz = trapped_bdg_lowest_eigenvalue(ws, ψ; niter=LANCZOS_NITER, atol=LANCZOS_ATOL,
+        ε=fd, params=p, rng=MersenneTwister(seed))
+    # FREQUENCY / DYNAMICAL axis — the block, used for what it is good at. Its own
+    # λ block is reported beside the Lanczos one so the two are never confused.
     lm = trapped_bdg_low_modes(ws, ψ; nev, block, max_iter, tol=HESS_TOL,
         ε=fd, params=p, rng=MersenneTwister(seed))
     fr = trapped_bdg_frequencies(ws, ψ; nev, ε=fd, params=p, modes=lm,
         rng=MersenneTwister(seed))
-    (; μ=p.μ, stationarity=stat, λ=lm.λ, λ_lower=lm.λ_lower,
-        widths=lm.widths, converged=lm.converged_modes,
+    (; μ=p.μ, stationarity=stat,
+        λ_min=lz.λ_min, λ_lower=lz.λ_lower, width=lz.width,
+        converged=lz.converged, goldstone=lz.goldstone, niter=lz.niter_used,
+        λ_block=lm.λ, block_converged=lm.converged_modes,
         ω=fr.omega, growth=fr.growth, labels=fr.labels,
         spectrum_reached=fr.spectrum_reached, fd_floor=fr.hessian_symmetry_defect,
         lhy=fr.lhy_active)
@@ -177,9 +195,9 @@ function calibrate()
             tol=1e-10, target_magnetization=0.0, verbose=false)
         ψ = copy(ws.state.psi)
         m = measure(ws, ψ; nev=4, block=10, max_iter=60)
-        @printf("  %s → λ_min = %+.4e (converged=%s, stationarity %.1e)\n",
-            name, m.λ[1], m.converged[1], m.stationarity)
-        push!(out, (; name, λ=m.λ[1], want, conv=m.converged[1]))
+        @printf("  %s → λ_min = %+.4e (converged=%s, %d Lanczos iters, stationarity %.1e)\n",
+            name, m.λ_min, m.converged, m.niter, m.stationarity)
+        push!(out, (; name, λ=m.λ_min, want, conv=m.converged))
     end
     bad = String[]
     pos, neg = out[1], out[2]
@@ -238,7 +256,7 @@ for (i, path) in enumerate(cells)
     # not a constant.
     λ2 = NaN
     if !isnan(FD_EPS2)
-        λ2 = measure(ws, ψ; fd=FD_EPS2).λ[1]
+        λ2 = measure(ws, ψ; fd=FD_EPS2).λ_min
     end
     ok = m.stationarity < STAT_TOL
     # The threshold that separates "negative" from "zero" is the cell's own
@@ -247,20 +265,22 @@ for (i, path) in enumerate(cells)
     # would be comparing a number to a ratio. The Kato–Temple width is the
     # uncertainty on λ_min in λ's own units, which is exactly what "is this
     # distinguishable from zero" needs.
-    tolλ = max(1e-8, m.widths[1])
+    tolλ = max(1e-8, m.width)
     verdict = !ok ? "indeterminate(nonstationary)" :
-              !m.converged[1] ? "unresolved" :
-              m.λ[1] < -tolλ ? "SADDLE" :
-              m.λ[1] < tolλ ? "marginal" : "minimum"
+              !m.converged ? "unresolved" :
+              m.λ_min < -tolλ ? "SADDLE" :
+              m.λ_min < tolλ ? "marginal" : "minimum"
     push!(rows, (; cell=i, path, B_uG=c.B, pin=c.pin, fperp0=c.fperp0, mu=m.μ,
-        stationarity=m.stationarity, lambda_min=m.λ[1], lambda_lower=m.λ_lower[1],
-        width=m.widths[1], converged=m.converged[1], lambda_min_fd2=λ2,
+        stationarity=m.stationarity, lambda_min=m.λ_min, lambda_lower=m.λ_lower,
+        width=m.width, converged=m.converged, lanczos_iters=m.niter,
+        goldstone=m.goldstone, lambda_min_fd2=λ2,
+        lambda_block1=m.λ_block[1], block1_converged=m.block_converged[1],
         omega_min=m.ω[1], growth_max=maximum(abs, m.growth),
         spectrum_reached=m.spectrum_reached, label1=String(m.labels[1]),
         fd_floor=m.fd_floor, lhy_active=m.lhy, verdict,
         wall_s=round(time() - t0; digits=1)))
-    @printf("[%2d] B=%7.3f µG  λ_min=%+.4e [%+.4e] w=%.1e conv=%-5s  ω_min=%.4e γ=%.1e  %-12s stat=%.1e  %s  %.0fs\n",
-        i, c.B, m.λ[1], m.λ_lower[1], m.widths[1], m.converged[1], m.ω[1],
+    @printf("[%2d] B=%7.3f µG  λ_min=%+.4e [%+.4e] w=%.1e conv=%-5s (%3d it)  ω_min=%.4e γ=%.1e  %-12s stat=%.1e  %s  %.0fs\n",
+        i, c.B, m.λ_min, m.λ_lower, m.width, m.converged, m.niter, m.ω[1],
         maximum(abs, m.growth), verdict, m.stationarity,
         isnan(λ2) ? "" : @sprintf("fd2 λ=%+.3e", λ2), time() - t0)
     flush(stdout)
