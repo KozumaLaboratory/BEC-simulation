@@ -269,10 +269,58 @@ This is the structural fact the rest of the campaign is about: **a condensate is
 born polarised**, not because it is preferred but because below $N_0^\ast$ the
 flower state does not exist to be selected.
 
-*(The polarised walk upward, the energy crossing $f_{\rm eq}$, and whether the
-polarised branch has any spinodal in $f$ — pending.)*
+**The polarised branch, by contrast, has no spinodal in $f$ at all.** Walked
+*upward* from $f = 0.02$ ($N_0 = 10^3$) to $f = 1$ it stays converged at the gate
+in every one of 25 cells — $|\nabla E| \sim 8\times10^{-6}$, `stop_reason = tol`,
+$\langle F_\perp\rangle$ falling monotonically $0.299 \to 0.0745$ and $J_z$ running
+$-6.00 \to -1.262$ — and its $f = 1$ cell reproduces #335's independently
+converged reference to $4.8\times10^{-4}$ per atom (10.863612 against 10.864086,
+$\langle F_\perp\rangle$ 0.0745 against 0.0744). That is the walk's positive
+control and it passes; the residual is 0.36 % of the branch separation the
+classifier discriminates on.
 
-### 5.3 The ensemble
+*(`figs/eu334/bifurcation_k1.8_g32/{flower_down,polar_up}.csv`, job 8442264.)*
+
+### 5.3 The selection window: where the two branches are within $k_BT$
+
+The branch separation is what #334's question turns on, and it is **not**
+extensive everywhere. Multiplying the per-atom difference by the atom number
+actually present:
+
+| $f$ | 0.3195 | 0.3761 | 0.4426 | 0.5210 | 0.6132 | 0.7218 | 0.8496 | 1.0000 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| $N_0$ | 15975 | 18805 | 22130 | 26050 | 30660 | 36090 | 42480 | 50000 |
+| $E_{\rm polar}-E_{\rm flower}$ /atom | −0.00491 | +0.00786 | +0.02299 | +0.04053 | +0.06043 | +0.08259 | +0.10670 | +0.13253 |
+| $\Delta E_{\rm total}$ | **−78** | **+148** | +509 | +1056 | +1853 | +2981 | +4533 | +6626 |
+| $\Delta E_{\rm total}/k_BT$ at $T=10$ | −7.8 | +14.8 | +50.9 | +105.6 | +185.3 | +298.0 | +453.3 | +662.6 |
+
+So the structure at $(\kappa = 1.8, B = 20\ \mu$G$)$ is:
+
+| range | what exists | which is the ground state |
+|---|---|---|
+| $f < f_{\rm sp} \in (0.271, 0.320)$ | polarised only | polarised, by default |
+| $f_{\rm sp} < f < f_{\rm eq} \approx 0.339$ | both | **polarised** — the flower is born *above* it |
+| $f > f_{\rm eq}$ | both | **flower**, and the gap grows without bound |
+
+$f_{\rm eq} \approx 0.339$ ($N_0 \approx 1.7\times10^4$) by linear interpolation of
+$\Delta E_{\rm total}$ through zero between the two bracketing cells.
+
+**This is the prediction the ensemble tests, and it is more favourable than the
+$f = 1$ numbers suggested.** At $f = 1$ the branches are 663 $k_BT$ apart at
+$T = 10$ and nothing thermal can happen. But the whole question is decided near
+$f_{\rm sp}$, where they are **8–15 $k_BT$ apart** — the same order as a
+fluctuation. Whether the *barrier between* them is also that small is what a
+trajectory measures and a static continuation cannot. Registered before the runs:
+
+- if the barrier is comparable to the separation, the flower fraction should be
+  **large and rate-dependent**, rising as the traversal slows;
+- if the barrier is much larger, it should be **zero at every rate**, and the
+  campaign's answer is that the polarised branch is a trap.
+
+Either outcome is a result. What would *not* be a result is measuring this at
+$f = 1$, where the answer is 0 by arithmetic.
+
+### 5.4 The ensemble
 
 *(Pending.)*
 
