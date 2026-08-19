@@ -183,9 +183,92 @@ broadcast against a CuArray — it fails to compile the kernel. The #339 instrum
 therefore could not run on a GPU at all; the oracles are CPU-only and CI has no
 GPU, so the first real GPU use is what found it. Fixed in the same branch.
 
-### 5.1 The fold in the spectrum
+### 5.1 There is no fold in the spectrum where the branch ends
 
-*(in flight — job 8443760)*
+*(jobs 8443760, 8443883; 32³ × 13 on an H100, 9–41 s per cell)*
+
+**The branch-tangent curvature does not vanish.** Seven cells at a uniform
+ΔB = 1 µG (the `_fine` scan, B = 61…68, every one stationary at 7–9×10⁻⁶ and
+every one on the flower branch):
+
+| B [µG] | 61 | 62 | 63 | 64 | 65 | 66 | 67 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R = ⟨t, A t⟩ | 2.624 | 2.552 | 2.474 | 2.392 | 2.305 | 2.216 | 2.115 |
+
+R² is linear in B to **0.4 % rms** — so this is a clean measurement, not noise —
+and its zero sits at **B = 78.2 µG**, nearly ten µG past where the branch stops
+existing. Criterion 4's verdict is therefore **DISAGREES (Δ = 9.8 µG > 1.0)**, and
+criterion 3 **FAILS** (R falls by 1.24× over 61→67 where ≥ 3× was required).
+
+A first pass (job 8443760) got Δ = 2.4 µG from three points, but those three had
+been formed at MIXED step sizes — 1 µG, 1 µG and 0.25 µG — because the driver
+paired each cell with whatever came next in the list. A chord is not a tangent,
+and one estimated over 1 µG is not the same quantity as one over 0.25 µG. The
+uniform series above replaced it; the confound was mine and it made the
+disagreement look four times smaller than it is.
+
+**The escape direction does not soften either** *(job 8443979)*. At the last
+surviving flower cell, B = 68.25 µG, along the direction the state actually falls
+to at 68.50 (⟨F⊥⟩ 2.275 → 0.905):
+
+    ⟨d, A d⟩ = +3.403
+
+Positive, and larger than the tangent curvature. This test is ONE-SIDED and needs
+no convergence certificate: a negative value would have PROVEN the cell is already
+a saddle. Positive proves the weaker, and here sufficient, statement that the way
+it falls is uphill — **a barrier is still there at 68.25 µG**.
+
+**What is NOT excluded.** λ_min could see a soft direction transverse to both
+probes, and λ_min is unresolved on these states (§5.0: value 0.056, certified
+width 0.47). So the correct statement is bounded: *nothing measured here softens
+where the branch ends, and the one axis that could still hide a fold cannot be
+resolved with the available preconditioner.*
+
+The frequency axis says the same thing from a third side: ω_min = 1.897, 1.894,
+1.890, 1.885, 1.881, 1.876, 1.871 at B = 61…67 — **flat to 1.4 % across the whole
+approach**, with growth ≤ 9×10⁻¹² (dynamically stable everywhere). The lowest
+resolvable excitation does not notice the branch end at all.
+
+## 6. Answer
+
+**The spectrum does not see a spinodal at 68.4 µG.** Three measurements, none of
+which needed a converged eigenvalue:
+
+1. the curvature along the branch, 2.62 → 2.12 over 61→67 µG, extrapolating to
+   zero at 78 µG rather than 68.4;
+2. the curvature along the escape direction at the last surviving cell, +3.40;
+3. the lowest resolvable frequency, flat at 1.87 within 1.4 %.
+
+At a saddle-node all three should collapse toward zero. **None of them does.**
+
+That does not overturn #335's measurement — its cells are exactly what was
+measured here, and its continuation genuinely loses the flower branch above
+68.4 µG. It changes the READING. "The branch stops existing" and "a warm-started
+L-BFGS can no longer stay on it" are different statements, and the curvature says
+the second one is the safe one. #335's own hold experiment fits that reading at
+least as well: the flower ψ held at 70 µG moved by 0.089 in 217 ms, which was read
+as an instability growing slowly because the spinodal is near — and reads equally
+as a state that barely moved because the barrier is still there.
+
+**The consequence for the experiment is small but real.** #335's deliverable is
+the Stern-Gerlach level count on the falling leg, which does not depend on this;
+that stands. What weakens is the auxiliary claim that a RISING ramp must convert
+by 68.4 µG "at any rate", since that argument is a spinodal argument. If the
+flower minimum survives past 68.4 with a barrier, a fast enough rising ramp can
+carry it further — which is what the predecessor campaign actually observed
+(flower surviving to > 100 µG at every rate) and attributed to the ramp being too
+fast for a slowly-growing instability.
+
+**What would settle it**, and why this campaign cannot: a λ_min resolved on the
+weak-field Eu soft manifold. Both available eigensolvers fail there for the
+documented reason — the stiffness is interaction-dominated (c₀n ≈ 2343) and the
+kinetic-only preconditioner does not capture it. This campaign's contribution to
+that is a measurement rather than a fix: the wall is at width/value ≈ 10 on these
+states, with the FD step ruled out as its cause.
+
+**Not attempted here**, and now known to be unanswerable by this route: the κ=0.9
+control and the polarised-branch minimum-vs-saddle question of #335 §5.2 in its
+two-sided form. The one-sided part IS answerable — §5.2's escape probe below.
 
 ## 6. Answer
 
