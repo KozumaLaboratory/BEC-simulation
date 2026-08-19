@@ -84,35 +84,43 @@ echo "results=$KLAUS_RESULTS"
 # unless `KLAUS_FFTW_THREADS` overrides. The dynamics is FFT-bound, so this is
 # the knob that matters.
 #
-# FFTW THREADS DEFAULT TO 1 HERE, AND THAT IS THE FIX — measured, three arms,
-# one variable (2026-08-19, all `--smoke`, same commit, same node class):
+# FFTW THREADS DEFAULT TO THE CORE COUNT, measured ON THE GRID THAT RUNS.
 #
-#   arm  julia -t   FFTW threads   ru_maxrss   outcome
-#   A       16          16          36.9 GB    SIGKILL at 55 s   (job 8445105)
-#   B       16           1           1.08 GB   exit 0, 343 s     (job 8445106)
-#   C        1           1           1.27 GB   exit 0, 341 s     (job 8445107)
+# 128^3 (production), hold 0.05 s, one variable:
 #
-# A and B differ in NOTHING but the FFTW thread count and their peak RSS differs
-# by 34x. B against C also says the threading buys no wall time on this problem
-# (343 s vs 341 s), so 1 is not a sacrifice here — but that is measured on the
-# SMOKE grid, and the production grid is bigger. Raise it with
-# KLAUS_FFTW_THREADS and measure rather than inheriting this number.
+#   FFTW threads   wall     ru_maxrss    job
+#        1        1803 s     1.06 GB     8445674
+#        4         825 s     1.28 GB     8445675
+#       16         575 s     1.15 GB     8445676   <- 3.13x faster than 1
 #
-# NOT EXPLAINED, and left unexplained rather than guessed: the same `-t 16` with
-# FFTW at 16 peaks at 1.12 GB locally (/usr/bin/time -v, 10-core box) and
-# completes in 159 s. So it is not the thread count alone. The obvious candidate
-# is FFTW sizing work by the CPUs it can SEE — the node has 384 — rather than by
-# the threads it was asked for, which would make this the same class as every
-# other library that reads /proc/cpuinfo instead of its cgroup. That is a
-# hypothesis; nothing here tested it.
+# 48^3 (--smoke), where this was FIRST measured and where the answer INVERTS:
 #
-# The first failure was a SIGSEGV inside FFTW's threaded spawn loop (job
-# 8444494) and the stack trace pointed at FFTW as a bug. It was the same
-# exhaustion landing in a worker task. TWO FAILURE MODES FROM ONE CONFIGURATION
-# — SIGSEGV at 3m14s, then SIGKILL at 55 s — is what said "resource", not "bug".
-export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-1}"
+#   julia -t   FFTW threads   ru_maxrss   outcome
+#      16          16          36.9 GB    SIGKILL at 55 s   (8445105)
+#      16           1           1.08 GB   exit 0, 343 s     (8445106)
+#       1           1           1.27 GB   exit 0, 341 s     (8445107)
+#
+# So the small grid says "1 or die" and the production grid says "16, and it is
+# also the LIGHTEST". Both are measured; neither generalises to the other. A
+# default of 1 was set from the 48^3 table alone with a comment saying the
+# production grid should be measured — and then the production seeds were
+# launched without measuring it, at 3.13x the cost, into a 2 h h_rt they could
+# not have met (jobs 8445116/7/8, all `execd enforced h_rt limit` at 7195 s).
+# Writing the caveat is not measuring it.
+#
+# STILL NOT EXPLAINED: why 16 threads costs 36.9 GB at 48^3 and 1.15 GB at
+# 128^3 — a 19x LARGER problem using 32x LESS memory at the same thread count.
+# "Small grid x many threads is pathological" is as far as the measurements go.
+# The same `-t 16` with FFTW at 16 also peaks at 1.12 GB locally on a 10-core
+# box, so the visible-CPU count (384 on the node) is a candidate; untested.
+#
+# The first failure was a SIGSEGV inside FFTW's threaded spawn loop (8444494)
+# and the stack trace pointed at FFTW as a bug. TWO FAILURE MODES FROM ONE
+# CONFIGURATION — SIGSEGV at 3m14s, then SIGKILL at 55 s — is what said
+# "resource", not "bug".
 JT="${KLAUS_JULIA_THREADS:-16}"
-echo "julia_threads=$JT fftw_threads=${KLAUS_FFTW_THREADS:-<follows julia>}"
+export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-$JT}"
+echo "julia_threads=$JT fftw_threads=$KLAUS_FFTW_THREADS"
 time "$JULIA" --project=. -t "$JT" scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
