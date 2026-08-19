@@ -93,12 +93,23 @@ ensemble)
     for f in "$SEEDCELL" "$ENDCELL"; do
         [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
     done
+    # SHARDED over seeds. One trajectory is ~48 min at 64³ over 6 s of internal
+    # time, so a 20-seed cell in one job is 16 h — inside a 24 h slot with nothing
+    # to spare, and a kill costs the whole error bar. `SHARD` seeds per job makes
+    # the wall clock the shard, and the per-seed skip in submit_nucleate.sh makes a
+    # re-submission free.
+    SHARD=${SHARD:-5}
     for T in $TEMPS; do
         for TAU in $TAUS; do
             HOLD=$(awk -v a="$TOTAL_MS" -v b="$TAU" 'BEGIN{printf "%.1f", (a-b>0? a-b : 0)}')
-            q -N nu_T${T}_t${TAU} -l h_rt=24:00:00 \
-              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
-              scripts/eu334/submit_nucleate.sh
+            s0=1
+            while [ "$s0" -le "$NSEED" ]; do
+                n=$(( NSEED - s0 + 1 )); [ "$n" -gt "$SHARD" ] && n=$SHARD
+                q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=12:00:00 \
+                  -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_SEEDS_N=$n,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
+                  scripts/eu334/submit_nucleate.sh
+                s0=$(( s0 + n ))
+            done
         done
     done
     ;;
