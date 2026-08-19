@@ -40,7 +40,7 @@ include("solvers/continuation/pseudo_arclength.jl")
 include("solvers/continuation/triple_point.jl")
 include("solvers/twa.jl")
 include("solvers/binary_simulation.jl")
-include("solvers/scalar_egpe.jl")  # adiabatic-elimination scalar GPE (Klaus regime alt)
+include("solvers/scalar_egpe.jl")  # adiabatic-elimination scalar GPE (fast-Larmor alt)
 # 0-D truncated-Boltzmann evaporative-cooling model (thermal-cloud → BEC ramp
 # optimization). Parallel to GP: scalar N(t)/T(t) kinetics, not a wavefunction.
 include("solvers/evaporation/trap_geometry.jl")

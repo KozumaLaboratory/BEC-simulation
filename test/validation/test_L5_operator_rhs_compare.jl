@@ -304,7 +304,7 @@ end
 #
 # `apply_uniform_spin_rotation!` applies exp(-i dt (φ_x F_x + φ_y F_y + φ_z F_z))
 # (spatially uniform — used for transverse Zeeman Bx, By, magnetostir
-# Klaus path, and any constant spin rotation).
+# rotating-basis path, and any constant spin rotation).
 #
 # Reference: build M = Σ_α φ_α F_α directly (D×D Hermitian), exponentiate
 # with Julia's matrix exp. The implementation derives its rotation matrix

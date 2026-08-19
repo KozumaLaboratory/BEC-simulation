@@ -158,7 +158,7 @@ _fidelity(a, b) =
     end
 
     # (f) Rotating-basis Zeeman vs the registry SSoT. apply_local_spin_step!
-    # (Klaus-regime production) and apply_lab_spin_step! now build the spin
+    # (fast-Larmor production) and apply_lab_spin_step! now build the spin
     # Hamiltonian via zeeman_field_matrix!; the standard registry declares the
     # SAME sign once in _diag_coef(ZeemanTerm). Pin the n̂=ẑ reduction of the
     # rotating builder to _diag_coef entry-by-entry (and assert it is purely

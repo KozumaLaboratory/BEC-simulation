@@ -232,6 +232,11 @@ const FAST_TESTS = [
     # itself against, and — the load-bearing half — which of the targets
     # CLAUDE.md names have no gate at all. Pure table + file/tier lookups.
     "validation/test_type_c_claims.jl",
+    # One word ("Klaus") named the paper, the fast-Larmor regime and this
+    # project's own protocol at once, and a "correction" denying the paper's
+    # existence sat above a citation to it (#344). Pure text scan over the
+    # maintained tree, every arm through `calibrated_scan`.
+    "validation/test_klaus_name_disambiguation.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
@@ -413,6 +418,10 @@ const CI_EXTRA = [
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
+    # refusal that follows from it — a paper with no re-measurable record has
+    # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
+    "validation/test_klaus2022_ref.jl",
     # Klaus 2022 magnetostirring: the coefficient chain, the directional
     # magnetostriction oracle (coarse-grid ITP), and the pre-registered
     # thresholds re-applied to the stored production verdicts.
@@ -489,7 +498,7 @@ const CI_EXTRA = [
     # being true and nobody had checked.
     "workflow/test_active_learning_yaml.jl",
     "workflow/test_multi_fidelity_yaml.jl",
-    # Klaus 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
+    # Klaus et al. 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",

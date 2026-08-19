@@ -28,9 +28,10 @@ docs/
 |---|---|
 | End-to-end walkthrough (calibration → YAML → run → analyze) | `guides/lab_user_tutorial.md` |
 | YAML pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
-| Klaus 2022 / Eu fast-Larmor production path | `guides/klaus_regime.md` |
+| Fast-Larmor regime (Eu / Dy production path) | `guides/fast_larmor_regime.md` |
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) — **its hysteresis reading is RETRACTED, see the next row** | `guides/eu_adiabatic_protocol.md` |
 | The κ-dependent transition, re-measured: the "loop" is a J_z slide; the deliverable is a Stern-Gerlach level count | `guides/eu_kappa_hysteresis_loop.md` |
+| 磁場遮蔽仕様 — 弱磁場 Eu の状態を保持するための B⊥ 上限（AC/DC 分離、共鳴 26 Hz） | `guides/eu_shielding_spec.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |
@@ -45,6 +46,7 @@ docs/
 | Every key in a `dynamics:` block | `reference/dynamics.md` |
 | Module structure + data flow | `reference/architecture.md` |
 | API docstrings | `api/index.md` |
+| Which "Klaus" is meant — the paper, the fast-Larmor regime, or our own protocol | `conventions/klaus_name_disambiguation.md` |
 
 ### Understanding why the code is the way it is
 
@@ -71,7 +73,7 @@ docs/
 | Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
 | Whether a claim survives the ¹⁵¹Eu `a_S` measurement, or waits for it | `campaign/as_dependency_map.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |
-| Klaus 2022 magnetostirring vortex stripes (type-C reproduction): published parameters per figure, systematics, model selection, pre-registered accept/reject | `validation/klaus2022_primary_source.md` |
+| Klaus et al. 2022 magnetostirring vortex stripes (type-C reproduction): published parameters per figure, systematics, model selection, pre-registered accept/reject | `validation/klaus2022_primary_source.md` |
 | Closed-form theory derivations | `theory/*.md` |
 
 ## Documentation philosophy

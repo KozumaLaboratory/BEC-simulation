@@ -85,7 +85,7 @@ scan:
     - {name: seed_c, override: {pipeline.1.noise_seed: 33033}}
 ```
 
-## Multi-step movie (Klaus 2022 style)
+## Multi-step movie (Klaus et al. 2022 style)
 
 ```yaml
 pipeline:
