@@ -88,6 +88,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
+    # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
+    # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/branch_spectrum.jl",
+    "eu_spectrum/submit_spectrum.sh",
     # ── active campaign: field-noise shielding spec (docs/guides/eu_shielding_spec.md, #362) ──
     "eu_noise/noise_hold.jl",
     "eu_noise/shielding_spec.jl",
