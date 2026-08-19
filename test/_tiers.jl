@@ -178,6 +178,14 @@ const FAST_TESTS = [
     # physics rather than the inverse of the second one — and it caught two sign
     # flips (`c1`, `p`) on its first run.
     "model/test_realise_matches_resolver.jl",
+    # …and the BREADTH half. The file above builds a real Workspace, which costs
+    # FFT plans and an LHY table per config, so it runs over three; three of 414
+    # was the realisation layer's honest coverage. This one drops the Workspace
+    # and compares the two kwarg BUNDLES over every config that resolves to a
+    # Model — 414 of them, agreeing, with a per-class negative control so the
+    # clean result is not the four inert-field false positives the first
+    # measurement produced.
+    "model/test_realise_agrees_over_corpus.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
