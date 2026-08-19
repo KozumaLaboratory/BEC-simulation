@@ -107,10 +107,10 @@ def panel_separation(ax, a, b, temps=(5.0, 10.0)):
     ax.grid(True, alpha=0.6)
 
 
-def collect_selection(root: Path):
+def collect_selection(root: Path, glob: str = "nucleate_k1.8_T*/class/class_*.csv"):
     """(T, tau_ms) -> (n_flower, n_polar, n_excited) from the per-endpoint CSVs."""
     cells: dict[tuple[float, float], list[int]] = {}
-    for p in sorted(root.glob("nucleate_k1.8_T*/class/class_*.csv")):
+    for p in sorted(root.glob(glob)):
         t = read_tsv(p)
         if not t.get("branch", np.array([])).size:
             continue
@@ -119,6 +119,27 @@ def collect_selection(root: Path):
         lab = str(t["branch"][0])
         c[{"flower": 0, "polarised": 1}.get(lab, 2)] += 1
     return cells
+
+
+def print_table(cells, want: int = 20) -> None:
+    """The selection statistic, as text, with the cells that are SHORT named.
+
+    A cell that did not finish its trajectories is printed with its own n rather
+    than folded into the fraction — the pre-registered criterion says a partial
+    cell says so instead of quoting the fraction it happened to get.
+    """
+    if not cells:
+        print("no classified trajectories yet")
+        return
+    print(f"\n{'T':>6} {'tau[ms]':>9} {'n':>4} {'flower':>7} {'polar':>6} "
+          f"{'excited':>8} {'p_flower':>9}  95% CI")
+    for (T, tau) in sorted(cells):
+        nf, npo, nex = cells[(T, tau)]
+        n = nf + npo + nex
+        p, lo, hi = wilson(nf, n)
+        short = "" if n >= want else f"   << SHORT of {want}"
+        print(f"{T:>6.1f} {tau:>9.0f} {n:>4d} {nf:>7d} {npo:>6d} {nex:>8d} "
+              f"{p:>9.3f}  [{lo:.3f}, {hi:.3f}]{short}")
 
 
 def panel_selection(ax, cells):
@@ -177,8 +198,10 @@ def main() -> int:
     fig.savefig(p, dpi=200)
     print("wrote", p)
 
+    cells = collect_selection(args.root)
+    print_table(cells)
     fig2, ax2 = plt.subplots(figsize=(6.4, 4.2), constrained_layout=True)
-    panel_selection(ax2, collect_selection(args.root))
+    panel_selection(ax2, cells)
     p2 = args.out / "eu334_selection.png"
     fig2.savefig(p2, dpi=200)
     print("wrote", p2)
