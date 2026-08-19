@@ -38,27 +38,52 @@ using JLD2
 
 include(joinpath(@__DIR__, "h3_cells.jl"))
 
-"Sorted eigenvalues of <r_a r_b> plus the symmetry axis (smallest moment, oblate)."
+"""
+Sorted eigenvalues of the CENTRAL second-moment tensor
+`<(r-R)_a (r-R)_b>`, the symmetry axis (smallest moment, oblate) and the
+centre of mass `R`.
+
+Subtracting R is not optional. Without it the tensor is
+`<r_a r_b> = <(r-R)_a (r-R)_b> + R_a R_b`, so a droplet sitting 0.77 a_ho off
+the origin reports a moment of 0.649 where the shape contributes 0.055 — it
+reads as a long cigar while being a perfectly good torus. That happened here:
+the F=1 EdH cell came back "prolate" with eigenvalues [0.136, 0.146, 0.649]
+while its energy matched the on-axis ground state to six digits, which is the
+tell — a genuinely different shape does not have the same energy.
+
+`R` is returned as well, because in a QUENCH a drifting droplet also
+contaminates the rotation angle: the azimuth of the symmetry axis is measured
+about the box origin, so an orbiting droplet mixes orbital motion into what is
+meant to be the object's own rotation.
+"""
 function moment_axis(psi, grid::Grid{3})
     psi_h = psi isa Array ? psi : Array(psi)
     rho = total_density(psi_h, 3)
     dV = cell_volume(grid)
     T = zeros(3, 3)
+    com = zeros(3)
     tot = 0.0
     @inbounds for I in CartesianIndices(rho)
         r = (grid.x[1][I[1]], grid.x[2][I[2]], grid.x[3][I[3]])
         w = rho[I] * dV
         tot += w
-        for a in 1:3, b in a:3
-            T[a, b] += w * r[a] * r[b]
+        for a in 1:3
+            com[a] += w * r[a]
+            for b in a:3
+                T[a, b] += w * r[a] * r[b]
+            end
         end
+    end
+    T ./= tot
+    com ./= tot
+    for a in 1:3, b in a:3
+        T[a, b] -= com[a] * com[b]
     end
     for a in 1:3, b in 1:(a - 1)
         T[a, b] = T[b, a]
     end
-    T ./= tot
     ev = eigen(Symmetric(T))
-    (; eig=ev.values, axis=ev.vectors[:, 1])
+    (; eig=ev.values, axis=ev.vectors[:, 1], com=com)
 end
 
 """
@@ -70,8 +95,8 @@ gate on the generalized seed: a seed that built the wrong texture for axis != z
 would converge somewhere else.
 """
 function ground_state_axis(; axis=2, n=(64, 64, 64), box=(6.5, 6.5, 6.5),
-    backend=CUDABackend(), iters=4000)
-    cell = (; seed=:torus, N=15000, eps_dd=1.3, Bz_mG=0.0)
+    backend=CUDABackend(), iters=4000, cellname="T")
+    cell = merge(cell_for(cellname), (; Bz_mG=0.0))
     b = build_cell(cell; n=n, box=box)
     psi0 = seed_torus(b.grid, b.F; lam=b.lam, sr=b.sr, sz=b.sz, axis=axis)
     b = merge(b, (; psi0=psi0))
@@ -90,6 +115,9 @@ function main(args::Vector{String}=String[])
     nn = parse(Int, get(opts, "n", smoke ? "32" : "64"))
     bx = parse(Float64, get(opts, "box", "6.5"))
     Bz_mG = parse(Float64, get(opts, "Bz", "0.015"))
+    # `cell=` selects the physics: "T" is the F=6 extrapolation, "E1" is the
+    # paper's OWN Fig. 4 cell (F=1, N=15000, eps_dd=1.2, B_z = 0.05/0.1 mG).
+    cellname = get(opts, "cell", "T")
     dt = parse(Float64, get(opts, "dt", "5.0e-4"))
     t_end = parse(Float64, get(opts, "t_end", smoke ? "0.2" : "10.0"))
     be = get(opts, "backend", "gpu") == "cpu" ? CPUBackend() : CUDABackend()
@@ -103,15 +131,16 @@ function main(args::Vector{String}=String[])
 
     # ---- 1. B = 0 ground state with the axis along y ---------------------
     b, psi0, ws0, gs0 = ground_state_axis(; axis=2, n=(nn, nn, nn),
-        box=(bx, bx, bx), backend=be, iters=(smoke ? 40 : 4000))
+        box=(bx, bx, bx), backend=be, iters=(smoke ? 40 : 4000),
+        cellname=cellname)
     m0 = moment_axis(psi0, b.grid)
     e0 = energy_decomposition(ws0)
     @printf("  GS(axis=y): E/N = %.8f   grad_norm = %.3e\n", e0.total,
         get(gs0, :grad_norm, NaN))
     @printf("     moment eigenvalues = [%.5f, %.5f, %.5f]  axis = (%+.4f, %+.4f, %+.4f)\n",
         m0.eig..., m0.axis...)
-    @printf("     (the z-axis ground state in its own box gives E/N = -1.575563;\n")
-    @printf("      B=0 is rotationally invariant, so these must agree)\n")
+    println("     (B=0 is rotationally invariant, so this must equal the z-axis")
+    println("      ground state of the same cell: F=6 T gives E/N = -1.575563)")
 
     # ---- 2. quench B_z on and propagate ----------------------------------
     p = SpinorBEC.Units.bfield_to_p_gauss(Bz_mG * 1e-3, b.atom.g_F, OMEGA_REF)
@@ -131,7 +160,8 @@ function main(args::Vector{String}=String[])
     rec = (t=Float64[], Lx=Float64[], Ly=Float64[], Lz=Float64[],
         fx=Float64[], fy=Float64[], fz=Float64[], phi=Float64[],
         e1=Float64[], e2=Float64[], e3=Float64[], norm=Float64[],
-        rho_max=Float64[], edge=Float64[])
+        rho_max=Float64[], edge=Float64[],
+        cx=Float64[], cy=Float64[], cz=Float64[])
     np = b.grid.config.n_points
     function sample!(w)
         psi_h = Array(w.state.psi)
@@ -162,6 +192,9 @@ function main(args::Vector{String}=String[])
         push!(rec.norm, sum(abs2, psi_h) * dV)
         push!(rec.rho_max, maximum(rho) / A_HO_UM^3)
         push!(rec.edge, edge)
+        push!(rec.cx, ma.com[1]);
+        push!(rec.cy, ma.com[2]);
+        push!(rec.cz, ma.com[3])
     end
     sample!(ws)
     cbs = SimulationCallbacks(;
@@ -202,6 +235,9 @@ function main(args::Vector{String}=String[])
         maximum(abs.(rec.norm .- rec.norm[1])))
     @printf("  max edge frac = %.3e   (box gate; the object must not touch the wall)\n",
         maximum(rec.edge))
+    drift = maximum(sqrt.(rec.cx .^ 2 .+ rec.cy .^ 2 .+ rec.cz .^ 2))
+    @printf("  max |COM|     = %.3e a_ho  (the rotation angle is measured about the\n", drift)
+    @printf("                  box origin, so a drifting droplet mixes orbit into it)\n")
     println()
     println("  THE J_z LEDGER   (B is along z, so J_z = L_z + f_z is conserved)")
     @printf("    J_z(0)   = %+.6e\n", Jz[1])
@@ -248,14 +284,15 @@ function main(args::Vector{String}=String[])
         # dt and t_end belong in the NAME: the dt-convergence arm is the same
         # field at half the step, and a tag that omits dt silently overwrites
         # the very run it is supposed to be compared with (it did, once).
-        tag = @sprintf("edh_Bz%.0fuG_n%d_dt%.0em_t%.0f", Bz_mG * 1000, nn,
+        tag = @sprintf("edh_%s_Bz%.0fuG_n%d_dt%.0em_t%.0f", cellname, Bz_mG * 1000, nn,
             dt * 1e4, t_end)
         jldsave(joinpath(outdir, "$tag.jld2"); rec=rec, Jz=Jz, phi_u=phi_u,
             t_ms=t_ms, Bz_mG=Bz_mG, p=p, n=nn, box=bx, dt=dt,
             psi_final=Array(ws.state.psi),
             git_hash=strip(read(`git rev-parse HEAD`, String)))
         open(joinpath(outdir, "$tag.csv"), "w") do io
-            println(io, "t_ms,fx,fy,fz,Lx,Ly,Lz,Jz,phi_deg,e1,e2,e3,norm,rho_max,edge")
+            println(io,
+                "t_ms,fx,fy,fz,Lx,Ly,Lz,Jz,phi_deg,e1,e2,e3,norm,rho_max,edge,cx,cy,cz")
             for i in eachindex(rec.t)
                 println(
                     io,

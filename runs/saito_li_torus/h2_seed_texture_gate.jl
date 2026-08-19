@@ -99,7 +99,6 @@ println("\n-- the trap is free space, or a cage small enough not to matter --")
 # and EdH cells here still do, because a quenched droplet drifts. Either is
 # admissible, but the cage has to be shown irrelevant rather than assumed so.
 let pot = get(step, "potential", Dict()), ω = pot isa Dict ? get(pot, "omega", nothing) : nothing
-
     if ω === nothing
         check(true, "free space",
             "potential.type = $(pot isa Dict ? get(pot, "type", "none") : "none"); " *

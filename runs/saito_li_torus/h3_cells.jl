@@ -56,19 +56,32 @@ const EDGE_MAX = 1.0e-4
 # z-polarized prolate droplet that is its bistable partner (paper Fig. 3(a)).
 # `Bz_mG` in milligauss, the paper's unit in Fig. 3.
 const CELLS = Dict(
-    "T" => (; seed=:torus, N=15000, eps_dd=1.3, Bz_mG=0.0),
-    "C" => (; seed=:cigar, N=15000, eps_dd=1.3, Bz_mG=0.0),
+    "T" => (; seed=:torus, atom=:Eu151, N=15000, eps_dd=1.3, Bz_mG=0.0),
+    "C" => (; seed=:cigar, atom=:Eu151, N=15000, eps_dd=1.3, Bz_mG=0.0),
+    # The paper's OWN cells, at F=1. `Eu151_f1_effective` carries Table S1's
+    # F=1 moment (9/2 mu_B) and reproduces its a_dd = 24.72 a_B to 0.01 %, so
+    # these are reproductions rather than extrapolations. Fig. 3(b,c) publishes
+    # bistability over 0.03-0.17 mG with the energies crossing at 0.14 mG.
+    "T1" => (; seed=:torus, atom=:Eu151_f1_effective, N=50000, eps_dd=1.2, Bz_mG=0.0),
+    "C1" => (; seed=:cigar, atom=:Eu151_f1_effective, N=50000, eps_dd=1.2, Bz_mG=0.0),
+    # Fig. 1(a-c) and Fig. 4 (Einstein-de Haas) are N = 15000.
+    "E1" => (; seed=:torus, atom=:Eu151_f1_effective, N=15000, eps_dd=1.2, Bz_mG=0.0),
 )
-"Field-ladder cells, built on demand: T@0.05 / C@0.05 / ..."
+"""
+Field-ladder cells, built on demand: `T@0.05`, `C1@0.14`, ...
+
+The prefix names a cell in `CELLS` and the suffix overrides `Bz_mG`, so the
+F=6 extrapolation (`T`/`C`) and the paper's F=1 cells (`T1`/`C1`) run through
+one code path and differ only in the atom, N and eps_dd they carry.
+"""
 function cell_for(name::AbstractString)
     haskey(CELLS, name) && return CELLS[name]
-    m = match(r"^([TC])@([0-9.]+)$", name)
-    if m === nothing
+    m = match(r"^([A-Za-z0-9]+)@([0-9.]+)$", name)
+    if m === nothing || !haskey(CELLS, m[1])
         known = join(sort(collect(keys(CELLS))), ", ")
-        error("unknown cell $name (have $known, or T@<mG> / C@<mG>)")
+        error("unknown cell $name (have $known, or <name>@<mG>)")
     end
-    (; seed=(m[1] == "T" ? :torus : :cigar), N=15000, eps_dd=1.3,
-        Bz_mG=parse(Float64, m[2]))
+    merge(CELLS[m[1]], (; Bz_mG=parse(Float64, m[2])))
 end
 
 # ---------------------------------------------------------------------------
@@ -82,19 +95,23 @@ atom. Consequently `c_dd` is the NATURAL value and only `c_total` moves; see
 `g2_resolved_coefficients.jl` for why scaling both squares the ratio.
 """
 function build_cell(cell; n=(64, 64, 64), box=(6.5, 6.5, 3.5), seed_scale=1.0)
-    F = ATOM_BASE.F
-    a_dd = compute_a_dd(ATOM_BASE)
+    base = ATOM_REGISTRY[get(cell, :atom, :Eu151)]
+    F = base.F
+    a_dd = compute_a_dd(base)
     a_s = a_dd / cell.eps_dd
-    atom = AtomSpecies(ATOM_BASE.name, ATOM_BASE.mass, F, a_s, 0.0,
-        ATOM_BASE.mu_mag, ATOM_BASE.g_F)
+    atom = AtomSpecies(base.name, base.mass, F, a_s, 0.0, base.mu_mag, base.g_F)
 
-    c0 = 4π * (a_s / A_HO) * cell.N
+    # a_ho follows the ATOM's mass; every cell here is a Eu-151 nucleus, so it
+    # is the same number, but reading it off `base` keeps the F=1 effective
+    # model and the physical F=6 atom on one code path.
+    a_ho = sqrt(Units.HBAR / (base.mass * OMEGA_REF))
+    c0 = 4π * (a_s / a_ho) * cell.N
     c_dd = compute_c_dd_dimless(atom; N_atoms=cell.N, omega_ref=OMEGA_REF)
-    c_lhy = scalar_lhy_coefficient(a_s / A_HO, cell.N; eps_dd=cell.eps_dd)
+    c_lhy = scalar_lhy_coefficient(a_s / a_ho, cell.N; eps_dd=cell.eps_dd)
 
     v = droplet(; eps_dd=cell.eps_dd, N=cell.N, F=F, l=0)
     v.bound || error("cell has no bound variational droplet (N_c = $(v.N_c))")
-    L0_over_aho = a_s * cell.N / A_HO
+    L0_over_aho = a_s * cell.N / a_ho
     sr = v.sigma_r * L0_over_aho * seed_scale       # a_ho
     sz = v.sigma_z * L0_over_aho * seed_scale
     lam = v.lambda
