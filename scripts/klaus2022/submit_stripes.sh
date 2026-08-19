@@ -80,9 +80,20 @@ fi
 echo "seed=$KLAUS_SEED hold_s=$KLAUS_HOLD_S tag=$KLAUS_TAG smoke=${KLAUS_SMOKE:-0}"
 echo "results=$KLAUS_RESULTS"
 
-# `-t` matches the requested cores; FFTW threads are set from it inside the
-# script. The dynamics is FFT-bound, so this is the knob that matters.
-time "$JULIA" --project=. -t 16 scripts/klaus2022_reproduce.jl stripes $EXTRA
+# `-t` matches the requested cores; FFTW threads follow it inside the script
+# unless `KLAUS_FFTW_THREADS` overrides. The dynamics is FFT-bound, so this is
+# the knob that matters.
+#
+# Both are overridable ONLY because job 8444494 segfaulted inside FFTW's
+# threaded spawn loop here (see the header of scripts/klaus2022_reproduce.jl).
+# The defaults are unchanged, so a plain submit runs what it always ran; the
+# knobs let three arms — `-t 16` as-is, `-t 16` with FFTW single-threaded, and
+# `-t 1` — go into the queue TOGETHER and come back as one wait instead of
+# three. Which of them is green is the measurement; none of them is a fix.
+export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-}"
+JT="${KLAUS_JULIA_THREADS:-16}"
+echo "julia_threads=$JT fftw_threads=${KLAUS_FFTW_THREADS:-<follows julia>}"
+time "$JULIA" --project=. -t "$JT" scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
 exit $rc

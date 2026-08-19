@@ -23,7 +23,24 @@ using JLD2
 using Printf
 using Dates
 
-FFTW.set_num_threads(Threads.nthreads())
+# `KLAUS_FFTW_THREADS` exists because job 8444494 SEGFAULTED on TSUBAME inside
+# FFTW's threaded spawn loop (`FFTW/.../providers.jl:49` → `spawn_apply` →
+# `n1bv_12`), on the dynamics step, after the ground state completed cleanly.
+# The same commit, the same FFTW artifact (`8655261c…`) and the same Julia
+# 1.12.6 run to completion locally at `-t 16` in 159 s, so the binary is not the
+# variable and a local repro is not available to bisect against.
+#
+# This is a DIAGNOSTIC knob, not a fix, and its default is exactly the previous
+# behaviour: unset ⇒ `Threads.nthreads()`. It exists so that one queue wait can
+# discriminate FFTW-internal threading from Julia threading instead of three,
+# which at a 2.5 h queue depth is the difference between answering this today
+# and guessing. Passing an env var the script does not read is silent — that
+# already cost a job on this campaign — so it is read here and echoed below.
+const _FFTW_THREADS = let v = get(ENV, "KLAUS_FFTW_THREADS", "")
+    isempty(v) ? Threads.nthreads() : parse(Int, v)
+end
+FFTW.set_num_threads(_FFTW_THREADS)
+@info "FFTW threads" fftw=_FFTW_THREADS julia=Threads.nthreads()
 using SpinorBEC
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
