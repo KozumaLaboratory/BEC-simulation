@@ -1,5 +1,10 @@
 # ¹⁵¹Eu vs ¹⁵³Eu — the one prediction that needs no scattering length
 
+> **FROZEN 2026-08-19.** A record of what was measured on that date, not a maintained
+> document. The claims that must survive the code moving are gated instead, in
+> `test/analysis/test_isotope_q_map.jl`; the measurements are reproducible from the
+> drivers in §4. Live sources: `CLAUDE.md`, `docs/index.md`, and the code.
+>
 > **Status: §1–§3 are the pre-registration.** They were written **before any
 > compute** and fix the axes, the systematics and the rejection criteria. §4 is the
 > instrument, §5 the measurements with each row naming the run that produced it, §6
@@ -257,6 +262,12 @@ The transverse seed at q = 0.05 costs +0.035 over polar and relaxes into it; the
 polar-vs-magnetized gap is set by c₁F²n/2 ≈ 5.8, an order above anything q does before
 B ≈ 1 G.
 
+¹⁵³Eu at 32³ over a **factor 240 in q** (0.05 → 12, i.e. B = 0.041 → 0.64 G;
+`figs/eu_isotope_q/Eu153_c1+0.0278_as1.00_k1.8_g32_iso.tsv`) says the same thing more
+sharply: every seed lands on **E = 11.0769571608, identical in all twelve digits**, with
+⟨F_z²⟩ ≤ 3×10⁻¹⁹. Nothing about the quadratic Zeeman is visible in the ground state of
+either isotope, and that is the whole reason the deliverable moved to the excitations.
+
 ### 5.4 Ground state, FM side — a boundary, continuous, at ~1.3 G
 
 `figs/eu_isotope_q/Eu151_c1-0.0150_as1.00_k1.8_g32_wide.tsv` (32³, 14 q points, every
@@ -275,6 +286,31 @@ A **continuous** transition: the in-plane magnetization decays smoothly and dies
 q = 15.6 and 29.5, i.e. B₁₅₁ ∈ [1.10, 1.51] G. The level count is discrete and moves
 (5 → 3 → 1), so criterion 2 is satisfiable on this side. But q_c is set by |c₁|n and c₁ is
 unmeasured — the *location* is a drawing of parameter space, not a prediction.
+
+**The collapse, measured (criterion 1).** The same 14-point q grid run for ¹⁵³Eu
+(`figs/eu_isotope_q/Eu153_c1-0.0150_as1.00_k1.8_g32_wide.tsv`) tracks ¹⁵¹Eu to
+~1×10⁻³ in ⟨F_⊥⟩ at every point and dies in the same bracket. Scanning a **common q
+grid** rather than a common field is what makes this a test: the exactly-known factor
+2.278719 is not folded in and then divided back out, so what is left is the mass
+correction alone. Locating q_c by the ⟨F_⊥⟩ contour, log-interpolated:
+
+| ⟨F_⊥⟩ contour | q_c(¹⁵¹Eu) | q_c(¹⁵³Eu) | ratio | ⇒ B₁₅₃/B₁₅₁ |
+|---|---|---|---|---|
+| 3.0 | 9.674 | 9.742 | 1.00695 | 0.66475 |
+| 2.5 | 11.041 | 11.126 | 1.00775 | 0.66501 |
+| 2.0 | 12.600 | 12.708 | 1.00855 | 0.66528 |
+| 1.5 | 14.379 | 14.514 | 1.00935 | 0.66554 |
+
+**0.6648–0.6655 against the pre-registered acceptance window [0.655, 0.675]** — passes,
+with a measured residual of +0.35…+0.47 % over the naive 0.66245. That residual sits
+inside the 0.663–0.668 band §3 predicted from the 0.66 % / 2.0 % coupling corrections,
+and §3 also said in advance that it is **below the 1.4 % ratio error a 1 % per-isotope
+field calibration would carry**, so it is not claimed as a measurable prediction.
+
+The q_c ratio drifts monotonically with the contour (1.0070 → 1.0094) because the
+transition is continuous: "where it dies" is a property of the curve **and** of the
+threshold chosen, the same window-dependence that once faked a physics gap here. Quote
+the contour with any q_c.
 
 ### 5.5 The magnon spectrum — where the prediction actually lives
 
@@ -374,11 +410,14 @@ test would otherwise be quoted as evidence for a claim it could not see.
 
 Against the criteria pre-registered in §3.1:
 
-1. **The map is confirmed** — the isotope is exactly three numbers, gated, with a negative
-   control. The *field-collapse* form of the criterion turned out not to apply: there is no
-   ground-state boundary on Eu's expected AFM side to collapse (§5.3), and on the FM side
-   the boundary's location depends on the unmeasured c₁ (§5.4). The collapse survives in
-   the form that matters — the magnon ratio — where it is exact.
+1. **The map is confirmed, and the field collapse with it.** The isotope is exactly three
+   numbers, gated, with a negative control. On the FM side the measured collapse is
+   **B₁₅₃/B₁₅₁ = 0.6648–0.6655** against the pre-registered window [0.655, 0.675] (§5.4).
+   On Eu's expected AFM side the criterion is not testable at all — there is no
+   ground-state boundary to collapse, because q does nothing there (§5.3) — and the FM
+   boundary's absolute location depends on the unmeasured c₁. The collapse also survives
+   in the form that matters most, the magnon ratio, where it is exact rather than
+   0.4 % off.
 2. **Deliverable as a discrete measurement: partly.** The FM boundary moves a level count
    5 → 3 → 1. The AFM side offers no discrete observable, because it offers no
    q-dependence at all. The magnon deliverable is a *frequency ratio*, which the
