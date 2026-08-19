@@ -320,7 +320,74 @@ trajectory measures and a static continuation cannot. Registered before the runs
 Either outcome is a result. What would *not* be a result is measuring this at
 $f = 1$, where the answer is 0 by arithmetic.
 
-### 5.4 The ensemble
+### 5.4 The same structure at 64³, which is where the trajectories run
+
+`figs/eu334/bifurcation_k1.8_g64/*` (job 8442299, 26 cells over
+$f \in [0.2306, 0.5210]$, anchored on the 32³ cells and upsampled, $L$-BFGS cap 600).
+
+| | last converged flower cell | first polarised cell | bracket for $f_{\rm sp}$ | $f_{\rm eq}$ |
+|---|---:|---:|---:|---:|
+| 32³ | 0.3195 ($\langle F_\perp\rangle$ 3.500) | 0.2714 (0.122) | [0.271, 0.320] | 0.339 |
+| 64³ | 0.3239 (3.528) | 0.2827 (0.118) | **[0.283, 0.324]** | **0.343** |
+
+The brackets overlap, their midpoints differ by 2.7 %, and $f_{\rm eq}$ agrees to
+1.2 %. Per-cell agreement across the whole window is $2\times10^{-5}$ relative in
+$E$ and 0.12 % in $\langle F_\perp\rangle$ (e.g. $f = 0.5210$: $E$ 8.334430 at 64³
+against 8.334264 at 32³, $\langle F_\perp\rangle$ 4.4418 against 4.4470). The 64³
+$f = 0.3026$ cell is `max_steps` mid-collapse and is **excluded** by criterion 6,
+which is what makes the bracket [0.283, 0.324] rather than [0.283, 0.303].
+
+### 5.5 The κ = 0.9 control, statically: one branch, no gap
+
+`figs/eu334/bifurcation_k0.9_g32/*` (job 8442301). The two continuations start
+from *different* states at *opposite* ends of the family — the κ = 0.9 flower seed
+at $f = 1$ walking down, an ITP $m = -F$ state at $f = 0.02$ walking up — and land
+on the same branch:
+
+| $f$ | 0.1959 | 0.2306 | 0.2714 | 0.3195 | 0.3761 | 0.4426 | 0.6132 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| $E$/atom, from above | 3.758533 | 4.080689 | 4.419860 | 4.778227 | 5.156510 | 5.555697 | 6.417122 |
+| $E$/atom, from below | 3.758532 | 4.080692 | 4.419865 | 4.778254 | 5.156578 | 5.555759 | 6.417128 |
+| $\langle F_\perp\rangle$ | 0.642 | 0.729 | 0.788 | 0.834 | 0.872 | 0.910 | 1.938 |
+
+Agreement to 6–7 digits in $E$ and to ≈ 1 % in $\langle F_\perp\rangle$ over the
+whole window the κ = 1.8 campaign runs in. **There is no second branch to be
+metastable on**, which is the static half of the control and matches #335 §5.3.
+
+Above $f \approx 0.7$ the two walks separate in $\langle F_\perp\rangle$ (2.35 vs
+2.15 at $f = 0.7218$; 2.84 vs 2.47 at $f = 1$) while their energies still agree to
+$3\times10^{-3}$, and several of those cells report `max_steps`. That is the soft
+manifold and its orientation freedom, not two branches — the same signature #335
+§5.3 recorded below 30 µG — and it is outside the window in any case. It is stated
+rather than trimmed because a reader who only saw the table above would think the
+walks agree everywhere.
+
+### 5.6 The classifier, calibrated
+
+`figs/eu334/classify_calib_eta{0.02,0.05,0.15}/calibration_f0.3466.csv` (job
+8442497), at 64³ and at $f = 0.3466$ where both branches exist and are converged.
+The two branches there are only $8.14\times10^{-4}$ per atom apart — a harder test
+than $f = 1$, by a factor 160.
+
+| case | verdict | $E$ relaxed | $\Delta E$ from the flower branch |
+|---|---|---:|---:|
+| flower reference | **flower** | 7.112518 | $+2.4\times10^{-9}$ |
+| polarised reference | **polarised** | 7.113331 | $+8.14\times10^{-4}$ |
+| flower + noise | **flower** | 7.112518 | $+3.9\times10^{-9}$ … $+7.0\times10^{-9}$ |
+| polarised + noise | **polarised** | 7.113331 | $+8.14\times10^{-4}$ |
+| equal mix of the two | polarised (recorded) | 7.113331 | $+8.14\times10^{-4}$ |
+
+Identical at $\eta = 0.02$, 0.05 and 0.15, so the classifier is not sensitive to
+the excitation amplitude over the range a trajectory can arrive with. The relaxed
+flower state returns to its own branch energy to nine digits, which is what makes
+a $8\times10^{-4}$ discriminant usable at all.
+
+The mixed state is reported, not asserted: it relaxes to the polarised branch.
+That is a property of the basin boundary at this $f$ and it is exactly why the
+outcome set has three members — a classifier that had been tuned until the mix
+came out "ambiguous" would be a fitted threshold.
+
+### 5.7 The ensemble
 
 *(Pending.)*
 
