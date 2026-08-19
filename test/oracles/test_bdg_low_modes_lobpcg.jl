@@ -79,3 +79,51 @@ end
     @test res.width < 1e-6
     @test res.goldstone
 end
+
+# A PRECONDITIONER CHANGES THE ITERATION, NEVER THE SPECTRUM. `precond=:combined`
+# wires in `P_C = P_V^½ P_K P_V^½` (`solvers/preconditioner.jl`), which adds the
+# real-space stiffness `V_trap + c₀n` that the kinetic-only inverse leaves alone —
+# the stiffness that matters on the weak-field Eu manifold, where the block
+# solver was measured returning λ_min = 1.68 with a Kato–Temple width of 5.7.
+#
+# The sharpest available correctness statement is that the two arms must return
+# the SAME eigenvalues. If they disagree, one of them is not solving the problem
+# it claims to: a metric cannot move an eigenvalue. Speed is NOT asserted here —
+# it is a property of the state, and this small gapped fixture is not the state
+# the option exists for.
+@testset "preconditioner is a metric: :combined ≡ :kinetic on the spectrum" begin
+    grid = make_grid(GridConfig(16, 10.0))
+    interactions = InteractionParams(Dict(0 => 4.0, 1 => 0.3))
+    r = find_ground_state_lbfgs(;
+        grid, atom=Rb87, interactions, potential=HarmonicTrap(1.0),
+        n_steps=400, tol=1e-11, initial_state=:polar, verbose=false,
+    )
+    ws = r.workspace
+    ψ = copy(ws.state.psi)
+    prm = constrained_hessian_params(ws, ψ)
+
+    kin = trapped_bdg_low_modes(ws, ψ; nev=3, block=8, max_iter=60, tol=1e-9,
+        params=prm, rng=MersenneTwister(3))
+    comb = trapped_bdg_low_modes(ws, ψ; nev=3, block=8, max_iter=60, tol=1e-9,
+        precond=:combined, params=prm, rng=MersenneTwister(3))
+
+    @test all(kin.converged_modes)
+    @test all(comb.converged_modes)
+    for k in 1:3
+        # Same eigenvalue, to well inside each arm's own certified width.
+        @test isapprox(comb.λ[k], kin.λ[k];
+            atol=max(1e-6, 2 * max(kin.widths[k], comb.widths[k])))
+    end
+    # …and the vectors span the same subspace: each combined Ritz vector is
+    # inside the kinetic block's span. Eigenvalues agreeing while the vectors
+    # differ would mean the two solved different problems and coincided.
+    dV = prm.dV
+    ipR(a, b) = real(sum(conj.(a) .* b)) * dV
+    for v in comb.vectors
+        proj2 = sum(ipR(v, u)^2 for u in kin.vectors)
+        @test proj2 > 0.99 * ipR(v, v)
+    end
+
+    @test_throws ArgumentError trapped_bdg_low_modes(ws, ψ; precond=:bogus,
+        params=prm, max_iter=1)
+end

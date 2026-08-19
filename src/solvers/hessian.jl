@@ -316,8 +316,12 @@ Rayleigh–Ritz refresh runs when the iteration ends at the cap rather than at
 that refresh the reported values lagged the returned block by one LOBPCG step.
 
 Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
-`α_pre` (preconditioner shift, defaults to `max(|μ|, 1e-3)`), `ε`+`order`
-(HvP), `extra_nullspace`, `rng`.
+`α_pre` (kinetic shift, defaults to `max(|μ|, 1e-3)`), `precond`
+(`:kinetic` default, or `:combined` for `P_V^½ P_K P_V^½` — the real-space
+stiffness `V_trap + c₀n` that the kinetic-only inverse leaves alone), `α_v`
+(the `P_V` regulariser, same default), `ε`+`order` (HvP), `extra_nullspace`,
+`rng`. A preconditioner changes the iteration and not the spectrum, so the two
+`precond` arms must agree on λ — gated.
 
 VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. The
 preconditioner's convergence ADVANTAGE is NOT yet realised at Eu production
@@ -331,9 +335,14 @@ until it reports `converged=true`.
 function trapped_bdg_low_modes(
     ws, ψ;
     nev::Int=1, block::Int=8, max_iter::Int=30, tol::Float64=1e-6,
-    α_pre::Union{Nothing, Float64}=nothing, ε::Float64=1e-5, order::Int=2,
+    α_pre::Union{Nothing, Float64}=nothing, precond::Symbol=:kinetic,
+    α_v::Union{Nothing, Float64}=nothing, ε::Float64=1e-5, order::Int=2,
     extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
 )
+    precond in (:kinetic, :combined) || throw(
+        ArgumentError(
+            "trapped_bdg_low_modes: precond must be :kinetic or :combined, got :$precond"),
+    )
     p = params === nothing ? constrained_hessian_params(ws, ψ) : params
     k2 = _to_device_cached(ws.backend, ws.grid.k_squared)
     ipR(a, b) = real(sum(conj.(a) .* b)) * p.dV
@@ -348,7 +357,25 @@ function trapped_bdg_low_modes(
         end
         w
     end
-    Tprec(v) = project(_kinetic_precondition!(copy(v), ws, k2, α))
+    # `:combined` reaches for the preconditioner this repo already has —
+    # `P_C = P_V^½ P_K P_V^½` (`solvers/preconditioner.jl`), whose own header
+    # names "the BdG eigensolver crawls" as the thing it exists for, and which
+    # was never wired to this consumer. The kinetic-only inverse flattens ½k²
+    # and leaves the REAL-space stiffness `V_trap + c₀n` untouched; on the
+    # weak-field Eu manifold that is the stiffness that matters.
+    #
+    # A preconditioner changes the ITERATION, never the SPECTRUM — so the two
+    # arms must return the same λ, and `test_bdg_low_modes_lobpcg.jl` asserts
+    # exactly that. Default is unchanged (`:kinetic`).
+    α_V = α_v === nothing ? max(abs(p.μ), 1e-3) : α_v
+    sqrt_pv = precond === :combined ? build_precond_sqrt_pv(ws, ψ, α_V) : nothing
+    Tprec(v) = project(
+        if sqrt_pv === nothing
+            _kinetic_precondition!(copy(v), ws, k2, α)
+        else
+            combined_precondition!(copy(v), ws, sqrt_pv, k2, α)
+        end,
+    )
     A(v) = constrained_hessian_action(ws, ψ, v; p.μ, p.dV, p.n2, ε, order)
 
     b = max(block, nev + 2)
