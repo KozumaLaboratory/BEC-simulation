@@ -80,7 +80,9 @@ campaign-gate: 15 refs from docs/campaign/fix_list.toml
   unknown provenance: 3   <- not a pass and not a fail
 ```
 
-133 of the 203 have an Eu / klaus_quench / Matsui / Barnett / EdH name. The producing
+133 of the **200 disqualified** have an Eu / klaus_quench / Matsui / Barnett /
+EdH name (a name match, not a config read — it scopes the damage, it does not
+classify it). The producing
 commits cluster hard: 137 runs at `15a9f1ee` (2026-05-26), 32 at `306ef71a`
 (2026-05-21), 9 at `e8168dcb` (2026-05-23) — i.e. the corpus is a May snapshot,
 and every June–July correction postdates all of it.
@@ -360,12 +362,14 @@ The two arms are `klaus_quench_omm0p5_keeprot.yaml` and
 `klaus_quench_omp0p5_keeprot_mFplus.yaml`. Reading them at `bce2068f~1` — the
 tree the PASS was measured on — and at HEAD:
 
-| | seed | B_z (prep → hold) | Ω/ω_⊥ |
-|---|---|---|---|
-| **pre-fix** `omm0p5_keeprot` | m=−F | −0.01 → −2.6e-5 G | −0.5 |
-| **pre-fix** `omp0p5_keeprot_mFplus` | m=+F | +0.01 → +2.6e-5 G | +0.5 |
-| **HEAD** `omm0p5_keeprot` | m=−F | **+0.01 → +2.6e-5 G** | −0.5 |
-| **HEAD** `omp0p5_keeprot_mFplus` | m=+F | +0.01 → +2.6e-5 G | +0.5 |
+| | seed | B_z (prep → hold) | Ω/ω_⊥ | mirror? |
+|---|---|---|---|---|
+| **at `bce2068f~1`** `omm0p5_keeprot` | m=−F | −0.01 → −2.6e-5 G | −0.5 | ✅ all three flip |
+| **at `bce2068f~1`** `omp0p5_keeprot_mFplus` | m=+F | +0.01 → +2.6e-5 G | +0.5 | |
+| **after `bce2068f`** `omm0p5_keeprot` | m=−F | **+0.01 → +2.6e-5 G** | −0.5 | ❌ only m and Ω flip |
+| **after `bce2068f`** `omp0p5_keeprot_mFplus` | m=+F | +0.01 → +2.6e-5 G | +0.5 | |
+| **repaired here** `omm0p5_keeprot` | m=−F | +0.01 → +2.6e-5 G | −0.5 | ✅ all three flip |
+| **repaired here** `omp0p5_keeprot_mFplus` | m=+F | **−0.01 → −2.6e-5 G** | +0.5 | |
 
 Under the reflection that reverses chirality (take y → −y), **every axial vector
 in the problem flips**: L_z → −L_z (so Ω → −Ω), F → mirrored (so m → −m), **and
@@ -391,13 +395,35 @@ should be expected to fail.
 
 **Corollary for per-file repairs.** A fix applied file-by-file can be right on
 every file and still break a relationship that spans two of them. Nothing in the
-tree recorded that these two configs were a pair, so nothing could warn. Where a
-pair of configs *is* a mirror pair, say so in both files.
+tree recorded that these two configs were a pair, so nothing could warn. The
+single-file gate does report both `mFplus` arms in its m=+F list, but as "seed
+opposes field" — it reads one file at a time and cannot see a broken *pair*.
 
-`test/workflow/test_config_zeeman_seed_agreement.jl` reports both `mFplus` arms
-in its m=+F warning list, so the inconsistency is visible today — but it is
-reported as "seed opposes field", not as "the mirror relationship is broken",
-because the gate reads one file at a time.
+### 5.1 What was done about it
+
+**The repair is determinate here, and `bce2068f`'s stated blocker does not
+apply.** That commit left m=+F configs alone because "flip the field" and "flip
+the seed" are both consistent and the intent is unrecoverable from the file. For
+these two, the intent *is* recoverable: they exist only as the mirror arm of a
+named partner, so the mirror role fixes which of the two moves. B_z flipped
+negative on both `mFplus` files. Each is now self-consistent (m=+F wants B_z<0)
+**and** each pair flips all three axial quantities again.
+
+**Validated by measurement, not by sign bookkeeping**: arm G in §3.6 runs the
+repaired `omp0p5_keeprot_mFplus` shape and reproduces its partner's peak
+P_{−5,−4} = 0.24311 to five digits.
+
+**And made mechanical.** All four files now carry `# mirror-pair: <partner>` in
+the header, and `test/workflow/test_mirror_pairs_flip_every_axial_quantity.jl`
+(fast tier) asserts the declaration is symmetric and that the seed, Ω **and**
+B_z all flip with equal magnitude — with a canary that reconstructs the
+post-`bce2068f` broken pair and requires the B_z clause to reject it, so an
+all-green run is not the same string as a predicate that matches everything.
+
+Note that both members of each repaired pair now sit at the **aligned** (Zeeman
+ground) preparation, so the pair is mirror-correct and, per §3.4, in the regime
+where the rotation enhancement does not exist. Fixing the mirror and fixing the
+physics are separate jobs; §6 R1 is the second one.
 
 ---
 
