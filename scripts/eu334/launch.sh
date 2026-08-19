@@ -107,21 +107,26 @@ ensemble)
     # nucleation possible where transport is blocked. Passed through `-v`, not
     # exported: qsub only forwards the variables it is named, so an `export` here
     # would have left every job running the full theory.
-    # SHARDED over seeds. One trajectory is ~1.5 h at 64³ over 4 s of internal time
-    # (measured: 7.7 ms/step, 691k steps at dt = 0.004), so a 20-seed cell in one
-    # job would be 30 h. `SHARD` seeds per job makes the wall clock the shard, and
-    # the per-seed skip in submit_nucleate.sh makes a re-submission free.
-    SHARD=${SHARD:-3}
+    # ONE trajectory per job, and a 12 h slot for a job that takes ~7 h.
+    #
+    # The isolated rate probe measured 7.7 ms/step, i.e. 1.5 h for 691k steps, and a
+    # 3-seed shard in a 6 h slot was sized from it. Under the real ensemble — 30
+    # gpu_1 jobs, four to a node, all bandwidth-bound on 64³ D=13 FFTs — the
+    # measured rate is 6.6 h per trajectory, 4.4× the isolated one. The first wave
+    # was therefore killed at its walltime having banked one trajectory of three.
+    #
+    # A probe run alone does not measure the campaign; it measures the probe. One
+    # trajectory per job makes the wall clock independent of that factor, and the
+    # per-seed skip in submit_nucleate.sh makes a resubmission cost only what is
+    # missing.
+    SHARD=${SHARD:-1}
     for T in $TEMPS; do
         for TAU in $TAUS; do
             HOLD=$(awk -v a="$TOTAL_MS" -v b="$TAU" 'BEGIN{printf "%.1f", (a-b>0? a-b : 0)}')
             s0=1
             while [ "$s0" -le "$NSEED" ]; do
                 n=$(( NSEED - s0 + 1 )); [ "$n" -gt "$SHARD" ] && n=$SHARD
-                # h_rt is 6 h against a measured 4.5 h for a 3-seed shard. The
-                # reserved term is billed at 0.1 x h_rt against 0.7 x actual, so a
-                # 12 h slot on a 4.5 h job pays 25 % more for nothing.
-                q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=6:00:00 \
+                q -N nu_T${T}_t${TAU}_s${s0} -l h_rt=12:00:00 \
                   -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_NO_ED=1,NU_SEEDS_N=$n,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
                   scripts/eu334/submit_nucleate.sh
                 s0=$(( s0 + n ))
@@ -165,6 +170,14 @@ kappa09)
     q -N nu_k09 -l h_rt=24:00:00 \
       -v NU_KAPPA=0.9,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_NO_ED=1,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_MU1_FROM=$END09,NU_OUT=$OUT/nucleate_k0.9_T5.0_tau500 \
       scripts/eu334/submit_nucleate.sh
+    ;;
+
+# Classify every endpoint that has one and no class CSV yet. Idempotent, and
+# separate from the trajectory jobs so a shard killed at its walltime does not
+# leave its finished trajectories unread.
+classify)
+    q -N eu334_cls -l h_rt=12:00:00 -v CL_ROOT=$OUT,CL_GRID=64 \
+      scripts/eu334/submit_classify.sh
     ;;
 
 *) echo "unknown stage '$1'" >&2; exit 64 ;;

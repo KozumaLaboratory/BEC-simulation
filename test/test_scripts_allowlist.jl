@@ -94,6 +94,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu334/submit_bifurcation.sh",
     "eu334/submit_nucleate.sh",
     "eu334/submit_smoke.sh",
+    "eu334/submit_classify.sh",
     "eu334/window.jl",
     "eu334/nucleation_bifurcation.jl",
     "eu334/nucleate.jl",
