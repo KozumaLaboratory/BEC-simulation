@@ -43,8 +43,11 @@ bifurcation)
     q -N nb18_32 -l h_rt=12:00:00 \
       -v NB_KAPPA=1.8,NB_GRID=32,NB_FMIN=0.02,NB_FMAX=1.0,NB_NF=25,NB_OUT=$OUT/bifurcation_k1.8_g32 \
       scripts/eu334/submit_bifurcation.sh
+    # κ = 0.9 has its own converged f = 1 seed; the #335 references are κ = 1.8
+    # states and anchoring on one here would start the walk off its own branch.
+    SEEDS=${EU334_SEEDS:-/gs/fs/tga-kozuma-kouhi/uk07267/runs/eu335/seeds}
     q -N nb09_32 -l h_rt=12:00:00 \
-      -v NB_KAPPA=0.9,NB_GRID=32,NB_FMIN=0.02,NB_FMAX=1.0,NB_NF=25,NB_OUT=$OUT/bifurcation_k0.9_g32 \
+      -v NB_KAPPA=0.9,NB_GRID=32,NB_FMIN=0.02,NB_FMAX=1.0,NB_NF=25,NB_ANCHOR_FLOWER=$SEEDS/flower_k0.9_B020_g32.jld2,NB_OUT=$OUT/bifurcation_k0.9_g32 \
       scripts/eu334/submit_bifurcation.sh
     ;;
 

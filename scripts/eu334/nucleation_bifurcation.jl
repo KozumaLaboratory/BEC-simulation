@@ -293,7 +293,11 @@ function main()
     # converged branch. The flower walk STARTS there so its check is trivial; the
     # polarised walk arrives there after 25 cells of continuation from f = FMIN,
     # and that one is the real test of the ladder.
-    if isapprox(last(F_LADDER), 1.0; rtol=1e-9)
+    # The #335 references are κ = 1.8 states. Comparing a κ = 0.9 walk against
+    # them would be a control that always fails, which is worse than none —
+    # anything can be attributed to it. At other κ the endpoint is printed and
+    # explicitly labelled as unreferenced.
+    if isapprox(last(F_LADDER), 1.0; rtol=1e-9) && isapprox(KAPPA, 1.8; rtol=1e-9)
         ref = anchor_f1(:m_minus_F)
         p1 = polar[end]
         @printf("\npositive control — polarised walk's f=1 cell vs #335 reference:\n")
@@ -301,6 +305,10 @@ function main()
             p1[3], ref.E, p1[3] - ref.E, p1[5], ref.fperp)
         abs(p1[3] - ref.E) < 1e-3 || @printf(
             "  REFUSING to interpret: the walk did not return to the reference branch\n")
+    elseif isapprox(last(F_LADDER), 1.0; rtol=1e-9)
+        p1 = polar[end]
+        @printf("\nκ = %.2f: no converged f = 1 reference exists for this κ, so the walk's\n", KAPPA)
+        @printf("endpoint (E/atom %.6f, ⟨F⊥⟩ %.4f) is reported UNREFERENCED.\n", p1[3], p1[5])
     else
         @printf("\nwindow walk (f ends at %.4f) — the f = 1 positive control does not apply here;\n",
             last(F_LADDER))
