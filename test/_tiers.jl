@@ -1127,28 +1127,55 @@ const _COST = Dict{String, Float64}(
     "workflow/test_triple_point.jl" => 127.0,
     "test_dealias_2_3.jl" => 76.0,
     "solvers/test_continuation.jl" => 58.0,
-    "workflow/test_pipeline.jl" => 17.0,
+    "workflow/test_pipeline.jl" => 199.0,
     "workflow/test_infrastructure.jl" => 15.0,
     # Was 13.0 when it only built tables; #179 added a run_yaml A/B
     # (`method: lbfgs` reaches the tabulated LHY), which dominates. Now the
     # heaviest single file in the fast tier — measured 255.9 s.
     "workflow/test_lhy_block_wiring.jl" => 255.9,
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
-    "test_level4_general_F_phase_emergence.jl" => 13.0,
-    "analysis/test_tof_multiframe.jl" => 9.5,
+    "test_level4_general_F_phase_emergence.jl" => 101.0,
+    "analysis/test_tof_multiframe.jl" => 44.0,
     "gpu/test_mixed_precision.jl" => 9.0,
-    "analysis/test_physics_invariants.jl" => 8.0,
-    "solvers/test_simulation.jl" => 8.0,
+    "analysis/test_physics_invariants.jl" => 55.0,
+    "solvers/test_simulation.jl" => 58.0,
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "solvers/test_lbfgs_history_precision.jl" => 8.0,
     "solvers/test_lbfgs_line_search_fused_gradient.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
-    "solvers/test_3d.jl" => 5.0,
+    "solvers/test_3d.jl" => 60.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
-    "solvers/test_lbfgs_line_search_and_de.jl" => 15.0,
+    "solvers/test_lbfgs_line_search_and_de.jl" => 66.0,
+
+    # ── The ten below had NO entry, so they were modelled at _DEFAULT_COST =
+    # 3.0 s while measuring 22–377 s. Handed out last by a heaviest-first
+    # queue, a 377 s file starts when the other workers are nearly done, and
+    # the makespan becomes that pickup time plus the file.
+    #
+    # Measured 2026-08-19 on the 4-vCPU GitHub runner these estimates are
+    # calibrated for (run 32217501709). CI had been emitting the annotation for
+    # every one of them on EVERY run — 17 distinct entries across the two jobs,
+    # up to 126x — so this is acting on a warning the suite already produced,
+    # not a new discovery.
+    #
+    # Effect, from the per-worker totals in that run: `integration` finished at
+    # 740 s against a 548 s floor (its four workers ran 369/450/740/631), i.e.
+    # 35 % of that job was the ordering. `fast`, whose heavy files DO have
+    # entries, came in at 574/571/571/572 — at its floor. Same runner, same
+    # scheduler, and the difference is this table.
+    "dynamics/test_spgpe.jl" => 377.0,
+    "validation/test_dipolar_supersolid_tube.jl" => 372.0,
+    "workflow/test_spinor_gs_from_jld2.jl" => 149.0,
+    "solvers/test_evaporation_tools.jl" => 144.0,
+    "model/test_gs_step_returns_one_state.jl" => 94.0,
+    "workflow/test_yaml_physics_reaches_workspace.jl" => 74.0,
+    "hamiltonian/test_rk4ip_convergence_order.jl" => 30.0,
+    "test_level4_f1_phase_emergence.jl" => 28.0,
+    "hamiltonian/test_taylor_tolerance_criterion.jl" => 23.0,
+    "workflow/test_pipeline_name_and_precedence.jl" => 22.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)
