@@ -1,8 +1,14 @@
 # Klaus Ω refinement around the parabolic-interpolation vertex (Ω*≈0.42).
 # Source: scripts/validation/klaus_omega_refine_gen.jl
 #   Ω/ω_⊥ = -0.38
-#   B_hold = 2.6 nT, matched chirality (m=-F, Ω<0), hold-only,
+#   B_hold = 2.6 nT, matched chirality (m=+F, Ω<0), hold-only,
 #   rotation-start delay = 2 ms (the protocol-optimal delay).
+#
+# anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
+#   state. Measured 2026-08-19 (#343): rotation contrast +16.5 % anti-aligned
+#   against -0.45 % aligned, and peak P_adj 0.53 against 0.24. This is the
+#   standard Einstein-de Haas preparation (Kawaguchi-Saito-Ueda PRL 96, 080405).
+#   Authority: docs/campaign/edh_quench_polarisation_decision.md
 
 defaults:
   kind: spinor
@@ -22,7 +28,7 @@ pipeline:
       lhy: {kind: none}
       B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
-      initial_state: m_minus_F
+      initial_state: m_plus_F
       init_sigma: 1.5
       dt: 0.005
       n_steps: 3000

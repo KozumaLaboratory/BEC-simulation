@@ -1,9 +1,9 @@
 # Klaus 2-phase quench protocol (batch 3 killer controls) — auto-generated.
 # Source: scripts/validation/klaus_quench_batch3_gen.jl
 #
-# Cell : klaus_quench_omm0p5_keeprot_mFplus
-#   initial state         : m_plus_F    (m_sign = +F)
-#   Ω/ω_⊥ scan magnitude  : -0.5
+# Cell : klaus_quench_omp0p5_keeprot_mirror
+#   initial state         : m_minus_F   (m_sign = -F)
+#   Ω/ω_⊥ scan magnitude  : 0.5
 #   Ω applied in          : prep=true  quench=true  hold=true
 #   DDI in dynamics       : true
 #   B quench applied      : true
@@ -11,23 +11,20 @@
 #   dt scale              : 1.0
 #   N_atoms               : 10000
 #
-# mirror-pair: klaus_quench_omp0p5_keeprot.yaml
+# mirror-pair: klaus_quench_omm0p5_keeprot.yaml
 #
-# B_z is NEGATIVE here and positive in the partner, and that is the point.
-# The chirality-reversing mirror (y -> -y) acts on EVERY axial quantity:
-# L_z -> -L_z (so Omega flips), F -> mirrored (so m flips), and B is axial too
-# (so B_z flips). Flipping only Omega and m gives a pair that is not a mirror.
-#
-# This file and its partner were a genuine mirror pair until 2026-07-29, when
-# bce2068f flipped B_z on the 211 configs that pinned m=-F and — correctly, given
-# what it could know — left the m=+F ones alone. Each file was then right and the
-# PAIR was broken: both sat at B_z = +0.01 G, so the sheet's
-# "(init m x Omega sign) reversal symmetry, 3-digit match" gate was comparing an
-# uphill Zeeman cascade against a downhill one. Repaired 2026-08-19 (#343) by
-# flipping the field, which is the determinate repair HERE — bce2068f's stated
-# blocker was that "flip the field" and "flip the seed" are both consistent and
-# the intent is unrecoverable from the file, and the mirror role recovers it.
+# B_z is NEGATIVE here and positive in the partner, deliberately: the
+# chirality-reversing mirror flips every AXIAL quantity — Omega, m, and B_z —
+# and B is axial. See the sibling file
+# klaus_quench_omm0p5_keeprot_mirror.yaml for the full note on how bce2068f
+# broke this pair while repairing each file correctly (#343, 2026-08-19).
 # Gated by test/workflow/test_mirror_pairs_flip_every_axial_quantity.jl.
+#
+# anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
+#   state. Measured 2026-08-19 (#343): rotation contrast +16.5 % anti-aligned
+#   against -0.45 % aligned, and peak P_adj 0.53 against 0.24. This is the
+#   standard Einstein-de Haas preparation (Kawaguchi-Saito-Ueda PRL 96, 080405).
+#   Authority: docs/campaign/edh_quench_polarisation_decision.md
 
 defaults:
   kind: spinor
@@ -47,7 +44,7 @@ pipeline:
       lhy: {kind: none}
       B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
       gauge_fix: false
-      initial_state: m_plus_F
+      initial_state: m_minus_F
       init_sigma: 1.5
       dt: 0.005
       n_steps: 3000
@@ -56,7 +53,7 @@ pipeline:
   - dynamics:   # rotation_prep
       duration: 6.9115
       dt: 0.005
-      rotating_frame_omega: -0.5
+      rotating_frame_omega: 0.5
       B: {Bz: "-0.01 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
@@ -70,7 +67,7 @@ pipeline:
   - dynamics:   # B_quench
       duration: 0.69115
       dt: 0.001
-      rotating_frame_omega: -0.5
+      rotating_frame_omega: 0.5
       B: {Bz: {from: -0.01, to: -2.6000000000000002e-5, duration: 0.6911504}, theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
@@ -82,7 +79,7 @@ pipeline:
   - dynamics:   # weak_field_hold
       duration: 6.9115
       dt: 0.005
-      rotating_frame_omega: -0.5
+      rotating_frame_omega: 0.5
       B: {Bz: "-2.6000000000000002e-5 Gauss", theta: 0.0, phi: 0.0}
       ddi: {enabled: true, secular: false}
       lhy: {kind: none}
