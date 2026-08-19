@@ -24,6 +24,7 @@ export SP_OUT="${SP_OUT:-$EU335_OUT/spectrum_k${SP_KAPPA}_g${SP_GRID}}"
 # cross-checked by the driver.
 for v in SP_CELLS SP_CELLS_N SP_BLOCK SP_HESS_TOL SP_FD_EPS SP_FD_EPS2 \
          SP_STATIONARY_TOL SP_FIT_BMIN SP_BSP_REF SP_BSP_TOL SP_PADDING \
+         SP_PRECOND SP_LANCZOS_NITER SP_ESCAPE_CELL SP_TANGENT_MAX_DB \
          SP_DEALIAS SP_SKIP_CONTROLS; do
     [ -n "${!v:-}" ] && export "$v"
 done

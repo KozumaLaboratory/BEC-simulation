@@ -26,6 +26,7 @@
 #   SP_CELLS=a/psi.jld2;b/psi.jld2   cells to measure (`;` — qsub -v cuts at `,`)
 #   SP_CELLS_N=                      expected count; guards that cut
 #   SP_NEV=6  SP_BLOCK=  SP_MAXITER=40  SP_HESS_TOL=1e-6
+#   SP_PRECOND=kinetic|combined     block preconditioner (see LANCZOS_ATOL note)
 #   SP_FD_EPS=1e-5                   Hessian finite-difference step
 #   SP_FD_EPS2=                      second FD step (instrument axis); "" = skip
 #   SP_KAPPA=1.8 SP_GRID=32 SP_BOX=24.0 SP_PIN=0.002 SP_PADDING=0
@@ -67,6 +68,10 @@ const MAXITER = Int(getf("SP_MAXITER", 40))
 # early-stops on the same certificate and costs ~2 gradient evals per iteration.
 const LANCZOS_NITER = Int(getf("SP_LANCZOS_NITER", 300))
 const LANCZOS_ATOL = getf("SP_LANCZOS_ATOL", 1e-6)
+# `:combined` adds the real-space stiffness (V_trap + c₀n) the kinetic-only
+# inverse leaves alone — the documented next step after this campaign measured
+# the wall at width/value ≈ 10 on these very cells.
+const PRECOND = Symbol(get(ENV, "SP_PRECOND", "kinetic"))
 const HESS_TOL = getf("SP_HESS_TOL", 1e-6)
 const FD_EPS = getf("SP_FD_EPS", 1e-5)
 const FD_EPS2 = haskey(ENV, "SP_FD_EPS2") && !isempty(ENV["SP_FD_EPS2"]) ?
@@ -155,7 +160,7 @@ function measure(ws, ψ; nev=NEV, block=BLOCK, max_iter=MAXITER, fd=FD_EPS, seed
     # FREQUENCY / DYNAMICAL axis — the block, used for what it is good at. Its own
     # λ block is reported beside the Lanczos one so the two are never confused.
     lm = trapped_bdg_low_modes(ws, ψ; nev, block, max_iter, tol=HESS_TOL,
-        ε=fd, params=p, rng=MersenneTwister(seed))
+        ε=fd, precond=PRECOND, params=p, rng=MersenneTwister(seed))
     fr = trapped_bdg_frequencies(ws, ψ; nev, ε=fd, params=p, modes=lm,
         rng=MersenneTwister(seed))
     (; params=p, μ=p.μ, stationarity=stat,
