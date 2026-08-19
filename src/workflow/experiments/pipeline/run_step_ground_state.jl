@@ -359,6 +359,20 @@ end
 # explosion CLAUDE.md §"Type stability boundaries" exists to prevent. The
 # `NamedTuple` inside `_gs_stage_params` has a per-call type by construction, so
 # the narrowing has to happen here.
+# Same fail-safe as `_gs_artifact_id`, one level earlier: a config `gs_model`
+# cannot resolve has no Stage, so a following `:evolve` stage has no `from` and
+# gets no id either. The chain fails safe end to end rather than inventing a
+# root for itself.
+@noinline function _gs_stage_or_nothing(
+    r::GSResolved, p::Dict{String, Any}
+)::Union{Nothing, Stage}
+    try
+        gs_stage(r, p)
+    catch
+        nothing
+    end
+end
+
 @noinline function _gs_artifact_id(r::GSResolved, p::Dict{String, Any})::Union{Nothing, String}
     try
         artifact_id(gs_stage(r, p))
@@ -547,6 +561,7 @@ function _run_step(
                 :ground_state_provenance => String(gs_admission.provenance),
                 :workspace => ws_cached,
                 :gs_stage_ref => stage_ref,
+                :gs_stage => _gs_stage_or_nothing(r, p),
             )
             # The other three quarters of the verdict. The marker carries
             # `stop_reason`, `floor_limited` and `grad_norm`; until this commit a
@@ -866,6 +881,12 @@ function _run_step(
         :ground_state_grad_norm => gs_v.grad_norm,
         :workspace => gs.workspace,
         :gs_stage_ref => stage_ref,
+        # The Stage itself, not just its id. A following `:evolve` stage needs
+        # it as `from` — `artifact_id` recurses into the chain, so the dynamics
+        # id carries the ground state that produced ψ. Built unconditionally
+        # (it is pure and cheap) rather than only when the stage cache is on,
+        # because the dynamics id is not a caching question.
+        :gs_stage => _gs_stage_or_nothing(r, p),
     )
     (psi_out, grid, atom, gs.workspace, step_result)
 end

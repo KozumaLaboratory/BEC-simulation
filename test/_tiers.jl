@@ -440,6 +440,10 @@ const CI_EXTRA = [
     # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
     "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # The `:evolve` Stage producer: the DYNAMICS_SCHEMA partition is total, a
+    # model-level key is refused rather than dropped, and the real-time ambient
+    # switches finally move an artifact id.
+    "model/test_evolve_stage.jl",
     # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
     # refusal that follows from it — a paper with no re-measurable record has
     # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
