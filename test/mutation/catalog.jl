@@ -353,7 +353,10 @@ const MUTANTS = Mutant[
          data labelled `phase_classify` that a different analyzer produced — \
          the aliased-dispatch silent-bug factory the convention exists to stop."),
     Mutant(:gs_interactions_inherit_over_explicit,
-        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
+        # Relocated body, unchanged text: `_resolve_gs_interactions` moved out of
+        # run_step_ground_state.jl into resolve_gs.jl. Retargeting the path is the
+        # whole fix — the anchor still matches once at resolve_gs.jl:75.
+        "src/workflow/experiments/pipeline/resolve_gs.jl",
         r"    if haskey\(p, \"interactions\"\)\n        return _parse_gs_interactions\(p\[\"interactions\"\], atom\)\n    elseif ws_prev !== nothing\n        return ws_prev\.interactions",
         "    if ws_prev !== nothing\n        return ws_prev.interactions\n    elseif haskey(p, \"interactions\")\n        return _parse_gs_interactions(p[\"interactions\"], atom)",
         :path_default, :fatal,
@@ -525,25 +528,43 @@ const MUTANTS = Mutant[
         "The named wrapper stops forwarding `phi`, so every caller asking for an \
          in-plane direction gets phi = 0. `:transverse_x` is exactly this call, and \
          the wrapper's whole contract is that it is `init_psi` with a name."),
+    # Both entries below used to anchor on `_gs_cache_key` — a hand-listed dict
+    # laundered through `_hashable`. Cutover step 3 DELETED that key (see the
+    # essay at run_step_ground_state.jl:191) and split admission in two:
+    # `gs_model(r)` carries the physics, `_gs_stage_params(r, p)` the numerics.
+    # The two CONTRACTS are unchanged, so the mutants are retargeted rather than
+    # retired — one per half, still injecting "id blind to physics" and "id
+    # sensitive to non-physics".
     Mutant(:gs_cache_key_ignores_interactions,
-        "src/workflow/experiments/pipeline/run_step_ground_state.jl",
-        r"        \"c\" => _hashable\(interactions\.c\),",
-        "        # mutant: interaction channels dropped from the cache key",
+        "src/workflow/experiments/pipeline/resolve_gs.jl",
+        # Anchored on c1, NOT on the c4/c6 extra ranks. Blanking `c_extra_*` was
+        # tried first and is a DEGENERATE KNOB: no fixture under test/model/ and no
+        # committed config under runs/ sets `c4:`/`c6:`, so `ranks` is already empty
+        # and the "mutation" changes no byte. It duly reported ESCAPED from a probe
+        # containing test_gs_admission_axes.jl, which would have read as a gap in
+        # the one file whose job is that partition. c1 is live in every fixture
+        # (c1_ratio = -0.01 / -0.02 / 0.0), so a miss here is a real miss.
+        r"        c0=get\(c, 0, 0\.0\),\n        c1=get\(c, 1, 0\.0\),",
+        "        c0=get(c, 0, 0.0),\n        c1=0.0,",
         :drop, :fatal,
-        "the GS stage cache's 'sensitivity to real physics' contract",
-        "Drops the scattering channels from the cache key, so changing c0/c1 hits a \
-         STALE cached ground state. The run reports success and reuses the wrong \
-         physics — the worst shape a cache bug can take, because nothing looks \
-         broken."),
+        "the GS admission id's 'sensitivity to real physics' contract",
+        "Drops the spin-dependent coupling from the artifact id while the SOLVE still \
+         reads it from `GSResolved`, so two configs differing only in c1 address the \
+         same stage artifact. The store is content-addressed and SHARED, so this \
+         serves one config's ground state to a different question. The run reports \
+         success and reuses the wrong physics — the worst shape a cache bug can take, \
+         because nothing looks broken."),
     Mutant(:gs_cache_key_includes_metadata,
         "src/workflow/experiments/pipeline/run_step_ground_state.jl",
-        r"        \"v\" => 1,                                    # key-schema version",
-        "        \"v\" => 1, \"analyze\" => _hashable(get(p, \"analyze\", nothing)),",
+        r"        tol=r\.tol,\n        n_steps=r\.n_steps,",
+        "        tol=r.tol,\n        analyze=string(get(p, \"analyze\", nothing)),\n        n_steps=r.n_steps,",
         :drop, :subtle,
-        "the cache's 'INSENSITIVE to non-physics' contract",
-        "Folds a NON-physics key (the analyze block) into the cache key, so adding an \
-         analyzer invalidates a ground state that is physically identical. Silent: \
-         the answers stay right and only the cost changes."),
+        "the GS admission id's 'INSENSITIVE to non-physics' contract",
+        "Folds a NON-physics key (the analyze block) into the numerics half of the \
+         admission id, so adding an analyzer invalidates a ground state that is \
+         physically identical. Silent: the answers stay right and only the cost \
+         changes. `test/model/test_gs_admission_axes.jl` partitions every GS_SCHEMA \
+         key and is the file that should see this."),
     Mutant(:b_block_cartesian_direction_guard,
         "src/workflow/experiments/schema/B_block.jl",
         r"    has_cartesian && has_direction &&\n        throw\(",
