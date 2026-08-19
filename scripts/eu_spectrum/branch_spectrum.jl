@@ -283,6 +283,14 @@ end
 # the NEXT one. `SP_TANGENT_MAX_DB` keeps a chord from being called a derivative:
 # two cells 5 µG apart on a branch that is about to fold are not a tangent.
 const TANGENT_MAX_DB = getf("SP_TANGENT_MAX_DB", 1.5)
+# The ESCAPE direction: where the state jumps to when the branch ends. Given a
+# post-collapse cell, `⟨d, A d⟩` at the flower cell along `d = ψ_after − ψ_before`
+# answers what the tangent cannot. It is a ONE-SIDED test and needs no
+# convergence certificate: R_escape < 0 PROVES the flower state is already a
+# saddle (one negative direction is a proof), while R_escape > 0 proves only that
+# this particular direction is uphill — a barrier along the way it actually
+# falls, which is what "the minimum still exists here" means operationally.
+const ESCAPE_CELL = get(ENV, "SP_ESCAPE_CELL", "")
 
 loaded = [load_cell(p) for p in cells]
 rows = NamedTuple[]
@@ -342,6 +350,17 @@ for (i, path) in enumerate(cells)
         maximum(abs, m.growth), verdict, m.stationarity,
         isnan(λ2) ? "" : @sprintf("fd2 λ=%+.3e", λ2), time() - t0)
     flush(stdout)
+    # The escape probe runs against the FIRST cell only (the one nearest the end).
+    if i == 1 && !isempty(ESCAPE_CELL)
+        e = load_cell(ESCAPE_CELL)
+        tr = tangent_rayleigh(ws, ψ, copyto!(similar(ψ), e.psi), 1.0, m.params)
+        @printf("     ESCAPE probe → ⟨d,Ad⟩ = %+.6e   (from ⟨F⊥⟩ %.3f at B=%.2f to %.3f at B=%.2f)\n",
+            tr.R, c.fperp0, c.B, e.fperp0, e.B)
+        println(tr.R < 0 ?
+                "     ⇒ NEGATIVE: this cell is ALREADY A SADDLE along the escape direction — a proof, no certificate needed." :
+                "     ⇒ POSITIVE: uphill along the direction it actually falls, i.e. a BARRIER is still there at this field.")
+        flush(stdout)
+    end
     ks = collect(keys(rows[1]))
     open(joinpath(OUT, "spectrum.csv"), "w") do io
         writedlm(io, reshape(String.(ks), 1, :))
