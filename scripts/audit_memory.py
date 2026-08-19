@@ -335,11 +335,22 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]|\]\(([A-Za-z0-9_\-]+)\.md\)")
 
 
 def link_targets(text):
-    """Every stem this text points at, in EITHER link form."""
+    """Every stem this text points at, in EITHER link form.
+
+    Both the literal stem AND its hyphen-normalized form are yielded. The
+    normalization exists so a `[[gotcha-foo]]` still finds `gotcha_foo.md`,
+    but applying it unconditionally CORRUPTS a stem whose hyphen is real:
+    `gotcha_doc_p_q_table_was_computed_at_1e-4_of_the_field_2026_08_19`
+    became `..._at_1e_4_...`, matched nothing, and the file was reported as
+    an orphan on 2026-08-19 while being linked from MEMORY.md the whole time.
+    Yielding both can only find links that exist, never invent one.
+    """
     for wiki, md in _LINK.findall(prose(text)):
         raw = wiki or md
         key = raw[:-3] if raw.endswith(".md") else raw
-        yield key.replace("-", "_")
+        yield key
+        if "-" in key:
+            yield key.replace("-", "_")
 
 
 def reachable(texts, roots):
