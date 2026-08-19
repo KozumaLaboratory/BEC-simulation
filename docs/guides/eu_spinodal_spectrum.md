@@ -1,5 +1,9 @@
 # Does the spectrum see the spinodal? — the κ=1.8 flower branch end, measured a third way
 
+> **FROZEN 2026-08-19.** The campaign ran and §6 is its answer; nobody will be
+> re-deriving these numbers as the code moves. Reproducible from the jobs named
+> in §5 and the driver in `scripts/eu_spectrum/`.
+>
 > **PRE-REGISTRATION, written 2026-08-19 BEFORE any compute.** §1–§4 are the
 > axes, the systematics, the instrument calibration and the rejection criteria,
 > fixed in advance so the interpretation is not chosen after the runs finish.
@@ -57,9 +61,9 @@ this one** and its λ_min would be measuring that mismatch:
 - 32³, box 24, κ = ω_z/ω_⊥ ∈ {1.8, 0.9}, **unpadded DDI**, secular off, q = 0,
   **LHY off**, pin ε = 0.002 p-units = 0.1352 µG (the pin is part of the
   Hamiltonian and stays in it for the Hessian).
-- Cells are the #335 outputs `runs/eu335/branch_*` (untracked — 6.8 MB of ψ per
+- Cells are the #335 outputs `runs/eu335/branch_*` (untracked): 6.8 MB of ψ per
   cell, living in the TSUBAME group area `/gs/fs/tga-kozuma-kouhi/uk07267/runs/`
-  and never in this repository); each carries its own (B, pin) and the c₀/c₁/c_dd
+  and never in this repository. Each carries its own (B, pin) and the c₀/c₁/c_dd
   epoch assertion `load_cell` already enforces.
 
 **Mean-field only.** LHY is off, matching #335. Every number here is a mean-field
