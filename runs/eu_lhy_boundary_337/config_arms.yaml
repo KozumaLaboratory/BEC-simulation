@@ -43,6 +43,15 @@
 #  else.
 #
 #  9 B × 9 comparison runs = 81 solves, submitted as 9 array tasks.
+#
+#  RE-RUN 2026-08-19 against the corrected homogeneous BdG (`7e6770c2`, #361/#367):
+#  `_bdg_ddi_matrices` had built its normal block from the Hartree term, which is
+#  zero for a uniform condensate. It was 2x too large on a polarised state and
+#  IDENTICALLY ZERO on a polar one. Every `full_bdg`- and `spatial`-derived number
+#  in the first pass of this campaign came from that code. This comment changes
+#  the config bytes, hence the content-addressed run directory, so the whole scan
+#  recomputes rather than mixing pre- and post-fix cells -- a dataset that is half
+#  one and half the other is not a dataset.
 # ─────────────────────────────────────────────────────────────────────
 units: {B: Gauss}
 defaults: {kind: spinor, backend: gpu}
