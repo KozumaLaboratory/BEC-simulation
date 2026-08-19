@@ -132,6 +132,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "klaus2022_reproduce.jl",
     "klaus2022_reanalyse.jl",
     "klaus2022_figures.py",
+    # The ensemble re-measurement at the paper's own analysis window
+    # (700 ms - 1.1 s, Fig. 4c), one seed per job. A cluster submit wrapper —
+    # category 3, same as the other `submit_*.sh` above.
+    "klaus2022/submit_stripes.sh",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
