@@ -249,12 +249,8 @@ const FAST_TESTS = [
     # side of this conflict would have put it back and reddened CI again — a union
     # of both sides is not a resolution when one side is a fix.
     "dynamics/test_spgpe_projector_composition.jl",
-    "dynamics/test_energy_damping_buffer_reuse.jl",
-    "dynamics/test_energy_damping_cayley.jl",
     "dynamics/test_mu_from_total_number.jl",
     "dynamics/test_mu_equilibrium_constraint.jl",
-    "dynamics/test_mu_lda_constraint.jl",
-    "dynamics/test_number_conserving_spgpe.jl",
     "workflow/test_measurement_provenance.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
@@ -374,6 +370,13 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # Evolve a field, so they are not FAST. The cayley gate alone runs four
+    # testsets at ~3 min each; putting it in FAST timed the job out at 15 min
+    # and cancelled it, which reads as "CI cancelled" rather than "too slow".
+    "dynamics/test_energy_damping_buffer_reuse.jl",
+    "dynamics/test_energy_damping_cayley.jl",
+    "dynamics/test_number_conserving_spgpe.jl",
+    "dynamics/test_mu_lda_constraint.jl",
     # (physics block × solver path) table: the term must be LIVE on the
     # Workspace after a YAML run, on every path. Drives run_config, so `ci`
     # rather than `fast`. Replaces the per-incident plumbing files — a new path
@@ -860,6 +863,16 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Measured on TSUBAME. The cayley gate is four testsets at ~3 min each, which is
+    # why it belongs nowhere near FAST: it timed the fast job out at 15 min and the
+    # run came back "cancelled", which reads as infrastructure rather than as a test
+    # that is too slow for the tier it was put in.
+    "dynamics/test_energy_damping_cayley.jl" => 750.0,
+    "dynamics/test_number_conserving_spgpe.jl" => 240.0,
+    "dynamics/test_energy_damping_buffer_reuse.jl" => 120.0,
+    "dynamics/test_mu_lda_constraint.jl" => 60.0,
+    "dynamics/test_mu_from_total_number.jl" => 8.0,
+    "dynamics/test_mu_equilibrium_constraint.jl" => 8.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
     # against the 3.0 s default it had been taking. The default made it the
     # LAST file handed out, which is the worst possible order for the one
