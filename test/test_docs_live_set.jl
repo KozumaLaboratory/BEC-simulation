@@ -67,7 +67,7 @@ const LIVE_DOCS = [
     # LIVE because it is what a reader is sent to: the frozen document opens by
     # pointing here, and `spatial.jl` / `potentials.jl` cite its measurements.
     "docs/theory/lhy_scheme_selection_eu_f6.md",
-    # The Klaus 2022 type-C claim's evidence: published parameters per figure,
+    # The Klaus 2022 reproduction's evidence: published parameters per figure,
     # the systematics, the model-selection numbers, and the pre-registered
     # thresholds. LIVE rather than dated because the gate reads its thresholds
     # and one row of it is an OPEN disagreement — a reader has to know it is
