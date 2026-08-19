@@ -7,6 +7,15 @@
 > carries the full argument is `docs/manuscript/klaus_protocol_sheet.md`; the 11x
 > quadratic-Zeeman correction is measured NOT to apply in this nT band
 > (`q/p = 2.3e-8` at 2.6 nT, `ed3be749`).
+>
+> **RE-DERIVED 2026-08-19. `0.468 ± 0.003` is superseded by `0.68 ± 0.04`**, and
+> the mechanism changed with it: the response is **even in Ω** (so the chirality
+> rule this document builds on is void), and a *static* radial trap weakened to
+> `ω_eff = √(ω_⊥² − Ω²)` reproduces the entire effect to 0.06–0.19 % — the
+> enhancement is **centrifugal, not Coriolis, and rotation is not required at
+> all**. Authority: `docs/campaign/edh_quench_polarisation_decision.md` §9.
+> Every `0.468` below is history. Gated by
+> `test/test_retracted_numbers_carry_their_replacement.jl`.
 
 <!-- promoted from agent memory `klaus_quench_protocol_pivot_2026_05_26.md` on 2026-07-31; historical record, not an SSoT -->
 <!-- Eu spinor rotation+quench protocol — 2-phase rotation-prep+weak-field-quench scan. Load-bearing observable is post-quench m=-5,-4 excitation, not bare ⟨F_z⟩. Called the "rotation-assisted EdH quench" since 2026-08-19; the protocol design is original to this project and was never proposed by any published paper. -->

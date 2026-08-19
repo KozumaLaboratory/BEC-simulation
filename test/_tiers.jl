@@ -30,6 +30,10 @@ const FAST_TESTS = [
     # reachable, and every commit cited in campaign/manuscript prose is either a
     # listed correction or an explicitly-reasoned non-correction (#343).
     "test_campaign_fix_list_gate.jl",
+    # A retracted number may not appear without its replacement IN THE SAME FILE.
+    # `0.468` survived weeks in an experimentalist sheet that carried its own
+    # retraction at the top — documents are read by section, not from the top.
+    "test_retracted_numbers_carry_their_replacement.jl",
     # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
     # bce2068f repaired two configs correctly one at a time and broke the mirror
     # relationship between them; nothing recorded that they were a pair (#343).
