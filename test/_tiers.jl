@@ -1119,6 +1119,11 @@ const _COST = Dict{String, Float64}(
     # re-read from their own YAML. No solve and no workspace: `resolve_gs` stops
     # at the resolved objects, so the cost is YAML parsing + O(n) grid setup.
     "model/test_corpus_resolves.jl" => 22.0,
+    # Same walk as above plus `gs_model` and both kwarg bundles per config, and a
+    # four-class negative control. No workspace and no solve. Measured 23.4 s in
+    # CI (23 s locally) — the default 3.0 s estimate reddened the cost-model gate,
+    # which is that gate doing its job on a new file.
+    "model/test_realise_agrees_over_corpus.jl" => 24.0,
     # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
     "model/test_no_ambient_module_refs.jl" => 1.0,
     # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
