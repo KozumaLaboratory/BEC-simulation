@@ -58,12 +58,24 @@ export KLAUS_TAG="${KLAUS_TAG:-_s${KLAUS_SEED}}"
 # different experiment than the one its thresholds were registered for.
 export KLAUS_RESULTS="${KLAUS_RESULTS:-$(pwd)/out/klaus2022_ensemble${KLAUS_TAG}.json}"
 
-echo "seed=$KLAUS_SEED hold_s=$KLAUS_HOLD_S tag=$KLAUS_TAG"
+# `KLAUS_SMOKE=1` renders every code path on the SMALL grid, for the
+# "smoke-test before any >10 min launch" rule. It is a real flag rather than
+# something a caller can approximate: passing an env var the script does not
+# read is silent, and the first submission of this job did exactly that —
+# `-v KLAUS_SMOKE_ARGS=1` was ignored, so a 30-minute walltime would have been
+# spent on a 1.1 s production run and killed with nothing to show.
+EXTRA=""
+if [ "${KLAUS_SMOKE:-0}" = "1" ]; then
+    EXTRA="--smoke"
+    echo "SMOKE: small grid, short hold — not a production result"
+fi
+
+echo "seed=$KLAUS_SEED hold_s=$KLAUS_HOLD_S tag=$KLAUS_TAG smoke=${KLAUS_SMOKE:-0}"
 echo "results=$KLAUS_RESULTS"
 
 # `-t` matches the requested cores; FFTW threads are set from it inside the
 # script. The dynamics is FFT-bound, so this is the knob that matters.
-time "$JULIA" --project=. -t 16 scripts/klaus2022_reproduce.jl stripes
+time "$JULIA" --project=. -t 16 scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
 exit $rc
