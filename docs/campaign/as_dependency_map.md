@@ -104,7 +104,10 @@ repository has already published once.
 
 The LHY closures split along the same line. $\varepsilon_\text{LHY}^\text{FM} =
 (8/15\pi^2)(g_{2F}n)^{5/2}$ reads the measured channel and nothing else, giving
-`5.488550501e+01` at both $r = 0$ and $r = 1/36$ to ten digits, while the polar
+`5.488550501e+01` at both $r = 0$ and $r = 1/36$ to ten digits, and so does its
+dipolar form, which multiplies by $Q_5(\varepsilon_{dd})$ at
+$\varepsilon_{dd} = c_{dd}F^2/(3g_{2F})$ — both inputs measured, so a polarized Eu
+cloud's LHY is fully determined today. Meanwhile the polar
 and icosahedral closed forms read the whole vector and fall by **73 %** and
 **77 %** over those same two points — 8.0 and 8.5 normalised units. The separate
 question of whether `full_bdg`'s $\varepsilon_\text{LHY}$ is scheme-dependent for

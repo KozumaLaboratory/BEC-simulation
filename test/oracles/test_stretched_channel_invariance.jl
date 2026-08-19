@@ -135,6 +135,18 @@ const _RS = _rs(6)
             # ε_LHY^FM = (8/15π²)(g_{2F} n)^{5/2} — g_{2F} is the measured one.
             @test isapprox(lhy_energy_fm(n, F, gdict(r)), fm0; rtol=1e-12)
         end
+
+        # The DIPOLAR FM form is the one Eu actually uses, and it is the same
+        # statement: (g_{2F} n)^{5/2}·Q₅(ε_dd) with ε_dd = c_dd F²/(3 g_{2F}).
+        # Both inputs are measured, so a polarized Eu cloud's LHY is fully
+        # determined today — which is the claim the dependency map rests on.
+        eps_dd = compute_a_dd(Eu151) / Eu151.a_s
+        fmd0 = lhy_energy_fm_dipolar(n, F, gdict(0.0), eps_dd)
+        @test fmd0 > 0
+        for r in _RS[2:end]
+            @test isapprox(lhy_energy_fm_dipolar(n, F, gdict(r), eps_dd), fmd0;
+                rtol=1e-12)
+        end
         # CONTROL: the polar and I_h closed forms read the whole channel vector.
         @test !isapprox(lhy_energy_polar(n, F, gdict(1 / 36)),
             lhy_energy_polar(n, F, gdict(0.0)); rtol=1e-2)
