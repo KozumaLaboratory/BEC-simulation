@@ -122,7 +122,11 @@ published comparisons, held by a ratchet), the figure registry in
 `src/manuscript/figures.jl`, and `docs/campaign/CAMPAIGN.md` §11. The 392 uncited
 stored summaries are deliberately not classified — per
 `docs/validation/stored_results_vintage_audit.md` a stored claim costs a
-re-derivation to place, so only what something cites is worth placing.
+re-derivation to place, so only what something cites is worth placing. The
+run-level companion to this claim-level table is
+`docs/campaign/doc_run_citation_inventory.md` (frozen 2026-08-02), which
+adjudicated the *cited directories* rather than the claims and found four with a
+stated result, two of them false alarms.
 
 Sensitivity is two points, normalised as in §1; "recompute?" asks whether the
 number changes when the six channels arrive.
