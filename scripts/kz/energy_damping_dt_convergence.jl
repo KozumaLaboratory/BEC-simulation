@@ -24,6 +24,17 @@ grid = make_grid(GridConfig((n, n, n), (L, L, L)))
 dV = cell_volume(grid)
 @printf("44^3 box %.1f  T=%.3g  eps_cut=%.3g  k_cut=%.3g  k_max=%.3g\n",
     L, T, eps_cut, k_cut, π * n / L)
+# The increment form cut the loss 4.53e-3 -> 2.45e-3 but it is STILL flat in dt, so the
+# mechanism I named was incomplete. With a self-adjoint idempotent projector and psi in
+# C, the increment form conserves number EXACTLY at the continuous level:
+#   dN/dt = 2 Re int psi* P{i phi psi} = 2 Re int (P psi)* (i phi psi) = 0
+# so a residual that ignores dt means something in the step is not that form.
+#
+# The noise is the split that decides it. Energy damping carries a multiplicative noise,
+# and if it is applied the same way it leaks by the same route. noise=false isolates the
+# deterministic part.
+const NOISE = get(ENV, "SBEC_ED_NOISE", "true") == "true"
+@printf("noise = %s\n", NOISE)
 @printf("\n%-9s %-8s %-13s %-13s %-13s %-13s\n",
     "dt", "steps", "N start", "N end", "loss/step", "loss/TIME")
 T_TOTAL = 20.0
@@ -44,7 +55,7 @@ for dt in (0.02, 0.01, 0.005, 0.002, 0.001)
     N0 = real(sum(abs2, ws.state.psi)) * dV
     steps = round(Int, T_TOTAL / dt)
     for s in 1:steps
-        apply_spgpe_step!(ws, res, dt; t=0.0, seed=90000 + s)
+        apply_spgpe_step!(ws, res, dt; t=0.0, seed=90000 + s, noise=NOISE)
     end
     N1 = real(sum(abs2, ws.state.psi)) * dV
     per_step = (N0 - N1) / (N0 * steps)
