@@ -11,7 +11,12 @@
 # is also the unit the binomial error is quoted over, so a killed job costs one
 # error bar rather than a hole in the middle of one.
 #$ -cwd
-#$ -l node_q=1
+# gpu_1: one full non-MIG H100 with 8 cores, type coefficient 0.200 against
+# node_q's 0.250 — the cheapest full H100 on TSUBAME 4 (別表3). The trajectory is
+# GPU-bound and the host side (the per-frame scalars, the classifier's L-BFGS)
+# fits in 8 threads, so the extra 40 cores node_q buys are 25 % of the bill for
+# nothing.
+#$ -l gpu_1=1
 #$ -l h_rt=24:00:00
 #$ -j y
 #$ -o logs/tsubame/

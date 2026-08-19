@@ -104,7 +104,7 @@ const DT = getf("NU_DT", 0.002)
 const EVERY = Int(getf("NU_EVERY", 5))
 const SEED = Int(getf("NU_SEED", 1))
 const NOISE = gets("NU_NOISE", "1") == "1"
-const FRAMES = Int(getf("NU_FRAMES", 200))
+const FRAMES = Int(getf("NU_FRAMES", 50))
 const SEED_FILE = gets("NU_SEED_FILE", "")
 const OUT = gets("NU_OUT", joinpath("figs", "eu334", "nucleate"))
 mkpath(OUT)
@@ -335,6 +335,12 @@ function main()
         end
         if step % save_every == 0 || step == n_steps
             rec!(step, last_r)
+            # One line per frame. A trajectory is ~an hour and the CSV is only
+            # written at the end, so without this the log is empty for the whole
+            # run and a stalled job is indistinguishable from a slow one.
+            r = rows[end]
+            @printf("    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f\n",
+                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13])
             flush(stdout)
         end
     end
