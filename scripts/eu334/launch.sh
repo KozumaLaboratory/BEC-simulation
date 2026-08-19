@@ -34,12 +34,16 @@ TEMPS=${TEMPS:-"5.0 10.0"}
 # of N₀ wide — so a µ ramp FASTER than that does not make the field cross faster,
 # it only raises the driving. τ = 4500 ms is quasi-static, 500 ms is drive-limited,
 # 1500 ms is between.
-TAUS=${TAUS:-"500 1500 4500"}
+TAUS=${TAUS:-"400 1300 4000"}
 # Every arm runs to the SAME total duration, holding at µ₁ after its ramp, so all
 # of them end at the same condensate fraction and the cells differ in how fast
 # they crossed the window rather than in where they stopped. Without it the fast
 # arm reports a selection statistic for a state that never reached the window.
-TOTAL_MS=${TOTAL_MS:-6000}
+# 4000 ms is set by where the CHOICE is frozen, not by where the growth ends: the
+# branches pass 50 k_BT apart by f ≈ 0.40, and 0.68 e-foldings of N₀ at the
+# reservoir-limited rate 2γΔµ takes ≈ 2400 ms. Running to f = 1 would cost 3× for
+# a decision already made.
+TOTAL_MS=${TOTAL_MS:-4000}
 # dt = 0.004 with a 0.002 arm as the systematic check: #335 measured ⟨F⊥⟩ agreeing
 # to three digits between 0.004 and 0.001 on this Hamiltonian, and it had to
 # disclose an unrun dt axis. This campaign runs one.
