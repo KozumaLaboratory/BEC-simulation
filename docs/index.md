@@ -31,6 +31,7 @@ docs/
 | Klaus 2022 / Eu fast-Larmor production path | `guides/klaus_regime.md` |
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) — **its hysteresis reading is RETRACTED, see the next row** | `guides/eu_adiabatic_protocol.md` |
 | The κ-dependent transition, re-measured: the "loop" is a J_z slide; the deliverable is a Stern-Gerlach level count | `guides/eu_kappa_hysteresis_loop.md` |
+| ¹⁵¹Eu vs ¹⁵³Eu: the one prediction that needs no scattering length — a 2.2787× magnon-frequency ratio at the same field, and why the mixture engine is not justified yet | `guides/eu_isotope_q_prediction.md` |
 | Upgrade old configs after a convention change | `guides/migration_guide.md` |
 | Pick the right precision / save_every / k_cut | `guides/performance_tuning.md` |
 | Finite-T reservoirs / second-scale evaporation (full SPGPE) | `guides/spgpe.md` |

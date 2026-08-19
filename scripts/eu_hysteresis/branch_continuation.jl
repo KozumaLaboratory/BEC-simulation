@@ -60,12 +60,10 @@ import CUDA
 using SpinorBEC
 using SpinorBEC: Units, eu151_preset, find_ground_state, find_ground_state_lbfgs,
     init_psi, add_white_noise!, SpinSystem, static_zeeman, upsample_spinor,
-    magnetization, orbital_angular_momentum, CUDABackend, CPUBackend
+    magnetization, orbital_angular_momentum, spin_scalars, CUDABackend, CPUBackend
 using DelimitedFiles: writedlm
 using JLD2: jldsave, jldopen
 using Printf
-
-include(joinpath(@__DIR__, "..", "eu_ramp_common.jl"))   # spin_scalars
 
 getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
 

@@ -88,6 +88,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
+    "eu_isotope_q/q_boundary.jl",
+    "eu_isotope_q/magnon_gap.jl",
     # ── active campaign: KZ / SPGPE (scripts/kz/README.md) ──
     "kz/README.md",
     "kz/classical_field_tc.jl",
