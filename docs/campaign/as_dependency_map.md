@@ -111,8 +111,10 @@ cloud's LHY is fully determined today. Meanwhile the polar
 and icosahedral closed forms read the whole vector and fall by **73 %** and
 **77 %** over those same two points — 8.0 and 8.5 normalised units. The separate
 question of whether `full_bdg`'s $\varepsilon_\text{LHY}$ is scheme-dependent for
-Eu textures (`docs/validation/full_bdg_scheme_dependence_eu_f6.md`) is a
-different axis and is not touched by any of this.
+Eu textures is a different axis and is not touched by any of this. It was
+**measured on 2026-08-19 (#337) at at most ~6 %** —
+`docs/theory/lhy_scheme_selection_eu_f6.md`, which supersedes and freezes
+`docs/validation/full_bdg_scheme_dependence_eu_f6.md`.
 
 ## 3. The table
 
@@ -152,7 +154,7 @@ number changes when the six channels arrive.
 | paper2 FIG-3: ¹⁵¹Eu LHY-to-mean-field ratio vs trap $\omega$ | figure registry | all $g_S$, plus the state ansatz | **8.5 units** for the icosahedral closed form, 77 % over two points; only an FM arm is invariant | **Y** |
 | F=6 phase diagram and polyhedral selection; "Eu sits on the FM–cyclic–$I_h$ triple junction" | CAMPAIGN §11, paper2 | the **channel spread itself** | maximal — at uniform $g_S$ the $\sigma_S$ sum rule makes polar, FM, cyclic and $I_h$ exactly degenerate, so the unknown is not a parameter of this claim, it **is** the claim | **Y** |
 | #335 hysteresis: falling-leg occupied-$m_F$ count 6–7 vs 3–4 | project verdict | $\kappa = \omega_z/\omega_r$, $B$, $c_1$ | the $\kappa$ and $B$ axes are invariant, the $c_1$ axis is not; being a count, it survives calibration error | **Y** on the $c_1$ axis |
-| `full_bdg` $\varepsilon_\text{LHY}$ scheme dependence for Eu F=6 | `full_bdg_scheme_dependence_eu_f6.md` | all $g_S$, and the scheme | **unmeasured in $r$** — those arms varied the scheme, not the channels | **Y** |
+| `full_bdg` $\varepsilon_\text{LHY}$ scheme dependence for Eu F=6 (**measured ≤ 6 %**, #337: `lhy_scheme_selection_eu_f6.md`) | `full_bdg_scheme_dependence_eu_f6.md` | all $g_S$, and the scheme | **unmeasured in $r$** — those arms varied the scheme, not the channels | **Y** |
 | paper4 FIG-2/3: $\sigma/\mu$ vs $N$, species universality | figure registry | truncated Wigner, $\varepsilon_{dd}$, spinor | **unmeasured** — no two-point exists, so do not read it as zero | **Y** until measured |
 
 Three rows say *unmeasured* instead of a number, which is the honest entry:
