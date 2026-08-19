@@ -64,6 +64,11 @@ const FD_EPS2 = haskey(ENV, "SP_FD_EPS2") && !isempty(ENV["SP_FD_EPS2"]) ?
 const PADDING = get(ENV, "SP_PADDING", "0") == "1"
 const STAT_TOL = getf("SP_STATIONARY_TOL", 1e-4)
 const FIT_BMIN = getf("SP_FIT_BMIN", 55.0)
+# The fit and the softening claim are about the FLOWER branch, which is the one
+# that ends. A single job also carries polarised cells (#335 §5.2), and those sit
+# at ⟨F⊥⟩ ≈ 0.9 against the flower's ≥ 2.2 — selecting on B alone would have put
+# them in the same fit and asked where a branch that does not end, ends.
+const FIT_FPERP_MIN = getf("SP_FIT_FPERP_MIN", 1.5)
 const BSP_REF = getf("SP_BSP_REF", 68.4)
 const BSP_TOL = getf("SP_BSP_TOL", 0.3)
 const OUT = get(ENV, "SP_OUT", "figs/eu_spectrum/branch")
@@ -207,10 +212,10 @@ isempty(cells) && error("SP_CELLS is empty — nothing to measure")
 Branch spectrum: κ=%.2f grid=%d³ box=%.1f  %s
   nev=%d block=%d max_iter=%d hess_tol=%g   FD ε=%g%s
   stationarity gate %.1e   DDI padding=%s   %d cell(s)
-  agreement band: |B_sp_fit − %.2f| ≤ %.2f µG  (fit over flower cells B ≥ %.1f)
+  agreement band: |B_sp_fit − %.2f| ≤ %.2f µG  (fit over cells with B ≥ %.1f AND ⟨F⊥⟩ ≥ %.2f)
 """, KAPPA, GRID_N, BOX, HAS_GPU ? "CUDA" : "CPU", NEV, BLOCK, MAXITER, HESS_TOL,
     FD_EPS, isnan(FD_EPS2) ? "" : " and $(FD_EPS2)", STAT_TOL, PADDING,
-    length(cells), BSP_REF, BSP_TOL, FIT_BMIN)
+    length(cells), BSP_REF, BSP_TOL, FIT_BMIN, FIT_FPERP_MIN)
 flush(stdout)
 
 if get(ENV, "SP_SKIP_CONTROLS", "0") == "1"
@@ -273,8 +278,10 @@ end
 # λ_min² = a(B_sp − B) at a fold. The fit is applied to cells that PASSED both
 # gates (stationary and converged) and sit above SP_FIT_BMIN, and its verdict was
 # fixed in `docs/guides/eu_spinodal_spectrum.md` §4 before the run.
+is_flower(r) = isfinite(r.fperp0) && r.fperp0 >= FIT_FPERP_MIN
 usable = [r for r in rows if r.converged && r.stationarity < STAT_TOL &&
-              r.B_uG >= FIT_BMIN && isfinite(r.lambda_min) && r.lambda_min > 0]
+              is_flower(r) && r.B_uG >= FIT_BMIN && isfinite(r.lambda_min) &&
+              r.lambda_min > 0]
 println()
 if length(usable) < 3
     println("FIT: skipped — only $(length(usable)) usable cell(s) above B=$FIT_BMIN " *
@@ -305,7 +312,8 @@ FIT (pre-registered): λ_min² = a·(B_sp − B) over %d cells with B ≥ %.1f �
 end
 
 # Criterion 3: the softening claim, measured rather than eyeballed.
-flower = [r for r in rows if r.converged && r.stationarity < STAT_TOL && r.lambda_min > 0]
+flower = [r for r in rows if r.converged && r.stationarity < STAT_TOL &&
+              is_flower(r) && r.lambda_min > 0]
 if length(flower) >= 2
     lo, hi = argmin(r -> r.B_uG, flower), argmax(r -> r.B_uG, flower)
     ratio = lo.lambda_min / hi.lambda_min
