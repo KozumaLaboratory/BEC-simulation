@@ -162,7 +162,7 @@ function _steihaug_cg(Hc, gp, prm, Minv, Mmul, Mdot, ipR, Δ, maxit, cg_tol)
     d = copy(y)
     ry = ipR(r, y)
     rnorm0 = sqrt(ipR(r, r))
-    rnorm0 < 1e-300 && return z
+    rnorm0 < UNDERFLOW_FLOOR && return z
 
     for _ in 1:maxit
         Hd = Hc(d)
@@ -328,7 +328,7 @@ function _pcg_newton(Hc, b, Minv, ipR, maxit, cg_tol)
     d = copy(z)
     rz = ipR(r, z)
     rnorm0 = sqrt(ipR(r, r))
-    rnorm0 < 1e-300 && return x
+    rnorm0 < UNDERFLOW_FLOOR && return x
     for _ in 1:maxit
         Hd = Hc(d)
         dHd = ipR(d, Hd)

@@ -432,7 +432,7 @@ function _extract_spinor(psi::AbstractArray{<:Complex})
         spinor[c] = psi[peak_cart, c]
     end
     nrm = norm(spinor)
-    nrm > 1e-30 && (spinor ./= nrm)
+    nrm > COUPLING_TOL && (spinor ./= nrm)
     spinor
 end
 

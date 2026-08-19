@@ -22,7 +22,7 @@ function _apply_UB!(
 ) where {T, D}
     θ = Float64(theta)
     φ = Float64(phi)
-    abs(θ) + abs(φ) < 1e-30 && return nothing
+    abs(θ) + abs(φ) < COUPLING_TOL && return nothing
     R = _UB_combined_rotation(sm, θ, φ, inverse)
     _apply_rotation_to_spin_axis!(psi, R, ndim; scratch=scratch)
     nothing

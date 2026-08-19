@@ -96,8 +96,8 @@ function validate_conservation(
     ws.state.t = t_save
     ws.state.step = step_save
 
-    norm_drift = abs(N1 - N0) / max(N0, 1e-30)
-    energy_drift = abs(E1 - E0) / max(abs(E0), 1e-30)
+    norm_drift = abs(N1 - N0) / max(N0, DENOM_FLOOR)
+    energy_drift = abs(E1 - E0) / max(abs(E0), COUPLING_TOL)
     mag_drift = abs(M1 - M0) / max(abs(M0), 1e-10)
     Jz_drift = (track_Jz && N >= 2) ? abs(Jz1 - Jz0) / max(abs(Jz0), 1e-10) : NaN
 
@@ -188,7 +188,7 @@ function _estimate_growth_rate(time_series::Vector{Float64}, dt_sample::Float64)
     y_mean = sum(log_vals) / n
     num = sum((t_vals[i] - t_mean) * (log_vals[i] - y_mean) for i in 1:n)
     den = sum((t_vals[i] - t_mean)^2 for i in 1:n)
-    den < 1e-30 && return 0.0
+    den < COUPLING_TOL && return 0.0
     num / den
 end
 

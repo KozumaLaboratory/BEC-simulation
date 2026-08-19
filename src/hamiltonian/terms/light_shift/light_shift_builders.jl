@@ -144,7 +144,7 @@ function apply_light_shift_step!(
         # phase rotation in eigenbasis
         for k in 1:D
             phase_arg = eigvals[k] * intensity * dt_frac
-            v[k] *= imaginary_time ? exp(-phase_arg) : cis(-phase_arg)
+            v[k] *= wick_phase(-phase_arg, imaginary_time)
         end
         # spinor = U × v
         for c in 1:D

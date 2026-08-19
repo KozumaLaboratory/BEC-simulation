@@ -250,7 +250,7 @@ function _tensor_step_point!(
     end
     if offdiag_sq * dt^2 < 1e-12
         @inbounds for c in 1:D
-            phase = imaginary_time ? exp(-real(h[c, c]) * dt) : cis(-real(h[c, c]) * dt)
+            phase = wick_phase(-real(h[c, c]) * dt, imaginary_time)
             psi[I, c] = phase * spinor_in[c]
         end
         return nothing
@@ -265,7 +265,7 @@ function _tensor_step_point!(
         for j in 1:D
             s += conj(vecs[j, k]) * spinor_in[j]
         end
-        tmp[k] = (imaginary_time ? exp(-vals[k] * dt) : cis(-vals[k] * dt)) * s
+        tmp[k] = wick_phase(-vals[k] * dt, imaginary_time) * s
     end
 
     @inbounds for i in 1:D

@@ -438,10 +438,13 @@ function apply_step!(term::ZeemanTerm, psi::AbstractArray{<:Complex},
         F = sm.system.F
         D = sm.system.n_components
         n_pts = ntuple(d -> size(psi, d), Val(N))
+        # `shift` is 0.0 in real time, so both branches take the SAME exponent
+        # and this is one `wick_phase` call, not two spellings. It did not read
+        # that way while the branch was written out by hand.
         shift = imaginary_time ? minimum(_diag_coef(term, F - (c - 1)) for c in 1:D) : 0.0
         for c in 1:D
             coef = _diag_coef(term, F - (c - 1))
-            factor = imaginary_time ? exp(-(coef - shift) * dt) : cis(-coef * dt)
+            factor = wick_phase(-(coef - shift) * dt, imaginary_time)
             idx = _component_slice(N, n_pts, c)
             view(psi, idx...) .*= factor
         end

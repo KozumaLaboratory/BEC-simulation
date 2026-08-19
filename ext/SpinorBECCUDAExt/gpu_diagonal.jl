@@ -32,7 +32,7 @@ end
 # scalar and tabulated kernels differ only in how they get that one number and
 # cannot drift on the rest of the diagonal.
 @inline function _diag_phase_from(
-    n::T, Vt_i::T, c0::T, lhy::T, dt::T, ::Val{IT},
+    n::T, Vt_i::T, c0::T, lhy::T, dt::T, ::Val{IT}
 ) where {T, IT}
     varg = (Vt_i + c0 * n + lhy) * dt
     # one transcendental per voxel instead of D
@@ -40,7 +40,7 @@ end
 end
 
 @inline function _diag_voxel_phase(
-    Pmf, i, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
+    Pmf, i, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT}
 ) where {T, D, IT}
     n = _diag_voxel_density(Pmf, i, T, Val(D))
     lhy = clhy == zero(T) ? zero(T) : clhy * n * sqrt(n)
@@ -48,7 +48,7 @@ end
 end
 
 @inline function _diag_step_kernel!(
-    P, Pmf, Vt, db, zph, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
+    P, Pmf, Vt, db, zph, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT}
 ) where {T, D, IT}
     i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     i > size(P, 1) && return nothing
@@ -128,7 +128,7 @@ end
 # here. Used by the fused half-step, which needs it twice (once on each side of
 # its rotations) from ONE pass over ψ_mf.
 @inline function _diag_phase_kernel!(
-    vph, db, Pmf, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT},
+    vph, db, Pmf, Vt, c0::T, clhy::T, dt::T, ::Val{D}, ::Val{IT}
 ) where {T, D, IT}
     i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     i > size(Pmf, 1) && return nothing
@@ -168,7 +168,7 @@ function SpinorBEC._diagonal_step_svec!(
     threads = min(Ns, 256)
     blocks = cld(Ns, threads)
     CUDA.@cuda threads = threads blocks = blocks _diag_step_kernel!(
-        P, Pmf, Vt, db, zph, T(c0), clhy, dtf, Val(D), Val(it),
+        P, Pmf, Vt, db, zph, T(c0), clhy, dtf, Val(D), Val(it)
     )
     nothing
 end
@@ -185,12 +185,15 @@ const _DIAG_ZPH_KEY = Dict{Tuple{Int, DataType, Int}, Any}()
 # exp/cis of the per-component Zeeman phase. `shift` is the ITP overflow guard
 # (`min(zeeman_diag)`), a no-op in real time.
 function _zeeman_phase_host(
-    zeeman_diag::SVector{D, Float64}, dtf::T, it::Bool,
+    zeeman_diag::SVector{D, Float64}, dtf::T, it::Bool
 ) where {D, T}
     shift = it ? T(minimum(zeeman_diag)) : zero(T)
     Complex{T}[
-        it ? Complex{T}(exp(-(T(zeeman_diag[c]) - shift) * dtf), zero(T)) :
-        cis(-T(zeeman_diag[c]) * dtf) for c in 1:D
+        if it
+            Complex{T}(exp(-(T(zeeman_diag[c]) - shift) * dtf), zero(T))
+        else
+            cis(-T(zeeman_diag[c]) * dtf)
+        end for c in 1:D
     ]
 end
 

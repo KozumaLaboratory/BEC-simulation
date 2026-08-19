@@ -74,13 +74,13 @@ function apply_spatial_lhy_spin_step!(
             n += a
             szl += (F - (c - 1)) * a
         end
-        n < 1e-30 && continue
+        n < COUPLING_TOL && continue
         sp = zero(ComplexF64)
         for c in 2:D
             sp += fp[c] * conj(P[i, c - 1]) * P[i, c]
         end
         smag = sqrt(abs2(sp) + szl * szl)
-        smag < 1e-30 && continue
+        smag < COUPLING_TOL && continue
         p = smag / (n * F)
         de1 = _lhy_de1_dp(lhy, clamp(p, 0.0, 1.0))
         de1 == 0.0 && continue
@@ -102,7 +102,7 @@ function apply_spatial_lhy_spin_step!(
     # `+dt·c·p` in the exponent because A carries it with a minus.
     dt_t = RT(dt_frac)
     idx = ntuple(_ -> Colon(), ndim)
-    scale = imaginary_time ? exp.(shift .* dt_t) : cis.(shift .* dt_t)
+    scale = wick_phase(shift .* dt_t, imaginary_time)
     for c in 1:D
         view(psi, idx..., c) .*= scale
     end

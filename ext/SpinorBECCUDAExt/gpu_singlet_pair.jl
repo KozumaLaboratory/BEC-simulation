@@ -46,7 +46,7 @@ function SpinorBEC.apply_singlet_pair_step!(
     psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {T <: AbstractFloat}
     c2 = SpinorBEC.get_cn(interactions, 2)
-    abs(c2) < 1e-30 && return nothing
+    abs(c2) < COUPLING_TOL && return nothing
 
     D = 2F + 1
     n_pts = ntuple(d -> size(psi, d), ndim)

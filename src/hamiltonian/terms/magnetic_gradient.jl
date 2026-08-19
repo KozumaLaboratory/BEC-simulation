@@ -51,19 +51,10 @@ function apply_step!(::MagneticGradientTerm, psi, dt::Real, imaginary_time::Bool
     N = ndims(psi) - 1
     D = size(psi, N + 1)
     x_axis = ws.grid.x[p.axis]
-    if imaginary_time
-        for c in 1:D
-            psi_c = view(psi, ntuple(_ -> :, Val(N))..., c)
-            @inbounds for I in CartesianIndices(size(psi_c))
-                psi_c[I] *= exp(-coeff * x_axis[I[p.axis]] * dt)
-            end
-        end
-    else
-        for c in 1:D
-            psi_c = view(psi, ntuple(_ -> :, Val(N))..., c)
-            @inbounds for I in CartesianIndices(size(psi_c))
-                psi_c[I] *= cis(-coeff * x_axis[I[p.axis]] * dt)
-            end
+    for c in 1:D
+        psi_c = view(psi, ntuple(_ -> :, Val(N))..., c)
+        @inbounds for I in CartesianIndices(size(psi_c))
+            psi_c[I] *= wick_phase(-coeff * x_axis[I[p.axis]] * dt, imaginary_time)
         end
     end
     return nothing
@@ -155,7 +146,7 @@ function sign_oracle(::Type{MagneticGradientTerm})
                 num += x_axis[I[p.axis]] * n_I
                 den += n_I
             end
-            den = max(den, 1e-30)
+            den = max(den, DENOM_FLOOR)
             x_mean = num * dV / (den * dV)
             return coeff > 0 ? x_mean < 0.0 : x_mean > 0.0
         end,

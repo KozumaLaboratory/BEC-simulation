@@ -85,11 +85,14 @@ const ALLOWED = Dict{Tuple{String, String}, String}(
     ("src/hamiltonian/integrator/dealias.jl", "DEALIAS_K_CUTOFF") => "[STEP-4] physical-k form of the same projector; already IN the id via \
                                                              GridSpec.dealias_k_cut (resolve_gs.jl:337)",
     ("src/hamiltonian/integrator/split_step.jl", "MEANFIELD_MIDPOINT_ENABLED") => "[STEP-4] real-time only (measured exactly 0.0 under ITP: `!imaginary_time` \
-                                                                          guards both half-potential sites). Belongs in the params of an `:evolve` Stage, and \
-                                                                          no `:evolve` Stage exists yet — `run_step_dynamics.jl` declares none",
+                                                                          guards both half-potential sites). Now IN the params of the `:evolve` Stage \
+                                                                          (`evolve_stage.jl`, 2026-08-19), so what remains is deleting the global. It is still \
+                                                                          absent from the GROUND-STATE id below, which is correct: it is real-time only and \
+                                                                          measures exactly 0.0 under ITP",
     ("src/hamiltonian/integrator/combined_spin_step.jl", "COMBINED_SPIN_STEP_ENABLED") => "[STEP-4] a different splitting of the same H, agreeing at O(dt^3). Same \
-                                                                                  destination and same blocker as MEANFIELD_MIDPOINT_ENABLED; combined_spin_step.jl:42-46 \
-                                                                                  already says so",
+                                                                                  destination as MEANFIELD_MIDPOINT_ENABLED, and the same blocker until 2026-08-19 — it is \
+                                                                                  now in the `:evolve` Stage's params; combined_spin_step.jl:42-46 already says it is a \
+                                                                                  physics choice the run must make",
     ("src/hamiltonian/integrator/spin_chain.jl", "SPIN_CHAIN_FUSION_ENABLED") => "[STEP-4] measured bit-identical on both devices; it exists so \
                                                                          test/oracles/test_spin_chain_fusion_parity.jl can run BOTH statements on one input. \
                                                                          Freezing it would delete the gate — but the parity gate is CUDA-only, so on a \

@@ -67,7 +67,7 @@ function _apply_spin_matrix(Mat, ψ, ndim::Int, n_pts, D::Int)
     out = zero(ψ)
     for c in 1:D, c2 in 1:D
         w = Mat[c, c2]
-        abs(w) < 1e-30 && continue
+        abs(w) < COUPLING_TOL && continue
         view(out, _component_slice(ndim, n_pts, c)...) .+=
             w .* view(ψ, _component_slice(ndim, n_pts, c2)...)
     end
@@ -129,7 +129,7 @@ end
 # and rank a barely-present generator above the one that dominates.
 function _subspace_overlap(g, vecs, ipR)
     ng = sqrt(max(ipR(g, g), 0.0))
-    ng < 1e-30 && return 0.0
+    ng < COUPLING_TOL && return 0.0
     ĝ = g ./ ng
     basis = _mgs_ortho(vecs, ipR)
     isempty(basis) && return 0.0
@@ -313,7 +313,7 @@ function trapped_bdg_frequencies(
 
     G = [_ipC(S[i], AS[j], dV) for i in 1:m, j in 1:m]
     A_red = real.(G)
-    scale = maximum(abs, A_red) + 1e-30
+    scale = maximum(abs, A_red) + COUPLING_TOL
     hessian_symmetry_defect = maximum(abs, A_red .- transpose(A_red)) / scale
     gen = imag.(G) ./ 2                     # ½⟨Sᵢ, J A Sⱼ⟩_R
     J_red = [imag(_ipC(S[i], S[j], dV)) for i in 1:m, j in 1:m]
@@ -321,7 +321,7 @@ function trapped_bdg_frequencies(
 
     E = eigen(gen)
     evals = E.values
-    rad = maximum(abs, evals) + 1e-30
+    rad = maximum(abs, evals) + COUPLING_TOL
     pair_residual =
         maximum(λ -> minimum(abs(-λ - λ2) for λ2 in evals), evals) / rad
 
@@ -358,8 +358,8 @@ function trapped_bdg_frequencies(
             a = a ./ nrm
             b = b ./ nrm
         end
-        Aa = reduce(.+, (real(c[j]) .* AS[j] for j in 1:m)) ./ max(nrm, 1e-300)
-        Ab = reduce(.+, (imag(c[j]) .* AS[j] for j in 1:m)) ./ max(nrm, 1e-300)
+        Aa = reduce(.+, (real(c[j]) .* AS[j] for j in 1:m)) ./ max(nrm, UNDERFLOW_FLOOR)
+        Ab = reduce(.+, (imag(c[j]) .* AS[j] for j in 1:m)) ./ max(nrm, UNDERFLOW_FLOOR)
         # ½JA = ½(−i)A. Full-space residual of the mode equation.
         r1 = (-im / 2) .* Aa .- γ .* a .- ω .* b
         r2 = (-im / 2) .* Ab .- γ .* b .+ ω .* a
@@ -383,7 +383,7 @@ function trapped_bdg_frequencies(
     # collapses to 6e-6, reporting residuals of 200–750 for an operator whose
     # own scale says they are O(1). `maximum(abs, A_red)/2` is the largest ½A on
     # this subspace, i.e. the natural bound on ω within it.
-    omega_scale = max(maximum(omega) + maximum(abs, growth), scale / 2, 1e-30)
+    omega_scale = max(maximum(omega) + maximum(abs, growth), scale / 2, COUPLING_TOL)
     residuals ./= omega_scale
 
     gens_proj = [

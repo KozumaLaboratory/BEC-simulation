@@ -38,7 +38,7 @@ end
 # varying density reweighting that biases the ITP fixed point — CPU fix
 # 2026-06-15, mistake_itp_imaginary_time_euler_stage3_density_bias).
 @inline function _euler_apply_voxel!(
-    psi, i, α_i, β_i, θ_i, m_gpu, λ_gpu, shV, shCV, ::Val{D}, ::Val{IT},
+    psi, i, α_i, β_i, θ_i, m_gpu, λ_gpu, shV, shCV, ::Val{D}, ::Val{IT}
 ) where {D, IT}
     T = real(eltype(psi))
     CT = Complex{T}
@@ -71,15 +71,10 @@ end
         s[c] = acc
     end
 
-    # Step 3: D_z(θ)
-    if IT
-        @inbounds for c in 1:D
-            s[c] *= exp(-m_gpu[1, c] * θ_i)
-        end
-    else
-        @inbounds for c in 1:D
-            s[c] *= cis(-m_gpu[1, c] * θ_i)
-        end
+    # Step 3: D_z(θ). `IT` is a type parameter, so `Val(IT)` resolves the Wick
+    # branch at compile time and the kernel stays branchless.
+    @inbounds for c in 1:D
+        s[c] *= wick_phase(-m_gpu[1, c] * θ_i, Val(IT))
     end
 
     # Step 4: R_y(β)
@@ -112,7 +107,7 @@ end
 
 # --- Array-angle kernel (spin_mixing, raman) ---
 @inline function _euler_5stage_kernel!(
-    psi, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V, ::Val{D}, ::Val{IT},
+    psi, α, β, θ, m_gpu, m_shift, λ_gpu, V, conj_V, ::Val{D}, ::Val{IT}
 ) where {D, IT}
     CT = Complex{real(eltype(psi))}
     shV = CUDA.CuStaticSharedArray(CT, D * D)
@@ -127,7 +122,7 @@ end
 
 # --- DDI phi-angle kernel: angles from the dipolar field, no broadcast pass ---
 @inline function _ddi_euler_kernel!(
-    psi, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt::T, ::Val{D}, ::Val{IT},
+    psi, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt::T, ::Val{D}, ::Val{IT}
 ) where {T, D, IT}
     CT = Complex{T}
     shV = CUDA.CuStaticSharedArray(CT, D * D)
@@ -153,7 +148,7 @@ end
 # voxel-uniform arrays → read on lane 0 of each width-16 subgroup and broadcast.
 # Sign-bearing body is the shared `_euler_apply_warp!` (single physics declaration).
 @inline function _euler_5stage_warp_kernel!(
-    psi, α, β, θ, m_gpu, λ_gpu, V, conj_V, ::Val{D}, ::Val{IT},
+    psi, α, β, θ, m_gpu, λ_gpu, V, conj_V, ::Val{D}, ::Val{IT}
 ) where {D, IT}
     T = real(eltype(psi))
     CT = Complex{T}
@@ -173,7 +168,9 @@ end
     cc = active ? sl + 1 : 1
     m_c = active ? (@inbounds m_gpu[1, cc]) : zero(T)
     λ_c = active ? (@inbounds λ_gpu[1, cc]) : zero(T)
-    αv = zero(T); βv = zero(T); θv = zero(T)
+    αv = zero(T);
+    βv = zero(T);
+    θv = zero(T)
     if sl == 0 && in_range
         αv = @inbounds α[vox, 1]
         βv = @inbounds β[vox, 1]
@@ -254,7 +251,9 @@ end
 # v_out[c] = Σ_k M[linear(c,k)] · s_k, with s_k broadcast from lane k of the
 # subgroup. `lin(c,k)` returns the column-major linear index into the shared
 # D×D matrix for output row `c`, source `k`.
-@inline function _warp_matvec(s::Complex{T}, sh, cc::Int, ::Val{D}, ::Val{W}, lin::F) where {T, D, W, F}
+@inline function _warp_matvec(
+    s::Complex{T}, sh, cc::Int, ::Val{D}, ::Val{W}, lin::F
+) where {T, D, W, F}
     acc = zero(Complex{T})
     @inbounds for k in 1:D
         a = _shfl_c(s, k, Val(W))
@@ -264,14 +263,14 @@ end
 end
 
 @inline function _euler_apply_warp!(
-    psi, vox, in_range, active, cc, α, β, θ, m_c, λ_c, shV, shCV, ::Val{D}, ::Val{IT},
+    psi, vox, in_range, active, cc, α, β, θ, m_c, λ_c, shV, shCV, ::Val{D}, ::Val{IT}
 ) where {D, IT}
     T = real(eltype(psi))
     CT = Complex{T}
     W = 16
     # conjV[k, j] (j=cc) → (cc-1)*D + k ;  V[c, k] (c=cc) → (k-1)*D + cc
     cvlin = (c, k) -> (c - 1) * D + k
-    vlin  = (c, k) -> (k - 1) * D + c
+    vlin = (c, k) -> (k - 1) * D + c
 
     s = (active && in_range) ? (@inbounds psi[vox, cc]) : zero(CT)
 
@@ -295,7 +294,7 @@ end
 end
 
 @inline function _ddi_euler_warp_kernel!(
-    psi, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt::T, ::Val{D}, ::Val{IT},
+    psi, phi_x, phi_y, phi_z, m_gpu, λ_gpu, V, conj_V, dt::T, ::Val{D}, ::Val{IT}
 ) where {T, D, IT}
     CT = Complex{T}
     shV = CUDA.CuStaticSharedArray(CT, D * D)
@@ -318,7 +317,9 @@ end
 
     # Angles are voxel-uniform: compute the transcendentals (atan/acos/sqrt)
     # ONCE on the subgroup's lane 0 and broadcast — not 13× redundantly.
-    α = zero(T); β = zero(T); θ = zero(T)
+    α = zero(T);
+    β = zero(T);
+    θ = zero(T)
     if sl == 0 && in_range
         px = @inbounds phi_x[vox]
         py = @inbounds phi_y[vox]

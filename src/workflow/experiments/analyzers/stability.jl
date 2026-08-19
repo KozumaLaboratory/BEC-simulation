@@ -45,7 +45,7 @@ function _analyze_bogoliubov_dispersion(psi, grid, atom, params, ws_prev)
     peak_idx = argmax(n_total)
     spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
     n0 = sum(abs2, spinor)
-    n0 > 1e-30 && (spinor ./= sqrt(n0))
+    n0 > COUPLING_TOL && (spinor ./= sqrt(n0))
     interactions = ws_prev.interactions
     c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
     zeeman = if is_uniform(ws_prev.zeeman)
@@ -104,7 +104,7 @@ function _run_bogoliubov_analyzer(psi, grid, atom, params, ws_prev)
         spinor[c] = psi_host[peak_idx, c]
         n0 += abs2(spinor[c])
     end
-    if n0 > 1e-30
+    if n0 > COUPLING_TOL
         spinor ./= sqrt(n0)
     end
 
