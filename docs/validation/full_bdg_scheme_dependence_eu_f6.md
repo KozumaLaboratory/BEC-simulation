@@ -1,5 +1,12 @@
 # The Eu F=6 LHY instability is entirely dipolar — and that names the fix
 
+> **FROZEN 2026-08-19.** Describes the tree as of that date; not maintained.
+> Its headline verdict has been **overturned** — read
+> `docs/theory/lhy_scheme_selection_eu_f6.md` for the current statement. Frozen
+> rather than kept LIVE because a document whose main conclusion no longer holds
+> should not advertise itself as maintained, and because the measurements below
+> remain a correct record of what was known on 2026-07-30.
+>
 > **Superseded in part, 2026-08-19 (#337).** Two things here have since been
 > measured rather than argued, and both change the verdict:
 >

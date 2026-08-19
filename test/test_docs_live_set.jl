@@ -56,12 +56,16 @@ const LIVE_DOCS = [
     "docs/reference/yaml_schema_reference.md",
     "docs/validation/config_metadata_blocks.toml",
     "docs/validation/config_prose_harvest.toml",
-    "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
-    # The #337 answer. LIVE rather than dated because it is what a reader is
-    # sent to: `full_bdg_scheme_dependence_eu_f6.md` (itself LIVE) now opens by
-    # pointing here for the current statement, and `spatial.jl` /
-    # `potentials.jl` cite its measurements. A pointer target that is allowed to
-    # go stale is the failure mode the split exists to prevent.
+    # The #337 answer, and the REPLACEMENT for
+    # `docs/validation/full_bdg_scheme_dependence_eu_f6.md`, which was LIVE until
+    # 2026-08-19 and is now dated: its headline verdict ("NOT ANSWERABLE with the
+    # current machinery") was overturned by measurement and its q-table was
+    # computed at 1e-4 of the campaign's field. A document whose main conclusion
+    # no longer holds must not advertise itself as maintained — so this is a
+    # SWAP, not a +1, and the budget below is unchanged.
+    #
+    # LIVE because it is what a reader is sent to: the frozen document opens by
+    # pointing here, and `spatial.jl` / `potentials.jl` cite its measurements.
     "docs/theory/lhy_scheme_selection_eu_f6.md",
     # The Klaus 2022 type-C claim's evidence: published parameters per figure,
     # the systematics, the model-selection numbers, and the pre-registered
