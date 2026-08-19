@@ -1,5 +1,11 @@
 # Excitation spectrum of a trapped spinor condensate — the ω instrument
 
+> **FROZEN 2026-08-19.** A record of what was built and decided, dated on
+> purpose: the maintained surfaces are the docstrings of
+> `trapped_bdg_frequencies` / `bragg_response` and the two gate files, which the
+> suite keeps honest. Numbers here were measured on this date and nothing
+> re-derives them, so read them as a measurement with a date on it.
+
 Closes #339. What was missing was not a sweep but an instrument: no BdG path in
 this repo could produce the excitation spectrum of a trapped 13-component
 texture, so "the Bogoliubov excitations of the chiral / magnetic-vortex phase and
