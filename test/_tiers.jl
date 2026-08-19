@@ -738,6 +738,14 @@ const CI_EXTRA = [
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
     # classifier candidates, spin_texture_xy Fx/Fy orientation).
     "oracles/test_redundancy_gates.jl",
+    # Second catcher for three schema guards the 2026-08-19 mutation sweep found
+    # had exactly ONE in the whole per-PR surface — and in each case a `:pin` or
+    # `:api` one, i.e. evidence that the parser throws, not that it throws in the
+    # right place. Grounds each boundary in the machinery it protects: the
+    # c1_ratio bound against the root of `interaction_params_from_constraint`'s
+    # denominator, the B-form exclusion against the two readings actually
+    # disagreeing, and GS interaction precedence against the resolved coupling.
+    "oracles/test_schema_guards_are_grounded.jl",
     # BdG / Bogoliubov analytic-dispersion anchor: the linearize/Hessian
     # functor every stability (saddle-rejection) verdict rides on, pinned
     # to the known Ueda F=1 polar/FM closed forms + universal polar
@@ -1035,7 +1043,8 @@ const _COST = Dict{String, Float64}(
     # direction oracle; the rest is table lookups against a stored JSON.
     "validation/test_klaus2022_vortex_stripes.jl" => 25.0,
     # Three coarse ITP solves against the dipolar Thomas-Fermi closed form.
-    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 100.0,
+    # 369 s measured on the CI runner (was 100).
+    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
     # One 24³ ground state + 100 dynamics steps through the YAML entry point.
     "workflow/test_scalar_egpe_yaml.jl" => 40.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
@@ -1052,10 +1061,23 @@ const _COST = Dict{String, Float64}(
     "dynamics/test_thermal_cfield.jl" => 2.4,
     "workflow/test_measurement_provenance.jl" => 0.7,
     "oracles/test_spin_chain_fusion_parity.jl" => 260.0,
-    # Measured locally 2026-08-19 (10-core box): 128 s of solver time for the
-    # ITP-vs-L-BFGS pair plus one L-BFGS control. Registered so it goes out
-    # early rather than last.
-    "oracles/test_itp_dt_limited_advisory.jl" => 150.0,
+    # 654.9 s on the CI runner at its old 24³ fixture — the LONGEST file in the
+    # per-PR suite, and on its own the `oracles` job's makespan (654.9 s against
+    # a 586 s perfect-split floor). One file set the floor for every PR.
+    #
+    # The 150 that stood here came from "measured locally 2026-08-19 (10-core
+    # box): 128 s" — a real measurement, on the wrong machine. This table is
+    # calibrated for the 4-vCPU runner (see the header below) and the rule was
+    # already written into it, sixty lines down on
+    # `workflow/test_multi_fidelity_yaml.jl`, because the same mistake killed a
+    # nightly run.
+    #
+    # The fixture is now 20³ (see that file's header for the margin table and
+    # why 16³ does not work): 126.9 s locally, so ~420 s here on the same 3.2x
+    # ratio the 24³ pair measured. Deliberately left at the MEASURED-equivalent
+    # rather than trimmed further — below this the `fast` job binds and further
+    # cuts buy nothing.
+    "oracles/test_itp_dt_limited_advisory.jl" => 420.0,
     # ── Measured on the CI runner: median over 4 green `fast` + `oracles`
     # runs (2026-07-28), every file whose median exceeded 6 s. Regenerate by
     # medianing the per-file timing tables that each chunk prints.
@@ -1181,8 +1203,8 @@ const _COST = Dict{String, Float64}(
     "manuscript/test_f9_f11_polyhedral.jl" => 10.7,
     "analysis/test_paper3_validation.jl" => 10.6,
     "oracles/test_trapped_bdg_spectrum.jl" => 10.6,
-    "oracles/test_trapped_bdg_frequencies.jl" => 26.0,  # 6 LOBPCG fixtures + dense
-    "oracles/test_bragg_response_spectrum.jl" => 13.0,  # 7 real-time runs
+    "oracles/test_trapped_bdg_frequencies.jl" => 78.0,  # 6 LOBPCG fixtures + dense
+    "oracles/test_bragg_response_spectrum.jl" => 133.0,  # 7 real-time runs
     "oracles/test_apply_operator_accumulates.jl" => 10.3,
     "oracles/test_stability_sneaky_prover.jl" => 10.3,
     "oracles/test_path_coverage.jl" => 10.0,
@@ -1241,28 +1263,66 @@ const _COST = Dict{String, Float64}(
     "workflow/test_triple_point.jl" => 127.0,
     "test_dealias_2_3.jl" => 76.0,
     "solvers/test_continuation.jl" => 58.0,
-    "workflow/test_pipeline.jl" => 17.0,
+    "workflow/test_pipeline.jl" => 199.0,
     "workflow/test_infrastructure.jl" => 15.0,
     # Was 13.0 when it only built tables; #179 added a run_yaml A/B
     # (`method: lbfgs` reaches the tabulated LHY), which dominates. Now the
     # heaviest single file in the fast tier — measured 255.9 s.
     "workflow/test_lhy_block_wiring.jl" => 255.9,
     "hamiltonian/test_lhy_gradient_all_modes.jl" => 7.0,  # 4 F=6 table builds + FD
-    "test_level4_general_F_phase_emergence.jl" => 13.0,
-    "analysis/test_tof_multiframe.jl" => 9.5,
+    "test_level4_general_F_phase_emergence.jl" => 101.0,
+    "analysis/test_tof_multiframe.jl" => 44.0,
     "gpu/test_mixed_precision.jl" => 9.0,
-    "analysis/test_physics_invariants.jl" => 8.0,
-    "solvers/test_simulation.jl" => 8.0,
+    "analysis/test_physics_invariants.jl" => 55.0,
+    "solvers/test_simulation.jl" => 58.0,
     "solvers/test_lbfgs_sobolev_preconditioner.jl" => 6.5,
     "solvers/test_lbfgs_fast_path_equivalence.jl" => 6.0,
     "solvers/test_lbfgs_history_precision.jl" => 8.0,
     "solvers/test_lbfgs_line_search_fused_gradient.jl" => 6.0,
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl" => 6.0,
     "solvers/test_lbfgs_accuracy_floor.jl" => 6.0,
-    "solvers/test_3d.jl" => 5.0,
+    "solvers/test_3d.jl" => 60.0,
     "dynamics/test_twa.jl" => 5.0,
     "solvers/test_lbfgs.jl" => 5.0,
-    "solvers/test_lbfgs_line_search_and_de.jl" => 15.0,
+    "solvers/test_lbfgs_line_search_and_de.jl" => 66.0,
+
+    # ── The ten below had NO entry, so they were modelled at _DEFAULT_COST =
+    # 3.0 s while measuring 22–377 s. Handed out last by a heaviest-first
+    # queue, a 377 s file starts when the other workers are nearly done, and
+    # the makespan becomes that pickup time plus the file.
+    #
+    # Measured 2026-08-19 on the 4-vCPU GitHub runner these estimates are
+    # calibrated for (run 32217501709). CI had been emitting the annotation for
+    # every one of them on EVERY run — 17 distinct entries across the two jobs,
+    # up to 126x — so this is acting on a warning the suite already produced,
+    # not a new discovery.
+    #
+    # Effect, from the per-worker totals in that run: `integration` finished at
+    # 740 s against a 548 s floor (its four workers ran 369/450/740/631), i.e.
+    # 35 % of that job was the ordering. `fast`, whose heavy files DO have
+    # entries, came in at 574/571/571/572 — at its floor. Same runner, same
+    # scheduler, and the difference is this table.
+    "dynamics/test_spgpe.jl" => 377.0,
+    "validation/test_dipolar_supersolid_tube.jl" => 372.0,
+    "workflow/test_spinor_gs_from_jld2.jl" => 149.0,
+    "solvers/test_evaporation_tools.jl" => 144.0,
+    "model/test_gs_step_returns_one_state.jl" => 94.0,
+    "workflow/test_yaml_physics_reaches_workspace.jl" => 74.0,
+    "hamiltonian/test_rk4ip_convergence_order.jl" => 30.0,
+    "test_level4_f1_phase_emergence.jl" => 28.0,
+    "hamiltonian/test_taylor_tolerance_criterion.jl" => 23.0,
+    "workflow/test_pipeline_name_and_precedence.jl" => 22.0,
+
+    # ── Second harvest. The first pass read the annotations out of the `fast`
+    # and `integration` job logs only, which is two thirds of the per-PR suite,
+    # and `oracles` is the third — the one that BINDS once the other two are
+    # packed (measured makespan 654.9 s against fast 544.6 s and integration
+    # 384.9 s). Its remaining nine annotations, all from run 32237847445:
+    "oracles/test_jz_conservation_ddi.jl" => 204.0,
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl" => 78.0,
+    "oracles/test_solver_forwards_every_knob.jl" => 67.0,
+    "oracles/test_term_consistency.jl" => 22.0,
+    "oracles/test_flux_closure_ddi_identity.jl" => 20.0,
 )
 
 _cost(f) = get(_COST, f, _DEFAULT_COST)
@@ -1278,7 +1338,8 @@ hurt makespan; an over-estimate merely over-reserves a slot. Returns the stale
 entries (for tests).
 """
 function warn_cost_drift(
-    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0
+    timings; factor::Float64=3.0, abs_gap::Float64=15.0, floor_s::Float64=8.0,
+    quiet::Bool=false,
 )
     stale = NamedTuple{(:file, :measured, :estimate), Tuple{String, Float64, Float64}}[]
     for (f, t) in timings
@@ -1287,7 +1348,13 @@ function warn_cost_drift(
             push!(stale, (file=f, measured=t, estimate=est))
         end
     end
-    isempty(stale) && return stale
+    # `quiet` is for the meta-test, which calls this with synthetic fixtures to
+    # check the arithmetic. Without it those fixtures print real-looking
+    # annotations into the CI log on every run — a stale-cost line naming a file
+    # that does not exist and therefore can never be actioned, sitting in the
+    # same stream as the ones that can. Nine genuine annotations went unread for
+    # weeks; adding permanent noise to that stream is the wrong direction.
+    (isempty(stale) || quiet) && return stale
     ci = lowercase(get(ENV, "GITHUB_ACTIONS", "")) == "true"
     for s in stale
         msg = string(
