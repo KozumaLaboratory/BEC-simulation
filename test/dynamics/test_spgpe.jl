@@ -242,7 +242,22 @@ end
         # The comparison to 2γµ is the one that means something: a reservoir whose
         # number-conserving process moves N faster than its number-changing one is
         # not usable for a growth problem, whatever the absolute rate.
-        function null_drive_rate(n; T=1.0, steps=1000, dt=0.01)
+        # k_cut is held FIXED across the grids and the ANTI-ALIASING MARGIN
+        # k_max/k_cut is the axis. That choice states the hypothesis: ψ and the
+        # phase φ are both band-limited to k_cut, so ψ·e^{iφ} carries content out to
+        # 2k_cut, and on a grid with k_max < 2k_cut that content ALIASES back into
+        # the band instead of being cleanly removed. If the loss is aliasing it
+        # must collapse once k_max ≥ 2k_cut and be flat above.
+        #
+        # A previous version let k_cut vary with the grid and read the resulting
+        # difference as "resolution dependence". Two things were moving, so it
+        # measured neither.
+        #
+        # `@printf` takes ONE literal format, not a concatenation: `"a" * "b"` is an
+        # ordinary expression and the macro rejects it at expansion time. Gated by
+        # test_scripts_allowlist.jl after this bit me twice in one day.
+        kcut_fixed = 3.0
+        function null_drive_rate(n; k_cut=kcut_fixed, T=1.0, steps=1000, dt=0.01)
             SpinorBEC.scratch_clear!()
             ws = flowing_state!(scalar_ws(; n=(n, n, n)))
             dV = cell_volume(ws.grid)
@@ -251,33 +266,34 @@ end
                 real(sum(conj(ws.state.psi) .* hpsi)) * dV /
                 (real(sum(abs2, ws.state.psi)) * dV)
             end
-            k_cut = min(sqrt(2 * (mu + T)), 0.8 * π / (18.0 / n))
-            r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=0.5 * k_cut^2,
+            ec = 0.5 * k_cut^2
+            r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=ec,
                 number_damping=false)
-            γ = spgpe_growth_rate(; T, mu, eps_cut=0.5 * k_cut^2, a_s=0.02)
+            γ = spgpe_growth_rate(; T, mu, eps_cut=ec, a_s=0.02)
             n0 = norm_sq(ws)
             for s in 1:steps
                 apply_spgpe_step!(ws, r, dt; t=0.0, seed=4200 + s)
             end
-            # |d ln N / dt| from the scattering reservoir, against the growth
-            # reservoir's own 2γµ at the same (T, µ, ϵ_cut).
-            (; rate=abs(norm_sq(ws) - n0) / n0 / (steps * dt), growth=2 * γ * mu)
+            (; rate=abs(norm_sq(ws) - n0) / n0 / (steps * dt), growth=2 * γ * mu,
+                margin=(π / (18.0 / n)) / k_cut)
         end
-        a = null_drive_rate(32)
-        b = null_drive_rate(48)
-        # One literal, not a concatenation: `@printf` needs its format string at
-        # macro-expansion time, and `*` of two literals is still an expression to
-        # it. That is a parse error, i.e. the whole file fails to load — cheap to
-        # find, but only if something actually runs the file.
+        rs = [null_drive_rate(n) for n in (24, 32, 48, 64)]
         Printf.@printf(
-            "\n  projected energy damping at ZERO drive: 32³ |dlnN/dt| = %.3e   48³ = %.3e   (growth scale 2γµ = %.3e)\n",
-            a.rate, b.rate, a.growth)
-        # A reservoir process cannot depend on the discretisation. If it does, the
-        # noise is not normalised against the grid it is drawn on.
-        @test isapprox(a.rate, b.rate; atol=1e-5, rtol=0.5)
-        # …and it must not outrun the process it corrects.
-        @test a.rate < 0.5 * a.growth
-        @test b.rate < 0.5 * b.growth
+            "\n  projected energy damping at ZERO drive, k_cut = %.1f, growth scale 2γµ = %.3e\n",
+            kcut_fixed, rs[1].growth)
+        for r in rs
+            Printf.@printf("    k_max/k_cut = %.2f   |dlnN/dt| = %.3e   (%.3f × growth)\n",
+                r.margin, r.rate, r.rate / r.growth)
+        end
+        # Above the anti-aliasing margin the loss must be BOTH small against the
+        # process it corrects AND flat in resolution — a reservoir rate cannot know
+        # the grid spacing.
+        ok = [r for r in rs if r.margin >= 2.0]
+        @test !isempty(ok)                       # the scan must reach the margin
+        for r in ok
+            @test r.rate < 0.1 * r.growth
+        end
+        length(ok) >= 2 && @test isapprox(ok[1].rate, ok[end].rate; atol=1e-5, rtol=0.5)
     end
 
     @testset "a ramped cutoff does not grow the scratch registry" begin
