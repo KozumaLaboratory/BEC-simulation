@@ -38,6 +38,16 @@ using SpinorBEC
         h = zeros(ComplexF64, size(ws.state.psi))
         thermal_cfield!(h, grid, hp; T, mu=1.5, c0, k_cut, seed=515)
         copyto!(ws.state.psi, h)
+        # INTO C before anything is measured. thermal_cfield! low-passes at k_cut and
+        # then multiplies by the density envelope in REAL space, which broadens the
+        # spectrum past the cutoff — on this configuration N = 699 -> 340, so more than
+        # half the seed is outside C. Without this the first projection removes it, ONCE,
+        # and every rate computed afterwards is that one-time loss divided by the run
+        # length. That confound is what made the exponential's loss look independent of
+        # dt: N_end was 664.759 / 664.762 / 664.729 / 664.743 for 1000 / 2000 / 4000 /
+        # 10000 steps, four digits identical across a factor of ten in step count, which
+        # no per-step process can produce.
+        apply_projected_gp!(ws, k_cut)
         ws
     end
     N_of(w) = real(sum(abs2, w.state.psi)) * dV
@@ -55,24 +65,26 @@ using SpinorBEC
         (N0 - N_of(w)) / (N0 * t_total)
     end
 
-    @testset "the midpoint form loses far less than the exponential" begin
-        expo = loss_rate(; dt=0.01, iters=0)
-        cay = loss_rate(; dt=0.01, iters=2)
-        @info "energy damping loss per unit time" exponential=expo cayley=cay
-        @test expo > 0                       # the exponential does lose — the premise
-        @test abs(cay) < 0.2 * expo          # and the midpoint form largely does not
+    @testset "the exponential's loss is O(dt) — discretisation, not a defect" begin
+        # Measured with the seed in C: 2.57e-4 at dt = 0.02 and 6.47e-5 at dt = 0.005,
+        # a factor of four for a factor of four. I had called this loss a broken term on
+        # the strength of a "flat in dt" reading that came from the confound above.
+        e = [loss_rate(; dt, iters=0) for dt in (0.02, 0.005)]
+        @info "exponential loss per unit time" dt02=e[1] dt005=e[2]
+        @test e[1] > 0                                  # it does lose — the premise
+        @test e[2] < 0.5 * e[1]                         # and the loss converges away
     end
 
-    @testset "and it CONVERGES: the residual scales with dt" begin
-        # This is the property that separates a scheme from a defect, and the one the
-        # exponential fails — its loss is flat over a factor of twenty in dt.
-        r = [loss_rate(; dt, iters=2) for dt in (0.02, 0.005)]
-        @info "midpoint residual vs dt" dt02=r[1] dt005=r[2]
-        @test abs(r[2]) < 0.5 * abs(r[1])
-        # The exponential over the same pair must NOT converge, or the comparison is
-        # vacuous — a positive control on the discriminator itself.
-        e = [loss_rate(; dt, iters=0) for dt in (0.02, 0.005)]
-        @test abs(e[2]) > 0.7 * abs(e[1])
+    @testset "the midpoint form conserves to rounding" begin
+        # -2.6e-9 per step measured, sign flipped: the projected phase operator P(i phi)P
+        # is skew-Hermitian on C, so its Cayley transform is unitary and this holds in ANY
+        # basis. The spectral-Galerkin representation is not required for it, which is
+        # what I concluded and had wrong.
+        cay = loss_rate(; dt=0.02, iters=2)
+        expo = loss_rate(; dt=0.02, iters=0)
+        @info "midpoint vs exponential at dt = 0.02" cayley=cay exponential=expo
+        @test abs(cay) < 0.05 * abs(expo)
+        @test abs(cay) < 1e-5                           # absolute, not just relative
     end
 
     @testset "it is stable, which the explicit form was accused of failing" begin
@@ -90,11 +102,14 @@ using SpinorBEC
         @test 0.1 * 698 < Nf < 10 * 698      # neither drained nor blown up
     end
 
-    @testset "one sweep is not enough and three is not needed" begin
-        # iters is a real knob, so its convergence is measured rather than asserted.
-        l = [loss_rate(; dt=0.01, iters=i) for i in (1, 2, 3)]
+    @testset "the Picard sweep count converges" begin
+        # iters is a real knob, so its convergence is measured rather than declared
+        # adequate. The requirement is that adding a sweep stops changing the answer,
+        # not that more sweeps monotonically improve it — the residual is at rounding
+        # level, where monotonicity is not available to assert.
+        l = [loss_rate(; dt=0.02, iters=i) for i in (1, 2, 3)]
         @info "loss vs Picard sweeps" one=l[1] two=l[2] three=l[3]
-        @test abs(l[2]) <= abs(l[1])
-        @test abs(l[3] - l[2]) <= abs(l[2] - l[1])
+        @test all(x -> abs(x) < 1e-4, l)
+        @test abs(l[3] - l[2]) <= abs(l[2] - l[1]) + 1e-9
     end
 end
