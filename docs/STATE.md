@@ -208,11 +208,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 263 files
-- `CI_EXTRA` — 135 files
+- `FAST_TESTS` — 264 files
+- `CI_EXTRA` — 136 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 88 files
+- `ORACLE_TESTS` — 89 files
 - `INTEGRATION_TESTS` — 53 files
 
 ## Validation ladder — instruments present on disk
@@ -274,8 +274,8 @@ as complete.
 
 | subtree | files cited | of |
 |---|---|---|
-| `src/model/` | 3 | 14 |
 | `src/hamiltonian/` | 13 | 63 |
+| `src/model/` | 3 | 15 |
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
