@@ -195,25 +195,29 @@ ended at `max_iter` returned values one step behind its own basis.
 
 ## 6. KNOWN-LIMITs
 
-**The homogeneous DDI BdG disagrees with the gated operator.** Under DDI the
-uniform-limit containment against `bogoliubov_spectrum` fails by ~3 %: at
-c_dd = 0.05 the trapped spin quartet splits to 0.456306 / 0.488935 where the
-homogeneous path gives 0.451721 / 0.474220. The two TRAPPED paths — dense
-`trapped_bdg_spectrum` and the new reduction, independent solvers over the same
-gated operator — agree with each other to 3.7e-7, so the disagreement is not in
-the new instrument. `test_bogoliubov_anchor.jl` states its own KNOWN-LIMIT: it
-gates the CONTACT BdG only. Deriving the second variation of
-`E_DDI = (c_dd/2)∫∫Q(M,M)` with `M_a = ψ†F_aψ` gives a normal block with two
-terms,
+**The homogeneous DDI BdG disagreed with the gated operator — FIXED the same day
+(#361 → `7e6770c2`, PR #367).** Kept here because the mechanism is the point.
+Under DDI the uniform-limit containment against `bogoliubov_spectrum` failed by
+~3 %: at c_dd = 0.05 the trapped spin quartet split to 0.456306 / 0.488935 where
+the homogeneous path gave 0.451721 / 0.474220. The two TRAPPED paths — dense
+`trapped_bdg_spectrum` and this reduction, independent solvers over the same
+gated operator — agreed with each other to 3.7e-7, so the disagreement was not
+in the new instrument. `test_bogoliubov_anchor.jl` states its own KNOWN-LIMIT: it
+gates the CONTACT BdG only. The second variation of
+`E_DDI = (c_dd/2)∫∫Q(M,M)` with `M_a = ψ†F_aψ` has a normal block of two terms,
 
     c_dd Q_ab M_a⁽⁰⁾(F_b)  +  2c_dd Q_ab (F_aψ)_m conj((F_bψ)_m′),
 
-and `_bdg_ddi_matrices` carries only the first. For a polar state `M⁽⁰⁾ = 0`, so
-the homogeneous normal DDI block is entirely absent exactly where a spin-roton
-prediction would look. Not fixed here: that path feeds the phase-diagram
-stability verdicts (`triple_point.jl`, `test_level4_*`), so a factor change needs
-its own campaign. Recorded as `@test_broken` in the gate, so whoever fixes the
-homogeneous side is told by an unexpected pass. Filed as #361.
+and `_bdg_ddi_matrices` carried only the first — which is exactly ZERO for a
+polar state, i.e. the whole normal DDI block was missing precisely where a
+spin-roton prediction looks.
+
+It was shipped as `@test_broken` rather than fixed here, because that path feeds
+the phase-diagram stability verdicts. Hours later the fix landed from another
+branch and the gate reported **Unexpected Pass** — which is the entire argument
+for `@test_broken` over a commented-out assertion or a pinned wrong number: it
+told the next person the day the premise changed, with nobody having to remember
+to come back. The arm is now a live assertion at the contact arm's tolerance.
 
 **Which axis.** `growth` (Re λ of the reduced generator) is the DYNAMICAL axis —
 does a perturbation grow. The Hessian's `λ_min` sign is the ENERGETIC axis — is

@@ -259,30 +259,26 @@ end
     end
 end
 
-# MEASURED DISAGREEMENT, recorded in executable form (2026-08-19).
+# DDI uniform-limit containment against `bogoliubov_spectrum` — and the story of
+# this testset is the argument for the mechanism, so it stays written down.
 #
-# Under DDI the uniform-limit containment against `bogoliubov_spectrum` FAILS by
-# ~3 %: at c_dd = 0.05 the trapped spin quartet splits to 0.456306 / 0.488935
-# while the homogeneous path gives 0.451721 / 0.474220. The two TRAPPED paths
-# (dense + reduction) agree with each other to 3.7e-7, so the disagreement is
-# not in the new instrument.
+# It shipped as `@test_broken` on 2026-08-19. The trapped spin quartet split to
+# 0.456306 / 0.488935 at c_dd = 0.05 while the homogeneous path gave
+# 0.451721 / 0.474220 — a 3 % disagreement — and the two TRAPPED paths (dense
+# `trapped_bdg_spectrum` + this reduction, independent solvers) agreed with each
+# other to 3.7e-7, so the odd one out was `bogoliubov_spectrum`, whose DDI blocks
+# no test anchored (`test_bogoliubov_anchor.jl` states that KNOWN-LIMIT itself:
+# contact only). Filed as #361 with the derivation — the second variation of
+# `E_DDI = (c_dd/2)∫∫Q(M,M)` has a normal block of TWO terms and
+# `_bdg_ddi_matrices` carried only the Hartree one, which is exactly ZERO for a
+# polar state.
 #
-# `bogoliubov_spectrum`'s DDI blocks are the unanchored side:
-# `test_bogoliubov_anchor.jl` states its own KNOWN-LIMIT — it gates the CONTACT
-# BdG only. Deriving the second variation of `E_DDI = (c_dd/2)∫∫Q(M,M)` with
-# `M_a = ψ†F_aψ` gives a normal block with TWO terms,
-#   c_dd Q_ab M_a⁽⁰⁾(F_b)  +  2c_dd Q_ab (F_aψ)_m conj((F_bψ)_m′),
-# and `_bdg_ddi_matrices` carries only the first. For a polar state M⁽⁰⁾ = 0, so
-# the homogeneous normal DDI block is entirely absent exactly where this test
-# looks. Fixing it is NOT in scope here: that path feeds the phase-diagram
-# stability verdicts (`triple_point.jl`, `test_level4_*`), so a factor change
-# there needs its own campaign. Filed as #361.
-#
-# `@test_broken` is the right shape: it passes while the disagreement stands and
-# reports an UNEXPECTED PASS the moment someone fixes the homogeneous side —
-# which is the notification this file wants to send, and which a commented-out
-# assertion or a pinned wrong number would not.
-@testset "KNOWN-LIMIT: homogeneous DDI BdG disagrees with the gated operator" begin
+# Hours later `7e6770c2` (#367) landed that fix and this line reported
+# **Unexpected Pass**. That is the whole point of `@test_broken` over a
+# commented-out assertion or a pinned wrong number: the gate told the next person
+# the day the premise changed, without anyone remembering to come back. It is now
+# a live assertion at the same tolerance the contact arm uses.
+@testset "trapped ω ≡ homogeneous BdG WITH DDI (was #361, fixed in 7e6770c2)" begin
     fx = _uniform_box(ComplexF64[0, 1, 0]; c_dd=0.05)
     r = trapped_bdg_frequencies(fx.ws, fx.ψ; nev=8, max_iter=80, hess_tol=1e-9,
         rng=MersenneTwister(1))
@@ -290,7 +286,5 @@ end
         c_dd=0.05, k_direction=(1.0, 0.0, 0.0))
     spin = [w for w in r.omega if 1e-3 < w < 0.7]
     @test !isempty(spin)
-    @test_broken maximum(w -> minimum(abs(w - v) for v in ref), spin) < 1e-5
-    # …and it is a 3 % disagreement, not a rounding difference.
-    @test maximum(w -> minimum(abs(w - v) for v in ref), spin) < 0.05
+    @test maximum(w -> minimum(abs(w - v) for v in ref), spin) < 1e-5
 end
