@@ -377,7 +377,7 @@ function save_rotating_basis_result!(
                     total = sum(abs2, psi)
                     for c in 1:D
                         idx = ntuple(d -> d <= ndim ? Colon() : c, ndim + 1)
-                        pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, 1e-30)
+                        pops[s, c] = sum(abs2, view(psi, idx...)) / max(total, DENOM_FLOOR)
                     end
                 end
                 f["dynamics/component_populations"] = pops

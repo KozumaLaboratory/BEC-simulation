@@ -67,7 +67,7 @@ function scan_phase_diagram_2d(;
             end
 
             if !isnan(prev_energy) &&
-                abs(r.energy - prev_energy) / max(abs(prev_energy), 1e-30) >
+                abs(r.energy - prev_energy) / max(abs(prev_energy), COUPLING_TOL) >
                energy_jump_threshold
                 r = find_ground_state_multistart(;
                     grid,

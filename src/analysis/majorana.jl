@@ -322,7 +322,7 @@ function _peak_point_group(psi, F::Int, ndim::Int, n_total, dV)
         end
     end
 
-    max_n < 1e-30 && return :trivial
+    max_n < COUPLING_TOL && return :trivial
 
     spinor = Vector{ComplexF64}(undef, D)
     norm_sq = 0.0

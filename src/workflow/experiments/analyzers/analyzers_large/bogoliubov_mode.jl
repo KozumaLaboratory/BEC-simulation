@@ -14,7 +14,7 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
     peak_idx = argmax(n_total)
     spinor = ComplexF64[psi_host[peak_idx, c] for c in 1:D]
     n0 = sum(abs2, spinor)
-    n0 > 1e-30 && (spinor ./= sqrt(n0))
+    n0 > COUPLING_TOL && (spinor ./= sqrt(n0))
 
     interactions = ws_prev.interactions
     c_dd_val = ws_prev.ddi === nothing ? 0.0 : ws_prev.ddi.C_dd
@@ -70,7 +70,7 @@ function _analyze_bogoliubov_mode(psi, grid, atom, params, ws_prev)
     u = uv[1:D];
     v = uv[(D + 1):2D]
     weight_per_m = abs2.(u) .+ abs2.(v)
-    weight_per_m ./= max(sum(weight_per_m), 1e-30)
+    weight_per_m ./= max(sum(weight_per_m), COUPLING_TOL)
     wavelength = k_peak > 1e-12 ? 2π / k_peak : Inf
     (k_peak=k_peak, omega=ω_mode,
         growth_rate=imag(ω_mode),

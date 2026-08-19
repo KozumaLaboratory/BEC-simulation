@@ -147,7 +147,7 @@ function check(spec::OperatorRHSSpec, c::RunComparison)
         )
         num = sqrt(sum(abs2, Hpsi_a .- Hpsi_b))
         den = sqrt(sum(abs2, Hpsi_a))
-        rel = num / max(den, 1e-30)
+        rel = num / max(den, DENOM_FLOOR)
         hp_pass = rel < spec.tol_hpsi
         push!(details, :hpsi_rel_l2 => (
             got=rel, bound=spec.tol_hpsi, pass=hp_pass))
@@ -168,7 +168,7 @@ function check(spec::OperatorRHSSpec, c::RunComparison)
     for term in sort(collect(common_terms))
         ea = c.a.e_decomp[term]
         eb = c.b.e_decomp[term]
-        denom = max(abs(ea), abs(eb), 1e-30)
+        denom = max(abs(ea), abs(eb), COUPLING_TOL)
         rel = abs(ea - eb) / denom
         term_pass = rel < spec.tol_per_term_E
         push!(details, Symbol("E_$term") => (

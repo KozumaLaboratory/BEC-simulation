@@ -174,7 +174,7 @@ function multipole_spectrum(
         w_sum += sq
     end
     w_sum *= dV
-    w_sum < 1e-30 && return Dict{Int, Float64}(k => 0.0 for k in keys(ops))
+    w_sum < COUPLING_TOL && return Dict{Int, Float64}(k => 0.0 for k in keys(ops))
 
     out = Dict{Int, Float64}()
     for (k, O_k) in ops

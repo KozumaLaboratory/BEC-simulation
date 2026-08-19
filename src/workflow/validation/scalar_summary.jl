@@ -239,7 +239,7 @@ function write_run_summary(run_dir::AbstractString, jld2_path::AbstractString;
             isempty(peaks) && return missing
             nratio = if (r !== missing && r.dynamics !== nothing &&
                          !isempty(r.dynamics.norms))
-                (r.dynamics.norms[end] / max(r.dynamics.norms[1], 1e-30))
+                (r.dynamics.norms[end] / max(r.dynamics.norms[1], DENOM_FLOOR))
             else
                 1.0
             end

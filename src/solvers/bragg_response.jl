@@ -155,9 +155,9 @@ function bragg_response(
         step % sample_every == 0 && _sample!()
     end
 
-    norm_drift = abs(real(sum(abs2, ws.state.psi)) * dV - norm0) / max(norm0, 1e-30)
+    norm_drift = abs(real(sum(abs2, ws.state.psi)) * dV - norm0) / max(norm0, DENOM_FLOOR)
     e1 = total_energy(ws)
-    energy_drift = abs(e1 - e0) / max(abs(e0), 1e-30)
+    energy_drift = abs(e1 - e0) / max(abs(e0), COUPLING_TOL)
 
     dt_s = dt * sample_every
     om, S_n = _response_spectrum(nk, dt_s, window)
@@ -221,6 +221,6 @@ function _refine_peak(ω::Vector{Float64}, S::Vector{Float64})
     (j == 2 || j == length(S)) && return (ω[j], S[j])
     y0, ym, yp = S[j], S[j - 1], S[j + 1]
     den = ym - 2y0 + yp
-    δ = abs(den) > 1e-30 ? 0.5 * (ym - yp) / den : 0.0
+    δ = abs(den) > COUPLING_TOL ? 0.5 * (ym - yp) / den : 0.0
     (ω[j] + clamp(δ, -1.0, 1.0) * (ω[2] - ω[1]), y0)
 end

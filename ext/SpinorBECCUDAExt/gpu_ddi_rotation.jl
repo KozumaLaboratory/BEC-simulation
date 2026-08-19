@@ -59,7 +59,7 @@ end
 # Taylor path, both field layouts. Two call sites rather than one with a
 # Union-typed field/map tuple, so each launches a concretely-typed kernel.
 @inline function _ddi_rotate_taylor!(
-    P, phi_x, phi_y, phi_z, coef, scale::T, ::Val{D}, n_pts, N, imaginary_time, F,
+    P, phi_x, phi_y, phi_z, coef, scale::T, ::Val{D}, n_pts, N, imaginary_time, F
 ) where {T, D}
     if size(phi_x) == n_pts
         _apply_spin_rotation_taylor!(

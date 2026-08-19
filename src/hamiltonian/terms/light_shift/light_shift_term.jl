@@ -15,13 +15,10 @@ function apply_step!(::LightShiftTerm, psi, dt::Real, imaginary_time::Bool, ws)
     N = ndims(psi) - 1
     D = size(psi, N + 1)
     if ls.is_diagonal
+        itv = Val(imaginary_time)
         for c in 1:D
             phase = ls.eigvals[c] .* ls.profile
-            if imaginary_time
-                view(psi, ntuple(_ -> :, Val(N))..., c) .*= exp.(.-phase .* dt)
-            else
-                view(psi, ntuple(_ -> :, Val(N))..., c) .*= cis.(.-phase .* dt)
-            end
+            view(psi, ntuple(_ -> :, Val(N))..., c) .*= wick_phase.(.-phase .* dt, itv)
         end
     else
         error(
@@ -101,7 +98,7 @@ function _grad_light_shift!(grad, psi, ws, n_pts, D, ::Val{N}) where {N}
         for c in 1:D
             idx_c = _component_slice(N, n_pts, c)
             for c2 in 1:D
-                abs(M_full[c, c2]) < 1e-30 && continue
+                abs(M_full[c, c2]) < COUPLING_TOL && continue
                 idx_c2 = _component_slice(N, n_pts, c2)
                 view(grad, idx_c...) .+= M_full[c, c2] .* profile .* view(psi, idx_c2...)
             end

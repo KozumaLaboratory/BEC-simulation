@@ -29,7 +29,7 @@ catastrophic cancellation between two nearly equal O(N) sums, and — since the
 projector is an FFT round-trip rather than a literal no-op — leaves the
 round-trip error, ~1e-15 relative, as the floor. Measured here the floor is the
 residual amplitude in already-masked modes, ~1e-16 *squared*, so re-projecting
-an already-projected field returns ~1e-30 rather than ~1e-15.
+an already-projected field returns ~COUPLING_TOL rather than ~1e-15.
 """
 function apply_projected_gp!(
     ws::Workspace{N}, k_cut::Real;
