@@ -328,9 +328,9 @@ my initial 64³ promotion forgot. Documented as memory
 `gotcha_rotating_frame_omega_gpu_scalar_indexing.md`. CPU re-dispatch
 running.
 
-### Klaus protocol pivot + 3-batch result chain
+### Rotation-assisted EdH quench pivot + 3-batch result chain
 
-1. **Pivot** (anko 2026-05-26 evening): Klaus/Barnett scan re-aimed
+1. **Pivot** (anko 2026-05-26 evening): the Barnett-window scan re-aimed
    from bare-⟨F_z⟩ sustained-rotation response to 2-phase
    rotation-prep + weak-field-quench → post-quench m=−5, −4 excitation.
 2. **Batch 1** (10 cells, 32³): keep_rot Ω=−0.5 surprise — P_{−5,−4}
@@ -350,7 +350,7 @@ running.
 > **Pre-rotation is null; sustained rotation during the weak-field
 > EdH-active hold drives the excitation.**  The signal is governed
 > by the relative chirality of the initial spin polarization and the
-> trap rotation — NOT by the absolute Ω sign.  Recommended Klaus
+> trap rotation — NOT by the absolute Ω sign.  Recommended rotation-assisted-EdH
 > experimental protocol: skip pre-rotation; quench to B_hold ≈ 2.6 nT;
 > rotate during the weak-field hold only, with rotation chirality
 > opposite to the initial stretched-state polarisation, at

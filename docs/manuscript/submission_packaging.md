@@ -189,7 +189,7 @@ paper4 directory should be created mirroring paper1-3 structure.
   author = {[上妻 group]},
   title = {[Eu post-quench EdH protocol reference]},
   journal = {?}, year = {2022},
-  note = {Klaus 2022 magnetostir reference. Specific citation TBD.},
+  note = {Klaus et al., Nat. Phys. 18, 1453 (2022), arXiv:2206.12265.},
 }
 ```
 

@@ -1,8 +1,8 @@
-# `_parse_dimless_freq` Hz convention regression (Klaus 2022 magnetostir footgun).
+# `_parse_dimless_freq` Hz convention regression (Klaus et al. 2022 magnetostir footgun).
 #
 # CLAUDE.md / memory `gotcha_waveform_frequency_convention.md`:
 # YAML `phi_omega: "226 Hz"` must convert to `(2π · f) / ω_ref`, NOT `f / ω_ref`.
-# The missing 2π was a Klaus 2022 magnetostir bug — the spinor solver received
+# The missing 2π was a Klaus et al. 2022 magnetostir bug — the spinor solver received
 # a quasi-DC field and produced no orbital response. This test pins the
 # correct conversion so a future refactor of the units block cannot reintroduce
 # the 2π drop silently.
@@ -11,7 +11,7 @@ using Test
 using SpinorBEC
 using SpinorBEC: _parse_dimless_freq
 
-@testset "phi_omega Hz convention (Klaus 2022 magnetostir 2π footgun)" begin
+@testset "phi_omega Hz convention (Klaus et al. 2022 magnetostir 2π footgun)" begin
     @testset "Real input passes through unchanged" begin
         # When the user writes `phi_omega: 4.524`, that's already the
         # dimensionless ratio ω / ω_ref — no conversion applied.
