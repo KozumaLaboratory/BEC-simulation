@@ -642,6 +642,14 @@ const CI_EXTRA = [
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
     # classifier candidates, spin_texture_xy Fx/Fy orientation).
     "oracles/test_redundancy_gates.jl",
+    # Second catcher for three schema guards the 2026-08-19 mutation sweep found
+    # had exactly ONE in the whole per-PR surface — and in each case a `:pin` or
+    # `:api` one, i.e. evidence that the parser throws, not that it throws in the
+    # right place. Grounds each boundary in the machinery it protects: the
+    # c1_ratio bound against the root of `interaction_params_from_constraint`'s
+    # denominator, the B-form exclusion against the two readings actually
+    # disagreeing, and GS interaction precedence against the resolved coupling.
+    "oracles/test_schema_guards_are_grounded.jl",
     # BdG / Bogoliubov analytic-dispersion anchor: the linearize/Hessian
     # functor every stability (saddle-rejection) verdict rides on, pinned
     # to the known Ueda F=1 polar/FM closed forms + universal polar
