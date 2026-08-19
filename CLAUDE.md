@@ -125,6 +125,22 @@ Umbrella files `Foo.jl` `include` sub-files in dependency order; public exports 
     - `apply_step!` — implemented for all 14 registry terms, but the free-function cascade stayed legal, so **11 of the 14 have zero production callers** and are green in tests that production does not run.
 
     "Keep the old form for legacy call sites" is how a migration becomes permanent, and a permanently half-finished migration is *two live declarations of the same physics* — the exact thing the new layer was built to delete. So: the PR that introduces the canonical form either migrates every caller, or lands a gate (grep meta-test, `calibrated_scan`, mutation entry) that makes the next new caller of the old form red. **An unmigrated caller with no gate is not "deferred cleanup"; it is the defect, already shipped.**
+12. **Before relaxing a constraint that looks too strict, RUN the thing it is guarding.** A plausible explanation of why a bound is unnecessary is not evidence, because a wrong premise produces an explanation of exactly the same quality as a right one. The only difference is visible on execution.
+
+    Measured 2026-08-19: this happened four times in one session, and the reasoning was physically sound every time.
+
+    | read as | actually |
+    |---|---|
+    | the 14-term registry should drive the propagator; 11 unused `apply_step!` are dead | `:diagonal` FUSES four terms into one per-voxel kernel — one transcendental instead of D=13 |
+    | two mutants targeting a deleted function should be retired | their CONTRACTS survived the deletion; `main` retargeted them and kept the coverage |
+    | `waveform_magnitude` reads a waveform's value | it is the largest absolute value. Used at six sites it flipped the signs of `p` and `c1` — the Zeeman ground state and ferromagnetic-vs-polar |
+    | `_is_trivial_direction`'s `θ == 0` is too narrow; θ = π is axial so the sign rides in `p` | the GS path ignores the direction ENTIRELY. θ ∈ {0, 1, π/2, π} all give `p = -147.955`, `(bx,by) = (0,0)` |
+
+    The last one is the sharpest, because **an existing test said so and I edited it.** Its comment read "on this path a tilted field silently runs along +z"; I read it, kept my inference above it, and relaxed the predicate. Thirty seconds of resolving that block at four θ would have ended it — and that is what eventually did.
+
+    So, in order: (1) construct one input the constraint rejects; (2) run it in the relaxed world and look; (3) only then edit. **A test that contradicts you is evidence, not an obstacle** — if you cannot reconstruct why it was written, you have not yet earned the right to change it.
+
+    And pin the PREMISE beside the constraint, so the next reader does not have to re-derive it: `test_gs_refuses_dropped_physics.jl` asserts the four-θ collapse as well as the refusal, so the day `theta` becomes live on that path the guard goes red instead of quietly outliving its reason. This is the general shape — a conservative-looking bound is either a lost reason or a live constraint, and only an executed probe distinguishes them.
 
 ## Workflow model (spec → CAS → run → observe)
 

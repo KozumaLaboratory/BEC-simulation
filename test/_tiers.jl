@@ -664,6 +664,12 @@ const CI_EXTRA = [
     # re-implementation of Julia's signature grammar and read two of the four
     # entry points as accepting nothing.
     "oracles/test_solver_forwards_every_knob.jl",
+    # A ground_state step that declares physics this path drops must REFUSE
+    # rather than run. `dropped_physics` existed since cutover 1b and only
+    # `gs_model` read it, so such a config got no Model loudly and ran silently —
+    # the run being the half that produces numbers. Two committed configs are
+    # affected and both were running a +z field where they declare −z.
+    "oracles/test_gs_refuses_dropped_physics.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
@@ -1124,6 +1130,14 @@ const _COST = Dict{String, Float64}(
     # CI (23 s locally) — the default 3.0 s estimate reddened the cost-model gate,
     # which is that gate doing its job on a new file.
     "model/test_realise_agrees_over_corpus.jl" => 24.0,
+    # Builds a ground state per perturbation, over BOTH fixtures (3-D and the new
+    # 2-D one) and both solvers: ~20 solves at 8³/8². Measured 59 s. It landed in
+    # #386 with no entry at all, which is the same omission #389 hit one PR later
+    # — unnoticed there only because `test_state_doc_is_current.jl` failed first.
+    "oracles/test_solver_forwards_every_knob.jl" => 60.0,
+    # Two 8³ pipeline steps (the refusal and the override arms) plus four
+    # resolutions for the premise assertion. Measured 34 s.
+    "oracles/test_gs_refuses_dropped_physics.jl" => 34.0,
     # Reads ~700 .jl files line by line. No Julia compute at all; measured 0.5 s.
     "model/test_no_ambient_module_refs.jl" => 1.0,
     # One tiny 1-D 5-step ITP through `run_pipeline` (the positive control) plus
