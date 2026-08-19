@@ -76,7 +76,7 @@ that there was only one of them.
 
 **Subdirectories (.jl count):** `continuation/ (5)`, `evaporation/ (9)`, `ground_state/ (6)`, `lbfgs/ (4)`, `simulation/ (4)`
 
-**Top-level files:** `adaptive.jl`, `binary_simulation.jl`, `convergence_metrics.jl`, `ground_state.jl`, `hessian.jl`, `newton_cg.jl`, `photon_heating.jl`, `preconditioner.jl`, `projected_gp.jl`, `scalar_egpe.jl`, `sgpe.jl`, `simulation.jl`, `spgpe.jl`, `thermal_cfield.jl`, `trapped_bdg.jl`, `twa.jl`
+**Top-level files:** `adaptive.jl`, `bdg_frequencies.jl`, `binary_simulation.jl`, `bragg_response.jl`, `convergence_metrics.jl`, `ground_state.jl`, `hessian.jl`, `newton_cg.jl`, `photon_heating.jl`, `preconditioner.jl`, `projected_gp.jl`, `scalar_egpe.jl`, `sgpe.jl`, `simulation.jl`, `spgpe.jl`, `thermal_cfield.jl`, `trapped_bdg.jl`, `twa.jl`
 
 `CLAUDE.md` restated this directory twice and the two restatements disagreed
 with each other; both omitted `evaporation/` and five top-level files, and one
@@ -206,11 +206,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 258 files
-- `CI_EXTRA` — 125 files
+- `FAST_TESTS` — 259 files
+- `CI_EXTRA` — 128 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 79 files
+- `ORACLE_TESTS` — 82 files
 - `INTEGRATION_TESTS` — 52 files
 
 ## Validation ladder — instruments present on disk
@@ -276,7 +276,7 @@ as complete.
 | `src/hamiltonian/` | 13 | 63 |
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
-| `src/solvers/` | 2 | 44 |
+| `src/solvers/` | 2 | 46 |
 | `src/workflow/` | 5 | 173 |
 | `src/foundation/` | 1 | 40 |
 | `src/analysis/` | 1 | 51 |
