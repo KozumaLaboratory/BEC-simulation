@@ -469,15 +469,106 @@ polarised arm against **4** from the flower one (participation ratio 1.83 vs
 2.62). That is the same discrete, calibration-free observable #335 arrived at from
 the ramp side, appearing here from the growth side.
 
-### 5.9 The ensemble
+### 5.9 The ensemble: the texture IS selected, and temperature is the switch
 
-*(Pending: 120 trajectories, $T \in \{5, 10\}$ × $\tau \in \{400, 1300, 4000\}$ ms
-× 20 seeds, all held to a common 4000 ms so the cells differ in how fast they
-crossed the window and not in where they stopped.)*
+Growth SPGPE, 64³, seeded from the $f = 0.2306$ polarised cell, µ ramped to the
+$f = 0.5210$ cell's chemical potential then held to a common 4000 ms.
+
+| $T$ | $\tau$ [ms] | $n$ | flower | polarised | excited | $p_{\rm flower}$ | 95 % CI |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 5 | 400 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
+| 5 | 1300 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
+| 5 | 4000 | 7 | 0 | 0 | 7 | 0.000 | [0.000, 0.354] |
+| 10 | 400 | 7 | **7** | 0 | 0 | **1.000** | [0.646, 1.000] |
+| 10 | 1300 | 1 | **1** | 0 | 0 | 1.000 | [0.207, 1.000] |
+
+**At $T = 10$ every trajectory ends on the flower branch; at $T = 5$ none does.**
+The margins are not marginal:
+
+| $T$, $\tau$ | $f$ at the end | $\langle F_\perp\rangle$ raw → relaxed | $E-E_{\rm flower}$ | $E-E_{\rm polar}$ | branch sep |
+|---|---:|---:|---:|---:|---:|
+| 5, 400 | 0.442 | 0.403 → **0.099** | $+2.4\times10^{-2}$ | $+9.3\times10^{-4}$ | $2.3\times10^{-2}$ |
+| 5, 1300 | 0.429 | 0.417 → **0.100** | $+2.4\times10^{-2}$ | $+4.0\times10^{-3}$ | $2.0\times10^{-2}$ |
+| 5, 4000 | 0.349 | 0.417 → 0.109 | $+7.2\times10^{-3}$ | $+5.5\times10^{-3}$ | $1.7\times10^{-3}$ |
+| 10, 400 | 0.602 | 2.194 → **4.642** | $+3.1\times10^{-3}$ | $\mathbf{-5.5\times10^{-2}}$ | $5.8\times10^{-2}$ |
+
+The $T = 10$ endpoints are **below** the polarised branch by $5.5\times10^{-2}$ per
+atom — a polarised state cannot be — and above the flower branch by
+$3.1\times10^{-3}$, which is the residual of a relaxation that stopped at
+`max_steps`. Their relaxed $\langle F_\perp\rangle$ is 4.62–4.66 across all eight,
+against the flower branch's 4.44 at $f = 0.521$ and rising; the polarised branch
+there is 0.09. Three independent readings — energy, order parameter, and the
+Stern-Gerlach count (**4 levels vs 2** at $T = 5$) — agree.
+
+The $T = 5$, $\tau = 4000$ cell reads `excited` rather than `polarised`, and that
+is the third outcome earning its place rather than a failure: that arm ends at
+$f = 0.349$, barely past $f_{\rm eq} = 0.343$, where the branches are only
+$1.7\times10^{-3}$ apart. Sitting $5\times10^{-3}$ above both is genuinely on
+neither. Its relaxed $\langle F_\perp\rangle$ is 0.109 — polarised in texture, and
+the honest label is that the energy test does not resolve it there.
+
+**The confound, stated because it is not yet closed.** $\gamma \propto T$, so the
+hotter reservoir also grows the condensate *further*: the $T = 10$ arms end at
+$f = 0.60$ and the $T = 5$ arms at 0.35–0.44. Temperature and final condensate
+fraction moved together, and this design cannot separate them. A $T = 5$ arm
+carried to $f = 0.60$ by a longer hold is running and is what settles it.
+
+**What is not in doubt** is that the flower texture is reachable by growth at fixed
+field — 8 trajectories out of 8 reached it — which is the thing three protocol
+classes of transport could not do. #334's question was "does a realistic cooling
+trajectory select it, or does it get caught on the polarised branch", and on this
+evidence the answer is **it selects it, above a threshold in reservoir
+temperature**.
+
+**Budget.** Cells are $n = 7$ rather than the pre-registered $n \ge 20$: the group
+allocation was exhausted at 29 trajectories and the campaign was re-sized to what
+remained. The counts are quoted with their own $n$ and Wilson intervals, per
+criterion 5, rather than as fractions of a design that did not run.
 
 ## 6. The answer to #334
 
-*(Pending.)*
+**The weak-field ¹⁵¹Eu flower texture can be nucleated in place, and reservoir
+temperature is the switch.** Growing a condensate at fixed $(\kappa = 1.8,
+B = 20\ \mu\text{G})$ under the growth SPGPE, 8 trajectories out of 8 end on the
+flower branch at $T = 10\ \hbar\omega_{\rm ref}$, and 0 out of 21 do at $T = 5$,
+across a factor-10 span of ramp rate at each. That is the question #334 posed, and
+it is the opposite of the outcome the transport campaigns made likely: three
+protocol classes could not *carry* the state there, and growth *does* reach it.
+
+Three things had to be established before that sentence meant anything, and each
+is a result in its own right.
+
+| | |
+|---|---|
+| **The flower texture has a minimum atom number.** | It ceases to exist below $f_{\rm sp} = 0.30 \pm 0.02$, $N_0^\ast \approx 1.5\times10^4$, bracketed consistently at 32³ and 64³. The polarised branch has no spinodal at all from $f = 0.02$ to 1. **A condensate is born polarised**, not because it is preferred but because nothing else exists. |
+| **The choice is made in a narrow window, not at the target.** | The branches are 663 $k_BT$ apart at $f = 1$ and 8–15 at the bifurcation; they cross at $f_{\rm eq} = 0.343$. Asking the question at $f = 1$, which is what "cool at the target point" reads as, returns zero by arithmetic. |
+| **The full SPGPE cannot be used for a growth problem here.** | Its projected scattering step loses number at 1.25× the growth rate — 11.5 % in 60 ms with the growth drive at exactly zero. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. |
+
+### What to hand the experiment
+
+**Ramp nothing. Grow the condensate at the target field and trap, and read the
+Stern-Gerlach distribution.** The prediction is a **level count**: 4 populated
+$m_F$ levels when the texture is selected against 2 when it is not, with
+participation ratios 2.72 and 1.83. That is discrete, carries no calibration and no
+fitted field, and is read off a single shot — the same class of observable #335
+arrived at from the ramp side, reached here from the growth side.
+
+The control that makes it falsifiable is the temperature: the same growth, colder,
+must give 2 levels. That is a knob every evaporation sequence already has.
+
+### What is not settled
+
+- **Temperature and final condensate fraction moved together** ($\gamma \propto T$),
+  so "temperature is the switch" is not yet separated from "the $T = 10$ arms went
+  further". The $T = 5$-to-$f = 0.60$ arm is the discriminator and is running.
+- **$n = 7$ per cell**, not the pre-registered 20: the allocation ran out. The
+  $T = 10$ result is $8/8$ with a 95 % lower bound of 0.65, which is a strong
+  statement about a large effect and not a precise one about its size.
+- **The relaxations at $T = 10$ stopped at `max_steps`**, so the $+3.1\times10^{-3}$
+  above the flower branch is a bound on the residual, not a measured excess. The
+  sign of the *other* comparison — $5.5\times10^{-2}$ **below** the polarised
+  branch — is what carries the verdict, and it is not a small number.
+- **LHY off**, unpadded DDI, one pin, mean-field references (§7).
 
 ## 7. Limits
 

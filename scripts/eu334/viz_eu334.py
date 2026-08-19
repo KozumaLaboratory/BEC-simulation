@@ -48,12 +48,25 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
 
 
 def branch_tables(root: Path, grid: str):
+    """The branch table. Defaults to 32³ because it is the one that SPANS the
+    endpoints: the 64³ walk covers f in [0.23, 0.52] and the T = 10 trajectories
+    end at f = 0.60. Using the coarser table is not a compromise here — §5.4
+    measured the two agreeing to 2e-5 relative in E, i.e. 1.8e-4 absolute against
+    a branch separation of 5.8e-2 at f = 0.60, a factor 300."""
     d = root / f"bifurcation_k1.8_g{grid}"
     fl, po = d / "flower_down.csv", d / "polar_up.csv"
     if not (fl.exists() and po.exists()):
         return None
-    a, b = read_tsv(fl), read_tsv(po)
-    return a, b
+    # SORTED BY f. The flower walk runs DOWNWARD, so its CSV is in descending f,
+    # and `np.interp` requires ascending `xp` — with descending it returns a
+    # plausible number that is simply wrong. Here it read the f = 0.32 energy for
+    # an f = 0.59 state and called every T = 10 endpoint "polarised", against the
+    # "flower" the same arithmetic gives on sorted input. Nothing warns.
+    def by_f(t):
+        o = np.argsort(t["f"])
+        return {k: (v[o] if v.shape == t["f"].shape else v) for k, v in t.items()}
+
+    return by_f(read_tsv(fl)), by_f(read_tsv(po))
 
 
 def flower_branch_mask(t) -> np.ndarray:
@@ -107,24 +120,54 @@ def panel_separation(ax, a, b, temps=(5.0, 10.0)):
     ax.grid(True, alpha=0.6)
 
 
-def collect_selection(root: Path, glob: str = "nucleate_k1.8_T*/class/class_*.csv"):
-    """(T, tau_ms) -> (n_flower, n_polar, n_excited) from the per-endpoint CSVs."""
+def _assert_ascending(t, name: str) -> None:
+    """np.interp fails SILENTLY on descending xp, so the ordering is asserted at
+    the point of use rather than trusted from the reader."""
+    if not np.all(np.diff(t["f"]) > 0):
+        raise ValueError(f"{name} table is not ascending in f — np.interp would "
+                         "return a plausible wrong number")
+
+
+def assign(E: float, f: float, a, b) -> str:
+    """Branch label from the relaxed energy, RECOMPUTED against the table.
+
+    Deliberately not the label stored in the class CSV. That label was computed
+    against whatever table the classifier ran with, and a table can be extended or
+    re-measured afterwards — which is the whole reason the classify stage is
+    separate from the trajectories. Reading the stored label back would freeze a
+    verdict to a table nobody can see from here.
+
+    `unread` is a refusal, not a verdict: outside the flower branch's own f range
+    there is either no second basin (below it) or no reference (above it), and
+    counting either as "not selected" would inflate a zero with cells the test
+    could not be run on.
+    """
+    _assert_ascending(a, "flower")
+    _assert_ascending(b, "polarised")
+    m = flower_branch_mask(a)
+    ff, fE = a["f"][m], a["E_atom"][m]
+    if f < ff.min() or f > ff.max():
+        return "unread"
+    Ef = float(np.interp(f, ff, fE))
+    Ep = float(np.interp(f, b["f"], b["E_atom"]))
+    sep = abs(Ep - Ef)
+    if E > max(Ef, Ep) + sep:
+        return "excited"
+    return "flower" if abs(E - Ef) <= abs(E - Ep) else "polarised"
+
+
+def collect_selection(root: Path, a, b,
+                      glob: str = "nucleate_k1.8_T*/class/class_*.csv"):
+    """(T, tau_ms) -> [n_flower, n_polar, n_excited, n_unread]."""
     cells: dict[tuple[float, float], list[int]] = {}
     for p in sorted(root.glob(glob)):
         t = read_tsv(p)
-        if not t.get("branch", np.array([])).size:
+        if not t.get("E", np.array([])).size:
             continue
         key = (float(t["T"][0]), float(t["tau_ms"][0]))
-        c = cells.setdefault(key, [0, 0, 0])
-        lab = str(t["branch"][0])
-        if lab in ("below_branch", "above_table"):
-            # the question was not posed there. `below_branch`: the flower branch
-            # does not exist at that f. `above_table`: there is no reference at
-            # that f, and clamping to the last row measures the f mismatch rather
-            # than the branch. Counting either as "not selected" would inflate a
-            # zero with cells the classifier could not read.
-            continue
-        c[{"flower": 0, "polarised": 1}.get(lab, 2)] += 1
+        c = cells.setdefault(key, [0, 0, 0, 0])
+        lab = assign(float(t["E"][0]), float(t["f"][0]), a, b)
+        c[{"flower": 0, "polarised": 1, "excited": 2}.get(lab, 3)] += 1
     return cells
 
 
@@ -141,12 +184,13 @@ def print_table(cells, want: int = 20) -> None:
     print(f"\n{'T':>6} {'tau[ms]':>9} {'n':>4} {'flower':>7} {'polar':>6} "
           f"{'excited':>8} {'p_flower':>9}  95% CI")
     for (T, tau) in sorted(cells):
-        nf, npo, nex = cells[(T, tau)]
+        nf, npo, nex, nun = cells[(T, tau)]
         n = nf + npo + nex
         p, lo, hi = wilson(nf, n)
-        short = "" if n >= want else f"   << SHORT of {want}"
+        short = "" if n >= want else f"  << SHORT of {want}"
+        unread = "" if nun == 0 else f"  (+{nun} unread)"
         print(f"{T:>6.1f} {tau:>9.0f} {n:>4d} {nf:>7d} {npo:>6d} {nex:>8d} "
-              f"{p:>9.3f}  [{lo:.3f}, {hi:.3f}]{short}")
+              f"{p:>9.3f}  [{lo:.3f}, {hi:.3f}]{short}{unread}")
 
 
 def panel_selection(ax, cells):
@@ -160,7 +204,7 @@ def panel_selection(ax, cells):
         taus = sorted(k[1] for k in cells if k[0] == T)
         xs, ps, los, his, ns = [], [], [], [], []
         for tau in taus:
-            nf, npo, nex = cells[(T, tau)]
+            nf, npo, nex = cells[(T, tau)][:3]
             n = nf + npo + nex
             p, lo, hi = wilson(nf, n)
             xs.append(tau); ps.append(p); los.append(lo); his.append(hi); ns.append(n)
@@ -205,7 +249,7 @@ def main() -> int:
     fig.savefig(p, dpi=200)
     print("wrote", p)
 
-    cells = collect_selection(args.root)
+    cells = collect_selection(args.root, a, b)
     print_table(cells)
     fig2, ax2 = plt.subplots(figsize=(6.4, 4.2), constrained_layout=True)
     panel_selection(ax2, cells)

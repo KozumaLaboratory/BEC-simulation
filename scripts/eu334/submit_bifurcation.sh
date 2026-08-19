@@ -6,7 +6,11 @@
 #
 # `-o` must name an EXISTING directory or the job never starts.
 #$ -cwd
-#$ -l node_q=1
+# gpu_1, not node_q: the walk is one GPU solve per cell and 8 cores is plenty, so
+# node_q's 48 slots cost 25 % more (type coefficient 0.250 against 0.200) AND make
+# the job unschedulable while the ensemble holds the GPUs — the f = 0.52–0.70
+# extension sat queued for three hours behind its own campaign.
+#$ -l gpu_1=1
 #$ -l h_rt=12:00:00
 #$ -j y
 #$ -o logs/tsubame/
