@@ -196,6 +196,16 @@ function assign(E, tabs, f)
     f < tabs[:flower].f_min && return (; label=:below_branch,
         E_flower=NaN, E_polar=interp(tabs[:polar], f, :E), sep=NaN,
         dE_flower=NaN, dE_polar=E - interp(tabs[:polar], f, :E))
+    # ABOVE the table there is no reference at all, and `interp` clamps at the last
+    # row rather than saying so. E/atom rises steeply with f — 7.11 at f = 0.347
+    # against 8.33 at 0.521 — so comparing an f = 0.60 state against the f = 0.521
+    # references adds ≈ +0.4 to BOTH differences and every endpoint comes back
+    # `excited` by ten times the branch separation. That is what the T = 10 cells
+    # reported until 2026-08-20, while the same states' relaxed ⟨F⊥⟩ was 4.64 —
+    # the flower value. The energy test cannot be run off the end of its table.
+    fmax = tabs[:flower].f[end]
+    f > fmax * (1 + 1e-9) && return (; label=:above_table,
+        E_flower=NaN, E_polar=NaN, sep=NaN, dE_flower=NaN, dE_polar=NaN)
     Ef = interp(tabs[:flower], f, :E)
     Ep = interp(tabs[:polar], f, :E)
     sep = abs(Ep - Ef)

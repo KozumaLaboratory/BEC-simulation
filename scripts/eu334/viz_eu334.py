@@ -117,10 +117,12 @@ def collect_selection(root: Path, glob: str = "nucleate_k1.8_T*/class/class_*.cs
         key = (float(t["T"][0]), float(t["tau_ms"][0]))
         c = cells.setdefault(key, [0, 0, 0])
         lab = str(t["branch"][0])
-        if lab == "below_branch":
-            # the question was not posed there: the flower branch does not exist
-            # at that condensate fraction, so counting it as "not selected" would
-            # inflate the statistic with cells that could not have gone either way
+        if lab in ("below_branch", "above_table"):
+            # the question was not posed there. `below_branch`: the flower branch
+            # does not exist at that f. `above_table`: there is no reference at
+            # that f, and clamping to the last row measures the f mismatch rather
+            # than the branch. Counting either as "not selected" would inflate a
+            # zero with cells the classifier could not read.
             continue
         c[{"flower": 0, "polarised": 1}.get(lab, 2)] += 1
     return cells
