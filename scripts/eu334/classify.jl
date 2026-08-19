@@ -80,6 +80,9 @@ const TOL = getf("CL_TOL", 1e-5)
 const BIF = gets("CL_BIF", joinpath("figs", "eu334", "bifurcation"))
 const OUT = gets("CL_OUT", joinpath("figs", "eu334", "classify"))
 const WIND_THRESH = getf("CL_WIND_THRESH", 1e-3)
+# Eigenvector-residual polish on the final rung. Off by default (~20×120 HvPs);
+# ON is what makes the energy comparison certified rather than merely small.
+const RESID = gets("CL_RESIDUAL", "0") == "1"
 mkpath(OUT)
 
 const HAS_GPU = CUDA.functional()
@@ -171,9 +174,17 @@ function relax(psi1, f)
     pr = preset_at(f)
     psi = Array{ComplexF64}(psi1)
     local g
-    for ε in LADDER
+    for (j, ε) in enumerate(LADDER)
+        # `residual_polish` on the LAST rung. L-BFGS accepts steps by an energy
+        # comparison, so it floors at √eps·‖g‖ and stops at `max_steps` on a state
+        # that is as good as the method can make it — which is what every T = 10
+        # endpoint did, leaving |∇E| up to 1.7e-2 and the energy comparison
+        # uncertified. `residual_newton_refine` drives (H−µ)ψ→0 instead and is not
+        # energy-gated, so the gradient becomes the certificate rather than the
+        # obstacle. This is the case CLAUDE.md names for it.
         g = find_ground_state_lbfgs(; base_kw(pr, ε)..., psi_init=psi, n_steps=LBFGS,
-            tol=TOL, m_lbfgs=10, newton_polish=false, verbose=false)
+            tol=TOL, m_lbfgs=10, newton_polish=false, verbose=false,
+            residual_polish=(RESID && j == length(LADDER)))
         psi = Array{ComplexF64}(g.workspace.state.psi)
     end
     s = spin_scalars(psi, pr.grid)
@@ -336,7 +347,13 @@ function main()
         interp(tabs[:polar], d.f, :fperp))
     @printf("  E_relaxed = %.6f   ΔE_flower = %+.4e   ΔE_polar = %+.4e   sep = %.4e\n",
         r.E, a.dE_flower, a.dE_polar, a.sep)
-    @printf("  |∇E| = %.2e (%s)   excitation carried η = %.4f\n", r.grad, r.stop, eta)
+    @printf("  |∇E| = %.2e (%s)   excitation carried η = %.4f%s\n", r.grad, r.stop, eta,
+        RESID ? "   [residual-polished]" : "")
+    # A verdict read off an unconverged relaxation is a verdict about the solver.
+    # Say so on the line rather than leaving it to whoever reads `stop` later.
+    r.grad < 10 * TOL || @printf(
+        "  CAUTION: |∇E| = %.1e is %.0f× the gate — the energy comparison below is a bound, not a measurement\n",
+        r.grad, r.grad / TOL)
     @printf("  BRANCH: %s\n", uppercase(String(a.label)))
 
     w = windings(r.psi, grid)
