@@ -277,6 +277,7 @@ Stateless meta-loop over the queue. Permanent invariants:
 
 These look "off" but are correct. Changing them silently breaks chained downstream code.
 
+- **`trapped_bdg_low_modes` returns HESSIAN eigenvalues, not frequencies.** `λ₋ = 2ε_k ∝ k²` where `ω ∝ k`; the identity is `ω = √(λ₊λ₋)/2`. The two differ in their LEADING POWER, so reading λ as a spectrum reports a quadratic phonon branch and no tolerance reconciles it — #339's own acceptance criterion asked for exactly that comparison and could not be met as written. Excitation spectrum ⇒ `trapped_bdg_frequencies`; the dynamic structure factor S(k,ω) ⇒ `bragg_response` (the STATIC S(k) from `_analyze_bragg_spectroscopy` is its ω-integral and **cannot show a roton**). The energetic axis (sign of `λ_min`) and the dynamical axis (`growth` / `Im ω`) are orthogonal — say which one a claim is about. `trapped_bdg_frequencies` reports whether it got past the state's null manifold (`spectrum_reached`, false ⇒ NOT a spectrum) because the F=6 polar `e₀` manifold swallows a small `nev` whole, and every number it returns is then honest and not an excitation. `bragg_response` has no such failure mode but does carry `omega_resolution = 2π/T` — **quote it with any peak**. Design: `docs/design/trapped_spinor_bdg_spectrum.md`.
 - **DDI**: `c_dd = μ₀μ²` (no 4π), `Q_αβ = k̂_α k̂_β − δ_αβ/3` (no 1/(4π)), `Q(k=0) = 0`. Chain self-consistent.
 - **ITP Zeeman shift**: subtracts `min(E_m)` to prevent overflow.
 - **Scalar LHY**: `@warn` present. Known approximation.

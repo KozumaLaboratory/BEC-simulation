@@ -237,7 +237,25 @@ end
 
 # Modified Gram–Schmidt orthonormalisation in a given real inner product,
 # dropping near-dependent directions (so [X, W, P_prev] can be fed raw).
-function _mgs_ortho(vecs, ipR; tol::Float64=1e-10)
+#
+# `refine` (a projector) is applied AFTER the normalising division, and that
+# ordering is the whole point. `w ./ nw` with a small `nw` is an amplifier: the
+# LOBPCG basis [X, W, X_prev] becomes near-dependent as it converges (‖W‖ → 0,
+# X ≈ X_prev), so a component of size 1e-16 along a direction the caller
+# projected out gets multiplied by 1/nw ~ 1e3 every iteration. Measured on the
+# uniform F=1 polar box: max|⟨ψ,S⟩| ran 3e-16 → 1.5e-14 → 2.3e-13 over six
+# iterations, i.e. geometric, reaching O(1) well inside `max_iter=80`.
+#
+# The consequence was not noise but a FALSE EIGENVALUE. `A = P(H−2μ)P` maps its
+# own projector's null space (`ψ` and `iψ`) to exactly zero, so once that
+# direction re-enters the basis the solver reports it as an eigenvalue 0 with
+# residual ~1e-10 — a spurious mode carrying a PERFECT convergence certificate.
+# At `nev=1` on a gapped state (all this used to be asked for) it was invisible;
+# at the `nev` an excitation spectrum needs it produced two extra zero modes,
+# which `trapped_bdg_frequencies` would then have labelled as physical
+# Goldstones. Re-projecting each normalised basis vector holds the leak at
+# roundoff instead of letting it grow, and costs one projection per vector.
+function _mgs_ortho(vecs, ipR; tol::Float64=1e-10, refine=identity)
     out = empty(vecs)
     for v in vecs
         w = copy(v)
@@ -245,7 +263,10 @@ function _mgs_ortho(vecs, ipR; tol::Float64=1e-10)
             w = w .- u .* ipR(u, w)
         end
         nw = sqrt(max(ipR(w, w), 0.0))
-        nw > tol && push!(out, w ./ nw)
+        nw > tol || continue
+        w = refine(w ./ nw)
+        nw2 = sqrt(max(ipR(w, w), 0.0))
+        nw2 > tol && push!(out, w ./ nw2)
     end
     out
 end
@@ -254,7 +275,9 @@ end
 _combine(S, C) = [reduce(.+, (C[j, k] .* S[j] for j in 1:length(S))) for k in 1:size(C, 2)]
 
 """
-    trapped_bdg_low_modes(ws, ψ; nev=1, block=8, ...) → (; λ, λ_lower, residuals, converged, μ, iterations)
+    trapped_bdg_low_modes(ws, ψ; nev=1, block=8, ...)
+        → (; λ, λ_lower, residuals, converged, μ, iterations,
+             converged_modes, widths, vectors)
 
 Lowest `nev` eigenvalues of the constrained second variation `P(H−2μ)P` via
 block **LOBPCG with a kinetic Fourier preconditioner** — the
@@ -273,6 +296,24 @@ Returns the Ritz values `λ` (upper bounds), per-mode Kato–Temple lower bounds
 residuals < `tol`). `extra_nullspace` projects out known Goldstone modes
 beyond the gauge `iψ` (vortex rotation / free-space translation) — these are
 DEFLATED (removed), the physical soft mode is NOT (the block grabs it).
+
+**PER-MODE certificates, because a scalar flag is unreadable once `nev` > 1.**
+`converged_modes[k]` and `widths[k] = λ[k] − λ_lower[k]` are reported for every
+returned mode. Raising `nev` shrinks the Ritz gap `δₖ` that the Kato–Temple
+width divides by, so the modes at the TOP of the returned block certify far
+worse than `λ_min` does — a `converged=true` aggregate over `nev=30` is not a
+statement about mode 30. Read `converged_modes` (and `widths`) mode by mode; the
+aggregate is kept only for the gate-2 single-mode callers. The `λ_min` still
+dropping at the iteration cap that #50 hid inside a plausible VALUE is exactly
+a `converged_modes[k] == false`.
+
+`vectors` are the Ritz VECTORS matching `λ` element-for-element — the basis
+`trapped_bdg_frequencies` complexifies to reach the ω axis. They are
+`⟨,⟩_R`-orthonormal (`ipR(vᵢ,vⱼ) = δᵢⱼ`) and live in the tangent space (the
+gauge `iψ` and any `extra_nullspace` are projected out of them). A final
+Rayleigh–Ritz refresh runs when the iteration ends at the cap rather than at
+`tol`, so `λ`, `residuals` and `vectors` always describe the SAME block — before
+that refresh the reported values lagged the returned block by one LOBPCG step.
 
 Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
 `α_pre` (preconditioner shift, defaults to `max(|μ|, 1e-3)`), `ε`+`order`
@@ -312,15 +353,19 @@ function trapped_bdg_low_modes(
 
     b = max(block, nev + 2)
     _randvec() = _to_device(ws.backend, randn(rng, ComplexF64, size(ψ)))
-    X = _mgs_ortho([project(_randvec()) for _ in 1:b], ipR)
+    X = _mgs_ortho([project(_randvec()) for _ in 1:b], ipR; refine=project)
     AX = [A(x) for x in X]
     Xprev = typeof(ψ)[]
     θ = zeros(length(X))
     resn = fill(Inf, length(X))
     iters = 0
 
-    for it in 1:max_iter
-        iters = it
+    # The Rayleigh–Ritz pass is the LAST thing the loop does, so the reported
+    # (θ, resn) always describe the RETURNED X. The earlier for-form expanded
+    # the block after its convergence test, so a run that ended at `max_iter`
+    # returned values one step behind its own vectors.
+    while true
+        iters += 1
         # Rayleigh-Ritz on the current block → rotate X, AX to Ritz vectors.
         nb = length(X)
         Θ = [ipR(X[i], AX[j]) for i in 1:nb, j in 1:nb]
@@ -330,10 +375,10 @@ function trapped_bdg_low_modes(
         θ = e.values
         R = [AX[i] .- θ[i] .* X[i] for i in 1:nb]
         resn = [sqrt(max(ipR(r, r), 0.0)) for r in R]
-        maximum(@view resn[1:min(nev, nb)]) < tol && break
+        (maximum(@view resn[1:min(nev, nb)]) < tol || iters >= max_iter) && break
 
         W = [Tprec(R[i]) for i in 1:nb]
-        S = _mgs_ortho(vcat(X, W, Xprev), ipR)
+        S = _mgs_ortho(vcat(X, W, Xprev), ipR; refine=project)
         AS = [A(s) for s in S]
         ns = length(S)
         Hs = [ipR(S[i], AS[j]) for i in 1:ns, j in 1:ns]
@@ -352,8 +397,12 @@ function trapped_bdg_low_modes(
         δ = (k < nb ? θ[k + 1] : θ[k]) - θ[k]
         δ > resn[k] ? θ[k] - resn[k]^2 / δ : θ[k] - resn[k]
     end
+    residuals = resn[1:m]
     (;
-        λ, λ_lower, residuals=resn[1:m], converged=maximum(@view resn[1:m]) < tol,
+        λ, λ_lower, residuals, converged=maximum(residuals) < tol,
         μ=p.μ, iterations=iters,
+        converged_modes=[r < tol for r in residuals],
+        widths=[λ[k] - λ_lower[k] for k in 1:m],
+        vectors=X[1:m],
     )
 end
