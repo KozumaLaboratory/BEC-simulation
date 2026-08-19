@@ -298,18 +298,18 @@ the two conventions differ by a few percent regardless.
 
 ## 5. Criterion B — how much the phase boundary moves without LHY
 
-> **NUMBERS IN THIS SECTION ARE BEING RE-MEASURED (2026-08-19).** The `spatial`
-> arm and the `full_bdg` fallback ran through the pre-`7e6770c2` DDI block. Jobs
-> 8442771 (Bz) and 8442773 (c1) recompute both campaigns in full — including the
-> closed-form arms, which are unaffected, so that no cell is a mix. Treat every
-> figure below as provisional until this banner is removed.
-
 Two campaigns, both at ¹⁵¹Eu, 32×32×64, box 12×12×24, κ = 1, LBFGS +
 `newton_polish`, `tol = 1e-9` — the campaign's own precision recipe from
 `config_c1_precise_B0k1.yaml`, differing from it only in the `lhy` block.
 `runs/eu_lhy_boundary_337/config_arms.yaml` scans Bz at `c1_ratio = 1/36`;
 `config_arms_c1.yaml` scans `c1_ratio` at B = 5 µG. Read by
-`bench/lhy_boundary_report.jl`.
+`bench/lhy_boundary_report.jl`. Both were **re-run in full** after `7e6770c2`
+(jobs 8442771 and 8442773, both GREEN, 81 + 99 solves).
+
+A useful consistency check fell out of the re-run: the closed-form arms —
+`none`, `fm_dipolar`, `polar_contact`, `scalar` — came back **bit-identical** to
+the pre-fix pass, and only the `spatial` arm moved. They contain no DDI BdG
+block, so that is exactly the set that should have been unaffected.
 
 ### 5.1 The gap shift, and the positive control
 
@@ -322,7 +322,7 @@ comparing the same pair of states:
 | `none` | 0 | 0 | −0.1195 | — |
 | one functional (`fm_dipolar` both) | 0.3562 | 0.3485 | −0.1101 | **+0.0094** |
 | own ansatz (`fm_dipolar` / `polar_contact`) | 0.3562 | 0.0717 | +0.1896 | **+0.3091** |
-| `spatial` (texture-following) | 0.4175 | 0.1165 | +0.2069 | **+0.3264** |
+| `spatial` (texture-following) | 0.4143 | 0.1630 | +0.1547 | **+0.2742** |
 | CONTROL, scalar ×10 | 1.8241 | 1.8099 | −0.0811 | **+0.0384** |
 
 Three readings, in order of how much they matter:
@@ -330,16 +330,15 @@ Three readings, in order of how much they matter:
 1. **The scheme choice dominates the LHY magnitude by 33×.** Giving both
    branches the same fully-polarised functional shifts the gap by 0.0094 —
    because a common offset almost cancels in a difference. Giving each branch the
-   functional its own spinor calls for shifts it by 0.3091. That is the 3.9×
+   functional its own spinor calls for shifts it by 0.3091. That is the 2.7×
    ε(FM)/ε(polar) ratio of §7.2 arriving in an actual solve.
 2. **`spatial` independently confirms which of the two is physical.** It assumes
    no ansatz — it tabulates `e₁(p)` from the local spinors of the actual cloud —
-   and it lands at +0.3264, within 6 % of the own-ansatz answer and 35× the
+   and it lands at +0.2742, within 11 % of the own-ansatz answer and 29× the
    single-functional one. So this is not a matter of taste between two
    conventions: the calculation that asks the cloud agrees with the per-state
-   functional. (Its 0.4175 on the stretched branch runs ~17 % above
-   `fm_dipolar`'s 0.3562, of which ~7.5 % is the `full_bdg`-vs-closed-form method
-   gap of §4 and the rest is the texture.)
+   functional. (Its 0.4143 on the stretched branch runs ~16 % above
+   `fm_dipolar`'s 0.3562, part method gap and part texture.)
 3. **The control fires.** ×10 on the amplitude moves the gap 4.1× further than
    ×1 in the same single-functional configuration — sub-linear because the state
    relaxes against the added repulsion, but unambiguous. And no arm is
@@ -359,10 +358,19 @@ a δB, so the boundary measurement moved to the `c1_ratio` axis, which is where
 the campaign pins c1\* ≈ 0.028–0.029 and where every arm crosses.
 
 One number from the field scan is reused below: the observed local slope
-|∂ΔE/∂B| = 0.0311 per µG near the crossing. That is 0.35× the 0.0888 the pure
-Zeeman argument predicts, because the stretched branch is `cyclic` rather than
-fully polarised at these fields — which is exactly why the slope has to be
-measured rather than derived.
+|∂ΔE/∂B| = 0.0311 per µG near the crossing (0.0236 for the `spatial` arm). That
+is ~0.35× the 0.0888 the pure Zeeman argument predicts, because the stretched
+branch is `cyclic` rather than fully polarised at these fields — which is exactly
+why the slope has to be measured rather than derived.
+
+**The Bz axis also fails its own pre-registered control threshold, so it is not
+the axis this document quotes.** The ×10 control's gap shift converts to
+−2.58 µG against the 5 µG written into `config_arms.yaml` before launch, and the
+report REFUSES a verdict there. It is not that the instrument is blind — the
+physics arms move 9.2 and 12.2 µG, far more than the control — it is that the
+threshold was set from a pre-launch estimate that turned out optimistic, and
+raising it after seeing the data would empty the criterion of content. The c1
+axis, whose control passes at 4× its threshold, is the measurement.
 
 ### 5.3 The c1 axis — where every arm has a boundary, and the answer
 
@@ -388,7 +396,7 @@ a crossing past them.
 | `none` | — (merges instead) | 41.9 |
 | one functional (`fm_dipolar` both) | — (merges instead) | 36.8 |
 | **own ansatz per branch** | **0.02376** | 66.8 |
-| **`spatial`** | **0.02345** | 58.5 |
+| **`spatial`** | **0.02444** | 51.3 |
 | CONTROL scalar ×30 | — | 17.4 |
 
 So at this coupling, **including ε_LHY per state does not merely displace the
@@ -408,8 +416,8 @@ through each arm's own median |∂ΔE/∂c1| — and through the field slope
 | `none` | −0.1524 | 0 | 0 | 0 |
 | one functional (`fm_dipolar` both) | −0.1399 | **+0.0125** | **+3.4e-4** | **+0.40** |
 | own ansatz per branch | +0.1557 | **+0.3081** | **+7.3e-3** | **+9.9** |
-| `spatial` | +0.1709 | **+0.3233** | **+9.4e-3** | **+10.4** |
-| CONTROL scalar ×30 | −0.0810 | +0.0714 | +4.1e-3 | +2.3 |
+| `spatial` | +0.1222 | **+0.2746** | **+6.6e-3** | **+11.6** |
+| CONTROL scalar ×30 | −0.0810 | +0.0714 | +4.1e-3 | — |
 
 **The control passes**: ×30 on the amplitude moves the gap 5.7× further than ×1
 and converts to 4.1e-3 in `c1_ratio`, four times the 1e-3 pre-launch threshold.
@@ -427,8 +435,8 @@ by a factor of 21.**
   26 % of `c1_ratio`, and it changes the *topology* of the diagram, not just the
   position of a line.
 - **`spatial` decides between them.** It assumes no ansatz and lands with the
-  per-state answer (9.4e-3 against 7.3e-3), not with the common-functional one
-  (3.4e-4). So the defensible reading is the expensive one: **the mean-field
+  per-state answer (6.6e-3 against 7.3e-3, a 10 % difference), not with the
+  common-functional one (3.4e-4, a factor 19 away). So the defensible reading is the expensive one: **the mean-field
   FM/polar line at `c1_ratio ≈ 1/36` is NOT defensible**, and the campaign's
   `provisional / mean-field-only` self-labelling was right.
 
@@ -441,12 +449,6 @@ orders below the 0.01 shifts being read. Three cells sit at |∇E| ~ 1e-1 to 3e-
 should not be leaned on individually.
 
 ## 6. Criterion C — the `SpatialLHY` residual in µG
-
-> **NUMBERS IN THIS SECTION ARE BEING RE-MEASURED (2026-08-19).** The `spatial`
-> arm and the `full_bdg` fallback ran through the pre-`7e6770c2` DDI block. Jobs
-> 8442771 (Bz) and 8442773 (c1) recompute both campaigns in full — including the
-> closed-form arms, which are unaffected, so that no cell is a mix. Treat every
-> figure below as provisional until this banner is removed.
 
 **Two defects had to be fixed before this could be measured at all**, and both
 were silent:
@@ -473,13 +475,14 @@ Measured on the converged states of the Bz campaign:
 
 | B (µG) | signed | non-cancelling | worst weighted voxel | uniform worst (old) |
 |---:|---:|---:|---:|---:|
-| 0 | −0.029 | 0.057 | 0.127 | 0.193 |
-| 5 | **−0.065** | 0.066 | 0.160 | 0.204 |
-| 10 | −0.072 | 0.072 | 0.166 | 0.161 |
-| 15 | +0.060 | 0.078 | 0.205 | 0.248 |
-| 20 | −0.016 | 0.053 | 0.163 | 0.168 |
-| 30 | +0.032 | 0.089 | 0.331 | 0.330 |
-| 40 | −0.011 | 0.055 | 0.189 | 0.382 |
+| 0 | **0 (exact)** | — | — | — |
+| 5 | −0.032 | 0.034 | 0.082 | 0.114 |
+| 10 | **−0.035** | 0.045 | 0.096 | 0.147 |
+| 15 | −0.033 | 0.046 | 0.073 | 0.137 |
+| 20 | **+0.064** | 0.064 | 0.127 | 0.199 |
+| 30 | +0.057 | 0.057 | 0.186 | 0.234 |
+| 40 | +0.022 | 0.028 | 0.074 | 0.215 |
+| 55, 70 | **0 (exact)** | — | — | — |
 
 The **polar branch has no *spatial* residual at all**: its p spread is below
 `min_spread`, so `compute_spatial_lhy` declines to build a table and falls back
@@ -489,17 +492,19 @@ dropped the branch out of the propagation and halved the answer.) It is zero for
 *this* approximation only — that branch still carries the ±1.3 % scheme band of §3,
 which is a different and larger error and is not double-counted here.
 
-**Propagation.** The residual moves only the stretched branch, by
-`signed × E_LHY = −0.065 × 0.417 = −0.027`, so the gap by the same and the
-boundary by
+**Propagation.** The residual moves only the stretched branch, so the gap moves
+by `signed × E_LHY` and the boundary by that over the measured slope:
 
-    δc1* = 0.027 / 34.4 = 7.9e-4        δB = 0.027 / 0.0311 = 0.87 µG
+| B (µG) | 5 | 10 | 15 | 20 | 30 | 40 |
+|---|---:|---:|---:|---:|---:|---:|
+| δ(ΔE) | −0.0133 | −0.0144 | −0.0132 | +0.0248 | +0.0205 | +0.0074 |
+| **δB (µG)** | −0.43 | **−0.46** | −0.42 | **+0.80** | +0.66 | +0.24 |
 
-**So the `SpatialLHY` residual is worth ~0.9 µG on the boundary — an order of
-magnitude below the ~10 µG the scheme choice is worth.** Quote it; do not lead
-with it. Note this is ~7 %, not the 1–3 % the issue and `spatial.jl` record;
-those came from `n_atoms = 1` test states and from the uniform-worst statistic
-respectively.
+**So the `SpatialLHY` residual is worth |δB| ≤ 0.8 µG on the boundary — an order
+of magnitude below the ~10 µG the scheme choice is worth.** Quote it; do not lead
+with it. Note the residual is ~3–6 %, not the 1–3 % the issue and `spatial.jl`
+record; those came from `n_atoms = 1` test states and from the uniform-worst
+statistic respectively.
 
 ## 7. Criterion D — which claims need ε_LHY at all
 
