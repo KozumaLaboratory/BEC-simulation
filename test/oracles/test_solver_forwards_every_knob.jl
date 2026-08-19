@@ -79,13 +79,43 @@ const _FWD_PERTURBATIONS = [
     (:rotating_frame_omega, 0.35),
 ]
 
+# The 2-D fixture. `quasi_2d` and `quasi_2d_ddi` are refused on a 3-D grid
+# (`make_workspace.jl:120`, `convolution.jl:17`), so the four knobs that ride
+# them were disclosed as un-exercised when this file only had the 3-D fixture.
+# They are exercised now, which is what a disclosure list is FOR — it names the
+# hole so the hole can be closed, rather than letting absence read as coverage.
+const _FWD_GRID_2D = make_grid(GridConfig((8, 8), (6.0, 6.0)))
+
+"2-D base. `l_z` is set because `quasi_2d` refuses a non-positive one, so the
+perturbation has to arrive with its companion — which is itself the point of
+`quasi_2d` and `l_z` being one physical choice in two kwargs."
+_fwd_base_2d() = (
+    grid=_FWD_GRID_2D,
+    atom=Na23,
+    interactions=InteractionParams(Dict(0 => 1.0, 1 => -0.05)),
+    zeeman=ZeemanParams(0.3, 0.05),
+    potential=HarmonicTrap((1.0, 1.0)),
+    enable_ddi=true,
+    c_dd=0.2,
+    n_steps=1,
+    tol=1e-3,
+    fft_flags=FFTW.ESTIMATE,
+    verbose=false,
+)
+
+# (kwarg, perturbed value, extra kwargs the perturbation needs to be legal).
+const _FWD_PERTURBATIONS_2D = [
+    (:quasi_2d, true, (; l_z=0.7)),
+    (:quasi_2d_ddi, true, (; l_z_ddi=0.7)),
+    # `l_z` alone, with quasi_2d already on in both arms, so this isolates the
+    # length itself rather than the mode switch.
+    (:l_z, 1.3, (; quasi_2d=true)),
+    (:l_z_ddi, 1.3, (; quasi_2d_ddi=true)),
+]
+
 "Physics kwargs this file does NOT exercise, with why. Asserted non-empty-for-a-
 reason below so the list cannot quietly become the whole set."
 const _FWD_NOT_EXERCISED = Dict(
-    :quasi_2d_ddi => "needs a 2-D grid fixture; make_ddi_params refuses it at N=3",
-    :quasi_2d => "the contact quasi-2D reduction, same 2-D fixture requirement",
-    :l_z => "only meaningful with quasi_2d",
-    :l_z_ddi => "only meaningful with quasi_2d_ddi",
     :ddi_pad_factor => "shapes the padded kernel; ddi_padding=true is the arm tested",
     :ddi_trunc_radius => "shapes the truncated kernel; not varied here",
     :spinor_lhy => "gated by test_lhy_table_path_coverage.jl, which varies the kind",
@@ -159,7 +189,8 @@ end
         # excuse a typo) and carry a reason. And the union with what IS exercised
         # must cover every physics kwarg, so a NEW one is not silently in neither.
         phys = Set(k for k in _MAKE_WORKSPACE_KWARGS if !(k in _FWD_RUNTIME))
-        exercised = Set(first.(_FWD_PERTURBATIONS))
+        exercised = union(Set(first.(_FWD_PERTURBATIONS)),
+            Set(t[1] for t in _FWD_PERTURBATIONS_2D))
         for (k, why) in _FWD_NOT_EXERCISED
             @test k in phys
             @test !isempty(strip(why))
@@ -195,6 +226,36 @@ end
                                workspace — it is inert, i.e. not forwarded" solver=name knob=kw
                     end
                     @test got != ref
+                end
+            end
+
+            # The 2-D arm. `quasi_2d` and `quasi_2d_ddi` are refused at N=3
+            # (`make_workspace.jl:120`, `convolution.jl:17`), so these four knobs
+            # were disclosed as un-exercised while this file had only the 3-D
+            # fixture. Closing a disclosed hole is what the disclosure is for.
+            base2d = NamedTuple(
+                k => v for (k, v) in pairs(merge(_fwd_base_2d(), extra))
+                           if k in acc
+            )
+            # Skip the whole arm rather than half-run it if the solver cannot take
+            # the 2-D base — silently comparing an incomplete fixture is the
+            # degenerate-knob trap.
+            if all(k -> k in acc, (:quasi_2d, :l_z)) ||
+                all(k -> k in acc, (:quasi_2d_ddi, :l_z_ddi))
+                ref2d = _fwd_signature(solver(; base2d...).workspace)
+                for (kw, val, companions) in _FWD_PERTURBATIONS_2D
+                    # A perturbation needs BOTH its knob and its companions
+                    # accepted: `quasi_2d` without `l_z` throws ("quasi_2d
+                    # requires l_z > 0"), which is the API saying they are one
+                    # physical choice.
+                    (kw in acc && all(k -> k in acc, keys(companions))) || continue
+                    @testset "$kw arrives (2-D)" begin
+                        got = _fwd_signature(
+                            solver(; base2d..., companions..., kw => val).workspace)
+                        got == ref2d && @info "a 2-D knob this solver ACCEPTS changed \
+                                               nothing in the built workspace" solver=name knob=kw
+                        @test got != ref2d
+                    end
                 end
             end
         end
