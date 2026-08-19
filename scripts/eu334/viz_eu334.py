@@ -226,7 +226,13 @@ def panel_selection(ax, cells):
             p, lo, hi = wilson(nf, n)
             xs.append(tau); ps.append(p); los.append(lo); his.append(hi); ns.append(n)
         xs = np.asarray(xs, float)
-        ax.errorbar(xs, ps, yerr=[np.array(ps) - los, np.array(his) - np.array(ps)],
+        # Clip at zero. A Wilson interval can land a hair outside [p_lo, p_hi] in
+        # floating point when p saturates, and matplotlib rejects a negative yerr
+        # outright — so the figure dies at the moment every cell reads 0 or 1,
+        # which is exactly when it matters most.
+        lo_err = np.clip(np.array(ps) - np.array(los), 0.0, None)
+        hi_err = np.clip(np.array(his) - np.array(ps), 0.0, None)
+        ax.errorbar(xs, ps, yerr=[lo_err, hi_err],
                     fmt="o-", ms=5, capsize=3, color=CAT[i],
                     label=rf"$T$ = {T:g} ($n$ = {min(ns)}–{max(ns)})")
         # Annotate the SATURATED cells with their count and one-sided limit —
