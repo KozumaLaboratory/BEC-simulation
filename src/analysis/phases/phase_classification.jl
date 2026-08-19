@@ -63,7 +63,7 @@ function _order_parameters_core(
     # reduces in-place.
     n_sum = sum(n_total) * dV
     n_sq_sum = sum(x -> x * x, n_total) * dV
-    if n_sum < 1e-30
+    if n_sum < COUPLING_TOL
         return (
             spin_order=0.0,
             nematic_order=0.0,
@@ -140,7 +140,7 @@ function _density_weighted_mean(field, density, dV)
         w_sum += wi
         fw_sum += field[i] * wi
     end
-    w_sum < 1e-30 && return 0.0
+    w_sum < COUPLING_TOL && return 0.0
     fw_sum / w_sum
 end
 
@@ -205,7 +205,7 @@ function _mean_majorana_entropy(
         s_sum += w * _majorana_star_entropy(spinor, F)
         w_sum += w
     end
-    w_sum < 1e-30 && return 0.0
+    w_sum < COUPLING_TOL && return 0.0
     s_sum / w_sum
 end
 

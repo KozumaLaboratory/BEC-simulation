@@ -489,7 +489,7 @@ function _lhy_bdg_energy_and_growth(spinor, n0, F, interactions, zeeman, c_dd,
             end
             extend!(b, 2b, max(8, n_k ÷ 2))
             E2 = total(2b)
-            err = abs(E2 - E) / max(abs(E2), 1e-300)
+            err = abs(E2 - E) / max(abs(E2), UNDERFLOW_FLOOR)
             E, b = E2, 2b
             err <= rtol && break
         end

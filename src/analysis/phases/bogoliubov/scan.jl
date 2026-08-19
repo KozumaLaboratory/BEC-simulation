@@ -238,7 +238,7 @@ function predict_supersolid_params(imap::InstabilityMap)
     max_g = maximum(amap)
     pos_vals = filter(x -> x > 1e-10, amap)
     min_g = isempty(pos_vals) ? max_g : minimum(pos_vals)
-    anisotropy = max_g > 1e-10 ? max_g / max(min_g, 1e-30) : 0.0
+    anisotropy = max_g > 1e-10 ? max_g / max(min_g, DENOM_FLOOR) : 0.0
 
     pattern = if anisotropy > 3.0
         :stripe

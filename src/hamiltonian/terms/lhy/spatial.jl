@@ -184,7 +184,7 @@ function spatial_lhy_residual(lhy::SpatialLHY, psi_init::AbstractArray{<:Complex
         exact = _lhy_bdg_energy_density(z, 1.0, F, interactions, zeeman, c_dd,
             nothing, nothing, nothing; rtol)
         tab = _interpolate_1d(lhy.polarisations, lhy.e1_values, p)
-        abs(exact) < 1e-30 && continue
+        abs(exact) < COUPLING_TOL && continue
         worst = max(worst, abs(tab - exact) / abs(exact))
         hit = true
     end

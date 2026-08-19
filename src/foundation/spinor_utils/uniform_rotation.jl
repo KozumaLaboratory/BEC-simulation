@@ -25,7 +25,7 @@ function apply_uniform_spin_rotation!(
     imaginary_time::Bool=false,
     scratch::Union{Nothing, AbstractArray}=nothing,
 ) where {D}
-    abs(phi_x) + abs(phi_y) + abs(phi_z) < 1e-30 && return nothing
+    abs(phi_x) + abs(phi_y) + abs(phi_z) < COUPLING_TOL && return nothing
 
     # The rotation is spatially uniform — the same D×D unitary is applied at
     # every grid point. Build R once (D² scalar ops on host), then apply it

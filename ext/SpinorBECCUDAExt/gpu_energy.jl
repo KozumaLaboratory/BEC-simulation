@@ -52,7 +52,7 @@ function _gpu_lhy_energy(psi, ws, n_comp, N, n_pts, dV)
         a2 = lhy.a_2d_sq
         lc = lhy.log_const
         E = sum(n) do ni
-            ni < 1e-30 ? zero(ni) : ni * ni * (log(ni * a2) + lc)
+            ni < COUPLING_TOL ? zero(ni) : ni * ni * (log(ni * a2) + lc)
         end
         return lhy.c_lhy_2d * E * dV
     else
@@ -156,12 +156,12 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
     # out buffer + fill. Gradient accumulated directly. Matches the CPU direct
     # energy formulas (bit-close, ~1e-14 reduction reassociation).
     E_c0 = 0.0
-    if abs(ws.interactions[0]) > 1e-30
+    if abs(ws.interactions[0]) > COUPLING_TOL
         accum_grad(c0_t)
         E_c0 = 0.5 * ws.interactions[0] * sum(abs2, ctx.n_density) * dV
     end
     E_c1 = 0.0
-    if abs(ws.interactions[1]) > 1e-30
+    if abs(ws.interactions[1]) > COUPLING_TOL
         accum_grad(c1_t)   # (re)computes ctx.fx/fy/fz = spin density
         E_c1 =
             0.5 * ws.interactions[1] *

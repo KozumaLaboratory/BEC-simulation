@@ -99,7 +99,7 @@ function _lbfgs_direction(
         # ψ-sized arrays for a number we had.
         ys = 1.0 / (rho_hist[end] * dV)
         yy = _realdot(y_hist[end], y_hist[end])   # ≡ sum(abs2, y)
-        γ = ys / max(yy, 1e-30)
+        γ = ys / max(yy, DENOM_FLOOR)
         q .*= γ
     end
 
