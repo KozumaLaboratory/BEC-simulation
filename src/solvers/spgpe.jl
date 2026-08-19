@@ -405,6 +405,7 @@ energy decreases monotonically. That sign is the oracle for this term.
 function apply_energy_damping_step!(
     ws::Workspace{N}, M::Real, T::Real, dt::Real;
     seed::Union{Nothing, Int}=nothing, noise::Bool=true, k_cut::Real=Inf,
+    cayley_iters::Int=0,
 ) where {N}
     M_f = Float64(M)
     M_f > 0 || return nothing
@@ -497,10 +498,77 @@ function apply_energy_damping_step!(
     #
     # Neither form is right. Closing this needs the C-region mode coefficients, not a
     # choice between these two.
+    if cayley_iters <= 0
+        for c in 1:D
+            idx = _component_slice(N, n_pts, c)
+            psi_c = view(psi, idx...)
+            @. psi_c *= cis(real(phase_k))
+        end
+    else
+        _cayley_phase_step!(ws, phase_k, n_pts, D, Float64(k_cut), cayley_iters)
+    end
+    nothing
+end
+
+"""
+    _cayley_phase_step!(ws, phase_k, n_pts, D, k_cut, iters)
+
+Apply `ψ → ψ + i P{φ (ψ + ψ')/2}` by Picard iteration — the midpoint (Cayley) form of
+the projected phase operator.
+
+# Why this rather than `ψ *= cis(φ)`
+
+The energy-damping term is `∂ψ = −i P{ψ V_ε} dt` and the projector sits on the PRODUCT.
+With `P` self-adjoint, `ψ ∈ C` and `V_ε` real,
+
+    dN/dt = 2 Re[−i ∫ ψ* P{ψV_ε}] = 2 Re[−i ∫ (Pψ)* ψV_ε] = 2 Re[−i ∫ |ψ|²V_ε] = 0
+
+exactly, in any basis. So number conservation does not need the spectral-Galerkin
+representation — I concluded it did, and that was wrong. `P(iφ)P` restricted to `C` is
+skew-Hermitian, and the Cayley transform of a skew-Hermitian operator is unitary, so the
+midpoint form conserves the norm exactly ON `C` and is stable.
+
+The two forms that do not work, both measured:
+
+  `ψ *= cis(φ)`      pointwise norm-preserving and stable, but a FINITE rotation:
+                     `exp(iφ)` is not band-limited even when `φ` is, so the product
+                     carries weight above the cutoff and the caller's projector removes
+                     it. 4.53e-3 per unit time, flat across dt 0.02 → 0.001.
+  `ψ += iφψ`         the projector's form, cuts the loss to 2.45e-3, but explicit — and
+                     Rooney, Blakie & Bradley use a weak SEMI-implicit Euler precisely
+                     because a multiplicative term needs it.
+
+`iters` Picard sweeps give an error `O(φ^(iters+1))`; `φ ∝ ℳ̄ dt`, so two is ample and
+the iteration converges for `|φ| < 2`. The projection is a k-space mask, two FFTs per
+sweep per component, so this costs ~2× the term's existing transform count — paid only
+when asked for.
+"""
+function _cayley_phase_step!(
+    ws::Workspace, phase_k, n_pts::NTuple{N, Int}, D::Int, k_cut::Float64, iters::Int
+) where {N}
+    psi = ws.state.psi
+    plans = ws.fft_plans
+    RT = real(eltype(psi))
+    kc2 = isfinite(k_cut) ? RT(k_cut^2) : RT(Inf)
+    _, _, ksq, _ = _energy_damping_buffers(ws, n_pts, k_cut)
+    psi_old = scratch_get!(:cay_old, (typeof(psi), n_pts)) do
+        _similar(ws.backend, psi, eltype(psi), n_pts...)
+    end
+    work = scratch_get!(:cay_work, (typeof(psi), n_pts)) do
+        _similar(ws.backend, psi, eltype(psi), n_pts...)
+    end
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        @. psi_c *= cis(real(phase_k))
+        copyto!(psi_old, psi_c)
+        for _ in 1:iters
+            # work = φ (ψ_old + ψ_current)/2, then projected to C.
+            @. work = im * real(phase_k) * (psi_old + psi_c) / 2
+            plans.forward * work
+            @. work = ifelse(ksq <= kc2, work, zero(eltype(work)))
+            plans.inverse * work
+            @. psi_c = psi_old + work
+        end
     end
     nothing
 end

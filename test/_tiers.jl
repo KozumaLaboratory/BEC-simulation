@@ -250,6 +250,7 @@ const FAST_TESTS = [
     # of both sides is not a resolution when one side is a fix.
     "dynamics/test_spgpe_projector_composition.jl",
     "dynamics/test_energy_damping_buffer_reuse.jl",
+    "dynamics/test_energy_damping_cayley.jl",
     "dynamics/test_mu_from_total_number.jl",
     "dynamics/test_mu_equilibrium_constraint.jl",
     "dynamics/test_mu_lda_constraint.jl",
