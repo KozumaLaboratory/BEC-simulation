@@ -50,7 +50,7 @@ Each declares its sign in one coefficient function in the file named.
 |---|---|---|---|
 | 1 | `kinetic` | `KineticTerm` | `src/hamiltonian/terms/kinetic.jl:13` |
 | 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl:7` |
-| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:216` |
+| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:227` |
 | 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl:33` |
 | 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:147` |
 | 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl:8` |
@@ -209,11 +209,11 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
 - `FAST_TESTS` — 261 files
-- `CI_EXTRA` — 132 files
+- `CI_EXTRA` — 134 files
 - `FULL_EXTRA` — 74 files
 - `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 87 files
-- `INTEGRATION_TESTS` — 51 files
+- `ORACLE_TESTS` — 88 files
+- `INTEGRATION_TESTS` — 52 files
 
 ## Validation ladder — instruments present on disk
 
