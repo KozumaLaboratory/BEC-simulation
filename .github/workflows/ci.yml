@@ -150,6 +150,14 @@ jobs:
       SPINORBEC_TEST_WORKERS: auto
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The fast tier contains `test_campaign_fix_list_gate.jl`, which runs
+          # CAMPAIGN.md §4 guard 1 for real: `git merge-base --is-ancestor` over
+          # every ref in fix_list.toml. Under the default shallow checkout none
+          # of those commits is in the clone, so the gate cannot look — and a
+          # correction gate that cannot run in CI is the exact failure #343 was
+          # opened about. Full history is seconds here.
+          fetch-depth: 0
       - uses: julia-actions/setup-julia@v2
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:

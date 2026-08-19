@@ -29,6 +29,30 @@ const _CAMPAIGN = joinpath(_REPO, "docs", "campaign", "CAMPAIGN.md")
 _git_ok(cmd) = success(pipeline(setenv(cmd, dir=_REPO); stdout=devnull, stderr=devnull))
 _have(rev) = _git_ok(`git rev-parse --quiet --verify $(rev * "^{commit}")`)
 
+"""
+Is this clone missing the history the gate needs?
+
+`actions/checkout` defaults to `fetch-depth: 1`, and under a shallow clone every
+`git merge-base --is-ancestor <2026-06-ref> HEAD` fails for want of the commit —
+so the gate reported dead refs and blew up on `rev-parse <ref>^` with exit 128.
+That is not a broken fix list, it is a blind instrument, and the two must not
+share a message. `.github/workflows/ci.yml` now checks out with `fetch-depth: 0`;
+this predicate exists so a regression there says so in one line instead of
+surfacing as a raw git error inside an unrelated assertion.
+"""
+_shallow() =
+    strip(read(setenv(`git rev-parse --is-shallow-repository`, dir=_REPO),
+        String)) == "true"
+
+@testset "the clone carries the history the gate needs" begin
+    if _shallow()
+        @warn "SHALLOW CLONE: the campaign ancestor gate cannot look. This is a " *
+            "CI configuration regression, not a fix-list problem — restore " *
+            "`fetch-depth: 0` on the checkout step that runs the fast tier."
+    end
+    @test !_shallow()
+end
+
 # Commit SHAs quoted in campaign / manuscript prose that are NOT corrections a
 # run must descend from. Each needs a reason, written here, at the moment the
 # citation is added — that classification is the whole point of the gate. A new
@@ -115,10 +139,19 @@ end
     #    verdict must name the fix. The parent of the newest listed ref is such a
     #    commit by construction, so this canary cannot silently stop being one.
     newest = last(sort(fixes; by=f -> f.merged))
-    parent = strip(read(setenv(`git rev-parse $(newest.ref * "^")`, dir=_REPO), String))
-    v = campaign_gate_verdict(parent; fixes, repo=_REPO)
-    @test v.verdict === :disqualified
-    @test newest.id in v.missing
+    # Guard the read: under a shallow clone this `rev-parse` exits 128 and the
+    # canary died with a raw `failed process` inside an assertion about
+    # something else. The dedicated shallow testset above is where that is
+    # reported; here it just means "cannot construct the canary".
+    if _have(newest.ref * "^")
+        parent = strip(read(setenv(`git rev-parse $(newest.ref * "^")`, dir=_REPO), String))
+        v = campaign_gate_verdict(parent; fixes, repo=_REPO)
+        @test v.verdict === :disqualified
+        @test newest.id in v.missing
+    else
+        @warn "canary 3 skipped: $(newest.ref)^ is not in this clone (shallow?)"
+        @test _shallow()   # the ONLY admissible reason; otherwise this is red
+    end
 
     # 4. A clean HEAD passes. Only meaningful because 1-3 showed red is reachable.
     @test campaign_gate_verdict("HEAD"; fixes, repo=_REPO).verdict === :pass
