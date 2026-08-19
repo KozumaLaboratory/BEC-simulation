@@ -52,7 +52,7 @@ bifurcation)
 # window stage A found. 64³ is the coarsest grid whose k_max clears µ + T; the
 # anchors are stage A's own cells, upsampled.
 window)
-    LO=${2:?F_LO required — from stage A's measured bifurcation}
+    LO=${2:?F_LO required — from the measured bifurcation in stage A}
     HI=${3:?F_HI required}
     AF=$(printf "$OUT/bifurcation_k1.8_g32/flower_down_f%06.4f.jld2" "$HI")
     AP=$(printf "$OUT/bifurcation_k1.8_g32/polar_up_f%06.4f.jld2" "$LO")

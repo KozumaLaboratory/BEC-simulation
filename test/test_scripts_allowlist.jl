@@ -237,3 +237,30 @@ end
     isempty(broken) || @info "include targets that exist under no base" broken
     @test !isempty(refs)      # nothing to check ⇒ the extractor, not the tree
 end
+
+# Same class, other language. A submit wrapper is only ever executed by the
+# scheduler, so a quoting slip in one is discovered by a job that dies in its
+# first second after queueing — `${2:?… stage A's …}` is parsed, and the
+# apostrophe inside it took a launcher down. `bash -n` parses without running,
+# which is exactly the distinction that makes this safe to gate.
+@testset "shell scripts under scripts/ parse" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+    shs = String[]
+    for (dir, _, fs) in walkdir(joinpath(root, "scripts")), f in fs
+        endswith(f, ".sh") && push!(shs, joinpath(dir, f))
+    end
+    parses(p) = success(pipeline(`bash -n $p`; stdout=devnull, stderr=devnull))
+
+    probe = mktempdir()
+    good = joinpath(probe, "good.sh")
+    bad = joinpath(probe, "bad.sh")
+    write(good, "echo ok\n")
+    write(bad, "x=\${1:?it's broken}\n")
+
+    bad_scripts = calibrated_scan(shs; match=p -> !parses(p), present=bad, absent=good,
+        describe=p -> relpath(p, root))
+    @test isempty(bad_scripts)
+    isempty(bad_scripts) || @info "shell scripts that do not parse" bad_scripts
+    @test !isempty(shs)
+end
