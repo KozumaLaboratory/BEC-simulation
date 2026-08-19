@@ -335,11 +335,22 @@ _LINK = re.compile(r"\[\[([^\]]+)\]\]|\]\(([A-Za-z0-9_\-]+)\.md\)")
 
 
 def link_targets(text):
-    """Every stem this text points at, in EITHER link form."""
+    """Every stem this text points at, in EITHER link form.
+
+    BOTH spellings are yielded, because the hyphen is ambiguous. Wiki-links are
+    sometimes written with hyphens where the file uses underscores, which is why
+    the normalisation exists -- but a filename may also contain a LITERAL hyphen,
+    and normalising that one destroys the match: `...at_1e-4_of_the_field` became
+    `...at_1e_4_...`, and a memory linked from `MEMORY.md` was reported as
+    reachable from nothing (2026-08-19). Yielding both costs nothing and cannot
+    fabricate reachability, since only keys that exist as files are followed.
+    """
     for wiki, md in _LINK.findall(prose(text)):
         raw = wiki or md
         key = raw[:-3] if raw.endswith(".md") else raw
-        yield key.replace("-", "_")
+        yield key
+        if "-" in key:
+            yield key.replace("-", "_")
 
 
 def reachable(texts, roots):
