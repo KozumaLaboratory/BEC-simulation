@@ -4,7 +4,7 @@
 #
 # The verification-type split — A: code correctness, B: physics agreement, C:
 # model fidelity — has been repo policy for a long time and has been enforced by
-# nothing. "Tests pass" is an A statement and "matches Klaus 2022" is a C
+# nothing. "Tests pass" is an A statement and "matches Klaus et al. 2022" is a C
 # statement, and the only thing stopping a report from swapping them is whoever
 # writes the report. The inner constructor below is the entire enforceable
 # content of that taxonomy: three lines that refuse the three ways the categories

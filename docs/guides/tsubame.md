@@ -258,7 +258,7 @@ on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
 | `eu151_full_64cube_200ms`      | 64×64×32 | 200 ms  | 3–4h |
 
 All configs use `epsilon: 1.0e-6` per the audit finding (Y6 ε=1e-3
-silently fails for `p·F·dt > 300` in Klaus regime — see
+silently fails for `p·F·dt > 300` in the fast-Larmor regime — see
 `docs/archive/thesis_batch_audit_2026-04-28.md` and the
 `gotcha_K3_routing_pre_2026_05_13` memory note).
 
@@ -285,7 +285,7 @@ julia --project=. -e '
 ### Pre-submit checklist
 
 1. **`dy164_main_eps1e6` parity**: if local ε=1e-6 result still shows
-   m=+F: 1.0→1.0 frozen, the Dy164 Klaus reproduction is real (just
+   m=+F: 1.0→1.0 frozen, the Dy164 magnetostir reproduction is real (just
    deeply adiabatic); fine to submit. If it differs, the original was
    a numerical artifact — investigate before committing TSUBAME hours.
 2. **Project.toml + Manifest.toml** must match TSUBAME's Julia

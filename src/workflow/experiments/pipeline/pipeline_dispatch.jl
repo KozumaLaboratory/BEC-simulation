@@ -117,7 +117,7 @@ Derive dt from accumulated-error target ε via global error scaling
 ε ≈ C · T · dt^p where p is integrator order, C ~ O(1).
 
 Safety factor 0.1 → conservative dt that consistently meets target across
-typical Klaus / B-1 problems (verified empirically, prevents under-resolved
+typical fast-Larmor / B-1 problems (verified empirically, prevents under-resolved
 DDI / fast-rotation regimes).
 
 Returns: dt = 0.1 · (ε / duration)^(1/p)

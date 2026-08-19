@@ -7,7 +7,7 @@ Author: anko (assisted by Claude Opus 4.7) Status: Draft — pre-implementation 
 
 ## Motivation
 
-Experimental papers (Klaus 2022, EdH matsui 2025, etc.) specify magnetic fields as **vectors in Gauss** or **(magnitude, direction)** tuples, not as the dimensionless (p, q, bx, by) quadruple used internally by `split_step.jl`. Writing experimental YAML directly in (p, q, bx, by) requires manual unit conversion and is error-prone.
+Experimental papers (Klaus et al. 2022, EdH matsui 2025, etc.) specify magnetic fields as **vectors in Gauss** or **(magnitude, direction)** tuples, not as the dimensionless (p, q, bx, by) quadruple used internally by `split_step.jl`. Writing experimental YAML directly in (p, q, bx, by) requires manual unit conversion and is error-prone.
 
 Phase 1.5 adds a **schema-level dispatch** in the YAML parser so users can write B-fields at the abstraction they prefer. No runtime cost — all conversion happens at parse time.
 
@@ -69,7 +69,7 @@ Coil-based: compute B from coil geometry + currents. Experimental-integration la
 
 All time-dep specs (ramps, sinusoidals, PWL) are **sampled and stored as `PiecewiseLinearWaveform`** after conversion, not as closures.
 
-Rationale: `FunctionWaveform(t -> B_to_p(Bz(t), ...))` would create a unique closure type per call site, contaminating `make_workspace`'s 23-param inference via abstract `PipelineStep` dispatch. The same pitfall we just caught in pulse_sequence (see `CLAUDE.md > Type stability boundaries`). Sampling to 1024 points gives negligible error for Klaus-style ramps (ms-scale on 1-second windows).
+Rationale: `FunctionWaveform(t -> B_to_p(Bz(t), ...))` would create a unique closure type per call site, contaminating `make_workspace`'s 23-param inference via abstract `PipelineStep` dispatch. The same pitfall we just caught in pulse_sequence (see `CLAUDE.md > Type stability boundaries`). Sampling to 1024 points gives negligible error for magnetostir ramps (ms-scale on 1-second windows).
 
 **Implementation**: reuse `_build_windowed_waveform` sampler from `pulse_sequence.jl`, or a leaner variant without windowing.
 
@@ -105,7 +105,7 @@ Rule: inherited from step's `interactions.omega_ref` if available, else from top
 2. Level 1 with `Bx` linear ramp → bx_wf samples match analytic `p(t)` (within 1%).
 3. Level 2 theta ramp at fixed B_mag, phi=0: `Bx = B_mag · sin(θ)`, `Bz = B_mag · cos(θ)` — verify vector matches.
 4. Mixing Level 0 and Level 1 raises `ArgumentError` with clear message.
-5. Klaus 2022-like fragment (tilt ramp in theta, simultaneous B_mag) round-trips through run_pipeline without JIT regression (< 10 min via existing JIT guard).
+5. Klaus et al. 2022-like fragment (tilt ramp in theta, simultaneous B_mag) round-trips through run_pipeline without JIT regression (< 10 min via existing JIT guard).
 
 ## Estimated scope
 
@@ -115,7 +115,7 @@ Rule: inherited from step's `interactions.omega_ref` if available, else from top
 - Tests: ~100 lines
 - Total: ~310 lines, target < 400 per file (within `CLAUDE.md` limit)
 
-## Klaus 2022 YAML preview (Level 2)
+## Klaus et al. 2022 YAML preview (Level 2)
 
 ```yaml
 pipeline:
