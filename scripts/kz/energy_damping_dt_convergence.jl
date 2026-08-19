@@ -67,3 +67,52 @@ end
 @printf("loss/TIME -> 0  => discretisation, and dt was too large\n")
 @printf("\nBEFORE the increment form: 4.5285e-03 4.5288e-03 4.5305e-03 4.5312e-03 4.5303e-03\n")
 @printf("  (dt 0.02 -> 0.001, flat to 0.06%% over a factor of 20 — the exponential form)\n")
+
+
+# Does the loss fall with band margin?
+#
+# The increment i*phi*psi is a PRODUCT of two C-region fields, so its spectrum is their
+# convolution and reaches 2*k_cut. A product of two C fields is not in C, and the
+# step's closing projector cuts whatever lies above the cutoff — which happens for the
+# exponential and the increment alike, and is why the increment form only bought 1.85x.
+#
+# So: is the residual aliasing, or is it the projector legitimately removing weight that
+# the grid could represent? Vary k_max/k_cut at FIXED physics by changing n at fixed box.
+# At the current 2.02 the grid can just barely hold the product. If the loss falls as the
+# margin grows it is aliasing and the fix is margin or dealiasing; if it is flat the
+# projector is removing real out-of-band weight and number conservation in this scheme
+# needs a different treatment.
+#
+# Fixed dt, since dt has already been shown not to matter (flat over a factor of 20).
+@printf("\n\n=== band margin at fixed dt = 0.005, T_total = 20 ===\n")
+@printf("%-7s %-9s %-9s %-13s %-13s %-13s\n",
+    "n", "k_max", "kmax/kcut", "N start", "N end", "loss/TIME")
+for nn in (44, 66, 88, 132)
+    g = make_grid(GridConfig((nn, nn, nn), (L, L, L)))
+    dVn = cell_volume(g)
+    dt = 0.005
+    sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
+        normalize_every=0)
+    w = make_workspace(; grid=g, atom=Eu151,
+        interactions=InteractionParams(Dict{Int, Float64}(0 => c0)),
+        potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
+        fft_flags=FFTW.ESTIMATE)
+    hp = make_fft_plans(g.config.n_points; flags=FFTW.ESTIMATE)
+    h = zeros(ComplexF64, size(w.state.psi))
+    thermal_cfield!(h, g, hp; T, mu=1.5, c0, k_cut, seed=31337)
+    copyto!(w.state.psi, h)
+    res = SPGPEReservoir(; T, mu=1.5, a_s=0.007, k_cut, gamma=NaN, M=NaN,
+        number_damping=false, energy_damping=true)
+    N0 = real(sum(abs2, w.state.psi)) * dVn
+    steps = round(Int, 20.0 / dt)
+    for st in 1:steps
+        apply_spgpe_step!(w, res, dt; t=0.0, seed=90000 + st, noise=NOISE)
+    end
+    N1 = real(sum(abs2, w.state.psi)) * dVn
+    kmax = π * nn / L
+    @printf("%-7d %-9.3g %-9.3f %-13.6g %-13.6g %-13.4e\n",
+        nn, kmax, kmax / k_cut, N0, N1, (N0 - N1) / (N0 * steps * dt))
+    flush(stdout)
+end
+@printf("\nfalls with margin => aliasing; margin or dealiasing is the fix\n")
+@printf("flat with margin  => the projector removes real out-of-band weight\n")
