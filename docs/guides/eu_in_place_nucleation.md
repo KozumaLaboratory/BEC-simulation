@@ -449,6 +449,26 @@ exists at $f = 0.313$ and is the lower-energy state past $f_{\rm eq} = 0.343$ �
 and it does not go there. That is the control passing: with no fluctuation there
 is no selection, and the branches stay a factor 25 apart in the order parameter.
 
+**Both arms end classified as the branch they started on**, which is criterion 1
+discharged:
+
+| arm | $N_C$ | $f$ | $\langle F_\perp\rangle$ | relaxed $E$ | $\Delta E$ to flower | $\Delta E$ to polar | verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| from polarised | 11530 → 19417 | 0.388 | 0.153 | 7.445602 | $+1.13\times10^{-2}$ | $+8.5\times10^{-4}$ | **POLARISED** |
+| from flower | 17330 → 23621 | 0.472 | 4.201 | 8.023855 | $+1.08\times10^{-3}$ | $-2.88\times10^{-2}$ | **FLOWER** |
+
+Each lands within $10^{-3}$ per atom of its own branch and is an order of
+magnitude further from the other, against a branch separation of $1.0$–$3.0
+\times10^{-2}$ at those $f$. Note the ΔE to the *wrong* branch is **negative** for
+the flower arm — it sits below the polarised branch, as the ground state should
+past $f_{\rm eq}$ — so the classifier is not merely picking the nearest number, it
+is resolving which side of the crossing the state is on.
+
+The Stern-Gerlach counts already separate: **2 populated $m_F$ levels** from the
+polarised arm against **4** from the flower one (participation ratio 1.83 vs
+2.62). That is the same discrete, calibration-free observable #335 arrived at from
+the ramp side, appearing here from the growth side.
+
 ### 5.9 The ensemble
 
 *(Pending: 120 trajectories, $T \in \{5, 10\}$ × $\tau \in \{400, 1300, 4000\}$ ms
