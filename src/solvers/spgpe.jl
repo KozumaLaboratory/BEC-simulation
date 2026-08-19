@@ -487,26 +487,46 @@ function apply_energy_damping_step!(
 end
 
 """
-    _energy_damping_buffers(ws, n_pts) -> (divj, phase_k, ksq, kinv)
+    _energy_damping_buffers(ws, n_pts, k_cut) -> (divj, phase_k, ksq, kinv)
 
 Cached device buffers + k-space kernels for the energy-damping step. `kinv` is
-`1/|k|` with the `k=0` entry zeroed (see [`apply_energy_damping_step!`](@ref));
-`ksq` is `ws.grid.k_squared` resident on the device, which the per-call
-`_to_device` in `apply_projected_gp!` would otherwise re-upload every step.
+`1/|k|` with the `k=0` entry zeroed and everything above `k_cut` zeroed (see
+[`apply_energy_damping_step!`](@ref)); `ksq` is `ws.grid.k_squared` resident on
+the device, which the per-call `_to_device` in `apply_projected_gp!` would
+otherwise re-upload every step.
+
+**`k_cut` is NOT part of the cache key**, and that is the whole point of this
+function's shape. `tracking_cutoff` exists to ramp the cutoff — it is a
+`Waveform`, evaluated fresh every reservoir sub-step — so keying on it gives a
+distinct entry per step, and `SCRATCH_REGISTRY` holds strong references and never
+evicts. Measured 2026-08-19 on a 64³ D=13 SPGPE growth ramp: 34 557 reservoir
+sub-steps, four buffers each, and the job died with
+`Out of GPU memory trying to allocate 4.000 MiB` at 99.97 % of a 94 GiB H100 —
+after the ramp had run to completion often enough to look like a physics result.
+A *constant* cutoff hides it completely, which is why every existing test passed.
+
+So the shape-dependent buffers are keyed on shape alone and `kinv` is REBUILT in
+place from the cached `ksq` on each call. That is one O(N) device broadcast
+against the sub-step's several FFTs, i.e. free, and it removes the failure mode
+rather than making its onset later.
 """
 function _energy_damping_buffers(
     ws::Workspace, n_pts::NTuple{N, Int}, k_cut::Float64=Inf
 ) where {N}
     psi = ws.state.psi
-    key = (typeof(psi), n_pts, k_cut)
+    RT = real(eltype(psi))
+    key = (typeof(psi), n_pts)
     divj = scratch_get!(:ed_divj, key) do
-        _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
+        _similar(ws.backend, psi, RT, n_pts...)
     end
     phase_k = scratch_get!(:ed_phase, key) do
         _similar(ws.backend, psi, eltype(psi), n_pts...)
     end
     ksq = scratch_get!(:ed_ksq, key) do
-        _to_device(ws.backend, convert(Array{real(eltype(psi))}, ws.grid.k_squared))
+        _to_device(ws.backend, convert(Array{RT}, ws.grid.k_squared))
+    end
+    kinv = scratch_get!(:ed_kinv, key) do
+        _similar(ws.backend, psi, RT, n_pts...)
     end
     # Band-limited to the C region, Rooney et al. Eq. (15): the correlator carries
     # δ_C(k,−k'), so both the kernel and the noise it colours live BELOW the
@@ -514,14 +534,9 @@ function _energy_damping_buffers(
     # that multiplies the field, and the product was then removed by the caller's
     # projector — 0.05 % of the norm per step at ℳ̄ = 0.01 and 0.53 % at ℳ̄ = 0.1,
     # which over 20000 steps took N from 56.4 to 1.6e-3 and 1.2e-44.
-    kinv = scratch_get!(:ed_kinv, key) do
-        kc2 = k_cut^2
-        host = map(ws.grid.k_squared) do k2
-            (k2 > 0 && k2 <= kc2) ? real(eltype(psi))(1 / sqrt(k2)) :
-            zero(real(eltype(psi)))
-        end
-        _to_device(ws.backend, host)
-    end
+    kc2 = RT(k_cut^2)
+    @. kinv = ifelse((ksq > 0) & (ksq <= kc2), one(RT) / sqrt(max(ksq, floatmin(RT))),
+        zero(RT))
     (divj, phase_k, ksq, kinv)
 end
 

@@ -29,11 +29,21 @@ mkdir -p logs/tsubame "$OUT"
 # branches are within ~8 k_BT of each other at the bifurcation at T = 10 and
 # within ~16 at T = 5, so if a thermal fluctuation can choose at all, it can here.
 TEMPS=${TEMPS:-"5.0 10.0"}
-# Traversal times around the reservoir-limited growth time, which is what the
-# experiment's evaporation rate maps onto: 1/(γµ) is ~1 s at T = 5 and ~0.65 s at
-# T = 10, and the window is 0.6 e-foldings of N₀ wide. So 500 ms is roughly
-# matched and the other two bracket it by 3×.
-TAUS=${TAUS:-"150 500 1500"}
+# Ramp times bracketing the reservoir-limited growth time. The condensate grows at
+# 2γ(µ_res − µ_ψ), which is ~1/3000 ms⁻¹ at T = 5, and the window is 0.8 e-foldings
+# of N₀ wide — so a µ ramp FASTER than that does not make the field cross faster,
+# it only raises the driving. τ = 4500 ms is quasi-static, 500 ms is drive-limited,
+# 1500 ms is between.
+TAUS=${TAUS:-"500 1500 4500"}
+# Every arm runs to the SAME total duration, holding at µ₁ after its ramp, so all
+# of them end at the same condensate fraction and the cells differ in how fast
+# they crossed the window rather than in where they stopped. Without it the fast
+# arm reports a selection statistic for a state that never reached the window.
+TOTAL_MS=${TOTAL_MS:-6000}
+# dt = 0.004 with a 0.002 arm as the systematic check: #335 measured ⟨F⊥⟩ agreeing
+# to three digits between 0.004 and 0.001 on this Hamiltonian, and it had to
+# disclose an unrun dt axis. This campaign runs one.
+DT=${DT:-0.004}
 NSEED=${NSEED:-20}
 
 q() { echo "+ qsub $*"; qsub -g "$G" "$@"; }
@@ -85,8 +95,9 @@ ensemble)
     done
     for T in $TEMPS; do
         for TAU in $TAUS; do
+            HOLD=$(awk -v a="$TOTAL_MS" -v b="$TAU" 'BEGIN{printf "%.1f", (a-b>0? a-b : 0)}')
             q -N nu_T${T}_t${TAU} -l h_rt=24:00:00 \
-              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_TAU_MS=$TAU,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
+              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=$TAU,NU_HOLD_MS=$HOLD,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_k1.8_T${T}_tau${TAU} \
               scripts/eu334/submit_nucleate.sh
         done
     done
@@ -105,13 +116,14 @@ control)
     # must stay polarised; from a flower cell it must stay flower. One arm alone
     # cannot tell "the solver holds a branch" from "the solver always ends up
     # here", and that difference is the whole positive control.
+    HOLD=$(awk -v a="$TOTAL_MS" 'BEGIN{printf "%.1f", a-1500}')
     q -N nu_quiet_p -l h_rt=12:00:00 \
-      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_polar \
+      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_polar \
       scripts/eu334/submit_nucleate.sh
     FLOWERCELL=${4:-}
     if [ -n "$FLOWERCELL" ]; then
         q -N nu_quiet_f -l h_rt=12:00:00 \
-          -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_TAU_MS=500,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$FLOWERCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_flower \
+          -v NU_KAPPA=1.8,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1500,NU_HOLD_MS=$HOLD,NU_NOISE=0,NU_SEEDS_N=1,NU_SEED_FILE=$FLOWERCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/quiet_from_flower \
           scripts/eu334/submit_nucleate.sh
     else
         echo "note: the flower-seeded quiet arm needs a flower cell as argument 4"

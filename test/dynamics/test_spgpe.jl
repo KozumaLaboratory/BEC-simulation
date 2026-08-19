@@ -211,6 +211,34 @@ end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
     end
 
+    @testset "a ramped cutoff does not grow the scratch registry" begin
+        # `tracking_cutoff` exists to RAMP k_cut, so it takes a different value
+        # every reservoir sub-step. Keying the energy-damping buffers on it gave
+        # one set of four device arrays per step: a 64³ D=13 growth ramp died at
+        # 99.97 % of a 94 GiB H100 after 34 557 sub-steps, and every existing test
+        # passed because they all hold the cutoff fixed. So the shape-dependent
+        # buffers are keyed on SHAPE and the cutoff-dependent one is rebuilt in
+        # place — which is checkable without a GPU and without a long run.
+        SpinorBEC.scratch_clear!()
+        ws = flowing_state!(scalar_ws())
+        for (i, kc) in enumerate(range(2.0, 4.0; length=25))
+            apply_energy_damping_step!(ws, 5e-3, 1.0, 1e-3; seed=i, noise=true, k_cut=kc)
+        end
+        for cat in (:ed_divj, :ed_phase, :ed_ksq, :ed_kinv)
+            n = length(get(SpinorBEC.SCRATCH_REGISTRY, cat, Dict()))
+            @test n == 1
+            n == 1 || @info "energy-damping scratch grew with the cutoff" cat n
+        end
+        # …and the kernel it rebuilds is still the right one: the LAST cutoff must
+        # be the one in force, or the buffer is being reused without being refilled.
+        divj, phase_k, ksq, kinv = SpinorBEC._energy_damping_buffers(
+            ws, ws.grid.config.n_points, 3.0)
+        k2 = ws.grid.k_squared
+        @test all(iszero, kinv[k2 .> 9.0])
+        inband = (k2 .> 0) .& (k2 .<= 9.0)
+        @test all(isapprox.(kinv[inband], 1 ./ sqrt.(k2[inband]); rtol=1e-12))
+    end
+
     @testset "quiet: energy decreases monotonically (Eq. 29)" begin
         ws = flowing_state!(scalar_ws())
         E = Float64[gp_energy(ws)]
