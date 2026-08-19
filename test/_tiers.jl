@@ -35,6 +35,12 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    # A spin-F magnetic vortex has component windings v_m = -m, i.e. up to
+    # ±6 for Eu. The plaquette detector caps at ±1 and non_abelian_holonomy
+    # returns cis(phase), ~1 for every integer; this pins the detector that
+    # reads them, and that it REFUSES when under-sampled rather than
+    # returning a clean wrong integer (#336).
+    "analysis/test_component_phase_winding.jl",
     # The #335 loop-width extractor refuses to report until its controls pass;
     # that refusal is the guarantee, so it is gated rather than left to --selftest.
     "analysis/test_hysteresis_conversion_depth.jl",
@@ -561,6 +567,11 @@ const CI_EXTRA = [
     "oracles/test_apply_operator_accumulates.jl",
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
+    # The DDI half of the homogeneous BdG, which nothing gated: the normal block
+    # was the Hartree term (zero for a uniform cloud, since Q(q=0) = 0) instead
+    # of the exchange term, so it was 2x on a polarized state and identically
+    # zero on a polar one (#361).
+    "oracles/test_dipolar_bogoliubov_anchor.jl",
     # What the six unmeasured Eu scattering channels CANNOT move: the stretched
     # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
     # fixed c_total leaves them exact. Each invariance carries a control that
