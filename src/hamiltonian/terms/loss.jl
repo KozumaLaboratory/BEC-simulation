@@ -43,7 +43,7 @@ derivable). `L3` / `L3_per_m` exist for backward compat with calibrated
 `density_buf` is an optional scratch array (size = `size(psi)[1:ndim]`); pass
 to avoid allocating one per call inside hot loops.
 
-Early-exits when all rates are below 1e-30. Per-m vectors are validated
+Early-exits when all rates are below COUPLING_TOL. Per-m vectors are validated
 against `n_components`.
 """
 function apply_loss_step!(
@@ -62,7 +62,7 @@ end
 """
     _is_active(loss::LossParams) -> Bool
 
-True if any channel (γ_dr, L3, K3, evap) has a rate above 1e-30. Used as
+True if any channel (γ_dr, L3, K3, evap) has a rate above COUPLING_TOL. Used as
 the early-exit gate in `apply_loss_step!` and as a primer target in
 `src/precompile.jl` so the cold-JIT path is already specialised when the
 first dynamics step runs.
@@ -71,9 +71,9 @@ function _is_active(loss::LossParams)
     L3_scalar_max = isempty(loss.L3_per_m) ? loss.L3 : maximum(abs, loss.L3_per_m)
     K3_scalar_max = isempty(loss.K3_per_m_cubic) ? loss.K3_cubic :
                     maximum(abs, loss.K3_per_m_cubic)
-    has_evap = loss.evap_rate > 1e-30 && loss.evap_energy_cutoff > 0
-    return loss.gamma_dr >= 1e-30 || L3_scalar_max >= 1e-30 ||
-           K3_scalar_max >= 1e-30 || has_evap
+    has_evap = loss.evap_rate > COUPLING_TOL && loss.evap_energy_cutoff > 0
+    return loss.gamma_dr >= COUPLING_TOL || L3_scalar_max >= COUPLING_TOL ||
+           K3_scalar_max >= COUPLING_TOL || has_evap
 end
 
 function apply_loss_step!(
@@ -86,7 +86,7 @@ function apply_loss_step!(
     density_buf::AbstractArray{<:AbstractFloat},
 )
     _is_active(loss) || return nothing
-    has_evap = loss.evap_rate > 1e-30 && loss.evap_energy_cutoff > 0
+    has_evap = loss.evap_rate > COUPLING_TOL && loss.evap_energy_cutoff > 0
 
     if !isempty(loss.L3_per_m) && length(loss.L3_per_m) != n_components
         throw(
@@ -115,11 +115,11 @@ function apply_loss_step!(
 
         idx = _component_slice(ndim, n_pts, c)
         psi_view = view(psi, idx...)
-        if gamma_lin_rate >= 1e-30
+        if gamma_lin_rate >= COUPLING_TOL
             # exp(-γ_lin · n_total · dt / 2)  → dn_m/dt = -γ_lin n n_m  (2-body shape)
             @. psi_view *= exp(-gamma_lin_rate * density_buf * dt / 2)
         end
-        if K3_c >= 1e-30
+        if K3_c >= COUPLING_TOL
             # exp(-K_3 · n_total² · dt / 2)  → dn_m/dt = -K_3 n² n_m  (true 3-body)
             @. psi_view *= exp(-K3_c * density_buf * density_buf * dt / 2)
         end
@@ -190,7 +190,7 @@ function _dipolar_relaxation_shape(F::Int)
         raw_sum += s
     end
 
-    shape = if raw_sum < 1e-30
+    shape = if raw_sum < COUPLING_TOL
         zeros(Float64, D)
     else
         Z = raw_sum / D

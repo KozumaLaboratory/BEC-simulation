@@ -1,6 +1,6 @@
 # --- Unified B-block builders ---
 # User-facing reference: docs/reference/yaml_schema_reference.md (B block).
-# Operational guide: docs/guides/klaus_regime.md "Spec B(t), not (p,q,bx,by)".
+# Operational guide: docs/guides/fast_larmor_regime.md "Spec B(t), not (p,q,bx,by)".
 #
 # Three coord-system inputs (auto-detected from keys):
 #   :dimless    — p, q, bx, by                 (dimensionless, ℏω_ref units)

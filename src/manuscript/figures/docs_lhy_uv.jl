@@ -32,7 +32,7 @@ function _lhy_uv_prefix_subtraction(spinor, n0, F, ip, k_max, n_k)
             omega > 1e-10 || continue
             c_star = argmax(abs2.(view(ef.vectors, 1:D, eb)))
             mu_b = ek + n0 * real(h_mf[c_star, c_star]) - mu + zee[c_star]
-            zpe += 0.5 * (omega - ek - mu_b + mu_b^2 / (2.0 * max(ek, 1e-30)))
+            zpe += 0.5 * (omega - ek - mu_b + mu_b^2 / (2.0 * max(ek, DENOM_FLOOR)))
         end
         E += k^2 * zpe * dk / (2.0 * π^2)
     end

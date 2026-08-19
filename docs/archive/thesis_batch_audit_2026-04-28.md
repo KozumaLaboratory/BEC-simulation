@@ -22,7 +22,7 @@
 
 Final m-spectrum at ε=1e-3 is uniform across all 13 m levels (`[0.106, 0.094, 0.094, 0.088, …]`) — equipartition. At ε=1e-6 it stays in m=+F.
 
-**Conclusion**: ε=1e-3 was insufficient at p=3000. The Y6 ε-formula `dt = 0.1 · (ε / T)^(1/6)` assumes commutator scales of O(1), but for Klaus-regime p · F · dt the leading 6-fold splitting commutator has scale ∝ pᵏ for some k > 0 — the safety prefactor 0.1 is empirically too lax.
+**Conclusion**: ε=1e-3 was insufficient at p=3000. The Y6 ε-formula `dt = 0.1 · (ε / T)^(1/6)` assumes commutator scales of O(1), but for fast-Larmor p · F · dt the leading 6-fold splitting commutator has scale ∝ pᵏ for some k > 0 — the safety prefactor 0.1 is empirically too lax.
 
 ### `p_10000` initial state spreading (also NUMERICAL)
 

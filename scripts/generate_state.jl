@@ -81,28 +81,30 @@ end
 # ---------------------------------------------------------------- sections
 
 """
-The forward outer-potential chain, read out of the function that issues it.
+The forward outer-potential chain, read out of the value that declares it.
 
-This is the fact that went wrong twice. It is derived by scanning
-`_outer_operators_fwd!` for `@timeit_debug TIMER "<name>"` labels and the two
-`_apply_*_step!` calls that carry no label, in source order — so adding a
-substep updates this document, and no hand-maintained list can disagree with it.
+This is the fact that went wrong twice. Until 2026-08-19 it was derived by
+SCRAPING `_outer_operators_fwd!` for `@timeit_debug TIMER "<name>"` labels plus
+the two `_apply_*_step!` calls that carried no label — a regex over source,
+which CLAUDE.md's own "Measuring" section calls a second implementation of the
+grammar, and which duly returned 0 the moment the chain moved into per-substep
+methods. (The floor caught that, which is the mechanism working: generation was
+REFUSED rather than emitting a document with an empty chain.)
+
+The chain is now a Tuple, `OUTER_CHAIN`, so this reads the value. No grammar, no
+labels, no unlabelled-call special case.
 """
 function split_step_chain()
     rel = "src/hamiltonian/integrator/split_step.jl"
-    body = funcbody(rel, "_outer_operators_fwd!")
-    isempty(body) && return (rel, 0, String[])
     ops = String[]
-    for l in body
-        m = match(r"@timeit_debug\s+TIMER\s+\"([a-z_0-9]+)\"", l)
-        if m !== nothing
-            push!(ops, m.captures[1])
-            continue
+    src = readsrc(rel)
+    m = match(r"const OUTER_CHAIN = \(\n((?:\s*:[a-z_0-9]+,\n)+)\)", src)
+    if m !== nothing
+        for mm in eachmatch(r":([a-z_0-9]+)", m.captures[1])
+            push!(ops, mm.captures[1])
         end
-        m = match(r"^\s*_apply_([a-z_0-9]+)_step!\(", l)
-        m !== nothing && push!(ops, m.captures[1])
     end
-    (rel, lineno(rel, "function _outer_operators_fwd!"), unique(ops))
+    (rel, lineno(rel, "const OUTER_CHAIN = ("), unique(ops))
 end
 
 """
@@ -623,8 +625,10 @@ function render()
         "are all unconditional in the source)")
     p("## Split-step: the forward outer-potential chain")
     p()
-    p("Read from `_outer_operators_fwd!` (`$rel:$ln`), in source order.")
-    p("**$(length(ops)) substeps.** Each auto-skips when its coupling is ≈ 0.")
+    p("Read from `OUTER_CHAIN` (`$rel:$ln`), the Tuple both directions derive from:")
+    p("`_outer_operators_fwd!` runs it as declared, `_outer_operators_bwd!` runs")
+    p("`reverse` of it. **$(length(ops)) substeps.** Each auto-skips when its")
+    p("coupling is ≈ 0.")
     p()
     for (i, o) in enumerate(ops)
         p("$i. `$o`")

@@ -150,7 +150,7 @@ function apply_fl_alignment(
 
     @inbounds for I in CartesianIndices(n_pts)
         B_mag = sqrt(Bx[I]^2 + By[I]^2 + Bz[I]^2)
-        if B_mag < 1e-30
+        if B_mag < COUPLING_TOL
             for c in 1:D
                 psi_fl[I, c] = psi[I, c]
             end

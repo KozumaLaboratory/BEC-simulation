@@ -11,7 +11,7 @@ function parse_pipeline(data::Dict)
     # pipeline step's inner block. Step-level entries override defaults.
     # E.g. `defaults: {kind: rotating_basis, save_every: 30, epsilon: 1e-6}`
     # applies to ground_state + every dynamics block. Useful for DRY across
-    # multi-phase Klaus / Berry configs.
+    # multi-phase fast-Larmor / Berry configs.
     defaults = haskey(data, "defaults") ? data["defaults"] : nothing
     if defaults !== nothing
         defaults isa AbstractDict || throw(ArgumentError(
@@ -100,6 +100,8 @@ function _parse_step(d::Dict)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisGroundStateStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEGroundStateStep(params)
         else
             GroundStateStep(params)
         end
@@ -112,6 +114,8 @@ function _parse_step(d::Dict)
         elseif kind in ("rotating_basis", "option_gamma") ||
             kind in (:rotating_basis, :option_gamma)
             RotatingBasisDynamicsStep(params)
+        elseif kind == "scalar_egpe" || kind == :scalar_egpe
+            ScalarEGPEDynamicsStep(params)
         else
             DynamicsStep(params)
         end
@@ -350,12 +354,20 @@ end
     elseif step isa RotatingBasisDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
             verbose, checkpoint_dir, pipeline_results=results, live_status_path)
-    elseif step isa DynamicsStep
+    elseif step isa ScalarEGPEDynamicsStep
         _run_step(step, psi, grid, atom, workspace;
-            verbose, checkpoint_dir, live_status_path)
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
+    elseif step isa DynamicsStep
+        # `pipeline_results` joined the other three dynamics kinds here on
+        # 2026-08-19: the spinor path needs the preceding `:gs_stage` to build
+        # an `:evolve` Stage `from` it, and that is the only way the real-time
+        # ambient switches reach an artifact id at all.
+        _run_step(step, psi, grid, atom, workspace;
+            verbose, checkpoint_dir, pipeline_results=results, live_status_path)
     elseif step isa GroundStateStep ||
         step isa BinaryGroundStateStep ||
-        step isa RotatingBasisGroundStateStep
+        step isa RotatingBasisGroundStateStep ||
+        step isa ScalarEGPEGroundStateStep
         _run_step(step, psi, grid, atom, workspace; verbose, checkpoint_dir)
     else
         # Defensive: a new PipelineStep subtype must be added explicitly above

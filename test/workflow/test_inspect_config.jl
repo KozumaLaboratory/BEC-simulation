@@ -2,7 +2,7 @@ using Test
 using SpinorBEC
 
 @testset "inspect_config" begin
-    @testset "clean Klaus quench config — no warnings" begin
+    @testset "clean rotation-assisted EdH quench config — no warnings" begin
         path = joinpath(@__DIR__, "..", "..", "runs",
             "klaus_quench_omm0p1_holdonly_delay2ms_refine_90bfb48f",
             "config.yaml")

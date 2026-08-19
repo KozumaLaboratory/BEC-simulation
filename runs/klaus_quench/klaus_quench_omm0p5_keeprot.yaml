@@ -8,6 +8,9 @@
 #   B quench applied      : true
 #   rotation kept in hold : true
 #
+# mirror-pair: klaus_quench_omp0p5_keeprot_mFplus.yaml
+#   (the chirality mirror flips Omega, m AND B_z — see that file's header)
+#
 # Pipeline:
 #   GS (Ω=0, B=0.01 G, DDI on)
 #   → rotation_prep (10.0 ms, B=0.01 G, Ω=-0.5, DDI=true)

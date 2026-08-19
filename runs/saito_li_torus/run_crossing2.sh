@@ -12,11 +12,11 @@ mkdir -p runs/saito_li_torus/out
 
 echo "=== cigar at 18 uG, box_z = 32 ==="
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e 'import CUDA' \
-  -e 'include("runs/saito_li_torus/b_cells.jl"); main(String["C@0.018","n=64","nz=384","box_xy=6.5","box_z=32.0","iters=4000"])'
+  -e 'include("runs/saito_li_torus/h3_cells.jl"); main(String["C@0.018","n=64","nz=384","box_xy=6.5","box_z=32.0","iters=4000"])'
 echo "--- rc=$? ---"
 
 echo "=== torus at 18 uG, box_z = 8 ==="
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e 'import CUDA' \
-  -e 'include("runs/saito_li_torus/b_cells.jl"); main(String["T@0.018","n=64","nz=128","box_xy=6.5","box_z=8.0","iters=4000"])'
+  -e 'include("runs/saito_li_torus/h3_cells.jl"); main(String["T@0.018","n=64","nz=128","box_xy=6.5","box_z=8.0","iters=4000"])'
 echo "--- rc=$? ---"
 echo ALL_DONE

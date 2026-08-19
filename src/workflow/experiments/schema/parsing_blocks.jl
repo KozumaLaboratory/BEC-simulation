@@ -264,13 +264,12 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     omega_ref = Float64(ω_raw)
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
 
-    # c_total: the atom's natural value UNLESS the config overrode it. The
-    # override is the supported way to say "this run uses a scattering length
-    # the atom does not have" (Li–Saito's hypothetical droplet-forming a_s, a
-    # Feshbach-tuned cell, a pinned sweep), so everything derived from a_s below
-    # must read the override — see `_resolve_lhy_block!`.
-    c_total_natural = compute_c_total(atom; N_atoms, omega_ref)
-    c_total = haskey(inter, "c_total") ? Float64(inter["c_total"]) : c_total_natural
+    # c_total from the registry a_s. This is the value used when the config does
+    # NOT supply one; `_parse_gs_interactions` prefers `interactions.c_total`
+    # when present, so this local is only the fallback and the banner below must
+    # not present it as what the Hamiltonian got.
+    c_total_registry = compute_c_total(atom; N_atoms, omega_ref)
+    c_total = haskey(inter, "c_total") ? Float64(inter["c_total"]) : c_total_registry
 
     # c_dd: derive if not explicitly specified. `apply_schema_defaults!` has
     # already injected `ddi: {}` for ground_state steps (the only context
@@ -292,10 +291,12 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
         end
     end
 
-    # ε_dd of the run as configured. This read `compute_a_dd(atom)/atom.a_s`
-    # until 2026-08-19 — the ATOM's pair, blind to a `c_total` / `ddi.c_dd`
-    # override. `runs/saito_li_torus/config.yaml` overrides both to reach
-    # ε_dd = 1.3 and was reported (and LHY-coupled) at the atom's 0.54.
+    # ε_dd of the run AS CONFIGURED. This read `compute_a_dd(atom)/atom.a_s`
+    # — the atom's pair, blind to a `c_total` / `ddi.c_dd` override — and that
+    # value is what the LHY auto-derivation below keys on. The banner was
+    # taught to print the effective ratio; the DERIVATION still used the
+    # intrinsic one, so a droplet config got its contact term from the override
+    # and its LHY term from the registry a_s.
     # `effective_eps_dd` inverts the same two coupling formulas, so it returns
     # the atom's own ratio whenever nothing is overridden.
     eps_dd = if isnan(c_dd_val)
@@ -325,21 +326,36 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
     if verbose
         c_lhy_val = Float64(get(inter, "c_lhy", 0.0))
         l_z_val = ddi_d isa Dict ? Float64(get(ddi_d, "l_z", 0.0)) : 0.0
-        overridden = !isapprox(c_total, c_total_natural; rtol=1e-9)
+        # ε_dd printed here is the DIMENSIONLESS ratio the Hamiltonian runs at,
+        # ε_dd = c_dd·F²/(3·c_total). `eps_dd` above is the atom's intrinsic
+        # a_dd/a_s and is what the LHY auto-derivation keys on; the two differ
+        # whenever a config overrides c_total or c_dd, which is exactly what a
+        # droplet study does. Printing only the intrinsic one reported
+        # ε_dd=0.5402 for a run at 1.3000 (issue #336).
+        # via `effective_eps_dd` rather than inline, so the banner and the LHY
+        # derivation above cannot drift apart — they are the same ratio.
+        eps_dd_eff =
+            c_total > 0 && !isnan(c_dd_val) ?
+            effective_eps_dd(atom.F, c_total, c_dd_val) : eps_dd
         println(
             "  Derived: c_total=$(round(c_total; digits=1))" *
             (
-                if overridden
-                    " [OVERRIDE; natural $(round(c_total_natural; digits=1)), " *
-                    "a_s=$(round(a_s_over_a_ho * a_ho / Units.BOHR_RADIUS; digits=2))a₀ " *
-                    "vs atom $(round(atom.a_s / Units.BOHR_RADIUS; digits=2))a₀]"
+                if haskey(inter, "c_total")
+                    " (from config; registry a_s gives $(round(c_total_registry; digits=1)))"
                 else
                     ""
                 end
             ) *
             " c_dd=$(isnan(c_dd_val) ? "N/A" : string(round(c_dd_val; digits=1)))" *
             " c_lhy=$(round(c_lhy_val; digits=1))" *
-            " ε_dd=$(round(eps_dd; digits=4))" *
+            " ε_dd=$(round(eps_dd_eff; digits=4))" *
+            (
+                if abs(eps_dd_eff - eps_dd) > 1e-6
+                    " (atom a_dd/a_s = $(round(eps_dd; digits=4)))"
+                else
+                    ""
+                end
+            ) *
             (l_z_val > 0 ? " l_z=$(round(l_z_val; digits=4))" : ""),
         )
     end
@@ -386,7 +402,7 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # that overrode `interactions.c_total` got an LHY coefficient built from a
     # different scattering length than its own contact term — for
     # `runs/saito_li_torus/config.yaml` (a_s 110 a₀ → 45.7 a₀ for ε_dd = 1.3)
-    # that was 8.98× in `(a_s/a_ho)^{5/2}` alone, 3.52× after the Q₅ factor, on
+    # that is 8.98× in `(a_s/a_ho)^{5/2}` alone, 3.52× after the Q₅ factor, on
     # the one term the droplet's existence depends on. The 6 other c_total-
     # overriding configs in `runs/` pin at the natural value (verified to
     # ≤ 6.6e-6), so they are unaffected.

@@ -5,7 +5,7 @@
 #
 # At B_z = 0 there is no bistability: the cigar seed relaxes into a magnetic
 # vortex with the same second-moment eigenvalues and the opposite circulation
-# (d_shape.jl), so the paper's Fig. 3(b) statement that the cigar "becomes
+# (h4_shape.jl), so the paper's Fig. 3(b) statement that the cigar "becomes
 # unstable below some critical magnetic field" holds at F = 6 too.
 #
 # FIELD SCALE, predicted before scanning (CLAUDE.md gate 2). The torus is held
@@ -28,7 +28,7 @@ for mG in 0.003 0.010 0.030 0.100; do
   echo "=== Bz = ${mG} mG ==="
   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
     -e 'import CUDA' \
-    -e "include(\"runs/saito_li_torus/b_cells.jl\"); main(String[\"T@${mG}\",\"C@${mG}\",${BOX}])"
+    -e "include(\"runs/saito_li_torus/h3_cells.jl\"); main(String[\"T@${mG}\",\"C@${mG}\",${BOX}])"
   echo "--- Bz=${mG} rc=$? ---"
 done
 echo ALL_DONE

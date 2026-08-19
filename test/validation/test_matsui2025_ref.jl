@@ -99,26 +99,43 @@ const PINS_NOT_MEASURED = Dict{Symbol, Float64}(
 const FIXDIR = joinpath(@__DIR__, "..", "fixtures", "matsui2025")
 const REFPATH = ref_source_path(:matsui2025)
 
-# Break-and-restore, for the canaries. Byte-identity on the way back is verified
-# by the caller, not assumed: a canary that corrupts a committed fixture and
-# restores it approximately is worse than no canary.
-#
-# This does mutate a COMMITTED file for ~1 ms at a time, and the runner takes
-# files in parallel across independent processes, so it is only safe while this
-# file is the only test that reads `refs/`. That is asserted below rather than
-# hoped for — `ref` is one of the six names a researcher types, so a second
-# reader is a matter of time, and the day it appears these canaries need a copy
-# rather than the original.
-function with_broken(f, path::AbstractString, mangle)
-    original = read(path)
+# Where the canaries' throwaway source lives. The pid is in the name so two
+# workers running this file cannot collide on it.
+const CANARY_SOURCE = Symbol("_canary_matsui2025_", Libc.getpid())
+
+"""
+    with_canary_source(f, from, mangle)
+
+Run `f(source)` against a THROWAWAY copy of `from`'s TOML with `mangle` applied,
+registered under its own source name and deleted afterwards.
+
+This used to be a break-and-restore ON THE COMMITTED FILE, which is safe only
+while this file is the only test that reads `refs/` — a property this file
+asserted rather than hoped for, and which went red on 2026-08-19 the moment
+`refs/klaus2022.toml` arrived with its own gate. The runner hands test files to
+independent processes, so a concurrent reader could observe the broken bytes;
+this repository has already shipped a defect that was green run directly and red
+under `SPINORBEC_TEST_WORKERS=auto` (the `claim` name collision), which is the
+worst shape a race can take.
+
+A copy REMOVES the hazard instead of declaring it: no committed file is written,
+so there is nothing for another process to observe and nothing to restore. What
+that costs is one thing the old helper checked and this cannot — that the
+restore was byte-exact — and it is not a loss, because there is no restore. The
+`@test ref(:matsui2025, …)` lines after each canary correspondingly changed
+meaning: they were "the canary tested the gate and not the restore", and they
+are now plain value pins on a file that was never touched.
+"""
+function with_canary_source(f, from::Symbol, mangle)
+    path = ref_source_path(CANARY_SOURCE)
     try
-        write(path, mangle(String(copy(original))))
-        f()
+        write(path, mangle(read(ref_source_path(from), String)))
+        f(CANARY_SOURCE)
     finally
-        write(path, original)
+        rm(path; force=true)
     end
-    read(path) == original ||
-        error("canary failed to restore $path byte-for-byte")
+    isfile(path) &&
+        error("canary source $path survived the test; refs/ must not keep it")
     nothing
 end
 
@@ -289,31 +306,38 @@ end
 
     # --- arm 3: canaries. Break the source, run, confirm RED, restore. -------
 
-    @testset "tripwire — this is the only test that reads refs/" begin
-        # The canaries below mutate the committed TOML in place. Under
-        # `SPINORBEC_TEST_WORKERS=auto` each file runs in its own process off a
-        # shared queue, so a second reader could observe the broken state. When
-        # this goes red, move the canaries onto a copy.
-        me = relpath(@__FILE__, joinpath(dirname(dirname(@__DIR__)), "test"))
-        readers = String[]
-        for (root, _, files) in walkdir(joinpath(dirname(dirname(@__DIR__)), "test")),
-            f in files
-
-            (startswith(f, "test_") && endswith(f, ".jl")) || continue
-            rel = relpath(joinpath(root, f), joinpath(dirname(dirname(@__DIR__)), "test"))
-            rel == me && continue
-            occursin(r"\bref\(:|ref_measure\(|ref_source_path\(|ref_quantities\(",
-                read(joinpath(root, f), String)) && push!(readers, rel)
-        end
-        @test isempty(readers)
+    @testset "the canaries never write a committed file" begin
+        # This WAS "this is the only test that reads refs/", guarding the
+        # break-and-restore below against a concurrent reader in another
+        # process. It fired as designed on 2026-08-19 when `refs/klaus2022.toml`
+        # brought a second, entirely legitimate reader, and the remedy its own
+        # comment named — move the canaries onto a copy — is done.
+        #
+        # So the property changed. It is no longer "nobody else reads", which
+        # would now be a rule against using the registry; it is "nothing in the
+        # tests writes a source anyone else could read". That holds by
+        # construction rather than by convention, and these assertions are what
+        # keep it from being quietly reverted.
+        me = read(@__FILE__, String)
+        @test !occursin("with_broken" * "(", me)     # the in-place mutator is gone
+        @test occursin("with_canary_source(", me)
+        # No canary leaked into the registry — neither from this run nor from a
+        # crashed earlier one.
+        @test !isfile(ref_source_path(CANARY_SOURCE))
+        srcs = SpinorBEC._known_sources()
+        @test !any(s -> startswith(String(s), "_canary"), srcs)
+        # …and the registry does hold the real sources, so the line above is a
+        # statement about canaries rather than about `refs/` being empty.
+        @test :matsui2025 in srcs
+        @test :klaus2022 in srcs
     end
 
     @testset "canary — a wrong stored value is refused, not returned" begin
-        with_broken(
-            REFPATH, s -> replace(s, "value = 12.838286496502" => "value = 12.848286496502")
-        ) do
+        with_canary_source(
+            :matsui2025, s -> replace(s, "value = 12.838286496502" => "value = 12.848286496502")
+        ) do src
             e = try
-                ref(:matsui2025, :dip_width_exp_scanwindow_nT)
+                ref(src, :dip_width_exp_scanwindow_nT)
                 nothing
             catch err
                 err
@@ -331,18 +355,18 @@ end
         # 0.32 nT, which is 320x the file-vs-measurement tolerance and 1.3x the
         # +8.8 % excess the width is used to arbitrate. If `window` were ever
         # defaulted or dropped, this is the size of the error it would cause.
-        with_broken(
-            REFPATH,
+        with_canary_source(
+            :matsui2025,
             s -> replace(s,
                 "window = [-13.0, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted" => "window = [-12.5, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted",
             ),
-        ) do
+        ) do src
             # The stored value no longer matches, so `ref` refuses …
-            @test_throws ArgumentError ref(:matsui2025, :dip_width_sim_scanwindow_nT)
+            @test_throws ArgumentError ref(src, :dip_width_sim_scanwindow_nT)
             # … and what the changed window actually measures is the OTHER
             # published number, which is the point: both are correct
             # measurements of different things.
-            @test ref_measure(:matsui2025, :dip_width_sim_scanwindow_nT) ≈
+            @test ref_measure(src, :dip_width_sim_scanwindow_nT) ≈
                 PIN_WIDTH_SIM_W125_9 atol = PIN_TOL
         end
         @test ref(:matsui2025, :dip_width_sim_scanwindow_nT).value ≈ 13.0734 atol = PIN_TOL
@@ -352,14 +376,14 @@ end
         # "Measured off the COMMITTED fixture" is only checkable if the bytes
         # are checked. Change one digit of the declared hash and every measured
         # row that reads that file must refuse.
-        with_broken(
-            REFPATH,
+        with_canary_source(
+            :matsui2025,
             s -> replace(s,
                 "5cd28028a215024ee7785ce07c1cff5bab0894ec9d6d076f2e958611e8df4d41" => "5cd28028a215024ee7785ce07c1cff5bab0894ec9d6d076f2e958611e8df4d42",
             ),
-        ) do
+        ) do src
             e = try
-                ref(:matsui2025, :dip_centre_sim_nT)
+                ref(src, :dip_centre_sim_nT)
                 nothing
             catch err
                 err
@@ -374,14 +398,14 @@ end
         # An unknown key is an error, not something quietly ignored: the 45-key
         # `metadata:` block that nothing reads is what this layer removes, and
         # permitting unknown keys here would re-open it one level down.
-        with_broken(
-            REFPATH,
+        with_canary_source(
+            :matsui2025,
             s -> replace(s,
                 "[quantity.zeeman_q_Hz]\nprovenance = \"read_off\"" => "[quantity.zeeman_q_Hz]\nvibes = \"good\"\nprovenance = \"read_off\"",
             ),
-        ) do
+        ) do src
             e = try
-                ref(:matsui2025, :zeeman_q_Hz)
+                ref(src, :zeeman_q_Hz)
                 nothing
             catch err
                 err
@@ -393,12 +417,12 @@ end
         # A reconstruction without its cost is refused BY NAME. This is the gate
         # that makes "a value without its argument" unrepresentable rather than
         # merely discouraged.
-        with_broken(
-            REFPATH, s -> replace(s,
+        with_canary_source(
+            :matsui2025, s -> replace(s,
                 "cost = 1.428571428571\ncost_units" => "cost_units")
-        ) do
+        ) do src
             e = try
-                ref(:matsui2025, :N_atoms)
+                ref(src, :N_atoms)
                 nothing
             catch err
                 err
@@ -413,8 +437,8 @@ end
         # others behind, and the others alone are enough to demand the rest —
         # so the one-key version above would stay green even with the
         # reconstruction clause deleted from `ref`. Measured: it did.
-        with_broken(
-            REFPATH,
+        with_canary_source(
+            :matsui2025,
             s -> replace(s,
                 """alternative = 35000.0
     alternative_locus = "time.f90:1667 — what setup_parameters actually ships"
@@ -422,9 +446,9 @@ end
     cost_units = "x in c_0 + 36 c_1 (4687.266258 at 5.0e4 against 3281.086380 at 3.5e4)"
     cost_kind = "measured"
     """ => ""),
-        ) do
+        ) do src
             e = try
-                ref(:matsui2025, :N_atoms)
+                ref(src, :N_atoms)
                 nothing
             catch err
                 err
@@ -505,23 +529,27 @@ end
     end
 end
 
-@testset "Matsui Fig. 4B as a Claim — as far as the tree allows" begin
+@testset "Matsui Fig. 4B as a Claim" begin
     # WHAT IS REAL TODAY, and what is not.
     #
-    # The type-C claim Fig. 4B is — "our simulated dip width reproduces theirs"
-    # — needs 45 `:evolve` cells over a 5 ms hold plus a `c_dd = 0` control.
-    # ZERO of those 46 stages are constructible: `gs_stage`
-    # (`run_step_ground_state.jl:310`) is the only `Stage` producer in `src/`,
-    # and `:evolve` appears there only as a member of `STAGE_KINDS`.
-    # `run_step_dynamics.jl` declares none — the same blocker two committed
-    # tests in `test/model/` already name.
+    # UNTIL 2026-08-19 this read: the type-C claim needs `:evolve` cells plus a
+    # `c_dd = 0` control, and ZERO of them are constructible because `gs_stage`
+    # is the only `Stage` producer in `src/` — so the file built the type-A
+    # claim instead and left a tripwire for the day a producer appeared.
+    # `evolve_stage.jl` is that day; the tripwire fired and the type-C claim
+    # below is built rather than described.
     #
-    # So this file does NOT construct a green type-C Fig. 4B claim. Offering the
-    # ground-state stage as evidence for a dip-width claim would be restating a
-    # different observable, which is the failure mode the control field exists
-    # to name. What it does instead: (a) assert the TARGET is real and available
-    # now, (b) build the type-A claim the resolved config genuinely supports,
-    # and (c) leave a tripwire that fires the day an `:evolve` producer appears.
+    # What has NOT changed is the reason the ground-state stage was refused as
+    # evidence: a dip width is a property of a real-time scan, so offering a
+    # `:relax` stage would restate a different observable — the failure mode the
+    # `control` field exists to name.
+    #
+    # And constructing a claim is not running one. `Claim`'s constructor cannot
+    # check that the evidence was computed (`evidence = Stage[]` constructs, as
+    # the testset above pins), so what the type-C block establishes is that the
+    # PIECES exist and fit: the right kind of evidence, a control that is the
+    # physics switched off, and a target that arbitrates. Our measured numbers
+    # against theirs live in `docs/validation/matsui_campaign_report.md`.
 
     @testset "the target is available and arbitrating" begin
         t = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
@@ -533,18 +561,70 @@ end
         @test !ref(:matsui2025, :dip_centre_exp_nT).arbitrates
     end
 
-    @testset "tripwire — no :evolve Stage producer exists yet" begin
-        # When this goes red, the Fig. 4B type-C claim above becomes
-        # constructible and should be built here rather than described.
+    @testset "type-C: the Fig. 4B claim, now that it is constructible" begin
+        # This was a tripwire asserting NO `:evolve` producer existed, with the
+        # instruction "when this goes red, the Fig. 4B type-C claim above
+        # becomes constructible and should be built here rather than
+        # described". `evolve_stage.jl` landed 2026-08-19; this is the claim.
+        #
+        # WHAT CONSTRUCTING IT DOES AND DOES NOT ESTABLISH. It establishes that
+        # the pieces exist and fit: an `:evolve` stage as evidence (the right
+        # KIND of observable — a dip width is a property of a real-time scan,
+        # which is why the ground-state stage was refused as evidence), a
+        # control that is the physics switched off, and a target that
+        # arbitrates. It does NOT establish that the claim is TRUE: the
+        # constructor cannot run anything, and `evidence = Stage[]` would
+        # construct too. Our measured −2.5099 / 12.740 against their
+        # −2.5 / 12.84 lives in `docs/validation/matsui_campaign_report.md`.
+        cfg = joinpath(dirname(dirname(@__DIR__)), "runs", "matsui_fig4b",
+            "fig4b_scan_n32.yaml")
+        m = yaml_to_model(cfg)
+        gs = stage(:relax; model=m, method=:itp, dt=0.005, n_steps=20_000)
+        ev = evolve_stage(gs, Dict{String, Any}("duration" => 5.0, "dt" => 0.001))
+        @test ev isa Stage
+        @test ev.kind === :evolve          # the kind the tripwire was waiting for
+        @test ev.from === gs               # …and it carries the state it started from
+
+        # The control is the DDI switched off, not a tolerance loosened: the
+        # dip is a dipolar effect, so `c_dd = 0` is the arm that must fail.
+        m0 = with(m; ddi=DDISpec())
+        @test m0 != m                      # the control really is different physics
+        gs0 = stage(:relax; model=m0, method=:itp, dt=0.005, n_steps=20_000)
+        ev0 = evolve_stage(gs0, Dict{String, Any}("duration" => 5.0, "dt" => 0.001))
+        @test ev0 isa Stage
+        @test artifact_id(ev0) != artifact_id(ev)
+
+        tgt = ref(:matsui2025, :dip_width_exp_scanwindow_nT)
+        c = claim(
+            "our Fig. 4B EdH dip WIDTH reproduces Matsui et al. over their " *
+            "scan window";
+            kind=:C, evidence=[ev], control=ev0, target=tgt)
+        @test c.kind === :C
+        @test c.evidence[1].kind === :evolve
+        @test c.control.kind === :evolve
+        @test c.target.arbitrates
+
+        # The refusals still bite on this exact claim, so `:C` is enforced and
+        # not merely spelled: no control, and a target that does not arbitrate.
+        @test_throws ArgumentError Claim("x", :C, Stage[ev], nothing, tgt)
+        @test_throws ArgumentError Claim("x", :C, Stage[ev], ev0,
+            ref(:matsui2025, :dip_centre_exp_nT))
+    end
+
+    @testset "the :evolve producer stays" begin
+        # The inverse of the tripwire this replaced. Deleting the producer would
+        # make the claim above unconstructible again, and a ratchet in this
+        # direction is what stops that being a silent regression.
         src = joinpath(dirname(dirname(@__DIR__)), "src")
         producers = String[]
         for (root, _, files) in walkdir(src), f in files
             endswith(f, ".jl") || continue
-            p = joinpath(root, f)
-            occursin(r"Stage\(\s*:evolve|stage\(\s*:evolve", read(p, String)) &&
-                push!(producers, relpath(p, src))
+            fp = joinpath(root, f)
+            occursin(r"Stage\(\s*:evolve|stage\(\s*:evolve", read(fp, String)) &&
+                push!(producers, relpath(fp, src))
         end
-        @test isempty(producers)
+        @test !isempty(producers)
+        @test "workflow/experiments/pipeline/evolve_stage.jl" in producers
     end
 
     # The claim the tree DOES support: that the production config resolves to
@@ -689,12 +769,12 @@ const ARBITRATES_PINS = (
             (:axis_offset, :window_not_covered, :absolute_population)
         # A reason invented in the TOML is refused by name. Without this, the key
         # is the free `Bool` it replaced, wearing a list.
-        with_broken(REFPATH,
+        with_canary_source(:matsui2025,
             s -> replace(s,
                 "disqualified_by = [\"axis_offset\"]" => "disqualified_by = [\"we_dont_like_it\"]",
-                count=1)) do
+                count=1)) do src
             e = try
-                ref(:matsui2025, :dip_centre_exp_nT)
+                ref(src, :dip_centre_exp_nT)
                 nothing
             catch err
                 err
@@ -709,12 +789,12 @@ const ARBITRATES_PINS = (
 
         # A bare string is not a one-element list: `"axis_offset"` iterated as
         # characters would produce twelve nonsense reasons.
-        with_broken(REFPATH,
+        with_canary_source(:matsui2025,
             s -> replace(s,
                 "disqualified_by = [\"axis_offset\"]" => "disqualified_by = \"axis_offset\"",
-                count=1)) do
+                count=1)) do src
             e = try
-                ref(:matsui2025, :dip_centre_exp_nT)
+                ref(src, :dip_centre_exp_nT)
                 nothing
             catch err
                 err
@@ -725,11 +805,11 @@ const ARBITRATES_PINS = (
 
         # And the key is REQUIRED on a measured row: dropping it must not silently
         # make the row arbitrate.
-        with_broken(REFPATH,
+        with_canary_source(:matsui2025,
             s -> replace(s, "disqualified_by = [\"absolute_population\"]\n" => "",
-                count=1)) do
+                count=1)) do src
             e = try
-                ref(:matsui2025, :dip_minimum_sim_atoms)
+                ref(src, :dip_minimum_sim_atoms)
                 nothing
             catch err
                 err
@@ -747,12 +827,12 @@ const ARBITRATES_PINS = (
         for (q, t) in doc["quantity"]
             @test !haskey(t, "arbitrates")
         end
-        with_broken(REFPATH,
+        with_canary_source(:matsui2025,
             s -> replace(s,
                 "disqualified_by = [\"axis_offset\"]" => "disqualified_by = [\"axis_offset\"]\narbitrates = true",
-                count=1)) do
+                count=1)) do src
             e = try
-                ref(:matsui2025, :dip_centre_exp_nT)
+                ref(src, :dip_centre_exp_nT)
                 nothing
             catch err
                 err

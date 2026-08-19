@@ -40,9 +40,12 @@ as campaign evidence.
 
 The machine-readable ref list is **`docs/campaign/fix_list.toml`** — the file guard 1
 reads, and the only place the SHAs are declared. The table below is the human-readable
-context and deliberately carries no SHAs, so the two cannot drift. It has 14 entries to
-this table's 11: the June integrator row expands into the four propagator paths that
+context and deliberately carries no SHAs, so the two cannot drift. It has 15 entries to
+this table's 12: the June integrator row expands into the four propagator paths that
 carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
+`test/test_campaign_fix_list_gate.jl` pins the two counts against each other
+and re-runs the ancestor check over every ref, so neither the drift nor a dead ref is
+left to a reader.
 
 | merged | correction | effect |
 |---|---|---|
@@ -54,6 +57,7 @@ carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined ste
 | 2026-07-27 | scalar `c_lhy` short by π(a_s/a_ho)√N | 6.8× for ¹⁵¹Eu |
 | 2026-07-28 | tabulated LHY dropped on the GPU broadcast path (#125) | LHY silently off |
 | 2026-07-28 | tabulated LHY energy 2.5× too large | — |
+| **2026-07-29** | **211 Eu configs pinned m = −F under a field that prefers m = +F** | the dynamics ran in a field opposing the prepared polarisation; **configs, not code** — see below |
 | #158 | closed-form tables `N_atoms` too large | caused a spurious 15× arrest |
 | #174 | closed-form LHY drift (135 % → ~1e-9; LHY 97 % → 5–7 % of total) | — |
 | #139 | `summary_provenance` / `_repo_commit` stamping landed | pre-#139 runs cannot be retro-dated |
@@ -61,7 +65,18 @@ carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined ste
 **The gate is mechanical, not a judgement call.** Use
 `git merge-base --is-ancestor <ref> HEAD` over every ref in `fix_list.toml` — not "this
 run looks recent". One re-derivation was nearly published because a fix merged **22
-minutes after** the run.
+minutes after** the run. Run it with
+`julia --project=. scripts/cli.jl campaign-gate` (`--runs` to sweep stored runs).
+
+**The 2026-07-29 row is the one that does not mean what the others mean.** Every other
+ref corrects code, so "the producing commit descends from it" is the whole question.
+That one corrects the **config corpus**, and descent only says the repaired YAML *was
+available* — a run can descend from it and still have been launched from an
+uncommitted copy carrying the old sign. Descent is necessary, not sufficient; for that
+row also check the config the run actually consumed. It was added 2026-08-19 (issue
+#343) after being cited as a disqualifying correction by
+`docs/manuscript/klaus_protocol_sheet.md` while absent from the machine-readable list —
+i.e. the gate could not see the fix the prose leant on.
 
 ---
 
@@ -89,6 +104,20 @@ claim must carry a machine-checkable predicate (a test name or a grep assertion)
 **fails when the limit no longer holds**. Same discipline as the existing
 set-equivalence meta-test. Four rows discharging themselves within three days,
 silently, is the argument for it: nothing told anyone.
+
+**And a `KNOWN-LIMIT` that says a coefficient is gated by NOTHING is a defect
+report, not a caveat.** `test_bogoliubov_anchor.jl` carried exactly that sentence
+about the DDI block of the homogeneous BdG. When the block was finally derived
+(#361, 2026-08-19) it was wrong in two independent ways at once — the normal term
+was the Hartree piece, which is identically zero for a uniform cloud, so it was
+2× on a polarized state and structurally absent on a polar one — and the μ it fed
+depended on the probe direction, in four hand-written copies of one assembly.
+Neither could have survived a single gate. The rule that follows is cheap:
+**when a header names an ungated coefficient, treat that sentence as the work
+item, and do not read the absence of red as agreement.** The correction moved the
+most-unstable direction of a production Eu fixture from 15° to 90°
+(`docs/validation/bdg_ddi_verdict_delta_361.md`) while every gated verdict stayed
+green — which is what "gated by nothing" means in numbers.
 
 ---
 
@@ -131,7 +160,7 @@ disagreeing human. Note which one a claim rests on.
 
 - **A — code correctness**: units, sign, conservation, bit-identity, GPU = CPU.
 - **B — physics agreement**: closed-form limits, F=1 polar vs FM, polyhedral classification.
-- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus 2022,
+- **C — model fidelity**: comparison to published experiment (Matsui EdH, Klaus et al. 2022,
   Yan-Li-Saito Barnett).
 
 Every numeric claim a session writes must carry: **type (A/B/C) + producing commit +
@@ -140,6 +169,14 @@ test tier**. "Tests pass" is A. "Matches Matsui" is C. Do not conflate.
 For ¹⁵¹Eu: **type A is achievable now; type C is blocked on atomic-physics inputs** for
 anything depending on channel-resolved interactions. Claims resting only on $q$,
 $\epsilon_{dd}$, or geometry are quotable today.
+
+**Per claim, that split is `as_dependency_map.md`.** The boundary is sharper than
+this paragraph implies and it is exact: the one measured input, $a_{12} = 110(4)a_B$,
+IS the constraint $c_0 + 36c_1 = c_\text{total}$, and the stretched pair plus its
+first magnon are pure $S = 2F$ — so a fully polarized cloud's mean field, LHY (FM
+closed form), phonon branch and first magnon cannot be moved by the six unmeasured
+channels at all, while the phase diagram is nothing *but* those channels. Gated by
+`test/oracles/test_stretched_channel_invariance.jl`.
 
 ---
 

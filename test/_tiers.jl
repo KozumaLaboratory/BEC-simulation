@@ -13,6 +13,12 @@ const FAST_TESTS = [
     # a_s / eps_dd read back from the couplings actually in force, so a
     # `c_total` override cannot leave the LHY term on the atom's a_s.
     "hamiltonian/test_effective_couplings_roundtrip.jl",
+    # The mutation catalog's self-check, moved OUT of the nightly harness it was
+    # buried in. `check_anchors` is a regex over ~40 files (0.5 s) but ran only
+    # inside the hour-scale mutation job — which was producing nothing (#275) —
+    # so three mutants had rotted with nothing to say so. An instrument's
+    # self-check must not be gated behind running the instrument.
+    "mutation/test_catalog_anchors_resolve.jl",
     "test_quality.jl",
     # Meta-test: every test_*.jl under test/ is in exactly one tier or the
     # MANUAL allowlist (enforces CLAUDE.md commitment #7 structurally).
@@ -22,6 +28,15 @@ const FAST_TESTS = [
     "test_scripts_allowlist.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
+    # CAMPAIGN.md §4 guard 1 executed rather than described: every fix_list ref
+    # is a live ancestor, the two documents' counts cannot drift, red is proved
+    # reachable, and every commit cited in campaign/manuscript prose is either a
+    # listed correction or an explicitly-reasoned non-correction (#343).
+    "test_campaign_fix_list_gate.jl",
+    # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
+    # bce2068f repaired two configs correctly one at a time and broke the mirror
+    # relationship between them; nothing recorded that they were a pair (#343).
+    "workflow/test_mirror_pairs_flip_every_axial_quantity.jl",
     "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
@@ -38,6 +53,12 @@ const FAST_TESTS = [
     "test_level12_production_audit.jl",
     "test_level0_gpu_cpu_consistency.jl",
     "analysis/test_faraday.jl",
+    # A spin-F magnetic vortex has component windings v_m = -m, i.e. up to
+    # ±6 for Eu. The plaquette detector caps at ±1 and non_abelian_holonomy
+    # returns cis(phase), ~1 for every integer; this pins the detector that
+    # reads them, and that it REFUSES when under-sampled rather than
+    # returning a clean wrong integer (#336).
+    "analysis/test_component_phase_winding.jl",
     # The #335 loop-width extractor refuses to report until its controls pass;
     # that refusal is the guarantee, so it is gated rather than left to --selftest.
     "analysis/test_hysteresis_conversion_depth.jl",
@@ -150,6 +171,11 @@ const FAST_TESTS = [
     "model/test_yaml_to_model.jl",
     "model/test_resolve_gs_is_shared.jl",
     "model/test_ddi_trunc_radius_three_states.jl",
+    # The Model migration's ratchet: the count of call sites still transcribing
+    # a config's physics into `make_workspace` kwargs by hand may shrink and may
+    # not grow. `src/model.jl` said "still to come" with no number and no
+    # consequence for months; this is the number (CLAUDE.md commitment 11).
+    "model/test_model_adoption_ratchet.jl",
     # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
@@ -235,6 +261,11 @@ const FAST_TESTS = [
     # itself against, and — the load-bearing half — which of the targets
     # CLAUDE.md names have no gate at all. Pure table + file/tier lookups.
     "validation/test_type_c_claims.jl",
+    # One word ("Klaus") named the paper, the fast-Larmor regime and this
+    # project's own protocol at once, and a "correction" denying the paper's
+    # existence sat above a citation to it (#344). Pure text scan over the
+    # maintained tree, every arm through `calibrated_scan`.
+    "validation/test_klaus_name_disambiguation.jl",
     "validation/test_L5_operator_rhs_compare.jl",
     "dynamics/test_tdhfb_f1_validation.jl",
     "hamiltonian/test_ddi_convention_factorial.jl",
@@ -415,7 +446,39 @@ const CI_EXTRA = [
     # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
+    # ¹⁵¹Eu ↔ ¹⁵³Eu: the isotope is exactly three numbers (c_total, c_dd, q), the
+    # q ratio is exact from measured hyperfine constants, and the |m| ≥ 2 magnons
+    # of the polar state carry no interaction shift. #341 stage 1's deliverable
+    # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
+    "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
+    # The `:evolve` Stage producer: the DYNAMICS_SCHEMA partition is total, a
+    # model-level key is refused rather than dropped, and the real-time ambient
+    # switches finally move an artifact id.
+    "model/test_evolve_stage.jl",
+    # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
+    # refusal that follows from it — a paper with no re-measurable record has
+    # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
+    "validation/test_klaus2022_ref.jl",
+    # Klaus 2022 magnetostirring: the coefficient chain, the directional
+    # magnetostriction oracle (coarse-grid ITP), and the pre-registered
+    # thresholds re-applied to the stored production verdicts.
+    "validation/test_klaus2022_vortex_stripes.jl",
+    # Why that reproduction runs on the scalar eGPE and not the spinor solver,
+    # as a computation over the scale hierarchy rather than a paragraph.
+    "validation/test_klaus_model_selection.jl",
+    # Calibration of the Klaus residual-image hole/stripe detector: every
+    # assertion paired with the pattern that must NOT be found.
+    "analysis/test_vortex_stripes.jl",
+    # The truncated-Wigner seed and its basis. Pins the seeded atom fraction:
+    # drawn on plane waves instead of trap eigenstates it came out at 102 % of N.
+    "solvers/test_scalar_thermal_seed.jl",
+    # Magnitude oracle for the dipolar kernel. The existing kernel test pins
+    # symmetry and direction only — a kernel scaled by any constant passes it.
+    "oracles/test_dipolar_magnetostriction_magnitude.jl",
+    # The `kind: scalar_egpe` YAML wiring: parse, step types, refusals, one
+    # end-to-end run. The solver existed for two months with no way to reach it.
+    "workflow/test_scalar_egpe_yaml.jl",
     # Pins the Fig. 4B dip centre / width read off the published Matsui dataset,
     # so the type-C target cannot drift when the fixture or the metric changes.
     # Pure I/O + arithmetic, but reads a fixture — ci rather than fast.
@@ -473,7 +536,7 @@ const CI_EXTRA = [
     # being true and nobody had checked.
     "workflow/test_active_learning_yaml.jl",
     "workflow/test_multi_fidelity_yaml.jl",
-    # Klaus 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
+    # Klaus et al. 2022 magnetostir plumbing smoke. Was MANUAL as "heavy YAML scenario
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",
@@ -531,6 +594,20 @@ const CI_EXTRA = [
     "oracles/test_apply_operator_accumulates.jl",
     "oracles/test_loss_nonunitarity.jl",
     "oracles/test_registry_completeness.jl",
+    # The DDI half of the homogeneous BdG, which nothing gated: the normal block
+    # was the Hartree term (zero for a uniform cloud, since Q(q=0) = 0) instead
+    # of the exchange term, so it was 2x on a polarized state and identically
+    # zero on a polar one (#361).
+    "oracles/test_dipolar_bogoliubov_anchor.jl",
+    # The other half of `test_magnetization_conservation_rtp.jl`: imaginary time
+    # is not unitary, so it leaves the magnetization sector — which is why an
+    # adiabatic ramp need not reach the ITP ground state (#22, #335, #334).
+    "oracles/test_itp_does_not_conserve_magnetization.jl",
+    # What the six unmeasured Eu scattering channels CANNOT move: the stretched
+    # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
+    # fixed c_total leaves them exact. Each invariance carries a control that
+    # moves (#342, `docs/campaign/as_dependency_map.md`).
+    "oracles/test_stretched_channel_invariance.jl",
     "oracles/test_lhy_analytic.jl",
     "oracles/test_lhy_full_bdg_closed_form_parity.jl",
     "oracles/test_light_shift_analytic.jl",
@@ -550,6 +627,27 @@ const CI_EXTRA = [
     # gradient to `fp_ladder_coeff` / `singlet_pair_sign`, so the formula can no
     # longer drift independently across c₁ / Raman / spatial-Zeeman / DDI sites.
     "oracles/test_spin_ladder_single_source.jl",
+    # Same shape, for the imaginary-time ↔ real-time branch. 14 of the tree's 32
+    # `if imaginary_time` blocks carried a full copy of their exponent in each
+    # arm — including the diagonal Hamiltonian, four times. `wick_phase` is the
+    # one statement; this is the gate that makes the next hand-written branch
+    # red on the day it lands (CLAUDE.md commitment 11).
+    "oracles/test_wick_phase_single_statement.jl",
+    # And for the numerical-zero thresholds. `COUPLING_TOL` lost 7:121 to the
+    # bare `1e-30` precisely because it shipped without this file.
+    "oracles/test_threshold_single_statement.jl",
+    # The split-step outer chain is one value (`OUTER_CHAIN`), both directions
+    # derive from it, and the substep → registry-term map is TOTAL: a new
+    # HamTerm that no propagator applies is red here. Also pins that
+    # fwd(+dt)·bwd(−dt) = id, which is what makes the derived reversal a
+    # checked property rather than a claim.
+    "oracles/test_outer_chain_registry_mapping.jl",
+    # A `dynamics:` step must build the kernel its own `ddi:` block declares.
+    # `secular` / `quasi_2d` / `l_z` are baked into the Q tensors so they cannot
+    # ride the inherited DDIParams, and the handler re-resolved neither — a
+    # dynamics step asking for the secular kernel silently got the full one,
+    # which is the PATH-GAP class this campaign found to be the commonest.
+    "oracles/test_dynamics_honours_kernel_ddi_knobs.jl",
     # Imaginary-time propagator generator == registry operator (spin-mixing
     # + DDI). Gates the 2026-06-15 per-voxel exp(-(m+F)θ) density-bias class
     # that only the propagator↔operator generator comparison can see.
@@ -607,6 +705,12 @@ const CI_EXTRA = [
     # Magnitude sibling of the above: the closed forms had a consistency oracle
     # and no SI anchor, and were exactly N_atoms too large in that gap.
     "oracles/test_lhy_magnitude_si_anchor.jl",
+    # The same anchor at production couplings. The one above holds only at
+    # uniform g_S (c₁ = 0) and no DDI, and neither is true of any Eu run —
+    # c1_ratio is +1/36 or −0.005 and ε_dd = 0.54. This pins the identity that
+    # licenses #337's scheme choice (fm_dipolar IS the fully-polarised dipolar
+    # LHY of the literature) plus the c_dd → ε_dd conversion nothing asserted.
+    "oracles/test_lhy_fm_dipolar_is_the_scalar_scheme.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs
@@ -631,6 +735,17 @@ const CI_EXTRA = [
     # ≡ bare Lanczos (trapped_bdg_lowest_eigenvalue) on λ_min, + Kato–Temple
     # two-sided certificate bracket.
     "oracles/test_bdg_low_modes_lobpcg.jl",
+    # Trapped spinor excitation FREQUENCIES (trapped_bdg_frequencies): the
+    # uniform-limit ω anchor against the homogeneous BdG + the analytic F=1
+    # polar density/magnon closed forms, the `λ is NOT ω` category pin
+    # (ω = √(λ₋λ₊)/2, and λ₋ ∝ k² where ω ∝ k), the Goldstone-vs-gauge
+    # classification, and the spurious-null-space regression (the projector's
+    # own null space leaking into the LOBPCG basis as a converged fake zero).
+    "oracles/test_trapped_bdg_frequencies.jl",
+    # S(k,ω) by real-time impulse response (bragg_response): peak ≡ the
+    # Bogoliubov branch per channel, + the three controls a spectrum needs
+    # (channel selectivity, linearity in the kick, zero-kick ⇒ no line).
+    "oracles/test_bragg_response_spectrum.jl",
     # StabilitySpec three-valued gate: replays the non-stationary /
     # non-converged false-verdict class (mistake_stability_verdict_from_
     # nonstationary_point) — gate returns :indeterminate, not a confident
@@ -894,6 +1009,13 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Three coarse-grid scalar-eGPE ITP solves for the magnetostriction
+    # direction oracle; the rest is table lookups against a stored JSON.
+    "validation/test_klaus2022_vortex_stripes.jl" => 25.0,
+    # Three coarse ITP solves against the dipolar Thomas-Fermi closed form.
+    "oracles/test_dipolar_magnetostriction_magnitude.jl" => 100.0,
+    # One 24³ ground state + 100 dynamics steps through the YAML entry point.
+    "workflow/test_scalar_egpe_yaml.jl" => 40.0,
     # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
     # against the 3.0 s default it had been taking. The default made it the
     # LAST file handed out, which is the worst possible order for the one
@@ -1024,6 +1146,8 @@ const _COST = Dict{String, Float64}(
     "manuscript/test_f9_f11_polyhedral.jl" => 10.7,
     "analysis/test_paper3_validation.jl" => 10.6,
     "oracles/test_trapped_bdg_spectrum.jl" => 10.6,
+    "oracles/test_trapped_bdg_frequencies.jl" => 26.0,  # 6 LOBPCG fixtures + dense
+    "oracles/test_bragg_response_spectrum.jl" => 13.0,  # 7 real-time runs
     "oracles/test_apply_operator_accumulates.jl" => 10.3,
     "oracles/test_stability_sneaky_prover.jl" => 10.3,
     "oracles/test_path_coverage.jl" => 10.0,

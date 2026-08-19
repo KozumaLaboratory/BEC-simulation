@@ -234,7 +234,12 @@ end
         @test isempty(stale)
         # The refusal list is the one part of the partition the SOURCE carries;
         # pinned here so moving a key out of it costs a deliberate edit.
-        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman", "B_direction"])
+        # `a_s`, `ddi_pad` and `B_magnitude_gauss` joined 2026-08-18 with
+        # `kind: scalar_egpe`: declared in GS_SCHEMA, read only by that path,
+        # and therefore SILENTLY IGNORED on a spinor ground_state — `a_s` most
+        # sharply, since the run would fall back to the registry value.
+        @test Set(GS_KEYS_DROPPED_PHYSICS) == Set(["quasi_2d", "l_z", "raman",
+            "B_direction", "a_s", "ddi_pad", "B_magnitude_gauss"])
 
         # Nothing in `to_model` names raman / geometry / reservoir / loss /
         # magnetic_gradient, so a ground-state model must hold their inactive

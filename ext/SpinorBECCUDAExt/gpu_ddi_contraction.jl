@@ -20,7 +20,7 @@
 # rather than of formulas.
 
 @inline function _ddi_contract_kernel!(
-    Px, Py, Pz, Fx, Fy, Fz, Qxx, Qxy, Qxz, Qyy, Qyz, Qzz, Ct,
+    Px, Py, Pz, Fx, Fy, Fz, Qxx, Qxy, Qxz, Qyy, Qyz, Qzz, Ct
 )
     i = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     i > length(Px) && return nothing

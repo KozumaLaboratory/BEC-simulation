@@ -130,8 +130,8 @@ function scan_phase_boundary(;
             hi_p = mid_p
         end
         p_critical = (lo_p + hi_p) / 2
-        rel_dE = abs(ΔE) / max(abs(es[lo_state]), abs(es[hi_state]), 1e-30)
-        rel_dp = (hi_p - lo_p) / max(range_span, 1e-30)
+        rel_dE = abs(ΔE) / max(abs(es[lo_state]), abs(es[hi_state]), COUPLING_TOL)
+        rel_dp = (hi_p - lo_p) / max(range_span, DENOM_FLOOR)
         if rel_dE < bisection_tol && rel_dp < bisection_tol
             break
         end

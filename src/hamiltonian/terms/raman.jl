@@ -202,7 +202,7 @@ function sign_oracle(::Type{RamanTerm})
         predicate=function (psi, ws)
             ws.raman === nothing && return true
             r = raman_at(ws.raman, ws.state.t)
-            abs(r.delta) <= 1e-30 && return true
+            abs(r.delta) <= COUPLING_TOL && return true
             sm = ws.spin_matrices
             _, _, fz = spin_density_vector(psi, sm, ndims(psi) - 1)
             return sign(sum(fz) * cell_volume(ws.grid)) == -sign(r.delta)

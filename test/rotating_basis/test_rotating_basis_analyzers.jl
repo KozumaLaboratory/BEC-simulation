@@ -116,7 +116,7 @@ using SpinorBEC
     end
 
     @testset "X6: berry_connection_trajectory analytical" begin
-        # Constant tilt + linear stir (Klaus-style)
+        # Constant tilt + linear stir (magnetostir-style)
         times_x6 = collect(0.0:0.1:1.0)
         res = SpinorBEC.berry_connection_trajectory(times_x6;
             theta_func=(t) -> 0.611,

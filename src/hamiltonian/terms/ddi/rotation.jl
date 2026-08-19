@@ -371,18 +371,11 @@ function _apply_ddi_rotation!(
         # Must NOT add a per-voxel (m+F) overflow shift: θ ∝ |Φ(r)| is
         # spatially varying, so exp(-F·θ(r)) is a density reweighting that
         # survives global normalization and biases the ITP fixed point.
-        if imaginary_time
-            for c in 1:D
-                m_c = RT(F - (c - 1))
-                pc = view(P, :, c)
-                @. pc = pc * exp(-m_c * theta)
-            end
-        else
-            for c in 1:D
-                m_c = RT(F - (c - 1))
-                pc = view(P, :, c)
-                @. pc = pc * cis(-m_c * theta)
-            end
+        itv = Val(imaginary_time)
+        for c in 1:D
+            m_c = RT(F - (c - 1))
+            pc = view(P, :, c)
+            @. pc = pc * wick_phase(-m_c * theta, itv)
         end
 
         # Step 4: Ry(β)

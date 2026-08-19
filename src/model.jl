@@ -17,7 +17,19 @@
 # does not, by name and reason, so step 3's scope can only change deliberately.
 #
 # Still to come: `make_workspace(::Model)` and the retirement of the fifteen
-# YAML normalisation passes.
+# YAML normalisation passes. What that needs, concretely, is the Spec → runtime
+# realisation this layer does not have — `GridSpec` → `Grid`, `PotentialSpec` →
+# its eight trap terms, `ZeemanSpec` → `ZeemanParams`/`ZeemanField`, `DDISpec` →
+# the eight DDI kwargs, `LHYSpec` → `(spinor_lhy, lhy_opts)`. Today the arrows
+# run the other way only: `gs_model` builds specs FROM already-resolved runtime
+# objects.
+#
+# "Still to come" is how a migration does not finish, so as of 2026-08-19 it is
+# also a NUMBER. `test/model/test_model_adoption_ratchet.jl` counts the call
+# sites that still transcribe a config's physics into `make_workspace` kwargs by
+# hand — SEVEN — and fails if that grows. The count can only come down, and it
+# comes down one call site at a time. See CLAUDE.md commitment 11 for why a
+# promise without a gate is not a plan.
 #
 # Loaded after `hamiltonian.jl` because `GaussianBeam`
 # (`hamiltonian/terms/trap/optical_trap.jl`) is the one physics type outside

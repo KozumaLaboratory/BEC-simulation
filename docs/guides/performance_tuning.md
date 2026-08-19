@@ -23,7 +23,7 @@ Side effect: norm decreases as removed-mode mass leaks out. Track `norms[end] / 
 Snapshot every Nth step:
 
 - `save_every: 5000` — minimal, ~30 frames per typical run
-- `save_every: 1000` — ~150 frames, ~6 ms cadence on Klaus-style runs
+- `save_every: 1000` — ~150 frames, ~6 ms cadence on fast-Larmor runs
 - `save_every: 100`  — ~1500 frames, very dense (movie-quality)
 
 Snapshot in-memory vs streamed:

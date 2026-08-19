@@ -29,7 +29,7 @@
 # here for the same reason it is in `run_step_ground_state.jl` — see that file's
 # header and CLAUDE.md §"Type stability boundaries".
 
-export resolve_gs, gs_model, yaml_to_model, GSResolved
+export resolve_gs, gs_model, yaml_to_model, GSResolved, gs_physics_kwargs
 
 # ---------------------------------------------------------------------------
 # The per-slot resolvers (moved verbatim from run_step_ground_state.jl)
@@ -134,11 +134,24 @@ end
 #                     `B.phi`; ONLY the rotating-basis path reads it
 #                     (`run_step_rotating/ground_state.jl:147`), so on this path
 #                     a tilted field silently runs along +z.
+#   a_s             — scattering length in BOHR RADII, read only by
+#                     `_scalar_egpe_couplings` (`kind: scalar_egpe`). On the
+#                     spinor path the run silently uses the ATOM_REGISTRY value
+#                     instead, which for ¹⁶²Dy is 122 a₀ against the 109-112 a₀
+#                     a dipolar-vortex paper works at — a 10 % error in ε_dd
+#                     that nothing would print.
+#   ddi_pad         — per-axis zero-pad factors for the SCALAR dipolar
+#                     convolution (`ScalarDDIPad`). The spinor path has its own
+#                     `ddi.padded` / `ddi.pad_factor`; this key does not reach it.
+#   B_magnitude_gauss — carried for `spin_treatment_report` only. The scalar
+#                     path has no Zeeman term at all; the field enters solely as
+#                     a direction, so this is provenance, not physics.
 #
 # The partition of GS_SCHEMA into {reaches a Model slot, reaches Stage/Initial,
 # dropped} is pinned in `test/model/test_yaml_to_model.jl`; adding a schema key
 # without classifying it is red there.
-const GS_KEYS_DROPPED_PHYSICS = ("quasi_2d", "l_z", "raman", "B_direction")
+const GS_KEYS_DROPPED_PHYSICS = ("quasi_2d", "l_z", "raman", "B_direction",
+    "a_s", "ddi_pad", "B_magnitude_gauss")
 
 """
     GSResolved
@@ -194,6 +207,47 @@ struct GSResolved
     dealias_k_cut::Float64
     dropped_physics::Vector{String}
 end
+
+"""
+    gs_physics_kwargs(r::GSResolved) -> NamedTuple
+
+The seventeen physics kwargs, spelled with the names `make_workspace`,
+`find_ground_state` and `find_ground_state_lbfgs` all three accept.
+
+`run_step_ground_state.jl` called those three functions with this bundle written
+out LONGHAND at each site. Seventeen kwargs, three copies, one function — and on
+2026-08-02 two branches independently added the same three entries to one of the
+copies, git merged both without a conflict, and the package stopped parsing
+(`fix: the merge duplicated three make_workspace kwargs`). The copies are what
+made a textual merge plausible; a merge cannot duplicate a function call.
+
+Runtime and solver knobs are NOT here: `sim_params`, `psi_init`, `n_steps`,
+`tol`, `dt`, `verbose`, and the LBFGS/ITP-specific options differ per call site
+because they genuinely differ. This bundle is exactly the part that must not.
+
+Concretely typed throughout (every `GSResolved` field is declared), so splatting
+it into a kwarg call keeps the inference fence `run_step_ground_state.jl`'s
+header describes — CLAUDE.md §"Type stability boundaries".
+"""
+gs_physics_kwargs(r::GSResolved) = (
+    grid=r.grid,
+    atom=r.atom,
+    interactions=r.interactions,
+    zeeman=r.zeeman,
+    potential=r.potential,
+    enable_ddi=r.enable_ddi,
+    c_dd=r.c_dd,
+    secular_ddi=r.secular,
+    quasi_2d_ddi=r.quasi_2d_ddi,
+    l_z_ddi=r.l_z_ddi,
+    ddi_trunc_radius=r.ddi_trunc,
+    ddi_padding=r.ddi_padded,
+    ddi_pad_factor=r.ddi_pad_factor,
+    backend=r.backend,
+    light_shift=r.light_shift,
+    spinor_lhy=r.spinor_lhy,
+    lhy_opts=r.lhy_opts,
+)
 
 # `gs_ddi_tuple(r)` — the eight DDI values as the positional tuple
 # `_parse_gs_ddi` returns — lived here to feed `_gs_cache_key`, which hashed

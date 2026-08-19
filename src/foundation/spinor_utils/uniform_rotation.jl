@@ -25,7 +25,7 @@ function apply_uniform_spin_rotation!(
     imaginary_time::Bool=false,
     scratch::Union{Nothing, AbstractArray}=nothing,
 ) where {D}
-    abs(phi_x) + abs(phi_y) + abs(phi_z) < 1e-30 && return nothing
+    abs(phi_x) + abs(phi_y) + abs(phi_z) < COUPLING_TOL && return nothing
 
     # The rotation is spatially uniform — the same D×D unitary is applied at
     # every grid point. Build R once (D² scalar ops on host), then apply it
@@ -33,7 +33,7 @@ function apply_uniform_spin_rotation!(
     # is GPU-safe: no scalar indexing into the (possibly CuArray) psi.
     #
     # `scratch` (typically `ws.state.psi_scratch`) avoids allocating a fresh
-    # full-size buffer per call. For Klaus-style runs with ~10⁶ rotation
+    # full-size buffer per call. For fast-Larmor runs with ~10⁶ rotation
     # calls this matters — without scratch the CUDA pool eats GC pressure
     # equivalent to ~70 TB total allocations on a 64×64×32 Dy164 grid.
     R = _compute_uniform_rotation_matrix(sm, phi_x, phi_y, phi_z, dt_frac, imaginary_time)
@@ -71,7 +71,7 @@ end
 (shape `(n_pts..., D)`). Reformulated as a single dense matrix product
 `buf_2d = psi_2d · Rᵀ` where psi_2d/buf_2d are `(N_spatial, D)` views;
 on GPU this is one CUBLAS gemm instead of D² per-slab broadcasts
-(D=17 Klaus → ~289× kernel-launch reduction). On CPU it dispatches to
+(D=17, i.e. Dy164 → ~289× kernel-launch reduction). On CPU it dispatches to
 BLAS gemm.
 
 `scratch`, if supplied, is reused as the gemm output buffer (must be

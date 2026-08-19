@@ -281,7 +281,7 @@ function _tabulate_lhy(energy_fn, ::Type{ResultT};
     densities = collect(range(0.0, n_max; length=n_points))
     energy = zeros(Float64, n_points)
     for (i, n) in enumerate(densities)
-        n < 1e-30 && continue
+        n < COUPLING_TOL && continue
         # The closed forms are ε = (8/15π²)(g n)^(5/2) with `n` the PHYSICAL
         # density and `g` the SI coupling. Here `n = |ψ|²` is normalised to
         # ∫|ψ|²dV = 1 and `g` comes from the dimensionless `c₀ = 4π(a_s/a_ho)N`,

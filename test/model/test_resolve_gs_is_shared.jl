@@ -180,6 +180,88 @@ end
         @test !occursin("_resolve_gs_atom", src)
     end
 
+    @testset "B2. the runner re-reads no key GSResolved already carries" begin
+        # Arm B looks for named parser FUNCTIONS. A second reader does not have
+        # to call one.
+        #
+        # Found 2026-08-19: three lines in `run_step_ground_state.jl` assigned
+        # `spinor_lhy_mode`, `gs_lhy_opts` and `gs_rf_omega` from `r`, and then
+        # immediately overwrote all three with `get(p, "lhy_kind", …)`,
+        # `get(p, "lhy_opts", …)` and `get(p, "rotating_frame_omega", …)` — the
+        # same three expressions `resolve_gs.jl:299-306` evaluates, verbatim.
+        # Arm B saw no forbidden name because there was none: a bare `get` on a
+        # Dict is not a parser. Arm A saw `resolve_gs` called, because it was.
+        # Arm C compared values, and the values AGREED — they were copies.
+        #
+        # All three arms were green over a live duplicate, and the comment
+        # directly above it said this exact duplication was forbidden. "No
+        # parser is called here" is not "no physics is re-read here", and only
+        # this arm checks the second.
+        src = rgs_code_only(runner_file)
+
+        # Keys `GSResolved` carries. Re-reading one in the runner means two
+        # declarations of that slot, whether or not they currently agree.
+        resolved_keys = (
+            "atom", "grid", "interactions", "potential", "B", "ddi",
+            "light_shift", "lhy", "lhy_kind", "lhy_opts",
+            "rotating_frame_omega", "backend", "method", "tol", "n_steps",
+            "dt", "duration",
+        )
+        # Keys the runner legitimately owns: solver knobs and I/O that are NOT
+        # physics and are deliberately absent from `GSResolved`. Listed so the
+        # exclusion is a decision. `initial_state`/`init_state_params` seed ψ,
+        # which is a Stage input, not a Model slot.
+        runner_owned = (
+            "cache", "initial_state", "init_state_params", "seed_from", "pin",
+            "m_lbfgs", "newton_polish", "residual_polish", "tol_drho",
+            "target_magnetization", "noise_seed", "analyze", "save",
+            "checkpoint_dir", "ramp", "temperature_ratio",
+        )
+        @test isempty(intersect(Set(resolved_keys), Set(runner_owned)))
+
+        # `haskey(p, k)` is NOT a re-read: several sites test a block's PRESENCE
+        # to decide whether a `ws_prev` may be reused, which is a question about
+        # the declaration rather than about the physics in it. Only fetching a
+        # value counts.
+        reread(k) = occursin("get(p, \"$k\"", src) || occursin("p[\"$k\"]", src)
+
+        # Calibrated. The positive control is a key the runner DOES own, so a
+        # predicate that could never match would fail here rather than report a
+        # clean file; the negative control is a key no config has.
+        @test any(reread, runner_owned)
+        @test !reread("definitely_not_a_schema_key")
+
+        # Two sites read a resolved block for something `GSResolved` does not
+        # carry. Both are listed, with what they take, so that the exception is
+        # a decision and its scope is visible — an unexplained allowlist entry
+        # is how this gate would quietly stop meaning anything.
+        #
+        #   interactions / B / potential  — `_seed_cell_signature` builds a
+        #       (c1_ratio, Bz, κ, initial_state) tuple to MATCH a seed file
+        #       against a scan cell. It is a lookup key over the raw
+        #       post-override dict, not an input to the solve. KNOWN LIMIT: it
+        #       reads `B.Bz` directly, so a `B:` block in lab units
+        #       (`{p_mv, coil_mode}`) signs as 0.0 while the resolver returns
+        #       the calibrated field.
+        #   ddi  — the adaptive `c_dd` RAMP spec (`ddi.c_dd.adaptive`).
+        #       `GSResolved` carries the static resolved `c_dd`; the ramp is a
+        #       callback the runner builds. KNOWN LIMIT: a ramp changes the
+        #       physics and is not a slot of the Model the artifact id hashes.
+        allowed_reread = ("interactions", "B", "potential", "ddi")
+
+        offenders = [k for k in resolved_keys if reread(k) && !(k in allowed_reread)]
+        isempty(offenders) || println(
+            "  runner re-reads keys GSResolved already carries: ",
+            join(offenders, ", "))
+        @test isempty(offenders)
+
+        # The allowlist must not outlive its reason: every entry has to still be
+        # read, or it is stale cover for the next duplicate that lands on it.
+        dead = [k for k in allowed_reread if !reread(k)]
+        isempty(dead) || println("  stale arm-B2 allowlist entries: ", join(dead, ", "))
+        @test isempty(dead)
+    end
+
     @testset "C. both consumers produce the pinned physics" begin
         # --- consumer 1: yaml_to_model, through gs_model ---
         m = gs_model(resolve_gs(rgs_params(), nothing, nothing, nothing; verbose=false))

@@ -9,7 +9,7 @@ mkdir -p runs/saito_li_torus/out
 run () {
   echo "=== $1 ==="
   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e 'import CUDA' \
-    -e "include(\"runs/saito_li_torus/f_edh.jl\"); main(String[$2])"
+    -e "include(\"runs/saito_li_torus/h6_edh.jl\"); main(String[$2])"
   echo "--- $1 rc=$? ---"
 }
 

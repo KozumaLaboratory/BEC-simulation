@@ -68,7 +68,7 @@ function SpinorBEC.apply_spin_mixing_step!(
     imaginary_time::Bool=false,
     psi_mf::Union{Nothing, AbstractArray}=nothing,
 ) where {D, T <: AbstractFloat}
-    abs(c1) < 1e-30 && return nothing
+    abs(c1) < COUPLING_TOL && return nothing
     n_pts = ntuple(d -> size(psi, d), ndim)
     N = prod(n_pts)
     cache = _get_gpu_sm_cache(psi, sm, ndim)

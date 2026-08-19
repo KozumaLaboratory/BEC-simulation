@@ -23,14 +23,14 @@ SHORT='"n=64","nz=64","box_xy=6.5","box_z=3.5","iters=4000"'
 for mG in 0.030 0.010; do
   echo "=== both branches, long box: Bz = ${mG} mG ==="
   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e 'import CUDA' \
-    -e "include(\"runs/saito_li_torus/b_cells.jl\"); main(String[\"C@${mG}\",\"T@${mG}\",${LONG}])"
+    -e "include(\"runs/saito_li_torus/h3_cells.jl\"); main(String[\"C@${mG}\",\"T@${mG}\",${LONG}])"
   echo "--- rc=$? ---"
 done
 
 for mG in 0.050 0.070; do
   echo "=== torus upper critical: Bz = ${mG} mG ==="
   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e 'import CUDA' \
-    -e "include(\"runs/saito_li_torus/b_cells.jl\"); main(String[\"T@${mG}\",${SHORT}])"
+    -e "include(\"runs/saito_li_torus/h3_cells.jl\"); main(String[\"T@${mG}\",${SHORT}])"
   echo "--- rc=$? ---"
 done
 echo ALL_DONE

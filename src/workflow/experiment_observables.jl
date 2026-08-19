@@ -58,7 +58,7 @@ for (fn, base) in (
     @eval $fn(exp::Experiment) =
         _memoize(exp, $(QuoteNode(fn))) do
             ts = $base(exp)
-            maximum(abs.(ts .- ts[1])) / max(abs(ts[1]), 1e-30)
+            maximum(abs.(ts .- ts[1])) / max(abs(ts[1]), COUPLING_TOL)
         end
 end
 

@@ -1,4 +1,4 @@
-# Rotating-basis (Klaus-regime) support — layer map
+# Rotating-basis (fast-Larmor regime) support — layer map
 
 **There is no rotating-basis engine.** It was retired 2026-06-21
 (`refactor(rotating_basis)!: retire the RotatingBasisWS engine`, −2580 lines).
@@ -97,7 +97,7 @@ physical claim is stated in.
 
 Use **`kind: rotating_basis`** when the natural question is about the spin
 relative to the field — per-m populations along $\hat B(t)$, adiabaticity,
-Klaus-style magnetostir spin-up — or to reuse its analyzers.
+a magnetostir spin-up — or to reuse its analyzers.
 
 Note the standard dynamics path takes plain `split_step!`, which is only
 1st-order in time once the DDI is active. Pass `integrator: midpoint` for

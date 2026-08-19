@@ -6,7 +6,7 @@
 # behaviour is bit-identical to the prior in-line versions.
 
 """
-Apply diagonal phase `psi .*= imaginary_time ? exp.(arg) : cis.(arg)` where
+Apply diagonal phase `psi .*= wick_phase(arg, imaginary_time)` where
 `arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]`. CPU uses the
 direct scalar loop (cache-friendly); GPU uses reshape/broadcast (the scalar
 loop scalar-indexes a CuArray and crashes — see gotcha memo).
@@ -16,15 +16,16 @@ function _shear_phase!(psi, coord_vals, k_vals, fft_dim::Int, coord_dim::Int,
     if psi isa Array
         @inbounds for I in CartesianIndices(size(psi))
             arg = factor * coord_vals[I[coord_dim]] * k_vals[I[fft_dim]]
-            psi[I] *= imaginary_time ? exp(arg) : cis(arg)
+            psi[I] *= wick_phase(arg, imaginary_time)
         end
     else
         coord_r = _axis_broadcast(psi, coord_vals, coord_dim)
         k_r = _axis_broadcast(psi, k_vals, fft_dim)
-        if imaginary_time
-            psi .*= exp.(factor .* coord_r .* k_r)
-        else
-            psi .*= cis.(factor .* coord_r .* k_r)
+        # `Val`, not the `Bool` method: this must fuse into the device multiply
+        # (the materialising form would allocate a grid) and the eltype must
+        # stay concrete to cross into a CUDA kernel.
+        let itv = Val(imaginary_time)
+            psi .*= wick_phase.(factor .* coord_r .* k_r, itv)
         end
     end
     nothing
@@ -39,7 +40,7 @@ function _apply_1d_shear_batch!(
     factor::Float64,
     imaginary_time::Bool,
 )
-    abs(factor) < 1e-30 && return nothing
+    abs(factor) < COUPLING_TOL && return nothing
 
     psi_k = fft(psi, fft_dim)
     _shear_phase!(psi_k, coord_vals, k_vals, fft_dim, coord_dim, factor, imaginary_time)
@@ -58,7 +59,7 @@ function _apply_1d_shear_batch!(
     fwd_plan,
     inv_plan,
 )
-    abs(factor) < 1e-30 && return nothing
+    abs(factor) < COUPLING_TOL && return nothing
 
     fwd_plan * psi
     _shear_phase!(psi, coord_vals, k_vals, fft_dim, coord_dim, factor, imaginary_time)

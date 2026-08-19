@@ -1,712 +1,402 @@
-# Li–Saito 磁気渦トーラスドロップレット — issue #336
+# Saito–Li magnetic-vortex torus droplet at ¹⁵¹Eu F=6 — issue #336
 
-対象論文: Shaoxiong Li and Hiroki Saito, *Quantum droplets with magnetic vortices
-in spinor dipolar Bose-Einstein condensates*,
-[arXiv:2402.18885](https://arxiv.org/abs/2402.18885) (2024)。
-本文・Supplemental Material・Table S1 まで LaTeX ソースで読んだ。
-（著者順は Li → Saito。ディレクトリ名 `saito_li_torus` はそれを読む前の命名。）
+Target: Li & Saito, *Quantum droplets with magnetic vortices in spinor dipolar
+Bose-Einstein condensates*, [arXiv:2402.18885](https://arxiv.org/abs/2402.18885)
+(v1, 29 Feb 2024). Local copy:
+`docs/refs/Saito_Li_2024_magnetic_vortex_droplets_arXiv2402.18885.pdf`.
 
-検証対象セル: **Fig. 1(d) 第3パネル / Fig. 2(a) 赤線 — F=6, N=15000, ε_dd=1.3**。
+The cell is **Fig. 1(d) third panel / Fig. 2(a) cyan curve**:
+(F, N, ε_dd) = (6, 15000, 1.3), B = 0, free space.
 
-主張の種別は `docs/conventions/testing_strategy.md` の A/B/C で明示する。
-**type A** = コード正しさ、**type B** = 物理の一致（閉形式・変分）、
-**type C** = 公開実験/公開図との一致。
+## Verdict
 
----
+**Reproduced, type-C, to within 1.3 % on every published anchor.** The config
+that had been sitting here unrun since `9c0e54f0` would not have produced it:
+five independent defects, listed below, two of which cancelled in the one
+number a reader would have checked.
 
-## 0. 要約
+| Fig. 2(a) anchor | ours (96³) | paper | dev |
+|---|---|---|---|
+| peak ρ/N | 0.516 μm⁻³ | 0.509 | **+1.3 %** |
+| torus radius r_peak | 0.817 μm | 0.815 | **+0.2 %** |
+| FWHM inner edge | 0.527 μm | 0.528 | **−0.2 %** |
+| FWHM outer edge | 1.106 μm | 1.109 | **−0.3 %** |
+| ρ(r=0)/N | 0.007 | 0.011 | hole, both |
 
-config は 2 つの schema epoch を跨いで運ばれ一度も実行されていなかった。
-**GPU を使う前に前提を検証したところ 5 件の欠陥が出て、うち 3 件は run を
-無意味にするものだった。** 修正後、Fig. 1(d)/2(a) をピーク密度 **1.1 %** で
-再現し、論文が明記していない定性的特徴（中心の m=0 残留）まで一致した。
+Paper values are digitised from Fig. 2(a) by `g3_digitise_fig2a.py`. That
+extractor refuses to report until its **positive control** — the F=1 N=15000
+curve — reproduces the *independent* Fig. 1(c) panel of the same paper (it gives
+2.955 at r = 0.286 μm against 2.97 at 0.29, i.e. 0.5 % and 1.4 %), and until a
+colour not present in the figure returns no curve.
 
-| # | 前提 | 判定 |
+Producing commit: `9924e181` (dirty tree; the config and the winding detector in
+this branch). Normalisation: the paper's own, ρ/N in μm⁻³ against r in μm, with
+`a_ho = 0.78029 μm` from ω_ref = 2π·110 Hz.
+
+### Supporting measurements
+
+* **Per-component winding is v_m = −m for all 13 components** (m = +6 … −6),
+  measured per component at r = r_peak, each with the detector's own
+  convergence flag. This is Fig. 1(b) — which shows m=+1 winding −2π, m=0 flat,
+  m=−1 winding +2π — generalised to F = 6.
+* **|f|/ρ = 5.998 against F = 6** at the density peak, with the in-plane
+  fraction 1.0000: fully polarised and purely azimuthal. That is the
+  assumption Eq. (1) of the paper rests on, so it is checked rather than
+  assumed.
+* **Flux-closure identity**: E_ddi/E_s = −1.2970 against −ε_dd = −1.3000
+  (0.23 %). For a divergence-free fully polarised magnetisation this is exact,
+  so it is the sharpest available gate on the DDI prefactor and the ε_dd
+  bookkeeping *simultaneously*.
+* **J_z = L_z + F_z = 0** to 1e-6, as the paper's B = 0 state requires.
+* **Self-bound inside the box**: edge density is 1e-4 of the peak.
+* Norm ∫|ψ|²dV = 1.00000000.
+
+### Energy budget
+
+| term | value (per particle) | share of Σ\|E_term\| |
 |---|---|---|
-| 1 | `c1_ratio: 0.0` | **正しい。論文のモデルそのもの** |
-| 2 | `c_total: 583` + `c_dd: 152` で ε_dd=1.3 | **誤り。実効 ε_dd = 3.129（2.407 倍）** |
-| 3 | `lhy: {kind: scalar}` | **誤り。c_lhy が 3.52 倍過大**（src のクラスバグ） |
-| 4 | box `[3,3,3] a_ho` | **誤り。xy に 1.7 倍足りない** |
-| 5 | seed `polar_core_vortex` | **誤り。別のトポロジー** |
-| 6 | `omega: [0.01]³` ≈ 自由空間 | **正しい。⟨V⟩/N は \|E\|/N の 6.1e-5** |
-| 7 | ITP `dt: 0.005` | **不可。この regime は dt で不動点がずれる** |
-
----
-
-## 1. ゲート1 — 一次資料からの前提検証
-
-`CLAUDE.md` §"Before computing" のゲート1（GPU を使う前に primary source を読む）。
-
-### 1.1 スピン依存接触相互作用を切るのは論文のモデル（前提1: OK）
-
-> "Since the values of Δa are predicted to be relatively small for the europium
-> atoms, **we ignore the spin-dependent contact interaction.**"
-
-`c1_ratio: 0.0` は便宜ではなく論文の定式化。ここは config が正しかった。
-
-### 1.2 ε_dd の二重計上（前提2: 致命的）
-
-論文は ε_dd ≡ a_dd/a_s を、**a_s だけを下げて** 1 より大きくする（a_dd は
-原子の磁気モーメントで決まり動かせない）。このコードの無次元係数では
-
-```
-c_dd/c_total = 3 ε_dd / F²          (厳密; `effective_eps_dd` の docstring に導出)
-```
-
-が成り立つ（`compute_c_total` と `compute_c_dd_dimless` を反転しただけ）。
-自然値で数値検証: `63.3064/1406.1795 = 0.04502015291755459` と
-`3 × 0.540241835/36 = 0.04502015291755459` — 機械精度で一致。
-
-したがって **c_total だけを動かし、c_dd は自然値のまま**にしなければならない。
-commit 済み config は両方を 2.407 倍ずつスケールしており、比が二乗される:
-
-```
-eps_dd_eff = (36/3) × 152/583 = 3.1286        (目標 1.3 の 2.407 倍)
-```
-
-`a1_units_audit.jl` が全数値を出力する。
-
-### 1.3 LHY 係数が 3.52 倍過大（前提3: 致命的、かつ src のバグ）
-
-`_resolve_lhy_block!` は `lhy: {kind: scalar}` の c_lhy を自動導出するが、
-**`interactions.c_total` の override を見ずに `atom.a_s` を読んでいた**。
-
-```
-自動導出 c_lhy (a_s=110 a₀, ε_dd=0.540) = 972.5578
-正しい    c_lhy (a_s=45.71 a₀, ε_dd=1.3) = 276.2785
-比 = 3.5202  =  (110/45.71)^{5/2} × Q₅(0.540)/Q₅(1.3)  =  8.9823 × 0.39190
-```
-
-**ドロップレットは LHY で存在している物体**なので、これは周辺的な誤差ではない。
-
-これは config の問題ではなく **クラスのバグ** — `c_total` を override する
-どの config も踏む。root fix を入れた（§4）。
-
-### 1.4 箱が物体より小さい（前提4: 致命的）
-
-変分解（§2）が予言する密度分布は、ピークの 1e-4 まで **r = 2.54 a_ho** まで
-広がる。commit 済み config の xy 半幅は 1.5 a_ho — **1.69 倍足りない**。
-
-新しい箱 `[6.5, 6.5, 3.5]`: xy 半幅 3.25（余裕 28 %）、z 半幅 1.75（余裕 33 %）。
-トーラスは扁平（A = 4.21）なので z を xy より短くしてある。
-DDI は zero-padded（既定 true）で、自己束縛体が周期像を見ないようにする。
-
-### 1.5 seed が別物（前提5: 致命的）
-
-論文の状態は Eq. (2):
-
-```
-Ψ_v(r) = √ρ_v(r,z) · exp(−i S_z φ) · ζ^(y)
-```
-
-= **磁化が全域で面内、方位角方向に循環**（n̂ = φ̂）。
-
-- `polar_core_vortex` は「m=0 の芯を m=±F の密度が囲む」— 別の物体。
-- `flower` は docstring では n̂ = φ̂ と書いてあるが、**実装は芯が軸方向**
-  （θ≈0, m=+F）で縁だけ面内に倒れる。docstring と実装が食い違っている。
-- 正解は `spin_coherent` で θ=π/2, φ₀=π/2, winding 1。
-  m 成分の位相が e^{−imφ}、すなわち e^{−iS_zφ} になる。
-
-`a3_config_gate.jl` は名前を信じず**テクスチャを測る**:
-φ̂ との cos = 1.0、|f_z|/|f| = 1.3e-16、|f|/(Fρ) = 1.0。
-
-### 1.6 弱いケージは半径を決めていない（前提6: OK）
-
-```
-⟨V⟩/N = ½ω²(⟨r²⟩+⟨z²⟩) = 8.33e-5 ℏω_ref
-|E|/N                     = 1.359  ℏω_ref
-比                        = 6.1e-5
-```
-
-ケージ自身の長さ 1/√ω = 10 a_ho に対しドロップレットは ⟨r⟩ = 1.22 a_ho。無害。
-
-### 1.7 ITP は使えない（前提7: 致命的）
-
-姉妹論文のキャンペーン（`runs/yls_barnett_f6/README.md` §2）が同じ regime で
-測定済み: **自由空間ドロップレットでは虚時間の不動点が dt でずれる。**
-dt=2e-3 でピーク密度 44 % 誤、しかも `dpsi = 3e-6` と収束を報告し、
-**格子 0.4 %・箱 2 % で不変**なので収束スキャンが誤答を認定してしまう。
-そのキャンペーンは「`runs/saito_li_torus/` (#336) is the same regime and will
-hit this」と明記していた。
-
-このセルで実測した cancellation ratio `|E|/Σ|E_i| = 0.0167` は、
-`ITP_CANCELLATION_WARN = 0.05`（droplet 0.0038–0.0118 と trapped 0.678–1.000 の
-57 倍のギャップから較正）の**警告側**にある。→ `method: lbfgs`。
-
----
-
-## 2. 変分解 — 2つの独立実装（type B）
-
-論文の変分理論（Eqs. 2–3, S2–S10）を**2通りに実装して突き合わせた**。
-
-1. **閉形式**: `runs/yls_barnett_f6/a2_variational_stability.jl` の ℓ=0 メンバ。
-   Li–Saito の S4/S7/S8 は姉妹論文の S6/S7/S8 と ℓ=0 で同一なので、
-   書き写さず `include` している。
-2. **直接求積**: `variational.py`（scratchpad）— 閉形式を一切使わず
-   Gauss–Legendre で E_kin, E_s, E_LHY を数値積分。
-
-**worst deviation 0.088 %**（下表）。
-
-さらに、この求積実装は論文自身の **Fig. S1(a)–(d)** と **Fig. 2(b)** を再現する
-（陽性対照）。陰性対照として **ε_dd < 1 ではどんな N でも束縛しない**ことも確認
-（ε_dd = 0.54 / 0.9 / 0.99、N ≤ 1e6）— これは #338 が定理として示したものと一致。
-
-### 2.1 PDF から復元した ansatz の指数
-
-Supplement の PDF テキスト抽出は密度を `r^λ` と描画するが、**正しくは `r^{2λ}`**。
-3つの内部整合性が独立にそれを要求する:
-
-1. 規格化定数の `Γ(λ+1)` は `r^{2λ}` でしか N に積分されない
-2. S4 のスピン巻き付き項 `F/λ` は `⟨1/r²⟩ = 1/(λσ_r²)`、すなわち `r^{2λ}`
-3. S10 の `A(λ) = [(λ+1)Γ²(λ+1)/Γ²(λ+3/2) − 1]^{-1/2}` は
-   `r^{2λ}` に対する `⟨r⟩/√(⟨r²⟩−⟨r⟩²)` そのもの
-
-同様に S7 の分母は `√(2π)` ではなく **`√2·π`**（求積との比が厳密に 1/√π =
-0.56419 で出た）。姉妹キャンペーンの独立実装も `sqrt(2)*pi` である。
-
-### 2.2 目標セルの予言（repo の Eu151）
-
-```
-a_s      = 45.7128 a₀  ( = a_dd/1.3, a_dd = 59.4266 a₀ )
-λ        = 3.5452      aspect A = 4.2097
-σ_r      = 0.45902 µm = 0.5883 a_ho
-σ_z      = 0.33782 µm = 0.4329 a_ho
-r_peak   = 0.86427 µm = 1.1076 a_ho
-⟨r⟩      = 0.95211 µm = 1.2202 a_ho
-n_peak   = 0.52220 N µm⁻³
-N_c      = 7501（停留点基準）/ 9189（E<0 基準） ⇒ N/N_c = 2.00 / 1.63
-```
-
-repo の Eu151 は µ = 6.9769 µ_B ⇒ a_dd = 59.4266 a₀、論文 Table S1 の
-理想値 µ = 7 µ_B ⇒ 59.82 a₀ と **0.66 % 差**。ε_dd はどちらでも厳密に 1.3 で、
-0.66 % は物理的長さスケールにだけ乗る。
-
-### 2.3 なぜ論文は F=6 だけ ε_dd = 1.3 にしたのか
-
-```
-N_c(F=6, ε_dd=1.2) = 18420（停留点）/ 22575（E<0）  >  15000
-N_c(F=6, ε_dd=1.3) =  7501            /  9189       <  15000
-```
-
-F=1 パネルは ε_dd=1.2 で足りるが、F=6 は同じ N では**束縛しない**。
-Fig. 1(d) が F=6 だけ 1.3 を使っているのはそのため。
-
----
-
-## 3. eGPE 結果（type B / type C）
-
-`b_cells.jl`、L-BFGS、n=64, box (6.5, 6.5, 3.5) a_ho、GPU、
-producing commit `b2d746cc`、wall **82 s**、`grad_norm = 4.13e-6`。
-
-### 3.1 Fig. 1(d) / Fig. 2(a) との比較
-
-| 量 | eGPE | 変分 | 差 |
-|---|---|---|---|
-| **ρ_max** | **0.51643 N µm⁻³** | 0.52220 | **−1.1 %** |
-| r_peak（リング半径） | 0.80232 µm | 0.86427 | −7.2 % |
-| ⟨r⟩ | 0.88357 µm | 0.95211 | −7.2 % |
-| √⟨x²⟩ | 0.82829 a_ho | 0.8869 | −6.6 % |
-| √⟨z²⟩ | 0.32329 a_ho | 0.3061 | +5.6 % |
-| E/N | **−1.5746 ℏω_ref** | −1.3592 | eGPE が低い ✓ |
-
-**変分は上界でなければならず、実際に上界になっている**（eGPE が 15.8 % 低い）。
-これは type-B の整合性チェックであって、一致の指標ではない。
-
-半径が 7 % 小さく z 方向に 6 % 高いのは、ansatz が縁の構造（flat-top 傾向）を
-表現できないため。論文自身も Fig. 2(a) で GP と変分のズレを認めている
-（N=80000 では逆に GP が広くなる、と書いている）。
-
-**論文が明記している定性的特徴を独立に再現した**:
-
-> "The density at r = 0 must vanish for the fully-polarized assumption in
-> Eq. (2), whereas **the center is slightly occupied for the GP results**."
-
-`out/fig2a.png` の r→0 で実線だけが立ち上がっているのがそれ。
-
-### 3.2 エネルギー内訳と LHY の割合
-
-```
-E/N total = −1.574581 ℏω_ref
-  ddi     = −48.05479   (50.83 % of Σ|E_i|)
-  density = +37.05199   (39.19 %)
-  kinetic =  +3.75606   ( 3.97 %)
-  lhy     =  +5.67208   ( 6.00 %)
-  trap    =  +0.00007   ( 0.00 %)
-```
-
-**LHY の割合は 2 通りに出す（受け入れ基準が要求している）**:
-
-- `|E_LHY| / Σ|E_i|` = **0.0600**
-- `|E_LHY| / |E_total|` = **3.602**
-
-キャンペーン guard の「15 % 超で自動失格」は**後者で大きく超える**。
-これはドロップレットでは正当で、E_total が大きな項どうしの差（+37.05 と
-−48.05 で正味 −1.57）だから。黙って通さず両方を明示する。
-
-### 3.3 flux-closure 恒等式（type A — 最も鋭いゲート）
-
-```
-E_ddi / E_s = −1.296956      厳密値 −ε_dd = −1.3      差 0.23 %
-```
-
-∇·M = 0 の完全偏極磁化に対し `E_ddi = −ε_dd E_s` は**厳密**に成り立つ
-（[[gotcha_flux_closure_makes_ddi_exactly_minus_epsdd_times_contact_2026_08_18]]、
-`test/oracles/test_flux_closure_ddi_identity.jl`）。これが 1.3 に戻ったことは、
-DDI 前置係数・c₀ 規格化・ε_dd 帳簿がまとめて正しいことを意味する。
-修正前の config なら **−3.13 付近**が出ていたはずで、この 1 つの数字だけで
-欠陥2 は検出できた。
-
-（0.23 % のズレは厳密な 1e-12 ではない。収束したトーラスは中心付近で完全偏極を
-わずかに外れる（|f|/(Fρ) = 0.9967）ため、恒等式の前提が厳密には成り立たない。
-姉妹キャンペーンでも収束状態では 0.5–1 % のズレが出ている。）
-
-### 3.4 成分ごとの winding（受け入れ基準）
-
-**全体ではなく成分ごとに測り、mask されたゼロと本物のゼロを区別する。**
-
-```
-v_m : +6:−6  +5:−5  +4:−4  +3:−3  +2:−2  +1:−1  0:0  −1:+1 … −6:+6
-```
-
-13 成分すべてで **v_m = −m**、すなわち m + v_m = 0（= ℓ）。
-これは e^{−i S_z φ} が要求する構造そのもの。
-
-winding を読んだ輪の上での |ψ| の範囲も出力している（最小 5.58e-3、
-最大/最小比 0.94–0.99）。**振幅が測定可能な水準にある輪の上で読んだ winding**
-であることを示すためで、n_m = 9.4e-5 の少数成分（m=±6）でも |ψ| は
-ノイズ床から 3 桁以上上にある。
-
-### 3.5 その他の健全性
-
-```
-|f|/(F ρ)      = 0.9967      論文: "|f|/ρ ≃ F except near the center"
-edge density   = 5.192e-05   箱の妥当性 — ⟨L_z⟩ の周期箱 leak も同時に排除
-⟨L⟩            = (0, 0, 0)   ℓ=0 なので当然
-⟨f⟩            = (0, 0, 0)   磁化は循環しているので正味ゼロ
-n_m            = 二項分布 (φ̂ 方向のスピンコヒーレント状態)
-```
-
-`edge density = 5.2e-5` は #336 が指摘した **周期箱での L_z ill-defined 問題**
-に対する直接の答え。Barnett の作業で 4 回誤診した leak は雲が xy 境界に
-触れていたのが原因で、ここでは境界の密度が 5e-5 しかない。
-
-### 3.6 格子・箱の収束（受け入れ基準: 自己束縛体のサイズが箱で動いてはいけない）
-
-全アーム L-BFGS、`grad_norm ≤ 3.3e-6`、commit `b2d746cc`。
-
-| arm | dx_xy [a_ho] | box_xy | E/N [ℏω_ref] | ρ_max [N µm⁻³] | ⟨r⟩ [µm] | √⟨z²⟩ [a_ho] | E_ddi/E_s |
-|---|---|---|---|---|---|---|---|
-| n=40 | 0.1625 | 6.5 | −1.57458106 | 0.51449 | 0.88358 | 0.32329 | −1.296956 |
-| n=48 | 0.1354 | 6.5 | −1.57458147 | 0.51577 | 0.88358 | 0.32329 | −1.296956 |
-| **n=64（基準）** | **0.1016** | **6.5** | **−1.57458148** | **0.51643** | **0.88357** | **0.32329** | **−1.296956** |
-| n=96 | 0.0677 | 6.5 | −1.57458148 | 0.51786 | 0.88357 | 0.32329 | −1.296956 |
-| n=80, box×1.25 | 0.1016 | 8.125 | −1.57560464 | 0.51534 | 0.88611 | 0.32237 | −1.297017 |
-| n=64×128, box_z=8 | 0.1016 | 6.5 | −1.57556278 | 0.51489 | 0.88613 | 0.32221 | −1.297018 |
-
-**箱**: 箱を 1.25 倍にして E/N は **+0.065 %**、⟨r⟩ は **+0.29 %**。
-z 方向だけ 2.3 倍（3.5 → 8.0 a_ho）にしても E/N は +0.062 %、⟨r⟩ +0.29 %。
-**自己束縛体のサイズは箱で動いていない。**
-
-**格子**: n=40 → 48 で E が 4.1e-7 動き、48 → 64 で 1e-8、64 → 96 で 0。
-スペクトル収束が n≈48 で飽和している。
-**これは「スキャンが盲目」ではない**（そう見えるので粗いアームを足した）:
-E は実際に動いてから止まる。⟨r⟩ と √⟨z²⟩ は n=40 で既に 6 桁一致。
-
-唯一まだ動いているのは **ρ_max**（点値なので最も収束が遅い）:
-n=40..96 で 0.51449 → 0.51786、**幅 0.65 %**。格子点が真のリング極大に
-どれだけ近いかは n ごとに変わるので単調でもない。したがって
-
-> **ρ_max = 0.516 ± 0.002 N µm⁻³**（格子由来）、変分予言 0.522 に対し **−1.1 %**
-
-と、格子の幅つきで述べるのが正しい。
-
-### 3.7 B_z = 0 に双安定性は無い — シガーは磁気渦に崩れる
-
-トーラス種とシガー種を**共通の箱**（6.5×6.5×8.0 a_ho、n=64×64×128;
-シガーは z 方向に伸びるのでトーラス用の箱 box_z=3.5 では規格の 5.7e-2 が
-境界に乗る）で独立に収束させた。
-
-| | E/N [ℏω_ref] | ρ_max | grad_norm |
-|---|---|---|---|
-| トーラス種 | −1.5755628 | 0.51489 | 3.0e-6 |
-| シガー種 | −1.5755614 | 0.51761 | 2.2e-3 |
-
-エネルギーが 1.4e-6 しか違わない。`b_cells.jl` が出す ⟨r⟩ や σ_x, σ_z は
-**実験室軸に縛られた量**なので、これだけでは「同じ状態か別の状態か」を
-判定できない。回転不変な言明は**二次モーメントテンソル ⟨r_a r_b⟩ の
-固有値の組**であり、`d_shape.jl` がそれを測る:
-
-```
-トーラス種: λ_i = [0.10382, 0.69013, 0.69013] a_ho²   軸 = (0.000, 0.000, 1.000)
-シガー種  : λ_i = [0.10382, 0.69013, 0.69026] a_ho²   軸 = (0.708, −0.706, 0.000)
-```
-
-**固有値の組が 2e-4 で一致する。** どちらも扁平（λ₁ ≪ λ₂ = λ₃）で、
-その軸まわりの磁化循環 ⟨f̂·φ̂⟩ は **+1.00000 と −1.00000**。
-
-すなわち **シガー種は静止せず、軸が xy 面内・逆キラリティの磁気渦に崩れた**。
-エネルギー一致はこれで説明がつく — B=0 では回転が厳密な対称性なので、
-向きの違う磁気渦は厳密に縮退している。
-
-これは論文の Fig. 3(b) の記述と一致する:
-
-> "the cigar-shaped droplet becomes unstable **below some critical magnetic
-> field**"
-
-したがって**双安定性は有限磁場でしか問えない**。§3.8 の磁場ラダーへ。
-
-### 3.8 磁場ラダー — トーラス枝は確立、シガー枝は未確立
-
-`run_field_ladder.sh`、共通の箱 6.5×6.5×8.0 a_ho、n=64×64×128、両 seed。
-
-事前予測（gate 2）: トーラスを保っているのは方位角スピン巻き付きのコスト
-⟨S_z²⟩/r² = (F/2)/(λσ_r²) = 2.44 ℏω_ref/atom。z 偏極状態は |p|F を得て、
-Eu F=6 では p = −0.0148/µG。等しくなるのは **B ≈ 27 µG**。
-実測の交差はそれより下（後述）で、**予測は 3 倍ずれたが桁は当たった** —
-ラダーの範囲決めという目的は果たしている。
-
-#### トーラス枝（信頼できる）
-
-| B_z [µG] | E/N [ℏω_ref] | ⟨f_z⟩ | E_ddi/E_s | 循環 ⟨f̂·φ̂⟩ | edge |
+| kinetic | +3.749 | 4.0 % |
+| contact | +36.951 | 39.2 % |
+| DDI | −47.926 | 50.8 % |
+| LHY | +5.650 | 6.0 % |
+| **total** | **−1.575** | — |
+
+The campaign guard disqualifies runs whose LHY exceeds 15 % **of the total**;
+here that ratio is 359 %, because the total is a small residue of large
+cancelling terms. Quoted against the gross budget it is 6.0 %. Neither number is
+a pass — a droplet is an LHY-stabilised object and is expected to sit here — so
+both are stated rather than one being chosen.
+
+The cancellation ratio R = |E_total|/Σ|E_term| = **0.0167**, inside the band
+where `find_ground_state`'s advisory fires and the imaginary-time fixed point is
+set by dt rather than by the Hamiltonian. This is why `method: lbfgs`.
+
+### Convergence in grid and in box
+
+| cell | dx | E | peak ρ/N | r_peak | edge/peak |
 |---|---|---|---|---|---|
-| 0 | −1.575563 | 0 | −1.297018 | +1.00000 | 1.2e-6 |
-| 3 | −1.575846 | −0.0128 | −1.297013 | +1.00000 | 1.2e-6 |
-| 10 | −1.578714 | −0.0426 | −1.296967 | +0.99996 | 1.3e-6 |
-| 30 | −1.604089 | −0.1294 | −1.296548 | +0.99967 | 1.6e-6 |
-| 50 | −1.654561 | −0.2205 | — | — | 7.2e-5 |
-| 70 | — | −5.9732 | — | 0 | **2.2e-1** |
-| 100 | — | −5.9413 | −1.222141 | 0 | **2.4e-1** |
+| 64³ box 6 | 0.0732 μm | −1.5754124 | 0.513 | 0.812 μm | 1.0e-4 |
+| 96³ box 6 | 0.0488 μm | −1.5754124 | 0.516 | 0.817 μm | 9.4e-5 |
+| 88³ box 8 | 0.0709 μm | −1.5754118 | 0.513 | 0.825 μm | 2.7e-7 |
 
-**50 µG まではトーラスが生き残る**（扁平、軸 z、循環 +1、flux closure 維持、
-edge ≤ 7e-5）。磁場とともに ⟨f_z⟩ が単調に増える（0 → −0.221）のは、論文
-Fig. 3(c) の「トーラスの右半分が厚くなって F_z が増える」に対応する。
+Energy is identical to 7 digits across a 1.5× refinement in dx **and** a 1.33×
+enlargement of the box at fixed resolution; the radius moves 1.6 % over both.
+The 88³ box-8 cell is the box test proper — the box grows while dx does not —
+and its edge density is 2.7e-7 of the peak, so the object is self-bound rather
+than held by the periodic boundary.
 
-**70 µG でトーラス種は完全偏極して壊れる**（⟨f_z⟩ = −5.97、edge 22 %）。
-したがって
+Every cell reaches the L-BFGS energy-comparison floor at |∇E| ≈ 3e-6 and so
+reports `converged=false`. That flag means "tol=1e-9 was below what the method
+can resolve", not "unconverged"; the driver's own warning says exactly that.
 
-> **トーラス枝の上部臨界磁場 B_c ∈ (50, 70) µG**（F=6, N=15000, ε_dd=1.3）
+**A convergence scan is not by itself evidence here.** In this regime an ITP
+answer is grid-independent to 0.4 % and box-independent to 2 % while being 44 %
+wrong, so the scan certifies whatever the solver settled on. The load-bearing
+checks are the ones that do not depend on the solver: the flux-closure identity
+(0.23 %) and the agreement with the published profile.
 
-これは論文 Fig. 3(b) の
+### Bistability at B = 0 — the cigar seed falls into the torus
 
-> "There is a critical magnetic field, **above which the torus-shaped droplet
-> becomes unstable**"
+`cells/cigar_n96_box6.yaml` seeds `m_plus_F`: spin uniformly along z, no
+winding, the Fig. 3(a) branch. It descends from E = +53.07 through +0.68 and
+converges at **E = −1.5754125** — the torus energy, and all four energy terms
+agree with the torus cell to 6 digits.
 
-に対応する — F=6 への転記であって再現ではない（論文の Fig. 3 は F=1,
-N=50000 で 0.03–0.17 mG）。F=6 の臨界磁場は F=1 の 1/3 以下。
+That is not a coincidental degeneracy. At B = 0 with c₁ = 0 the Hamiltonian is
+invariant under *simultaneous* space+spin rotation, so the converged droplet may
+sit anywhere in an SO(3)-degenerate family, and the **sorted eigenvalues of the
+second-moment tensor** are what identify the object (the axis does not):
 
-#### シガー枝 — 箱を3回倍にして初めて確立した
+| cell | sorted ⟨r_a r_b⟩ | symmetry axis | COM |
+|---|---|---|---|
+| torus 96³ | [0.10383, 0.69018, 0.69018] | (0, 0, 1) | (0, 0, 0) |
+| cigar 96³ | [0.10398, 0.69016, 0.69018] | (0.707, −0.707, 0) | (−0.65, −0.66, −0.01) |
 
-**最初にこのラダーを「10 µG で収束したシガーが存在し、エネルギーも低い」と
-読んだのは誤りだった。** 同じ出力の `edge density` 列がそれを否定していた:
+Same object, axis rotated into the xy-plane and the centre of mass drifted
+(free space is translation-invariant). Profiled about *its own* axis the cigar
+cell reproduces the paper as well as the torus cell does: peak 0.515 (+1.2 %),
+r_peak 0.828 (+1.6 %), identical FWHM.
 
-| B_z [µG] | シガー種の edge fraction | 判定 |
+**So at B = 0, on this cell, there is no cigar branch** — the uniform seed is
+unstable and relaxes into the magnetic vortex. That is consistent with Fig. 3(b),
+where the cigar becomes unstable *below* a critical field and the bistability
+window is B_z ≃ 0.03–0.17 mG. It is not a reproduction of Fig. 3, which is
+published at F = 1, ε_dd = 1.2.
+
+Two measurement traps this cell walked into, both fixed in `g6_measure.jl`
+rather than worked around:
+
+* profiling on a fixed z = 0 slice reported the rotated droplet as a centre-peaked
+  blob at r = 0.029 μm with ρ(0)/N = 0.482 — a completely wrong state. The
+  profile is now taken about the *measured* axis;
+* `v_m = −m` is a statement in the basis quantised **along the torus axis**. For
+  a tilted cell the components mix and the z-basis windings are not −m. The
+  report now says so instead of counting 13 disagreements.
+
+## What was wrong with the config
+
+The file had never been executed. `find runs/saito_li_torus -type f` returned
+the config alone, and it had been carried across two schema epochs.
+
+1. **`c_dd: 152` double-counted ε_dd.** ε_dd ≡ a_dd/a_s, and a_dd is fixed by
+   the atom (μ = 6.977 μ_B ⇒ a_dd = 59.43 a₀). The paper reaches ε_dd > 1 by
+   assuming a *smaller a_s*, so exactly one knob moves. Scaling c_dd as well
+   multiplies the ratio a second time by 2.407.
+2. **The step-level `interactions:` block silently dropped the mixin's
+   `c_total: 583`.** `use:` layering is shallow (`_apply_step_mixins`): a
+   step-level block replaces the mixin's wholesale. Resolved, `c_total` read
+   back absent, so the run would have used the registry-derived 1406.
+3. **(1) and (2) cancelled.** 152·36/(3·1406) = 1.297 ≈ 1.3 — the right ratio,
+   reached at 2.4× the paper's absolute interaction scale (a_s = 110 a₀ rather
+   than 45.71 a₀). The one number a reader would have checked was right, and
+   the system was not the paper's.
+4. **The scalar LHY coefficient did not follow either override.** It
+   auto-derives from the registry a_s *and* the registry ε_dd = 0.5402,
+   giving c_lhy = 972.56 where 2473.56 would have been consistent with the rest
+   of that Hamiltonian — 0.39× — while the correct run needs 276.28. LHY is what
+   stabilises a droplet, so this is not a peripheral error.
+5. **`polar_core_vortex` is the wrong topology.** Its outer region is
+   (|+F⟩e^{iφ} + |−F⟩e^{−iφ})/√2, which has ⟨F⟩ = 0 — an unmagnetised
+   polar-core vortex, carrying no magnetic vortex, and violating the
+   fully-polarised premise of Eq. (1). The paper's state is
+   √ρ·e^{−iS_zφ}·ζ^(y): `spin_coherent` with θ=π/2, φ-offset=π/2, charge 1.
+6. **`box: [3,3,3]` cut the droplet in half.** `box_size` is the FULL width
+   (`grid.jl`: `dx = box_size/n_points`), so 3 a_ho is a half-width of 1.17 μm
+   against a cloud that reaches 1.4 μm.
+7. **ITP at dt = 5e-3 is the known droplet-regime trap** — see the R = 0.0167
+   above.
+
+The trap that made this hard to see: item 3. A config can be wrong in two
+places and right in the ratio those two places determine.
+
+## Two defects fixed in `src/` rather than here
+
+* `_resolve_derived_params!` printed the run banner's `c_total` and `ε_dd`
+  recomputed from the registry, unconditionally — so a run that *correctly*
+  honoured `c_total: 584.37` announced `c_total=1406.2 ε_dd=0.5402`. The
+  banner is what a reader checks a config against. It now reports the honoured
+  value and the effective ε_dd, naming the registry value alongside.
+* `component_phase_winding` (new, `src/analysis/topology.jl`). Neither existing
+  detector can read a spin-F magnetic vortex: `winding_number_field` resolves
+  at most ±1 per plaquette, and `non_abelian_holonomy` returns `cis(phase_acc)`,
+  which is ≈1 for *every* integer winding. The new one refuses rather than
+  guessing when under-sampled — required, because an under-sampled loop returns
+  `ℓ − n·round(ℓ/n)`, a clean and plausible wrong integer.
+  Gated by `test/analysis/test_component_phase_winding.jl` (fast tier).
+
+## Reproducing
+
+Run-output directories are not tracked in this repo (no content-addressed run
+dir is), so the `runs/torus_n96_box6_<hash>/` names quoted above do not resolve
+from a fresh checkout. What IS tracked is `cells/`, and `run_yaml` keys the
+output directory on the raw bytes of the config — so the same file reproduces
+the same directory name:
+
+```bash
+julia --project=. runs/saito_li_torus/g5_make_cells.jl        # regenerate cells from config.yaml
+julia --project=. -e 'import CUDA; using SpinorBEC; run_yaml("runs/saito_li_torus/cells/torus_n96_box6.yaml")'
+julia --project=. runs/saito_li_torus/g6_measure.jl runs/torus_n96_box6_3014e1e20ffcd4d9
+```
+
+Start with `smoke.yaml` (32³, ~1 min) before anything larger.
+
+## Files
+
+| file | what |
+|---|---|
+| `config.yaml` | the production cell, 128³ box 6 |
+| `smoke.yaml` | 32³, 25 iterations — every code path, ~1 min |
+| `cells/` | convergence + bistability cells, generated from `config.yaml` |
+| `g1_units_and_premises.jl` | gate 1: every asserted number recomputed |
+| `g2_resolved_coefficients.jl` | what the YAML resolves to, before/after |
+| `g3_digitise_fig2a.py` | Fig. 2(a) digitiser with its controls |
+| `g4_what_the_solver_built.jl` | what `_parse_gs_interactions` actually returns |
+| `g5_make_cells.jl` | cell generator (one physics source of truth) |
+| `g6_measure.jl` | the type-C measurement above |
+
+## Not done, and why
+
+* **The field-driven transition (Fig. 3) and the Einstein-de Haas rotation
+  (Fig. 4) are published at F = 1, ε_dd = 1.2 — not at this cell.** Running them
+  here is an extrapolation beyond the paper, not a reproduction of it, and must
+  be labelled that way. The B = 0 half of the bistability question IS answered
+  above; anything on the field axis should follow the #335 discipline of naming
+  both states by energy at each field, and should expect the ±10 nT class of
+  systematic to matter at 0.03–0.17 mG.
+* **The 128³ cell did not run.** It was launched, thrashed a GPU that a
+  concurrent session had half-allocated, and was killed in favour of the
+  bistability and box cells. 64³/96³/88³-box-8 already agree to 7 digits in
+  energy, so it would have been a fourth point on a flat line rather than new
+  information — but it is absent, not passed.
+* The paper's own numerics use dx ≈ 0.01 μm; this cell is 0.049 μm at 96³. The
+  F = 6 object is ~3× larger than the F = 1 one the paper's step was chosen for,
+  and the 64³→96³ agreement above is the evidence that it is resolved.
+
+---
+
+# 続き: 磁場軸 — Fig. 3（双安定）と Fig. 4（Einstein–de Haas）
+
+上の「Not done, and why」が挙げていた2件。**論文の再現ではなく、論文が
+F=1, ε_dd=1.2 で示した構造をこのセル (F=6, N=15000, ε_dd=1.3) へ外挿した
+予言**として読むこと。#335 の規律に従い、**各磁場で両状態をエネルギーで
+名指し**している。
+
+スクリプトは `h1_`–`h7_`（`g1_`–`g6_` の静的再現に続く番号）。
+eGPE は全て L-BFGS、GPU、`grad_norm ≤ 5e-6`。
+
+## 静的セルの独立再現（corroboration）
+
+`h3_cells.jl` は `g5/g6` とは別の driver（自前の seed 構成・箱・observable）
+だが、同じ数値に着地する:
+
+| | この driver | `g6_measure.jl`（上） |
 |---|---|---|
-| 0, 3 | 2.9e-7 | シガーではなく**磁気渦に崩れた**（§3.7 と同じ） |
-| 10 | **4.2e-1** | 規格の 42 % が境界 — 箱を埋めた雲 |
-| 30 | **8.3e-3** | prolate だが σ_z=2.19 に対し半箱 4.0（1.8σ）— 不足 |
-| 100 | **1.5e-2** | 同上 |
+| ρ_max | 0.5164 ± 0.002 N µm⁻³ | 0.516 |
+| r_peak | 0.802–0.816 µm | 0.817 |
 
-トーラス側が全セルで 1.2e-6 なのと 4〜5 桁違う。自分で印字した列を読まずに
-主張しかけたので、`report` を**判定を書く**ように直した
-（`EDGE_MAX = 1e-4` 超で `*** UNUSABLE` と理由を出す）。
-列を出すだけでは不足、というのが教訓。
-cf. [[feedback_check_the_runs_own_report_before_claiming]]。
+さらに `E_ddi/E_s = −1.296956` を厳密値 −1.3 に対して 0.23 % で満たす
+（flux closure 恒等式 = ε_dd 帳簿の最も鋭いゲート）。
 
-**箱スキャンで決着した**（B_z = 30 µG、n=64×64×n_z）:
+## 変分理論を2実装で突き合わせ（type B）
 
-| box_z [a_ho] | 半箱/σ_z | σ_z [a_ho] | E/N [ℏω_ref] | edge | 使用可 |
-|---|---|---|---|---|---|
-| 8 | 1.8 | 2.190 | −1.972555 | 8.3e-3 | ✗ |
-| 16 | 2.3 | 3.435 | −2.774476 | 1.3e-3 | ✗ |
-| **32** | **4.6** | **3.491** | **−2.772653** | **3.9e-5** | **✓** |
+`h1_variational_cross_check.jl`。論文の Eqs. (2)–(3), (S2)–(S10) を
+**閉形式**（`runs/yls_barnett_f6/a2_variational_stability.jl` の ℓ=0 メンバ）と
+**直接求積**（閉形式を使わない Gauss–Legendre）で独立に実装し、
+**worst deviation 0.088 %**。論文自身の Fig. S1(a)–(d) と Fig. 2(b)（N_c が
+F=1..6 で単調増加）を再現し、陰性対照として ε_dd < 1 では N ≤ 1e6 まで
+どこでも束縛しないことを確認。
 
-最後の倍化で σ_z は **+1.6 %**、E/N は **+0.065 %** しか動かない。
-`grad_norm = 6.8e-7`。**シガー枝は実在し、自己束縛している。**
+Supplement の PDF から復元する際の落とし穴2件:
+密度は **`r^{2λ}`**（`r^λ` ではない — 規格化の Γ(λ+1)、S4 の F/λ、S10 の
+A(λ) が3つとも独立にそれを要求）、S7 の分母は **`√2·π`**（`√(2π)` ではない）。
 
-#### B_z = 30 µG で双安定 — 両状態を箱収束させたうえでエネルギーで名指しする
+目標セルの予言: σ_r = 0.5883 a_ho、A = 4.2097、⟨r⟩ = 1.2202 a_ho、
+n_peak = 0.52220 N µm⁻³、N_c = 7501（停留点）/ 9189（E<0）⇒ N/N_c = 1.6–2.0。
 
-| | E/N [ℏω_ref] | ⟨f_z⟩ | E_ddi/E_s | aspect | edge | grad_norm |
-|---|---|---|---|---|---|---|
-| 磁気渦トーラス | −1.604089 | −0.129 | −1.296548 | 2.571 | 1.6e-6 | 2.1e-6 |
-| **偏極シガー** | **−2.772653** | −5.955 | −1.246513 | 0.127 | 3.9e-5 | 6.8e-7 |
+## Fig. 3 — 双安定と交差磁場
 
-**同じ (F, N, ε_dd, B_z) で両方が定常。これが双安定性であり、30 µG では
-シガーが 1.169 ℏω_ref 低い。**
+箱ゲート（最外殻ボクセルの規格占有 > 1e-4 で `*** UNUSABLE`）を通ったセルのみ:
 
-#### なぜシガーは弱くしか束縛しないのか（測定つき）
-
-Zeeman 項は完全偏極状態では形に依らない定数（⟨f_z⟩ = −FN）なので、
-**束縛には寄与しない**。Zeeman を引くと:
-
-```
-E_torus  非Zeeman = −1.604089 + 0.05747 = −1.5466
-E_cigar  非Zeeman = −2.772653 + 2.64478 = −0.1279     ← 12 倍浅い
-```
-
-理由は DDI の異方性関数。flux closure では E_ddi = −ε_dd E_s が**形に依らず
-厳密**だが、z 偏極状態では
-
-```
-E_ddi/E_s = −ε_dd · f(κ),   κ = σ_ρ/σ_z,   f(0)=1, f(1)=0, f(∞)=−2
-```
-
-で、**有限の形では必ず f < 1**（無限に伸びた極限でのみ 1 に達する）。実測:
-
-```
-トーラス: E_ddi/E_s = −1.29655  →  f = 0.9973
-シガー  : E_ddi/E_s = −1.24651  →  f = 0.9589
-```
-
-論文の変分理論（S2–S8）は flux closure を仮定しているので**シガー枝には
-適用できない**。偏極枝は別の変分問題（ガウス型 + f(κ)）で、
-`scratchpad/polarized.py` で解いた:
-
-```
-N_c(偏極, ε_dd=1.2) = 52535        N_c(偏極, ε_dd=1.3) = 17441
-N_c(渦,   ε_dd=1.3) = 7501–9189
-```
-
-**ε_dd=1.3, N=15000 は偏極枝のガウス閾値 17441 のすぐ下**（N/N_c = 0.86）。
-ガウスは上界なので実際の閾値はもっと低く、eGPE が非常に浅い束縛
-（−0.128）を見つけたのと整合する。**トーラスは N/N_c = 1.6–2.0 で堅牢、
-シガーは閾値ぎりぎり** — これが 12 倍の差の由来。
-
-#### エネルギー交差 — 16.5 µG
-
-両枝とも磁場依存が単純（渦は ⟨f_z⟩ ∝ B、シガーは完全偏極なので ⟨f_z⟩ 一定）
-なので、**箱ゲートを通った実測点だけ**で決まる:
-
-| B_z [µG] | トーラス E/N | edge | シガー E/N | edge | 基底状態 |
-|---|---|---|---|---|---|
-| 0 | −1.575563 | 1.2e-6 | （磁気渦に崩れる） | — | トーラスのみ |
-| 3 | −1.575846 | 1.2e-6 | （磁気渦に崩れる） | — | トーラスのみ |
-| **16** | **−1.583638** | 1.3e-6 | **−1.539958** | 4.5e-5 | **トーラス**（0.0437 差） |
-| **18** | **−1.585788** | 1.4e-6 | **−1.715940** | 4.4e-5 | **シガー**（0.1302 差） |
-| **30** | **−1.604089** | 1.6e-6 | **−2.772653** | 3.9e-5 | **シガー**（1.1686 差） |
-| 50 | −1.654561 | 7.2e-5 | — | — | — |
-
-**16 → 18 µG で符号が反転する。交差は内挿ではなく測定**。全セルが箱ゲートを
-通っている（edge ≤ 4.5e-5、`grad_norm` ≤ 2e-6）。
-
-```
-E_torus(B) = −1.575563 − 3.16e-5 B²      B in µG
-E_cigar(B) = −0.131078 − 0.088050 B      （16/30 µG の実測2点）
-⇒ 交差 B_× = 16.50 µG
-```
-
-**この当てはめは予言として3回検証した**（走らせる前に値を出して照合）:
-
-| | 予言 | 実測 | 差 |
+| B_z [µG] | トーラス E/N | シガー E/N | 基底状態 |
 |---|---|---|---|
-| E_torus(16 µG) | −1.583650 | −1.583638 | 1.2e-5 |
-| E_cigar(16 µG) | −1.537498 | −1.539958 | 2.5e-3 |
-| E_torus(18 µG) | −1.585801 | −1.585788 | 1.3e-5 |
-| E_cigar(18 µG) | −1.715978 | −1.715940 | 3.8e-5 |
+| 0 | −1.575563 | （磁気渦に崩れる） | トーラスのみ |
+| 3 | −1.575846 | （磁気渦に崩れる） | トーラスのみ |
+| **16** | **−1.583638** | −1.539958 | **トーラス**（0.0437 差） |
+| **18** | −1.585788 | **−1.715940** | **シガー**（0.1302 差） |
+| 30 | −1.604089 | **−2.772653** | シガー（1.1686 差） |
+| 50 | −1.654561 | — | トーラス健在（edge 7.2e-5） |
+| 70 | 完全偏極して崩壊（edge 22 %） | — | トーラス枝は消えた |
 
-#### F=6 の相図
+**16 → 18 µG で符号が反転する。交差は内挿ではなく測定。**
 
 ```
-B_z ≲ 3 µG       : トーラスのみ（シガー種は磁気渦に崩れる）
-B_× = 16.5 µG    : エネルギー交差。以下はトーラスが基底状態
-16.5–50 µG       : 双安定。シガーが基底状態、トーラスは準安定
-50 < B_c < 70 µG : トーラス枝が消える
+B_× = 16.50 µG                     (両枝の実測から)
+トーラス枝の上部臨界 B_c ∈ (50, 70) µG
 ```
+
+当てはめは**走らせる前に値を出して4回照合**した（E_torus(16) 予言
+−1.583650 対 実測 −1.583638 など、最大 2.5e-3）。
 
 論文の F=1, N=50000 は双安定域 0.03–0.17 mG で交差 0.14 mG。
-**F=6 では同じ構造が 1 桁低い磁場で起きる**、というのがここでの予言
-（再現ではない — 論文はこのセルの磁場依存を計算していない）。
+**F=6 では 1 桁低い磁場で同じ構造が起きる。**
 
-### 3.9 Einstein–de Haas 回転（論文 Fig. 4）— 再現
+### 偏極枝は箱を3回倍にして初めて確立した
 
-論文のプロトコルそのまま:
+B_z = 30 µG で box_z を 8 → 16 → 32 a_ho:
+σ_z が 2.190 → 3.435 → **3.491**、edge が 8.3e-3 → 1.3e-3 → **3.9e-5**。
+最後の倍化で σ_z は +1.6 %、E/N は +0.065 % しか動かない。
+**1 回目の倍化では発散か収束か判定できない**（σ_z が 1.57 倍動いた）。
 
-> "the initial droplet state is prepared for zero magnetic field with the
-> symmetry axis in the **y** direction, and the magnetic field B_z is turned on
-> at t = 0 ... the droplet begins to rotate around the z axis, where the total
-> angular momentum F_z + L_z is maintained to be zero."
+### なぜシガーは浅くしか束縛しないか
 
-#### 準備 — y 軸トーラスは回転対称性で検証できる
+Zeeman 項は完全偏極では形に依らないので束縛に寄与しない。差し引くと
+トーラス −1.5466 に対しシガー **−0.1279**（12 倍浅い）。理由は DDI 異方性:
+flux closure では `E_ddi = −ε_dd E_s` が形に依らず厳密だが、z 偏極では
+`E_ddi/E_s = −ε_dd f(κ)` で有限の形では必ず `f < 1`（実測 0.9973 vs 0.9589）。
+**論文の変分理論は flux closure 前提なのでシガー枝には適用できない。**
+別途ガウス+f(κ) で解くと N_c(偏極, ε_dd=1.3) = 17441 > 15000（上界）で、
+閾値ぎりぎりという eGPE の結果と整合する。
 
-`seed_torus(...; axis=)` を任意軸に一般化し、axis=y の基底状態を L-BFGS で
-収束させた。**B=0 では Hamiltonian が回転不変なので、z 軸基底状態と一致
-しなければならない** — これが一般化 seed のゲート:
+## Fig. 4 — Einstein–de Haas 回転
 
-```
-axis=y : E/N = −1.57556285   二次モーメント固有値 [0.10382, 0.69013, 0.69013]
-                             軸 = (0.0000, +1.0000, 0.0000)
-axis=z : E/N = −1.575563     二次モーメント固有値 [0.10382, 0.69013, 0.69013]
-```
+論文のプロトコル: 対称軸を **y** に向けた B=0 基底状態を用意し、
+B_z を t=0 で on にする。
 
-**エネルギー 8e-8 一致、形は 5 桁一致、軸だけが回っている。** grad_norm 1.1e-6。
-
-#### 磁場
-
-論文は F=1（安定限界 0.17 mG）に対し 0.05 / 0.1 mG を使う。F=6 のトーラスは
-50–70 µG で消えるので、限界に対する同じ割合は **15 / 30 µG**。論文の 0.1 mG を
-そのまま使えば物体が壊れるだけ。
-
-#### 結果（quench、n=64、cube box 6.5 a_ho、dt=5e-4、28.94 ms）
-
-| B_z | 回転角 | ⟨f_z⟩ 終値 | ⟨L_z⟩ 終値 | swing（両者共通） | corr(f_z,L_z) | max\|J_z\| | norm drift |
-|---|---|---|---|---|---|---|---|
-| 15 µG | **163.0°** | −0.07789 | +0.07750 | 0.11720 | **−0.999861** | 5.8e-4 | 1.9e-11 |
-| 30 µG | **325.6°** | −0.14699 | +0.14344 | 0.23450 | **−0.998260** | 3.9e-3 | 1.4e-11 |
-
-**J_z(0) = −1.9e-13**（y 軸トーラスは ⟨L_z⟩=⟨f_z⟩=0）。
-
-読み取れること:
-
-1. **スピン角運動量が軌道角運動量に変換されている。** ⟨f_z⟩ が負に振れ
-   （g_F>0・B_z>0 なので m=−F が Zeeman 基底状態）、⟨L_z⟩ が**同じ大きさだけ**
-   正に振れる。swing は両者で**同一の 5 桁**（0.11720 / 0.23450）。
-   corr(f_z, L_z) = −0.9999 / −0.9983。これが EdH。
-2. **雲は実際に z 軸まわりに回る。** 対称軸の方位角が 90° → 253° / 416°。
-   L_z > 0 と回転の向き（反時計回り）が整合。
-3. **磁場に対して線形。** 2 倍の磁場で移った角運動量がちょうど 2 倍
-   （0.11720 → 0.23450）、回転角も 2.00 倍（163.0° → 325.6°）。
-   これはトルク則 d⟨J⟩/dt = γ⟨f⟩×B の直接の帰結。
-4. **J_z 台帳。** B ‖ z なので H は z 軸回転で不変 ⇒ J_z は保存量。
-   実測 max|J_z| は交換された角運動量の 0.5 %（15 µG）/ 1.7 %（30 µG）。
-   **これは物理の結果ではなく計器のゲート**として報告する。
-   残差の出どころは dt ではない（下記）: **境界**が第一容疑。edge が
-   1.8e-4 → 7.1e-4（3.9 倍）になると max|J_z| は 5.8e-4 → 3.9e-3（6.7 倍）で、
-   周期箱の ⟨L_z⟩ leak（#336 が指摘した論点）と整合する。
-5. **「形を変えずに回る」は近似的にしか成り立たない。** ソート済み
-   モーメント固有値 e1 の振れは 15 µG で 5.1 %、30 µG で 19.1 %
-   — quench が呼吸モードを励起している。ρ_max は 0.6 % しか動かない。
-   論文はこの主張を定量化していないので、ここは追加情報。
-
-境界占有は 1.8e-4（15 µG）/ 7.1e-4（30 µG）で、静的セルの 1.2e-6 より大きい
-（cube 箱 + 呼吸）。エネルギーではなく角運動量比を見ているので致命的ではないが、
-静的セルと同じ厳しさは満たしていないことは明記する。
-
-#### dt 収束（積分器のゲート）
-
-DDI 平均場は積分器が壊れる典型的な場所（姉妹キャンペーンの ITP 事件）なので、
-dt を半分（2.5e-4）にしたアームを回し、**粗い方のサンプル時刻で**比較した:
-
-| 量 | max\|dt − dt/2\| | range に対して |
-|---|---|---|
-| f_z | 1.07e-6 | 0.0005 % |
-| L_z | 1.01e-6 | 0.0004 % |
-| 回転角 | 1.32e-5 deg | 0.0000 % |
-| J_z | 4.98e-7 | 0.0155 % |
-
-5.79 ms までの回転角は **65.312 deg** で両者一致（6 桁）。
-
-**逆向きに比較すると 4.3 % の「差」が出る** — 粗い側（0.29 ms 間隔）を
-振動する f_z に線形内挿するとそうなる。密にサンプルした側を内挿するのが正しい。
-自分の比較手続きが作った数字を物理と読みかけた例。
-
-**そして max|J_z| は dt でほぼ動かない**（3.074e-3 → 3.076e-3）。
-時間刻みの誤差ではないので、上記のとおり空間側（境界）に帰属する。
-
-#### 途中で見つけた欠陥 — 密度は正しいのにテクスチャが消える seed
-
-一般化 seed に教科書どおり Condon–Shortley の (−1)^{F−m} を入れたところ、
-**実現した磁化が (−n_x, −n_y, +n_z)**、つまり方位角が π ずれた。
-
-- **axis=z では隠れる**: θ≡π/2 なので全体が一様に反転するだけ、
-  循環の符号が変わる（B=0 では縮退）ので測っても「正常」に見える。
-- **axis=y では壊れる**: θ が位置依存なので面内成分だけ反転し、
-  **⟨f̂·φ̂⟩ が 0.000 に落ちる**。しかも**密度は完璧なトーラスのまま**、
-  固有値も軸も正しい。エネルギーすら −1.5755（正解 −1.5756）に来る。
-
-密度と軸だけ見ていたら通っていた。`a3_config_gate.jl` に
-**3 軸すべてで循環を測る**チェックを追加した。
-
----
-
-## 4. src への root fix
-
-config を patch するのではなく、**クラスを潰した**
-（`feedback_fix_the_class_not_the_instance`）。
-
-- `effective_a_s_over_a_ho(c_total, N)` — `c_total = 4π(a_s/a_ho)N` の逆
-- `effective_eps_dd(F, c_total, c_dd)` — `ε_dd = (F²/3)(c_dd/c_total)`
-  （F=0 は `compute_c_dd` が F で割らないので F→1 の代数）
-
-`_resolve_derived_params!` / `_resolve_lhy_block!` がこれを通すようになり、
-`c_total` を override した run では a_s・ε_dd・c_lhy が**すべて追従**する。
-verbose 行も override を明示する:
+**一般化 seed のゲートは回転不変性**: B=0 では H が z 軸回転で不変なので、
+axis=y の基底状態は axis=z のものと一致しなければならない。
 
 ```
-Derived: c_total=584.4 [OVERRIDE; natural 1406.2, a_s=45.71a₀ vs atom 110.0a₀]
-         c_dd=63.3 c_lhy=276.3 ε_dd=1.3
+axis=y : E/N = −1.57556285   固有値 [0.10382, 0.69013, 0.69013]  軸 = (0,+1,0)
+axis=z : E/N = −1.575563     固有値 [0.10382, 0.69013, 0.69013]  軸 = (0,0,+1)
 ```
 
-**影響範囲は測った。** `runs/` の 479 個の yaml のうち `c_total` を override
-するのは 13 個、そのうち scalar/quasi_2d LHY を明示 c_lhy なしで使うのは 7 個。
-6 個は `twa_*_pinned` で、**自然値に pin されている**ことを数値確認した
-（c_total は 9.4e-9、c_dd は 6.6e-6 の相対差 — 書かれたリテラルの丸め）。
-したがって挙動が変わるのは `runs/saito_li_torus/config.yaml` だけで、
-それは今まで間違っていたもの。
+エネルギー 8e-8 一致、形は 5 桁一致、軸だけが回っている。
 
-gate: `test/hamiltonian/test_effective_couplings_roundtrip.jl`（fast tier、94 assertion、1.3 s）。
-全 registry 原子で順逆が 1e-12 で一致すること、override が無視されないこと、
-そして「引数を無視する実装なら通ってしまう」ことを防ぐ陰性対照を含む。
+磁場は 15 / 30 µG（論文は F=1 の限界 0.17 mG に対し 0.05 / 0.1 mG。
+F=6 の限界は 50–70 µG なので同じ割合。論文の 0.1 mG では物体が壊れる）。
 
----
+| B_z | 回転角 | 移った角運動量 | corr(f_z,L_z) | max\|J_z\| | edge |
+|---|---|---|---|---|---|
+| 15 µG | **163.0°** | 0.11720 | **−0.999861** | 5.8e-4 | 1.8e-4 |
+| 30 µG | **325.6°** | 0.23450 | **−0.998260** | 3.9e-3 | 7.1e-4 |
 
-## 5. ファイル
+28.94 ms、n=64、cube box 6.5 a_ho、J_z(0) = −1.9e-13、norm drift ≤ 1.9e-11。
+
+1. ⟨f_z⟩ が負に、⟨L_z⟩ が**同じ大きさだけ**正に振れる（swing が 5 桁一致）。
+2. 対称軸の方位角が実際に z 軸まわりを回る（90° → 253° / 416°）。
+3. **磁場に厳密に線形** — 2 倍で移動量ちょうど 2 倍、回転角 2.00 倍。
+   トルク則 d⟨J⟩/dt = γ⟨f⟩×B の直接の帰結。
+4. 「形を変えずに回る」は近似的: モーメント固有値 e1 の振れは 5.1 %（15 µG）/
+   19.1 %（30 µG）。quench が呼吸モードを励起している。論文はこの主張を
+   定量化していない。
+
+### dt 収束と J_z 残差
+
+dt を半分にして**粗い側のサンプル時刻で**比較: f_z / L_z / 回転角の差は
+**≤ 1.3e-5**（5.79 ms までの回転角は 65.312° で一致）。
+逆向きに内挿すると 4.3 % の「差」が出るが、これは疎な側を振動信号に
+線形内挿した比較手続きの産物。
+
+**max|J_z| は dt でほぼ動かない**（3.074e-3 → 3.076e-3）ので、
+残差は時間積分ではない。edge が 3.9 倍で J_z 残差が 6.7 倍になることから、
+**周期箱の ⟨L_z⟩ leak** が第一容疑。帰属の確定は未了。
+
+### 一般化 seed で踏んだ罠
+
+教科書どおり Condon–Shortley の (−1)^{F−m} を入れると、この repo の
+`spin_matrices` 規約では磁化が (−n_x, −n_y, +n_z) になる（方位角が π ずれ）。
+
+- **axis=z では隠れる**: θ≡π/2 なので一様反転 = 縮退した逆キラリティ。
+- **axis=y では ⟨f̂·φ̂⟩ が 0.000 に落ちる。しかも密度は完璧なトーラスのまま、
+  固有値も軸も正しく、エネルギーすら 1e-5 で正解に来る。**
+
+`h2_seed_texture_gate.jl` が **3 軸すべてで循環を測る**。
+
+## 追加ファイル
 
 | file | 内容 | GPU |
 |---|---|---|
-| `config.yaml` | 修正後の宣言的 config（全数値の由来をヘッダに記載） | — |
-| `a1_units_audit.jl` | ε_dd 二重計上と LHY 3.52 倍の算術 | 不要 |
-| `a2_variational_target.jl` | 変分予言 + 2実装クロスチェック + Fig 2(b) 陽性対照 | 不要 |
-| `a3_config_gate.jl` | config が主張どおりか（seed テクスチャを実測） | 不要 |
-| `b_cells.jl` | eGPE セル（1プロトコル）+ 全 observable + 箱ゲート | 必要 |
-| `c_figures.jl` / `c_plot.py` | Fig 1(d) / Fig 2(a) の CSV と描画 | 不要 |
-| `d_shape.jl` | 二次モーメント固有値でトーラス/シガーを回転不変に判定 | 不要 |
-| `e_ladder_plot.py` | 磁場ラダー図（log を parse、箱ゲート落ちは白抜き） | 不要 |
-| `f_edh.jl` | Einstein–de Haas: axis=y の GS → B_z quench → J_z 台帳 | 必要 |
-| `g_edh_plot.py` | Fig. 4 相当（角運動量台帳 + 回転角） | 不要 |
-| `run_edh2.sh` | EdH 3 アーム（15/30 µG + dt 収束） | 必要 |
-| `run_baseline.sh` | baseline + 格子/箱 収束アーム | 必要 |
-| `run_conv_and_bistability.sh` | 粗い格子（陽性対照）+ B=0 双安定 | 必要 |
-| `run_field_ladder.sh` / `run_bistability_v2.sh` | 磁場ラダー、長い箱で再試行 + トーラス上部臨界 | 必要 |
-| `run_cigar_boxscan.sh` / `run_crossing.sh` / `run_crossing2.sh` | 偏極枝の箱スキャンと交差の直接確認 | 必要 |
-
-図: `out/fig1d_*.png`（Fig 1(d) 相当）、`out/fig2a.png`（Fig 2(a) 相当）、
-`out/conv.png`（収束）、`out/fig3_ladder.png`（Fig 3 相当）、`out/fig4_edh.png`（Fig 4 相当）。
-
-再現:
+| `h1_variational_cross_check.jl` | 変分 2 実装の突き合わせ + Fig. 2(b) 陽性対照 | 不要 |
+| `h2_seed_texture_gate.jl` | 係数・箱・solver・seed テクスチャ（3 軸）のゲート | 不要 |
+| `h3_cells.jl` | eGPE セル（1 プロトコル）+ observable + 箱ゲート | 必要 |
+| `h4_shape.jl` | 二次モーメント固有値で torus/cigar を回転不変に判定 | 不要 |
+| `h5_ladder_plot.py` | Fig. 3 相当（`out/fig3_ladder.png`） | 不要 |
+| `h6_edh.jl` | axis=y GS → B_z quench → J_z 台帳 | 必要 |
+| `h7_edh_plot.py` | Fig. 4 相当（`out/fig4_edh.png`） | 不要 |
+| `run_field_ladder.sh` `run_bistability_v2.sh` `run_cigar_boxscan.sh` `run_crossing{,2}.sh` `run_edh2.sh` | 各アーム | 必要 |
 
 ```bash
-# GPU 不要（数秒〜1分）
-julia --project=. runs/saito_li_torus/a1_units_audit.jl
-julia --project=. runs/saito_li_torus/a2_variational_target.jl
-julia --project=. runs/saito_li_torus/a3_config_gate.jl
-julia --project=. -e 'using SpinorBEC; include("test/hamiltonian/test_effective_couplings_roundtrip.jl")'
-
-# GPU（WSL2 では LD_LIBRARY_PATH が必要）
-bash runs/saito_li_torus/run_baseline.sh              # baseline 82 s + 収束アーム
-bash runs/saito_li_torus/run_conv_and_bistability.sh
+julia --project=. runs/saito_li_torus/h1_variational_cross_check.jl   # 0.088 % 一致
+julia --project=. runs/saito_li_torus/h2_seed_texture_gate.jl         # ALL CHECKS PASS
 bash runs/saito_li_torus/run_field_ladder.sh
-bash runs/saito_li_torus/run_crossing.sh
-julia --project=. runs/saito_li_torus/c_figures.jl
-julia --project=. runs/saito_li_torus/d_shape.jl
-python3 runs/saito_li_torus/c_plot.py
-python3 runs/saito_li_torus/e_ladder_plot.py
+bash runs/saito_li_torus/run_crossing.sh && bash runs/saito_li_torus/run_crossing2.sh
+bash runs/saito_li_torus/run_edh2.sh
+julia --project=. runs/saito_li_torus/h4_shape.jl
+python3 runs/saito_li_torus/h5_ladder_plot.py
+python3 runs/saito_li_torus/h7_edh_plot.py
 ```
 
-`out/*.jld2` は gitignore（55–330 MB/セル）。各 jld2 は producing `git_hash`
-を記録する。全 eGPE 結果は commit `b2d746cc`。
+## この続きでやっていないこと
 
----
-
-## 6. やっていないこと
-
-- **論文 Fig. 5 の supersolid**（surfboard トラップ、F=1, N=4×10⁵）— #336 の
-  スコープ外（issue が挙げていない）。
-- EdH の J_z 残差（交換量の 0.5–1.7 %）の**確定した帰属**。dt 非依存であること
-  までは示した（⇒ 時間積分ではない）が、箱を広げて edge を静的セル並みの
-  1e-6 に落として消えるかは未確認。それが決め手になる 1 本。
-- **F=1 セル**（Fig. 1(a)–(c), Fig. 2(a) の青線, Fig. 3 全体）の直接再現。
-  変分側では 2 実装が 0.02 % で一致し Fig. S1 を再現しているが、eGPE は
-  F=6 セルしか回していない。
-- トーラス上部臨界磁場の絞り込みは (50, 70) µG まで。
-- `polar_two_channel` / `polar_dipolar` 姉妹 run（config ヘッダが将来の作業
-  として挙げていたもの）。§3.2 のとおり scalar Q5 が論文の Eq. (1) と代数的に
-  同一なので、これは「論文の再現」ではなく「論文のモデルを超える」作業。
+- EdH の J_z 残差（交換量の 0.5–1.7 %）の帰属確定。dt 非依存までは示した。
+- 論文 Fig. 5 の supersolid（surfboard トラップ、F=1, N=4×10⁵）。
