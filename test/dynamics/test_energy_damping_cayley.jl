@@ -109,7 +109,12 @@ using SpinorBEC
         # level, where monotonicity is not available to assert.
         l = [loss_rate(; dt=0.02, iters=i) for i in (1, 2, 3)]
         @info "loss vs Picard sweeps" one=l[1] two=l[2] three=l[3]
-        @test all(x -> abs(x) < 1e-4, l)
+        # ONE sweep is not the midpoint form at all: psi + P{phi (psi+psi)/2} is
+        # psi + P{phi psi}, the EXPLICIT increment, and it does not conserve — measured
+        # -1.38e-3 against -2.6e-7 for two sweeps. Asserting a small residual for all
+        # three would have hidden that, so state it instead.
+        @test abs(l[1]) > 100 * abs(l[2])
+        @test all(x -> abs(x) < 1e-5, l[2:3])
         @test abs(l[3] - l[2]) <= abs(l[2] - l[1]) + 1e-9
     end
 end
