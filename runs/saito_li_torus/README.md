@@ -184,6 +184,22 @@ places and right in the ratio those two places determine.
   `ℓ − n·round(ℓ/n)`, a clean and plausible wrong integer.
   Gated by `test/analysis/test_component_phase_winding.jl` (fast tier).
 
+## Reproducing
+
+Run-output directories are not tracked in this repo (no content-addressed run
+dir is), so the `runs/torus_n96_box6_<hash>/` names quoted above do not resolve
+from a fresh checkout. What IS tracked is `cells/`, and `run_yaml` keys the
+output directory on the raw bytes of the config — so the same file reproduces
+the same directory name:
+
+```bash
+julia --project=. runs/saito_li_torus/g5_make_cells.jl        # regenerate cells from config.yaml
+julia --project=. -e 'import CUDA; using SpinorBEC; run_yaml("runs/saito_li_torus/cells/torus_n96_box6.yaml")'
+julia --project=. runs/saito_li_torus/g6_measure.jl runs/torus_n96_box6_3014e1e20ffcd4d9
+```
+
+Start with `smoke.yaml` (32³, ~1 min) before anything larger.
+
 ## Files
 
 | file | what |
