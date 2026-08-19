@@ -479,8 +479,11 @@ $f = 0.5210$ cell's chemical potential then held to a common 4000 ms.
 | 5 | 400 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
 | 5 | 1300 | 7 | 0 | **7** | 0 | 0.000 | [0.000, 0.354] |
 | 5 | 4000 | 7 | 0 | 0 | 7 | 0.000 | [0.000, 0.354] |
-| 10 | 400 | 7 | **7** | 0 | 0 | **1.000** | [0.646, 1.000] |
+| 10 | 400 | 10 | **10** | 0 | 0 | **1.000** | [0.722, 1.000] |
 | 10 | 1300 | 1 | **1** | 0 | 0 | 1.000 | [0.207, 1.000] |
+| 10 | 4000 | 4 | **4** | 0 | 0 | **1.000** | [0.510, 1.000] |
+
+![selection against ramp rate, at two reservoir temperatures](figures/eu334_selection.png)
 
 **At $T = 10$ every trajectory ends on the flower branch; at $T = 5$ none does.**
 The margins are not marginal:
@@ -544,35 +547,59 @@ each arm stopped. What this cannot say is whether 0.65 against 0.39 is enough to
 change the *basin*, because that question is answered by relaxing, and the
 relaxations exist only at the endpoints.
 
-**The closing measurement**, running: $T = 10$ carried only to $f = 0.4250$ — the
-$T = 5$ arms' own endpoint fraction — so temperature is the single difference
-between two verdicts. It is done from this side rather than by pushing $T = 5$ up
-to $f = 0.60$ because a reservoir at $\mu = 11.72$ *equilibrates* near
-$f \approx 0.52$: a longer hold at $T = 5$ asymptotes there and never reaches 0.60,
-which is a design error in the first version of this arm and is why it was
-replaced.
+**The closing measurement.** $T = 10$ carried to the reservoir µ of the
+$f = 0.4250$ cell instead of the $f = 0.5210$ one, so it stops near the $T = 5$
+arms' own endpoint rather than well past it. `figs/eu334/nucleate_k1.8_T10.0_matched`,
+6 seeds:
+
+| arm | $f$ at the end | $\langle F_\perp\rangle$ raw → relaxed | $E-E_{\rm flower}$ | $E-E_{\rm polar}$ | sep | verdict |
+|---|---:|---:|---:|---:|---:|---|
+| $T = 5$, $\tau = 400$ | 0.442 | 0.40 → 0.099 | $+2.4\times10^{-2}$ | $+9.3\times10^{-4}$ | $2.3\times10^{-2}$ | polarised |
+| **$T = 10$, matched** | **0.510** | 1.50 → **4.396** | $+3.7\times10^{-3}$ | $\mathbf{-3.4\times10^{-2}}$ | $3.8\times10^{-2}$ | **flower, 6/6** |
+
+At $f = 0.51$ against the $T = 5$ arms' 0.44 — a gap of 0.07 rather than the 0.16
+of the production cells — the hotter arm is still **6/6 flower** and the colder one
+**0/7**. The relaxed order parameter is 4.396 against a branch reference of 4.397
+at that $f$: it is *on* the branch, not near it.
+
+The residual gap in $f$ is not zero and cannot be made zero by this construction,
+because $f$ here is the **C-region population** and at $T = 10$ part of it is
+thermal: the same reservoir µ therefore gives a larger $N_C$ at the higher
+temperature. Two things bound the consequence. The 0.07 remaining is 44 % of the
+original 0.16, and the verdict did not move. And the branches at $f = 0.51$ are
+$3.8\times10^{-2}$ apart — 16× the $2.3\times10^{-2}$ at $f = 0.44$ is not the
+story, since the $T = 5$ arm sits on the *polarised* side of a separation of the
+same order.
+
+*(It is done from this side rather than by pushing $T = 5$ up to $f = 0.60$ because
+a reservoir at $\mu = 11.72$ equilibrates near $f \approx 0.52$: a longer hold at
+$T = 5$ asymptotes there and never reaches 0.60. That was the first version of this
+arm, and it is recorded because a design that cannot reach its own target produces
+a null that looks like an answer.)*
 
 **What is not in doubt** is that the flower texture is reachable by growth at fixed
-field — 8 trajectories out of 8 reached it — which is the thing three protocol
-classes of transport could not do. #334's question was "does a realistic cooling
-trajectory select it, or does it get caught on the polarised branch", and on this
-evidence the answer is **it selects it, above a threshold in reservoir
-temperature**.
+field — 21 trajectories out of 21 across four arms reached it — which is the thing
+three protocol classes of transport could not do. #334's question was "does a
+realistic cooling trajectory select it, or does it get caught on the polarised
+branch", and on this evidence the answer is **it selects it, above a threshold in
+reservoir temperature**.
 
-**Budget.** Cells are $n = 7$ rather than the pre-registered $n \ge 20$: the group
-allocation was exhausted at 29 trajectories and the campaign was re-sized to what
-remained. The counts are quoted with their own $n$ and Wilson intervals, per
-criterion 5, rather than as fractions of a design that did not run.
+**Budget.** Cells are $n = 7$–10 rather than the pre-registered $n \ge 20$: the
+group allocation was exhausted twice and the campaign was re-sized to what
+remained each time. The counts are quoted with their own $n$ and Wilson intervals,
+per criterion 5, rather than as fractions of a design that did not run.
 
 ## 6. The answer to #334
 
 **The weak-field ¹⁵¹Eu flower texture can be nucleated in place, and reservoir
 temperature is the switch.** Growing a condensate at fixed $(\kappa = 1.8,
-B = 20\ \mu\text{G})$ under the growth SPGPE, 8 trajectories out of 8 end on the
-flower branch at $T = 10\ \hbar\omega_{\rm ref}$, and 0 out of 21 do at $T = 5$,
-across a factor-10 span of ramp rate at each. That is the question #334 posed, and
-it is the opposite of the outcome the transport campaigns made likely: three
-protocol classes could not *carry* the state there, and growth *does* reach it.
+B = 20\ \mu\text{G})$ under the growth SPGPE, **15 trajectories out of 15** end on
+the flower branch at $T = 10\ \hbar\omega_{\rm ref}$ and **0 out of 21** do at
+$T = 5$, across a factor-10 span of ramp rate at each: Wilson bounds $p > 0.80$ and
+$p < 0.155$, which do not overlap. Ramp rate moves nothing over that span;
+temperature moves everything. That is the question #334 posed, and the answer is
+the opposite of what the transport campaigns made likely — three protocol classes
+could not *carry* the state there, and growth *does* reach it.
 
 Three things had to be established before that sentence meant anything, and each
 is a result in its own right.
@@ -597,13 +624,17 @@ must give 2 levels. That is a knob every evaporation sequence already has.
 
 ### What is not settled
 
-- **Temperature and final condensate fraction moved together** ($\gamma \propto T$).
-  Half of it is closed by the trajectories at matched $f$ (§5.10: 1.6× the
-  transverse spin at the same $f$); the basin question is closed by the $T = 10$
-  arm carried only to $f = 0.425$, which is running.
-- **$n = 7$ per cell**, not the pre-registered 20: the allocation ran out. The
-  $T = 10$ result is $8/8$ with a 95 % lower bound of 0.65, which is a strong
-  statement about a large effect and not a precise one about its size.
+- ~~Temperature and final condensate fraction moved together~~ — **closed** (§5.10).
+  At matched $f$ the hotter field carries 1.6× the transverse spin, and the
+  $T = 10$ arm stopped at $f = 0.51$ against the $T = 5$ arms' 0.44 is still 6/6
+  flower. A residual 0.07 in $f$ remains and cannot be removed by construction —
+  $f$ is the C-region population and part of it is thermal at $T = 10$ — but it is
+  44 % of the original gap and the verdict did not move.
+- **$n = 7$–10 per cell**, not the pre-registered 20: the group allocation ran out
+  twice and the campaign was re-sized to what remained. The $T = 10$ effect is
+  15/15 pooled across three rates (lower bound 0.80); the $T = 5$ null is 0/21
+  pooled (upper bound 0.155). Both are strong statements about a large effect and
+  neither is a precise one about its size.
 - ~~The relaxations at $T = 10$ stopped at `max_steps`~~ — **closed.**
   `residual_polish` takes $|\nabla E|$ to $8\times10^{-6}$, three orders down and at
   the library gate, and every label is unchanged (§5.9).

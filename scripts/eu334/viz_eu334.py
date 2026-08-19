@@ -157,17 +157,34 @@ def assign(E: float, f: float, a, b) -> str:
 
 
 def collect_selection(root: Path, a, b,
-                      glob: str = "nucleate_k1.8_T*/class/class_*.csv"):
-    """(T, tau_ms) -> [n_flower, n_polar, n_excited, n_unread]."""
-    cells: dict[tuple[float, float], list[int]] = {}
+                      glob: str = "nucleate_k1.8_T*/class*/class_*.csv"):
+    """(T, tau_ms) -> [n_flower, n_polar, n_excited, n_unread].
+
+    Where an endpoint has both a plain and a `class_resid` classification, the
+    residual-polished one WINS: it is the same state relaxed to |grad E| ~ 8e-6
+    instead of stopping at max_steps, so its energy is a measurement rather than a
+    bound. Keyed on (arm, file) so the two never both count.
+    """
+    best: dict[tuple[str, str], tuple] = {}
     for p in sorted(root.glob(glob)):
         t = read_tsv(p)
         if not t.get("E", np.array([])).size:
             continue
-        key = (float(t["T"][0]), float(t["tau_ms"][0]))
-        c = cells.setdefault(key, [0, 0, 0, 0])
-        lab = assign(float(t["E"][0]), float(t["f"][0]), a, b)
-        c[{"flower": 0, "polarised": 1, "excited": 2}.get(lab, 3)] += 1
+        arm = p.relative_to(root).parts[0]
+        # `_matched` and `_long` share (T, tau) with a production cell but carry a
+        # DIFFERENT µ target, so they are different measurements. Folding them in
+        # would silently pool two designs under one row.
+        if arm.endswith("_matched") or arm.endswith("_long"):
+            continue
+        key = (arm, str(t["file"][0]))
+        rec = (float(t["T"][0]), float(t["tau_ms"][0]),
+               float(t["E"][0]), float(t["f"][0]))
+        if key not in best or "class_resid" in p.parts:
+            best[key] = rec
+    cells: dict[tuple[float, float], list[int]] = {}
+    for (T, tau, E, f) in best.values():
+        c = cells.setdefault((T, tau), [0, 0, 0, 0])
+        c[{"flower": 0, "polarised": 1, "excited": 2}.get(assign(E, f, a, b), 3)] += 1
     return cells
 
 
@@ -212,17 +229,23 @@ def panel_selection(ax, cells):
         ax.errorbar(xs, ps, yerr=[np.array(ps) - los, np.array(his) - np.array(ps)],
                     fmt="o-", ms=5, capsize=3, color=CAT[i],
                     label=rf"$T$ = {T:g} ($n$ = {min(ns)}–{max(ns)})")
-        for x, p, hi, n in zip(xs, ps, his, ns):
+        # Annotate the SATURATED cells with their count and one-sided limit —
+        # "0/7, <0.35" and "7/7, >0.65" carry what the error bar alone cannot,
+        # since a bar touching 0 or 1 is a bound and not a measurement.
+        for x, p, lo, hi, n in zip(xs, ps, los, his, ns):
             if p == 0.0:
-                ax.annotate(f"0/{n}\n<{hi:.2f}", xy=(x, 0), xytext=(x, 0.06),
-                            ha="center", fontsize=8, color=INK2)
+                ax.annotate(f"0/{n}\n<{hi:.2f}", xy=(x, 0), xytext=(x, 0.09),
+                            ha="center", va="bottom", fontsize=8, color=CAT[i])
+            elif p == 1.0:
+                ax.annotate(f"{n}/{n}\n>{lo:.2f}", xy=(x, 1), xytext=(x, 0.91),
+                            ha="center", va="top", fontsize=8, color=CAT[i])
     ax.set_xscale("log")
-    ax.set_ylim(-0.05, 1.05)
+    ax.set_ylim(-0.08, 1.08)
     ax.set_xlabel("µ-ramp time τ [ms]  (traversal of the selection window)")
     ax.set_ylabel("flower selection fraction")
-    ax.set_title("Does a cooling trajectory choose the ground-state texture?",
+    ax.set_title("Reservoir temperature, not ramp rate, decides the texture",
                  loc="left")
-    ax.legend(loc="upper left")
+    ax.legend(loc="center left")
     ax.grid(True, alpha=0.6)
 
 
