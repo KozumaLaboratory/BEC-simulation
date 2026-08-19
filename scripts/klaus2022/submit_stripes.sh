@@ -22,6 +22,13 @@
 # of them rather than the ensemble, and each writes its OWN results file —
 # concurrent jobs sharing one JSON is a read-modify-write race that would
 # silently keep whichever finished last.
+#
+# THE RESOURCE CLASS IS NOT OVERRIDABLE FROM THE COMMAND LINE. Adding
+# `-l cpu_4=1` to the qsub alongside the `#$ -l cpu_16=1` below is REJECTED
+# outright — "Job is rejected because of multiple specifying of gpu_? and cpu_?
+# parameters at one time" — so trying a smaller class to get scheduled sooner
+# means editing this line, not passing a flag. `h_rt` overrides fine, which is
+# what makes the smoke usable.
 #$ -cwd
 #$ -l cpu_16=1
 #$ -l h_rt=8:00:00
