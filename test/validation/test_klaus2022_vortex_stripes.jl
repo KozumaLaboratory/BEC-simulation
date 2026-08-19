@@ -130,7 +130,16 @@ const RESULTS_JSON = normpath(
         end
 
         ramp = all_res["ar-ramp"]
-        @test ramp["published"]["omega_c_over_perp"] == 0.74
+        # The stored record's published block against the REGISTRY, not against
+        # a literal retyped here. This is what ties a run made before
+        # `refs/klaus2022.toml` existed to the registry that now owns those
+        # numbers — without re-running it.
+        @test ramp["published"]["omega_c_over_perp"] ==
+            ref(:klaus2022, :omega_c_over_omega_perp).value
+        @test ramp["published"]["ar_magnetostricted"] ==
+            ref(:klaus2022, :ar_magnetostricted).value
+        @test all_res["stripes"]["published"]["n_stripes"] ==
+            ref(:klaus2022, :n_vortex_stripes).value
         # The location of the AR MAXIMUM is what Klaus's Ω_c marks ("suddenly,
         # at Ω_c ≈ 0.74 ω_⊥, the AR abruptly collapses"). Recomputed here from
         # the stored series rather than read from a summary field, so the gate

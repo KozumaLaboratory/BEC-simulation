@@ -31,10 +31,20 @@ const RESULTS = joinpath(ROOT, "docs", "validation", "klaus2022_results.json")
 
 # --- Published values and the pre-registered verdict thresholds (§6) ---
 
+# The published numbers come from `refs/klaus2022.toml` via `ref`, NOT from
+# literals here. They were literals here until 2026-08-19, which is exactly the
+# hand-typed authority `refs/` exists to prevent: a number retyped into a script
+# has no locus, no schema and nothing that refuses it.
+#
+# Note what `ref` will NOT let this script do: every Klaus row is `read_off`
+# (they ship no re-measurable record), so `arbitrates` is false for all of them
+# and `Claim(:C, target=…)` is unconstructible. The comparison below is
+# therefore a documented reproduction, not a type-C claim — and the registry is
+# what makes that distinction checkable instead of a matter of wording.
 const PUBLISHED = (
-    omega_c_over_perp=0.74,      # Fig. 1c
-    ar_magnetostricted=1.03,     # Methods A.4
-    n_stripes=3,                 # Fig. 4b2
+    omega_c_over_perp=ref(:klaus2022, :omega_c_over_omega_perp).value,
+    ar_magnetostricted=ref(:klaus2022, :ar_magnetostricted).value,
+    n_stripes=ref(:klaus2022, :n_vortex_stripes).value,
 )
 
 const ACCEPT = (

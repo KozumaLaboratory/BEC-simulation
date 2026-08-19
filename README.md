@@ -23,7 +23,7 @@ driven entirely from YAML.
   direction $\hat B(t)$ varies on a timescale comparable to the Larmor
   precession, the standard spinor split-step blows up unless $\Delta t$ is
   pushed to absurd values. The `kind: rotating_basis` path co-rotates with
-  $\hat B(t)$ and absorbs the Larmor phase analytically, so Klaus-2022-style
+  $\hat B(t)$ and absorbs the Larmor phase analytically, so Klaus-et-al.-2022-style
   protocols just work.
 - **YAML in, results out.** A run is one YAML file: `pipeline:` (ground
   state → dynamics → analysis), `scan:` for sweeps, optional
@@ -107,7 +107,7 @@ Strang/Yoshida integrators.
 
 ```
 src/    Solvers, Hamiltonian terms, workflow, analysis
-runs/   YAML configs (Klaus magnetostir, Einstein–de Haas, phase diagrams, …)
+runs/   YAML configs (magnetostir, Einstein–de Haas, phase diagrams, …)
 docs/   guides/ reference/ conventions/ design/ validation/ theory/ … (see docs/index.md)
 test/   Tiered suite (fast / ci / oracles / integration / full / physics)
 dashboard/  React + WebGPU dashboard frontend

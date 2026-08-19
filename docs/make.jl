@@ -14,7 +14,7 @@ makedocs(
         "Guides" => [
             "Lab user tutorial" => "guides/lab_user_tutorial.md",
             "Pipeline cookbook" => "guides/pipeline_cookbook.md",
-            "Klaus / fast-Larmor regime" => "guides/klaus_regime.md",
+            "Fast-Larmor regime" => "guides/fast_larmor_regime.md",
             "Performance tuning" => "guides/performance_tuning.md",
             "Migration guide" => "guides/migration_guide.md",
             "TSUBAME (dev + scaling)" => "guides/tsubame.md",
@@ -23,6 +23,7 @@ makedocs(
             "Architecture" => "reference/architecture.md",
             "YAML schema" => "reference/yaml_schema_reference.md",
             "Dynamics block" => "reference/dynamics.md",
+            "Which \"Klaus\" is meant" => "conventions/klaus_name_disambiguation.md",
             "API" => "api/index.md",
         ],
         "Design notes" => [

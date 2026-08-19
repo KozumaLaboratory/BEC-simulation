@@ -204,11 +204,11 @@ arrest, at severe atom-loss cost
 
 ## Slide 6 — Next
 
-**Title:** Klaus/Barnett parameter window + long-time LHY stability
+**Title:** Rotation-assisted-EdH / Barnett parameter window + long-time LHY stability
 
 **Two parallel investigations launched this session:**
 
-### Klaus rotation protocol — experimental recommendation (post 2026-05-26 evening pivot)
+### Rotation-assisted EdH quench — experimental recommendation (post 2026-05-26 evening pivot)
 
 **Headline (slide-ready):**
 
@@ -218,7 +218,7 @@ arrest, at severe atom-loss cost
 > rotation-assisted EdH spin excitation in the weak-field regime —
 > NOT an equilibrium Barnett effect.
 
-**Klaus 2-phase quench scan, 17 cells (`runs/klaus_quench/`):**
+**Rotation-assisted EdH quench scan, 17 cells (`runs/klaus_quench/`):**
 
 | protocol                           | P_{-5,-4} | P_exc  |
 |------------------------------------|-----------|--------|
@@ -306,7 +306,7 @@ the "lossless stable arrest" wording is downgraded to "metastable in
 
 - Loss-on Matsui variant (~40% atom loss at 40 ms experiment match)
 - Spinor contact rotation (Ω vs F_z, L_z, J_z under DDI off/on)
-- Klaus protocol with full parameter sweep
+- Rotation-assisted EdH quench with full parameter sweep
 
 **Stop chasing:**
 
