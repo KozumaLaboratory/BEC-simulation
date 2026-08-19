@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────────────
+#  #337 criterion B — how far does the Eu F=6 phase boundary move when LHY
+#  is left out?
+#
+#  OBSERVABLE. The boundary is where ΔE(B) = E(stretched) − E(polar) crosses
+#  zero. ΔE has a large LHY-INDEPENDENT slope, because the stretched branch
+#  sits at m = −F and gains 6p while the polar branch is flat in p:
+#
+#      |∂ΔE/∂B| = 6·|dp/dB| = 6 × 0.651 / 44 µG = 0.0888 per µG
+#
+#  so a shift δ(ΔE) in the gap converts to δB = δ(ΔE)/0.0888 µG. That is the
+#  whole measurement: every arm reports its own B_c and the differences are
+#  read in µG directly.
+#
+#  SENSITIVITY BEFORE LAUNCH (CLAUDE.md gate 2), from config_smoke.yaml at
+#  B = 44 µG — MEASURED, not modelled, so the launch is not resting on my
+#  arithmetic. Energy shift relative to the `none` arm of the same seed:
+#
+#      stretched  none 6.9436 | fm_dipolar +0.3125 | scalar +0.3057 | spatial +0.3164
+#      polar      none 8.7227 | polar_contact +0.0727 | fm_dipolar +0.3649 | spatial +0.1069
+#
+#  Three things follow. (i) Every arm moves the energy, so none of them is
+#  silently inert — the failure that made a 40-point A/B read as "LHY does not
+#  matter" in 2026-07. (ii) `scalar` and `fm_dipolar` agree to 0.007 on the same
+#  seed, as the algebra says they must. (iii) The polar branch's LHY energy
+#  differs by 5× between the two schemes, which is the 3.9× ε(FM)/ε(polar) ratio
+#  showing up in an actual solve.
+#
+#  Converting with 0.0888/µG: one functional for both branches predicts a
+#  ~0.6 µG shift, each-branch-in-its-own-ansatz ~2.7 µG, and the control (×30 in
+#  the smoke, ×10 here) ~10 µG. Against a 5 µG B step near the crossing all
+#  three are resolvable and the control unmistakably so.
+#
+#  REJECTION CRITERION, written before launch. If B_c(fm_dipolar) − B_c(none)
+#  is under 0.5 µG while the ×10 control moves ≥ 5 µG, the mean-field boundary
+#  is defensible at the ≤ 0.5 µG level and the answer to #337-B is "LHY does not
+#  move this boundary". If the control does NOT move, the instrument is blind
+#  and NO verdict may be read off the physics arms.
+#
+#  Geometry/knobs copied from config_texture_bscan.yaml; solver settings from
+#  config_c1_precise_kappa_B0.yaml (the campaign's own precision-boundary
+#  recipe). The arms differ from the campaign in the `lhy` block and nothing
+#  else.
+#
+#  9 B × 9 comparison runs = 81 solves, submitted as 9 array tasks.
+#
+#  RE-RUN 2026-08-19 against the corrected homogeneous BdG (`7e6770c2`, #361/#367):
+#  `_bdg_ddi_matrices` had built its normal block from the Hartree term, which is
+#  zero for a uniform condensate. It was 2x too large on a polarised state and
+#  IDENTICALLY ZERO on a polar one. Every `full_bdg`- and `spatial`-derived number
+#  in the first pass of this campaign came from that code. This comment changes
+#  the config bytes, hence the content-addressed run directory, so the whole scan
+#  recomputes rather than mixing pre- and post-fix cells -- a dataset that is half
+#  one and half the other is not a dataset.
+# ─────────────────────────────────────────────────────────────────────
+units: {B: Gauss}
+defaults: {kind: spinor, backend: gpu}
+dealias: {enabled: true, k_cut: 5.0, auto_dt: true, dt_safety: 10.0}
+pipeline:
+  - ground_state:
+      atom: Eu151
+      interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0277777778}
+      grid: {n: [32, 32, 64], box: [12.0, 12.0, 24.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
+      method: lbfgs
+      m_lbfgs: 20
+      newton_polish: true
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      B: {Bz: "0.0 Gauss", theta: 0.0, phi: 0.0}
+      n_steps: 2500
+      tol: 1.0e-9
+  - analyze:
+      - phase_classify_distance: {}
+      - energy_decomposition: {}
+scan:
+  product:
+    pipeline.0.B.Bz:
+      - "0.0 Gauss"
+      - "5.0e-6 Gauss"
+      - "1.0e-5 Gauss"
+      - "1.5e-5 Gauss"
+      - "2.0e-5 Gauss"
+      - "3.0e-5 Gauss"
+      - "4.0e-5 Gauss"
+      - "5.5e-5 Gauss"
+      - "7.0e-5 Gauss"
+  comparison_runs:
+    # baseline — reproduces the campaign
+    - {name: fm_none,      override: {pipeline.0.initial_state: m_plus_F}}
+    - {name: polar_none,   override: {pipeline.0.initial_state: polar}}
+    # the literature scheme: ONE fully-polarised dipolar functional for both
+    # branches (Saito group, arXiv:2402.18885). Identical to the SI-anchored
+    # scalar × Q5 by algebra — gated to 6.6e-16 in bench/lhy_boundary_smoke.jl.
+    - {name: fm_fmdip,     override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: fm_dipolar}}}
+    - {name: polar_fmdip,  override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: fm_dipolar}}}
+    # the alternative: each branch in its OWN ansatz. Pairs with fm_fmdip.
+    - {name: polar_polcon, override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: polar_contact}}}
+    # texture-following — criterion C. n_points bounds the full_bdg fallback
+    # cost when the cloud is too uniform for a spatial table to be worth it.
+    - {name: fm_spatial,   override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: spatial, n_points: 40}}}
+    - {name: polar_spatial, override: {pipeline.0.initial_state: polar,   pipeline.0.lhy: {kind: spatial, n_points: 40}}}
+    # POSITIVE CONTROL — the same functional at 10× amplitude. If this does not
+    # move B_c, nothing measured by the arms above means anything.
+    - {name: fm_ctrl10,    override: {pipeline.0.initial_state: m_plus_F, pipeline.0.lhy: {kind: scalar, c_lhy: 59188.0}}}
+    - {name: polar_ctrl10, override: {pipeline.0.initial_state: polar,    pipeline.0.lhy: {kind: scalar, c_lhy: 59188.0}}}

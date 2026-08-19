@@ -432,6 +432,11 @@ const CI_EXTRA = [
     # classify_spinor_phase on 32³ state_zoo imprints (the threshold-setting
     # run, pinned). 17 imprints + fingerprints — ci rather than fast.
     "analysis/test_spinor_phase_classifier.jl",
+    # ¹⁵¹Eu ↔ ¹⁵³Eu: the isotope is exactly three numbers (c_total, c_dd, q), the
+    # q ratio is exact from measured hyperfine constants, and the |m| ≥ 2 magnons
+    # of the polar state carry no interaction shift. #341 stage 1's deliverable
+    # rests on all three. Builds workspaces + a BdG spectrum — ci, not fast.
+    "analysis/test_isotope_q_map.jl",
     "validation/test_dipolar_supersolid_tube.jl",
     # `refs/klaus2022.toml` + `ref`: the second source in the registry, and the
     # refusal that follows from it — a paper with no re-measurable record has
@@ -576,6 +581,10 @@ const CI_EXTRA = [
     # of the exchange term, so it was 2x on a polarized state and identically
     # zero on a polar one (#361).
     "oracles/test_dipolar_bogoliubov_anchor.jl",
+    # The other half of `test_magnetization_conservation_rtp.jl`: imaginary time
+    # is not unitary, so it leaves the magnetization sector — which is why an
+    # adiabatic ramp need not reach the ITP ground state (#22, #335, #334).
+    "oracles/test_itp_does_not_conserve_magnetization.jl",
     # What the six unmeasured Eu scattering channels CANNOT move: the stretched
     # pair |−F,−F⟩ and its first magnon are pure S = 2F, so a `c1_ratio` sweep at
     # fixed c_total leaves them exact. Each invariance carries a control that
@@ -657,6 +666,12 @@ const CI_EXTRA = [
     # Magnitude sibling of the above: the closed forms had a consistency oracle
     # and no SI anchor, and were exactly N_atoms too large in that gap.
     "oracles/test_lhy_magnitude_si_anchor.jl",
+    # The same anchor at production couplings. The one above holds only at
+    # uniform g_S (c₁ = 0) and no DDI, and neither is true of any Eu run —
+    # c1_ratio is +1/36 or −0.005 and ε_dd = 0.54. This pins the identity that
+    # licenses #337's scheme choice (fm_dipolar IS the fully-polarised dipolar
+    # LHY of the literature) plus the c_dd → ε_dd conversion nothing asserted.
+    "oracles/test_lhy_fm_dipolar_is_the_scalar_scheme.jl",
     # Directional / parity gates pinning the ungated physics-duplication
     # clusters the 2026-06-07 redundancy audit upheld as drift-risks
     # (vortex / monopole sign, manuscript spinors vs SSoT, init_psi vs

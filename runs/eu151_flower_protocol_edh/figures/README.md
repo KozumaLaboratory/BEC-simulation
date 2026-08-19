@@ -1,5 +1,23 @@
 # Eu-151 Flower Protocol (EDH) — Figures
 
+> **Nothing below this line is in `main`, as of 2026-08-19.** This file is the
+> only tracked thing in the directory. Every figure it names, and every
+> `scripts/flower_protocol_edh/*.py` renderer it cites, lives on
+> `feat/goto-rtp-k3-matsui` / `feat/edh-vs-flower-*` — PRs #27 and #33, both
+> **closed unmerged** on 2026-07-23 — and the `scripts/` tree they assumed was
+> retired wholesale by `e2159486` (217 one-off drivers, replaced by the
+> allowlist charter). A reader who goes looking for these files will not find
+> them in any checkout of `main`.
+>
+> It is kept because the naming convention below is still the right one, and
+> because #26 needs it: the K₃ comparison those figures back was measured on a
+> commit that fails 13 of the 14 refs in `docs/campaign/fix_list.toml`,
+> including all four DDI integrator corrections, so it has to be re-measured
+> rather than re-rendered. See the inventory on #26.
+>
+> The present tense in the rest of this file describes that branch's tree, not
+> this one.
+
 This directory holds **committed** rendered media (PNG / GIF) from the
 flower-protocol simulations. Heavy raw data (`*.h5`, `*.jld2`) lives
 under `../data/` and is **not** tracked.
