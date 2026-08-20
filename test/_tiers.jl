@@ -37,6 +37,7 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    "test_prior_art_dispositions.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
     # CAMPAIGN.md §4 guard 1 executed rather than described: every fix_list ref

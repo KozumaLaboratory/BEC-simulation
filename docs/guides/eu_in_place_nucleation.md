@@ -168,6 +168,8 @@ Held fixed, and load-bearing:
    one branch there statically — two continuations from opposite ends agreeing to
    6–7 digits. If the ensemble reports a branch split at κ = 0.9, the instrument
    is being measured and no κ = 1.8 number is reported.
+   → **PASSED 2026-08-20, 6/6 `below_branch`** — but only after it caught two
+   instrument defects that would each have produced a spurious statistic. §5.5b.
 8. **A cell may not be read if its C region moved outside the grid**, and it
    cannot: `nucleate.jl` refuses at both ends of the ramp. This is criterion 8
    rather than a footnote because it is the one that decides whether the numbers
@@ -380,6 +382,50 @@ manifold and its orientation freedom, not two branches — the same signature #3
 rather than trimmed because a reader who only saw the table above would think the
 walks agree everywhere.
 
+#### 5.5b The κ = 0.9 control, dynamically — and the defect it found (2026-08-20)
+
+Six trajectories, $T = 10$, $\tau = 1300$ ms, seeds 1–6, ending at
+$f = 0.565$–$0.581$ (jobs 8448255–8448260). Classified against a κ = 0.9 branch
+table built at the **trajectory's own grid** (`bifurcation_k0.9_g64`, job 8450458):
+
+| outcome | count |
+|---|---|
+| `below_branch` | **6 / 6** |
+| flower | 0 |
+| polarised | 0 |
+
+**Criterion 7 passes.** No selection statistic appears at κ = 0.9. At 64³ the
+flower table survives the $\langle F_\perp\rangle > 1$ mask at exactly one row
+($f = 0.6132$), where the two references differ by $1.05\times10^{-4}$ — against
+0.966–0.979 at κ = 1.8. The trajectories end below that, so there is no second
+branch to be on and the classifier says so instead of choosing one.
+
+**Two instrument defects had to be fixed before this control could be read, and
+both were of the kind it exists to catch.**
+
+*The wrong Hamiltonian.* `submit_classify.sh` took one `CL_KAPPA` for the whole
+sweep, so these trajectories were first classified against the κ = 1.8 table and
+relaxed in a κ = 1.8 trap; their `fperp_relaxed` = 4.59 is a number from a
+Hamiltonian they were never in. It went unread only because $f = 0.575$ exceeds
+that table's 0.521 ceiling and the rows came back `above_table`. **A control
+ending at slightly lower $f$ would have published it as a verdict.** κ now comes
+from each ψ's own filename and an unparseable name is refused, not defaulted.
+
+*No guard for degenerate references.* `assign` picked the nearer of two reference
+energies without checking there are two. Where the references coincide, that
+resolves on the last digit of an interpolation and returns `flower` or
+`polarised` with full confidence — **the instrument manufacturing exactly the
+selection statistic this control looks for**. Found by reading the κ = 0.9 table,
+not by the control, which had not yet run.
+
+The guard tests the **state**, not the energy, and the first version got that
+wrong: relative $|\Delta E|$ is $1.1\times10^{-4}$–$4.9\times10^{-3}$ at κ = 1.8
+against $8.6\times10^{-7}$–$4.6\times10^{-4}$ at κ = 0.9, and those **overlap** —
+branches genuinely approach in energy near a bifurcation. An energy cut tight
+enough to catch κ = 0.9 refuses production rows at κ = 1.8. Transverse spin does
+not overlap, so the cut is there, and the calibration (§5.6) was re-run to confirm
+the new refusal does not fire on the case it must pass.
+
 ### 5.6 The classifier, calibrated
 
 `figs/eu334/classify_calib_eta{0.02,0.05,0.15}/calibration_f0.3466.csv` (job
@@ -404,6 +450,44 @@ The mixed state is reported, not asserted: it relaxes to the polarised branch.
 That is a property of the basin boundary at this $f$ and it is exactly why the
 outcome set has three members — a classifier that had been tuned until the mix
 came out "ambiguous" would be a fitted threshold.
+
+### 5.6b Running the FULL theory on this ramp — the sub-theory question, measured
+
+§4 chose the growth SPGPE. Whether that choice changed the verdict was an
+experimental question and is now answered by running it (jobs 8448544–8448549,
+three seeds per temperature, same ramp, same seed cell, energy damping ON):
+
+| arm | $f$ at 4000 ms | $N_C$ | classification |
+|---|---:|---:|---|
+| full SPGPE, $T = 10$ | 0.066 | 3287 | **`below_branch`** (3/3) |
+| full SPGPE, $T = 5$ | 0.011 | 577 | **`below_branch`** (3/3) |
+| growth-only, $T = 10$ | 0.498 | 24886 | flower (55/55, §5.9) |
+
+**The full theory returns no verdict, rather than a different one.** It never
+reaches the bifurcation window, so the question #334 asks is not posed on those
+trajectories. The growth-only choice therefore did not change the answer; it is
+what made an answer exist.
+
+**Why it stalls is open, and three hypotheses are already excluded by measurement:**
+
+- *Not the projector's number loss.* Full and growth-only pay the **same** cost on
+  both channels — outflow 9886 vs 9986, truncation 31435 vs 31256 at $T = 10$;
+  1684 vs 1679 and 8628 vs 8612 at $T = 5$ — while one falls to a quarter and the
+  other rises 2.6×. A common-mode cost cannot produce a divergent outcome.
+- *Not the moving cutoff.* Pinning $k_{\rm cut}$ cuts the outflow 7 % (9886 → 9209)
+  and $N_C$ lands on the same 3287.
+- *Not energy damping in general.* A unit-scale probe of the suite's own
+  condensate-growth gate run at both values of $M$ (job 8450459) condenses in
+  both: $N_0 = 172.4$ at $M = 0$ against $159.7$ at $M \neq 0$, 0.586 and 0.543 of
+  $N_{\rm TF}$. Seven per cent apart, not a factor of nine.
+
+So the stall is specific to this configuration — F = 6, the DDI, or this ramp —
+and whether it is physics or a defect is **not settled**. It does not bear on the
+answer in §6, which is measured entirely on the growth SPGPE.
+
+*(That gate, `SPGPE grows a condensate to the Thomas-Fermi number`, runs at
+$M = 0.0$: nothing in the suite asserted the full theory condenses at all until
+this probe.)*
 
 ### 5.7 What the reservoir can and cannot be asked to do
 
@@ -430,10 +514,30 @@ Arm D is the one that settles it: with the growth drive **exactly zero**, so tha
 nothing physical can move $N_C$, the full SPGPE still loses 11.5 % in 60 ms. The
 channel is the energy-damping noise passing through the caller's projector —
 number-conserving as a *term*, only approximately so as a *step*
-(Rooney, Blakie & Bradley PRE **89**, 013302). Quantified in
-[spgpe.md](spgpe.md): the loss rate is grid-independent (flat to 5 % across a
-2.7× span of $k_\mathrm{max}/k_\mathrm{cut}$, which also refutes an aliasing
-explanation) and runs at ≈ 1.25× the growth rate $2\gamma\mu$.
+(Rooney, Blakie & Bradley PRE **89**, 013302).
+
+> **Evidence corrected 2026-08-20 — the conclusion stands, its original support
+> did not.** This paragraph used to rest on the loss rate being grid-independent
+> (flat to 5 % across a 2.7× span of $k_\mathrm{max}/k_\mathrm{cut}$) and running
+> at ≈ 1.25× the growth rate. Flatness in resolution distinguishes nothing: a
+> **one-off** is flat too. Chasing that led to the claim being withdrawn, and then
+> to the withdrawal itself being withdrawn, because the retraction was measured
+> with the noise **off**.
+>
+> What actually separates a one-off from a rate is duration. From a pre-projected
+> seed with $\gamma = 0$, noise on, averaged over seeds:
+> $\Delta N/N$ = $1.09\times10^{-4}$ at 50 steps and $4.38\times10^{-4}$ at 200 —
+> **ratio 4.04** where exact proportionality gives 4.00. It is a rate.
+>
+> **What this does NOT explain, stated because it was claimed here for an hour:**
+> the full theory on this ramp holds $N_C$ flat at $f = 0.065$ where growth-only
+> reaches $0.37$, and it is tempting to read that as the same loss. It is not.
+> The two arms pay the SAME projector cost — outflow 9886 vs 9986, truncated
+> 31435 vs 31256, sampled identically — while one falls to 3287 and the other
+> rises to 29601. A common-mode cost cannot produce a divergent outcome, and
+> pinning the cutoff moves $N_C$ by 5 parts in 3271. So the stall is the
+> energy-damping **drift** acting on the field, not its bookkeeping, and whether
+> that is correct physics is open. See [spgpe.md](spgpe.md).
 
 So **the ensemble runs the growth SPGPE**, Rooney Eq. (20) — a sub-theory in its
 own right, and the one that carries the $M_z$-changing exchange that makes
@@ -642,7 +746,7 @@ is a result in its own right.
 |---|---|
 | **The flower texture has a minimum atom number.** | A warm continuation cannot hold it below $f_{\rm sp} = 0.30 \pm 0.02$, $N_0^\ast \approx 1.5\times10^4$, bracketed consistently at 32³ and 64³, while the polarised branch is followable from $f = 0.02$ to 1. **A condensate is born polarised.** Whether the flower minimum *ceases to exist* there or merely becomes unreachable is the #398/#399 distinction and is not settled — see §5.2. |
 | **The choice is made in a narrow window, not at the target.** | The branches are 663 $k_BT$ apart at $f = 1$ and 8–15 at the bifurcation; they cross at $f_{\rm eq} = 0.343$. Asking the question at $f = 1$, which is what "cool at the target point" reads as, returns zero by arithmetic. |
-| **The full SPGPE cannot be used for a growth problem here.** | Its projected scattering step loses number at 1.25× the growth rate — 11.5 % in 60 ms with the growth drive at exactly zero. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. |
+| **The full SPGPE cannot be used for a growth problem here.** | With noise on, its projected scattering step loses number at a **rate**: 4.04× the loss for 4× the steps, from a pre-projected seed at zero growth drive. Directly visible on this campaign's ramp — the full theory holds $N_C$ flat at $f = 0.065$ where growth-only reaches $0.37$, and pinning the C region changes that by 5 parts in 3271, so it is the noise channel and not cutoff motion. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. *The evidence here was replaced on 2026-08-20; the original grid-independence argument could not distinguish a rate from a one-off — see §4.* |
 
 ### What to hand the experiment
 
