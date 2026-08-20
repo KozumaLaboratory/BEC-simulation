@@ -37,7 +37,8 @@ measurements, not tests).
 | 8 | Is the enhancement chirality-matched, as the sheet says? | **No.** The response is **even in Ω** to ≤ 0.124 %; Ω=0 is the minimum and both senses enhance equally. §9.2 |
 | 9 | Then what is the mechanism? | **Centrifugal, not Coriolis.** A *static* trap weakened to ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to **0.06 %** across the range. **Rotation is not needed** — weaken the radial trap to **0.71 ω_⊥**. §9.3, §10.1 |
 | 10 | Is it density, or the radial confinement? | **Radial.** A density-matched weakening along **z** instead lands *below* the baseline (−36 % of the gain). Same ω̄, opposite sign. §10.4 |
-| 11 | Does the prescription hold at the other two fields? | **No, and differently.** 1.3 nT: **no window at all** (+1.8 %, flat) — the old `0.3 @ 1.3 nT` has no replacement. 5.2 nT: enhancement exists but is **unresolved** at 7 points (non-monotonic, dip at 0.650) — no optimum quoted. §10.2 |
+| 11 | Does the prescription hold at the other two fields? | **No, and differently.** 1.3 nT: **no window at all** (+1.8 %, flat) — the old `0.3 @ 1.3 nT` has no replacement. 5.2 nT: **two branches**, resolved in §11. §10.2 |
+| 13 | 5.2 nT, resolved at 20 points + 64³ | **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
 | 4b | Is `eu151_klaus_phi_phys` really "the one Eu arc on the other side"? | **No.** `p > 0` puts m=+F at the *bottom*, so it is aligned like everything else — and therefore on the wrong side for the EdH quench. #343 §2's premise was an m-label comparison across two field parameterisations. §4.2 |
@@ -701,6 +702,81 @@ That is consistent with the ℓ ≠ 0 orbital modes the spin flip must populate
 having their cost set by ω_⊥ — but that reading is still an interpretation. What
 is *measured* is that a density-matched change along z does not substitute for
 it, which is what rules the density explanation out.
+
+---
+
+## 11. 5.2 nT resolved — two branches, and the old row is refuted
+
+§10.2 left 5.2 nT open rather than quoting a number: seven points showed
+non-monotonic structure that could not distinguish one broad optimum from two
+narrow ones. Densified to 20 points, plus two 64³ arms.
+
+### 11.1 The scan
+
+| ω_eff | P_adj | ω_eff | P_adj |
+|---:|---:|---:|---:|
+| 0.420 | 0.44336 | 0.680 | 0.49410 |
+| 0.450 | 0.46440 | 0.714 | 0.49960 |
+| 0.480 | 0.48567 | 0.750 | 0.50245 |
+| 0.500 | 0.49823 | **0.770** | **0.50252** |
+| 0.520 | 0.50789 | 0.800 | 0.50070 |
+| **0.550** | **0.51390** | 0.830 | 0.49666 |
+| 0.570 | 0.51300 | 0.850 | 0.49290 |
+| 0.600 | 0.50568 | 0.900 | 0.47910 |
+| 0.620 | 0.49592 | 0.950 | 0.45968 |
+| **0.650** | **0.48790** ← dip | 1.000 | 0.43930 |
+
+Global maximum at ω_eff ≈ 0.55, **+17.0 %** over ω_eff = 1. Secondary maximum at
+ω_eff ≈ 0.77. Dip between them at ω_eff ≈ 0.65, **5.06 %** below the global
+maximum — about 170× the dt/2 reproducibility floor (0.029 %) and infinitely
+above the seed floor (0.000 % over 5 live seeds).
+
+### 11.2 D4 — the structure is not a grid artifact
+
+Structure at 32³ is not structure until it survives 64³, so both the dip and the
+adjacent peak were re-run:
+
+| ω_eff | 32³ | 64³ | shift |
+|---:|---:|---:|---:|
+| 0.550 (peak) | 0.51390 | 0.52496 | **+2.15 %** |
+| 0.650 (dip) | 0.48790 | 0.50031 | **+2.54 %** |
+
+| | dip depth |
+|---|---:|
+| 32³ | 5.06 % |
+| **64³** | **4.70 %** |
+
+Both points move up by the same ~2.3 %, which is the one-signed offset G3 already
+measured at 2.6 nT (+2.47 %). **The dip does not fill in** — it retains 93 % of
+its depth. So the two-branch structure is physical at this resolution, and what
+32³ gets wrong is a uniform offset, not the shape.
+
+### 11.3 Verdict, against the criteria fixed before launch
+
+| | criterion | outcome |
+|---|---|---|
+| D1 | two maxima separated by a dip > 1 % ⇒ report two branches, quote no single optimum | dip is **4.70 %** at 64³ ⇒ **TWO BRANCHES**, no single optimum quoted |
+| D2 | vertex only from a ≥5-pt fit with negative curvature | **not applicable** — D1 fired first |
+| D3 | digits from the fit | not applicable |
+| D4 | structure must survive 64³ | **survives**, 93 % of depth retained |
+
+### 11.4 And the old row is refuted, not merely unresolved
+
+`[0.5, 0.6] at 5.2 nT` was written in Ω. In ω_eff that is
+√(1−0.5²) … √(1−0.6²) = **[0.80, 0.87]** — which in this scan is a *declining*
+shoulder (0.50070 → 0.49290), below **both** maxima. The global maximum sits at
+ω_eff ≈ 0.55, i.e. |Ω| ≈ 0.84, well outside the old window.
+
+So §10.2's "neither confirmed nor replaced" upgrades to **refuted**, and the
+replacement is not a number but a shape: *two branches, global maximum at
+ω_⊥,eff ≈ 0.55 ω_⊥*.
+
+**Hypothesis, and it has a cheap test.** At 2.6 nT the curve is a clean single
+peak with no dip; doubling the field introduces one. That is what a resonance
+entering the sampled window looks like — plausibly between the Zeeman splitting
+and the radial mode spacing, both of which the field and ω_⊥,eff set. The test
+is one more field: if the dip is a resonance, its ω_eff position must move again
+at 10.4 nT. **Not measured here.**
 
 <!-- REDERIVE -->
 
