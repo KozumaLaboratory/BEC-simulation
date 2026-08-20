@@ -153,3 +153,23 @@ pr = 139
 merged = 2026-07-29
 summary = "stamp the producing commit, and make staleness queryable"
 effect = "pre-#139 runs cannot be retro-dated, only re-run"
+
+[[fix]]
+id = "eu-edh-corpus-anti-aligned-retarget"
+ref = "e8dafe8e"
+pr = 392
+merged = 2026-08-19
+summary = "retarget the EdH-quench corpus to the ANTI-ALIGNED preparation"
+effect = "the aligned corpus was studying a regime where the phenomenon does not exist"
+note = """Same class as eu-config-field-sign, and the sharper half of it. bce2068f made \
+each config self-consistent by flipping the field, which moved the whole klaus_quench \
+family from the anti-aligned (Zeeman-highest) preparation the EdH cascade needs into \
+the aligned one, where the rotation enhancement measures -0.45 % against +16.5 %. \
+Every klaus_quench run predating this ref was launched at the preparation that has no \
+effect to measure. It also renamed the two mirror arms *_mFplus.yaml -> *_mirror.yaml, \
+so a pre-retarget citation of those paths no longer resolves. \
+Added 2026-08-20: the decision document leant on this retarget throughout its section 6.4 \
+and section 9 WITHOUT naming the SHA, so the citation gate had nothing to catch — the \
+#343 class again, hidden one level further down by the absence of a backticked hash. \
+Descent is necessary, not sufficient: as with eu-config-field-sign, also check the \
+config the run actually consumed."""

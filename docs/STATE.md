@@ -279,7 +279,7 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
-| `src/workflow/` | 5 | 174 |
+| `src/workflow/` | 5 | 175 |
 | `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 
