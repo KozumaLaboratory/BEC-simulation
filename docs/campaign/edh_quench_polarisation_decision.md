@@ -1062,6 +1062,87 @@ away. The 64³ run was then the obvious next thing rather than something nobody
 thought to do. **A stated uncertainty that overlaps the claim is a work item, and
 writing it down is what makes it one.**
 
+---
+
+## 16. Correcting §14.2, and why ITP cannot prepare the anti-aligned state
+
+§14.2 said the rotating-basis `E = NaN` and `conv = true` came from
+`run_registry.jl` reading absent keys through defaults. **The `conv = true` half
+of that is wrong**, and finding out why produced the sharpest result in this
+document.
+
+### 16.1 What §14.2 got wrong
+
+The `E=NaN conv=true` I quoted was the runner's **stdout**, not the file. Reading
+the file directly: `keys: psi, dynamics` — **`energy` and `converged` are ABSENT
+entirely.** My probe used `get(fh, "energy", NaN)` and I read its own default back
+as a diverged run.
+
+The cause is a **third writer**. `save_rotating_basis_result!`
+(`src/workflow/io/save_rotating_result.jl`) owns `result.jld2` for both
+`kind: rotating_basis` *and* `kind: spinor`-with-dynamics (`runner.jl:294`), and
+it wrote neither key. So `run_registry.jl`'s defaults — the thing §14.2 blamed —
+were never reached on this path at all.
+
+**Corrected statement.** The `converged = true` default was real and did print,
+but no rotating-basis run ever *stored* it, so the guard-7 claim in §14.2
+overstated: a guard reading the file finds nothing, which is `unknown`, not a
+pass. The #410 fix to the default remains right; it was simply not the fix for
+*this* path. Both writers now behave: absent stays absent, present gets written.
+
+### 16.2 With the energy finally reported, the config was producing nothing
+
+`ground_state.jl` now computes `total_energy(ws)` and a convergence flag from the
+μ movement against `tol` — a key the schema accepted and **nobody read**, so
+`tol: 1.0e-9` had been inert. Four arms, seed × ITP length:
+
+| `init_m_idx` | ITP | E | conv | ‖ψ‖² | non-zero entries |
+|---|---:|---:|---|---:|---|
+| 1 (aligned) | 100 | −160177.62 | false | 4.096 | 212992/212992 |
+| 1 (aligned) | 1500 | −160177.72 | **true** | 4.096 | 212992/212992 |
+| **13 (anti-aligned)** | 100 | **0.0** | false | **0.0** | **0/212992** |
+| **13 (anti-aligned)** | 1500 | **0.0** | false | **0.0** | **0/212992** |
+
+**ψ is identically zero** — all 212992 entries — and the run completed and
+returned it as a result.
+
+### 16.3 §4.2's prescription is unrealisable, and structurally so
+
+ITP applies `exp(−H dt)` with the Zeeman shift subtracting `min(E_m)`, so the
+lowest m gets factor 1 and the highest gets `exp(−(E_max−E_min) dt)`. Here that
+is `exp(−12·p·dt) = exp(−1602)`, which **underflows Float64 in one step**. The
+`n_before > 0` guard then skipped renormalisation and the loop ran to completion
+on zeros.
+
+> **Imaginary time is a projector onto the LOWEST state. The anti-aligned
+> preparation is the FURTHEST state from it. §4.2's `init_m_idx: 13` is not a
+> configuration choice that was wrong — it is not expressible by ITP at all.**
+
+The klaus_quench (spinor) corpus is unaffected and the reason is quantitative:
+there `p ≈ 148`, so the per-step factor is `exp(−8.9)`, renormalised every step
+and never underflowing. This only bites at the fast-Larmor `p = 26700`.
+
+### 16.4 What changed
+
+- `init_m_idx` reverted to `1` in `runs/eu151_klaus_phi_phys/config.yaml`, with
+  the reason at the line. The config is **knowingly aligned**, i.e. on the wrong
+  side for the EdH quench, and says so rather than claiming an anti-alignment it
+  cannot have.
+- **The underflow is now a hard error**, naming the mechanism and the remedy. A
+  zero wavefunction is not a result and must not complete.
+- The real repair is a **pipeline** change: relax the stretched state as the
+  ground state of the *opposite* field sign, then reverse the field for the
+  dynamics — which is also what an experiment does (pump, then reverse). Tracked
+  as `edh-phi-phys-anti-aligned-needs-field-reversal`; **not implemented here.**
+
+### 16.5 The pattern, third time in this document
+
+§12.1 (peak read outside the hold), §15 (32³ read as converged), and this one all
+have the same shape: **a quantity that was never measured being read through a
+default.** `NaN` announced itself; `true` and `0.0` did not. The energy had been
+missing for the entire life of this path and nothing said so — it took adding the
+report to discover the config produced nothing at all.
+
 <!-- REDERIVE -->
 
 ---

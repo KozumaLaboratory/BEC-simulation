@@ -218,6 +218,12 @@ end
     end
     n_steps = Int(get(p, "n_steps", use_from_jld2 ? 0 : 200))
     dt_itp = Float64(get(p, "dt", 0.005))
+    # `tol` was accepted by the schema and read by NOBODY on this path until
+    # 2026-08-20: the loop below ran a fixed `n_steps` with no convergence test at
+    # all, so `tol: 1.0e-9` in a config was an inert knob. It now decides the
+    # reported convergence flag (not an early exit — that would change results
+    # and invalidate every cached run dir for no physics gain).
+    tol_itp = Float64(get(p, "tol", 1.0e-9))
     ndim = length(n)
 
     # UNIFIED (2026-06-21): GS on the STANDARD split-step path (rotating engine
@@ -267,14 +273,53 @@ end
     # the retired rotating ITP: μ = -ln‖ψ‖/(2dt) per step, then renormalize).
     dV_gs = prod(grid.dx)
     μ_final = 0.0
-    for _ in 1:n_steps
+    μ_prev = NaN
+    μ_rel_change = NaN
+    for step in 1:n_steps
         split_step!(ws)
         n_before = sqrt(sum(abs2, ws.state.psi) * dV_gs)
+        # A norm that has underflowed to zero is not a small norm, it is the LOSS
+        # OF THE STATE, and the `n_before > 0` guard below used to skip
+        # renormalisation and let the loop run to completion on ψ ≡ 0 — returning
+        # E = 0.0 and a wavefunction of 212992 exact zeros as if it were a result.
+        #
+        # It is reachable by construction, not by accident. ITP applies
+        # `exp(-H dt)` with the Zeeman shift subtracting `min(E_m)`, so the
+        # LOWEST m gets factor 1 and the highest gets `exp(-(E_max-E_min) dt)`.
+        # At `p = 26700` and `dt = 0.005` that is `exp(-12·p·dt) = exp(-1602)`,
+        # which underflows Float64 in ONE step. Seeding the Zeeman-HIGHEST state
+        # at large p therefore cannot work: imaginary time is a projector onto
+        # the lowest state and this is the furthest thing from it.
+        if !(n_before > 0)
+            throw(
+                ErrorException(
+                    "rotating_basis ground state: the norm underflowed to zero at ITP " *
+                    "step $step of $n_steps. ITP relaxes to the LOWEST state, and the " *
+                    "Zeeman shift gives the highest m a factor exp(-(E_max-E_min)·dt) " *
+                    "= exp(-$(round(2 * F_atom * abs(p_z) * dt_itp, digits=1))) per " *
+                    "step here — so an anti-aligned (Zeeman-highest) seed is " *
+                    "annihilated, not relaxed. init_m_idx=$init_m_idx with p=$p_z is " *
+                    "that case. Prepare the stretched state as the ITP ground state " *
+                    "of the OPPOSITE field sign and reverse the field for the " *
+                    "dynamics; do not ask ITP for an excited state."),
+            )
+        end
         if n_before > 0
+            μ_prev = μ_final
             μ_final = -log(n_before) / (2 * dt_itp)
             ws.state.psi ./= n_before
+            # Relative μ movement on the LAST step. μ is free here (the loop
+            # already computes it from the norm decay); the energy is not, so the
+            # cheap quantity is the one that runs every step and the expensive one
+            # is evaluated once at the end.
+            isfinite(μ_prev) && abs(μ_final) > 0 &&
+                (μ_rel_change = abs(μ_final - μ_prev) / abs(μ_final))
         end
     end
+    # An ITP that ran zero steps has not converged to anything — `from_jld2`
+    # seeds land here with n_steps = 0, and reporting `true` for them would be
+    # the same "nobody checked, call it a pass" defect this replaces.
+    gs_converged = n_steps > 0 && isfinite(μ_rel_change) && μ_rel_change <= tol_itp
 
     # ψ̃_GS = U_B(θ_init,φ_init)† ψ_lab_GS — tilde basis for the dynamics handoff.
     psi_tilde_gs = Array{Complex{T_float}}(undef, size(ws.state.psi)...)
@@ -300,6 +345,17 @@ end
         ),
         :rotating_basis_F => F_atom,
         :rotating_basis_mu => μ_final,
+        # The energy the whole campaign machinery reads. Absent until 2026-08-20,
+        # so `run_registry.jl` wrote `energy = NaN` for every rotating-basis run
+        # — loudly, unlike the convergence flag beside it, which defaulted to
+        # `true` and satisfied CAMPAIGN.md guard 7 having never been asked.
+        # Evaluated ONCE on the converged ψ, in the lab basis, before the U_B†
+        # rotation to the tilde handoff.
+        :ground_state_energy => total_energy(ws),
+        :ground_state_converged => gs_converged,
+        # The evidence for that flag, so a reader can see WHY rather than trust it.
+        :rotating_basis_mu_rel_change => μ_rel_change,
+        :rotating_basis_itp_tol => tol_itp,
         :rotating_basis_per_m => per_m_gs,
         # Stash omega_ref so downstream rotating_basis dynamics steps
         # can convert physical-unit fields ("226 Hz") to dimensionless

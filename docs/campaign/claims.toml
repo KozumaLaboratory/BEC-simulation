@@ -566,3 +566,35 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "15"
 pr = 0
 note = """The part that generalises: grid adequacy is a property of the grid AND the integration time. Under the same 32³→64³ refinement the SHORT protocol (14.5 ω⁻¹) moved by a uniform +2.3 % and the 5.2 nT dip kept 93 % of its depth — shape preserved — while the long one moves -3.4/-23.1/-42.6/+91.3 % and orderings invert. So sections 9-12 are unaffected and only the long-time branch is out of reach at 32³. A convergence check at one duration does not transfer to another."""
+
+[[claim]]
+id = "edh-phi-phys-anti-aligned-needs-field-reversal"
+claim = "The anti-aligned preparation cannot be produced by ITP on the fast-Larmor rotating-basis path: at p = 26700 the Zeeman-shifted factor for the highest m is exp(-12·p·dt) = exp(-1602), which underflows in ONE step and returns ψ identically zero. It needs the state relaxed at the OPPOSITE field sign and the field reversed for the dynamics — a pipeline change, not a config key."
+status = "live"
+type = "A"
+scope = "`runs/eu151_klaus_phi_phys/config.yaml`, p = 26700, dt = 0.005, F = 6. Quantitative, so it does NOT generalise: the klaus_quench spinor corpus has p ≈ 148, per-step factor exp(-8.9), renormalised every step and never underflowing."
+uncertainty = "Four control arms — init_m_idx in {1, 13} x ITP in {100, 1500} — separate the candidate causes: both init_m_idx=13 arms give 0 of 212992 non-zero entries and ‖ψ‖² = 0.0, both init_m_idx=1 arms give ‖ψ‖² = 4.096 and E = -160177.6. The seed, not the ITP length, is what decides it."
+uncertainty_basis = "control"
+evidence = ["runs/eu151_klaus_phi_phys/config.yaml", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.3"
+pr = 0
+note = """SUPERSEDES the deferral in `edh-phi-phys-config-anti-alignment`, which proposed `init_m_idx: 13` as the repair. That was set on 2026-08-19 and reverted on 2026-08-20 once the energy was reported at all — the run had been completing on ψ ≡ 0 with E = 0.0 and saying nothing. The underflow is now a hard error naming the mechanism and the remedy. The repair is not implemented."""
+
+[[claim]]
+id = "rotating-basis-result-writer-omitted-energy"
+claim = "`save_rotating_basis_result!` — the writer that owns result.jld2 for BOTH `kind: rotating_basis` and `kind: spinor`-with-dynamics — wrote neither `energy` nor `converged`, so both keys were ABSENT from every dynamics run's result file."
+status = "live"
+type = "A"
+scope = "All runs written through `save_rotating_basis_result!` (runner.jl:294), which is every pipeline carrying a dynamics history."
+uncertainty = "unbounded: this is a code-shape claim, not a measured quantity — the writer either emits the key or it does not, and it did not. What is NOT bounded is how many stored runs are affected, because runs/ is untracked."
+uncertainty_basis = "none"
+evidence = ["src/workflow/io/save_rotating_result.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.1"
+pr = 0
+note = """CORRECTS section 14.2, which attributed the missing energy to `run_registry.jl` reading absent keys through defaults. That writer is never reached on this path. The `conv = true` default was real and printed to stdout, but was never STORED — so a guard reading the file finds nothing, which is unknown rather than a pass, and section 14.2's guard-7 claim overstated. The #410 default fix stands on its own path; this is a third writer nobody had checked."""
