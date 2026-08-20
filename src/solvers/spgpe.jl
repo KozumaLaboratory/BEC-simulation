@@ -455,24 +455,34 @@ function apply_energy_damping_step!(
     # wrong twice in opposite directions. Read this before measuring it a third
     # time; `test/dynamics/test_spgpe.jl` gates it.
     #
-    # The loss through the caller's projector is a ONE-OFF, not a rate: it is
-    # whatever the SEED carried outside the C region, removed the first time the
-    # projector runs. Measured with a pre-projected seed (P ψ₀ = ψ₀) the total over
-    # 400 steps is 1.1e-13; with the seed carrying 1e-4 outside, the FIRST step
-    # removes 1.0e-4 and every step after it costs 2.6e-16; at 1e-2 the first step
-    # removes 9.9e-3. Doubling dt changes nothing.
+    # It depends on the NOISE, and every wrong answer so far came from stating one
+    # sub-case as the whole:
     #
-    # It was read as a RATE (~1.25× the growth rate) because that measurement went
-    # through `apply_spgpe_step!` with a `tracking_cutoff`. A cutoff that moves
-    # every step MANUFACTURES fresh out-of-C content every step, so the one-off is
-    # paid again and again and looks stationary. Flatness in resolution — which was
-    # taken as proof of a scheme property — is also what a one-off shows.
+    #   noise OFF -> ONE-OFF. Whatever the SEED carried outside the C region,
+    #     removed the first time the projector runs. Pre-projected seed (P ψ₀ = ψ₀):
+    #     1.1e-13 total over 400 steps. Seed carrying 1e-4 outside: the FIRST step
+    #     removes 1.0e-4, every step after costs 2.6e-16. At 1e-2, 9.9e-3 on step
+    #     one. Doubling dt changes nothing.
     #
-    # Consequence for callers: a growth problem does NOT need
-    # `energy_damping=false`. What it needs is a seed inside its own C region;
-    # project it once before starting. If `tracking_cutoff` is used, each cutoff
-    # change legitimately bills the band it swept past — that is `cutoff_outflow`,
-    # reported separately, and it is physics rather than a defect.
+    #   noise ON  -> A RATE. Pre-projected seed so the one-off is already paid,
+    #     γ = 0 so nothing physical can move N: 1.0853e-4 over 50 steps, 4.3821e-4
+    #     over 200. Ratio 4.04 against the 4.00 of exact proportionality.
+    #
+    # The first reading called it a rate (~1.25× the growth rate) on the strength of
+    # flatness in resolution, which supports neither case — a one-off is flat too —
+    # and through a `tracking_cutoff`, which moves every step and so MANUFACTURES
+    # fresh out-of-C content, paying the one-off again and again. The retraction
+    # that followed then generalised the noise-off measurement past its own stated
+    # scope. Right conclusion for production, wrong evidence; then right evidence,
+    # wrong scope.
+    #
+    # Consequence for callers: with noise on, a growth problem DOES pay a continuing
+    # loss here, so `energy_damping=false` stays the conservative choice for one.
+    # Independently of that, give it a seed inside its own C region — project once
+    # before starting. If `tracking_cutoff` is used, each cutoff change legitimately
+    # bills the band it swept past: that is `cutoff_outflow`, reported separately,
+    # and it is physics rather than a defect. It is also NOT what stalls a growth
+    # run — pinning the cutoff on #334's ramp changed N_C by 5 parts in 3271.
     #
     # The band limit is the load-bearing part, and it was missing. Rooney et al.
     # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the

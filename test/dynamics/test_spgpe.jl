@@ -212,15 +212,26 @@ end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
     end
 
-    @testset "the PROJECTED step's number loss is ONE-OFF, not a rate" begin
-        # WHAT THIS REPLACED, AND WHY THE REPLACEMENT IS DIFFERENT IN KIND.
+    @testset "the PROJECTED step's number loss: ONE-OFF without noise, a RATE with it" begin
+        # TWO SUB-CASES, AND THE HISTORY OF GETTING THE SCOPE WRONG TWICE.
         #
         # An earlier version of this gate measured |dlnN/dt| through
         # `apply_spgpe_step!` at zero growth drive, found it flat in resolution,
         # and concluded the projected scattering step loses number "at the order of
         # the growth rate" — from which docs/guides/spgpe.md told callers a growth
         # problem must run `energy_damping=false`, and #334's whole ensemble did.
-        # That is retracted. So was the same claim, independently, in PR #351.
+        #
+        # That reading was then RETRACTED, here and independently in PR #351, on
+        # the strength of the noise-off measurement below. The retraction was
+        # itself too broad. Turning the noise back on (arm 4) gives ratio 4.04 for
+        # 4x the steps: with noise the loss IS a rate, so the ORIGINAL operational
+        # claim was right about production even though its evidence was not.
+        #
+        # What each measurement actually supports, kept separate because conflating
+        # them is what produced both errors:
+        #   noise OFF  ->  one-off, equal to the seed's out-of-C weight (arms 1-3)
+        #   noise ON   ->  a rate                                       (arm 4)
+        #   flatness in resolution  ->  supports NEITHER; a one-off is flat too
         #
         # The reading failed because a ONE-OFF and a RATE are identical at a single
         # endpoint, and because the measurement went through a `tracking_cutoff`:
@@ -388,12 +399,17 @@ end
         # with them. The assertion is on the CLASSIFICATION, with the boundary far
         # from both hypotheses (1x versus 4x), so seed-to-seed spread in the noise
         # cannot flip it.
-        # The assertion below is deliberately NOT written yet, and this comment is
-        # the reason. Writing `ratio < 2 || ratio > 3` here would pass for almost
-        # every possible measurement — a gate that cannot fail, which is the exact
-        # defect this file's other gates exist to prevent. The number gets measured
-        # first and the boundary gets pinned to what it shows.
-        @test isfinite(l_short) && isfinite(l_long)
+        # MEASURED 2026-08-20: 50 steps 1.0853e-4, 200 steps 4.3821e-4, ratio 4.04
+        # against the 4.00 that exact proportionality would give. With the noise on
+        # the loss IS a rate, and the one-off result above is a property of the
+        # noise-off sub-case only.
+        #
+        # This is the boundary written AFTER the measurement, which is the point of
+        # the comment that used to sit here. 3.0 sits five parts in a hundred from
+        # the measured 4.04 and a full unit from the 1.0 a saturating one-off would
+        # give, so seed-to-seed spread cannot cross it.
+        @test l_long / l_short > 3.0
+        @test l_short > 1.0e-6          # and the effect is real, not rounding
         @test isapprox(c2.total, c.total; rtol=0.05)
     end
 

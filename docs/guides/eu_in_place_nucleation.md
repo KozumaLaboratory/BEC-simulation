@@ -430,10 +430,25 @@ Arm D is the one that settles it: with the growth drive **exactly zero**, so tha
 nothing physical can move $N_C$, the full SPGPE still loses 11.5 % in 60 ms. The
 channel is the energy-damping noise passing through the caller's projector —
 number-conserving as a *term*, only approximately so as a *step*
-(Rooney, Blakie & Bradley PRE **89**, 013302). Quantified in
-[spgpe.md](spgpe.md): the loss rate is grid-independent (flat to 5 % across a
-2.7× span of $k_\mathrm{max}/k_\mathrm{cut}$, which also refutes an aliasing
-explanation) and runs at ≈ 1.25× the growth rate $2\gamma\mu$.
+(Rooney, Blakie & Bradley PRE **89**, 013302).
+
+> **Evidence corrected 2026-08-20 — the conclusion stands, its original support
+> did not.** This paragraph used to rest on the loss rate being grid-independent
+> (flat to 5 % across a 2.7× span of $k_\mathrm{max}/k_\mathrm{cut}$) and running
+> at ≈ 1.25× the growth rate. Flatness in resolution distinguishes nothing: a
+> **one-off** is flat too. Chasing that led to the claim being withdrawn, and then
+> to the withdrawal itself being withdrawn, because the retraction was measured
+> with the noise **off**.
+>
+> What actually separates a one-off from a rate is duration. From a pre-projected
+> seed with $\gamma = 0$, noise on, averaged over seeds:
+> $\Delta N/N$ = $1.09\times10^{-4}$ at 50 steps and $4.38\times10^{-4}$ at 200 —
+> **ratio 4.04** where exact proportionality gives 4.00. It is a rate.
+>
+> Corroborated by this campaign's own `fullspgpe` stage: the full theory on this
+> ramp holds $N_C$ flat at $f = 0.065$ where growth-only reaches $0.37$, and
+> pinning the C region moves it by 5 parts in 3271 — so the channel is the noise,
+> not the cutoff motion. See [spgpe.md](spgpe.md).
 
 So **the ensemble runs the growth SPGPE**, Rooney Eq. (20) — a sub-theory in its
 own right, and the one that carries the $M_z$-changing exchange that makes
@@ -642,7 +657,7 @@ is a result in its own right.
 |---|---|
 | **The flower texture has a minimum atom number.** | A warm continuation cannot hold it below $f_{\rm sp} = 0.30 \pm 0.02$, $N_0^\ast \approx 1.5\times10^4$, bracketed consistently at 32³ and 64³, while the polarised branch is followable from $f = 0.02$ to 1. **A condensate is born polarised.** Whether the flower minimum *ceases to exist* there or merely becomes unreachable is the #398/#399 distinction and is not settled — see §5.2. |
 | **The choice is made in a narrow window, not at the target.** | The branches are 663 $k_BT$ apart at $f = 1$ and 8–15 at the bifurcation; they cross at $f_{\rm eq} = 0.343$. Asking the question at $f = 1$, which is what "cool at the target point" reads as, returns zero by arithmetic. |
-| **The full SPGPE cannot be used for a growth problem here.** | Its projected scattering step loses number at 1.25× the growth rate — 11.5 % in 60 ms with the growth drive at exactly zero. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. |
+| **The full SPGPE cannot be used for a growth problem here.** | With noise on, its projected scattering step loses number at a **rate**: 4.04× the loss for 4× the steps, from a pre-projected seed at zero growth drive. Directly visible on this campaign's ramp — the full theory holds $N_C$ flat at $f = 0.065$ where growth-only reaches $0.37$, and pinning the C region changes that by 5 parts in 3271, so it is the noise channel and not cutoff motion. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. *The evidence here was replaced on 2026-08-20; the original grid-independence argument could not distinguish a rate from a one-off — see §4.* |
 
 ### What to hand the experiment
 

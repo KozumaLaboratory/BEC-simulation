@@ -217,12 +217,28 @@ bug class).
 | **condensation** | $N_0$ reaches $[0.3,1.5]\,N_\mathrm{TF}$ and stays below $N_C$ — the gate for the thing the solver exists to do | B |
 | **Rayleigh–Jeans total** | free field: $N_C$ equals $\sum_{\|k\|<k_\mathrm{cut}}T/(\epsilon_k-\mu)$ to 4 % | B |
 
-### The projected step's number loss is ONE-OFF, not a rate — and a moving cutoff makes it look like one
+### The projected step's number loss: ONE-OFF without noise, a RATE with it
 
-> **RETRACTED 2026-08-20.** This section previously said the projected scattering
-> step loses number "at the same order as the growth rate", concluding that a
-> growth problem must run `energy_damping=false`. **That was wrong**, and #334's
-> ensemble was designed on it. What follows is the measurement that settles it.
+> **This section has been wrong in both directions on 2026-08-20. Read the split
+> before quoting any part of it.**
+>
+> It first said the projected scattering step loses number "at the same order as
+> the growth rate", so a growth problem must run `energy_damping=false`; #334's
+> ensemble was designed on that. It was then RETRACTED here and, independently, in
+> PR #351, on the strength of a **noise-off** measurement showing a one-off.
+>
+> **The retraction was too broad.** The noise-off result is correct and is
+> reproduced below; it simply does not describe production, which runs with noise.
+> With the noise on, the loss **is** a rate — measured, ratio 4.04 for 4× the
+> steps. So the original operational advice was right about production even though
+> the evidence originally offered for it (flatness in resolution) never supported
+> it.
+>
+> | condition | behaviour | evidence |
+> |---|---|---|
+> | noise **off** | one-off, equal to the seed's out-of-C weight | tables below |
+> | noise **on** | **a rate** | ratio 4.04 at 4× steps, $\gamma = 0$ |
+> | flatness in resolution | supports **neither** — a one-off is flat too | — |
 
 The term is a real phase and cannot change $\int|\psi|^2$; production calls
 `apply_spgpe_step!`, which also projects, and there $\psi e^{i\phi}$ can carry
@@ -265,17 +281,43 @@ resolution that was taken as evidence of a scheme property is what a one-off doe
 too. #351 reached the same retraction independently and stated the general form:
 *flatness is what a one-off necessarily shows*.
 
-**Consequences.** A growth problem does **not** need `energy_damping=false`; the
-full SPGPE is usable, and #334's ensemble ran the growth-only sub-theory on a
-limit that does not exist. What a run does need is a seed that is inside its own C
-region — project it once before starting — and, if `tracking_cutoff` is used,
-awareness that each cutoff change bills the band it swept past. That is a physical
-outflow (`cutoff_outflow` reports it separately from `noise_truncated`) and not a
-defect, but it is not free.
+#### With the noise on, it is a rate
 
-Gated by `test/dynamics/test_spgpe.jl`, which asserts the CLASSIFICATION — step
-proportional to out-of-C weight, tail at rounding, pre-projected seed flat — rather
-than pinning the numbers above.
+Everything above is the **noise-off** sub-case. Production runs with noise, so the
+question has to be asked there too, and the earlier version of this section never
+did — it turned the noise off for a good reason (it makes a single endpoint a
+random variable) and then generalised past the condition it had measured.
+
+The arm that settles it starts from a **pre-projected** seed, so the one-off is
+already paid and cannot be mistaken for what follows, sets $\gamma = 0$ so nothing
+physical can move $N$, and compares two durations, averaged over seeds:
+
+| steps | $\Delta N/N$ |
+|---:|---:|
+| 50 | $1.0853\times10^{-4}$ |
+| 200 | $4.3821\times10^{-4}$ |
+| **ratio** | **4.04** (exact proportionality would give 4.00) |
+
+A one-off returns the same number at both durations. This scales with them.
+
+**Consequences.** A growth problem with noise on **does** pay a continuing number
+loss through the projector, so `energy_damping=false` remains the conservative
+choice for one — #334's ensemble is not invalidated. The measured stall is
+consistent with it: the full theory on #334's own ramp holds $N_C$ flat at
+$f = 0.065$ where growth-only reaches $0.37$, and **pinning the cutoff does not
+restore the growth** (3266 against 3271 at matched simulated time), which rules
+out cutoff motion as the mechanism and leaves the noise channel.
+
+Independently of the noise, a run still needs a seed inside its own C region —
+project it once before starting — and, if `tracking_cutoff` is used, awareness
+that each cutoff change bills the band it swept past. That is a physical outflow
+(`cutoff_outflow` reports it separately from `noise_truncated`) and not a defect,
+but it is not free.
+
+Gated by `test/dynamics/test_spgpe.jl`, which asserts the CLASSIFICATION in both
+sub-cases — noise off: step proportional to out-of-C weight, tail at rounding,
+pre-projected seed flat; noise on: the duration ratio above 3 — rather than
+pinning the numbers.
 
 Known limits, unchanged by this work:
 

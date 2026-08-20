@@ -97,22 +97,25 @@ ensemble)
     for f in "$SEEDCELL" "$ENDCELL"; do
         [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
     done
-    # GROWTH-ONLY. The reason recorded here when the ensemble was launched — "the
-    # projected scattering step loses number at ~1.25× the growth rate" — was
-    # WITHDRAWN on 2026-08-20 and must not be cited: the projected step's loss is
-    # ONE-OFF in the seed's out-of-C weight, and it read as a rate only because a
-    # tracking cutoff manufactures fresh out-of-C content every step. See the
-    # retraction in `src/solvers/spgpe.jl` and `docs/guides/spgpe.md`.
+    # GROWTH-ONLY, and it survives a day of being argued about in both directions.
     #
-    # What survives the retraction is Rooney Eq. (20) being the sub-theory that
-    # answers #334's question, and its carrying the M_z-changing exchange that
-    # makes nucleation possible where transport is blocked. What does NOT survive
-    # is the claim that the full theory was unusable — that was never measured.
-    # It is being measured now: the `fullspgpe` stage runs the full theory on the
-    # same ramp, and it holds N_C flat at f = 0.065 where growth-only reaches
-    # 0.37. Pinning the cutoff does not restore it, so the withdrawn mechanism is
-    # not the explanation either. Until `ed_probe` attributes that stall, this
-    # stage's choice of sub-theory is a stated assumption, not a justified one.
+    # The reason recorded here at launch — "the projected scattering step loses
+    # number at ~1.25× the growth rate" — rested on evidence that did not support
+    # it (flatness in resolution, which a one-off shows too), and was withdrawn on
+    # 2026-08-20. The withdrawal was then measured to be too broad: it rested on a
+    # NOISE-OFF experiment, and with the noise on the loss is a rate after all
+    # (ratio 4.04 for 4x the steps, at zero growth drive, from a pre-projected
+    # seed). Production runs with noise. See `src/solvers/spgpe.jl`.
+    #
+    # So the choice stands, now on a measurement instead of an inference, and the
+    # `fullspgpe` stage shows the consequence directly: the full theory on this
+    # very ramp holds N_C flat at f = 0.065 where growth-only reaches 0.37, and
+    # pinning the C region changes that by 5 parts in 3271 — so it is the noise
+    # channel, not the cutoff motion.
+    #
+    # What was always independent of that argument, and is the positive reason:
+    # Rooney Eq. (20) is a sub-theory in its own right and carries the M_z-changing
+    # exchange that makes nucleation possible where transport is blocked.
     # Passed through `-v`, not
     # exported: qsub only forwards the variables it is named, so an `export` here
     # would have left every job running the full theory.
