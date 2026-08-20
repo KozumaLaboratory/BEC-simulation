@@ -192,9 +192,115 @@ What it does answer:
 - **That the solver condenses when the reservoir allows it** — 82 % of
   $N_\mathrm{TF}$ at fixed $\mu=5$, $T=2$, still rising.
 
-Answering the atom-number question needs a **number-conserving** formulation, with
-$\mu(t)$ solved so that $N_C+N_I$ matches a measured total. That is not
-implemented.
+### The number-conserving formulation, and what it gives (2026-08-07)
+
+Implemented. $\mu$ is solved from the standard semiclassical Hartree–Fock constraint
+(Popov / Zaremba–Griffin–Nikuni; [Giorgini, Pitaevskii & Stringari](https://arxiv.org/pdf/cond-mat/9704014)),
+
+$$\mu_\mathrm{eff}(r)=\mu-V(r)-2c_0\big[n_c(r)+\tilde n(r)\big],\qquad
+N_0(\mu)+\tilde n_C(\mu)+N_I(\mu)=N_\mathrm{total},$$
+
+with the exchange factor of 2 on the thermal density only. Inside the condensate
+Thomas–Fermi gives $\mu_\mathrm{eff}=-c_0n_c\le 0$, so nothing diverges. $N_0$ is an
+**output**: whatever the constraint leaves once the thermal regions take their share.
+
+Evaluated along the euv3 trajectory:
+
+| $t$ (s) | $N$ | $T$ (nK) | $\mu_\mathrm{eq}$ | $N_0^\mathrm{eq}$ | $f_0$ |
+|---|---|---|---|---|---|
+| 1.594 | 8.60e4 | 780 | 7.33 | 2.35e4 | 0.27 |
+| **1.726** | 5.34e4 | 434 | 8.13 | **4.01e4** | 0.75 |
+| 1.859 | 1.29e4 | 197 | 4.83 | 1.15e4 | 0.89 |
+| 1.992 | 5485 | 118 | 3.47 | 5157 | 0.94 |
+| 2.390 | 3576 | 64 | 2.95 | 3513 | 0.98 |
+
+**The peak is $N_0\approx4.0\times10^4$ at $t=1.73$ s, 80 % of the measured
+$5.02\times10^4$** (PRL 129, 223401) — and it falls monotonically after that to
+$3.5\times10^3$ at the end of the ramp. Running the evaporation to completion throws
+condensate away: past 1.73 s the losses beat the cooling. So "optimising" this ramp
+means **stopping it at the peak**, and the 0-D model's own final $N_0=1789$ (3.6 % of
+measured) is the value at the wrong end of a curve rather than a failure of the model.
+
+**Three caveats, none of them small.**
+
+The table is the EQUILIBRIUM constraint, not dynamics. Whether the field can follow is
+a separate question, and it visibly cannot at the handoff: the constraint says
+$N_0=1.15\times10^4$ there while the c-field run reports $0$ through the first 5 % of
+its window. That gap is what a finite $\gamma$ costs and it is the thing the SPGPE
+exists to compute.
+
+$N_\mathrm{total}(t)$ still comes from the 0-D model and still carries the $K_3$
+systematic. What changed is that $K_3$ now moves the total rather than deciding
+whether a condensate exists.
+
+The c-field cannot cover the whole ramp. At 50 µK the internal temperature is 1762, so
+$\epsilon_\mathrm{cut}\sim5290$ and resolving it needs $\sim520^3$ — 1300× the $48^3$
+that already costs 460 ms/step with the DDI. The 0-D model carries the cooling and the
+c-field takes over at 1.85 s; everything before that enters only through $(N,T)$ at the
+handoff.
+
+### The dynamics: the field does not condense at the derived rates
+
+The table above is the equilibrium constraint. Whether the c-field *follows* it is the
+question the SPGPE exists to answer, and the answer at the handoff is no:
+
+| | field | constraint |
+|---|---|---|
+| thermal $C$ region, end of ramp | 34 | 51 |
+| condensate $N_0$, end of ramp | **0.071** | **3498** |
+
+with the constraint satisfiable at all 4977 control steps. **The thermal modes track
+equilibrium to 30 % and the condensate mode does not grow at all.** A broken engine would
+miss both, so what is failing is specifically condensate growth — whose rate is
+$2\gamma(\mu-\varepsilon_0)$.
+
+**It is the ramp, and the solver is not at fault.** Two measurements settle it.
+
+Raising $\gamma$ does not help, and could not: at 10× the C region fills to 94 % of the
+cloud (2.28e4 of 2.43e4, so the field responds to $\gamma$ exactly as it should) and
+$N_0$ is still 7.2; at 100× it is NaN. The growth noise goes as $\sqrt{2\gamma T}$, so
+fluctuation–dissipation ties damping to noise and $\gamma$ sets only the *rate* at which
+equilibrium is approached, never the equilibrium itself. The null result is not
+"$\gamma$ is not the knob" — it is that $\gamma$ was the wrong question.
+
+Removing the ramp answers it. Held at the ramp's **end** conditions
+($\mu = 2.95$, $T = 2.28$, $\epsilon_\mathrm{cut} = 8.34$), seeded thermal:
+
+| $t$ | 400 | 1200 | 4000 |
+|---|---|---|---|
+| $N_C$ | 2888 | 2953 | 3158 |
+| $N_0$ | 1231 | 1610 | **1761** |
+| $f_0$ | 0.43 | 0.55 | **0.56** |
+
+**The field condenses to $f_0 = 0.56$ and is still rising** — against the constraint's
+3498 — at exactly the conditions where the ramp run ends with $N_0 = 0.071$. So the
+failure is not at fixed point.
+
+The difference is what the field *arrives with*. The fixed-point run starts with 2858
+atoms in C; the ramp run reaches the same conditions holding **34**. As
+$\epsilon_\mathrm{cut}$ tracks $T$ down, the C region shrinks and the projector removes
+atoms faster than the reservoir refills them from I, so by the time conditions favour a
+condensate the field is empty. That mechanism is consistent with everything measured and
+has not been isolated on its own — at 10× $\gamma$ the field still empties, from 2.28e4
+to 198.
+
+**So: this evaporation ramp allows $4\times10^4$ condensed atoms thermodynamically, and
+the c-field does not reach them, because the ramp empties the classical region faster
+than the derived reservoir rates refill it.**
+
+The $\gamma$ scan **was run once before and thrown away**: the $N_0$ estimator read
+`psi[:,:,:,1]` while `thermal_cfield!` seeds the last component, so at $D=13$ it projected
+an empty array and returned $\sim 0$ at every $\gamma$ by construction. It is now checked
+against a known Thomas–Fermi state in $D = 1, 3, 13$ and in both the first and last
+component, returning 1.00000 each time.
+
+**Three attempts at this constraint, and only measurement caught the first two.**
+Prescribing $\mu$ from an assumed split prescribes $N_0$. Solving
+$N_I=N_\mathrm{total}-N_C$ with $N_C$ read from the field charges the whole
+field-to-equilibrium gap to the reservoir — it returned $\mu=16.7$, demanding
+$2\times10^5$ atoms against 6756 present. A discrete level sum that skipped levels
+below $\mu$ made the total non-monotone, so a 200-iteration bisection returned 2.34
+for 2.5. Reading the standard formalism first would have cost fifteen minutes.
 
 ## Validation
 

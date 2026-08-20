@@ -13,6 +13,9 @@
 # cold, which is what happens in the laboratory.
 
 export spgpe_reservoir, reservoir_chemical_potential
+export incoherent_population, mu_from_total_number
+export FeedbackWaveform, number_conserving_callback
+export coherent_population, mu_from_total_number_equilibrium
 
 """
     reservoir_chemical_potential(N, T, ω̄, m, a_s; branch=:condensate) -> μ [J]
@@ -234,4 +237,254 @@ function spgpe_reservoir(
         k_cut=k_cut_series, eps_cut=eps_cut_series, k_cut_max=maximum(k_cut_series),
         N0_ref=r.N0[sel], N_ref=r.N[sel], omega_bar=ωbar,
         duration_s=r.t[sel[end]] - t_ref, duration_internal=t_int[end])
+end
+
+"""
+    incoherent_population(mu, T, eps_cut; omega=1.0, n_max=4000) -> Float64
+
+Bose population of the I region — every harmonic level above `eps_cut` — at
+chemical potential `mu` and temperature `T`, in internal units:
+
+    N_I(μ,T) = Σ_{n : ε_n > ϵ_cut} g_n / (exp((ε_n − μ)/T) − 1),
+    ε_n = (n + 3/2)ω̄,   g_n = (n+1)(n+2)/2
+
+Strictly increasing in `mu` and divergent as `mu → ϵ_cut⁻`, which is what makes
+[`mu_from_total_number`](@ref) invertible.
+"""
+function incoherent_population(mu::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, n_max::Int=4000)
+    (T <= 0) && return 0.0
+    s = 0.0
+    for n in 0:n_max
+        ε = (n + 1.5) * Float64(omega)
+        ε > eps_cut || continue
+        x = (ε - Float64(mu)) / Float64(T)
+        x > 0 || return Inf                      # μ above an occupied I level
+        x > 60 && break                          # remaining terms are below 1e-26
+        s += 0.5 * (n + 1) * (n + 2) / expm1(x)
+    end
+    s
+end
+
+"""
+    mu_from_total_number(N_total, N_C, T, eps_cut; omega=1.0) -> Float64
+
+The chemical potential at which the atoms NOT in the c-field fill the I region:
+solve `N_I(μ,T) = N_total − N_C` for `μ`. Returns `NaN` when there is no solution.
+
+# Why this and not `reservoir_chemical_potential`
+
+That function maps a total `N` to a `μ` through an assumed equilibrium split — the
+Thomas–Fermi branch gives `μ = μ_TF(N₀)`, the thermal branch inverts `Li₃`. Either
+way `μ` is computed from `N` under an assumption about how `N` divides, and in a
+grand-canonical SPGPE **prescribing `μ` prescribes `N₀`**: `μ < ε₀` forbids a
+condensate and `μ > ε₀` fixes the size through `μ = ε₀ + c₀n₀`. So a run built that
+way cannot answer "how many atoms condense" — the answer was in the input. That is
+why the euv3 evaporation verdict was retracted: it moved with a one-parameter `K₃`
+fit and flipped at `K₃/fit ≈ 0.3`.
+
+This takes `N_C` from the field instead. What is prescribed is the **total**, an
+extensive measured quantity, and the split is left to the dynamics. The feedback is
+restoring rather than circular: a c-field holding few atoms leaves many for the I
+region, which at fixed `T` requires a higher `μ`, which drives growth — and the
+converse. `N₀` is then an output.
+
+What it does not fix: `N_total(t)` still comes from the 0-D model and still carries
+the `K₃` systematic. The difference is that `K₃` now moves the total rather than
+deciding whether a condensate exists at all.
+
+Requires `μ < ϵ_cut`, since the lowest I level sits there and a Bose occupation
+above it diverges. `NaN` is returned rather than a clamped value when
+`N_total ≤ N_C` (nothing left for the reservoir) or when the demand cannot be met
+below the cutoff — an unsatisfiable constraint is a fact about the trajectory, not
+something to paper over with a default.
+"""
+function mu_from_total_number(N_total::Real, N_C::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, rtol::Real=1e-8, iters::Int=200)
+    N_I_target = Float64(N_total) - Float64(N_C)
+    (N_I_target <= 0 || T <= 0) && return NaN
+
+    # ϵ_cut is the pole; bracket strictly below it. The lower end is walked down
+    # until the I region is under-filled, so the bracket is found rather than
+    # assumed — a hard-coded lower bound would silently fail for a cold reservoir.
+    hi = Float64(eps_cut) - 1e-9 * max(abs(eps_cut), 1.0)
+    incoherent_population(hi, T, eps_cut; omega) >= N_I_target || return NaN
+    lo = hi - Float64(T)
+    for _ in 1:60
+        incoherent_population(lo, T, eps_cut; omega) < N_I_target && break
+        lo -= max(Float64(T), abs(lo))
+        lo < -1e12 && return NaN
+    end
+
+    for _ in 1:iters
+        mid = 0.5 * (lo + hi)
+        n = incoherent_population(mid, T, eps_cut; omega)
+        (n < N_I_target) ? (lo = mid) : (hi = mid)
+        abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
+    end
+    0.5 * (lo + hi)
+end
+
+"""
+    FeedbackWaveform(value) <: Waveform
+
+A waveform whose value is read from a `Ref` at every step, so a controller can
+change it while the run is in progress.
+
+`SPGPEReservoir` evaluates `mu` once per step, and a precomputed
+`PiecewiseLinearWaveform` is the right representation when `μ(t)` is known in
+advance. It is the wrong one for [`mu_from_total_number`](@ref), which needs `N_C`
+from the field and therefore cannot be tabulated before the run.
+"""
+struct FeedbackWaveform <: Waveform
+    value::Base.RefValue{Float64}
+end
+FeedbackWaveform(x::Real=0.0) = FeedbackWaveform(Ref(Float64(x)))
+evaluate(w::FeedbackWaveform, ::Float64) = w.value[]
+max_frequency(::FeedbackWaveform) = 0.0
+
+"""
+    number_conserving_callback(mu_ref, N_total_of, T_of, eps_cut; omega=1.0, every=1)
+
+An `on_step` callback that keeps `mu_ref` at the value where the atoms outside the
+c-field fill the I region: `N_I(μ,T) = N_total(t) − N_C(t)`, with `N_C` measured
+from the field.
+
+`N_total_of(t)` supplies the total — from a 0-D evaporation trajectory, or from a
+measurement. The condensate number is then an OUTPUT of the run rather than a
+consequence of the `μ` that was fed in.
+
+When the demand cannot be met — `N_C` already exceeds the total, or the I region
+cannot hold the remainder below the cutoff — [`mu_from_total_number`](@ref) returns
+`NaN` and this leaves `mu_ref` at its previous value and counts the event. A
+trajectory that spends most of its steps unsatisfiable is not describing the
+experiment, and `n_unsatisfiable` is what says so; silently clamping would hide
+exactly the kind of imposed answer this whole mechanism exists to remove.
+"""
+function number_conserving_callback(
+    mu_ref::Base.RefValue{Float64}, N_total_of, T_of, eps_cut;
+    omega::Real=1.0, every::Int=1, counter::Base.RefValue{Int}=Ref(0),
+    # REQUIRED. It was optional with a "return NaN" fallback, so a caller that forgot it
+    # got a control loop that silently never updated mu — measured in CI as N_C identical
+    # across a 3x change in the total, with all 150 callbacks recorded unsatisfiable. An
+    # absent argument is missing, not a default; a MethodError is the correct outcome.
+    t_offset::Real=0.0, c0_lda::Real,
+)
+    function (ws, step, args...)
+        step % every == 0 || return nothing
+        # t_offset because a c-field run may start PART WAY through a ramp — the
+        # classical field cannot represent the hot end of an evaporation at all, so
+        # the 0-D model carries the cooling and this takes over for the formation.
+        # Without the offset N_total_of and T_of would be read as if the ramp had
+        # restarted from zero.
+        t = Float64(t_offset) + step * ws.sim_params.dt
+        N_C = real(sum(abs2, ws.state.psi)) * cell_volume(ws.grid)
+        # eps_cut may be a NUMBER or a FUNCTION of time. It has to be allowed to
+        # move: both reservoir coefficients depend on the cutoff only through
+        # (eps_cut - mu)/T, so holding it fixed while T falls drives that ratio up and
+        # decouples the reservoir — a failure this repo already gates elsewhere. And
+        # the controller must use the same cutoff the projector does, or it solves for
+        # a mu against an I region the field does not have.
+        ec = eps_cut isa Real ? Float64(eps_cut) : Float64(eps_cut(t))
+        # The semiclassical Hartree-Fock constraint, which is the standard form and
+        # the third one tried here. It solves N_0(mu) + n_th,C(mu) + N_I(mu) = N_total
+        # with every region at the same mu through mu_eff = mu - V - 2c0 n, so it does
+        # NOT read N_C from the field. Reading N_C was the second version's error: it
+        # charged the whole field-to-equilibrium gap to the reservoir and returned
+        # mu = 16.7 against a field of 6756 atoms, demanding 2e5.
+        #
+        # What is driven toward is the mu the whole cloud would have in equilibrium at
+        # this total and temperature — a target, not a residual.
+        mu = mu_from_total_lda(N_total_of(t); T=T_of(t), c0=c0_lda, eps_cut=ec, omega).mu
+        isnan(mu) ? (counter[] += 1) : (mu_ref[] = mu)
+        nothing
+    end
+end
+
+"""
+    coherent_population(mu, T, eps_cut; omega=1.0) -> Float64
+
+Bose population of the C region — the harmonic levels at or below `eps_cut`,
+excluding the ground state — at `(μ, T)`:
+
+    N_C^th(μ,T) = Σ_{n : ε_n ≤ ϵ_cut, ε_n > ε_0} g_n / (exp((ε_n − μ)/T) − 1)
+
+The ground state is left out because its occupation is the condensate, which is what
+`mu_from_total_number_equilibrium` solves for rather than assumes.
+"""
+function coherent_population(mu::Real, T::Real, eps_cut::Real; omega::Real=1.0)
+    (T <= 0) && return 0.0
+    s = 0.0
+    for n in 1:4000
+        ε = (n + 1.5) * Float64(omega)
+        ε <= eps_cut || break
+        x = (ε - Float64(mu)) / Float64(T)
+        # A level BELOW mu is not an error and must not return Inf: with a condensate
+        # present mu sits above many excited levels — in Thomas-Fermi mu >> eps_0 — and
+        # those levels are absorbed into the condensate that N_0(mu) already counts.
+        # Returning Inf made the bisection read every such mu as "too many atoms", so
+        # mu could never rise past the first excited level and a round-trip from 6.0
+        # came back 2.5.
+        x > 0 || continue
+        x > 60 && continue
+        s += 0.5 * (n + 1) * (n + 2) / expm1(x)
+    end
+    s
+end
+
+"""
+    mu_from_total_number_equilibrium(N_total, T, eps_cut; omega=1.0, c0, V) -> (; mu, N0)
+
+Solve `N₀(μ) + N_C^th(μ,T) + N_I(μ,T) = N_total` for the chemical potential of the
+WHOLE cloud, with the condensate taken in Thomas–Fermi, `N₀ = (4π/c₀)[μR³/3 − R⁵/10]`,
+`R = √(2(μ−ε₀))` for `μ > ε₀` and zero below.
+
+# Why this replaces `mu_from_total_number`
+
+That version solved `N_I(μ,T) = N_total − N_C` with `N_C` read from the field, which
+looked like the right way to stop prescribing `N₀`. It is not: it charges the whole
+discrepancy between the field and equilibrium to the reservoir. Measured on the euv3
+ramp at 10 % — `N_total = 8835`, field `N_C = 6756` — it returned `μ = 16.7`, a value
+whose Thomas–Fermi condensate is `2×10⁵`, thirty times the atoms present, and the
+field's `N₀` sat at 0.64 while `μ` stayed pinned there. A drive that demands thirty
+times what exists is not a transient, it is a mis-stated constraint.
+
+Here every region is a function of `μ` at the same `T`, so the solution is the `μ` the
+whole cloud would have in equilibrium at that total — which is what the reservoir
+should be driving the field toward. `N₀` still comes out rather than going in: it is
+whatever the constraint leaves after the thermal regions take their share.
+"""
+function mu_from_total_number_equilibrium(N_total::Real, T::Real, eps_cut::Real;
+    omega::Real=1.0, c0::Real, V::Real=1.0, rtol::Real=1e-8, iters::Int=200)
+    (N_total <= 0 || T <= 0) && return (; mu=NaN, N0=NaN)
+    ε0 = 1.5 * Float64(omega)
+    function total(mu)
+        N0 = if mu > ε0
+            R = sqrt(2 * (mu - ε0))
+            max((4π / Float64(c0)) * ((mu - ε0) * R^3 / 3 - R^5 / 10), 0.0)
+        else
+            0.0
+        end
+        N0 + coherent_population(mu, T, eps_cut; omega) +
+        incoherent_population(mu, T, eps_cut; omega)
+    end
+    hi = Float64(eps_cut) - 1e-9 * max(abs(eps_cut), 1.0)
+    total(hi) >= N_total || return (; mu=NaN, N0=NaN)
+    lo = min(ε0 - 10 * Float64(T), -Float64(T))
+    for _ in 1:60
+        total(lo) < N_total && break
+        lo -= max(Float64(T), abs(lo))
+        lo < -1e12 && return (; mu=NaN, N0=NaN)
+    end
+    for _ in 1:iters
+        mid = 0.5 * (lo + hi)
+        (total(mid) < N_total) ? (lo = mid) : (hi = mid)
+        abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
+    end
+    mu = 0.5 * (lo + hi)
+    N0 = mu > ε0 ?
+         let R = sqrt(2 * (mu - ε0))
+        max((4π / Float64(c0)) * ((mu - ε0) * R^3 / 3 - R^5 / 10), 0.0)
+    end : 0.0
+    (; mu, N0)
 end
