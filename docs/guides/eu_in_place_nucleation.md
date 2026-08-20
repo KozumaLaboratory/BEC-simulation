@@ -89,9 +89,9 @@ rather than convenient:
   $\epsilon_{\rm cut} \approx 125$, $k_{\rm cut} \approx 16$ and a 192³ grid at 13
   components. Not for an ensemble, and saying so with a number is better than
   discovering it after a week of queue.
-- *below $f_{\rm sp}$, where the flower branch does not exist*, the condensate is
-  polarised because there is nothing else to be. That **is** the disordered side
-  of this transition, and it costs no thermal cloud to reach.
+- *below $f_{\rm sp}$, where the continuation cannot hold a flower state*, the
+  condensate is polarised because nothing else is reachable. That **is** the
+  disordered side of this transition, and it costs no thermal cloud to reach.
 
 ### Axes, and the settings held fixed
 
@@ -259,7 +259,7 @@ cell). Walking the flower branch **down** in condensate fraction:
 | $\langle F_\perp\rangle$ | 5.010 | 4.671 | 4.182 | 3.870 | **3.500** | **0.122** | 0.130 |
 | $J_z$ | −1.133 | −1.290 | −1.541 | −1.693 | **−1.860** | −2.197 | −2.357 |
 
-**The flower branch ceases to exist between $f = 0.271$ and $f = 0.320$** —
+**The continuation loses the flower branch between $f = 0.271$ and $f = 0.320$** —
 $N_0^\ast \approx 1.4$–$1.6\times10^4$ atoms. Below it the continuation has fallen
 onto the polarised branch ($\langle F_\perp\rangle \approx 0.12$ and falling
 smoothly to 0.23 at $f = 0.02$), which is what a branch ending looks like from a
@@ -267,7 +267,25 @@ warm continuation.
 
 This is the structural fact the rest of the campaign is about: **a condensate is
 born polarised**, not because it is preferred but because below $N_0^\ast$ the
-flower state does not exist to be selected.
+warm continuation cannot hold a flower state at all.
+
+**A caveat inherited from #398, and it is the same one.** "The continuation loses
+the branch" and "the branch ends" are different claims, and #383 showed the
+distinction has teeth on this very manifold: at #335's field-spinodal the
+curvature, the escape direction and the lowest ω all fail to soften, so 68.4 µG is
+where a warm-started L-BFGS stops staying on the branch and *not* demonstrably
+where the minimum ceases to exist. $f_{\rm sp}$ here is measured the same way and
+carries the same caveat: what is established is that **the continuation cannot
+follow a flower state below $f \approx 0.30$**, bracketed consistently at two
+grids and with the certification of criterion 6.
+
+Nothing in §5.9 depends on which reading is right. The selection statistic is
+measured by growing *through* the window and classifying the endpoint against the
+branch table, and the table is built from cells that converged — so a flower
+minimum surviving below $f_{\rm sp}$ behind a barrier would change the *story* of
+why a small condensate is polarised, not the measurement that the cold trajectories
+end polarised and the hot ones end flower. Settling it wants the same λ_min
+computation #399 tracks, run in $f$ rather than in $B$.
 
 **The polarised branch, by contrast, has no spinodal in $f$ at all.** Walked
 *upward* from $f = 0.02$ ($N_0 = 10^3$) to $f = 1$ it stays converged at the gate
@@ -298,7 +316,7 @@ So the structure at $(\kappa = 1.8, B = 20\ \mu$G$)$ is:
 
 | range | what exists | which is the ground state |
 |---|---|---|
-| $f < f_{\rm sp} \in (0.271, 0.320)$ | polarised only | polarised, by default |
+| $f < f_{\rm sp} \in (0.271, 0.320)$ | polarised only, as far as a continuation can reach | polarised, by default |
 | $f_{\rm sp} < f < f_{\rm eq} \approx 0.339$ | both | **polarised** — the flower is born *above* it |
 | $f > f_{\rm eq}$ | both | **flower**, and the gap grows without bound |
 
@@ -622,7 +640,7 @@ is a result in its own right.
 
 | | |
 |---|---|
-| **The flower texture has a minimum atom number.** | It ceases to exist below $f_{\rm sp} = 0.30 \pm 0.02$, $N_0^\ast \approx 1.5\times10^4$, bracketed consistently at 32³ and 64³. The polarised branch has no spinodal at all from $f = 0.02$ to 1. **A condensate is born polarised**, not because it is preferred but because nothing else exists. |
+| **The flower texture has a minimum atom number.** | A warm continuation cannot hold it below $f_{\rm sp} = 0.30 \pm 0.02$, $N_0^\ast \approx 1.5\times10^4$, bracketed consistently at 32³ and 64³, while the polarised branch is followable from $f = 0.02$ to 1. **A condensate is born polarised.** Whether the flower minimum *ceases to exist* there or merely becomes unreachable is the #398/#399 distinction and is not settled — see §5.2. |
 | **The choice is made in a narrow window, not at the target.** | The branches are 663 $k_BT$ apart at $f = 1$ and 8–15 at the bifurcation; they cross at $f_{\rm eq} = 0.343$. Asking the question at $f = 1$, which is what "cool at the target point" reads as, returns zero by arithmetic. |
 | **The full SPGPE cannot be used for a growth problem here.** | Its projected scattering step loses number at 1.25× the growth rate — 11.5 % in 60 ms with the growth drive at exactly zero. Growth-only (Rooney Eq. 20) is the sub-theory that answers this, and it carries the $M_z$-changing exchange that makes nucleation possible where $J_z$ conservation blocks transport. |
 
