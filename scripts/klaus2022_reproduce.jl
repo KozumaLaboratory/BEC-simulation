@@ -23,7 +23,24 @@ using JLD2
 using Printf
 using Dates
 
-FFTW.set_num_threads(Threads.nthreads())
+# `KLAUS_FFTW_THREADS` exists because job 8444494 SEGFAULTED on TSUBAME inside
+# FFTW's threaded spawn loop (`FFTW/.../providers.jl:49` → `spawn_apply` →
+# `n1bv_12`), on the dynamics step, after the ground state completed cleanly.
+# The same commit, the same FFTW artifact (`8655261c…`) and the same Julia
+# 1.12.6 run to completion locally at `-t 16` in 159 s, so the binary is not the
+# variable and a local repro is not available to bisect against.
+#
+# This is a DIAGNOSTIC knob, not a fix, and its default is exactly the previous
+# behaviour: unset ⇒ `Threads.nthreads()`. It exists so that one queue wait can
+# discriminate FFTW-internal threading from Julia threading instead of three,
+# which at a 2.5 h queue depth is the difference between answering this today
+# and guessing. Passing an env var the script does not read is silent — that
+# already cost a job on this campaign — so it is read here and echoed below.
+const _FFTW_THREADS = let v = get(ENV, "KLAUS_FFTW_THREADS", "")
+    isempty(v) ? Threads.nthreads() : parse(Int, v)
+end
+FFTW.set_num_threads(_FFTW_THREADS)
+@info "FFTW threads" fftw=_FFTW_THREADS julia=Threads.nthreads()
 using SpinorBEC
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
@@ -163,6 +180,7 @@ function arm_ar_ramp(smoke)
     end
     Dict(
         "arm" => "ar-ramp", "smoke" => smoke, "verdict" => verdict,
+        "duration_s" => dur / SECOND,
         "omega_c_over_perp" => omega_c, "ar_peak" => ar_peak,
         "ar_at_peak_omega" => Ω[i_peak],
         "ar_static_magnetostricted" => gs.aspect_ratio_xy,
@@ -277,6 +295,14 @@ function arm_stripes(smoke; control::Bool)
     end
     Dict(
         "arm" => control ? "control" : "stripes", "smoke" => smoke,
+        # The hold ACTUALLY PROPAGATED, not the knob it was read from. Until
+        # 2026-08-19 this was written once more at the bottom of the file as
+        # `out["hold_s"] = ... HOLD_S`, i.e. the env default — so every `--smoke`
+        # record claimed 1.1 s while the run was 0.15 s. One quantity, two
+        # declarations, and only one of them knew about `smoke`. Recorded here
+        # because this is where the value is decided.
+        "hold_s" => hold / SECOND,
+        "duration_s" => dyn["duration"] / SECOND,
         "verdict" => verdict,
         "axis_order" => order, "axis_order_null" => null,
         "axis_order_over_null" => over_null,
@@ -307,7 +333,16 @@ function _save_frames(arm, smoke, times, cols, grid)
     isempty(cols) && return nothing
     dir = joinpath(ROOT, "runs", "klaus2022")
     mkpath(dir)
-    path = joinpath(dir, "$(arm)$(smoke ? "_smoke" : "")_frames.jld2")
+    # RESULT_TAG, for the same reason KLAUS_RESULTS exists and in the same
+    # words the submit wrapper already uses about the JSON: one seed per job so
+    # that concurrent jobs do not share a file. The JSON got that treatment and
+    # THIS DID NOT, so three seeds would all have written `stripes_frames.jld2`
+    # and kept whichever finished last — while each seed's JSON recorded that
+    # shared path as its own `frames_path`. A record saying "seed 1" pointing at
+    # seed 3's frames is worse than no frames: `klaus2022_reanalyse.jl` re-derives
+    # the verdicts from exactly this file, so the re-analysis would have been
+    # silently about a different run than the one it was labelled with.
+    path = joinpath(dir, "$(arm)$(smoke ? "_smoke" : RESULT_TAG)_frames.jld2")
     JLD2.jldsave(path; times=times, column_density=cols,
         dx=grid.dx[1], dy=grid.dx[2])
     path
@@ -329,7 +364,18 @@ end
 out["published"] = Dict(string(k) => v for (k, v) in pairs(PUBLISHED))
 out["accept"] = Dict(string(k) => v for (k, v) in pairs(ACCEPT))
 out["wigner_seed"] = WIGNER_SEED
-out["hold_s"] = out["arm"] == "control" ? CONTROL_HOLD_S : HOLD_S
+# NOT set here — each arm records the time it actually propagated. This line
+# used to restate `hold_s` from the env default and was wrong for every
+# `--smoke` run; see the comment beside the stripes arm's own entry.
+#
+# The assertion is on `duration_s` and NOT on `hold_s`, because `ar-ramp` has no
+# hold: it is a ramp, and giving its `dur` the name `hold_s` would make the
+# record read as a quantity the arm does not have. The first version of this
+# guard did demand `hold_s` from every arm and would have failed `ar-ramp` —
+# a gate reddening on correct work, forty minutes after writing that down as
+# the failure mode to avoid.
+haskey(out, "duration_s") ||
+    error("arm $(out["arm"]) did not record the duration it propagated")
 out["git_hash"] = strip(read(`git rev-parse HEAD`, String))
 out["dirty"] = !isempty(strip(read(`git status --porcelain`, String)))
 out["timestamp"] = string(now())

@@ -18,6 +18,11 @@
 using Test
 # parallel-runner contract: every test file loads the package (plain form)
 using SpinorBEC
+# `Meta.lower` expands macros in THIS module, so a macro the corpus uses has to be
+# resolvable here or every file "lowers" by failing to see the macro at all — which
+# silently disarms the gate below. `calibrated_scan` caught exactly that: its
+# positive control stopped matching when Printf was absent from Main.
+using Printf
 
 const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
@@ -88,6 +93,18 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu_hysteresis/submit_ramp.sh",
     "eu_hysteresis/submit_smoke.sh",
     "eu_hysteresis/submit_stability.sh",
+    # ── active campaign: Eu in-place nucleation (docs/guides/eu_in_place_nucleation.md, #334) ──
+    "eu334/_preamble.sh",
+    "eu334/launch.sh",
+    "eu334/submit_bifurcation.sh",
+    "eu334/submit_nucleate.sh",
+    "eu334/submit_smoke.sh",
+    "eu334/submit_classify.sh",
+    "eu334/window.jl",
+    "eu334/nucleation_bifurcation.jl",
+    "eu334/nucleate.jl",
+    "eu334/classify.jl",
+    "eu334/viz_eu334.py",
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
     # the SAME states, one by continuation and one by the second variation.
@@ -197,4 +214,209 @@ const _SCRIPTS_ALLOWLIST = Set([
         @test isempty(stale)
         isempty(stale) || @info "allowlist entries with no file" stale
     end
+end
+
+# The allowlist asserts a file EXISTS. It says nothing about whether that file
+# still runs, and on 2026-08-18 the 306→76 absorption deleted
+# `scripts/eu_ramp_common.jl` while two #335 instruments
+# (`eu_hysteresis/branch_{continuation,stability}.jl`) kept including it. Both
+# died on their first line for a month with nothing red: the allowlist was
+# happy, the tier suite does not execute scripts, and the campaign that needed
+# them was already finished. The class is "a tracked artifact points at a path
+# that a later commit removed", and it is checkable in milliseconds.
+@testset "include targets in scripts/ and docs figures resolve" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+
+    # `include(joinpath(@__DIR__, "a", "b.jl"))` and `include("a/b.jl")`.
+    # Anything with an interpolation or a non-literal argument is skipped rather
+    # than guessed at — and the count of skips is reported, so an extractor that
+    # understands nothing cannot pass as a tree with nothing to find.
+    re_dir = r"include\(\s*joinpath\(\s*@__DIR__\s*,\s*((?:\"[^\"]*\"\s*,\s*)*\"[^\"]*\")\s*\)\s*\)"
+    re_lit = r"include\(\s*\"([^\"$]*)\"\s*\)"
+    lit_parts(s) = String[strip(x, ['"', ' ']) for x in split(s, ",")]
+
+    # (file, printable target, [candidate absolute paths]). A `.jl` include is
+    # relative to its own file; the `julia -e '… include("x") …'` lines inside
+    # submit wrappers and usage comments run from the repo root. Both bases are
+    # offered and either one resolving is enough — the gate is looking for a
+    # target that exists NOWHERE, which is what a deletion leaves behind.
+    # `out`, not `refs`: a nested function assigning to a name that is already a
+    # local of the enclosing scope writes to THAT variable, and the first version
+    # of this gate silently replaced the corpus with the two-entry calibration
+    # probe — then reported the probe as the tree's only broken includes.
+    include_refs = function (path)
+        src = read(path, String)
+        out = Tuple{String, String, Vector{String}}[]
+        for m in eachmatch(re_dir, src)
+            t = joinpath(lit_parts(m[1])...)
+            push!(out, (path, t, [normpath(joinpath(dirname(path), t))]))
+        end
+        for m in eachmatch(re_lit, src)
+            t = String(m[1])
+            push!(
+                out,
+                (path, t, [normpath(joinpath(dirname(path), t)),
+                    normpath(joinpath(root, t))]),
+            )
+        end
+        out
+    end
+
+    files = String[]
+    for d in ("scripts", joinpath("docs", "guides", "figures"))
+        isdir(joinpath(root, d)) || continue
+        for (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            (endswith(f, ".jl") || endswith(f, ".sh")) && push!(files, joinpath(dir, f))
+        end
+    end
+    refs = Tuple{String, String, Vector{String}}[]
+    for f in files
+        append!(refs, include_refs(f))
+    end
+
+    # The extractor is the part that can go blind: a regex that matches nothing
+    # reports a clean tree. Prove it recovers both forms from source it will
+    # actually meet, before any count taken with it is used.
+    probe = mktempdir()
+    write(joinpath(probe, "p.jl"),
+        "include(joinpath(@__DIR__, \"sub\", \"there.jl\"))\ninclude(\"flat.jl\")\n")
+    got = Set(r[2] for r in include_refs(joinpath(probe, "p.jl")))
+    @test joinpath("sub", "there.jl") in got
+    @test "flat.jl" in got
+
+    broken = calibrated_scan(refs;
+        match=r -> !any(isfile, r[3]),
+        present=("synthetic", "gone.jl", [joinpath(root, "deleted_by_a_later_commit.jl")]),
+        absent=("synthetic", "Project.toml", [joinpath(root, "Project.toml")]),
+        describe=r -> string(r[1], " → ", r[2]))
+
+    @test isempty(broken)
+    isempty(broken) || @info "include targets that exist under no base" broken
+    @test !isempty(refs)      # nothing to check ⇒ the extractor, not the tree
+end
+
+# Same class, other language. A submit wrapper is only ever executed by the
+# scheduler, so a quoting slip in one is discovered by a job that dies in its
+# first second after queueing — `${2:?… stage A's …}` is parsed, and the
+# apostrophe inside it took a launcher down. `bash -n` parses without running,
+# which is exactly the distinction that makes this safe to gate.
+# Parsing is not enough for Julia either. `@printf("a" * "b", x)` PARSES — `*` of
+# two literals is an ordinary expression — and dies at MACRO EXPANSION with
+# "First argument to `@printf` after `io` must be a format string". Hit twice on
+# 2026-08-19, once in a driver and once in a test written to close a different
+# hole, each time discovered by a scheduler after minutes of queue and JIT.
+#
+# The obvious gate — `Meta.lower` the whole file, which expands macros without
+# executing anything — DOES NOT WORK, and the way that was found is the point.
+# `Meta.parseall` returns a `:toplevel` block, and lowering a `:toplevel` does not
+# recurse into its forms: each is lowered when it is evaluated. So the check
+# returned "ok" for every file including the planted defect. `calibrated_scan`
+# refused to report, naming the positive control, instead of printing a clean zero.
+#
+# So the gate reads the AST for the defect directly. That is narrower — it knows
+# about `@printf`/`@sprintf` and nothing else — and the narrowness is stated rather
+# than papered over: this catches the format-string class, not "macros expand".
+@testset "@printf format strings are literals, not concatenations" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+
+    _concat(x) = x isa Expr && x.head === :call && !isempty(x.args) && x.args[1] === :*
+
+    """Every `@printf`/`@sprintf` in `ex` whose FORMAT SLOT is a concatenation.
+
+    Only the format slot. Checking the first two argument positions blindly was the
+    first version and it flagged `@printf("… %4.0f%% …\n", 100thr, …)` in
+    `kz_toroidal_winding.jl` — `100thr` is juxtaposition multiplication, an
+    ordinary VALUE argument, and perfectly fine. A gate that cries wolf on correct
+    code gets switched off.
+
+    So: args[3] is the format unless it is an IO, in which case args[4] is. A
+    String literal in args[3] settles it without needing to know what an IO looks
+    like."""
+    function bad_formats(ex, out=String[])
+        if ex isa Expr
+            if ex.head === :macrocall && length(ex.args) >= 3 &&
+                ex.args[1] in (Symbol("@printf"), Symbol("@sprintf"))
+                # args[3] is the format UNLESS it is a bare symbol, which is the
+                # `@printf(io, fmt, …)` form. A String literal there is the format;
+                # so is a concatenation, which is exactly the defect — an earlier
+                # rule that fell through to args[4] whenever args[3] was not a
+                # String therefore skipped past the bad format and inspected a
+                # value, and the positive control caught it.
+                fmt = (ex.args[3] isa Symbol && length(ex.args) >= 4) ?
+                      ex.args[4] : ex.args[3]
+                _concat(fmt) && push!(out, string(ex.args[1], " at ", ex.args[2]))
+            end
+            for a in ex.args
+                bad_formats(a, out)
+            end
+        end
+        out
+    end
+
+    function offenders(path)
+        src = read(path, String)
+        ex = try
+            Meta.parseall(src)
+        catch e
+            return ["parse: " * sprint(showerror, e)]
+        end
+        bad_formats(ex)
+    end
+
+    files = String[]
+    for d in ("test", "scripts", joinpath("docs", "guides", "figures"))
+        isdir(joinpath(root, d)) || continue
+        for (dir, _, fs) in walkdir(joinpath(root, d)), f in fs
+            endswith(f, ".jl") && push!(files, joinpath(dir, f))
+        end
+    end
+
+    # The probes carry the ACTUAL defect and its innocent twin, in the two argument
+    # shapes the extractor has to tell apart.
+    probe = mktempdir()
+    bad = joinpath(probe, "bad.jl")
+    good = joinpath(probe, "good.jl")
+    write(bad, "using Printf\n@printf(\"a\" * \"%d\\n\", 1)\n")
+    # The negative control carries the three innocent shapes, including the one the
+    # first version got wrong: a juxtaposition-multiplied VALUE argument.
+    write(
+        good,
+        "using Printf\n@printf(\"a%d\\n\", 1)\n@printf(stderr, \"b%d\\n\", 2)\n" *
+        "x = 3\n@printf(\"c%.0f%%\\n\", 100x)\n",
+    )
+
+    broken = calibrated_scan(files;
+        match=p -> !isempty(offenders(p)),
+        present=bad, absent=good,
+        describe=p -> relpath(p, root))
+
+    @test isempty(broken)
+    for p in broken
+        @info "concatenated @printf format" file = relpath(p, root) what = offenders(p)
+    end
+    @test !isempty(files)
+end
+
+@testset "shell scripts under scripts/ parse" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+    shs = String[]
+    for (dir, _, fs) in walkdir(joinpath(root, "scripts")), f in fs
+        endswith(f, ".sh") && push!(shs, joinpath(dir, f))
+    end
+    parses(p) = success(pipeline(`bash -n $p`; stdout=devnull, stderr=devnull))
+
+    probe = mktempdir()
+    good = joinpath(probe, "good.sh")
+    bad = joinpath(probe, "bad.sh")
+    write(good, "echo ok\n")
+    write(bad, "x=\${1:?it's broken}\n")
+
+    bad_scripts = calibrated_scan(shs; match=p -> !parses(p), present=bad, absent=good,
+        describe=p -> relpath(p, root))
+    @test isempty(bad_scripts)
+    isempty(bad_scripts) || @info "shell scripts that do not parse" bad_scripts
+    @test !isempty(shs)
 end

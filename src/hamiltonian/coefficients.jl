@@ -2,6 +2,7 @@ export compute_interaction_params
 export compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint
 export compute_c_total, compute_c_dd_dimless, linear_zeeman_p
+export effective_a_s_over_a_ho, effective_eps_dd
 export compute_eu151_interactions
 export compute_lhy_2d_params
 export compute_quadratic_zeeman
@@ -282,6 +283,52 @@ Dimensionless DDI coupling: c_dd = N × μ₀μ² / (ℏω × a_ho³).
 function compute_c_dd_dimless(atom::AtomSpecies; N_atoms::Int, omega_ref::Float64)
     a_ho = sqrt(Units.HBAR / (atom.mass * omega_ref))
     N_atoms * compute_c_dd(atom) / (Units.HBAR * omega_ref * a_ho^3)
+end
+
+"""
+    effective_a_s_over_a_ho(c_total, N_atoms) -> Float64
+
+Invert `c_total = 4π (a_s/a_ho) N` for `a_s/a_ho`.
+
+A config may set `interactions.c_total` directly (the supported way to say
+"this run uses a scattering length the atom does not have" — Li–Saito's
+hypothetical droplet-forming `a_s`, a Feshbach-tuned cell, a pinned sweep).
+Anything downstream that needs `a_s` must then read it back from `c_total`,
+NOT from `atom.a_s`, or the run silently mixes two different scattering
+lengths. Returns `NaN` when `N_atoms ≤ 0`.
+"""
+function effective_a_s_over_a_ho(c_total::Real, N_atoms::Integer)
+    N_atoms > 0 || return NaN
+    Float64(c_total) / (4π * N_atoms)
+end
+
+"""
+    effective_eps_dd(F, c_total, c_dd) -> Float64
+
+`ε_dd = a_dd / a_s` recovered from the dimensionless couplings actually in
+force, rather than from the atom's tabulated pair.
+
+Derivation (spinor convention, `F ≥ 1`):
+
+    c_dd = N μ₀ (g_F μ_B)² / (ℏω a_ho³)        [`compute_c_dd_dimless`]
+         = N μ₀ μ² / (F² ℏω a_ho³)              [μ = g_F F μ_B]
+         = 12π N a_dd / (F² a_ho)               [a_dd = μ₀μ²M/(12πℏ²),
+                                                 ℏ²/M = ℏω a_ho²]
+    c_total = 4π N a_s / a_ho                   [`compute_c_total`]
+    ⇒ c_dd / c_total = 3 a_dd / (F² a_s) = 3 ε_dd / F²
+
+so `ε_dd = (F²/3)(c_dd/c_total)`. For a spinless atom (`F = 0`) `compute_c_dd`
+returns `μ₀μ²` undivided, which is the `F = 1` algebra, so the same expression
+holds with `F → 1`.
+
+This is the inverse of the pair (`compute_c_total`, `compute_c_dd_dimless`) and
+round-trips to `compute_a_dd(atom)/atom.a_s` for any registry atom — gated by
+`test/hamiltonian/test_effective_couplings_roundtrip.jl`.
+"""
+function effective_eps_dd(F::Integer, c_total::Real, c_dd::Real)
+    (isfinite(c_total) && c_total != 0 && isfinite(c_dd)) || return 0.0
+    Feff = max(Int(F), 1)
+    (Feff^2 / 3) * Float64(c_dd) / Float64(c_total)
 end
 
 """

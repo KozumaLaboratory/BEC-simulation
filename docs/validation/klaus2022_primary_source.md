@@ -463,6 +463,57 @@ the most likely common cause of both threshold misses: a cloud that is 4× more
 deformed than the paper's is a cloud whose surface modes and stripe spacing are
 not quite the paper's either.
 
+## 6f. The ensemble follow-up — and the refutation of the reason it was run
+
+§6d closed with: *"We under-ran the paper's own analysis window. A higher
+threshold met by a longer, ensembled run is the follow-up."* That follow-up is
+done — three seeds, 1.1 s hold, 128×128×64, on TSUBAME (jobs 8447213/4/5, ~1 h
+50 m each). **It did not lift the number, and the reason it was run is
+therefore refuted.**
+
+| | seed 1 | seed 2 | seed 3 | mean ± sd | threshold |
+|---|---|---|---|---|---|
+| axis order ÷ null | 4.589 | 4.578 | 4.776 | **4.65 ± 0.11** | ≥ 5.0 ✗ |
+| ÷ t=0 baseline | 1.725 | 1.894 | 2.421 | 2.01 ± 0.36 | ≥ 1.6 ✓ |
+| radial prominence | 2.009 | 1.895 | 2.046 | 1.98 ± 0.08 | ≥ 1.5 ✓ |
+| stripe misalignment | 4.15° | 4.79° | 3.47° | 4.13 ± 0.66° | ≤ 20° ✓ |
+| stripe count | 4.194 | 4.060 | 4.043 | **4.10 ± 0.09** | 2–4 ✗ |
+
+All three **REJECT**, on the same two criteria, and the misses are not scatter:
+5.0 is **3.1 σ** above the mean.
+
+**One realization at 500 ms gave 4.67 × null; seventy frames of each of three
+realizations at 1.1 s give 4.65.** Running longer and ensembling moved this
+observable by 0.4 %, which is the answer to whether the 500 ms single shot was
+the limitation. It was not.
+
+**The paper's own window makes it slightly worse, so the miss is not an artefact
+of ours.** The verdict stays on the pre-registered window — the last 20 % of the
+run, which is what §6 declares and which must not be re-registered a second time
+— but the frames are saved, so the paper's stated Fig. 4c window (700 ms – 1.1 s)
+costs nothing to *compare* against:
+
+| window | frames | seed 1 | seed 2 | seed 3 | mean |
+|---|---|---|---|---|---|
+| pre-registered, 0.88–1.10 s | 70 | 4.589 | 4.578 | 4.776 | 4.65 |
+| paper, 0.70–1.10 s | 126 | 4.385 | 4.392 | 4.731 | **4.50** |
+
+Widening to the paper's window lowers the ratio, because the signal decays
+through the run (§6d already measured that: 9 × null over 0–100 ms). The stripe
+count is unmoved (4.05 on the paper's window). The re-derivation reproduces each
+run's own reduction to three decimals, which is the cross-check that the
+instrument, not just the result, is being read correctly.
+
+**What DID improve is the axis.** 5.9° at 500 ms → 4.13 ± 0.66° here. The
+stripes follow B̂ better with a longer run; they simply are not *more* ordered.
+
+So the type-C stripe comparison is: **the axis and the alignment reproduce, the
+degree of order and the count do not**, and neither is now attributable to
+under-running. §6e's reading — that the 1.16 vs 1.03 magnetostriction is the
+most likely common cause — survives this and is the thing to attack next; a
+cloud deformed 4× too much has neither the paper's surface modes nor its stripe
+spacing.
+
 ## 7. What this cannot settle
 
 - Nothing here constrains a_s: it was fitted in the source against simulations

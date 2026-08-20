@@ -575,32 +575,58 @@ function _cayley_phase_step!(
 end
 
 """
-    _energy_damping_buffers(ws, n_pts) -> (divj, phase_k, ksq, kinv)
+    _energy_damping_buffers(ws, n_pts, k_cut) -> (divj, phase_k, ksq, kinv)
 
 Cached device buffers + k-space kernels for the energy-damping step. `kinv` is
-`1/|k|` with the `k=0` entry zeroed (see [`apply_energy_damping_step!`](@ref));
-`ksq` is `ws.grid.k_squared` resident on the device, which the per-call
-`_to_device` in `apply_projected_gp!` would otherwise re-upload every step.
+`1/|k|` with the `k=0` entry zeroed and everything above `k_cut` zeroed (see
+[`apply_energy_damping_step!`](@ref)); `ksq` is `ws.grid.k_squared` resident on
+the device, which the per-call `_to_device` in `apply_projected_gp!` would
+otherwise re-upload every step.
+
+**`k_cut` is NOT part of the cache key**, and that is the whole point of this
+function's shape. `tracking_cutoff` exists to ramp the cutoff — it is a
+`Waveform`, evaluated fresh every reservoir sub-step — so keying on it gives a
+distinct entry per step, and `SCRATCH_REGISTRY` holds strong references and never
+evicts. Measured 2026-08-19 on a 64³ D=13 SPGPE growth ramp: 34 557 reservoir
+sub-steps, four buffers each, and the job died with
+`Out of GPU memory trying to allocate 4.000 MiB` at 99.97 % of a 94 GiB H100 —
+after the ramp had run to completion often enough to look like a physics result.
+A *constant* cutoff hides it completely, which is why every existing test passed.
+
+So the shape-dependent buffers are keyed on shape alone and `kinv` is REBUILT in
+place from the cached `ksq` on each call. That is one O(N) device broadcast
+against the sub-step's several FFTs, i.e. free, and it removes the failure mode
+rather than making its onset later.
 """
 function _energy_damping_buffers(
     ws::Workspace, n_pts::NTuple{N, Int}, k_cut::Float64=Inf
 ) where {N}
     psi = ws.state.psi
-    # NOT keyed on k_cut. Three of these four buffers do not depend on it, and the
-    # cutoff TRACKS the temperature — so keying them all on its value allocated a
-    # fresh set every step and retained the old ones: 2.0 MB per step at 44^3 over
-    # ~17000 steps, which is the 36.6 GB that killed three cluster runs with exit 137.
-    # The control loop was the suspect and measured only 1.3 GB of it
-    # (scripts/kz/mu_lda_allocation.jl), which is what sent the search here.
+    # Both sides of this merge removed k_cut from the key independently. What it
+    # cost here: the cutoff TRACKS the temperature, so keying on its value allocated a
+    # fresh buffer set every step and retained the old — 2.0 MB per step at 44^3 over
+    # ~17000 steps, the 36.6 GB that killed three cluster runs with exit 137. The
+    # control loop was the suspect and measured 1.3 GB of it
+    # (scripts/kz/mu_lda_allocation.jl); being refuted is what sent the search here.
+    #
+    # main's refill is taken over the one written on this branch: it rebuilds kinv
+    # unconditionally instead of guarding on a cached last-cutoff, and it floors with
+    # floatmin rather than eps(kc2). The guarded version had a real bug — k_cut = Inf is
+    # the default, eps(Inf) is NaN, and the whole buffer went NaN whenever the cutoff was
+    # unrestricted. One broadcast per call beside the step's FFTs is not worth a cache.
+    RT = real(eltype(psi))
     key = (typeof(psi), n_pts)
     divj = scratch_get!(:ed_divj, key) do
-        _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
+        _similar(ws.backend, psi, RT, n_pts...)
     end
     phase_k = scratch_get!(:ed_phase, key) do
         _similar(ws.backend, psi, eltype(psi), n_pts...)
     end
     ksq = scratch_get!(:ed_ksq, key) do
-        _to_device(ws.backend, convert(Array{real(eltype(psi))}, ws.grid.k_squared))
+        _to_device(ws.backend, convert(Array{RT}, ws.grid.k_squared))
+    end
+    kinv = scratch_get!(:ed_kinv, key) do
+        _similar(ws.backend, psi, RT, n_pts...)
     end
     # Band-limited to the C region, Rooney et al. Eq. (15): the correlator carries
     # δ_C(k,−k'), so both the kernel and the noise it colours live BELOW the
@@ -608,27 +634,9 @@ function _energy_damping_buffers(
     # that multiplies the field, and the product was then removed by the caller's
     # projector — 0.05 % of the norm per step at ℳ̄ = 0.01 and 0.53 % at ℳ̄ = 0.1,
     # which over 20000 steps took N from 56.4 to 1.6e-3 and 1.2e-44.
-    # ONE buffer, refilled when the cutoff moves, rather than one per cutoff value.
-    # A tracking cutoff takes a different value every step, so caching by value is
-    # unbounded growth; the refill is a single broadcast over the grid, negligible
-    # beside the step's FFTs.
-    kinv = scratch_get!(:ed_kinv, key) do
-        _similar(ws.backend, psi, real(eltype(psi)), n_pts...)
-    end
-    last_kc = scratch_get!(:ed_kinv_kc, key) do
-        Ref(NaN)
-    end
-    if last_kc[] != k_cut
-        RTk = real(eltype(psi))
-        # k_cut = Inf is the DEFAULT and eps(Inf) is NaN, so the guard has to be a
-        # finite floor. With eps(kc2) the whole buffer went NaN whenever the cutoff was
-        # unrestricted, which is one of the two NaNs in the projector-composition gate —
-        # and I attributed the other to the increment form without isolating it.
-        kc2 = isfinite(k_cut) ? RTk(k_cut^2) : RTk(Inf)
-        floor_k = eps(one(RTk))
-        @. kinv = ifelse((ksq > 0) & (ksq <= kc2), 1 / sqrt(max(ksq, floor_k)), 0)
-        last_kc[] = k_cut
-    end
+    kc2 = RT(k_cut^2)
+    @. kinv = ifelse((ksq > 0) & (ksq <= kc2), one(RT) / sqrt(max(ksq, floatmin(RT))),
+        zero(RT))
     (divj, phase_k, ksq, kinv)
 end
 

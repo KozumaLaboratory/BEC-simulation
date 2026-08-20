@@ -21,6 +21,9 @@ const FAST_TESTS = [
     # at. Three src comments said it was inert there, from an R three orders
     # too small; nothing checked them.
     "hamiltonian/test_taylor_tolerance_binds.jl",
+    # a_s / eps_dd read back from the couplings actually in force, so a
+    # `c_total` override cannot leave the LHY term on the atom's a_s.
+    "hamiltonian/test_effective_couplings_roundtrip.jl",
     # The mutation catalog's self-check, moved OUT of the nightly harness it was
     # buried in. `check_anchors` is a regex over ~40 files (0.5 s) but ran only
     # inside the hour-scale mutation job — which was producing nothing (#275) —
@@ -45,6 +48,10 @@ const FAST_TESTS = [
     # `0.468` survived weeks in an experimentalist sheet that carried its own
     # retraction at the top — documents are read by section, not from the top.
     "test_retracted_numbers_carry_their_replacement.jl",
+    # "Nobody checked" must not be written as "converged". The rotating-basis GS
+    # reports no convergence flag, so every such run satisfied CAMPAIGN guard 7
+    # by default, having never been asked.
+    "workflow/test_converged_absent_is_not_a_pass.jl",
     # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
     # bce2068f repaired two configs correctly one at a time and broke the mirror
     # relationship between them; nothing recorded that they were a pair (#343).
