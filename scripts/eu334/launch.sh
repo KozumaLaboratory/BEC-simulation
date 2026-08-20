@@ -79,14 +79,30 @@ bifurcation)
 window)
     LO=${2:?F_LO required — from the measured bifurcation in stage A}
     HI=${3:?F_HI required}
-    AF=$(printf "$OUT/bifurcation_k1.8_g32/flower_down_f%06.4f.jld2" "$HI")
-    AP=$(printf "$OUT/bifurcation_k1.8_g32/polar_up_f%06.4f.jld2" "$LO")
+    # kappa is an ARGUMENT. It was hardcoded to 1.8, so the kappa = 0.9 control had
+    # no 64^3 table to be classified against and its trajectories were silently
+    # compared to the 1.8 one instead. A control whose reference cannot be built by
+    # the launcher is a control that does not get run.
+    K=${4:-1.8}
+    AF=$(printf "$OUT/bifurcation_k${K}_g32/flower_down_f%06.4f.jld2" "$HI")
+    AP=$(printf "$OUT/bifurcation_k${K}_g32/polar_up_f%06.4f.jld2" "$LO")
     for f in "$AF" "$AP"; do
         [ -f "$f" ] || { echo "missing stage-A anchor $f" >&2; exit 1; }
     done
-    q -N nb18_64 -l h_rt=24:00:00 \
-      -v NB_KAPPA=1.8,NB_GRID=64,NB_FMIN=$LO,NB_FMAX=$HI,NB_NF=13,NB_LBFGS=600,NB_ANCHOR_FLOWER=$AF,NB_ANCHOR_POLAR=$AP,NB_OUT=$OUT/bifurcation_k1.8_g64 \
+    q -N nb${K}_64 -l h_rt=24:00:00 \
+      -v NB_KAPPA=$K,NB_GRID=64,NB_FMIN=$LO,NB_FMAX=$HI,NB_NF=13,NB_LBFGS=600,NB_ANCHOR_FLOWER=$AF,NB_ANCHOR_POLAR=$AP,NB_OUT=$OUT/bifurcation_k${K}_g64 \
       scripts/eu334/submit_bifurcation.sh
+    ;;
+
+# The calibration the classifier refuses to run without, as its own stage. It has
+# to be exercised whenever `assign` changes: a guard added to catch a degenerate
+# reference must still pass the case it is NOT meant to catch, and that direction
+# is the one a new gate breaks.
+calibrate)
+    K=${2:-1.8}
+    q -N eu334_cal -l h_rt=2:00:00 \
+      -v CL_CALIBRATE=1,CL_KAPPA=$K,CL_GRID=64,CL_F=${3:-0.3761},CL_NOISE_ETA=${4:-1.2},CL_BIF=$OUT/bifurcation_k${K}_g64 \
+      scripts/eu334/submit_classify.sh
     ;;
 
 # Stage C. One job per (T, τ) cell, every seed inside it. The cell is the unit

@@ -39,6 +39,17 @@ CL_PIN="${CL_PIN:-0.002}"
 # this is total rather than a heuristic with a fallback. Refusing on a name that
 # does not match is the point: a default here is how the wrong trap got used.
 
+# `CL_CALIBRATE=1` runs the classifier against states whose answer is known and
+# stops. It takes no psi list, so it short-circuits the sweep below. Kept in this
+# wrapper rather than a separate one because the calibration must run in the same
+# environment as the classification it certifies.
+if [ "${CL_CALIBRATE:-}" = "1" ]; then
+    CL_KAPPA="${CL_KAPPA:-1.8}" CL_GRID="$CL_GRID" CL_B="$CL_B" CL_PIN="$CL_PIN" \
+        CL_BIF="${CL_BIF:-$EU334_OUT/bifurcation_k${CL_KAPPA:-1.8}_g${CL_GRID}}" \
+        "$JULIA" --project=. scripts/eu334/classify.jl
+    exit $?
+fi
+
 n=0; skipped=0; failed=0
 for p in "$CL_ROOT"/*/psi_*.jld2; do
     [ -e "$p" ] || continue

@@ -220,6 +220,30 @@ function assign(E, tabs, f)
     Ef = interp(tabs[:flower], f, :E)
     Ep = interp(tabs[:polar], f, :E)
     sep = abs(Ep - Ef)
+    # DEGENERATE REFERENCES. "Nearer of two" is only a question when there are two.
+    # At κ = 0.9 both walks land on the SAME state — #335's result that the
+    # crossover side carries one branch. Without this guard the comparison below
+    # resolves on the last digit of an interpolation and returns `flower` or
+    # `polarised` with full confidence and no refusal: a selection statistic
+    # manufactured where there is nothing to select between, which is exactly the
+    # failure #334's criterion 7 exists to detect.
+    #
+    # THE TEST IS ON THE STATE, NOT THE ENERGY, and the first version of this guard
+    # got that wrong. Energy separation does NOT distinguish the cases: measured
+    # over every masked row, relative |ΔE| is 1.14e-4 … 4.89e-3 at κ = 1.8 (64³)
+    # against 8.6e-7 … 4.55e-4 at κ = 0.9. Those OVERLAP — the branches genuinely
+    # approach each other in energy near the bifurcation, which is what a
+    # bifurcation is — so an energy cut tight enough to catch κ = 0.9 refuses
+    # production rows at κ = 1.8. Close is not the same as identical.
+    #
+    # Transverse spin separates them cleanly: |ΔF⊥|/F⊥ is 0.966 … 0.979 at κ = 1.8
+    # (0.968 … 0.986 at 32³) against 2.0e-4 … 0.424 at κ = 0.9. No overlap, and the
+    # cut sits ~1.5× from each side rather than hugging either.
+    Ff = interp(tabs[:flower], f, :fperp)
+    Fp = interp(tabs[:polar], f, :fperp)
+    abs(Ff - Fp) <= 0.7 * max(abs(Ff), abs(Fp)) && return (;
+        label=:degenerate_references, E_flower=Ef, E_polar=Ep, sep,
+        dE_flower=E - Ef, dE_polar=E - Ep)
     lab = if E > max(Ef, Ep) + sep
         :excited
     elseif abs(E - Ef) <= abs(E - Ep)
