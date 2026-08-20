@@ -256,7 +256,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # gamma is raised through a_s because the rates are DERIVED; pinning them is what
         # the unphysical-rate gate refuses, and that gate exists because six GPU arms once
         # ran at gamma 2.4-370x off.
-        for gm in (1.0, 10.0, 100.0)
+        # ONE arm per job. Three full ramps in one reservation hit the 6-hour wall and
+        # were SIGKILLed at 21589 s with nothing written — the first arm alone is ~5 h.
+        # SBEC_GAMMA_MULT selects it, so the arms are separate jobs and a wall clock that
+        # kills one does not delete the others.
+        for gm in (parse(Float64, get(ENV, "SBEC_GAMMA_MULT", "1.0")),)
             @printf("\n########## gamma multiplier %.0fx ##########\n", gm)
             o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, t_start_s=1.73,
                 gamma_mult=gm)

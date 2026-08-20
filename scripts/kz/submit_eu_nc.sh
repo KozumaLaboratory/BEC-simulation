@@ -7,7 +7,7 @@
 #$ -cwd
 #$ -N eunc
 #$ -l cpu_16=1
-#$ -l h_rt=6:00:00
+#$ -l h_rt=12:00:00
 #$ -j y
 set -eu
 PROOT=/gs/fs/tga-kozuma-kouhi/uk07267/spgpe_evap
