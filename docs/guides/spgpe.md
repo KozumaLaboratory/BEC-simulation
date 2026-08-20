@@ -310,14 +310,22 @@ second one refuted an attribution stated here earlier the same day:
 
 | arm | $N_C$ | outflow | truncated |
 |---|---:|---:|---:|
-| full SPGPE, moving cutoff | 11530 → **3287** | 9886 | 31435 |
-| full SPGPE, cutoff pinned | — | — | — (3266 vs 3271 at matched time) |
-| **growth-only** | 11530 → **29601** | **9986** | **31256** |
+| $T=10$ full SPGPE, moving cutoff | 11530 → **3287** | 9886 | 31435 |
+| $T=10$ full SPGPE, **cutoff pinned** | 11530 → **3287** | **9209** | 27894 |
+| $T=10$ **growth-only** | 11530 → **29601** | **9986** | **31256** |
+| $T=5$ full SPGPE | 11530 → **577** | 1684 | 8628 |
+| $T=5$ **growth-only** | 11530 → **21505** | **1679** | **8612** |
 
-Sampled identically in all arms. The two projector channels agree to ~1 %, and one
-arm grows by 2.6× while the other falls to a quarter. **A common-mode cost cannot
-explain a divergent outcome.** Pinning the cutoff also changes nothing, so cutoff
-motion is excluded as well.
+Sampled identically in all arms. Three readings, and they point the same way:
+
+- **Common mode.** At each temperature the full and growth-only arms agree on both
+  projector channels to under 1 % (9886/9986, 31435/31256 at $T=10$;
+  1684/1679, 8628/8612 at $T=5$) while one grows 2.6× and the other falls to a
+  quarter — or, at $T=5$, to a twentieth. A cost that is the same in both cannot
+  explain an outcome that differs by 50×.
+- **Reducing the channel changes nothing.** Pinning the cutoff cuts the outflow by
+  7 % — it is doing what it was meant to do — and $N_C$ lands on the *same* 3287.
+- **It replicates.** The $T=5$ pair is an independent instance of the same pattern.
 
 What is left is the energy-damping **drift**, not its bookkeeping: it acts on the
 field, and the growth rate $2\gamma(\mu_{\rm res} - \mu_\psi)$ shrinks as the C
