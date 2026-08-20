@@ -213,3 +213,6 @@ figs/**/*.csv
 
 # Mutation-harness output (test/mutation/run.jl)
 mutation_out/
+
+# lock files of the single-instance guard in the run drivers
+runs/**/.*.lock

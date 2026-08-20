@@ -175,7 +175,49 @@ function ground_state_axis(; axis=2, n=(64, 64, 64), box=(6.5, 6.5, 6.5),
     psi0 = seed_torus(b.grid, b.F; lam=b.lam, sr=b.sr, sz=b.sz, axis=axis)
     b = merge(b, (; psi0=psi0))
     psi, ws, gs = solve_cell(b; backend=backend, iters=iters)
+    _assert_is_the_torus(ws, b, axis)
     (b, psi, ws, gs)
+end
+
+"""
+Refuse a relaxed state that is not the torus we asked for.
+
+The `rotate_from_z` path has an energy gate; this path had none -- it printed
+the moment eigenvalues and left the reading to the reader. On 2026-08-20 a box
+scan run without `orient=rotate` relaxed instead into a PROLATE state with
+eigenvalues (3.92, 3.92, 5.19) against the torus's (0.055, 0.146, 0.146) and a
+POSITIVE E/N of +0.114, i.e. an unbound object roughly 5x too big. It then
+expanded onto the wall, and the f_z it produced was read as an EdH response.
+At B = 0 the orientation is an exact zero mode, which is why this basin is
+reachable at all and why `orient=rotate` exists.
+
+A torus has a DEGENERATE pair of moment eigenvalues (its symmetry axis) and is
+OBLATE about it -- the distinct eigenvalue is the SMALL one. A self-bound
+droplet in a negligible trap has E/N < 0.
+"""
+function _assert_is_the_torus(ws, b, axis)
+    e = moment_axis(ws.state.psi, b.grid).eig      # ascending
+    etot = energy_decomposition(ws).total
+    d12, d23 = abs(e[2] - e[1]), abs(e[3] - e[2])
+    # OBLATE (a torus): the degenerate pair is the LARGE two and the distinct
+    # eigenvalue is the small one, so the top gap closes -- (0.055, 0.146,
+    # 0.146) gives d23 = 0 < d12. PROLATE is the mirror image, (3.92, 3.92,
+    # 5.19) with d12 = 0 < d23, and that is the basin this gate exists to
+    # reject. Both have a degenerate pair, so degeneracy alone does not
+    # separate them; the shape does.
+    ok_shape = d23 < d12
+    deg_rel = min(d12, d23) / max(e[3], eps())
+    ok_deg = deg_rel < 0.02
+    ok_bound = etot < 0
+    if !(ok_deg && ok_shape && ok_bound)
+        error("the relaxed state is NOT the torus: moment eigenvalues = " *
+              "$(round.(e; digits=5)), E/N = $(round(etot; digits=6)). " *
+              "degenerate pair: $(ok_deg ? "ok" : "NO (rel gap $(round(deg_rel; sigdigits=3)))"); " *
+              "oblate: $(ok_shape ? "ok" : "NO -- this is prolate"); " *
+              "self-bound: $(ok_bound ? "ok" : "NO -- E/N >= 0, it will expand"). " *
+              "At B=0 the orientation is an exact zero mode; use orient=rotate.")
+    end
+    nothing
 end
 
 function main(args::Vector{String}=String[])
