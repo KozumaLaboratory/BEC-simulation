@@ -216,7 +216,7 @@ end
 statically dispatched. The previous closure-based form captured a
 `Vector{Any}` of callbacks and incurred dynamic dispatch on every
 step × every callback (a measurable cost in long Eu151 runs)."""
-struct ComposedCallbacks{T <: Tuple}
+struct ComposedCallbacks{T <: Tuple} <: Function
     cbs::T
 end
 
