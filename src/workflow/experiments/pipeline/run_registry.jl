@@ -646,7 +646,21 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
 
             psi_host = _to_host(result.psi)
             energy = get(result, :ground_state_energy, NaN)
-            converged = get(result, :ground_state_converged, true)
+            # ABSENT, not `true`. `:ground_state_converged` is already the discriminator
+            # for "did a ground state run at all" (`model/complete.jl:222`), so
+            # defaulting it to `true` here collapsed three different states into one:
+            # converged, did-not-converge, and NOBODY CHECKED. The third is real — a
+            # dynamics-only pipeline has no GS, and the rotating-basis GS
+            # (`run_step_rotating/ground_state.jl`) reports `mu` and no convergence flag
+            # at all — so every rotating-basis run was writing `converged = true` having
+            # never been asked, and walking through CAMPAIGN.md guard 7 ("conv == false
+            # => disqualified") by construction.
+            #
+            # Writing nothing is the minimal honest fix: every consumer already handles
+            # the key being missing (`haskey` in html_report.jl / run_summary.jl,
+            # `_gslib_get(..., -1)` in gs_library.jl, the optional-key list in
+            # open_result.jl), and absence cannot be mistaken for a pass.
+            converged = get(result, :ground_state_converged, nothing)
             grad_norm = get(result, :ground_state_grad_norm, NaN)
 
             # Mz measurement
@@ -681,7 +695,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                     f["finished_at"] = finished_at
                     f["duration_seconds"] = duration
                     f["energy"] = energy
-                    f["converged"] = converged
+                    converged === nothing || (f["converged"] = converged)
                     f["grad_norm"] = grad_norm
                     f["mz_actual"] = mz_actual
                     # Provenance. `gs_ref` already carries this value but only
@@ -860,7 +874,21 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
 
     psi_host = _to_host(result.psi)
     energy = get(result, :ground_state_energy, NaN)
-    converged = get(result, :ground_state_converged, true)
+    # ABSENT, not `true`. `:ground_state_converged` is already the discriminator
+    # for "did a ground state run at all" (`model/complete.jl:222`), so
+    # defaulting it to `true` here collapsed three different states into one:
+    # converged, did-not-converge, and NOBODY CHECKED. The third is real — a
+    # dynamics-only pipeline has no GS, and the rotating-basis GS
+    # (`run_step_rotating/ground_state.jl`) reports `mu` and no convergence flag
+    # at all — so every rotating-basis run was writing `converged = true` having
+    # never been asked, and walking through CAMPAIGN.md guard 7 ("conv == false
+    # => disqualified") by construction.
+    #
+    # Writing nothing is the minimal honest fix: every consumer already handles
+    # the key being missing (`haskey` in html_report.jl / run_summary.jl,
+    # `_gslib_get(..., -1)` in gs_library.jl, the optional-key list in
+    # open_result.jl), and absence cannot be mistaken for a pass.
+    converged = get(result, :ground_state_converged, nothing)
 
     tmp_file = _scratch_tmp_path(psi_file)
     jld_kwargs = _snapshot_compression_kwargs(result)
@@ -874,7 +902,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
             f["finished_at"] = finished_at
             f["duration_seconds"] = duration
             f["energy"] = energy
-            f["converged"] = converged
+            converged === nothing || (f["converged"] = converged)
             # Provenance — see the scan path for why this is a separate key from
             # `gs_ref`, and for the step-3 rename.
             gs_artifact_id = get(result, :gs_stage_ref, nothing)
