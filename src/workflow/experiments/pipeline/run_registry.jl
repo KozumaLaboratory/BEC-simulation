@@ -932,6 +932,19 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         rethrow(err)
     end
 
+    # The sibling `result.jld2` is a SUMMARY (PR #195). It only becomes one once
+    # a real point file carries the frames, which is exactly here — the auto-save
+    # in `run_pipeline` wrote it before this file existed, so it could not know.
+    # Non-fatal and key-only; refuses unless the point file provably covers it.
+    try
+        st = make_result_a_summary!(run_dir, psi_file)
+        verbose && st === :summarised &&
+            println("  result.jld2 reduced to a summary (frames live in ",
+                basename(psi_file), ")")
+    catch err
+        @warn "result.jld2 summary reduction failed (non-fatal)" run_dir exception=err
+    end
+
     # Catalog fuel (non-fatal) — see scan-path emit for rationale.
     try
         write_run_summary(run_dir, psi_file; source="finish_hook")

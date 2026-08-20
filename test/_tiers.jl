@@ -41,6 +41,7 @@ const FAST_TESTS = [
     # "Nobody checked" must not be written as "converged". The rotating-basis GS
     # reports no convergence flag, so every such run satisfied CAMPAIGN guard 7
     # by default, having never been asked.
+    "workflow/test_result_jld2_summary.jl",
     "workflow/test_converged_absent_is_not_a_pass.jl",
     # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
     # bce2068f repaired two configs correctly one at a time and broke the mirror

@@ -1,5 +1,6 @@
-export save_rotating_basis_result!, summarize_rotating_basis_result,
-    launch_experiment
+export save_rotating_basis_result!,
+    summarize_rotating_basis_result,
+    launch_experiment, make_result_a_summary!
 
 """
     summarize_rotating_basis_result(io, result; label="")
@@ -522,4 +523,90 @@ function save_rotating_basis_result!(
     end
 
     out_path
+end
+
+"""
+    make_result_a_summary!(run_dir, point_file) -> Symbol
+
+Rewrite `<run_dir>/result.jld2` WITHOUT its per-frame payload, once a real point
+file provably carries the same frames.
+
+WHY. `result.jld2` is a **summary artifact** — anko's decision on PR #195, which
+closed an attempt to collapse it into a symlink precisely because that would have
+changed the design rather than fixed a bug. What the same PR measured is that the
+summary is not one: 9.11 GB against point_001's 9.55 GB, carrying all 750 frames.
+Across the group volume that is 148.4 GB in 136 `result.jld2` files, ~11 % of the
+1.3 TB in use. Dropping the frames is what makes the file match its stated role,
+and it was left on record as the change to make instead.
+
+The dashboard keeps working without a redirect: `_resolve_snapshot_source` returns
+the requested path when it has its own streams, and the point file does.
+
+NOTE — the dashboard's own docstring says the opposite ("point_NNN gets only the
+static final ψ + scalar traces, per-frame volumes live in sibling result.jld2").
+Two statements of the intended layout existed and disagreed; today NEITHER holds,
+because both files are full. This follows the owner's explicit decision, and the
+docstring is corrected in the same commit rather than left to contradict it.
+
+REFUSES rather than guesses, because the failure is silent data loss:
+
+  - `result.jld2` absent, or a symlink            → `:skipped`
+  - the point file is a symlink (rotating-basis   → `:skipped`
+    runs point at `result.jld2`, so its frames
+    are the ONLY copy)
+  - the point file has no frames, or fewer, or a  → `:not_covered`
+    different spatial shape / component count
+  - already stripped                              → `:already_summary`
+
+Keys only — no frame is ever read, so the check costs milliseconds against files
+of several GB.
+"""
+function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractString)
+    res = joinpath(run_dir, "result.jld2")
+    (isfile(res) && !islink(res)) || return :skipped
+    (isfile(point_file) && !islink(point_file)) || return :skipped
+    samefile(res, point_file) && return :skipped
+
+    grp = "dynamics/psi_snapshots_streamed"
+    meta(path) = jldopen(path, "r") do f
+        haskey(f, "$grp/n_snapshots") || return nothing
+        (n=Int(f["$grp/n_snapshots"]),
+            shape=f["$grp/spatial_shape"], comps=f["$grp/n_components"])
+    end
+    rm_ = meta(res)
+    rm_ === nothing && return :already_summary
+    pm = meta(point_file)
+    pm === nothing && return :not_covered
+    (pm.n >= rm_.n && pm.shape == rm_.shape && pm.comps == rm_.comps) || return :not_covered
+
+    tmp = res * ".summary.tmp"
+    isfile(tmp) && rm(tmp; force=true)
+    try
+        jldopen(res, "r") do src
+            jldopen(tmp, "w") do dst
+                _copy_except!(dst, src, "", "dynamics/psi_snapshots_streamed")
+            end
+        end
+        mv(tmp, res; force=true)
+    catch err
+        isfile(tmp) && rm(tmp; force=true)
+        rethrow(err)
+    end
+    :summarised
+end
+
+# Recursive key copy that skips one group. JLD2 has no "copy all but" primitive,
+# and reconstructing the file by listing top-level keys alone would silently flatten
+# the `dynamics/` group the readers index into.
+function _copy_except!(dst, src, prefix::String, skip::String)
+    for k in keys(src)
+        path = isempty(prefix) ? String(k) : prefix * "/" * String(k)
+        path == skip && continue
+        v = src[k]
+        if v isa JLD2.Group
+            _copy_except!(dst, v, path, skip)
+        else
+            dst[path] = v
+        end
+    end
 end
