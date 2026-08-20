@@ -161,6 +161,12 @@ const _SCRIPTS_ALLOWLIST = Set([
     # (700 ms - 1.1 s, Fig. 4c), one seed per job. A cluster submit wrapper —
     # category 3, same as the other `submit_*.sh` above.
     "klaus2022/submit_stripes.sh",
+    # #407: the FFTW thread × grid RSS pathology (36.9 GB at 48³ against 1.15 GB
+    # at 128³, same thread count). The workaround shipped with #405; this is the
+    # mechanism, and it is a repo script rather than a one-off because the same
+    # trap is waiting for every other campaign that sets a thread count.
+    "klaus2022/fftw_thread_probe.jl",
+    "klaus2022/submit_fftw_probe.sh",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",

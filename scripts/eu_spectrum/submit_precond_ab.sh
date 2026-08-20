@@ -4,7 +4,10 @@
 #   qsub -g tga-kozuma-kouhi -N pab -v SP_CELLS='...;...',SP_CELLS_N=6 \
 #     scripts/eu_spectrum/submit_precond_ab.sh
 #$ -cwd
-#$ -l node_q=1
+# gpu_1, not node_q: this is one GPU eigensolve per (cell × arm) and 8 cores is
+# plenty, so node_q's 48 slots cost 25 % more (type coefficient 0.250 against
+# 0.200) for nothing — same reasoning as eu334/submit_bifurcation.sh.
+#$ -l gpu_1=1
 #$ -l h_rt=8:00:00
 #$ -j y
 #$ -o logs/tsubame/
