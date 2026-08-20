@@ -41,6 +41,7 @@ measurements, not tests).
 | 14 | Is the 5.2 nT dip a resonance? | **No — the prediction was made and failed.** ω_eff,dip ∝ B predicts a dip near 0.325 at 2.6 nT; the measured tail rises monotonically through it. §11.4 withdrawn; the second branch has no mechanism. §12.3 |
 | 15 | Was the observable right? | **Not at 10.4 nT.** The peak must be taken *inside the hold*; over the whole trajectory it read the pre-hold transient and 7 of 10 arms were blind. Re-extracted: **0.00 % change at 1.3 / 2.6 / 5.2 nT**, so §9–§11 stand. §12.1 |
 | 16 | Does it survive LHY? | **Yes.** `full_bdg` moves the baseline +0.07 % and the optimum +2.18 %; the enhancement goes +24.9 % → **+27.5 %**. §12.4 |
+| 18 | The field-rotation branch (`eu151_klaus_phi_phys`) | **Two code defects, no physics.** Its GPU path was dead (`spin_density_vector` allocated host arrays → scalar-indexing error); and it reported **`conv = true` having never been asked**, because the rotating-basis GS returns no convergence flag and the writer defaulted it to `true` — so every such run satisfied CAMPAIGN guard 7 by construction. Both fixed and gated. §14 |
 | 17 | Does the static substitution hold at long time? | **Only on the peak.** At 145 ms static and rotating differ by 3.2 % at the peak (vs 0.06 % short) but by **2.25× at the endpoint** — rotation gives a transient, the static trap a *sustained* transfer. §13 |
 | 13 | 5.2 nT, resolved at 20 points + 64³ | **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
@@ -913,6 +914,73 @@ The sheet's long-time rows (`P_exc(end) = 0.958 at 145 ms`) are not directly
 comparable — different cell (`keep_rot`, Ω = −0.5, aligned corpus) — and are not
 re-derived here. What is established is the *ordering*, which is the load-bearing
 part: static > rotating > baseline on sustained transfer.
+
+---
+
+## 14. The field-rotation branch: two code defects, no physics yet
+
+`runs/eu151_klaus_phi_phys/` — the field-rotation branch, 32×32×16 rotating-basis
+on GPU, 1 s steady stir × 8 scan points — had never been *run* since its seed was
+corrected to the anti-aligned end (§4.2). Smoking it before committing GPU hours
+(CLAUDE.md: render every path in ≈2 min first) found two defects and no physics.
+
+### 14.1 The rotating-basis GPU path was dead
+
+```
+ERROR: Scalar indexing is disallowed.
+  spin_density_vector → _compute_spin_density!
+  run_step_rotating/dynamics.jl:252
+```
+
+`spin_density_vector` allocated its three outputs as `zeros(Float64, n_pts)` —
+unconditionally **host**. On GPU that is a host destination with a device source,
+so the `@.` writes fall to the CPU broadcast kernel and **error**. Not a slow
+path: the whole rotating-basis dynamics path was unusable on GPU.
+
+Fixed with `similar(psi, Float64, n_pts)`, which is correct for any backend and
+leaves nothing to remember. The smoke then completes.
+
+### 14.2 `E = NaN` with `conv = true` — and the second half is the serious one
+
+The completed smoke reports `E=NaN conv=true`, with **ψ entirely finite**
+(212992/212992). Discriminated across four arms — seed `init_m_idx` ∈ {1, 13} ×
+ITP ∈ {100, 1500} — **all four give E = NaN with finite ψ**, so this is neither
+the anti-aligned seed (§4.2 is exonerated) nor an under-converged smoke.
+
+The cause is an absent key read through a default. The rotating-basis ground
+state returns `mu` and **no** energy and **no** convergence flag, and
+`run_registry.jl` read them as
+
+```julia
+energy    = get(result, :ground_state_energy,    NaN)
+converged = get(result, :ground_state_converged, true)   # <-- 
+```
+
+`NaN` for a missing energy is at least loud. **`true` for a missing convergence
+flag is not.** It collapses three states into one — converged, did-not-converge,
+and *nobody checked* — and the third is real: `:ground_state_converged` is
+already the discriminator for "did a ground state run at all"
+(`model/complete.jl:222`).
+
+> **Every rotating-basis run has been writing `converged = true` having never
+> been asked, and satisfying CAMPAIGN.md §4 guard 7 ("`conv == false` ⇒
+> disqualified") by construction.**
+
+Fixed by writing nothing when there is nothing to report — every consumer already
+handles absence — and gated by
+`test/workflow/test_converged_absent_is_not_a_pass.jl`, which counts the writes
+and the guarded writes and requires them equal, so a new unguarded write fails.
+
+**The rotating-basis GS still reports no energy.** That is left open and named
+rather than papered over: it needs the GS step to compute one, which is a change
+to that solver, not to the writer.
+
+### 14.3 Status
+
+No physics from this branch. What it produced is two defects, one of which was
+silently satisfying a campaign guard. The 8-point production scan is **not**
+launched — it would now run, but on a path whose ground state reports no energy,
+so there would be nothing to check the result against.
 
 <!-- REDERIVE -->
 

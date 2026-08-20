@@ -91,7 +91,17 @@ end
 
 """
 Local spin density vector (Fx, Fy, Fz) at each spatial point.
-Returns a tuple of 3 arrays.
+Returns a tuple of 3 arrays, on the SAME DEVICE as `psi`.
+
+The outputs used to be `zeros(Float64, n_pts)` — unconditionally host. On the GPU
+that gives a host destination and a device source, so the `@.` writes in
+`_compute_spin_density!` fall back to the CPU broadcast kernel and die with
+"Scalar indexing is disallowed". It is not a slow path, it is an error, and it
+took out the whole rotating-basis dynamics path on GPU
+(`run_step_rotating/dynamics.jl:252`) — found 2026-08-20 by smoking
+`runs/eu151_klaus_phi_phys/` before committing GPU hours to it.
+
+`similar` keeps this correct for any future backend without anything to remember.
 """
 function spin_density_vector(
     psi::AbstractArray{<:Complex},
@@ -100,9 +110,9 @@ function spin_density_vector(
 ) where {D}
     n_pts = ntuple(d -> size(psi, d), ndim)
 
-    fx = zeros(Float64, n_pts)
-    fy = zeros(Float64, n_pts)
-    fz = zeros(Float64, n_pts)
+    fx = fill!(similar(psi, Float64, n_pts), 0)
+    fy = fill!(similar(psi, Float64, n_pts), 0)
+    fz = fill!(similar(psi, Float64, n_pts), 0)
 
     _compute_spin_density!(fx, fy, fz, psi, sm, Val(D), ndim, n_pts)
 
