@@ -111,8 +111,13 @@ const _SCRIPTS_ALLOWLIST = Set([
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
     # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/_cells.jl",
     "eu_spectrum/branch_spectrum.jl",
     "eu_spectrum/submit_spectrum.sh",
+    # #397 (which consumer owns the preconditioner default) + #399 (does λ_min
+    # converge on the polarised branch) — same knob, same cells, one job.
+    "eu_spectrum/precond_ab.jl",
+    "eu_spectrum/submit_precond_ab.sh",
     # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
     "eu_isotope_q/q_boundary.jl",
     "eu_isotope_q/magnon_gap.jl",
