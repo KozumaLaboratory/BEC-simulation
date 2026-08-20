@@ -683,3 +683,48 @@ doc = "docs/guides/eu_spinodal_spectrum.md"
 section = "5.1"
 pr = 409
 note = """Everything #335 delivers that needs only this weaker reading stands unchanged, including the 32³↔64³ agreement of §5.8 and the deliverable itself — the Stern-Gerlach level count (6-7 populated m_F at κ = 1.8 against 3-4 at κ = 0.9, disjoint at all five rates), which never rested on the landscape reading. What is lost is the *at any rate* clause: behind a barrier a fast enough rising ramp carries the flower past 68.4 µG, which is what the predecessor campaign actually observed."""
+
+# --- #407: the FFTW planner's memory, and the hypothesis it was not ------------
+#
+# A type-A pair, and the reason they are here rather than only in CLAUDE.md is
+# that the RSS table has now been restated three times (the submit script's
+# header, the issue body, this campaign) and each restatement is a copy. The
+# `retired_literal` on the refuted row is what stops the killed hypothesis being
+# quoted back as a candidate.
+
+[[claim]]
+id = "fftw-mixed-radix-planner-memory"
+claim = "FFTW's MEASURE planner allocates gigabytes for a NON-POWER-OF-TWO transform when Julia has real threads: 1.66 GB at 48³ rising to 11.97 GB at 98³, against 0.35 GB at 64³ and 0.38 GB at 128³. The axis is the radix, not the grid size and not the thread count."
+status = "live"
+type = "A"
+scope = "TSUBAME cpu_16 (16 of 384 cores), Julia 1.12.6, FFTW.jl, `julia -t 16`, FFTW 16 threads, cubic complex in-place 3D plans, one process per point. Not measured on other machines; the same corner did NOT appear on a 10-core local box in #405."
+uncertainty = "One process per point and one point per (n, threads, flags) cell — no repeats, so the numbers carry no scatter estimate. What IS bounded is the ordering: the two power-of-two sizes are 4.7-34× below every mixed-radix neighbour, which no plausible run-to-run scatter closes. `ru_maxrss` is a high-water mark, so each figure is an upper bound on that process's peak and an exact one for the comparison being made."
+uncertainty_basis = "control"
+evidence = ["scripts/klaus2022/fftw_thread_probe.jl", "scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """Three conditions, each shown necessary by removing it: MEASURE (ESTIMATE gives 0.33-0.36 GB at every size), REAL Julia threads (`julia -t 1` gives 0.26-0.30 GB at every size EVEN WITH FFTW reporting 16 threads — FFTW.jl runs its parallel loop through Julia's threadpool), and a non-power-of-two length. The consequence for this repo is that `make_fft_plans` / `make_rfft_plans` DEFAULT to MEASURE and `src/analysis/dipole_field.jl` plans the DDI work shape that way, i.e. the path every eGPE ground state runs. Not auto-downgraded to ESTIMATE: that would change the throughput of every production run to fix a corner recognisable in advance, and one call is not a throughput measurement. `SPINORBEC_FFT_PLAN=estimate` is the deliberate opt-out; `fft_planning_memory_risk` is the predicate and `test_fft_planning_memory_risk.jl` gates it in both directions on all three axes."""
+
+[[claim]]
+id = "fftw-visible-cpu-count-hypothesis"
+claim = "The 36.9 GB at 48³ is caused by a library sizing per-thread scratch from the node's CPU count (`/proc/cpuinfo` = 384) rather than from the job's cgroup allocation (16)."
+status = "refuted"
+type = "A"
+scope = "Same cells as `fftw-mixed-radix-planner-memory`. The taskset arm narrows the VISIBLE set without changing the allocation, which was already 16."
+retired_literal = [
+    "visible-CPU count (384 on the node) is a candidate",
+    "reads /proc/cpuinfo (384) rather than the cgroup (16)",
+    "a library reads `/proc/cpuinfo` (384) rather than the cgroup (16)",
+]
+uncertainty = "unbounded: this is a refutation by counterexample, not a measurement of a quantity. Three sizes were run under `taskset`; two reproduce the blow-up with the affinity mask at 16 and the third (128³, a power of two) is cheap as always."
+uncertainty_basis = "none"
+evidence = ["scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """REFUTED 2026-08-21. Narrowing the visible CPU set to 16 with `taskset` leaves 48³ at 2.26 GB and 96³ at 8.38 GB — if anything slightly worse than the unnarrowed 1.66 and 6.73 GB. The count was never the mechanism. Worth keeping as a row rather than deleting, because it is a PLAUSIBLE hypothesis with a well-known general form (libraries that read the node instead of the cgroup) and it will be proposed again by anyone who meets the symptom without the radix table in hand. The first version of the probe could not have refuted it either: it ran at `julia -t 1`, where nothing blows up at all, so its `taskset` rows would have been a null on top of a null."""
