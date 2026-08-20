@@ -59,9 +59,10 @@ end
 
 _tag(w) = replace(@sprintf("%.3f", w), "." => "p")
 
-function config_text(; weff::Float64, field_nt::Float64, n::Int)
+function config_text(; weff::Float64, field_nt::Float64, n::Int, hold_scale::Float64=1.0)
     bhold = field_nt * GAUSS_PER_NT
     box = 12.0
+    hold = 5.5292 * hold_scale
     """
     # Static-trap ω_eff scan @ canonical EdH protocol (hold_only, delay=2 ms,
     # B_hold = $(field_nt) nT, m=+F).  ω_⊥,eff / ω_⊥ = $(@sprintf("%.3f", weff))
@@ -80,6 +81,12 @@ function config_text(; weff::Float64, field_nt::Float64, n::Int)
     # Built-in control: at ω_eff = 1.000 this must return the unweakened baseline.
     #   If the per-step `potential:` override were silently ignored, EVERY arm would
     #   return that same value — so a flat scan is a plumbing failure, not a null.
+    #
+    # hold_scale = $(hold_scale). At 1.0 the peak of peak-P_adj lands on the LAST
+    #   streamed frame for much of the scan, which is a truncation and not a peak:
+    #   the published 5.2 nT dip compares a resolved maximum (frame 38/42) against
+    #   boundary values (42/42). Arms with hold_scale > 1 exist to show whether the
+    #   structure survives once both sides peak inside the window.
 
     defaults:
       kind: spinor
@@ -134,8 +141,8 @@ function config_text(; weff::Float64, field_nt::Float64, n::Int)
           lhy: {kind: none}
           save: {every: 50, psi: true, precision: f64}
 
-      - dynamics:   # hold with the RADIALLY WEAKENED static trap (8 ms)
-          duration: 5.5292
+      - dynamics:   # hold with the RADIALLY WEAKENED static trap ($(round(8 * hold_scale; digits=1)) ms)
+          duration: $(hold)
           dt: 0.005
           rotating_frame_omega: 0.0
           potential: {type: harmonic, omega: [$(@sprintf("%.4f", weff)), $(@sprintf("%.4f", weff)), $(OMEGA_Z)]}
@@ -156,6 +163,8 @@ function main(args)
     grid = :dense52
     n = 32
     out = "runs/klaus_quench_weff"
+    hold_scale = 1.0
+    weffs = Float64[]
     i = 1
     while i <= length(args)
         a = args[i]
@@ -167,20 +176,26 @@ function main(args)
             n = parse(Int, args[i + 1]); i += 2
         elseif a == "--out"
             out = args[i + 1]; i += 2
+        elseif a == "--hold-scale"
+            hold_scale = parse(Float64, args[i + 1]); i += 2
+        elseif a == "--weff"
+            weffs = parse.(Float64, split(args[i + 1], ",")); i += 2
         else
             error("unknown argument $a")
         end
     end
     mkpath(out)
     written = String[]
-    for w in weff_grid(grid)
+    for w in (isempty(weffs) ? weff_grid(grid) : weffs)
         name = "klaus_weff$(_tag(w))_B$(replace(string(field_nt), "." => "p"))nT" *
-               (n == 32 ? "" : "_n$(n)") * ".yaml"
+               (n == 32 ? "" : "_n$(n)") *
+               (hold_scale == 1.0 ? "" : "_hold$(replace(string(hold_scale), "." => "p"))x") *
+               ".yaml"
         path = joinpath(out, name)
-        write(path, config_text(; weff=w, field_nt, n))
+        write(path, config_text(; weff=w, field_nt, n, hold_scale))
         push!(written, path)
     end
-    println("wrote $(length(written)) configs to $out (B = $field_nt nT, grid = $grid, n = $n)")
+    println("wrote $(length(written)) configs to $out (B = $field_nt nT, n = $n, hold_scale = $hold_scale)")
     written
 end
 
