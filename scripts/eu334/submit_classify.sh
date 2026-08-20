@@ -21,10 +21,34 @@ set +e
 
 CL_ROOT="${CL_ROOT:-$EU334_OUT}"
 CL_GRID="${CL_GRID:-64}"
-CL_KAPPA="${CL_KAPPA:-1.8}"
 CL_B="${CL_B:-20.0}"
 CL_PIN="${CL_PIN:-0.002}"
-CL_BIF="${CL_BIF:-$EU334_OUT/bifurcation_k${CL_KAPPA}_g${CL_GRID}}"
+
+# kappa is derived PER FILE from the psi's own name, not taken as one value for
+# the whole sweep.
+#
+# It used to be `CL_KAPPA=${CL_KAPPA:-1.8}` applied to every directory under
+# CL_ROOT. The kappa = 0.9 control therefore got classified against the kappa =
+# 1.8 branch table AND relaxed in a kappa = 1.8 trap: its `fperp_relaxed` = 4.59
+# was computed in the wrong Hamiltonian. The rows came back `above_table` (f =
+# 0.575 against that table's 0.521 ceiling) so the wrong number was never read as
+# a verdict — the refusal masked the defect rather than catching it, and a control
+# that runs to a slightly lower f would have published it.
+#
+# Every psi in this campaign carries kappa in its filename (126/126 checked), so
+# this is total rather than a heuristic with a fallback. Refusing on a name that
+# does not match is the point: a default here is how the wrong trap got used.
+
+# `CL_CALIBRATE=1` runs the classifier against states whose answer is known and
+# stops. It takes no psi list, so it short-circuits the sweep below. Kept in this
+# wrapper rather than a separate one because the calibration must run in the same
+# environment as the classification it certifies.
+if [ "${CL_CALIBRATE:-}" = "1" ]; then
+    CL_KAPPA="${CL_KAPPA:-1.8}" CL_GRID="$CL_GRID" CL_B="$CL_B" CL_PIN="$CL_PIN" \
+        CL_BIF="${CL_BIF:-$EU334_OUT/bifurcation_k${CL_KAPPA:-1.8}_g${CL_GRID}}" \
+        "$JULIA" --project=. scripts/eu334/classify.jl
+    exit $?
+fi
 
 n=0; skipped=0; failed=0
 for p in "$CL_ROOT"/*/psi_*.jld2; do
@@ -33,8 +57,18 @@ for p in "$CL_ROOT"/*/psi_*.jld2; do
     tag=$(basename "$p" .jld2); tag=${tag#psi_}
     out="$d/class"
     if [ -f "$out/class_$tag.csv" ]; then skipped=$((skipped+1)); continue; fi
-    CL_PSI="$p" CL_GRID="$CL_GRID" CL_KAPPA="$CL_KAPPA" CL_B="$CL_B" \
-        CL_PIN="$CL_PIN" CL_BIF="$CL_BIF" CL_OUT="$out" \
+    k=$(basename "$p" | sed -n 's/^psi_k\([0-9][0-9.]*\)_.*/\1/p')
+    if [ -z "$k" ]; then
+        echo "NO KAPPA IN NAME, refusing to guess: $p" >&2
+        failed=$((failed+1)); continue
+    fi
+    bif="$EU334_OUT/bifurcation_k${k}_g${CL_GRID}"
+    if [ ! -f "$bif/flower_down.csv" ]; then
+        echo "NO BRANCH TABLE for kappa=$k at ${CL_GRID}^3 ($bif): $p" >&2
+        failed=$((failed+1)); continue
+    fi
+    CL_PSI="$p" CL_GRID="$CL_GRID" CL_KAPPA="$k" CL_B="$CL_B" \
+        CL_PIN="$CL_PIN" CL_BIF="$bif" CL_OUT="$out" \
         "$JULIA" --project=. scripts/eu334/classify.jl
     if [ $? -eq 0 ]; then n=$((n+1)); else echo "CLASSIFY FAILED: $p"; failed=$((failed+1)); fi
     flush=1

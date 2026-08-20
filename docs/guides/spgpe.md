@@ -217,42 +217,133 @@ bug class).
 | **condensation** | $N_0$ reaches $[0.3,1.5]\,N_\mathrm{TF}$ and stays below $N_C$ — the gate for the thing the solver exists to do | B |
 | **Rayleigh–Jeans total** | free field: $N_C$ equals $\sum_{\|k\|<k_\mathrm{cut}}T/(\epsilon_k-\mu)$ to 4 % | B |
 
-### The scattering reservoir is number-conserving as a TERM, not as a STEP
+### The projected step's number loss: ONE-OFF without noise, a RATE with it
 
-The table's "number conservation" row is true of `apply_energy_damping_step!` —
-the sub-step is a real phase and cannot change $\int|\psi|^2$ — and it is measured
-with no projector in the path. Production calls `apply_spgpe_step!`, which
-projects, and there $\psi e^{i\phi}$ carries content past $k_\mathrm{cut}$ which
-the projector removes. Rooney, Blakie & Bradley (PRE **89**, 013302) say number
-conservation in the projected scheme is approximate. **Measured 2026-08-19, it is
-approximate at the same order as the growth rate**, so for a growth problem it is
-not a correction:
+> **This section has been wrong in both directions on 2026-08-20. Read the split
+> before quoting any part of it.**
+>
+> It first said the projected scattering step loses number "at the same order as
+> the growth rate", so a growth problem must run `energy_damping=false`; #334's
+> ensemble was designed on that. It was then RETRACTED here and, independently, in
+> PR #351, on the strength of a **noise-off** measurement showing a one-off.
+>
+> **The retraction was too broad.** The noise-off result is correct and is
+> reproduced below; it simply does not describe production, which runs with noise.
+> With the noise on, the loss **is** a rate — measured, ratio 4.04 for 4× the
+> steps. So the original operational advice was right about production even though
+> the evidence originally offered for it (flatness in resolution) never supported
+> it.
+>
+> | condition | behaviour | evidence |
+> |---|---|---|
+> | noise **off** | one-off, equal to the seed's out-of-C weight | tables below |
+> | noise **on** | **a rate** | ratio 4.04 at 4× steps, $\gamma = 0$ |
+> | flatness in resolution | supports **neither** — a one-off is flat too | — |
 
-| | $|d\ln N_C/dt|$ from the scattering reservoir alone, at zero growth drive |
-|---|---|
-| $k_\mathrm{max}/k_\mathrm{cut}$ = 1.40 / 1.86 / 2.79 / 3.72 | 9.34 / 9.14 / 9.48 / 9.60 $\times10^{-4}$ |
-| the growth rate it is beside, $2\gamma\mu$ | $7.5\times10^{-4}$ |
+The term is a real phase and cannot change $\int|\psi|^2$; production calls
+`apply_spgpe_step!`, which also projects, and there $\psi e^{i\phi}$ can carry
+weight past $k_\mathrm{cut}$ for the projector to remove. The question is whether
+that removal is a **rate** (paid every step, so it competes with growth) or a
+**one-off** (paid once, on whatever the seed had outside the C region).
 
-Flat to 5 % across a 2.7× span of resolution at fixed $k_\mathrm{cut}$ — so it is
-a property of the scheme and not of the grid. (An aliasing explanation was tested:
-$\psi$ and $\phi$ are each band-limited to $k_\mathrm{cut}$, so the product reaches
-$2k_\mathrm{cut}$ and a grid below that margin should behave differently. It does
-not. The hypothesis is refuted.)
+Those two look identical at a single endpoint. They are separated by attacking the
+mechanism rather than matching the symptom: **start from a pre-projected seed**,
+$\mathcal P\psi_0 = \psi_0$, and vary the seed's out-of-C weight.
 
-At the ¹⁵¹Eu weak-field point (#334: 64³, box 24, D = 13, $T = 5$,
-$\bar{\mathcal M} = 1.6\times10^{-3}$) the consequence is stark. With the growth
-drive set to exactly zero, $N_C$ fell **11.5 % in 60 ms**; with the noise off it
-held to 0.6 %; with the scattering reservoir off and a real drive it grew 4.7 %,
-as it should.
+Measured 2026-08-20, 48³ box 18, $k_\mathrm{cut} = 5.5$ (so
+$k_\mathrm{max}/k_\mathrm{cut} = 1.52$, #334's own ratio), $\bar{\mathcal M} =
+1.63\times10^{-3}$, $T = 5$, **noise off**, 400 steps:
 
-**So a run whose question is about atom number or condensate growth must use
-`energy_damping=false`** — the growth SPGPE, Rooney Eq. (20), which is a
-sub-theory in its own right — or state that its number budget is dominated by the
-scattering term's projector residual. Equilibrium studies at fixed $\mu$ are
-unaffected in kind, since there the loss is balanced by the growth term; what
-changes is that the stationary $N_C$ is not the one the growth term alone would
-set. Gated by `test/dynamics/test_spgpe.jl`, which pins both the flatness and the
-size.
+| seed | out-of-C weight | first step $\Delta N/N$ | per step after | total |
+|---|---:|---:|---:|---:|
+| **pre-projected** | $6\times10^{-32}$ | $1.9\times10^{-16}$ | $2.7\times10^{-16}$ | $\mathbf{1.1\times10^{-13}}$ |
+| small out-of-C | $1.0\times10^{-4}$ | $\mathbf{1.0\times10^{-4}}$ | $2.6\times10^{-16}$ | $1.0\times10^{-4}$ |
+| large out-of-C | $9.9\times10^{-3}$ | $\mathbf{9.9\times10^{-3}}$ | $2.6\times10^{-16}$ | $9.9\times10^{-3}$ |
+| large, $2\,dt$, half the steps | $9.9\times10^{-3}$ | $9.9\times10^{-3}$ | $2.6\times10^{-16}$ | $9.9\times10^{-3}$ |
+
+Three independent readings, all one-off:
+
+- **Pre-projecting the seed removes the loss entirely** — $10^{-13}$ over 400
+  steps, i.e. rounding. That is causal, not a coincidence of symptoms.
+- **The step is equal to the seed's out-of-C weight**, to three digits, across two
+  decades of it.
+- **The cumulative loss saturates at step 1** and does not move through step 400;
+  doubling $dt$ changes nothing.
+
+The steady residual after the first step is $2.6\times10^{-16}$ per step — machine
+precision, not a small rate.
+
+**Why it was read as a rate.** The earlier measurement went through
+`apply_spgpe_step!` with a `tracking_cutoff`, which by design moves every step. A
+moving cutoff **creates fresh out-of-C content each step**, so the one-off is paid
+again and again and the cumulative curve is a straight line. The flatness in
+resolution that was taken as evidence of a scheme property is what a one-off does
+too. #351 reached the same retraction independently and stated the general form:
+*flatness is what a one-off necessarily shows*.
+
+#### With the noise on, it is a rate
+
+Everything above is the **noise-off** sub-case. Production runs with noise, so the
+question has to be asked there too, and the earlier version of this section never
+did — it turned the noise off for a good reason (it makes a single endpoint a
+random variable) and then generalised past the condition it had measured.
+
+The arm that settles it starts from a **pre-projected** seed, so the one-off is
+already paid and cannot be mistaken for what follows, sets $\gamma = 0$ so nothing
+physical can move $N$, and compares two durations, averaged over seeds:
+
+| steps | $\Delta N/N$ |
+|---:|---:|
+| 50 | $1.0853\times10^{-4}$ |
+| 200 | $4.3821\times10^{-4}$ |
+| **ratio** | **4.04** (exact proportionality would give 4.00) |
+
+A one-off returns the same number at both durations. This scales with them.
+
+**Consequences.** A growth problem with noise on **does** pay a continuing number
+loss through the projector, so `energy_damping=false` remains the conservative
+choice for one — #334's ensemble is not invalidated.
+
+**But that loss is not what stalls a growth run, and the projector is not the
+mechanism.** Both statements were checked against #334's own trajectories, and the
+second one refuted an attribution stated here earlier the same day:
+
+| arm | $N_C$ | outflow | truncated |
+|---|---:|---:|---:|
+| $T=10$ full SPGPE, moving cutoff | 11530 → **3287** | 9886 | 31435 |
+| $T=10$ full SPGPE, **cutoff pinned** | 11530 → **3287** | **9209** | 27894 |
+| $T=10$ **growth-only** | 11530 → **29601** | **9986** | **31256** |
+| $T=5$ full SPGPE | 11530 → **577** | 1684 | 8628 |
+| $T=5$ **growth-only** | 11530 → **21505** | **1679** | **8612** |
+
+Sampled identically in all arms. Three readings, and they point the same way:
+
+- **Common mode.** At each temperature the full and growth-only arms agree on both
+  projector channels to under 1 % (9886/9986, 31435/31256 at $T=10$;
+  1684/1679, 8628/8612 at $T=5$) while one grows 2.6× and the other falls to a
+  quarter — or, at $T=5$, to a twentieth. A cost that is the same in both cannot
+  explain an outcome that differs by 50×.
+- **Reducing the channel changes nothing.** Pinning the cutoff cuts the outflow by
+  7 % — it is doing what it was meant to do — and $N_C$ lands on the *same* 3287.
+- **It replicates.** The $T=5$ pair is an independent instance of the same pattern.
+
+What is left is the energy-damping **drift**, not its bookkeeping: it acts on the
+field, and the growth rate $2\gamma(\mu_{\rm res} - \mu_\psi)$ shrinks as the C
+region's own $\mu_\psi$ rises. The full run indeed sits at $\mu_{\rm res}$ with a
+small condensate. Whether that is correct physics (a hot C region equilibrating at
+that $\mu$) or a defect in the drift term **is not settled here** — the projector
+hypothesis is what these numbers exclude, not what they establish.
+
+Independently of the noise, a run still needs a seed inside its own C region —
+project it once before starting — and, if `tracking_cutoff` is used, awareness
+that each cutoff change bills the band it swept past. That is a physical outflow
+(`cutoff_outflow` reports it separately from `noise_truncated`) and not a defect,
+but it is not free.
+
+Gated by `test/dynamics/test_spgpe.jl`, which asserts the CLASSIFICATION in both
+sub-cases — noise off: step proportional to out-of-C weight, tail at rounding,
+pre-projected seed flat; noise on: the duration ratio above 3 — rather than
+pinning the numbers.
 
 Known limits, unchanged by this work:
 

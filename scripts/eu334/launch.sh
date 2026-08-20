@@ -79,14 +79,30 @@ bifurcation)
 window)
     LO=${2:?F_LO required — from the measured bifurcation in stage A}
     HI=${3:?F_HI required}
-    AF=$(printf "$OUT/bifurcation_k1.8_g32/flower_down_f%06.4f.jld2" "$HI")
-    AP=$(printf "$OUT/bifurcation_k1.8_g32/polar_up_f%06.4f.jld2" "$LO")
+    # kappa is an ARGUMENT. It was hardcoded to 1.8, so the kappa = 0.9 control had
+    # no 64^3 table to be classified against and its trajectories were silently
+    # compared to the 1.8 one instead. A control whose reference cannot be built by
+    # the launcher is a control that does not get run.
+    K=${4:-1.8}
+    AF=$(printf "$OUT/bifurcation_k${K}_g32/flower_down_f%06.4f.jld2" "$HI")
+    AP=$(printf "$OUT/bifurcation_k${K}_g32/polar_up_f%06.4f.jld2" "$LO")
     for f in "$AF" "$AP"; do
         [ -f "$f" ] || { echo "missing stage-A anchor $f" >&2; exit 1; }
     done
-    q -N nb18_64 -l h_rt=24:00:00 \
-      -v NB_KAPPA=1.8,NB_GRID=64,NB_FMIN=$LO,NB_FMAX=$HI,NB_NF=13,NB_LBFGS=600,NB_ANCHOR_FLOWER=$AF,NB_ANCHOR_POLAR=$AP,NB_OUT=$OUT/bifurcation_k1.8_g64 \
+    q -N nb${K}_64 -l h_rt=24:00:00 \
+      -v NB_KAPPA=$K,NB_GRID=64,NB_FMIN=$LO,NB_FMAX=$HI,NB_NF=13,NB_LBFGS=600,NB_ANCHOR_FLOWER=$AF,NB_ANCHOR_POLAR=$AP,NB_OUT=$OUT/bifurcation_k${K}_g64 \
       scripts/eu334/submit_bifurcation.sh
+    ;;
+
+# The calibration the classifier refuses to run without, as its own stage. It has
+# to be exercised whenever `assign` changes: a guard added to catch a degenerate
+# reference must still pass the case it is NOT meant to catch, and that direction
+# is the one a new gate breaks.
+calibrate)
+    K=${2:-1.8}
+    q -N eu334_cal -l h_rt=2:00:00 \
+      -v CL_CALIBRATE=1,CL_KAPPA=$K,CL_GRID=64,CL_F=${3:-0.3761},CL_NOISE_ETA=${4:-1.2},CL_BIF=$OUT/bifurcation_k${K}_g64 \
+      scripts/eu334/submit_classify.sh
     ;;
 
 # Stage C. One job per (T, τ) cell, every seed inside it. The cell is the unit
@@ -97,14 +113,28 @@ ensemble)
     for f in "$SEEDCELL" "$ENDCELL"; do
         [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
     done
-    # GROWTH-ONLY, and that is a measurement rather than a preference: the
-    # projected scattering step loses number at ~1.25× the growth rate
-    # (`docs/guides/spgpe.md`), which at this operating point took N_C down 11.5 %
-    # in 60 ms with the growth drive set to exactly zero. A condensate cannot be
-    # grown through a window while a "number-conserving" term outruns the growth.
-    # Rooney Eq. (20) — the growth SPGPE — is the sub-theory that answers #334's
-    # question, and it is what carries the M_z-changing exchange that makes
-    # nucleation possible where transport is blocked. Passed through `-v`, not
+    # GROWTH-ONLY, and it survives a day of being argued about in both directions.
+    #
+    # The reason recorded here at launch — "the projected scattering step loses
+    # number at ~1.25× the growth rate" — rested on evidence that did not support
+    # it (flatness in resolution, which a one-off shows too), and was withdrawn on
+    # 2026-08-20. The withdrawal was then measured to be too broad: it rested on a
+    # NOISE-OFF experiment, and with the noise on the loss is a rate after all
+    # (ratio 4.04 for 4x the steps, at zero growth drive, from a pre-projected
+    # seed). Production runs with noise. See `src/solvers/spgpe.jl`.
+    #
+    # So the choice stands, now on a measurement instead of an inference. The
+    # `fullspgpe` stage shows the CONSEQUENCE — the full theory on this very ramp
+    # holds N_C flat at f = 0.065 where growth-only reaches 0.37 — but NOT the
+    # cause: both arms pay the same projector cost (outflow 9886 vs 9986,
+    # truncated 31435 vs 31256) while one falls to 3287 and the other rises to
+    # 29601, and pinning the cutoff moves it by 5 parts in 3271. The stall is the
+    # energy-damping drift, not the bookkeeping, and it is not yet attributed.
+    #
+    # What was always independent of that argument, and is the positive reason:
+    # Rooney Eq. (20) is a sub-theory in its own right and carries the M_z-changing
+    # exchange that makes nucleation possible where transport is blocked.
+    # Passed through `-v`, not
     # exported: qsub only forwards the variables it is named, so an `export` here
     # would have left every job running the full theory.
     # ONE trajectory per job, and a 12 h slot for a job that takes ~7 h.
@@ -170,6 +200,50 @@ kappa09)
     q -N nu_k09 -l h_rt=24:00:00 \
       -v NU_KAPPA=0.9,NU_GRID=64,NU_T=5.0,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_NO_ED=1,NU_SEEDS_N=$NSEED,NU_SEED_FILE=$SEED09,NU_MU1_FROM=$END09,NU_OUT=$OUT/nucleate_k0.9_T5.0_tau500 \
       scripts/eu334/submit_nucleate.sh
+    ;;
+
+# The ensemble ran the growth-only sub-theory (Rooney Eq. 20), so #334 item 3
+# asks whether the full theory would have answered differently. One trajectory per
+# temperature at the middle rate is enough to see a verdict move; this is a check
+# on the sub-theory, not a second ensemble.
+fullspgpe)
+    SEEDCELL=${2:?SEED_CELL required}
+    ENDCELL=${3:?END_CELL required}
+    for T in $TEMPS; do
+        for s0 in 1 2 3; do
+            q -N nu_full_T${T}_s${s0} -l h_rt=24:00:00 \
+              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_SEEDS_N=1,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_fullspgpe_T${T} \
+              scripts/eu334/submit_nucleate.sh
+        done
+    done
+    ;;
+
+# ATTRIBUTION for the stage above. The full-theory runs hold ~7.6x less condensate
+# than growth-only at the same simulated time, and the trajectory alone cannot say
+# whether the scattering reservoir is redistributing atoms (physics) or the moving
+# C region is re-imposing the projector's one-off loss every step (bookkeeping).
+# Pinning k_cut while the drive still runs separates them: suppression that
+# survives a stationary cutoff is physics.
+#
+# ONE job, and only after the stage above frees the GPUs — this is a shared
+# allocation and a second ensemble here would buy precision on a number whose
+# MEANING is what is in doubt.
+kcut_fixed)
+    SEEDCELL=${2:?SEED_CELL required}
+    ENDCELL=${3:?END_CELL required}
+    T=${4:-10.0}
+    q -N nu_kcfix_T${T} -l h_rt=24:00:00 \
+      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_KCUT_FIXED=1,NU_SEEDS_N=1,NU_SEED0=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_kcutfixed_T${T} \
+      scripts/eu334/submit_nucleate.sh
+    ;;
+
+# Unit-scale probe for the stall seen in the fullspgpe stage. Same setup as the
+# suite's only condensate-growth gate, run at BOTH values of M, so the arms differ
+# in one knob. Cheap and short: this is a debugging instrument, not a measurement
+# of the campaign's physics.
+ed_probe)
+    q -N eu334_edprobe -l h_rt=2:00:00 -v ED_NSTEP=${ED_NSTEP:-25000} \
+      scripts/eu334/submit_ed_probe.sh
     ;;
 
 # Classify every endpoint that has one and no class CSV yet. Idempotent, and

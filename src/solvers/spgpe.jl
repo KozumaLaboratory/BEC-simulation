@@ -451,6 +451,47 @@ function apply_energy_damping_step!(
 
     # 4. ψ ← ψ·exp(i·phase), with the phase BAND-LIMITED to the C region.
     #
+    # WHAT THE PROJECTED STEP COSTS IN NUMBER — settled 2026-08-20, after being got
+    # wrong twice in opposite directions. Read this before measuring it a third
+    # time; `test/dynamics/test_spgpe.jl` gates it.
+    #
+    # It depends on the NOISE, and every wrong answer so far came from stating one
+    # sub-case as the whole:
+    #
+    #   noise OFF -> ONE-OFF. Whatever the SEED carried outside the C region,
+    #     removed the first time the projector runs. Pre-projected seed (P ψ₀ = ψ₀):
+    #     1.1e-13 total over 400 steps. Seed carrying 1e-4 outside: the FIRST step
+    #     removes 1.0e-4, every step after costs 2.6e-16. At 1e-2, 9.9e-3 on step
+    #     one. Doubling dt changes nothing.
+    #
+    #   noise ON  -> A RATE. Pre-projected seed so the one-off is already paid,
+    #     γ = 0 so nothing physical can move N: 1.0853e-4 over 50 steps, 4.3821e-4
+    #     over 200. Ratio 4.04 against the 4.00 of exact proportionality.
+    #
+    # The first reading called it a rate (~1.25× the growth rate) on the strength of
+    # flatness in resolution, which supports neither case — a one-off is flat too —
+    # and through a `tracking_cutoff`, which moves every step and so MANUFACTURES
+    # fresh out-of-C content, paying the one-off again and again. The retraction
+    # that followed then generalised the noise-off measurement past its own stated
+    # scope. Right conclusion for production, wrong evidence; then right evidence,
+    # wrong scope.
+    #
+    # Consequence for callers: with noise on, a growth problem DOES pay a continuing
+    # loss here, so `energy_damping=false` stays the conservative choice for one.
+    # Independently of that, give it a seed inside its own C region — project once
+    # before starting. If `tracking_cutoff` is used, each cutoff change legitimately
+    # bills the band it swept past: that is `cutoff_outflow`, reported separately,
+    # and it is physics rather than a defect.
+    #
+    # AND THE PROJECTOR IS NOT WHAT STALLS A GROWTH RUN. On #334's ramp the full
+    # theory falls 11530 -> 3287 while growth-only rises 11530 -> 29601, and the two
+    # projector channels are the SAME in both (outflow 9886 vs 9986, truncated 31435
+    # vs 31256, sampled identically). A common-mode cost cannot produce a divergent
+    # outcome. Pinning the cutoff changes N_C by 5 parts in 3271, so cutoff motion is
+    # out too. What remains is the energy-damping DRIFT acting on the field —
+    # 2γ(µ_res − µ_ψ) shrinks as µ_ψ rises — and whether that is correct physics or a
+    # defect is OPEN. These numbers exclude the projector; they establish nothing.
+    #
     # The band limit is the load-bearing part, and it was missing. Rooney et al.
     # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the
     # noise it colours both live below the cutoff. With 1/|k| left unrestricted the

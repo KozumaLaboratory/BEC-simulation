@@ -307,8 +307,26 @@ function main()
     tw = [0.0, TAU, max(TAU + HOLD, TAU + 1e-9)]
     muw = PiecewiseLinearWaveform(tw, [MU0, MU1, MU1])
     Tw = ConstantWaveform(T_RES)
-    kcw = PiecewiseLinearWaveform(tw,
-        [sqrt(2 * (mu + N_T * T_RES)) for mu in (MU0, MU1, MU1)])
+    # `NU_KCUT_FIXED=1` pins the C region at its END value instead of tracking µ.
+    #
+    # This is the arm that attributes the energy-damped run's suppressed growth.
+    # The projected scattering step's number loss is ONE-OFF in the seed's
+    # out-of-C weight (measured; see the retraction in `src/solvers/spgpe.jl`), so
+    # a STATIONARY cutoff pays it once. A cutoff that ramps manufactures fresh
+    # out-of-C content every step, which re-imposes the one-off step after step
+    # and is indistinguishable from a rate in the trajectory alone.
+    #
+    # The existing NULL arm (`NU_MU1_EQ_MU0`) cannot separate this: with the two
+    # µ equal the cutoff is constant by construction, so the very motion under
+    # suspicion is absent. Pinning the cutoff while the DRIVE still runs is what
+    # isolates it. The end value is used because `k_cut < K_MAX` is already
+    # checked at both ends above, so pinning cannot silently leave the grid.
+    kc_of = mu -> sqrt(2 * (mu + N_T * T_RES))
+    kcw = if gets("NU_KCUT_FIXED", "") == "1"
+        ConstantWaveform(kc_of(MU1))
+    else
+        PiecewiseLinearWaveform(tw, [kc_of(mu) for mu in (MU0, MU1, MU1)])
+    end
     # `NU_NO_ED=1` selects the growth-only sub-theory (Rooney Eq. 20). Not a
     # convenience switch: the scattering term is number-conserving only BEFORE the
     # projector, and turning it off is how its residual is attributed rather than
@@ -352,8 +370,17 @@ function main()
             # written at the end, so without this the log is empty for the whole
             # run and a stalled job is indistinguishable from a slow one.
             r = rows[end]
-            @printf("    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f\n",
-                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13])
+            # The two projector channels belong on THIS line, not only in the CSV
+            # the run writes at the end. An energy-damped run held N_C flat for
+            # three seconds of simulated time and the log could not say whether
+            # atoms were leaving through the projector or the field had simply
+            # reached µ_res — the two columns that decide it existed the whole
+            # time, unreadable until the job finished. A stalled job the log
+            # cannot explain is the case the line was added for.
+            @printf(
+                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
+                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13],
+                r[14], r[15])
             flush(stdout)
         end
     end

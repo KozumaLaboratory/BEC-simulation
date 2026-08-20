@@ -430,6 +430,37 @@ Choose the probes from the failure being guarded against, never for
 convenience: a positive control that cannot fail proves nothing, which is the
 degenerate-knob trap in another costume.
 
+## Before starting a topic — enumerate the open work, and disposition it
+
+Not a reminder. A file that must exist, in a state it may not be left in:
+
+```bash
+python3 scripts/prior_art.py --topic <name> --keywords <k1> <k2> …
+# → docs/campaign/prior_art/<name>.md, every match starting at `unread`
+```
+
+Read each row and set its disposition (`read` / `unrelated` / `superseded` /
+`depends`). **`unread` fails `test_prior_art_dispositions.jl`.**
+
+Measured 2026-08-20: an SPGPE campaign re-derived, from a cluster job that died at
+99.97 % of a 94 GiB GPU, a cache-key bug that PR #351 had found, fixed and gated
+two days earlier — and then **shipped a documented limit the same PR had already
+retracted**, designing a 96-trajectory ensemble on a limit that does not exist.
+`gh pr list` had been run at the start of that session and #351 was *in the
+output*, its title beginning "feat(spgpe)", on a task that was entirely SPGPE.
+
+The failure was not search. **It was not connecting what was already displayed** —
+and two memory notes covering exactly this (`feedback_use_existing_artifacts_first`,
+`mistake_abandoned_branch_already_landed`) were both loaded and neither fired.
+Salience loses to task momentum, so a third note would not help; the remedy has to
+be an artifact whose absence stops the work. Here the line `#351  unread` is what
+stops it.
+
+What the gate does NOT check, because a gate implying more than it verifies is
+worse than none: it cannot know whether the enumeration is CURRENT (no network in
+the runner), and it cannot know whether a `read` row was really read. The record
+carries its own date and says so.
+
 ## Before computing — five gates
 
 Measured 2026-08-02: a request to fit an experiment produced **24 × 45-point GPU
