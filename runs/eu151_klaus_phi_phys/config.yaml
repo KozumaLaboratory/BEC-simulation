@@ -16,6 +16,12 @@
 #  fields that the mixin would otherwise drop into them.
 # ─────────────────────────────────────────────────────────────────────
 
+# anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
+#   state. `H = -p·F_z` with p > 0 puts m=+F lowest, so the anti-aligned seed here
+#   is m=-F, i.e. init_m_idx = 13. Measured 2026-08-19 (#343): rotation contrast
+#   +16.5 % anti-aligned against -0.45 % aligned.
+#   Authority: docs/campaign/edh_quench_polarisation_decision.md
+
 defaults: {kind: rotating_basis, backend: gpu}
 
 mixins:
@@ -34,10 +40,15 @@ pipeline:
   # LHY scalar.
   - ground_state:
       use: [eu151_klaus_phys]
-      B: {p: 26700.0}                             # Klaus-regime Bz for Eu
+      B: {p: 26700.0}                             # fast-Larmor-regime Bz for Eu
       ddi: {enabled: true}
       lhy: {kind: scalar}
-      init_m_idx: 1
+      # c=1 is m=+F and c=13 is m=-F. `H = -p·F_z`, so p > 0 puts m=+F at the
+      # BOTTOM of the ladder — the schema default here is `p_z > 0 ? 1 : D`
+      # (run_step_rotating/ground_state.jl), so `init_m_idx: 1` was never a
+      # choice, it was the default, and it prepared the Zeeman GROUND state.
+      # 1 -> 13 on 2026-08-19: the EdH cascade only runs from the HIGHEST state.
+      init_m_idx: 13
       init_sigma: 1.5
       dt: 0.005
       n_steps: 1500
