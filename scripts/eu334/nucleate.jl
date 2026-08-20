@@ -370,8 +370,17 @@ function main()
             # written at the end, so without this the log is empty for the whole
             # run and a stalled job is indistinguishable from a slow one.
             r = rows[end]
-            @printf("    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f\n",
-                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13])
+            # The two projector channels belong on THIS line, not only in the CSV
+            # the run writes at the end. An energy-damped run held N_C flat for
+            # three seconds of simulated time and the log could not say whether
+            # atoms were leaving through the projector or the field had simply
+            # reached µ_res — the two columns that decide it existed the whole
+            # time, unreadable until the job finished. A stalled job the log
+            # cannot explain is the case the line was added for.
+            @printf(
+                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
+                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13],
+                r[14], r[15])
             flush(stdout)
         end
     end
