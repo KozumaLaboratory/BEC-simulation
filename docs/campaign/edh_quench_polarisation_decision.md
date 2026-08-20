@@ -38,6 +38,11 @@ measurements, not tests).
 | 9 | Then what is the mechanism? | **Centrifugal, not Coriolis.** A *static* trap weakened to ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to **0.06 %** across the range. **Rotation is not needed** — weaken the radial trap to **0.71 ω_⊥**. §9.3, §10.1 |
 | 10 | Is it density, or the radial confinement? | **Radial.** A density-matched weakening along **z** instead lands *below* the baseline (−36 % of the gain). Same ω̄, opposite sign. §10.4 |
 | 11 | Does the prescription hold at the other two fields? | **No, and differently.** 1.3 nT: **no window at all** (+1.8 %, flat) — the old `0.3 @ 1.3 nT` has no replacement. 5.2 nT: **two branches**, resolved in §11. §10.2 |
+| 14 | Is the 5.2 nT dip a resonance? | **No — the prediction was made and failed.** ω_eff,dip ∝ B predicts a dip near 0.325 at 2.6 nT; the measured tail rises monotonically through it. §11.4 withdrawn; the second branch has no mechanism. §12.3 |
+| 15 | Was the observable right? | **Not at 10.4 nT.** The peak must be taken *inside the hold*; over the whole trajectory it read the pre-hold transient and 7 of 10 arms were blind. Re-extracted: **0.00 % change at 1.3 / 2.6 / 5.2 nT**, so §9–§11 stand. §12.1 |
+| 16 | Does it survive LHY? | **Yes.** `full_bdg` moves the baseline +0.07 % and the optimum +2.18 %; the enhancement goes +24.9 % → **+27.5 %**. §12.4 |
+| 18 | The field-rotation branch (`eu151_klaus_phi_phys`) | **Two code defects, no physics.** Its GPU path was dead (`spin_density_vector` allocated host arrays → scalar-indexing error); and it reported **`conv = true` having never been asked**, because the rotating-basis GS returns no convergence flag and the writer defaulted it to `true` — so every such run satisfied CAMPAIGN guard 7 by construction. Both fixed and gated. §14 |
+| 17 | Does the static substitution hold at long time? | **Only on the peak.** At 145 ms static and rotating differ by 3.2 % at the peak (vs 0.06 % short) but by **2.25× at the endpoint** — rotation gives a transient, the static trap a *sustained* transfer. §13 |
 | 13 | 5.2 nT, resolved at 20 points + 64³ | **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
@@ -776,7 +781,206 @@ peak with no dip; doubling the field introduces one. That is what a resonance
 entering the sampled window looks like — plausibly between the Zeeman splitting
 and the radial mode spacing, both of which the field and ω_⊥,eff set. The test
 is one more field: if the dip is a resonance, its ω_eff position must move again
-at 10.4 nT. **Not measured here.**
+at 10.4 nT.
+
+> **WITHDRAWN 2026-08-20 — the prediction was made and it failed.** §12.3. The
+> informative half was 2.6 nT, where a dip was predicted near ω_eff ≈ 0.325 and
+> the measured curve rises monotonically through it. The second branch at 5.2 nT
+> is a measured structure **without** a mechanism; this paragraph is kept struck
+> rather than deleted because a discarded hypothesis that was actually tested is
+> worth more to the next reader than a clean page.
+
+---
+
+## 12. The resonance prediction fails, and the observable needed fixing first
+
+### 12.1 An instrument correction that changed one field and no others
+
+Every peak up to here was taken over the **whole** streamed trajectory. At 10.4 nT
+four arms differing *only in the hold* returned peak P_adj = 0.26050 to five
+decimals — impossible unless the maximum lies before the hold. It does: argmax at
+frame 29, hold starts at frame 32.
+
+So the observable was reading the pre-hold transient, and "no dip at 10.4 nT"
+would have been a confirmed prediction read off a blind instrument. **The claim is
+always about the hold, so the peak must be taken inside it.**
+
+Re-extracted from cache — no recompute — across every arm measured so far:
+
+| scan | arms | peak moved? |
+|---|---:|---|
+| 1.3 nT (§10.2) | 7 | **0.00 % on all** |
+| 2.6 nT (§10.1, §11 tail) | 16 | **0.00 % on all** |
+| 5.2 nT (§10.2, §11) | 20 | **0.00 % on all** |
+| **10.4 nT** | 10 | **7 of 10 moved, by up to −23 %** |
+
+**§9, §10 and §11 are unaffected** — that is measured, not assumed. Only 10.4 nT
+is contaminated, and for a physical reason: it is the Zeeman-re-pinning regime the
+sheet warns about, so the hold suppresses the cascade and the transient wins.
+
+### 12.2 10.4 nT, read correctly: a clean single peak
+
+| ω_eff | peak in hold | ω_eff | peak in hold |
+|---:|---:|---:|---:|
+| 1.000 | 0.20139 | 0.650 | **0.30101** |
+| 0.900 | 0.22628 | 0.600 | 0.29316 |
+| 0.800 | 0.24117 | 0.550 | 0.25721 |
+| 0.750 | 0.25204 | 0.500 | 0.22104 |
+| 0.700 | 0.27828 | 0.450 | 0.20178 |
+
+Single maximum at **ω_eff = 0.650**, **+49.5 %** over ω_eff = 1 — the *largest
+relative* enhancement of any field measured, on the *smallest absolute* transfer
+(0.30 against 0.66 at 2.6 nT). Zeeman re-pinning is real — it costs a factor 2 in
+absolute transfer — but it does not close the channel, and weakening the trap
+helps proportionally more when it is nearly closed.
+
+### 12.3 The resonance reading is refuted
+
+§11.4 proposed that the 5.2 nT dip is a resonance, predicting ω_eff,dip ∝ B, and
+that prediction was written down before the runs:
+
+| field | predicted | observed | |
+|---|---|---|---|
+| 10.4 nT | dip at ω_eff ≈ 1.30 ⇒ none in range | no dip | consistent, but weakly — "no dip" is the easy half |
+| **2.6 nT** | **dip near ω_eff ≈ 0.325** | **0.250→0.375 rises monotonically: 0.45976, 0.46412, 0.46681, 0.47068, 0.47682** | **FAILS** |
+
+The informative arm fails. **The resonance reading is refuted** and §11.4 is
+withdrawn. What produces the second branch at 5.2 nT is now unexplained — and the
+honest position is that it is a measured structure without a mechanism, not a
+mechanism awaiting confirmation.
+
+Field dependence of the optimum, with everything read in the hold:
+
+| field | optimum ω_eff | enhancement | shape |
+|---|---:|---:|---|
+| 1.3 nT | — | +1.8 % | flat, no window |
+| 2.6 nT | 0.714 | +24.9 % | single peak |
+| 5.2 nT | 0.55 | +17.0 % | **two branches** |
+| 10.4 nT | 0.650 | **+49.5 %** | single peak |
+
+Non-monotonic in every column. There is no one-line prescription across field.
+
+### 12.4 LHY: the conclusion survives
+
+Everything above is `lhy: none`. Repeated at 2.6 nT with `full_bdg` (the
+general-spinor path; the closed forms assume an ansatz this state does not have):
+
+| | ω_eff = 1.000 | ω_eff = 0.714 | enhancement |
+|---|---:|---:|---:|
+| `lhy: none` | 0.52748 | 0.65864 | **+24.9 %** |
+| `lhy: full_bdg` | 0.52786 | 0.67297 | **+27.5 %** |
+
+LHY moves the baseline by **+0.07 %** and the optimum by **+2.18 %**. The
+enhancement does not merely survive, it grows slightly. **The `lhy: none` caveat
+is discharged for this conclusion** — though not for absolute values at other
+fields or densities, which were not re-run.
+
+---
+
+## 13. Long time (145 ms): the substitution is a short-time statement
+
+`runs/klaus_quench_long_time/` was **missed by the corpus retarget** — it was
+still `m_minus_F` at B_z > 0, i.e. aligned, until this branch. Retargeted (9
+configs, seed-agreement gate green), then three arms at hold = 100 ω_ref⁻¹
+(≈ 145 ms), 32³, CPU, peak taken inside the hold per §12.1:
+
+| arm | hold-peak P_adj | hold-peak P_exc | **P_adj at the END** |
+|---|---:|---:|---:|
+| baseline (ω_eff = 1.000, Ω = 0) | 0.38532 | 0.79035 | 0.23127 |
+| **static (ω_eff = 0.714, Ω = 0)** | 0.50790 (+31.8 %) | **0.88794** | **0.47517** |
+| **rotating (Ω = −0.70, full trap)** | 0.52475 (+36.2 %) | 0.84341 | 0.21093 |
+
+Two findings, and they point opposite ways.
+
+**On the peak, the substitution degrades but survives.** Static and rotating
+differ by **3.21 %** here against **0.06 %** on the short protocol. 3.21 % is
+comparable to the 32³↔64³ resolution uncertainty (2.5 %, G3), so this is
+*suggestive of divergence, not established* — it wants a 64³ point before anyone
+leans on it.
+
+**On the endpoint, they are qualitatively different, and that is not marginal.**
+The rotating arm peaks and then collapses back to 0.21093 — *below* the baseline's
+0.23127 — while the static arm holds 0.47517, i.e. **2.25×** the rotating one.
+Rotation produces a transient; the weakened static trap produces a *sustained*
+transfer.
+
+So the §9.3 substitution ("rotation is fully replaceable by a static weakened
+trap") is a **short-time statement**. At 145 ms the two agree on how high the
+cascade climbs and disagree completely on whether it stays there — and the static
+prescription is the better one on the observable an experiment would actually
+integrate.
+
+The sheet's long-time rows (`P_exc(end) = 0.958 at 145 ms`) are not directly
+comparable — different cell (`keep_rot`, Ω = −0.5, aligned corpus) — and are not
+re-derived here. What is established is the *ordering*, which is the load-bearing
+part: static > rotating > baseline on sustained transfer.
+
+---
+
+## 14. The field-rotation branch: two code defects, no physics yet
+
+`runs/eu151_klaus_phi_phys/` — the field-rotation branch, 32×32×16 rotating-basis
+on GPU, 1 s steady stir × 8 scan points — had never been *run* since its seed was
+corrected to the anti-aligned end (§4.2). Smoking it before committing GPU hours
+(CLAUDE.md: render every path in ≈2 min first) found two defects and no physics.
+
+### 14.1 The rotating-basis GPU path was dead
+
+```
+ERROR: Scalar indexing is disallowed.
+  spin_density_vector → _compute_spin_density!
+  run_step_rotating/dynamics.jl:252
+```
+
+`spin_density_vector` allocated its three outputs as `zeros(Float64, n_pts)` —
+unconditionally **host**. On GPU that is a host destination with a device source,
+so the `@.` writes fall to the CPU broadcast kernel and **error**. Not a slow
+path: the whole rotating-basis dynamics path was unusable on GPU.
+
+Fixed with `similar(psi, Float64, n_pts)`, which is correct for any backend and
+leaves nothing to remember. The smoke then completes.
+
+### 14.2 `E = NaN` with `conv = true` — and the second half is the serious one
+
+The completed smoke reports `E=NaN conv=true`, with **ψ entirely finite**
+(212992/212992). Discriminated across four arms — seed `init_m_idx` ∈ {1, 13} ×
+ITP ∈ {100, 1500} — **all four give E = NaN with finite ψ**, so this is neither
+the anti-aligned seed (§4.2 is exonerated) nor an under-converged smoke.
+
+The cause is an absent key read through a default. The rotating-basis ground
+state returns `mu` and **no** energy and **no** convergence flag, and
+`run_registry.jl` read them as
+
+```julia
+energy    = get(result, :ground_state_energy,    NaN)
+converged = get(result, :ground_state_converged, true)   # <-- 
+```
+
+`NaN` for a missing energy is at least loud. **`true` for a missing convergence
+flag is not.** It collapses three states into one — converged, did-not-converge,
+and *nobody checked* — and the third is real: `:ground_state_converged` is
+already the discriminator for "did a ground state run at all"
+(`model/complete.jl:222`).
+
+> **Every rotating-basis run has been writing `converged = true` having never
+> been asked, and satisfying CAMPAIGN.md §4 guard 7 ("`conv == false` ⇒
+> disqualified") by construction.**
+
+Fixed by writing nothing when there is nothing to report — every consumer already
+handles absence — and gated by
+`test/workflow/test_converged_absent_is_not_a_pass.jl`, which counts the writes
+and the guarded writes and requires them equal, so a new unguarded write fails.
+
+**The rotating-basis GS still reports no energy.** That is left open and named
+rather than papered over: it needs the GS step to compute one, which is a change
+to that solver, not to the writer.
+
+### 14.3 Status
+
+No physics from this branch. What it produced is two defects, one of which was
+silently satisfying a campaign guard. The 8-point production scan is **not**
+launched — it would now run, but on a path whose ground state reports no energy,
+so there would be nothing to check the result against.
 
 <!-- REDERIVE -->
 
