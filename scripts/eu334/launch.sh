@@ -172,6 +172,41 @@ kappa09)
       scripts/eu334/submit_nucleate.sh
     ;;
 
+# The ensemble ran the growth-only sub-theory (Rooney Eq. 20), so #334 item 3
+# asks whether the full theory would have answered differently. One trajectory per
+# temperature at the middle rate is enough to see a verdict move; this is a check
+# on the sub-theory, not a second ensemble.
+fullspgpe)
+    SEEDCELL=${2:?SEED_CELL required}
+    ENDCELL=${3:?END_CELL required}
+    for T in $TEMPS; do
+        for s0 in 1 2 3; do
+            q -N nu_full_T${T}_s${s0} -l h_rt=24:00:00 \
+              -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_SEEDS_N=1,NU_SEED0=$s0,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_fullspgpe_T${T} \
+              scripts/eu334/submit_nucleate.sh
+        done
+    done
+    ;;
+
+# ATTRIBUTION for the stage above. The full-theory runs hold ~7.6x less condensate
+# than growth-only at the same simulated time, and the trajectory alone cannot say
+# whether the scattering reservoir is redistributing atoms (physics) or the moving
+# C region is re-imposing the projector's one-off loss every step (bookkeeping).
+# Pinning k_cut while the drive still runs separates them: suppression that
+# survives a stationary cutoff is physics.
+#
+# ONE job, and only after the stage above frees the GPUs — this is a shared
+# allocation and a second ensemble here would buy precision on a number whose
+# MEANING is what is in doubt.
+kcut_fixed)
+    SEEDCELL=${2:?SEED_CELL required}
+    ENDCELL=${3:?END_CELL required}
+    T=${4:-10.0}
+    q -N nu_kcfix_T${T} -l h_rt=24:00:00 \
+      -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_KCUT_FIXED=1,NU_SEEDS_N=1,NU_SEED0=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_kcutfixed_T${T} \
+      scripts/eu334/submit_nucleate.sh
+    ;;
+
 # Classify every endpoint that has one and no class CSV yet. Idempotent, and
 # separate from the trajectory jobs so a shard killed at its walltime does not
 # leave its finished trajectories unread.
