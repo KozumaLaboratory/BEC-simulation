@@ -30,6 +30,19 @@
 > reading is not supported: the flower branch **ends at 68.4 ± 0.15 µG**, measured
 > statically; it merely takes longer than a ramp to fall once past its spinodal.
 >
+> **AMENDED 2026-08-20 (#398).** That last sentence is the part of this retraction
+> that does not hold. #383 measured three independent quantities at 68.25 µG and
+> none of them softens — the curvature's zero extrapolates to 78.2 µG, the escape
+> direction is **uphill** by +3.403, and the lowest ω is flat to 1.4 %. So 68.4 µG
+> is where a **warm-started continuation loses the branch**, which is not the same
+> as where the branch ends. If the flower minimum survives past it behind a
+> barrier, "flower survives to 100 µG" is back on the table and this document's
+> original rising-leg reading may have been right for the wrong stated reason.
+> The retraction's *other* half — that a B_z ramp conserves J_z, so no rate
+> converts between the two sectors — is untouched and is what actually closes the
+> hysteresis reading. See `eu_kappa_hysteresis_loop.md`'s HELD note; resolution
+> tracked as #399.
+>
 > What survives: the κ dependence, the static branch structure, and the protocol
 > machinery. What replaces the loop width as the deliverable: a discrete
 > Stern-Gerlach level count, 6–7 populated m_F at κ = 1.8 against 3–4 at κ = 0.9.
