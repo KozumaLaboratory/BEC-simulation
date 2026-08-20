@@ -9,8 +9,7 @@
 # This is also the 0-D model's claim restated in the c-field's own variables, so
 # disagreement between them is informative either way.
 using SpinorBEC, Printf
-include(joinpath(@__DIR__, "..", "..", "docs", "guides", "figures",
-    "eu_evaporation_spgpe.jl"))
+include(joinpath(@__DIR__, "../../docs/guides/figures/eu_evaporation_spgpe.jl"))
 traj = zero_d_trajectory()
 r = traj.r
 ω = traj.omega_of(r.t[1])

@@ -17,8 +17,7 @@
 # them.
 using SpinorBEC, FFTW, Printf, Statistics
 # zero_d_trajectory lives in the evaporation figure driver, not the package.
-include(joinpath(@__DIR__, "..", "..", "docs", "guides", "figures",
-    "eu_evaporation_spgpe.jl"))
+include(joinpath(@__DIR__, "../../docs/guides/figures/eu_evaporation_spgpe.jl"))
 
 const OUTDIR = get(ENV, "SPINORBEC_FIGS_ROOT", "runs/eu_number_conserving")
 

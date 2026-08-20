@@ -8,8 +8,7 @@
 # units and the grid each point would need, and let the affordable window be read off
 # rather than guessed.
 using SpinorBEC, Printf
-include(joinpath(@__DIR__, "..", "..", "docs", "guides", "figures",
-    "eu_evaporation_spgpe.jl"))
+include(joinpath(@__DIR__, "../../docs/guides/figures/eu_evaporation_spgpe.jl"))
 traj = zero_d_trajectory()
 r = traj.r
 ω_ref = traj.omega_of(r.t[1])
