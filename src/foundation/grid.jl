@@ -97,8 +97,13 @@ plan. A pure predicate so a test can pin it without allocating gigabytes.
 """
 function fft_planning_memory_risk(shape::NTuple{N, Int};
     flags=FFTW.MEASURE,
-    fftw_threads::Int=FFTW.get_num_threads(),
-    julia_threads::Int=Threads.nthreads()) where {N}
+    # `Integer`, not `Int`: `FFTW.get_num_threads()` returns an **Int32**, so an
+    # `::Int` annotation here is a MethodError on every call that takes the
+    # default — which is every call from `_warn_fft_planning_memory`, i.e. every
+    # `make_fft_plans` in the suite. Caught by CI, not by the unit test, because
+    # the unit test passes its threads explicitly as `Int` literals.
+    fftw_threads::Integer=FFTW.get_num_threads(),
+    julia_threads::Integer=Threads.nthreads()) where {N}
     (flags == FFTW.MEASURE || flags == FFTW.PATIENT) || return false
     fftw_threads > 1 || return false
     julia_threads > 1 || return false

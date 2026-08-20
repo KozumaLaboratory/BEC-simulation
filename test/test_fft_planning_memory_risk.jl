@@ -80,6 +80,27 @@ using FFTW
         end
     end
 
+    @testset "the DEFAULTS are callable — this is where it broke" begin
+        # The first version annotated the keywords `::Int`. `FFTW.get_num_threads()`
+        # returns an **Int32**, so every call that took the default was a
+        # MethodError — which is every call from the advisory, i.e. every
+        # `make_fft_plans` in the suite. The tests above all passed their threads
+        # explicitly as `Int` literals and were green throughout; CI caught it.
+        #
+        # So this testset exercises the DEFAULT path and nothing else. A unit
+        # test that only drives the arguments it chooses cannot see a defect in
+        # the arguments it does not.
+        @test fft_planning_memory_risk((48, 48, 24)) isa Bool
+        @test fft_planning_memory_risk((64, 64, 64)) isa Bool
+        @test fft_planning_memory_risk((32,)) isa Bool
+        @test fft_planning_memory_risk((48, 48, 24); flags=FFTW.ESTIMATE) === false
+        # and mixed integer widths, since that is the shape of the defect
+        @test fft_planning_memory_risk((48, 48, 24);
+            fftw_threads=Int32(16), julia_threads=Int32(16)) === true
+        @test fft_planning_memory_risk((48, 48, 24);
+            fftw_threads=UInt8(16), julia_threads=16) === true
+    end
+
     @testset "the power-of-two helper is right at the edges" begin
         @test SpinorBEC._is_pow2(1)
         @test SpinorBEC._is_pow2(2)
