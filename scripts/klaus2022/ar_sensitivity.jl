@@ -92,7 +92,9 @@ function run_gs(spec)
     cfg = SpinorBEC.parse_pipeline(data)
     t0 = time()
     res = run_config(cfg; verbose=false)
-    (res[:scalar_egpe_ground_state], time() - t0)
+    # `:scalar_gs` is the key `scripts/klaus2022_reproduce.jl` reads; there is no
+    # `:scalar_egpe_ground_state`.
+    (res[:scalar_gs], time() - t0)
 end
 
 # name => (override NamedTuple, axis, the value being varied, the published

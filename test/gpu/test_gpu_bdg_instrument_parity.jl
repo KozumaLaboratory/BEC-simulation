@@ -128,7 +128,17 @@ end
         energy_gradient!(grad, fx_c.ψ, fx_c.ws)
         @test sqrt(sum(abs2, grad .- 2p.μ .* fx_c.ψ) * p.dV) < 1e-10
 
-        kw = (; nev=4, n_hessian=6, max_iter=250, hess_tol=1e-9)
+        # `nev` MUST clear the null manifold. Uniform F=1 polar breaks two spin
+        # rotations, and each broken generator contributes its symplectic
+        # partner, so the zero block is FOUR-dimensional — `nev=4` lands exactly
+        # inside it. Measured: at `max_iter=40` the block had not descended and
+        # returned excitations at ω ≈ 0.77 and 0.85 (which then disagreed
+        # between devices, because they were unconverged); at `max_iter=250` it
+        # converged onto the true lowest four, every one of them a Goldstone at
+        # ω ≈ 3e-7, and the excitation control correctly went red on an
+        # agreement about zeros. Both readings are honest; only `nev=8` is
+        # useful.
+        kw = (; nev=8, n_hessian=12, max_iter=250, hess_tol=1e-9)
         # The eigensolver's start vectors come from `randn(rng, …)` on the HOST
         # and are then moved to the device, so seeding the same rng gives both
         # arms the same subspace and the comparison is of the arithmetic, not of
@@ -178,9 +188,21 @@ end
             @test isapprox(rc.omega[k], rg.omega[k]; rtol=1e-6, atol=1e-8)
         end
         # POSITIVE CONTROL: at least one CERTIFIED mode is an actual excitation,
-        # so the agreement is not an agreement about a null manifold.
+        # so the agreement is not an agreement about a null manifold. Asserted on
+        # the CERTIFIED set and not on `spectrum_reached`, which only says an
+        # excitation was RETURNED — the run that motivated this line returned two
+        # and certified neither, and reported `spectrum_reached = true` while
+        # every mode being compared was a Goldstone at ω ≈ 3e-7.
         @test rc.spectrum_reached
-        @test maximum(rc.omega[k] for k in certified) > 1e-3
+        excitations = [k for k in certified if rc.omega[k] > 1e-3]
+        if isempty(excitations)
+            println("  certified ω: ", [rc.omega[k] for k in certified])
+            println("  all ω: ", rc.omega)
+            println("  → every certified mode is a zero mode. Raise `nev` past the")
+            println("    null manifold (F=1 polar breaks two spin rotations, so the")
+            println("    zero block is 4-dimensional) or the comparison is about zeros.")
+        end
+        @test !isempty(excitations)
     end
 
     @testset "bragg_response: kick and probe reach the device" begin
