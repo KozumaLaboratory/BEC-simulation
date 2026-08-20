@@ -1,0 +1,14 @@
+# Extended-hold arms (hold_scale = 2.0). Pinned as a manifest rather than by
+# positional index: adding arms reorders a glob, and a queued job that reads the
+# new order runs a different config under the old task number.
+#
+# Why these six: the 5.2 nT scan peaks on the LAST streamed frame for
+# omega_eff 0.42-0.62, so the published two-branch structure compares a resolved
+# maximum (0.650, frame 38/42) against boundary values (42/42). These arms double
+# the hold so both sides can peak inside the window.
+runs/klaus_quench_weff/klaus_weff0p550_B5p2nT_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff0p770_B5p2nT_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff1p000_B5p2nT_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_hold2p0x.yaml
