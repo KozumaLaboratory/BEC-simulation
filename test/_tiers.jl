@@ -932,6 +932,13 @@ const FULL_EXTRA = [
     # broadcast propagator it replaces. Every production Eu run is tabulated and
     # every one of them took the fallback; GPU-only.
     "gpu/test_gpu_tabulated_lhy_fused_diagonal_parity.jl",
+    # #339's spectrum instruments (`trapped_bdg_frequencies`, `bragg_response`)
+    # shipped with two oracles and a green CI and had NEVER RUN ON A GPU — both
+    # oracles are 1D/F=1/CPU, and `ndim ≥ 2` is required before the rotation
+    # generator is reached at all. The first device use was #383's production
+    # job, which died on the first call. 3D is the requirement here, not a
+    # preference.
+    "gpu/test_gpu_bdg_instrument_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.
