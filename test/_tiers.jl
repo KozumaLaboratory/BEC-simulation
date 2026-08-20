@@ -451,8 +451,6 @@ const CI_EXTRA = [
     # testsets at ~3 min each; putting it in FAST timed the job out at 15 min
     # and cancelled it, which reads as "CI cancelled" rather than "too slow".
     "dynamics/test_energy_damping_buffer_reuse.jl",
-    "dynamics/test_energy_damping_cayley.jl",
-    "dynamics/test_number_conserving_spgpe.jl",
     "dynamics/test_mu_lda_constraint.jl",
     # (physics block × solver path) table: the term must be LIVE on the
     # Workspace after a YAML run, on every path. Drives run_config, so `ci`
@@ -849,6 +847,12 @@ const CI_EXTRA = [
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
 const FULL_EXTRA = [
+    # Measured: 750 s and 240 s. They were in FAST (timed that job out at 15 min),
+    # then in CI_EXTRA (timed integration out at 30 min). Twelve minutes of the
+    # integration budget for two files is not a per-PR gate; they run in `full` and on
+    # TSUBAME, where they were developed and where their numbers were measured.
+    "dynamics/test_energy_damping_cayley.jl",
+    "dynamics/test_number_conserving_spgpe.jl",
     # 1266 s on its own — three independent SPGPE equilibrium solves at
     # n = 48, each run to steady state from both directions. It was in
     # FAST_TESTS, where the job budget is 15 min: no worker count can help,
