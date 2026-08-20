@@ -16,15 +16,15 @@
 #  fields that the mixin would otherwise drop into them.
 # ─────────────────────────────────────────────────────────────────────
 
-# NOT anti-aligned, and it cannot be made so by editing a key. The EdH cascade
-#   needs the Zeeman-HIGHEST stretched state, which at p > 0 is m=-F
-#   (init_m_idx = 13) — but ITP ANNIHILATES it: the Zeeman-shifted factor for the
-#   highest m is exp(-12·p·dt) = exp(-1602) here, underflowing in one step and
-#   returning psi identically zero (measured 2026-08-20). Imaginary time relaxes
-#   to the LOWEST state.
-#   The fix is a pipeline change — relax at the opposite field sign, reverse the
-#   field for the dynamics — not a key change. Until then this config prepares
-#   the ALIGNED state and is on the wrong side for the EdH quench.
+# ANTI-ALIGNED, via `prepare_anti_aligned: true` on the ground_state step.
+#   The EdH cascade needs the Zeeman-HIGHEST stretched state, which at p > 0 is
+#   m=-F. That is NOT a seed choice: ITP is a projector onto the LOWEST state, so
+#   `init_m_idx: 13` gets exp(-12·p·dt) = exp(-1602) here, underflows in one step
+#   and returned psi identically zero (measured 2026-08-20).
+#   The preparation relaxes in the REVERSED field and reverses it back for the
+#   dynamics — the Zeeman-lowest state of -B is the Zeeman-highest state of +B,
+#   and it is a true ground state of the field it was relaxed in. `q` does not
+#   flip; it is even in B.
 #   Authority: docs/campaign/edh_quench_polarisation_decision.md
 
 defaults: {kind: rotating_basis, backend: gpu}
@@ -48,25 +48,21 @@ pipeline:
       B: {p: 26700.0}                             # fast-Larmor-regime Bz for Eu
       ddi: {enabled: true}
       lhy: {kind: scalar}
-      # c=1 is m=+F and c=13 is m=-F. `H = -p·F_z`, so p > 0 puts m=+F at the
-      # BOTTOM of the ladder, and `init_m_idx: 1` is the schema default at p > 0
-      # (`run_step_rotating/ground_state.jl`) — so this was never a choice, it
-      # was the default, and it prepares the Zeeman GROUND state.
+      # THE PREPARATION, and the one line that decides which end of the Zeeman
+      # ladder this run starts from. ITP relaxes at p = -26700 and the dynamics
+      # below runs at +26700, so the state handed over is the Zeeman-HIGHEST one
+      # the EdH cascade needs.
       #
-      # 2026-08-19 set this to 13 (the anti-aligned end the EdH cascade needs).
-      # 2026-08-20 REVERTED, because ITP cannot produce that state and the run
-      # said so only once the energy was being reported at all: at p = 26700 the
-      # Zeeman-shifted ITP factor for the highest m is exp(-12·p·dt) = exp(-1602),
-      # which underflows Float64 in ONE step. ψ came back as 212992 exact zeros
-      # with E = 0.0, and completed. Imaginary time is a projector onto the
-      # LOWEST state; asking it for the highest is not a configuration choice.
+      # History, because the shape recurs: 2026-08-19 tried `init_m_idx: 13` for
+      # this. The run COMPLETED and returned 212992 exact zeros with E = 0.0 —
+      # exp(-12·p·dt) = exp(-1602) underflows Float64 in ONE step. It was not a
+      # wrong configuration; it was inexpressible, and it only surfaced once the
+      # energy was reported at all. The underflow is now a hard error.
       #
-      # The anti-aligned preparation therefore needs the state relaxed as the
-      # ground state of the OPPOSITE field sign and the field reversed for the
-      # dynamics — a pipeline change, not a key change. Tracked as
-      # `edh-phi-phys-anti-aligned-needs-field-reversal`; the underflow is now a
-      # hard error instead of a zero result.
-      init_m_idx: 1
+      # No `init_m_idx` here on purpose: the default follows the ITP field, so it
+      # is already the right end. Naming it would re-introduce the coupling
+      # between two keys that has to agree.
+      prepare_anti_aligned: true
       init_sigma: 1.5
       dt: 0.005
       n_steps: 1500

@@ -1209,6 +1209,77 @@ The static weakened trap produces the **larger cascade**; rotation produces a
 neither — it inverted both. Which matters depends on what an experiment
 integrates, and this document is not in a position to choose for it.
 
+---
+
+## 18. The anti-aligned preparation, implemented
+
+§16.3 said the repair was a pipeline change and not a config key, and left it
+unimplemented. It is now `prepare_anti_aligned: true` on a `kind:
+rotating_basis` ground_state.
+
+### 18.1 What it does
+
+Relax at **−p**, hand the dynamics **+p**. The Zeeman-lowest state of −B is the
+Zeeman-highest state of +B, so the result is the anti-aligned stretched state —
+and it is a genuine ground state of the full interacting problem in the field it
+was relaxed in, not an excited state anyone had to construct. It is also what an
+experiment does.
+
+**Only `p` reverses.** `q ∝ |B|²` is **even** in the field, so reversing B leaves
+it alone; flipping it too would relax in a different quadratic Zeeman than the
+dynamics runs in — a different Hamiltonian, not a reversed field. The tilde basis
+`U_B(θ,φ)` is likewise unchanged: it is built from the field **axis**, and
+reversing the field along that axis is exactly what negating `p` does.
+
+Three places had to agree, and two of them are the kind that would have been
+silently wrong:
+
+| | why it matters |
+|---|---|
+| the ITP Zeeman uses `p_itp` | the actual reversal |
+| the **handoff** keeps `p_z` | if it carried `p_itp` the quench would run in the reversed field and be the aligned case under the other name — invisible in the ground state, wrong in everything after it |
+| the **default seed** follows `p_itp` | reading the requested `p` there hands the anti-aligned path the one seed that field annihilates. The underflow, re-introduced by the default |
+
+### 18.2 It asserts its own outcome
+
+The step throws unless `sign(⟨F_z⟩) = −sign(p)` at the requested field. That is
+not belt-and-braces: the defect this replaces was a run that **completed** and
+returned ψ ≡ 0, and a preparation that quietly returns the *aligned* state is the
+same class of failure — it would invert every conclusion drawn from the run while
+looking entirely healthy.
+
+`⟨F_z⟩` along B̂ is now recorded on every rotating-basis run
+(`rotating_basis_fz_along_b`), alongside `rotating_basis_prepare_anti_aligned`
+and `rotating_basis_p_itp`. **Which end of the Zeeman ladder a run started from
+is the controlling variable of this entire document** (§3, §4) and nothing was
+writing it down.
+
+### 18.3 The gate, and the canary that was too weak
+
+`test/rotating_basis/test_anti_aligned_preparation.jl` (full tier) pins all five
+points above, each against an **aligned control arm in the same field** and at
+both signs of `p` — one arm cannot distinguish "anti-aligned" from "the sign
+convention I assumed while reading it".
+
+Its RED canary needed strengthening after its first run **passed when it should
+have failed**. The original used `p = 400`, giving `exp(−2Fp·dt) = exp(−8)` per
+step — which the loop **renormalises away**, so the arm completes happily. Only a
+**single-step** underflow is the inexpressible case: Float64 dies below
+`exp(−708)`, i.e. `p > 35400` at F=1, `dt=0.01`. Production clears it by 2×
+(`exp(−1602)`).
+
+That distinction is the physics, not a test artefact: **a strong field is
+survivable and a very strong one is not**, and only the second cannot be asked
+for.
+
+### 18.4 What is not claimed
+
+Gated at F=1 on 8³. The mechanism is the sign of one Zeeman coefficient and does
+not depend on F — but **no production-scale arm has been run through this path
+yet**, so the ¹⁵¹Eu numbers in §3 and §4 are still the aligned-preparation ones.
+`runs/eu151_klaus_phi_phys/config.yaml` now carries the key; it has not been
+re-run.
+
 <!-- REDERIVE -->
 
 ---

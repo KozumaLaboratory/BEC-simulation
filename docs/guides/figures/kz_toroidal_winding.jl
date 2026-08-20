@@ -288,9 +288,19 @@ function kz_winding_scan(;
     tau_Qs=exp.(2.0:1.0:8.0), n_traj::Int=200, M_damp::Float64=0.0,
     dt::Float64=0.01, M_grid::Int=KZ_M, backend=CPUBackend(), tag::String="kz_torus",
     shard::Tuple{Int, Int}=(1, 1), raw_only::Bool=false, t_hold::Float64=NaN,
+    spinor::Bool=false, c1::Float64=0.0, atom=KZ_ATOM, which_W::Symbol=:auto,
+    common_seeds::Bool=false,
     L::Float64=KZ_L,
     T::Float64=NaN, eps_cut::Float64=NaN, gamma::Float64=1e-2,
 )
+    # SBEC_MAX_RATES truncates the rate list for a pre-flight smoke. Applied here, in
+    # the scan, so every mode inherits it and no branch has to repeat the trick — the
+    # first version put it in one branch and the next mode I added did not have it.
+    # It reduces coverage in a stated way: a smoke shows the branch RUNS, not that the
+    # slowest rate fits the wall clock.
+    let nr = parse(Int, get(ENV, "SBEC_MAX_RATES", "0"))
+        nr > 0 && (tau_Qs = collect(tau_Qs)[1:min(nr, length(tau_Qs))])
+    end
     Tc = ideal_torus_Tc()
     isnan(T) && (T = 0.5Tc)
     isnan(eps_cut) && (eps_cut = KZ_MU0 + T)      # occupation ~1 at the cut
@@ -325,8 +335,15 @@ function kz_winding_scan(;
         # spread over the whole seed range rather than a contiguous hole.
         for j in shard[1]:shard[2]:n_traj
             r = kz_trajectory_torus(;
-                tau_Q=τ, seed=90_000 + round(Int, 1000τ) + j * KZ_SEED_STRIDE,
-                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L)
+                # With common_seeds the seed does NOT depend on tau_Q, so every rate
+                # sees the same noise realisation and the differences between rates are
+                # correlated — which is what a slope is made of. The default mixes
+                # tau_Q in and decorrelates them.
+                tau_Q=τ,
+                seed=(common_seeds ? 90_000 : 90_000 + round(Int, 1000τ)) +
+                     j * KZ_SEED_STRIDE,
+                T, eps_cut, gamma, M_damp, dt, M_grid, backend, t_hold, L,
+                spinor, c1, atom)
             # For a spinor, WHICH winding scales is the question, so the choice is
             # explicit and the others go on the record rather than being discarded.
             push!(Ws, which_W === :mass ? r.W_mass :
@@ -420,6 +437,26 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     mode = get(ARGS, 1, "smoke")
+    # Parse-only. A typo in a mode string used to cost a 20-hour reservation that
+    # died on its first line — 48 shards did exactly that on `-6.4e-5`, which the
+    # spin1 parser rejected because it accepted only `[0-9.]`. Nothing else looks at
+    # a mode string: CI was green and the submit script's dirty check passed. Every
+    # submit script now calls this before qsub, so the cost of a typo is a second.
+    if mode == "--check-mode"
+        want = get(ARGS, 2, "")
+        pats = (
+            r"^spin1\d+of\d+:-?[-+0-9.eE]+:(nd|full):\d+:(mass|spin|m)$",
+            r"^gam\d+of\d+:[0-9.]+:(nd|full):\d+(:L[0-9.]+)?$",
+            r"^shard\d+of\d+:(nd|full):\d+$",
+            r"^slow\d+of\d+:(nd|full):\d+$",
+            r"^merge:\S+$",
+            r"^(smoke|conv|freeze|size|hold|dtconv)$",
+            r"^(xi|kcut|rate|physq)[0-9._]+$",
+        )
+        ok = any(!isnothing(match(r, want)) for r in pats)
+        println(ok ? "OK $want" : "REJECT $want")
+        exit(ok ? 0 : 1)
+    end
     backend = get(ENV, "SBEC_KZ_BACKEND", "cpu") == "gpu" ? CUDABackend() : CPUBackend()
     if mode == "smoke"
         # Every code path, smallest ensemble, two shortest quenches. NOT physics.
@@ -685,6 +722,68 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 @printf(io, "%.6f,%d,%.8f,%.8f\n", τ, length(byτ[τ]), σs[i], es[i])
             end
         end
+    elseif startswith(mode, "dtpush")
+        # How large can dt be before sigma(W) moves? Cost is linear in 1/dt and the
+        # scalar convergence sweep already found 0.05, 0.01 and 0.02 indistinguishable
+        # — it never tried LARGER. A KZ measurement needs sigma(W) to about a per
+        # cent, which is loose, so this is the cheapest factor available: dt = 0.2
+        # would be 4x.
+        #
+        # Measured at ONE rate, because the question is whether dt biases sigma(W),
+        # not what beta is. Same seeds at every dt so the comparison is paired.
+        for dt in (0.05, 0.1, 0.2, 0.4)
+            kz_winding_scan(; tau_Qs=(1e4,), n_traj=48, gamma=0.1, dt, M_grid=1024,
+                L=800.0, spinor=true, c1=0.0, atom=Rb87, backend,
+                tag="kz_dtpush_$(replace(string(dt), "." => "p"))")
+        end
+    elseif startswith(mode, "crn")
+        # Common random numbers across tau_Q. beta is a SLOPE, so what matters is the
+        # correlation between points, not the error on each. Reusing one noise
+        # realisation across every tau_Q makes the differences correlated and shrinks
+        # the slope error without buying a single extra trajectory.
+        #
+        # The seed currently mixes tau_Q in — seed = 90_000 + round(1000 tau_Q) +
+        # j * STRIDE — which deliberately DEcorrelates the points. This measures both
+        # ways at the same cost and compares the error on beta, which is the only
+        # figure of merit that matters here.
+        crn = endswith(mode, "on")
+        kz_winding_scan(; tau_Qs=(1 / 0.1) .* [1e2, 3e2, 1e3, 3e3, 1e4],
+            n_traj=48, gamma=0.1, dt=0.05, M_grid=1024, L=800.0,
+            spinor=true, c1=0.0, atom=Rb87, backend, common_seeds=crn,
+            tag="kz_crn_$(crn ? "on" : "off")")
+    elseif startswith(mode, "spin1")
+        # Step 1 of the ladder, on the VALIDATED protocol: toroidal, mu ramp,
+        # gamma = 0.1, L = 800, tau_Q spanning the freeze-out — where beta reproduced
+        # at 0.6 sigma (number-damping) and 0.05 sigma (full). Only c1 != 0 and three
+        # components change.
+        #
+        # "spin1IofN:C1:nd|full:NTRAJ:mass|spin|m". The winding is NAMED, not assumed:
+        # one trajectory at tau_Q = 1000 gave per_m = [+1, -1, 0], mass = 0, spin = -1
+        # for the same field, so the mass winding says no defect and the spin winding
+        # says one. All three print for seed 1 at every rate.
+        #
+        # C1 takes exponent notation. `[0-9.]` rejected -6.4e-5 and killed 48 shards
+        # on their first line with the 20-hour reservations already made.
+        m = match(
+            r"^spin1(\d+)of(\d+):(-?[-+0-9.eE]+):(nd|full):(\d+):(mass|spin|m)$", mode)
+        m === nothing && error(
+            "spin1 mode: spin1IofN:C1:nd|full:NTRAJ:mass|spin|m, got $mode")
+        local i1 = parse(Int, m[1])
+        local n1 = parse(Int, m[2])
+        local c1v = parse(Float64, m[3])
+        local g1v = 0.1
+        local which = m[6] == "m" ? :auto : Symbol(m[6])
+        # SBEC_MAX_RATES truncates the list for the pre-flight smoke. The smoke then
+        # exercises THIS branch — its regex, its parsing, its kwargs, a real
+        # trajectory — and only the rate list differs, which is declared rather than
+        # a second code path. What it does NOT establish is that the slowest rate
+        # fits the wall clock; that is a separate claim and is not being made.
+        kz_winding_scan(; tau_Qs=(1 / g1v) .* [1e2, 3e2, 1e3, 3e3, 1e4],
+            n_traj=parse(Int, m[5]), M_damp=(m[4] == "full" ? g1v : 0.0), gamma=g1v,
+            dt=0.05, M_grid=1024, L=800.0, spinor=true, c1=c1v, atom=Rb87,
+            which_W=which, backend, shard=(i1, n1), raw_only=true,
+            tag="kz_torus_spin1c" * replace(string(c1v), "." => "p", "-" => "m") *
+                m[4] * m[6] * "_s$(i1)of$(n1)")
     elseif startswith(mode, "shard")
         # "shardIofN:MD:NTRAJ" — one process per shard, strided over trajectories.
         # Trajectories are independent, and the per-step cost is small enough that

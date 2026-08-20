@@ -615,7 +615,27 @@ commit = "e11b0291"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "16.3"
 pr = 0
-note = """SUPERSEDES the deferral in `edh-phi-phys-config-anti-alignment`, which proposed `init_m_idx: 13` as the repair. That was set on 2026-08-19 and reverted on 2026-08-20 once the energy was reported at all — the run had been completing on ψ ≡ 0 with E = 0.0 and saying nothing. The underflow is now a hard error naming the mechanism and the remedy. The repair is not implemented."""
+note = """SUPERSEDES the deferral in `edh-phi-phys-config-anti-alignment`, which proposed `init_m_idx: 13` as the repair. That was set on 2026-08-19 and reverted on 2026-08-20 once the energy was reported at all — the run had been completing on ψ ≡ 0 with E = 0.0 and saying nothing. The underflow is a hard error naming the mechanism and the remedy.
+
+IMPLEMENTED 2026-08-20 as `prepare_anti_aligned` — see `edh-anti-aligned-prep-implemented`. This row stays `live` because the claim it makes is about ITP, not about the config: imaginary time still cannot produce the anti-aligned state, and the new key does not change that. It relaxes in a DIFFERENT field."""
+
+[[claim]]
+id = "edh-anti-aligned-prep-implemented"
+claim = "`prepare_anti_aligned: true` on a `kind: rotating_basis` ground_state relaxes at -p and hands the dynamics +p, producing the Zeeman-HIGHEST stretched state that the EdH quench needs. Only `p` reverses; `q ∝ |B|²` is even in the field and does not."
+status = "live"
+type = "A"
+scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F, but no production-scale arm has been run through it yet."
+uncertainty = "Directional, not numeric: an ALIGNED control arm in the same field comes out with sign(⟨F_z⟩) = +sign(p) and the anti-aligned arm with -sign(p), at both signs of p, each stretched to |⟨F_z⟩| = F within 0.05. A single arm could not tell the preparation from the sign convention assumed while reading it."
+uncertainty_basis = "control"
+evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.yaml"]
+evidence_status = "in_tree"
+commit = "0"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "18"
+pr = 0
+note = """The step now ASSERTS the outcome at runtime — `sign(⟨F_z⟩) = -sign(p)` or it throws — rather than trusting the construction. That is deliberate: the defect this replaces was a run that COMPLETED and returned ψ ≡ 0, and a preparation that quietly hands back the ALIGNED state is the same class and would invert every conclusion drawn from it. `⟨F_z⟩` along B̂ is also recorded in every result now (`rotating_basis_fz_along_b`), because which end of the ladder a run started from was the controlling variable of this whole campaign and nothing was reporting it.
+
+The canary needed strengthening: the first version used p = 400, where exp(-2·F·p·dt) = exp(-8) is renormalised away every step and the arm completes. Only a SINGLE-STEP underflow (exponent > 708) is the inexpressible case."""
 
 [[claim]]
 id = "rotating-basis-result-writer-omitted-energy"

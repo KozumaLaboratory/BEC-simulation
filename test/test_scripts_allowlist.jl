@@ -140,6 +140,31 @@ const _SCRIPTS_ALLOWLIST = Set([
     "kz/run_mdamplong.sh",
     "kz/run_mdampproj.sh",
     "kz/submit_kz_spin1.sh",
+    # The number-constraint arc (2026-08-19). Each of these is a measurement whose
+    # result is quoted in a commit message or in docs/guides/spgpe.md, kept so the
+    # number can be re-measured rather than trusted:
+    #   handoff_window          where the c-field can take over from the 0-D model
+    #   eu_number_conserving    the closed-loop evaporation driver
+    #   eu_equilibrium_N0       N_0 the constraint predicts along the ramp
+    #   n0_estimator_check      the N_0 estimator against a known TF state, per component
+    #   mu_constraint_continuity  the non-monotonicity that killed the level-sum form
+    #   mu_lda_allocation       where 36 GB came from (answer: not here)
+    #   energy_damping_dt_convergence / _clean_conservation  one-time vs per-step loss
+    "kz/energy_damping_clean_conservation.jl",
+    "kz/energy_damping_dt_convergence.jl",
+    # Removes the ramp: fixed (mu, T, eps_cut) at the ramp's end values, to separate
+    # "the field cannot condense here" from "the ramp does not leave time for it".
+    "kz/fixed_point_condensation.jl",
+    "kz/eu_cost.jl",
+    "kz/eu_equilibrium_N0.jl",
+    "kz/eu_number_conserving.jl",
+    "kz/eu_prof.jl",
+    "kz/handoff_window.jl",
+    "kz/mu_constraint_continuity.jl",
+    "kz/mu_lda_allocation.jl",
+    "kz/n0_estimator_check.jl",
+    "kz/submit_eu_nc.sh",
+    "kz/submit_kz_mode.sh",
     "kz/submit_kz_torus.sh",
     "kz/submit_kz_torus_sharded.sh",
     "kz/sync_tsubame.sh",
