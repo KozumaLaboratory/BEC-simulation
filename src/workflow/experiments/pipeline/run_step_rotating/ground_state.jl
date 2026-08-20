@@ -144,6 +144,28 @@ end
     p_z = Float64(get(zee, "p", 0.0))
     q_z = Float64(get(zee, "q", 0.0))
 
+    # --- Anti-aligned preparation -------------------------------------------
+    # The EdH quench starts from the stretched state at the TOP of the Zeeman
+    # ladder, and imaginary time cannot produce it: ITP is a projector onto the
+    # LOWEST state, so asking for the highest one gets `exp(-(E_max-E_min)·dt)`
+    # per step — at p = 26700 that is exp(-1602), which underflows in ONE step
+    # and used to return ψ ≡ 0 as a completed run.
+    #
+    # The state IS reachable, by the same route an experiment takes: relax in the
+    # reversed field, then reverse the field. The Zeeman-lowest state of -B is
+    # the Zeeman-highest state of +B, and it is a genuine ground state of the
+    # full interacting problem in the field it was relaxed in, not an excited
+    # state anyone had to construct.
+    #
+    # ONLY `p` FLIPS. `q ∝ |B|²` is EVEN in the field, so reversing B leaves it
+    # alone; flipping it too would relax in a different quadratic Zeeman than the
+    # dynamics runs in, which is a different Hamiltonian rather than a reversed
+    # field. The tilde basis U_B(θ,φ) is likewise unchanged — it is built from
+    # the field AXIS, and reversing the field along that axis is exactly what
+    # negating `p` does (`zee_gs` below multiplies all three components by p_z).
+    prepare_anti_aligned = Bool(get(p, "prepare_anti_aligned", false))
+    p_itp = prepare_anti_aligned ? -p_z : p_z
+
     B_hat = get(p, "B_direction", Dict{String, Any}())::Dict
     θ_init = Float64(get(B_hat, "theta", 0.0))
     φ_init = Float64(get(B_hat, "phi", 0.0))
@@ -159,7 +181,11 @@ end
 
     sm = spin_matrices(F_atom)
     D = 2F_atom + 1
-    init_m_idx = Int(get(p, "init_m_idx", p_z > 0 ? 1 : D))::Int
+    # Default the seed to the Zeeman-LOWEST state OF THE FIELD ITP ACTUALLY RUNS
+    # IN. Reading `p_z` here instead of `p_itp` would hand the anti-aligned path
+    # the one seed that field annihilates — the underflow this feature exists to
+    # avoid, reintroduced by the default.
+    init_m_idx = Int(get(p, "init_m_idx", p_itp > 0 ? 1 : D))::Int
     # Auto-derive init_sigma from Thomas-Fermi radius if user omits.
     # Geomean of per-axis R_TF gives the natural scale for an isotropic
     # Gaussian seed approximating the eventual TF profile:
@@ -242,9 +268,9 @@ end
         atom_obj
     end
     zee_gs = TimeDependentZeeman(
-        ConstantWaveform(p_z * cos(θ_init)), ConstantWaveform(q_z),
-        ConstantWaveform(p_z * sin(θ_init) * cos(φ_init)),
-        ConstantWaveform(p_z * sin(θ_init) * sin(φ_init)),
+        ConstantWaveform(p_itp * cos(θ_init)), ConstantWaveform(q_z),
+        ConstantWaveform(p_itp * sin(θ_init) * cos(φ_init)),
+        ConstantWaveform(p_itp * sin(θ_init) * sin(φ_init)),
     )
     ws = make_workspace(;
         grid, atom=atom_ws,
@@ -263,6 +289,9 @@ end
 
     if verbose
         seed_kind = use_from_jld2 ? "from_jld2" : "gaussian"
+        prepare_anti_aligned && printstyled(
+            "  anti-aligned prep: relaxing at p=", p_itp, ", dynamics gets p=", p_z,
+            " (q=", q_z, " unchanged — it is even in B)\n"; color=:cyan)
         println("  rotating_basis GS (unified→standard split_step!): F=", F_atom,
             " D=", D, " p=", p_z,
             " ε_dd_eff=", round(c_dd * F_atom^2 / (3 * c0); digits=3),
@@ -296,12 +325,12 @@ end
                     "rotating_basis ground state: the norm underflowed to zero at ITP " *
                     "step $step of $n_steps. ITP relaxes to the LOWEST state, and the " *
                     "Zeeman shift gives the highest m a factor exp(-(E_max-E_min)·dt) " *
-                    "= exp(-$(round(2 * F_atom * abs(p_z) * dt_itp, digits=1))) per " *
+                    "= exp(-$(round(2 * F_atom * abs(p_itp) * dt_itp, digits=1))) per " *
                     "step here — so an anti-aligned (Zeeman-highest) seed is " *
-                    "annihilated, not relaxed. init_m_idx=$init_m_idx with p=$p_z is " *
-                    "that case. Prepare the stretched state as the ITP ground state " *
-                    "of the OPPOSITE field sign and reverse the field for the " *
-                    "dynamics; do not ask ITP for an excited state."),
+                    "annihilated, not relaxed. init_m_idx=$init_m_idx with the ITP " *
+                    "field p=$p_itp is that case. Set `prepare_anti_aligned: true`, " *
+                    "which relaxes in the REVERSED field and hands the dynamics the " *
+                    "requested one; do not ask ITP for an excited state."),
             )
         end
         if n_before > 0
@@ -328,6 +357,35 @@ end
     per_m_gs = [sum(abs2, selectdim(psi_tilde_gs, ndim + 1, c)) * dV_gs for c in 1:D]
     ps_gs = sum(per_m_gs)
     ps_gs > 0 && (per_m_gs ./= ps_gs)
+
+    # ⟨F_z⟩ ALONG THE FIELD AXIS. The tilde basis is built from B̂, so component c
+    # carries m = F + 1 - c measured along the field and this sum needs no
+    # rotation. Reported always (it is ~13 multiply-adds on an already-computed
+    # population vector) because "which end of the Zeeman ladder" is the
+    # controlling variable of this whole campaign and nothing was reporting it.
+    fz_along_b = sum((F_atom + 1 - c) * per_m_gs[c] for c in 1:D)
+
+    # A DIRECTIONAL GATE, not a tolerance. Under `H = -p·F_z` the requested field
+    # puts m = +F lowest when p > 0, so the ANTI-aligned state is the one with
+    # sign(⟨F_z⟩) = -sign(p). Asked of the state that came back, at runtime,
+    # because the failure this replaces was a run that COMPLETED and returned
+    # ψ ≡ 0 — a preparation that silently gives the aligned state instead is the
+    # same class of defect and would invert every conclusion drawn from it.
+    if prepare_anti_aligned && is_active(p_z) && n_steps > 0
+        if !(sign(fz_along_b) == -sign(p_z))
+            throw(
+                ErrorException(
+                    "prepare_anti_aligned: the relaxed state is NOT anti-aligned. " *
+                    "⟨F_z⟩ along B̂ = $(round(fz_along_b, digits=4)) at requested " *
+                    "p = $p_z; anti-aligned requires sign(⟨F_z⟩) = -sign(p). The " *
+                    "state was relaxed at p = $p_itp, so either the seed " *
+                    "(init_m_idx=$init_m_idx) fought the reversed field or ITP did " *
+                    "not converge (n_steps=$n_steps, μ moved $(μ_rel_change) vs tol " *
+                    "$tol_itp). A preparation that quietly returns the ALIGNED state " *
+                    "inverts every conclusion drawn from the run."),
+            )
+        end
+    end
 
     placeholder_atom = AtomSpecies("RotatingBasis", 1.66e-25, F_atom, 0.0, 0.0, 0.0)
     # The GS handoff is a plain NamedTuple stashed in the Any-typed step_result
@@ -357,6 +415,12 @@ end
         :rotating_basis_mu_rel_change => μ_rel_change,
         :rotating_basis_itp_tol => tol_itp,
         :rotating_basis_per_m => per_m_gs,
+        # The controlling variable, recorded rather than inferred from `p` and a
+        # convention the reader has to remember. `prepare_anti_aligned` is stored
+        # too so a result file says which preparation produced it.
+        :rotating_basis_fz_along_b => fz_along_b,
+        :rotating_basis_prepare_anti_aligned => prepare_anti_aligned,
+        :rotating_basis_p_itp => p_itp,
         # Stash omega_ref so downstream rotating_basis dynamics steps
         # can convert physical-unit fields ("226 Hz") to dimensionless
         # ratios via _parse_dimless_freq. NaN if manual c0/c_dd path.

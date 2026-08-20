@@ -217,6 +217,11 @@ end
         ])
         to_stage_or_initial = Set([
             "kind", "species_A", "species_B", "F", "gauge_fix", "init_m_idx",
+            # `prepare_anti_aligned` reverses the field the rotating-basis ITP
+            # relaxes in — a STAGE decision (how to reach the state), not a
+            # MODEL one (which Hamiltonian). The dynamics still runs the `B` the
+            # model carries; only the relaxation sees the reversed field.
+            "prepare_anti_aligned",
             "init_sigma", "method", "dt", "n_steps", "tol", "tol_drho", "m_lbfgs",
             "newton_polish", "residual_polish", "initial_state", "backend",
             "target_magnetization", "temperature_ratio", "init_state_params",
