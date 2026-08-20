@@ -221,7 +221,8 @@ on the peak, and of the wrong sign — while demonstrably acting on the state
 (overlap 0.95, not 1). The mechanism the whole protocol is built on is absent at
 the polarisation the repaired configs prepare.
 
-**Consequence, and it is the operative one:** `|Ω|/ω_⊥ = 0.468 ± 0.003` is not
+**Consequence, and it is the operative one:** `|Ω|/ω_⊥ = 0.468 ± 0.003` (now
+superseded, §9.1) is not
 "a number that needs re-deriving". It is **not re-derivable as stated** — a
 parabolic optimum cannot be refined out of a flat, slightly negative response.
 Refining Ω at B_z > 0 would be twelve arms fitting a vertex to noise, which is
@@ -371,7 +372,10 @@ This was not in #343's list and is the sharpest thing here.
 > | (init m × Ω sign) reversal symmetry | 3-digit match in both branches  **PASS** |
 
 The two arms are `klaus_quench_omm0p5_keeprot.yaml` and
-`klaus_quench_omp0p5_keeprot_mFplus.yaml`. Reading them at `bce2068f~1` — the
+`klaus_quench_omp0p5_keeprot_mFplus.yaml` — **renamed to
+`klaus_quench_omp0p5_keeprot_mirror.yaml` by `e8dafe8e`** when the corpus was
+retargeted, so the `mFplus` name below is the one valid at each commit discussed
+and is NOT what to look for in the tree today. Reading them at `bce2068f~1` — the
 tree the PASS was measured on — and at HEAD:
 
 | | seed | B_z (prep → hold) | Ω/ω_⊥ | mirror? |
@@ -450,10 +454,11 @@ a different measurement.
 
 | # | item | outcome |
 |---|---|---|
-| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`) | **DONE — §9.1/9.2/9.3.** Not a refinement but a re-posing, and then a replacement: `\|Ω*\|/ω_⊥ = 0.68 ± 0.04`, +24.9 % over Ω=0. The response is **even in Ω**, so the chirality rule is void, and a **static** weakened trap reproduces the whole effect — the operative variable is ω_⊥,eff ≈ 0.73 ω_⊥, not Ω |
-| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | **DONE — §9.4.** 5 of 6 pass on criteria fixed before launch. G6 (N=5×10⁴, P_exc rises) **fails**, for a reason R1 explains. G3 passes at 2.47 %, refuting the sheet's "4-digit match" by two orders of magnitude |
+| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`) | **DONE — §9.1/9.2/9.3.** Not a refinement but a re-posing, and then a replacement; the old value is **superseded**, not refined: `\|Ω*\|/ω_⊥ = 0.68 ± 0.04`, +24.9 % over Ω=0. The response is **even in Ω**, so the chirality rule is void, and a **static** weakened trap reproduces the whole effect — the operative variable is ω_⊥,eff ≈ 0.73 ω_⊥, not Ω |
+| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | **DONE — §9.4.** 5 of 6 pass on criteria fixed before launch. G6 (N=5×10⁴, P_exc rises) **fails**, for a reason R1 explains. G3 passes at 2.47 %, so the sheet's "4-digit match" is **refuted** by two orders of magnitude |
 
-The `0.3 @ 1.3 nT` and `[0.5, 0.6] @ 5.2 nT` rows were **not** re-derived: they
+The `0.3 @ 1.3 nT` and `[0.5, 0.6] @ 5.2 nT` rows were **not** re-derived here
+(both are **refuted** by the ω_eff scans — §10.2 and §11): they
 are the same prescription at other fields, and §9.3 says the whole family is
 parameterised by the wrong variable. They should be re-posed as a trap-frequency
 scan at each field, not re-fitted in Ω.
@@ -525,7 +530,8 @@ Against the criteria fixed **before** launch:
 | C4 | digits limited by the fit | δ ≈ 0.042 ⇒ two digits, not three | **applied** |
 
 > **|Ω*| / ω_⊥ = 0.68 ± 0.04 at B = 2.6 nT.**
-> This **replaces** `0.468 ± 0.003`. The old value is not recovered, and its
+> This **replaces** `0.468 ± 0.003`, which is **superseded**. The old value is
+> not recovered, and its
 > third significant figure is not supportable at one seed.
 
 ### 9.2 The response is EVEN in Ω — the stated mechanism is not what acts
@@ -536,7 +542,7 @@ Against the criteria fixed **before** launch:
 | 0.30 | 0.56027 | 0.55964 | **0.113 %** |
 | 0.50 | 0.61164 | 0.61088 | **0.124 %** |
 
-The sheet's mechanism is **odd** in Ω — "matched chirality (Ω·sign(m_init) < 0)
+The sheet's **refuted** mechanism is **odd** in Ω — "matched chirality (Ω·sign(m_init) < 0)
 lowers the mode energy", ΔE = −Ω·ℓ. An effect that is even in Ω to 0.12 % cannot
 come from that term. Ω = 0 is the *minimum*; **both** senses of rotation enhance,
 equally.
@@ -603,7 +609,7 @@ for the +30 % the sheet claims. On the adjacent-pair observable the enhancement 
 there: P_adj **+6.4 %** (0.36119 vs 0.33956). The sheet's own row carried
 "(with metric caveat)"; the caveat was load-bearing.
 
-**G3 passes the criterion but refutes the sheet's stated precision.** The sheet
+**G3 passes the criterion, but the sheet's stated precision is refuted.** The sheet
 claims a "4-digit match" between 32³ and 64³. Measured: **+2.47 %** on peak
 P_adj (0.61698 → 0.63223) and +2.05 % on peak P_exc — a **2-digit** agreement,
 two orders of magnitude looser than advertised. That is fine for a converged
@@ -879,6 +885,11 @@ fields or densities, which were not re-run.
 
 ## 13. Long time (145 ms): the substitution is a short-time statement
 
+> **RETRACTED 2026-08-20 — every ordering below flips sign at 64³. See §15.**
+> The section is kept because the 32³ numbers are real and the retraction is
+> about what they support, not about whether they were measured. Do not quote
+> the endpoint comparison or the "sustained vs transient" reading.
+
 `runs/klaus_quench_long_time/` was **missed by the corpus retarget** — it was
 still `m_minus_F` at B_z > 0, i.e. aligned, until this branch. Retargeted (9
 configs, seed-agreement gate green), then three arms at hold = 100 ω_ref⁻¹
@@ -900,20 +911,26 @@ leans on it.
 
 **On the endpoint, they are qualitatively different, and that is not marginal.**
 The rotating arm peaks and then collapses back to 0.21093 — *below* the baseline's
-0.23127 — while the static arm holds 0.47517, i.e. **2.25×** the rotating one.
-Rotation produces a transient; the weakened static trap produces a *sustained*
-transfer.
+0.23127 — while the static arm holds 0.47517, i.e. ~~**2.25×**~~ the rotating one.
+Rotation produces ~~a transient~~; the weakened static trap produces a
+~~sustained transfer~~.
+<!-- REFUTED 2026-08-20 (§15, claim `edh-longtime-static-sustains`): at 64³ the
+     ratio is 0.68× and the arms swap roles. No replacement ordering exists. -->
+
+> **REFUTED — §15.** At 64³ this ordering inverts: static ÷ rotating at the end is
+> **0.68×**, and it is the *static* arm that decays while the rotating one is
+> still climbing. Neither resolution establishes the long-time ordering.
 
 So the §9.3 substitution ("rotation is fully replaceable by a static weakened
 trap") is a **short-time statement**. At 145 ms the two agree on how high the
 cascade climbs and disagree completely on whether it stays there — and the static
 prescription is the better one on the observable an experiment would actually
-integrate.
+integrate. *(That last clause is **refuted**; see §15.)*
 
 The sheet's long-time rows (`P_exc(end) = 0.958 at 145 ms`) are not directly
 comparable — different cell (`keep_rot`, Ω = −0.5, aligned corpus) — and are not
-re-derived here. What is established is the *ordering*, which is the load-bearing
-part: static > rotating > baseline on sustained transfer.
+re-derived here. The *ordering* was claimed here as the load-bearing part —
+~~static > rotating > baseline on sustained transfer~~ — and is **REFUTED** by §15.
 
 ---
 
@@ -982,6 +999,69 @@ silently satisfying a campaign guard. The 8-point production scan is **not**
 launched — it would now run, but on a path whose ground state reports no energy,
 so there would be nothing to check the result against.
 
+---
+
+## 15. RETRACTION — 32³ is not converged for the long-time branch
+
+§13 was published in PR #410 on the strength of three 32³ arms. The two arms its
+conclusion rests on were then re-run at 64³, and **both orderings reverse**.
+
+| | 32³ | 64³ |
+|---|---:|---:|
+| **hold-peak** static (ω_eff = 0.714) | 0.50790 | 0.49081 |
+| **hold-peak** rotating (Ω = −0.70) | 0.52475 | 0.40358 |
+| static vs rotating | **−3.2 %** | **+21.6 %** |
+| **endpoint** static | 0.47517 | 0.27262 |
+| **endpoint** rotating | 0.21093 | 0.40358 |
+| static ÷ rotating at the end (the **refuted** 32³ figure vs 64³) | **2.25×** | **0.68×** |
+
+Per-arm, 32³ → 64³: static peak −3.4 %, rotating peak −23.1 %, static endpoint
+**−42.6 %**, rotating endpoint **+91.3 %**.
+
+### 15.1 What is withdrawn
+
+- **REFUTED — "Rotation gives a transient, the static trap a sustained transfer."**
+  At 64³ it is the *static* arm that decays (0.49081 → 0.27262) and the
+  *rotating* one that is still climbing at 145 ms (peak = end = 0.40358).
+- **"The static prescription is the better one on the observable an experiment
+  would integrate."** Withdrawn — at 64³ the rotating arm ends higher.
+- **"Static and rotating differ by 3.21 %, suggestive of divergence."**
+  Withdrawn. The correct reading is not a 3 % divergence but that **32³ does not
+  resolve this branch at all.**
+
+### 15.2 What replaces it
+
+Only this, and it is deliberately thin:
+
+> **At 145 ms, 32³ is not resolution-converged. Nothing about the long-time
+> ordering of static vs rotating is established at either resolution**, because
+> 64³ has n = 1 per point and its baseline arm was **not** run — so 64³ shows the
+> 32³ answer is wrong without establishing the right one.
+
+### 15.3 The part that generalises: resolution adequacy is duration-dependent
+
+The short protocol and the long one behave completely differently under the same
+refinement:
+
+| | shift under 32³ → 64³ |
+|---|---|
+| short (14.5 ω⁻¹), §11.2 | a **uniform** +2.3 %; the 5.2 nT dip kept **93 %** of its depth, so the *shape* survived |
+| long (100 ω⁻¹), here | **−3.4 / −23.1 / −42.6 / +91.3 %** — not uniform, and orderings invert |
+
+**So §9–§12 are unaffected** — their conclusions rest on shapes and orderings at
+14.5 ω⁻¹, where the refinement was measured to be a uniform offset. It is only the
+long-time branch that 32³ cannot carry. Grid adequacy is not a property of the
+grid alone; it is a property of the grid *and the integration time*, and a
+convergence check done at one duration does not transfer to another.
+
+### 15.4 Why this was caught
+
+Because §13 said its own key number sat inside the resolution uncertainty
+(3.21 % against 2.5 %) and named the missing measurement instead of rounding it
+away. The 64³ run was then the obvious next thing rather than something nobody
+thought to do. **A stated uncertainty that overlaps the claim is a work item, and
+writing it down is what makes it one.**
+
 <!-- REDERIVE -->
 
 ---
@@ -1015,7 +1095,7 @@ most three fields changed, so there is no bespoke solver to trust:
 |---|---|---|
 | positive control (§2) | — | 16³, DDI off, `initial_state: spin_coherent`, `init_state_params: {init_theta: 1.5708}`, `Bz: ±0.01 Gauss` |
 | §3.2 (4 arms) | `klaus_quench_om0p0.yaml`, `klaus_quench_omm0p5_keeprot.yaml` | sign of every `Bz` incl. both ramp endpoints; `backend` |
-| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mFplus.yaml` | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
+| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mirror.yaml` (called `*_mFplus.yaml` when §3.6 was run; renamed by `e8dafe8e`) | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
 
 Observables, all from the library (no local reimplementation):
 `spin_populations_trajectory` / `psi_snapshots` (`src/workflow/validation/run_observables.jl`)

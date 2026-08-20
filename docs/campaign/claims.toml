@@ -1,0 +1,568 @@
+# Claim ledger — one row per physics claim, with its status as a FIELD, not as prose.
+#
+# WHY THIS FILE EXISTS
+#
+# `docs/campaign/edh_quench_polarisation_decision.md` is an excellent change log and
+# a bad place to look up what is currently true. It records, in order, that
+# `|Ω|/ω_⊥ = 0.468 ± 0.003` was the prescription, then that it is not re-derivable,
+# then that `0.68 ± 0.04` replaces it. Reading it front to back gives the right
+# answer. Reading any one section does not, and nothing in the tree says which
+# section is the live one.
+#
+# The measured consequence is in `docs/manuscript/klaus_protocol_sheet.md`. That
+# file carries a correct, detailed retraction at lines 17-70 — and then states the
+# retracted numbers bare at lines 105, 125, 227, 232-234, 255 and 293, including
+# inside the numbered lab protocol an experimentalist would actually follow. The
+# retraction is 160 lines above the point of use. Both PR #401 and PR #403 updated
+# the retraction block and left the protocol steps alone. Nothing was careless:
+# the status of a claim was not a thing the tree could hold, so it lived in
+# whichever paragraph someone last remembered to edit.
+#
+# So: status is a field. `superseded` and `refuted` are different values, `refuted
+# with no replacement` is representable, and `uncertainty` is REQUIRED — a row that
+# cannot state what bounds it is a row nobody has bounded, and that is information
+# rather than an omission to be defaulted away.
+#
+# WHAT A ROW IS
+#
+#   id                  stable kebab identifier; referenced by supersedes/superseded_by
+#   claim               the assertion, one sentence, in the form it should be quoted
+#   status              live | scoped | superseded | refuted | suggested | open | closed
+#                       `closed` = an `open` gap shut by doing the work; it keeps the
+#                       row rather than deleting it, because "this was looked at" is
+#                       the part a reader needs, and it requires a `note` saying what
+#                       shut it.
+#   type                A (code correctness) | B (physics agreement) | C (model fidelity)
+#                       — the taxonomy in CAMPAIGN.md §5, unchanged
+#   scope               what the claim is true OF: grid, seed count, closure, field,
+#                       preparation, duration. A claim with no scope is a claim
+#                       nobody has bounded.
+#   uncertainty         REQUIRED, non-empty. If nothing bounds it, say so in those
+#                       words — `unbounded: <why>` — do not leave it out.
+#   uncertainty_basis   fit | grid | dt | seed | control | none — how the number above
+#                       was obtained. `none` and a filled `uncertainty` is a
+#                       contradiction the gate rejects.
+#   evidence            run configs / arm sets the claim rests on
+#   evidence_status     in_tree | partial | absent — whether `evidence` resolves in
+#                       this repo. `absent` is common and is not a defect by itself;
+#                       it is the L1 hook, and it is what makes a re-derivation
+#                       cost visible before someone promises one.
+#   commit              producing commit
+#   doc, section        where the claim is written out (the L3 anchor)
+#   pr                  the PR that last moved this row
+#
+# Optional:
+#   supersedes / superseded_by   ids. Both directions are declared; the gate checks
+#                                they agree, so a half-migrated retraction is red.
+#   retired_literal              REQUIRED on superseded/refuted rows. String or
+#                                array — a retracted claim usually survives in
+#                                more than one wording, and the lab instruction
+#                                and the mechanism sentence are different points
+#                                of use. This is what the gates scan for.
+#   replacement_literal          String or array. What must appear instead.
+#                                DELIBERATELY ABSENT on a row refuted with no
+#                                replacement — `edh-window-1p3nt-0p3` is the case:
+#                                at 1.3 nT there is no operating window to
+#                                relocate the number to, and an empty field says
+#                                that where a placeholder value would hide it.
+#   prediction                   a statement fixed BEFORE the measurement
+#   prediction_registered        before | after — `after` is not a prediction and the
+#                                gate refuses to count it as one
+#   prediction_outcome           hit | miss | pending
+#   note
+#
+# THE FIRST DOCUMENT POURED IN is the rotation-assisted EdH quench decision doc
+# (#343 → #392 → #401 → #403). It was chosen because it contains every shape a
+# claim can have: a number with a fit uncertainty, the number it replaced, a
+# prescription refuted with no replacement, a claim whose replacement is a SHAPE
+# rather than a number, a hypothesis with a registered test, a gate that failed,
+# and a scope restriction that applies to all of them at once.
+
+schema_version = 1
+
+# --- Type A: the instrument -------------------------------------------------
+
+[[claim]]
+id = "eu-field-sign-knob-live"
+claim = "Under `H = -p·F_z`, `p ≡ -g_F μ_B B`, a ¹⁵¹Eu ground state at B_z = +0.01 G lands at m = -6 and at B_z = -0.01 G at m = +6, on current code."
+status = "live"
+type = "A"
+scope = "16³, DDI off, spin-coherent θ=π/2 seed, GPU. Positive control for every null in the same document."
+uncertainty = "⟨F_z⟩ = ±6.0 exactly; the observable is discrete (argmax m), so there is nothing to bound."
+uncertainty_basis = "control"
+evidence = ["16³ DDI-off pair, Bz = ±0.01 G, spin_coherent init_theta = 1.5708"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "2"
+pr = 392
+note = "Reproduces bce2068f's own 2026-07-29 measurement. Exists because this repo has shipped a table of nulls taken through a dead knob (mistake_null_from_a_degenerate_knob_2026_07_31)."
+
+[[claim]]
+id = "edh-mirror-flips-every-axial-quantity"
+claim = "A mirror arm is defined by the mirror operation: Ω, the spin projection AND B_z must all flip. Negating only the knob being scanned does not produce a mirror."
+status = "live"
+type = "A"
+scope = "General. Instantiated here for the klaus_quench pair; the same rule caught #338 (Barnett), where the missing partner was B_y rather than B_z."
+uncertainty = "Not a measured quantity. The measured consequence — the repaired pair agrees to < 1e-5 — is claim `edh-mirror-pair-repaired`."
+uncertainty_basis = "none"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "5"
+pr = 392
+note = "Gated by test/workflow/test_mirror_pairs_flip_every_axial_quantity.jl (fast tier), with a canary that reconstructs the post-bce2068f broken pair and requires the B_z clause to reject it."
+
+[[claim]]
+id = "edh-mirror-pair-repaired"
+claim = "The klaus_quench mirror pair, broken by `bce2068f`, is repaired, and the repair is confirmed by measurement: arm G reproduces its partner's peak P_adj = 0.24311 to five digits."
+status = "live"
+type = "A"
+scope = "32³, CPU, one seed, `lhy: none`, the two `*_keeprot*` arms only."
+uncertainty = "< 1e-5 relative between the two arms (G4). Bounded by the comparison itself, not by a fit."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "5.1"
+pr = 392
+
+# --- Type B: the preparation ------------------------------------------------
+
+[[claim]]
+id = "edh-requires-anti-aligned-preparation"
+claim = "The rotation-assisted EdH quench must prepare the stretched state ANTI-ALIGNED with B (the Zeeman-highest state). Every other Eu arc in this project prepares a Zeeman ground state and is aligned."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, one hold duration, ¹⁵¹Eu F=6 klaus_quench protocol. Stated as a relative orientation, never as an m label — `m = +F` means the opposite thing at the opposite field sign, which is the error that produced #343."
+uncertainty = "The DIRECTION is far outside any plausible scatter: ×2.2 in peak P_adj and +16.5 % vs -0.45 % in rotation contrast, against a seed floor of 0.000 % over 5 live seeds. The VALUES are not converged — grid systematic +2.47 % (G3), one seed, one duration."
+uncertainty_basis = "control"
+evidence = ["§3.2 four arms (klaus_quench_om0p0.yaml, klaus_quench_omm0p5_keeprot.yaml)", "§3.6 three arms E/F/G"]
+evidence_status = "partial"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "4"
+pr = 392
+prediction = "If the controlling variable is which end of the Zeeman ladder the prepared state sits on — rather than the sign of B_z — then m = +F at B_z > 0 must show the rotation enhancement return."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = "Registered in §3.5 and tested in §3.6: +16.5 % returned against -0.45 % at the same field. This is the standard Kawaguchi-Saito-Ueda EdH configuration (PRL 96, 080405) and should have been looked up before it was measured."
+
+[[claim]]
+id = "edh-enhancement-absent-at-aligned-preparation"
+claim = "At the ALIGNED (Zeeman-ground) preparation the rotation enhancement is absent: -0.45 % on peak P_adj, of the wrong sign, while the Ω knob is demonstrably acting on the state (overlap 0.95, not 1)."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, B_z = +0.01 G, m = -F, Ω ∈ {0, -0.5}."
+uncertainty = "-0.45 % against a dt/2 reproducibility floor of 0.029 % and a seed floor of 0.000 %; the sign is resolved, the magnitude is at the level of the grid systematic (2.5 %) and should not be quoted as a number."
+uncertainty_basis = "dt"
+evidence = ["runs/klaus_quench/klaus_quench_om0p0.yaml", "runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "3.4"
+pr = 392
+note = "This is why `0.468 ± 0.003` is not re-derivable AS POSED rather than merely stale — a parabolic optimum cannot be refined out of a flat, slightly negative response."
+
+# --- The Ω operating window: the superseded row and its replacement ---------
+
+[[claim]]
+id = "edh-omega-window-0p468"
+claim = "|Ω|/ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT, from a 7-point parabolic fit."
+status = "superseded"
+superseded_by = "edh-omega-window-2p6nt"
+retired_literal = ["0.468 ± 0.003"]
+replacement_literal = ["0.68 ± 0.04", "0.68 +- 0.04"]
+type = "B"
+scope = "Was: 32³, one seed, hold-only, 2 ms delay — at the ALIGNED preparation, which is the regime where the enhancement does not exist."
+uncertainty = "±0.003 was quoted from the fit covariance alone. It omitted the grid systematic (2.5 %) and rested on a preparation that produces no optimum to fit, so the third significant figure was never supportable."
+uncertainty_basis = "fit"
+evidence = ["7-point Ω refinement, 2026-05-27"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/archive/klaus_quench_protocol_pivot_2026-05-26.md"
+section = "Ω refinement"
+pr = 392
+note = "The old value is not recovered by the re-derivation. It is not a less precise version of 0.68 — it was measured at the wrong preparation."
+
+[[claim]]
+id = "edh-omega-window-2p6nt"
+claim = "|Ω*|/ω_⊥ = 0.68 ± 0.04 at B = 2.6 nT, +24.9 % over Ω = 0. Two significant figures, not three."
+status = "live"
+supersedes = "edh-omega-window-0p468"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, hold-only + 2 ms delay, ANTI-ALIGNED preparation, 20 Ω cells."
+uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = -2.70, fit rms 4.7e-3. Separately, the OBSERVABLE carries a +2.47 % one-signed grid systematic (32³→64³); that does not move the vertex but does bound any absolute P_adj quoted with it."
+uncertainty_basis = "fit"
+evidence = ["runs/klaus_quench/klaus_quench_om*_holdonly_delay2ms_refine.yaml (20 cells)"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.1"
+pr = 392
+note = "Criteria C1-C4 were fixed before launch: interior maximum required, > 5 % enhancement over Ω=0, ≥5-point fit with negative curvature and an interior vertex, digits limited by the fit. All four applied."
+
+# --- What actually acts -----------------------------------------------------
+
+[[claim]]
+id = "edh-chirality-matched"
+claim = "The enhancement requires matched chirality: Ω·sign(m_init) < 0 lowers the mode energy by ΔE = -Ω·ℓ, so the trap must be rotated counter to the stretched-spin direction."
+status = "refuted"
+superseded_by = "edh-response-even-in-omega"
+retired_literal = ["chirality opposite", "Ω · sign(m_init)", "Ω·sign(m_init)"]
+# NOT the bare `sign(m_init)`: that also matches the KINEMATICS (`ℓ = − sign(m_init) · k`),
+# which is correct and was never retracted. The refuted claim is the ENERGY rule
+# `ΔE = −Ω·ℓ ⇒ matched chirality wins`, so the literal carries the `Ω ·`. Both spacings
+# are listed because the two documents write it differently and whitespace is normalised
+# but `·` adjacency is not.
+replacement_literal = ["even in Ω", "even in Omega"]
+type = "B"
+scope = "Was stated as the mechanism of the whole protocol."
+uncertainty = "unbounded: never measured against ±Ω. It was a mechanism assumed from the Coriolis term, not a fitted result."
+uncertainty_basis = "none"
+evidence = ["klaus_protocol_sheet.md mechanism one-liner, step 5, and the falsification row"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/manuscript/klaus_protocol_sheet.md"
+section = "Mechanism"
+pr = 392
+
+[[claim]]
+id = "edh-response-even-in-omega"
+claim = "The response is EVEN in Ω to ≤ 0.124 %: both senses of rotation enhance identically and Ω = 0 is the minimum. Chirality is irrelevant to this observable."
+status = "live"
+supersedes = "edh-chirality-matched"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, |Ω| ∈ {0.1, 0.3, 0.5}."
+uncertainty = "0.071 / 0.113 / 0.124 % at |Ω| = 0.1 / 0.3 / 0.5, against a dt/2 reproducibility floor of 0.029 %. The residual asymmetry is ~4× the floor, i.e. small but resolved — it is not exactly zero."
+uncertainty_basis = "dt"
+evidence = [
+    "runs/klaus_quench/klaus_quench_omm0p1_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omm0p3_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omp0p1_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omp0p3_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omp0p5_holdonly_delay2ms_refine.yaml",
+]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.2"
+pr = 392
+note = "An effect even in Ω cannot come from -Ω·ℓ, which is odd. This is the knob-parity argument: a one-sided scan gives magnitude only, ±Ω identifies the term."
+
+[[claim]]
+id = "edh-mechanism-is-centrifugal"
+claim = "The enhancement is CENTRIFUGAL, not Coriolis: a static, non-rotating trap weakened to ω_eff = √(ω_⊥² - Ω²) reproduces the entire effect. Rotation is not required."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT. Verified at 4 matched points across ω_eff ∈ [0.6, 1.0], not only at the optimum."
+uncertainty = "Worst disagreement 0.06 % across the range (§10.1); 0.06-0.19 % at the two §9.3 points. Against a dt/2 floor of 0.029 %, so the substitution is exact to within about 2-6× the reproducibility floor."
+uncertainty_basis = "control"
+evidence = ["34 static-trap arms, §10; 2 matched arms, §9.3"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.3"
+pr = 392
+note = "The control carries its own positive control: had the per-step `potential:` override been silently ignored, these arms would have returned the Ω = 0 value 0.527, not 0.659."
+
+[[claim]]
+id = "edh-variable-is-radial-not-density"
+claim = "The operative variable is the radial confinement specifically, not the density: a density-matched weakening along z (same ω̄) lands BELOW the baseline, recovering -36 % of the gain."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, three arms."
+uncertainty = "The three arms are 0.52748 / 0.65864 / 0.48073 — separations of 25 % and 9 %, against a dt/2 floor of 0.029 %. The SIGN is what the arm establishes; the -36 % figure inherits the 2.5 % grid systematic."
+uncertainty_basis = "dt"
+evidence = ["baseline (1.000, 1.000, 1.1818); radial (0.714, 0.714, 1.1818); z-weakened (1.000, 1.000, 0.6026)"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.4"
+pr = 392
+note = "Rules out the density explanation. The reading that ℓ ≠ 0 orbital modes have their cost set by ω_⊥ is an interpretation and is NOT established here — see `edh-microscopic-reason-orbital-cost`."
+
+[[claim]]
+id = "edh-microscopic-reason-orbital-cost"
+claim = "A softer radial trap helps because the ℓ ≠ 0 orbital modes the spin flip must populate become cheaper (larger cloud, lower kinetic cost)."
+status = "suggested"
+type = "B"
+scope = "Interpretation of `edh-variable-is-radial-not-density`. Not measured."
+uncertainty = "unbounded: no measurement addresses the microscopic mechanism. The VARIABLE is established; the reason behind the variable is not."
+uncertainty_basis = "none"
+evidence = []
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.3"
+pr = 392
+
+# --- The three field rows: one prescription, one absence, one shape ----------
+
+[[claim]]
+id = "edh-lab-prescription-2p6nt"
+claim = "At B = 2.6 nT the lab prescription is a static radial trap at ω_⊥,eff/ω_⊥ = 0.71 — weaken the radial confinement by ~27 %, with no trap rotation. +24.9 % over the unweakened trap."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 2.6 nT ONLY. Does not transfer to 1.3 or 5.2 nT — see the two rows below."
+uncertainty = "Optimum located at ω_eff = 0.714 by a 34-arm static scan and independently at 0.68 ± 0.04 in |Ω| by the fit; the two agree. Quote one digit on the ratio. Absolute P_adj carries the +2.47 % one-signed grid systematic."
+uncertainty_basis = "fit"
+evidence = ["34 static-trap arms, §10.1-10.2"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.2"
+pr = 392
+note = "Replaces the rotating-anisotropic-trap prescription and removes the 'sign-convention mapping from simulation Ω to lab rotation direction' caveat with it."
+
+[[claim]]
+id = "edh-window-1p3nt-0p3"
+claim = "|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT."
+status = "refuted"
+retired_literal = ["≈ 0.3 at B = 1.3 nT"]
+type = "B"
+scope = "Was: the 1.3 nT row of the three-field prescription table."
+uncertainty = "unbounded: quoted from a 3-point scan with no fit uncertainty."
+uncertainty_basis = "none"
+evidence = ["3-point Ω scan {0.3, 0.5, 0.7}, 2026-05-27"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/manuscript/klaus_protocol_sheet.md"
+section = "Three-regime Ω operating window"
+pr = 401
+note = "REFUTED WITH NO REPLACEMENT, and that is the finding rather than a gap. At 1.3 nT the response is flat: 0.505 → 0.514 over ω_eff ∈ [0.65, 1.0], +1.8 %. There is no operating window to relocate the number to. Do not re-fit it."
+
+[[claim]]
+id = "edh-window-5p2nt-0p5-0p6"
+claim = "|Ω|/ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT."
+status = "refuted"
+superseded_by = "edh-two-branches-5p2nt"
+retired_literal = ["[0.5, 0.6]"]
+replacement_literal = ["two branches", "TWO BRANCHES"]
+type = "B"
+scope = "Was: the 5.2 nT row of the three-field prescription table."
+uncertainty = "unbounded: quoted from a 3-point scan with no fit uncertainty."
+uncertainty_basis = "none"
+evidence = ["3-point Ω scan {0.3, 0.5, 0.7}, 2026-05-27"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/manuscript/klaus_protocol_sheet.md"
+section = "Three-regime Ω operating window"
+pr = 403
+note = "In ω_eff the old window is [0.80, 0.87], which the 20-point scan resolves as a DECLINING shoulder (0.50070 → 0.49290) lying below BOTH maxima. #401 could only say 'neither confirmed nor replaced' at 7 points; #403 upgrades that to refuted. The status moved because the sampling changed, not because anyone re-read the prose."
+
+[[claim]]
+id = "edh-two-branches-5p2nt"
+claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65. No single optimum is quoted."
+status = "live"
+supersedes = "edh-window-5p2nt-0p5-0p6"
+type = "B"
+scope = "32³ for the 20-point shape, 64³ for the dip and the adjacent peak. CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT."
+uncertainty = "Dip depth 5.06 % at 32³ and 4.70 % at 64³ — 93 % retained, against a dt/2 reproducibility floor of 0.029 % (≈170×) and a seed floor of 0.000 % over 5 live seeds. Both points shift up by the same ~2.3 % under refinement, matching the one-signed +2.47 % offset G3 measured at 2.6 nT, so 32³ errs in OFFSET and not in SHAPE. The branch POSITIONS carry no fit uncertainty — they are sampled points on a 20-cell grid, spacing 0.02-0.05."
+uncertainty_basis = "grid"
+evidence = ["20 static-trap ω_eff arms at 5.2 nT; 2 arms at 64³ (ω_eff = 0.550, 0.650)"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11"
+pr = 403
+prediction = "D1: if two maxima are separated by a dip > 1 %, report two branches and quote no single optimum. D4: the structure must survive 64³ or it is a grid artifact."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = "The replacement for the old row is a SHAPE, not a number — which is why D2 and D3 (the parabolic fit and its digit count) are marked not-applicable rather than skipped: D1 fired first, and ordering the criteria before launch is what made that automatic. `evidence_status = absent`: #403 committed two documents and no configs, so the 22 arms behind this row do not resolve in the tree."
+
+[[claim]]
+id = "edh-5p2nt-dip-is-a-resonance"
+claim = "The 5.2 nT dip is a resonance entering the sampled window — plausibly between the Zeeman splitting and the radial mode spacing, both of which the field and ω_eff set."
+status = "suggested"
+type = "B"
+scope = "Hypothesis. The observation it explains is that 2.6 nT is a clean single peak and doubling the field introduces a dip."
+uncertainty = "unbounded: not measured. Two fields is not a trend."
+uncertainty_basis = "none"
+evidence = []
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11.4"
+pr = 403
+prediction = "If the dip is a resonance, its ω_eff position must move again at B = 10.4 nT. If it does not move, the resonance reading is wrong."
+prediction_registered = "before"
+prediction_outcome = "pending"
+note = "One arm settles it. Registered here so the answer is a residual against a written prediction rather than a description of whatever the run returns."
+
+# --- Acceptance gates and the precision claims they touch --------------------
+
+[[claim]]
+id = "edh-grid-convergence-4-digit"
+claim = "32³ and 64³ agree to 4 digits on the klaus_quench observables."
+status = "refuted"
+superseded_by = "edh-grid-convergence-2-digit"
+retired_literal = ["4-digit match"]
+replacement_literal = ["2.47 %", "+2.47%"]
+type = "A"
+scope = "Was: the grid-convergence row of the sheet's acceptance chain."
+uncertainty = "unbounded: no residual was ever quoted with it."
+uncertainty_basis = "none"
+evidence = ["klaus_protocol_sheet.md validation chain"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/manuscript/klaus_protocol_sheet.md"
+section = "validation chain"
+pr = 392
+
+[[claim]]
+id = "edh-grid-convergence-2-digit"
+claim = "32³ → 64³ moves peak P_adj by +2.47 % and peak P_exc by +2.05 %, one-signed. That is 2-digit agreement, two orders of magnitude looser than 4-digit."
+status = "live"
+supersedes = "edh-grid-convergence-4-digit"
+type = "A"
+scope = "klaus_quench protocol, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT. Confirmed one-signed at 5.2 nT too (+2.15 %, +2.54 %)."
+uncertainty = "The residual is the uncertainty: ±2.5 % is the floor on any absolute observable quoted from a 32³ arm in this family. It dwarfs the seed (0.000 %) and dt/2 (0.029 %) floors."
+uncertainty_basis = "grid"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml", "runs/klaus_quench/klaus_quench_om0p0_n64.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "One-signed means 32³ under-resolves the cascade rather than scattering about it, which is why the 5.2 nT dip survives refinement: a uniform offset cannot fill a dip. Cost, for whoever runs it next: 3026 s at 64³ against ~590 s at 32³ on the same core — 5.1×, not 8×, because the run is partly memory-bound (3.0 GB RSS)."
+
+[[claim]]
+id = "edh-g6-pexc-rises-at-matsui-n"
+claim = "At N = 5×10⁴ the rotation raises P_exc by ~30 %."
+status = "refuted"
+superseded_by = "edh-g6-omega-concentrates-not-creates"
+retired_literal = ["P_exc +30%"]
+replacement_literal = ["concentrates", "saturated"]
+type = "B"
+scope = "Was: acceptance gate G6 of the 2026-05-26 protocol spec."
+uncertainty = "unbounded. The sheet's own row carried '(with metric caveat)'; the caveat was load-bearing and was not read as one."
+uncertainty_basis = "none"
+evidence = ["klaus_quench_protocol_spec_2026_05_26.md gate G6"]
+evidence_status = "absent"
+commit = "unknown"
+doc = "docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md"
+section = "acceptance gates"
+pr = 392
+note = "`retired_literal` is deliberately the bare observable name and NOT a numeral: the retracted content here is the claim that P_exc is the observable the enhancement shows up in. Any live document quoting an enhancement in P_exc at Matsui N is quoting this row."
+
+[[claim]]
+id = "edh-g6-omega-concentrates-not-creates"
+claim = "Ω does not create excitation, it concentrates it. Peak P_exc is flat to |Ω| ≈ 0.6 while P_adj rises 24 %; at N = 5×10⁴ the cascade is already saturated (P_exc = 0.816), so P_exc has no headroom and the enhancement appears on P_adj (+6.4 %)."
+status = "live"
+supersedes = "edh-g6-pexc-rises-at-matsui-n"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, N = 5×10⁴."
+uncertainty = "P_exc measured at 0.81531 vs 0.81613, i.e. -0.10 % — resolved against the 0.029 % dt/2 floor and therefore a genuine null rather than an unresolved one. P_adj +6.4 % (0.36119 vs 0.33956) carries the 2.5 % grid systematic."
+uncertainty_basis = "dt"
+evidence = ["runs/klaus_quench/klaus_quench_om0p0_N50k.yaml", "runs/klaus_quench/klaus_quench_omm0p5_keeprot_N50k.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "G6 is recorded as FAIL against the criterion fixed before launch, and the row above explains why the criterion was the wrong one. Both facts are kept: the gate failed AND the gate was mis-posed."
+
+# --- Scope restrictions that bind every row above ----------------------------
+
+[[claim]]
+id = "edh-observable-deterministic-in-seed"
+claim = "On this protocol and duration peak P_adj is deterministic in the seed: 5 seeds agree to 5 decimals (sd = 0.00000), with the seed proved live (state overlap 0.9999997 at frame 1, growing to 1.9e-5 by frame 39)."
+status = "scoped"
+type = "A"
+scope = "klaus_quench hold-only + 2 ms delay at 32³, ω_eff ∈ {1.000, 0.714}. Does NOT generalise to longer holds, where the cascade's amplification of the seed (2 orders over this run) may reach the observable."
+uncertainty = "sd = 0.00000 over 5 seeds. This is a measured zero with a positive control, not an unmeasured one — checked precisely because an all-identical table is what a dead knob looks like."
+uncertainty_basis = "seed"
+evidence = ["5-seed arms at ω_eff = 1.000 and 0.714"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.3"
+pr = 392
+note = "Consequence: the seed axis carries no uncertainty to quote for this family, so every `uncertainty` field above is bounded by grid/dt instead. The `noise_seed` knob was initially wired to the wrong step and produced the same all-identical table for a wrong reason; that was found and fixed before these numbers."
+
+[[claim]]
+id = "edh-corpus-is-one-seed-32cubed-lhy-none"
+claim = "Every value in the rotation-assisted EdH quench re-derivation is one seed, 32³ (except where 64³ is stated), `lhy: none`, one hold duration, CPU."
+status = "live"
+type = "A"
+scope = "Binds every claim in this file whose id starts `edh-`. Stated as its own row so a reader who quotes one number does not have to find the caveat in a different section of a different document."
+uncertainty = "The directional findings (×2.2, +16.5 % vs -0.45 %, the 4.70 % dip) are far outside the measured floors and survive. The VALUES are not converged results and are not quotable as such."
+uncertainty_basis = "grid"
+evidence = ["§6.3"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "6.3"
+pr = 392
+
+# --- Open ------------------------------------------------------------------
+
+[[claim]]
+id = "klaus-sheet-frozen-but-prescriptive"
+claim = "`docs/manuscript/klaus_protocol_sheet.md` carried a dated FROZEN header — the tree's declaration that a file need not be true — and also a numbered lab protocol instructing a reader which rotation frequency, chirality and field to set. Its label and its use disagreed."
+status = "closed"
+type = "A"
+scope = "One document. The same shape may apply to `klaus_quench_protocol_spec_2026_05_26.md`, which is 1000 lines of frozen record containing the same prescriptions."
+uncertainty = "unbounded: this is a classification question, not a measurement. What IS measured is the count — 9 sites in that file state a retracted claim with no marker within 6 lines (lines 105, 125, 227, 232, 233, 234, 255, 293, 296), against a retraction block at lines 17-70."
+uncertainty_basis = "none"
+evidence = ["docs/manuscript/klaus_protocol_sheet.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/claims.toml"
+section = "Open"
+pr = 0
+note = """CLOSED 2026-08-20 by annotation, not by moving the file. The archive route was costed first and is the more expensive one: 15 inbound references, two of them CALIBRATION PROBES inside tests — `test_campaign_fix_list_gate.jl` uses this exact path as its negative control and would go blind if the file moved. Measuring the edges reversed the recommendation. What was done instead: (1) the nine point-of-use sites now carry SUPERSEDED / REFUTED at the line, with strikethrough on the values, so step 6 of the numbered protocol issues no instruction; (2) `docs/guides/edh_quench_lab_prescription.md` is a new LIVE document carrying only what survived, so a reader has somewhere true to go; (3) the retraction gates now bind LIVE docs PLUS every document this ledger names in its `doc` field, which reaches this file whether or not it is frozen. The asymmetry kept: a frozen document still need not be CORRECT, it must only not present a retracted claim as live. Rewriting history is not demanded; issuing orders from it is stopped."""
+
+
+[[claim]]
+id = "edh-phi-phys-config-anti-alignment"
+claim = "`runs/eu151_klaus_phi_phys/config.yaml` needs `init_m_idx: 13` at p > 0 (or p < 0 with `init_m_idx: 1`) to be anti-aligned; as committed it is aligned and therefore on the wrong side for the EdH quench."
+status = "open"
+type = "A"
+scope = "One config. `init_m_idx: 1` there is the schema default at p > 0 (`run_step_rotating/ground_state.jl:162`), so nothing was ever chosen."
+uncertainty = "unbounded: not measured. The sign bookkeeping is determinate; the consequence for that scan's results is not, because it has no quoted result."
+uncertainty_basis = "none"
+evidence = ["runs/eu151_klaus_phi_phys/config.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "4.2"
+pr = 392
+note = "Named rather than left implicit. It is a 32×32×16 GPU rotating-basis 8-point scan with no result being quoted, so it was deferred rather than fixed — but a deferral with no row is indistinguishable from an oversight."
+
+[[claim]]
+id = "edh-longtime-static-sustains"
+claim = "At 145 ms the rotating arm peaks and collapses back below the baseline while the static weakened trap holds 2.25× it, so rotation gives a transient and the static trap a SUSTAINED transfer."
+status = "refuted"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, hold = 100 ω_ref⁻¹, three arms."
+retired_literal = ["2.25×", "2.25x", "sustained transfer", "a transient"]
+uncertainty = "The claim was stated with its own key number (3.21 % static-vs-rotating at the peak) INSIDE the resolution systematic (2.5 %), and said so. That overlap is what made the 64³ run the obvious next step."
+uncertainty_basis = "grid"
+evidence = ["32³: baseline 0.38532/0.23127, static 0.50790/0.47517, rotating 0.52475/0.21093 (hold-peak/end)"]
+evidence_status = "absent"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "13"
+pr = 410
+note = """REFUTED 2026-08-20 by the 64³ re-run, with NO replacement ordering — see `edh-longtime-not-converged-at-32`. Both orderings invert: static-vs-rotating at the peak goes -3.2 % to +21.6 %, and at the endpoint 2.25× to 0.68×. Per-arm the endpoints move -42.6 % (static) and +91.3 % (rotating). This is not a 3 % divergence being resolved, it is 32³ failing to resolve the branch."""
+
+[[claim]]
+id = "edh-longtime-not-converged-at-32"
+claim = "At a 100 ω_ref⁻¹ hold, 32³ is not resolution-converged: refining to 64³ inverts both the peak and the endpoint ordering of static vs rotating, so NEITHER resolution establishes the long-time ordering."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, one seed. TWO arms at 64³ (static ω_eff=0.714 and rotating Ω=−0.70); the 64³ BASELINE was not run."
+uncertainty = "unbounded: n = 1 at each 64³ point and no 64³ baseline, so this bounds what 32³ CANNOT support without establishing what is true. A third arm and a second seed at 64³ are the missing measurements."
+uncertainty_basis = "grid"
+evidence = ["64³: static 0.49081/0.27262, rotating 0.40358/0.40358 (hold-peak/end) against 32³ 0.50790/0.47517 and 0.52475/0.21093"]
+evidence_status = "absent"
+commit = "32aa5e50"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "15"
+pr = 0
+note = """The part that generalises: grid adequacy is a property of the grid AND the integration time. Under the same 32³→64³ refinement the SHORT protocol (14.5 ω⁻¹) moved by a uniform +2.3 % and the 5.2 nT dip kept 93 % of its depth — shape preserved — while the long one moves -3.4/-23.1/-42.6/+91.3 % and orderings invert. So sections 9-12 are unaffected and only the long-time branch is out of reach at 32³. A convergence check at one duration does not transfer to another."""

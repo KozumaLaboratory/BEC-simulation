@@ -102,9 +102,9 @@ vortex-nucleation scan, the recommended Ω splits by purpose:
 
 | Regime                           | Ω/ω_⊥           | Optimised for                               |
 |----------------------------------|-----------------|---------------------------------------------|
-| **Short-time spin readout**      | **0.468 ± 0.003** | P_{-5,-4} peak at t ≈ 20 ms (3-digit refined) |
-| **Long-time balanced point**     | **≈ 0.5**         | P_exc ≈ 0.96 + 24 vortices @ t = 145 ms     |
-| **Vortex-rich (turbulent)**      | **≈ 0.7**         | 56 vortices, but P_exc drops to 0.89        |
+| ~~Short-time spin readout~~      | ~~0.468 ± 0.003~~ **SUPERSEDED** → weaken the radial trap to ω_⊥,eff/ω_⊥ = 0.71, no rotation (docs/guides/edh_quench_lab_prescription.md) | P_{-5,-4} peak at t ≈ 20 ms |
+| ~~Long-time balanced point~~     | ~~≈ 0.5~~ **SUPERSEDED** (rests on the same absent mechanism; not re-derived) | P_exc ≈ 0.96 + 24 vortices @ t = 145 ms |
+| ~~Vortex-rich (turbulent)~~      | ~~≈ 0.7~~ **SUPERSEDED**, same reason | 56 vortices, but P_exc drops to 0.89 |
 
 The simplest single experimental recommendation is **|Ω|/ω_⊥ = 0.5**.
 It is balanced across both short-time and long-time observables and
@@ -122,7 +122,7 @@ precision.
 
 Honest statement of the recommendation:
 
-> **Operating window:** |Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT (7-pt parabolic fit),
+> **Operating window (SUPERSEDED — see docs/guides/edh_quench_lab_prescription.md):** |Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT (7-pt parabolic fit),
 > with the precise optimum awaiting a local 7-point refinement
 > (dispatched).  Literature on rotating dipolar BECs
 > (O'Dell–Eberlein, Cai–Yuan–Rosenkranz–Pu–Bao, Halder et al.)
@@ -224,16 +224,17 @@ EdH channels that rotation can then act on.
 4. WAIT 1–2 ms after the quench   (let the EdH channel fully open;
    ends.                           rotating earlier loses ~15% of signal).
 
-5. Turn on trap rotation with chirality opposite to the initial spin
-   polarisation (counter-rotating with the stretched-spin direction).
+5. ~~Turn on trap rotation with chirality opposite to the initial spin
+   polarisation~~ — **REFUTED.** The response is EVEN in Ω to ≤ 0.124 %; both
+   senses enhance identically and Ω = 0 is the minimum. Do not rotate the trap
+   at all: weaken the radial trap instead (docs/guides/edh_quench_lab_prescription.md).
 
-6. Rotation frequency, tied to B (3-pt parabolic fit; awaiting 7-pt
-   refinement):
-                                   |Ω| / ω_⊥ ≈ 0.3      at B = 1.3 nT
-                                   |Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT (7-pt parabolic fit)  (default)
-                                   |Ω| / ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT
-   Off-diagonal (small B + large |Ω| or large B + small |Ω|) is
-   sub-optimal.
+6. Rotation frequency — **ALL THREE ROWS SUPERSEDED OR REFUTED.** Set nothing
+   from this step; the live prescription is docs/guides/edh_quench_lab_prescription.md.
+                                   ~~|Ω| / ω_⊥ ≈ 0.3      at B = 1.3 nT~~   REFUTED, **no replacement** — there is no operating window at 1.3 nT (+1.8 %, flat). Do not re-fit.
+                                   ~~|Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT~~   SUPERSEDED → static trap at ω_⊥,eff/ω_⊥ = 0.71 (|Ω*|/ω_⊥ = 0.68 ± 0.04 if you must use Ω).
+                                   ~~|Ω| / ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT~~   REFUTED — maps to ω_eff ∈ [0.80, 0.87], a declining shoulder below BOTH maxima. Replacement is a shape: two branches, global max ω_eff ≈ 0.55.
+   The "off-diagonal is sub-optimal" reading went with them.
 
 7. Keep rotation on for           ≥ 8 ms after rotation onset.
 
@@ -254,6 +255,11 @@ of orbital angular momentum (winding number ±1, sign set by J_z
 conservation).  Sustained rotation H − ΩL_z shifts the energy of
 that orbital mode by ΔE = −Ω · ℓ; matched chirality (Ω · sign(m_init)
 < 0) lowers the mode energy and enhances the spin-flip transition.
+
+> **REFUTED as the mechanism.** ΔE = −Ω·ℓ is ODD in Ω; the measured response is
+> EVEN to ≤ 0.124 %. What acts is the rotating frame's centrifugal −½Ω²ρ², and a
+> static trap at ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to 0.06 %.
+> See docs/guides/edh_quench_lab_prescription.md.
 
 ## Expected signature
 
@@ -290,10 +296,10 @@ that orbital mode by ΔE = −Ω · ℓ; matched chirality (Ω · sign(m_init)
 |------------------------------------------|-----------------------------------------|
 | DDI off → 0                              | 0.000          PASS                     |
 | no B quench → 0                          | 0.000          PASS                     |
-| 32³ ↔ 64³ grid convergence               | 4-digit match  PASS                     |
+| 32³ ↔ 64³ grid convergence               | ~~4-digit match~~ **REFUTED** — measured +2.47 %, one-signed (2-digit) |
 | (init m × Ω sign) reversal symmetry      | 3-digit match in both branches  PASS    |
 | dt/2 numerical reproducibility           | 0.02–0.14% deviation  PASS              |
-| N = 5×10⁴ qualitative reproducibility    | P_exc +30% over baseline  PASS (with metric caveat) |
+| N = 5×10⁴ qualitative reproducibility    | ~~P_exc +30% over baseline~~ **REFUTED as posed** — P_exc is saturated (0.816) and flat; Ω concentrates excitation rather than creating it. On P_adj: +6.4 % |
 | chirality timing decomposition           | hold_only = 97% of keep_rot  (pre-rotation null) |
 | B_hold sweep, [1.3, 5.2] nT              | broad sweet spot                        |
 | B_hold = 10 nT                           | Zeeman re-pinning (signal → baseline)   |

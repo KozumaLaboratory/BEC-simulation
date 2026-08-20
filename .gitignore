@@ -178,6 +178,12 @@ runs/**/*.gif
 runs/**/*.h5
 runs/**/*.csv
 runs/**/*.log
+# the exit-status file of the backgrounding idiom (`... ; echo $? > x.rc`).
+# Its sibling .log was already ignored, so a backgrounded run left exactly one
+# untracked file behind -- enough to make the tree dirty, which trips
+# `_assert_point_provenance` and reddens test/model/test_interrupted_dynamics_recomputes.jl
+# for a reason that has nothing to do with the code under test.
+runs/**/*.rc
 runs/**/*.json
 runs/**/*.pdf
 runs/**/*.aux
@@ -207,3 +213,6 @@ figs/**/*.csv
 
 # Mutation-harness output (test/mutation/run.jl)
 mutation_out/
+
+# lock files of the single-instance guard in the run drivers
+runs/**/.*.lock

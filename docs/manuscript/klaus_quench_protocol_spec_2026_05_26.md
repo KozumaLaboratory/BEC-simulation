@@ -12,6 +12,16 @@
 > a real paper and is **prior art for the magnetostir technique**, not the
 > source of this protocol. Authority: `docs/conventions/klaus_name_disambiguation.md`.
 
+> **SUPERSEDED 2026-08-20 — this spec issues no instructions.** The live
+> prescription is `docs/guides/edh_quench_lab_prescription.md`.
+> What died, in one place so a reader need not reconstruct it:
+> `|Ω|/ω_⊥ = 0.468 ± 0.003` → **`0.68 ± 0.04`**, and better stated as a static
+> radial trap at ω_⊥,eff/ω_⊥ = 0.71 with no rotation at all; the chirality rule
+> (`Ω · sign(m_init) < 0`) is REFUTED, the response being EVEN in Ω to ≤ 0.124 %;
+> `4-digit match` between 32³ and 64³ is REFUTED at +2.47 %; `P_exc +30%` at
+> N = 5×10⁴ is REFUTED as posed (P_exc is saturated; the enhancement is on P_adj,
+> +6.4 %). Per-claim status: `docs/campaign/claims.toml`.
+>
 > **Vintage.** The numbers here — including `|Ω| / ω_⊥ = 0.468`, quoted to three
 > significant figures — predate `bce2068f` (2026-07-29), which reverted the field
 > sign across 211 Eu configs, and have not been re-derived since. The sheet that
@@ -68,7 +78,7 @@ Combining short-time refinement (Fig K14) + long-time vortex branch
 
 | Regime                          | Ω/ω_⊥          | Observable peak                              | Use case                              |
 |---------------------------------|----------------|----------------------------------------------|---------------------------------------|
-| **Short-time spin readout**     | **0.468 ± 0.003** (3-digit) | P_{-5,-4} at t≈20 ms             | Brief Stern-Gerlach + TOF measurement |
+| ~~Short-time spin readout~~     | ~~0.468 ± 0.003~~ **SUPERSEDED** → 0.68 ± 0.04, or ω_⊥,eff/ω_⊥ = 0.71 static | P_{-5,-4} at t≈20 ms | Brief Stern-Gerlach + TOF measurement |
 | **Long-time balanced point**    | **0.5** (rounded) | P_exc=0.96, N_v=24 (cascade + vortex balance) | **Default experimental recommendation** |
 | **Vortex-rich over-rotated**    | **0.7**         | N_v=56 but P_exc drops to 0.89               | Turbulent / vortex-lattice study      |
 
@@ -103,7 +113,7 @@ single-signed.  As |Ω| grows, the bias weakens (turbulent regime).
 
 ```
 Simplest single value:   |Ω|/ω_⊥ = 0.5  (works across all regimes)
-Short-time fine-tune:    0.468 ± 0.003  (appendix / 3-digit precision)
+Short-time fine-tune:    0.468 ± 0.003   <- SUPERSEDED, see the banner: 0.68 ± 0.04, two digits
 Vortex-rich test:        0.7
 Onset / conservative:    0.3 – 0.42
 ```
@@ -128,13 +138,13 @@ Quadratic fit through all 7 points:
 ```
 P(Ω) = -7.411 Ω² − 6.930 Ω − 0.996
 RMSE = 0.0080
-Ω* = -0.468 ± 0.003   (1σ from covariance)
+Ω* = -0.468 ± 0.003   (1σ from covariance)   <- SUPERSEDED; the sign is meaningless too (response is even in Ω)
 P_max = 0.624
 ```
 
 The published protocol's operational optimum is therefore
 
-> **|Ω*| / ω_⊥ = 0.468 ± 0.003 at B_hold = 2.6 nT, delay = 2 ms, hold-only,
+> **SUPERSEDED — |Ω*| / ω_⊥ = 0.468 ± 0.003 at B_hold = 2.6 nT, delay = 2 ms, hold-only,
 > m=−F initial (matched chirality).  Peak P_{-5,-4} = 0.624.**
 
 The initial 3-point fit had pointed to 0.42; the 7-point refinement
@@ -651,7 +661,7 @@ load-bearing picture is "rotate during the EdH-active weak-field hold".
    rotation** (which is the same window the bare-Fz Barnett scan
    pointed at — strong consistency check between the two protocols).
 
-3. **Both 64³ anchors pass to ≤ 0.01% (4-digit match).** The
+3. **REFUTED — Both 64³ anchors pass to ≤ 0.01% (4-digit match).** Measured 2026-08-19: +2.47 %, one-signed, i.e. 2-digit. The
    Ω=−0.5 keep_rot 32³ → 64³ result is identical (0.5397, 0.8165,
    −4.138) and the Ω=0 baseline 32³ → 64³ is also identical (0.2191,
    0.2268, −5.703). Both the headline keep_rot peak AND the no-rotation
@@ -748,7 +758,7 @@ will be resolved when batch 3 lands.
 |---|-----------------|------------------------------------------------------------|-----------------------------------------------------|---------|--------------|
 | 1 | DDI off         | P_{-5,-4} → 0                                              | 0.000                                               | PASS    | batch 1      |
 | 2 | no B quench     | P_{-5,-4} → 0                                              | 0.000                                               | PASS    | batch 1      |
-| 3 | grid (32³↔64³)  | identical within 0.01%                                     | 4-digit match                                       | PASS    | batch 2      |
+| 3 | grid (32³↔64³)  | ~~identical within 0.01%~~ **REFUTED**: +2.47 %, one-signed | ~~4-digit match~~ 2-digit                          | PASS    | batch 2      |
 | 4 | spin / Ω reversal | strong/weak branch swaps under (init m × Ω sign) reversal | **strong pair 0.540 ↔ 0.540; weak pair 0.066 ↔ 0.066** | **PASS** | batch 3 Q1 |
 | 5 | dt / 2           | ‖P_{dt/2} − P_{dt}‖ / P_{dt} < 5% (target < 1%)            | **baseline 0.219 ↔ 0.219 (0.14%); keep_rot 0.5397 ↔ 0.5398 (0.02%)** | **PASS** | batch 3 Q4 |
 | 6 | N = 5×10⁴       | keep_rot trend preserved at experimental scale             | **qualitative PASS (P_exc 0.776 vs baseline 0.595, +30%); quantitative caveat: enhancement factor drops from 3.6× (N=10k) to 1.30× (N=50k) — cascade extends past m=−5,−4 at higher density** | **PASS (with caveat)** | batch 3 Q5 |
@@ -962,10 +972,10 @@ $$ \Delta E_{m_{\rm init}\mp k} = -\Omega \, [-\mathrm{sign}(m_{\rm init})\, k]\
                               = +\Omega \cdot \mathrm{sign}(m_{\rm init})\, k\, \hbar . $$
 
 The mode energy goes **down** (transition favoured) when
-Ω · sign(m_init) < 0, i.e. when the rotation chirality is opposite
+Ω · sign(m_init) < 0, i.e. when the rotation chirality is opposite   [REFUTED as the mechanism — the measured response is EVEN in Ω to ≤ 0.124 %; what acts is the centrifugal −½Ω²ρ²]
 to the initial spin polarisation.  This is exactly the matched-
 chirality strong-response branch (m=−F + Ω=−0.5 and m=+F + Ω=+0.5).
-For the mismatched chirality, Ω · sign(m_init) > 0 and the mode
+For the mismatched chirality, Ω · sign(m_init) > 0 and the mode   [REFUTED: both senses enhance identically]
 energy is shifted **up**, suppressing the transition.
 
 This single argument:
@@ -1040,7 +1050,7 @@ Combining batches 1-4:
    - Higher-B option:        B_hold = 5.2 nT, |Ω|/ω_⊥ = 0.5  (P=0.557)
 3. Skip pre-rotation.
 4. Wait ~1–2 ms after the quench is complete.
-5. Turn on trap rotation with chirality opposite to initial spin.
+5. ~~Turn on trap rotation with chirality opposite to initial spin.~~ **REFUTED** — do not rotate; weaken the radial trap (see the banner).
 6. Hold for ≥ 8 ms with rotation active.
 7. Observe P_adj / P_exc / ring textures.
 ```

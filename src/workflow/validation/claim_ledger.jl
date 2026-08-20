@@ -1,0 +1,472 @@
+# --- Claim ledger (docs/campaign/claims.toml) ---
+#
+# Reader for the ledger that holds a physics claim's STATUS as a field.
+#
+# The failure this exists to stop is not a wrong number. It is a correct
+# retraction written 160 lines above the place the number is used:
+# `docs/manuscript/klaus_protocol_sheet.md` retracts `0.468 ± 0.003` at lines
+# 17-70 and then states it bare at 105, 125 and 233 — the last inside the
+# numbered lab protocol, annotated `(default)`. Two PRs updated the retraction
+# block and left the protocol steps alone, because the status of a claim was not
+# a thing the tree could hold and so lived in whichever paragraph someone
+# remembered.
+#
+# Three field-level rules do the work, and each one is a state that used to be
+# unrepresentable:
+#
+#   `uncertainty` is REQUIRED and may not be empty. A row nobody has bounded is
+#   a fact, and `absent` must not be able to read as `small`.
+#
+#   `refuted` and `superseded` are different values, and `superseded_by` is
+#   OPTIONAL — "refuted with no replacement" is a real outcome (1.3 nT has no
+#   operating window) and had no way to be written down.
+#
+#   `retired_literal` is required on every non-live row. It is the string the
+#   gate hunts, so a retraction is enforced at the point of use rather than at
+#   the point of apology.
+#
+# Parsing is fail-closed, like `campaign_fix_list`: a row missing a required
+# field throws instead of being skipped, because skipping is exactly what lets a
+# claim escape the gate it was entered into.
+#
+# NOT THE SAME THING AS `src/model/claim.jl`, and the near-collision is worth
+# naming so a third one does not appear. That file's `Claim` is PROSPECTIVE: an
+# assertion tied to `Stage`s that have not run, whose constructor refuses a :B/:C
+# claim with no control arm and a :C claim with no arbitrating literature target.
+# This file's `LedgerClaim` is RETROSPECTIVE: an assertion already made, with the
+# status, uncertainty and document anchor it carries now. One guards the design
+# of a measurement, the other the shelf life of its result. The A/B/C taxonomy is
+# shared and is DERIVED from `CLAIM_KINDS` here rather than retyped — `uncertainty
+# _basis = "control"` in this ledger means the same thing as the control arm
+# there.
+
+using TOML
+
+export LedgerClaim, claim_ledger, claim_ledger_path,
+    CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
+    CLAIM_RETRACTION_MARKERS, claim_ledger_link_errors, claim_by_id, retired_literals,
+    unmarked_retired_literal_sites
+
+"""
+    CLAIM_STATUSES
+
+The closed set a claim's status may take. Closed on purpose: a free-text status
+re-creates the prose problem one column to the right.
+
+  `live`       — currently asserted
+  `scoped`     — true only inside a stated restriction; the restriction is the claim
+  `superseded` — replaced by a better statement of the same quantity
+  `refuted`    — measured false. May or may not have a replacement
+  `suggested`  — hypothesis, not measured. Never quotable as a result
+  `open`       — a known gap, named so a deferral is distinguishable from an oversight
+  `closed`     — an `open` row that was shut by DOING the work. Not `refuted`
+                 (nothing measured it false) and not deleted: erasing it would
+                 erase the fact that the gap existed, which is the part a reader
+                 needs in order to trust that the rest were looked at too. A
+                 `closed` row must carry a `note` saying what closed it.
+"""
+const CLAIM_STATUSES = ("live", "scoped", "superseded", "refuted", "suggested",
+    "open", "closed")
+
+"""
+    CLAIM_LEDGER_TYPES
+
+`CAMPAIGN.md` §5 taxonomy as ledger strings, DERIVED from `CLAIM_KINDS` in
+`src/model/claim.jl` rather than retyped. The taxonomy already had exactly one
+declaration and this file is not going to be its second.
+"""
+const CLAIM_LEDGER_TYPES = String.(CLAIM_KINDS)
+
+"""
+    CLAIM_UNCERTAINTY_BASES
+
+How the `uncertainty` field was obtained. `none` is legal and means the claim is
+unbounded — it must then be paired with an `uncertainty` that says so in words.
+"""
+const CLAIM_UNCERTAINTY_BASES = ("fit", "grid", "dt", "seed", "control", "none")
+
+"""
+    CLAIM_EVIDENCE_STATUSES
+
+Whether `evidence` resolves in this repo. `absent` is common and is not by itself
+a defect — most campaign arms are never committed — but it is the difference
+between "re-deriving this is a re-run" and "re-deriving this is a re-derivation",
+and that difference should not have to be rediscovered.
+"""
+const CLAIM_EVIDENCE_STATUSES = ("in_tree", "partial", "absent")
+
+"""
+    LedgerClaim
+
+One `[[claim]]` row of `docs/campaign/claims.toml`.
+
+`uncertainty` is a String and never `nothing`: the parser rejects a row without
+one. `superseded_by` and `supersedes` are `nothing` when unset, which is a
+different fact from `""`. `retired_literal` is a (possibly empty) vector — a
+retracted claim usually survives in more than one wording, and the lab
+instruction and the mechanism sentence are different points of use.
+"""
+struct LedgerClaim
+    id::String
+    claim::String
+    status::String
+    type::String
+    scope::String
+    uncertainty::String
+    uncertainty_basis::String
+    evidence::Vector{String}
+    evidence_status::String
+    commit::String
+    doc::String
+    section::String
+    pr::Union{Nothing, Int}
+    supersedes::Union{Nothing, String}
+    superseded_by::Union{Nothing, String}
+    retired_literal::Vector{String}
+    replacement_literal::Vector{String}
+    prediction::Union{Nothing, String}
+    prediction_registered::Union{Nothing, String}
+    prediction_outcome::Union{Nothing, String}
+    note::Union{Nothing, String}
+end
+
+"""
+    claim_ledger_path(; repo=nothing) -> String
+
+Path to `docs/campaign/claims.toml`. `repo` defaults to the package root.
+"""
+function claim_ledger_path(; repo::Union{Nothing, AbstractString}=nothing)
+    root = repo === nothing ? normpath(joinpath(@__DIR__, "..", "..", "..")) : repo
+    joinpath(root, "docs", "campaign", "claims.toml")
+end
+
+_opt(r, k) = (v=get(r, k, nothing); v isa AbstractString && !isempty(v) ? String(v) : nothing)
+
+"""A field that is a string, an array of strings, or absent — normalised to a vector."""
+function _strvec(r, k, id, path)
+    v = get(r, k, nothing)
+    v === nothing && return String[]
+    v isa AbstractString && return [String(v)]
+    v isa AbstractVector && return String[String(x) for x in v]
+    throw(ArgumentError("$path claim `$id`: `$k` must be a string or an array of strings"))
+end
+
+function _required(r, k, i, path)
+    v = get(r, k, nothing)
+    (v isa AbstractString && !isempty(strip(v))) || throw(
+        ArgumentError(
+            "$path [[claim]] #$i ($(get(r, "id", "<no id>"))) is missing required " *
+            "field `$k`. A row the gate cannot check must not exist — the whole " *
+            "point of the ledger is that an unstated field reads as an unstated " *
+            "fact and not as a benign default."),
+    )
+    String(v)
+end
+
+"""
+    claim_ledger(; path=claim_ledger_path()) -> Vector{LedgerClaim}
+
+Parse the ledger. Throws on any row that cannot be checked:
+
+  - a missing required field (notably `uncertainty`)
+  - a `status` / `type` / `uncertainty_basis` / `evidence_status` outside its set
+  - `uncertainty_basis = "none"` on a row whose `uncertainty` does not say it is
+    unbounded — a filled bound with no method behind it is the shape of a
+    fabricated error bar
+  - a non-`live` row with no `retired_literal`, which would be a retraction the
+    gate cannot enforce anywhere
+
+Link consistency between rows (`supersedes` ↔ `superseded_by`) is checked
+separately by [`claim_ledger_link_errors`](@ref), so a single bad edge names
+itself instead of aborting the parse.
+"""
+function claim_ledger(; path::AbstractString=claim_ledger_path())
+    isfile(path) || throw(ArgumentError("claim ledger not found: $path"))
+    doc = TOML.parsefile(path)
+    rows = get(doc, "claim", nothing)
+    rows isa AbstractVector || throw(ArgumentError("$path has no [[claim]] array"))
+    out = LedgerClaim[]
+    for (i, r) in enumerate(rows)
+        id = _required(r, "id", i, path)
+        status = _required(r, "status", i, path)
+        status in CLAIM_STATUSES || throw(
+            ArgumentError(
+                "$path claim `$id` has status `$status`; must be one of " *
+                join(CLAIM_STATUSES, ", "),
+            ),
+        )
+        typ = _required(r, "type", i, path)
+        typ in CLAIM_LEDGER_TYPES || throw(
+            ArgumentError(
+                "$path claim `$id` has type `$typ`; must be one of " *
+                join(CLAIM_LEDGER_TYPES, ", ") * " (CAMPAIGN.md §5)",
+            ),
+        )
+        unc = _required(r, "uncertainty", i, path)
+        basis = _required(r, "uncertainty_basis", i, path)
+        basis in CLAIM_UNCERTAINTY_BASES || throw(
+            ArgumentError(
+                "$path claim `$id` has uncertainty_basis `$basis`; must be " *
+                "one of " * join(CLAIM_UNCERTAINTY_BASES, ", "),
+            ),
+        )
+        if basis == "none" && !occursin("unbounded", lowercase(unc)) &&
+            !occursin("not a measured", lowercase(unc)) &&
+            !occursin("nothing to bound", lowercase(unc))
+            throw(
+                ArgumentError(
+                    "$path claim `$id` has uncertainty_basis = \"none\" but an " *
+                    "`uncertainty` that reads like a bound. Say `unbounded: <why>` " *
+                    "— a stated bound with no method behind it is worse than a " *
+                    "blank, because it survives being quoted."),
+            )
+        end
+        estatus = _required(r, "evidence_status", i, path)
+        estatus in CLAIM_EVIDENCE_STATUSES || throw(
+            ArgumentError(
+                "$path claim `$id` has evidence_status `$estatus`; must be " *
+                "one of " * join(CLAIM_EVIDENCE_STATUSES, ", "),
+            ),
+        )
+        retired = _strvec(r, "retired_literal", id, path)
+        if status in ("superseded", "refuted") && isempty(retired)
+            throw(
+                ArgumentError(
+                    "$path claim `$id` is `$status` but declares no " *
+                    "`retired_literal`. Then nothing stops the retracted form " *
+                    "being quoted, which is the exact defect this ledger was " *
+                    "opened over."),
+            )
+        end
+        status == "closed" && _opt(r, "note") === nothing &&
+            throw(
+                ArgumentError(
+                    "$path claim `$id` is `closed` but carries no `note`. A gap " *
+                    "recorded as shut without saying what shut it is indistinguishable " *
+                    "from one quietly dropped."),
+            )
+        pred_reg = _opt(r, "prediction_registered")
+        pred_reg === nothing || pred_reg in ("before", "after") ||
+            throw(
+                ArgumentError(
+                    "$path claim `$id`: prediction_registered must be " *
+                    "`before` or `after`",
+                ),
+            )
+        pred_out = _opt(r, "prediction_outcome")
+        pred_out === nothing || pred_out in ("hit", "miss", "pending") ||
+            throw(
+                ArgumentError(
+                    "$path claim `$id`: prediction_outcome must be " *
+                    "`hit`, `miss` or `pending`",
+                ),
+            )
+        ev = get(r, "evidence", String[])
+        ev isa AbstractVector || throw(
+            ArgumentError("$path claim `$id`: `evidence` must be an array")
+        )
+        prnum = get(r, "pr", nothing)
+        push!(
+            out,
+            LedgerClaim(id, _required(r, "claim", i, path), status, typ,
+                _required(r, "scope", i, path), unc, basis,
+                String[String(e) for e in ev], estatus,
+                _required(r, "commit", i, path), _required(r, "doc", i, path),
+                _required(r, "section", i, path),
+                prnum isa Integer ? Int(prnum) : nothing,
+                _opt(r, "supersedes"), _opt(r, "superseded_by"), retired,
+                _strvec(r, "replacement_literal", id, path),
+                _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note")),
+        )
+    end
+    isempty(out) && throw(ArgumentError("$path declares no claims"))
+    ids = [c.id for c in out]
+    length(unique(ids)) == length(ids) ||
+        throw(ArgumentError("$path has duplicate claim ids"))
+    out
+end
+
+"""
+    claim_by_id(claims, id) -> Union{Claim, Nothing}
+"""
+claim_by_id(claims::AbstractVector{LedgerClaim}, id::AbstractString) =
+    (i=findfirst(c -> c.id == id, claims); i === nothing ? nothing : claims[i])
+
+"""
+    claim_ledger_link_errors(claims) -> Vector{String}
+
+Every way the supersession graph can be inconsistent, as human-readable lines.
+Empty means the graph is sound.
+
+Checked: dangling ids, self-links, and — the one that actually bites — a
+`supersedes` edge whose target does not name it back. A half-declared retraction
+is how a superseded row keeps reading as live from one side.
+"""
+function claim_ledger_link_errors(claims::AbstractVector{LedgerClaim})
+    errs = String[]
+    ids = Set(c.id for c in claims)
+    for c in claims
+        for (field, target) in (("supersedes", c.supersedes),
+            ("superseded_by", c.superseded_by))
+            target === nothing && continue
+            target == c.id && push!(errs, "claim `$(c.id)`: $field points at itself")
+            target in ids ||
+                push!(errs, "claim `$(c.id)`: $field = `$target`, which is not a claim id")
+        end
+        if c.supersedes !== nothing && c.supersedes in ids
+            other = claim_by_id(claims, c.supersedes)
+            other.superseded_by == c.id || push!(
+                errs,
+                "claim `$(c.id)` supersedes `$(other.id)`, but `$(other.id)` names " *
+                "`$(something(other.superseded_by, "nothing"))` as its successor. " *
+                "One-directional supersession leaves the old row reading live from " *
+                "its own side.",
+            )
+            other.status == "live" && push!(
+                errs,
+                "claim `$(other.id)` is superseded by `$(c.id)` yet still has " *
+                "status `live`.",
+            )
+        end
+        if c.superseded_by !== nothing && c.superseded_by in ids
+            other = claim_by_id(claims, c.superseded_by)
+            other.supersedes == c.id || push!(
+                errs,
+                "claim `$(c.id)` names `$(other.id)` as its successor, but " *
+                "`$(other.id)` does not declare `supersedes = \"$(c.id)\"`.",
+            )
+        end
+        if c.prediction !== nothing && c.prediction_registered === nothing
+            push!(
+                errs,
+                "claim `$(c.id)` carries a prediction with no " *
+                "`prediction_registered`. A statement written after the measurement " *
+                "is a description, and counting it as a prediction is how a ledger " *
+                "starts flattering itself.",
+            )
+        end
+    end
+    errs
+end
+
+"""
+    retired_literals(claims) -> Vector{Pair{String, String}}
+
+`retired_literal => claim id` for every non-live row. This is the list the
+point-of-use gate scans documents for.
+"""
+retired_literals(claims::AbstractVector{LedgerClaim}) =
+    [lit => c.id for c in claims for lit in c.retired_literal]
+
+# --- The point-of-use gate ---------------------------------------------------
+
+"""
+    CLAIM_RETRACTION_MARKERS
+
+The vocabulary a document must use where it states a retracted claim. Small and
+closed on purpose: the gate has to be able to tell a marker from ordinary prose,
+and a document that says "does not matter" in its own words is indistinguishable
+from one that says nothing.
+
+Case-sensitive members are included deliberately — `SUPERSEDED` in a table cell
+reads as a status, `superseded` in a sentence reads as a description, and both
+are legitimate marks.
+"""
+const CLAIM_RETRACTION_MARKERS = (
+    "SUPERSEDED", "superseded", "REFUTED", "refuted", "RETIRED", "retired",
+    "retracted", "no replacement", "Vintage", "RE-DERIVED", "HISTORICAL",
+)
+
+_collapse_ws(s::AbstractString) = replace(strip(s), r"[ \t]+" => " ")
+
+"""
+    unmarked_retired_literal_sites(; claims, docs_root, window=6, skip=("archive",))
+        -> Vector{NamedTuple}
+
+Every place a retired claim is stated in a live document without a retraction
+marker near it. One NamedTuple per site: `(file, line, literal, claim_id, text)`.
+
+**The rule is proximity, and the reason is measured.** `klaus_protocol_sheet.md`
+carries a correct, thorough retraction of `0.468 ± 0.003` at its head and then
+states the number bare 160 lines later, inside the numbered lab protocol, marked
+`(default)`. A reader following the protocol never sees the retraction. So a mark
+in the same document is not enough; it has to be where the number is used.
+
+`window` is how many lines either side count as "near". It is a real threshold
+and it is set loose (6) rather than tight (0), because prose wraps and a gate
+that reddens on correct writing gets deleted — the failure mode this project has
+recorded is gates that are too strict, not too lax. At 6 the two cases are still
+159 lines apart.
+
+`files` overrides the walk with an explicit corpus. The caller supplies it so
+that "which documents must be true" stays declared in exactly one place —
+`LIVE_DOCS` in `test/test_docs_live_set.jl` — instead of this function growing a
+second opinion about it. Directories in `skip` are excluded from the default
+walk: `docs/archive/` is where history is kept on purpose.
+
+**What this does NOT reach.** A document that carries a dated FROZEN header is
+not required to be true, so the caller normally excludes it — and
+`docs/manuscript/klaus_protocol_sheet.md` is FROZEN while still carrying a
+numbered lab protocol. That is not a hole in the gate; it is a document whose
+label and whose use disagree, and it is recorded as claim
+`klaus-sheet-frozen-but-prescriptive` rather than patched over here.
+
+**What this does NOT catch**, said plainly because a gate that overstates its
+reach is worse than none: it matches literals, so a paraphrase of a retracted
+claim passes. It guards the observed failure — a table or a protocol step copied
+forward verbatim — and not the general one.
+"""
+function unmarked_retired_literal_sites(;
+    claims::AbstractVector{LedgerClaim}=claim_ledger(),
+    docs_root::AbstractString=joinpath(
+        normpath(joinpath(@__DIR__, "..", "..", "..")), "docs"),
+    files::Union{Nothing, AbstractVector}=nothing,
+    window::Int=6,
+    skip=("archive",))
+    lits = retired_literals(claims)
+    isempty(lits) && return NamedTuple[]
+    normlits = [(_collapse_ws(l), id) for (l, id) in lits]
+    out = NamedTuple[]
+    # `docs/archive/` is excluded even when the caller passes it explicitly. A
+    # ledger row's `doc` may point into the archive because that is WHERE THE CLAIM
+    # WAS ORIGINALLY WRITTEN — a provenance anchor, not an assertion being made
+    # today. Requiring every line of a retired document to re-declare its own
+    # retirement is the cost that would make the archive unwritable, and the
+    # archive already carries a whole-file header saying it is history.
+    isarchive(f) = occursin(joinpath("docs", "archive"), String(f))
+    paths = if files !== nothing
+        String[String(f) for f in files if endswith(String(f), ".md") && !isarchive(f)]
+    else
+        isdir(docs_root) || return out
+        acc = String[]
+        for (dir, dirs, fs) in walkdir(docs_root)
+            filter!(d -> !(d in skip), dirs)
+            append!(acc, [joinpath(dir, f) for f in fs if endswith(f, ".md")])
+        end
+        acc
+    end
+    for path in paths
+        lines = try
+            readlines(path)
+        catch
+            continue
+        end
+        norm = _collapse_ws.(lines)
+        for (i, ln) in pairs(norm)
+            for (lit, id) in normlits
+                occursin(lit, ln) || continue
+                lo, hi = max(1, i - window), min(length(norm), i + window)
+                marked = any(
+                    any(occursin(m, norm[j]) for m in CLAIM_RETRACTION_MARKERS)
+                    for j in lo:hi)
+                marked && continue
+                push!(
+                    out,
+                    (file=relpath(path, dirname(rstrip(docs_root, '/'))), line=i,
+                        literal=lit, claim_id=id, text=strip(lines[i])),
+                )
+            end
+        end
+    end
+    out
+end

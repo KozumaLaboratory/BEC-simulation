@@ -40,8 +40,8 @@ as campaign evidence.
 
 The machine-readable ref list is **`docs/campaign/fix_list.toml`** — the file guard 1
 reads, and the only place the SHAs are declared. The table below is the human-readable
-context and deliberately carries no SHAs, so the two cannot drift. It has 15 entries to
-this table's 12: the June integrator row expands into the four propagator paths that
+context and deliberately carries no SHAs, so the two cannot drift. It has 16 entries to
+this table's 13: the June integrator row expands into the four propagator paths that
 carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
 `test/test_campaign_fix_list_gate.jl` pins the two counts against each other
 and re-runs the ancestor check over every ref, so neither the drift nor a dead ref is
@@ -61,6 +61,7 @@ left to a reader.
 | #158 | closed-form tables `N_atoms` too large | caused a spurious 15× arrest |
 | #174 | closed-form LHY drift (135 % → ~1e-9; LHY 97 % → 5–7 % of total) | — |
 | #139 | `summary_provenance` / `_repo_commit` stamping landed | pre-#139 runs cannot be retro-dated |
+| **2026-08-19** | **the EdH-quench corpus was studying the ALIGNED preparation** | the cascade only runs from the Zeeman-HIGHEST state: +16.5 % vs −0.45 %; **configs, not code** — same caveat as the 2026-07-29 row |
 
 **The gate is mechanical, not a judgement call.** Use
 `git merge-base --is-ancestor <ref> HEAD` over every ref in `fix_list.toml` — not "this
