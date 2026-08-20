@@ -147,12 +147,15 @@ Klaus 2022 magnetostriction sensitivity — #406 steps 2 and 3
 flush(stdout)
 
 rows = NamedTuple[]
-base_ar = NaN
+# A `Ref`, not a bare global: a top-level `for` body is soft scope, so
+# `base_ar = ar` inside it creates a LOCAL and the read below sees nothing.
+base_ref = Ref(NaN)
 for (name, ov, axis, value, systematic) in ARMS
     wanted === nothing || name in wanted || continue
     gs, wall = run_gs(gs_spec(; ov...))
     ar = gs.aspect_ratio_xy
-    name == "baseline" && (base_ar = ar)
+    name == "baseline" && (base_ref[] = ar)
+    base_ar = base_ref[]
     # (AR − 1) is the physical quantity: AR = 1 is "no magnetostriction", so a
     # ratio of ARs would compress the very effect being compared.
     d_excess = isnan(base_ar) ? NaN : (ar - 1) / (base_ar - 1) - 1
@@ -173,6 +176,7 @@ end
 # ---------------------------------------------------------------- the verdict
 
 println("\n=== what would have to move, and by how much ===")
+base_ar = base_ref[]
 if isnan(base_ar)
     println("  baseline not run (AS_ARMS excluded it) — no derivative is quotable.")
 else
