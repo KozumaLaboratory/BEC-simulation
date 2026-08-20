@@ -565,6 +565,12 @@ function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractStr
     res = joinpath(run_dir, "result.jld2")
     (isfile(res) && !islink(res)) || return :skipped
     (isfile(point_file) && !islink(point_file)) || return :skipped
+    # `samefile` is the load-bearing one — canaried 2026-08-21: removing it lets
+    # the rotating-basis case strip its own only copy, and the gate goes red with
+    # `KeyError: dynamics/psi_snapshots_streamed`. The `islink` check above is
+    # REDUNDANT with it (a symlinked point file is the same file) and is kept as a
+    # cheap early exit, not as protection. Removing `islink` alone changes nothing,
+    # which is why that arm of the canary did not fire.
     samefile(res, point_file) && return :skipped
 
     grp = "dynamics/psi_snapshots_streamed"
