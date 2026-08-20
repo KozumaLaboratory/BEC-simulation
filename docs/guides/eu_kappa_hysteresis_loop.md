@@ -18,6 +18,40 @@
 > survive.
 >
 > **Read §6 first if you want the number to hand the experiment.**
+>
+> ## ⚠ HELD 2026-08-20: "68.4 µG is a spinodal" is not established
+>
+> §5.1 calls 68.4 µG a **mean-field spinodal** and draws a consequence from it —
+> *"a rising ramp must convert by then at any rate."* #383
+> (`docs/guides/eu_spinodal_spectrum.md`) measured three independent quantities on
+> those same cells and **none of them softens**: the branch-tangent curvature
+> `R = ⟨t,At⟩` is linear in `R²` to rms 0.4 % with its zero at **78.2 µG**, the
+> escape direction `⟨d,Ad⟩` from the 68.25 → 68.50 µG pair is **+3.403** (uphill
+> along the way it actually falls, i.e. a barrier), and the lowest resolvable ω is
+> flat to 1.4 %. A saddle-node takes all three to zero.
+>
+> **What the continuation measured is where a warm-started L-BFGS stops being able
+> to stay on the branch — not that the branch stops existing.** Those are different
+> claims and this document conflated them. Everything downstream that only needs
+> "the continuation loses the branch at 68.4 ± 0.15 µG" stands, including the grid
+> agreement of §5.8.
+>
+> **What is weakened**: the *at any rate* clause. If the flower minimum survives
+> past 68.4 µG behind a barrier, a fast enough rising ramp carries it further — and
+> that is exactly what the predecessor observed (flower surviving to > 100 µG at
+> every rate). §5.5b's hold experiment reads the same either way: a state 1.75 µG
+> past a spinodal moves slowly *because the growth rate vanishes there*, and a
+> state behind a barrier moves slowly *because there is a barrier*.
+>
+> **What is untouched**: §5.7's Stern-Gerlach level count, the deliverable — 6–7
+> populated m_F at κ = 1.8 against 3–4 at κ = 0.9, disjoint at all five rates. It
+> does not rest on the spinodal reading at all.
+>
+> Settling it needs a resolved λ_min at 68.25 µG, which neither solver reached in
+> #383. #395's preconditioner reaches λ_min ≤ 7.6e-8, so it is now answerable —
+> tracked as #399. Until then the honest phrasing is **"the field at which the
+> continuation loses the flower branch"**, and this document's own use of
+> "spinodal" should be read with that substitution throughout §5.1.
 
 ## 1. What is being delivered, and why it is worth the compute
 

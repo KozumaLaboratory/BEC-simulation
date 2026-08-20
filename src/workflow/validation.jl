@@ -37,3 +37,4 @@ include("validation/twin_audit.jl")             # Level-12 production audit (twi
 include("validation/run_observables.jl")        # snapshot trajectories + collapse classifier
 include("validation/scalar_summary.jl")          # run_scalar_summary + write_run_summary (catalog fuel)
 include("validation/campaign_gate.jl")          # CAMPAIGN.md §4 guard 1, executed rather than described
+include("validation/claim_ledger.jl")           # a claim's status as a FIELD, not as prose

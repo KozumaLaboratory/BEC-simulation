@@ -124,7 +124,7 @@ checking either.
 
 - admits: `src/workflow/experiment.jl:253`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:840`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:854`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
 - **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 
@@ -279,7 +279,7 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
-| `src/workflow/` | 5 | 174 |
+| `src/workflow/` | 5 | 175 |
 | `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 

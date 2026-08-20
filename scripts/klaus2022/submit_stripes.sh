@@ -80,9 +80,48 @@ fi
 echo "seed=$KLAUS_SEED hold_s=$KLAUS_HOLD_S tag=$KLAUS_TAG smoke=${KLAUS_SMOKE:-0}"
 echo "results=$KLAUS_RESULTS"
 
-# `-t` matches the requested cores; FFTW threads are set from it inside the
-# script. The dynamics is FFT-bound, so this is the knob that matters.
-time "$JULIA" --project=. -t 16 scripts/klaus2022_reproduce.jl stripes $EXTRA
+# `-t` matches the requested cores; FFTW threads follow it inside the script
+# unless `KLAUS_FFTW_THREADS` overrides. The dynamics is FFT-bound, so this is
+# the knob that matters.
+#
+# FFTW THREADS DEFAULT TO THE CORE COUNT, measured ON THE GRID THAT RUNS.
+#
+# 128^3 (production), hold 0.05 s, one variable:
+#
+#   FFTW threads   wall     ru_maxrss    job
+#        1        1803 s     1.06 GB     8445674
+#        4         825 s     1.28 GB     8445675
+#       16         575 s     1.15 GB     8445676   <- 3.13x faster than 1
+#
+# 48^3 (--smoke), where this was FIRST measured and where the answer INVERTS:
+#
+#   julia -t   FFTW threads   ru_maxrss   outcome
+#      16          16          36.9 GB    SIGKILL at 55 s   (8445105)
+#      16           1           1.08 GB   exit 0, 343 s     (8445106)
+#       1           1           1.27 GB   exit 0, 341 s     (8445107)
+#
+# So the small grid says "1 or die" and the production grid says "16, and it is
+# also the LIGHTEST". Both are measured; neither generalises to the other. A
+# default of 1 was set from the 48^3 table alone with a comment saying the
+# production grid should be measured — and then the production seeds were
+# launched without measuring it, at 3.13x the cost, into a 2 h h_rt they could
+# not have met (jobs 8445116/7/8, all `execd enforced h_rt limit` at 7195 s).
+# Writing the caveat is not measuring it.
+#
+# STILL NOT EXPLAINED: why 16 threads costs 36.9 GB at 48^3 and 1.15 GB at
+# 128^3 — a 19x LARGER problem using 32x LESS memory at the same thread count.
+# "Small grid x many threads is pathological" is as far as the measurements go.
+# The same `-t 16` with FFTW at 16 also peaks at 1.12 GB locally on a 10-core
+# box, so the visible-CPU count (384 on the node) is a candidate; untested.
+#
+# The first failure was a SIGSEGV inside FFTW's threaded spawn loop (8444494)
+# and the stack trace pointed at FFTW as a bug. TWO FAILURE MODES FROM ONE
+# CONFIGURATION — SIGSEGV at 3m14s, then SIGKILL at 55 s — is what said
+# "resource", not "bug".
+JT="${KLAUS_JULIA_THREADS:-16}"
+export KLAUS_FFTW_THREADS="${KLAUS_FFTW_THREADS:-$JT}"
+echo "julia_threads=$JT fftw_threads=$KLAUS_FFTW_THREADS"
+time "$JULIA" --project=. -t "$JT" scripts/klaus2022_reproduce.jl stripes $EXTRA
 rc=$?
 echo "EXIT_RC=$rc"
 exit $rc
