@@ -62,20 +62,20 @@ DISPOSITIONS = {
 }
 
 
-def gh_json(args: list[str]) -> list[dict]:
-    """`gh` output as JSON, or an empty list with a warning.
+def gh_json(args: list[str]) -> tuple[list[dict], bool]:
+    """`gh` output as JSON, paired with whether the call actually succeeded.
 
-    Never raises: a missing `gh` must not stop someone recording a disposition by
-    hand. It DOES warn, because a silent empty enumeration is the failure mode
-    this tool exists to remove.
+    Never raises — a missing `gh` must not stop someone recording a disposition
+    by hand — but it never lets a failure pass as an empty result either. Those
+    two are indistinguishable in the data and opposite in meaning.
     """
     try:
         out = subprocess.run(args, capture_output=True, text=True, timeout=60, check=True)
-        return json.loads(out.stdout)
+        return json.loads(out.stdout), True
     except Exception as e:  # noqa: BLE001 - any failure is the same story here
         print(f"WARNING: {' '.join(args[:3])}… failed ({e}); enumeration is INCOMPLETE",
               file=sys.stderr)
-        return []
+        return [], False
 
 
 def matches(text: str, keywords: list[str]) -> bool:
@@ -83,14 +83,26 @@ def matches(text: str, keywords: list[str]) -> bool:
     return any(k.lower() in t for k in keywords)
 
 
-def enumerate_topic(keywords: list[str]) -> list[dict]:
+def enumerate_topic(keywords: list[str]) -> tuple[list[dict], bool]:
+    """Matching open work, and whether the enumeration was COMPLETE.
+
+    The flag is load-bearing. An incomplete enumeration looks exactly like an
+    empty one, and writing an empty record over a full one destroys the very
+    dispositions this tool exists to accumulate — a network hiccup would erase
+    the reason #351 was finally read.
+    """
     items: list[dict] = []
-    for pr in gh_json(["gh", "pr", "list", "--state", "open", "--limit", "100",
-                       "--json", "number,title,headRefName"]):
+    complete = True
+    prs, ok = gh_json(["gh", "pr", "list", "--state", "open", "--limit", "100",
+                       "--json", "number,title,headRefName"])
+    complete &= ok
+    for pr in prs:
         if matches(pr["title"] + " " + pr["headRefName"], keywords):
             items.append({"kind": "pr", "ref": f"#{pr['number']}", "title": pr["title"]})
-    for iss in gh_json(["gh", "issue", "list", "--state", "open", "--limit", "100",
-                        "--json", "number,title"]):
+    issues, ok = gh_json(["gh", "issue", "list", "--state", "open", "--limit", "100",
+                          "--json", "number,title"])
+    complete &= ok
+    for iss in issues:
         if matches(iss["title"], keywords):
             items.append({"kind": "issue", "ref": f"#{iss['number']}", "title": iss["title"]})
     try:
@@ -101,38 +113,58 @@ def enumerate_topic(keywords: list[str]) -> list[dict]:
                 items.append({"kind": "branch", "ref": b, "title": ""})
     except Exception as e:  # noqa: BLE001
         print(f"WARNING: branch enumeration failed ({e}); INCOMPLETE", file=sys.stderr)
-    return items
+        complete = False
+    return items, complete
 
 
 def write_record(topic: str, keywords: list[str], items: list[dict]) -> Path:
     RECORD_DIR.mkdir(parents=True, exist_ok=True)
     path = RECORD_DIR / f"{topic}.md"
-    prev = {}
+    # Carry BOTH columns forward. The disposition says a row was handled; the
+    # note says what was found, and that is the part worth having — "#351: not
+    # reading this cost a day" is the whole point of the record. An earlier
+    # version preserved only the disposition, so the first regeneration silently
+    # blanked every note while reporting `0 unread`.
+    prev: dict[str, tuple[str, str]] = {}
     if path.exists():
         for line in path.read_text().splitlines():
-            m = re.match(r"^\|\s*([^|\s]+)\s*\|\s*(\w+)\s*\|", line)
-            if m and m.group(2) in DISPOSITIONS:
-                prev[m.group(1)] = m.group(2)
+            m = re.match(r"^\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)\|\s*$", line)
+            if m and m.group(2).strip() in DISPOSITIONS:
+                prev[m.group(1).strip()] = (m.group(2).strip(), m.group(4).strip())
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out = [
         f"# Prior art — {topic}",
         "",
-        f"Enumerated {stamp} for keywords: {', '.join(keywords)}.",
+        # The docs gate (test_docs_live_set.jl) asks every file to be either
+        # maintained or dated, and this is squarely the dated kind: nothing
+        # refreshes it, so a reader must know as-of when it was true. The
+        # generator stamps it rather than a human, so the mark cannot outlive the
+        # enumeration it describes.
+        f"> **FROZEN {stamp}.** A snapshot of the open work on {topic} as of that",
+        "> date. Re-run the generator when picking the topic up again; existing",
+        "> dispositions are preserved.",
         "",
-        "**A dated snapshot.** Nothing keeps this current; re-run",
-        f"`python3 scripts/prior_art.py --topic {topic} --keywords {' '.join(keywords)}`",
-        "when picking the topic up again. Existing dispositions are preserved.",
+        f"Keywords: {', '.join(keywords)}. Regenerate with",
+        f"`python3 scripts/prior_art.py --topic {topic} --keywords {' '.join(keywords)}`.",
         "",
         "Dispositions: " + ", ".join(f"`{k}`" for k in DISPOSITIONS),
         "",
         "| ref | disposition | what | note |",
         "|---|---|---|---|",
     ]
+    seen = set()
     for it in sorted(items, key=lambda x: (x["kind"], x["ref"])):
-        d = prev.get(it["ref"], "unread")
-        out.append(f"| {it['ref']} | {d} | {it['kind']}: {it['title']} | |")
-    if not items:
+        d, note = prev.get(it["ref"], ("unread", ""))
+        seen.add(it["ref"])
+        out.append(f"| {it['ref']} | {d} | {it['kind']}: {it['title']} | {note} |")
+    # A row that no longer matches has usually MERGED or CLOSED, which is exactly
+    # when its note is most worth keeping. Dropping it would let a topic be
+    # re-litigated the moment its prior art lands.
+    for ref, (d, note) in sorted(prev.items()):
+        if ref not in seen:
+            out.append(f"| {ref} | {d} | (no longer open) | {note} |")
+    if not out[-1].startswith("|") or out[-1].startswith("|---"):
         out.append("| — | read | nothing open matched these keywords | |")
     path.write_text("\n".join(out) + "\n")
     return path
@@ -173,7 +205,11 @@ def main() -> int:
         return check()
     if not a.topic or not a.keywords:
         ap.error("--topic and --keywords are required unless --check")
-    items = enumerate_topic(a.keywords)
+    items, complete = enumerate_topic(a.keywords)
+    if not complete and (RECORD_DIR / f"{a.topic}.md").exists():
+        print("REFUSING to overwrite an existing record from an INCOMPLETE "
+              "enumeration — fix `gh` / the network and re-run.", file=sys.stderr)
+        return 2
     p = write_record(a.topic, a.keywords, items)
     n_unread = sum(1 for line in p.read_text().splitlines() if "| unread |" in line)
     print(f"wrote {p.relative_to(ROOT)} — {len(items)} matched, {n_unread} unread")

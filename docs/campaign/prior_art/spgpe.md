@@ -1,10 +1,11 @@
 # Prior art — spgpe
 
-Enumerated 2026-08-20 for keywords: spgpe, reservoir, damping, evaporation.
+> **FROZEN 2026-08-20.** A snapshot of the open work on spgpe as of that
+> date. Re-run the generator when picking the topic up again; existing
+> dispositions are preserved.
 
-**A dated snapshot.** Nothing keeps this current; re-run
-`python3 scripts/prior_art.py --topic spgpe --keywords spgpe reservoir damping evaporation`
-when picking the topic up again. Existing dispositions are preserved.
+Keywords: spgpe, reservoir, damping, evaporation. Regenerate with
+`python3 scripts/prior_art.py --topic spgpe --keywords spgpe reservoir damping evaporation`.
 
 Dispositions: `unread`, `read`, `unrelated`, `superseded`, `depends`
 

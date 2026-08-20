@@ -83,3 +83,83 @@ using SpinorBEC
         )
     end
 end
+
+# The two ways a record can be destroyed by the thing that maintains it. Both
+# were found by running the generator once, not by the gate above — which only
+# ever reads the file — so they get their own.
+@testset "regenerating a prior-art record cannot destroy it" begin
+    root = normpath(joinpath(@__DIR__, ".."))
+    tool = joinpath(root, "scripts", "prior_art.py")
+
+    setup = d -> begin
+        mkpath(joinpath(d, "scripts"))
+        mkpath(joinpath(d, "docs", "campaign", "prior_art"))
+        cp(tool, joinpath(d, "scripts", "prior_art.py"))
+        rec = joinpath(d, "docs", "campaign", "prior_art", "t.md")
+        write(
+            rec,
+            """
+# Prior art — t
+
+> **FROZEN 2026-01-01.**
+
+| ref | disposition | what | note |
+|---|---|---|---|
+| #7 | read | pr: a thing | THE REASON, which is the part worth keeping |
+""",
+        )
+        (joinpath(d, "scripts", "prior_art.py"), rec)
+    end
+
+    # 1. An INCOMPLETE enumeration must not overwrite. `gh` failing and `gh`
+    #    returning nothing are identical in the data and opposite in meaning; the
+    #    first version could not tell them apart, so an offline moment would have
+    #    replaced the record with "nothing open matched these keywords".
+    mktempdir() do d
+        (script, rec) = setup(d)
+        before = read(rec, String)
+        # No `gh` on PATH is the cheapest faithful stand-in for "the enumeration
+        # failed" — same code path as a network error or an expired token.
+        p = pipeline(
+            setenv(`python3 $script --topic t --keywords spgpe`, "PATH" => "/usr/bin:/bin");
+            stdout=devnull, stderr=devnull,
+        )
+        @test !success(p)             # must refuse…
+        @test read(rec, String) == before   # …and leave the file untouched
+    end
+
+    # 2. A COMPLETE regeneration must carry the notes forward. The first version
+    #    preserved only the disposition column, so regeneration silently blanked
+    #    every note while cheerfully reporting `0 unread`.
+    mktempdir() do d
+        (script, rec) = setup(d)
+        bin = joinpath(d, "bin")
+        mkpath(bin)
+        gh = joinpath(bin, "gh")
+        write(
+            gh,
+            """
+            #!/bin/sh
+            case "\$1" in
+              pr) echo '[{"number":7,"title":"a thing","headRefName":"f/spgpe"}]' ;;
+              *)  echo '[]' ;;
+            esac
+            """,
+        )
+        chmod(gh, 0o755)
+        # The tree must be a git repo or BRANCH enumeration fails, the run counts
+        # as incomplete, and the refusal above fires — which would make this case
+        # pass for the opposite of its reason. (It did, the first time.)
+        run(pipeline(`git -C $d init -q`; stdout=devnull, stderr=devnull))
+        @test success(
+            pipeline(
+                setenv(
+                    `python3 $script --topic t --keywords spgpe`,
+                    "PATH" => bin * ":/usr/bin:/bin",
+                );
+                stdout=devnull, stderr=devnull,
+            ),
+        )
+        @test occursin("THE REASON", read(rec, String))
+    end
+end
