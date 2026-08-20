@@ -10,6 +10,9 @@ const FAST_TESTS = [
     # at. Three src comments said it was inert there, from an R three orders
     # too small; nothing checked them.
     "hamiltonian/test_taylor_tolerance_binds.jl",
+    # a_s / eps_dd read back from the couplings actually in force, so a
+    # `c_total` override cannot leave the LHY term on the atom's a_s.
+    "hamiltonian/test_effective_couplings_roundtrip.jl",
     # The mutation catalog's self-check, moved OUT of the nightly harness it was
     # buried in. `check_anchors` is a regex over ~40 files (0.5 s) but ran only
     # inside the hour-scale mutation job — which was producing nothing (#275) —
