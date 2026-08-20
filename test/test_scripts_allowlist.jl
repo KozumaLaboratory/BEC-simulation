@@ -167,6 +167,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     # trap is waiting for every other campaign that sets a thread count.
     "klaus2022/fftw_thread_probe.jl",
     "klaus2022/submit_fftw_probe.sh",
+    # #406: the magnetostricted-AR sensitivity table (1.16 against a published
+    # 1.03). A table before a scan, per CLAUDE.md gate 2 — most cells are ~zero
+    # and knowing WHICH is the result.
+    "klaus2022/ar_sensitivity.jl",
+    "klaus2022/submit_ar_sensitivity.sh",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
