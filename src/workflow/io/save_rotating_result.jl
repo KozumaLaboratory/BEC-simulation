@@ -352,6 +352,25 @@ function save_rotating_basis_result!(
                 f["psi"] = Array{ComplexF64}(snaps[1])
             end
 
+            # The ground-state provenance a campaign guard reads. This writer
+            # owns `result.jld2` for BOTH `kind: rotating_basis` and
+            # `kind: spinor`-with-dynamics (runner.jl:294), and until 2026-08-20
+            # it wrote neither key — so `energy` and `converged` were simply
+            # ABSENT from every dynamics run's result file, and a reader using
+            # `get(f, "energy", NaN)` got its own default back and read it as a
+            # diverged run. Written only when the pipeline actually produced
+            # them: absent must keep meaning "no ground state ran", which is what
+            # `model/complete.jl:222` uses it for.
+            let e = get(result, :ground_state_energy, nothing)
+                e === nothing || (f["energy"] = e)
+            end
+            let c = get(result, :ground_state_converged, nothing)
+                c === nothing || (f["converged"] = c)
+            end
+            let g = get(result, :ground_state_grad_norm, nothing)
+                g === nothing || (f["grad_norm"] = g)
+            end
+
             f["dynamics/times"] = collect(Float64, dyn[:times])
             f["dynamics/norms"] = collect(Float64, dyn[:norms])
             # Lz / Fx / Fy are populated by the rotating_basis path but absent in

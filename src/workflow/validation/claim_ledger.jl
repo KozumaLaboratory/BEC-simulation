@@ -373,8 +373,8 @@ reads as a status, `superseded` in a sentence reads as a description, and both
 are legitimate marks.
 """
 const CLAIM_RETRACTION_MARKERS = (
-    "SUPERSEDED", "superseded", "REFUTED", "refuted", "RETIRED", "retired",
-    "retracted", "no replacement", "Vintage", "RE-DERIVED", "HISTORICAL",
+    "superseded", "refuted", "retired", "retracted", "no replacement",
+    "vintage", "re-derived", "historical",
 )
 
 _collapse_ws(s::AbstractString) = replace(strip(s), r"[ \t]+" => " ")
@@ -455,9 +455,25 @@ function unmarked_retired_literal_sites(;
         for (i, ln) in pairs(norm)
             for (lit, id) in normlits
                 occursin(lit, ln) || continue
-                lo, hi = max(1, i - window), min(length(norm), i + window)
+                # A markdown table row is its own claim, so the window collapses
+                # to the line. Measured 2026-08-20: in this document's §0 verdict
+                # table the refuted row 17 (`2.25×`) sat one line above row 13,
+                # which says "**refuted**" about an unrelated claim — and that
+                # neighbour's marker made row 17 invisible to this gate. Prose
+                # wraps and needs the loose window; table rows do not, and their
+                # neighbours are always OTHER claims, which is exactly the
+                # arrangement that shields.
+                istable = startswith(ln, "|")
+                lo, hi = istable ? (i, i) :
+                         (max(1, i - window), min(length(norm), i + window))
+                # Case-insensitive, because the list carried "SUPERSEDED" and
+                # "superseded" and "REFUTED" and "refuted" as separate entries
+                # and then had only lowercase "retracted" — so a line reading
+                # "**RETRACTED**" was not a retraction to this gate. Enumerating
+                # the casings of a word is a list nobody finishes; fold once.
                 marked = any(
-                    any(occursin(m, norm[j]) for m in CLAIM_RETRACTION_MARKERS)
+                    any(occursin(m, lowercase(norm[j]))
+                        for m in CLAIM_RETRACTION_MARKERS)
                     for j in lo:hi)
                 marked && continue
                 push!(

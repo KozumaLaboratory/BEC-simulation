@@ -250,15 +250,22 @@ end
             atom = _atom_of(gs)
             @test atom !== nothing
             # `H = -p·F_z` with p > 0 puts m=+F at the BOTTOM of the ladder, so
-            # the ANTI-ALIGNED seed here is m=-F — `init_m_idx: 13`, retargeted
-            # 2026-08-19 from the schema default of 1. #343 §2 read this config
-            # as "the only Eu arc on the opposite side"; it was not — comparing m
-            # labels across two field parameterisations is what made it look that
-            # way — and it was on the wrong side for a different reason.
+            # this config is ALIGNED — and that is not a choice anyone made, it
+            # is the schema default at p > 0.
+            #
+            # It was set to `init_m_idx: 13` (anti-aligned) on 2026-08-19 and
+            # REVERTED on 2026-08-20: ITP cannot produce that state. At p = 26700
+            # the Zeeman-shifted factor for the highest m is exp(-12·p·dt) =
+            # exp(-1602), which underflows in one step, and the run returned ψ ≡ 0
+            # with E = 0.0. Imaginary time is a projector onto the LOWEST state.
+            # So the config is knowingly on the wrong side for the EdH quench, and
+            # the repair is a pipeline change (relax at the opposite field sign,
+            # reverse the field for the dynamics) — tracked in the ledger, not
+            # papered over with a key.
             @test _m_lowest(gs, atom) === :plus_F     # p > 0 ⇒ m=+F is lowest
-            @test _seed_of(gs, atom) === :minus_F     # …so m=-F is the highest
-            # Deliberate, and it must SAY so, or the gate is right to flag it.
-            @test occursin(_ANTIALIGNED, read(p, String))
+            @test _seed_of(gs, atom) === :plus_F      # …and that is what it seeds
+            # Consistent, so it must NOT claim an anti-alignment it does not have.
+            @test !occursin(_ANTIALIGNED, read(p, String))
         end
     end
 
