@@ -302,11 +302,29 @@ A one-off returns the same number at both durations. This scales with them.
 
 **Consequences.** A growth problem with noise on **does** pay a continuing number
 loss through the projector, so `energy_damping=false` remains the conservative
-choice for one — #334's ensemble is not invalidated. The measured stall is
-consistent with it: the full theory on #334's own ramp holds $N_C$ flat at
-$f = 0.065$ where growth-only reaches $0.37$, and **pinning the cutoff does not
-restore the growth** (3266 against 3271 at matched simulated time), which rules
-out cutoff motion as the mechanism and leaves the noise channel.
+choice for one — #334's ensemble is not invalidated.
+
+**But that loss is not what stalls a growth run, and the projector is not the
+mechanism.** Both statements were checked against #334's own trajectories, and the
+second one refuted an attribution stated here earlier the same day:
+
+| arm | $N_C$ | outflow | truncated |
+|---|---:|---:|---:|
+| full SPGPE, moving cutoff | 11530 → **3287** | 9886 | 31435 |
+| full SPGPE, cutoff pinned | — | — | — (3266 vs 3271 at matched time) |
+| **growth-only** | 11530 → **29601** | **9986** | **31256** |
+
+Sampled identically in all arms. The two projector channels agree to ~1 %, and one
+arm grows by 2.6× while the other falls to a quarter. **A common-mode cost cannot
+explain a divergent outcome.** Pinning the cutoff also changes nothing, so cutoff
+motion is excluded as well.
+
+What is left is the energy-damping **drift**, not its bookkeeping: it acts on the
+field, and the growth rate $2\gamma(\mu_{\rm res} - \mu_\psi)$ shrinks as the C
+region's own $\mu_\psi$ rises. The full run indeed sits at $\mu_{\rm res}$ with a
+small condensate. Whether that is correct physics (a hot C region equilibrating at
+that $\mu$) or a defect in the drift term **is not settled here** — the projector
+hypothesis is what these numbers exclude, not what they establish.
 
 Independently of the noise, a run still needs a seed inside its own C region —
 project it once before starting — and, if `tracking_cutoff` is used, awareness

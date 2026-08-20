@@ -445,10 +445,15 @@ number-conserving as a *term*, only approximately so as a *step*
 > $\Delta N/N$ = $1.09\times10^{-4}$ at 50 steps and $4.38\times10^{-4}$ at 200 —
 > **ratio 4.04** where exact proportionality gives 4.00. It is a rate.
 >
-> Corroborated by this campaign's own `fullspgpe` stage: the full theory on this
-> ramp holds $N_C$ flat at $f = 0.065$ where growth-only reaches $0.37$, and
-> pinning the C region moves it by 5 parts in 3271 — so the channel is the noise,
-> not the cutoff motion. See [spgpe.md](spgpe.md).
+> **What this does NOT explain, stated because it was claimed here for an hour:**
+> the full theory on this ramp holds $N_C$ flat at $f = 0.065$ where growth-only
+> reaches $0.37$, and it is tempting to read that as the same loss. It is not.
+> The two arms pay the SAME projector cost — outflow 9886 vs 9986, truncated
+> 31435 vs 31256, sampled identically — while one falls to 3287 and the other
+> rises to 29601. A common-mode cost cannot produce a divergent outcome, and
+> pinning the cutoff moves $N_C$ by 5 parts in 3271. So the stall is the
+> energy-damping **drift** acting on the field, not its bookkeeping, and whether
+> that is correct physics is open. See [spgpe.md](spgpe.md).
 
 So **the ensemble runs the growth SPGPE**, Rooney Eq. (20) — a sub-theory in its
 own right, and the one that carries the $M_z$-changing exchange that makes

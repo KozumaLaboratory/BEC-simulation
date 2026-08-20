@@ -107,11 +107,13 @@ ensemble)
     # (ratio 4.04 for 4x the steps, at zero growth drive, from a pre-projected
     # seed). Production runs with noise. See `src/solvers/spgpe.jl`.
     #
-    # So the choice stands, now on a measurement instead of an inference, and the
-    # `fullspgpe` stage shows the consequence directly: the full theory on this
-    # very ramp holds N_C flat at f = 0.065 where growth-only reaches 0.37, and
-    # pinning the C region changes that by 5 parts in 3271 — so it is the noise
-    # channel, not the cutoff motion.
+    # So the choice stands, now on a measurement instead of an inference. The
+    # `fullspgpe` stage shows the CONSEQUENCE — the full theory on this very ramp
+    # holds N_C flat at f = 0.065 where growth-only reaches 0.37 — but NOT the
+    # cause: both arms pay the same projector cost (outflow 9886 vs 9986,
+    # truncated 31435 vs 31256) while one falls to 3287 and the other rises to
+    # 29601, and pinning the cutoff moves it by 5 parts in 3271. The stall is the
+    # energy-damping drift, not the bookkeeping, and it is not yet attributed.
     #
     # What was always independent of that argument, and is the positive reason:
     # Rooney Eq. (20) is a sub-theory in its own right and carries the M_z-changing

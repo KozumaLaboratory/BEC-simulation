@@ -481,8 +481,16 @@ function apply_energy_damping_step!(
     # Independently of that, give it a seed inside its own C region — project once
     # before starting. If `tracking_cutoff` is used, each cutoff change legitimately
     # bills the band it swept past: that is `cutoff_outflow`, reported separately,
-    # and it is physics rather than a defect. It is also NOT what stalls a growth
-    # run — pinning the cutoff on #334's ramp changed N_C by 5 parts in 3271.
+    # and it is physics rather than a defect.
+    #
+    # AND THE PROJECTOR IS NOT WHAT STALLS A GROWTH RUN. On #334's ramp the full
+    # theory falls 11530 -> 3287 while growth-only rises 11530 -> 29601, and the two
+    # projector channels are the SAME in both (outflow 9886 vs 9986, truncated 31435
+    # vs 31256, sampled identically). A common-mode cost cannot produce a divergent
+    # outcome. Pinning the cutoff changes N_C by 5 parts in 3271, so cutoff motion is
+    # out too. What remains is the energy-damping DRIFT acting on the field —
+    # 2γ(µ_res − µ_ψ) shrinks as µ_ψ rises — and whether that is correct physics or a
+    # defect is OPEN. These numbers exclude the projector; they establish nothing.
     #
     # The band limit is the load-bearing part, and it was missing. Rooney et al.
     # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the
