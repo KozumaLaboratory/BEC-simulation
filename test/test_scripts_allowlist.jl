@@ -161,6 +161,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     # documents and no configs, so its evidence read `absent` in the claim ledger
     # -- re-deriving it was a re-derivation, not a re-run.
     "validation/klaus_weff_scan_gen.jl",
+    # Classification, deliberately separate from the trajectory jobs: a shard
+    # reaped at h_rt never reads its own completed work.
+    "validation/klaus_weff_extract.jl",
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
     "validation/rk4ip_step_size_probe.jl",
