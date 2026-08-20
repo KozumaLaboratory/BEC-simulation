@@ -127,6 +127,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     #   energy_damping_dt_convergence / _clean_conservation  one-time vs per-step loss
     "kz/energy_damping_clean_conservation.jl",
     "kz/energy_damping_dt_convergence.jl",
+    # Removes the ramp: fixed (mu, T, eps_cut) at the ramp's end values, to separate
+    # "the field cannot condense here" from "the ramp does not leave time for it".
+    "kz/fixed_point_condensation.jl",
     "kz/eu_cost.jl",
     "kz/eu_equilibrium_N0.jl",
     "kz/eu_number_conserving.jl",
