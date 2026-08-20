@@ -1,6 +1,7 @@
 using Test
 using FFTW
 using LinearAlgebra
+using Printf
 using Random
 using SpinorBEC
 
@@ -209,6 +210,117 @@ end
             apply_energy_damping_step!(ws, 5e-3, 2.0, 0.01; seed=s, noise=true)
         end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
+    end
+
+    @testset "the PROJECTED step's number loss is real, grid-free, and O(growth)" begin
+        # Gate C above calls `apply_energy_damping_step!` DIRECTLY, so no projector
+        # is in the path and the phase is exactly norm-preserving — the file's own
+        # comment says as much. Production goes through `apply_spgpe_step!`, which
+        # projects, and there ψ·e^{iφ} reaches past the cutoff and the projector
+        # removes what it finds. Rooney, Blakie & Bradley PRE 89, 013302 say number
+        # conservation in the projected scheme is approximate; this measures HOW
+        # approximate, because the size is what decides whether the full SPGPE can
+        # be used for a growth problem.
+        #
+        # Measured 2026-08-19 at the #334 operating point (64³, box 24, D = 13,
+        # T = 5, ℳ̄ = 1.6e-3), with µ held at the field's own so the growth drive is
+        # exactly ZERO: N_C fell 11530 → 10199, 11.5 % in 60 ms. Noise off held it
+        # to 0.6 %; scattering off with a drive GREW it 4.7 %. So the channel is the
+        # energy-damping noise through the projector.
+        #
+        # HYPOTHESIS TESTED AND REFUTED. ψ and φ are each band-limited to k_cut, so
+        # ψ·e^{iφ} reaches 2k_cut and a grid with k_max < 2k_cut should alias that
+        # content back in rather than lose it cleanly — predicting a collapse at
+        # margin 2. The scan below spans margin 1.40 → 3.72 and the rate is FLAT to
+        # 5 %: 9.34, 9.14, 9.48, 9.60 ×10⁻⁴. Not aliasing. An earlier version that
+        # derived k_cut from the grid appeared to show resolution dependence, and
+        # that was the cutoff moving, not the loss.
+        #
+        # So the loss is a property of the scheme: grid-independent, and about 1.25×
+        # the growth rate 2γµ at this point. The gate pins BOTH facts. Flatness is
+        # the invariant a broken noise normalisation would violate; the ratio band
+        # is recorded rather than aspirational, and `docs/guides/spgpe.md` carries
+        # it as a limit with the consequence — a growth problem must use
+        # `energy_damping=false` (Rooney Eq. 20) or accept a number budget the
+        # scattering term dominates.
+        #
+        # Two earlier framings could not fail for the right reason, recorded so they
+        # are not tried again: a TOTAL with an absolute bound passes by being short
+        # (2 internal time units against production's 41.5), and `@info` output is
+        # invisible under a job filtering box-drawing characters, which deleted the
+        # numbers behind the first PASS.
+        kcut_fixed = 3.0
+        function null_drive_rate(n; k_cut=kcut_fixed, T=1.0, steps=1000, dt=0.01)
+            SpinorBEC.scratch_clear!()
+            ws = flowing_state!(scalar_ws(; n=(n, n, n)))
+            # µ is the RESERVOIR's, one thermal energy below the cutoff — the
+            # standard n_T = 1 C-region depth. Deliberately NOT the field's own:
+            # number damping is off, so µ enters only through (ϵ_cut − µ)/T in ℳ̄,
+            # and the field's µ here is 9.26, above ϵ_cut, where
+            # `spgpe_growth_rate` correctly refuses. Deriving the cutoff from the
+            # field would also have moved the scan's own axis with it.
+            ec = 0.5 * k_cut^2
+            mu = ec - T
+            r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=ec,
+                number_damping=false)
+            γ = spgpe_growth_rate(; T, mu, eps_cut=ec, a_s=0.02)
+            n0 = norm_sq(ws)
+            for s in 1:steps
+                apply_spgpe_step!(ws, r, dt; t=0.0, seed=4200 + s)
+            end
+            (; rate=abs(norm_sq(ws) - n0) / n0 / (steps * dt), growth=2 * γ * mu,
+                margin=(π / (18.0 / n)) / k_cut)
+        end
+        rs = [null_drive_rate(n) for n in (24, 32, 48, 64)]
+        Printf.@printf(
+            "\n  projected energy damping at ZERO drive, k_cut = %.1f, growth scale 2γµ = %.3e\n",
+            kcut_fixed, rs[1].growth)
+        for r in rs
+            Printf.@printf("    k_max/k_cut = %.2f   |dlnN/dt| = %.3e   (%.3f × growth)\n",
+                r.margin, r.rate, r.rate / r.growth)
+        end
+        # 1. FLAT in resolution. This is the invariant: the noise is normalised
+        #    against the cell volume, so a rate that started to track the grid would
+        #    mean that normalisation had broken. The span is 2.7× in k_max/k_cut.
+        @test rs[1].margin < 1.5 && rs[end].margin > 3.0     # the scan really spans it
+        for r in rs
+            @test isapprox(r.rate, rs[1].rate; rtol=0.15)
+        end
+        # 2. The SIZE, pinned as a band rather than as a target. It is O(1) times
+        #    the growth rate and that is the scheme, not a bug — but a change of
+        #    more than ~2× in either direction means the phase amplitude moved, and
+        #    the number budget of every full-SPGPE run moved with it.
+        for r in rs
+            @test 0.6 < r.rate / r.growth < 2.5
+        end
+    end
+
+    @testset "a ramped cutoff does not grow the scratch registry" begin
+        # `tracking_cutoff` exists to RAMP k_cut, so it takes a different value
+        # every reservoir sub-step. Keying the energy-damping buffers on it gave
+        # one set of four device arrays per step: a 64³ D=13 growth ramp died at
+        # 99.97 % of a 94 GiB H100 after 34 557 sub-steps, and every existing test
+        # passed because they all hold the cutoff fixed. So the shape-dependent
+        # buffers are keyed on SHAPE and the cutoff-dependent one is rebuilt in
+        # place — which is checkable without a GPU and without a long run.
+        SpinorBEC.scratch_clear!()
+        ws = flowing_state!(scalar_ws())
+        for (i, kc) in enumerate(range(2.0, 4.0; length=25))
+            apply_energy_damping_step!(ws, 5e-3, 1.0, 1e-3; seed=i, noise=true, k_cut=kc)
+        end
+        for cat in (:ed_divj, :ed_phase, :ed_ksq, :ed_kinv)
+            n = length(get(SpinorBEC.SCRATCH_REGISTRY, cat, Dict()))
+            @test n == 1
+            n == 1 || @info "energy-damping scratch grew with the cutoff" cat n
+        end
+        # …and the kernel it rebuilds is still the right one: the LAST cutoff must
+        # be the one in force, or the buffer is being reused without being refilled.
+        divj, phase_k, ksq, kinv = SpinorBEC._energy_damping_buffers(
+            ws, ws.grid.config.n_points, 3.0)
+        k2 = ws.grid.k_squared
+        @test all(iszero, kinv[k2 .> 9.0])
+        inband = (k2 .> 0) .& (k2 .<= 9.0)
+        @test all(isapprox.(kinv[inband], 1 ./ sqrt.(k2[inband]); rtol=1e-12))
     end
 
     @testset "quiet: energy decreases monotonically (Eq. 29)" begin

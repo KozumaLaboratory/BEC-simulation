@@ -217,6 +217,43 @@ bug class).
 | **condensation** | $N_0$ reaches $[0.3,1.5]\,N_\mathrm{TF}$ and stays below $N_C$ — the gate for the thing the solver exists to do | B |
 | **Rayleigh–Jeans total** | free field: $N_C$ equals $\sum_{\|k\|<k_\mathrm{cut}}T/(\epsilon_k-\mu)$ to 4 % | B |
 
+### The scattering reservoir is number-conserving as a TERM, not as a STEP
+
+The table's "number conservation" row is true of `apply_energy_damping_step!` —
+the sub-step is a real phase and cannot change $\int|\psi|^2$ — and it is measured
+with no projector in the path. Production calls `apply_spgpe_step!`, which
+projects, and there $\psi e^{i\phi}$ carries content past $k_\mathrm{cut}$ which
+the projector removes. Rooney, Blakie & Bradley (PRE **89**, 013302) say number
+conservation in the projected scheme is approximate. **Measured 2026-08-19, it is
+approximate at the same order as the growth rate**, so for a growth problem it is
+not a correction:
+
+| | $|d\ln N_C/dt|$ from the scattering reservoir alone, at zero growth drive |
+|---|---|
+| $k_\mathrm{max}/k_\mathrm{cut}$ = 1.40 / 1.86 / 2.79 / 3.72 | 9.34 / 9.14 / 9.48 / 9.60 $\times10^{-4}$ |
+| the growth rate it is beside, $2\gamma\mu$ | $7.5\times10^{-4}$ |
+
+Flat to 5 % across a 2.7× span of resolution at fixed $k_\mathrm{cut}$ — so it is
+a property of the scheme and not of the grid. (An aliasing explanation was tested:
+$\psi$ and $\phi$ are each band-limited to $k_\mathrm{cut}$, so the product reaches
+$2k_\mathrm{cut}$ and a grid below that margin should behave differently. It does
+not. The hypothesis is refuted.)
+
+At the ¹⁵¹Eu weak-field point (#334: 64³, box 24, D = 13, $T = 5$,
+$\bar{\mathcal M} = 1.6\times10^{-3}$) the consequence is stark. With the growth
+drive set to exactly zero, $N_C$ fell **11.5 % in 60 ms**; with the noise off it
+held to 0.6 %; with the scattering reservoir off and a real drive it grew 4.7 %,
+as it should.
+
+**So a run whose question is about atom number or condensate growth must use
+`energy_damping=false`** — the growth SPGPE, Rooney Eq. (20), which is a
+sub-theory in its own right — or state that its number budget is dominated by the
+scattering term's projector residual. Equilibrium studies at fixed $\mu$ are
+unaffected in kind, since there the loss is balanced by the growth term; what
+changes is that the stationary $N_C$ is not the one the growth term alone would
+set. Gated by `test/dynamics/test_spgpe.jl`, which pins both the flatness and the
+size.
+
 Known limits, unchanged by this work:
 
 - The classical field is **cutoff-dependent**; absolute equilibrium $N_0$ is not a
