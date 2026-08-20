@@ -254,13 +254,45 @@ equilibrium to 30 % and the condensate mode does not grow at all.** A broken eng
 miss both, so what is failing is specifically condensate growth — whose rate is
 $2\gamma(\mu-\varepsilon_0)$.
 
-Whether that is the finite-$\gamma$ lag or a remaining defect is being discriminated by a
-$\gamma$ scan (1×, 10×, 100×, raised through $a_s$ since the rates are derived). **That
-scan was run once before and thrown away**: the $N_0$ estimator read `psi[:,:,:,1]` while
-`thermal_cfield!` seeds the last component, so at $D=13$ it projected an empty array and
-returned $\sim 0$ at every $\gamma$ by construction. It is now checked against a known
-Thomas–Fermi state in $D = 1, 3, 13$ and in both the first and last component, returning
-1.00000 each time.
+**It is the ramp, and the solver is not at fault.** Two measurements settle it.
+
+Raising $\gamma$ does not help, and could not: at 10× the C region fills to 94 % of the
+cloud (2.28e4 of 2.43e4, so the field responds to $\gamma$ exactly as it should) and
+$N_0$ is still 7.2; at 100× it is NaN. The growth noise goes as $\sqrt{2\gamma T}$, so
+fluctuation–dissipation ties damping to noise and $\gamma$ sets only the *rate* at which
+equilibrium is approached, never the equilibrium itself. The null result is not
+"$\gamma$ is not the knob" — it is that $\gamma$ was the wrong question.
+
+Removing the ramp answers it. Held at the ramp's **end** conditions
+($\mu = 2.95$, $T = 2.28$, $\epsilon_\mathrm{cut} = 8.34$), seeded thermal:
+
+| $t$ | 400 | 1200 | 4000 |
+|---|---|---|---|
+| $N_C$ | 2888 | 2953 | 3158 |
+| $N_0$ | 1231 | 1610 | **1761** |
+| $f_0$ | 0.43 | 0.55 | **0.56** |
+
+**The field condenses to $f_0 = 0.56$ and is still rising** — against the constraint's
+3498 — at exactly the conditions where the ramp run ends with $N_0 = 0.071$. So the
+failure is not at fixed point.
+
+The difference is what the field *arrives with*. The fixed-point run starts with 2858
+atoms in C; the ramp run reaches the same conditions holding **34**. As
+$\epsilon_\mathrm{cut}$ tracks $T$ down, the C region shrinks and the projector removes
+atoms faster than the reservoir refills them from I, so by the time conditions favour a
+condensate the field is empty. That mechanism is consistent with everything measured and
+has not been isolated on its own — at 10× $\gamma$ the field still empties, from 2.28e4
+to 198.
+
+**So: this evaporation ramp allows $4\times10^4$ condensed atoms thermodynamically, and
+the c-field does not reach them, because the ramp empties the classical region faster
+than the derived reservoir rates refill it.**
+
+The $\gamma$ scan **was run once before and thrown away**: the $N_0$ estimator read
+`psi[:,:,:,1]` while `thermal_cfield!` seeds the last component, so at $D=13$ it projected
+an empty array and returned $\sim 0$ at every $\gamma$ by construction. It is now checked
+against a known Thomas–Fermi state in $D = 1, 3, 13$ and in both the first and last
+component, returning 1.00000 each time.
 
 **Three attempts at this constraint, and only measurement caught the first two.**
 Prescribing $\mu$ from an assumed split prescribes $N_0$. Solving
