@@ -3,6 +3,17 @@
 # like test_tier_membership.jl still sees FAST_TESTS / MANUAL_TESTS_ALLOWLIST
 # / select_tests when it runs inside a parallel chunk process. Tier
 # membership stays explicit (CLAUDE.md commitment #7).
+#
+# EDITING THIS FILE MEANS REGENERATING docs/STATE.md:
+#
+#     julia --project=. scripts/generate_state.jl
+#
+# `test_state_doc_is_current.jl` counts the tiers and fails when the committed
+# doc disagrees, printing the command. It caught a two-file drift on this
+# branch — committed CI_EXTRA 143 against a derived 141 — because the doc was
+# regenerated during a merge and the tiers were edited AFTERWARDS. The gate
+# does its job; what it cannot do is fire before the commit, so the ordering
+# is written here where the edit happens.
 
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
