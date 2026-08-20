@@ -61,8 +61,25 @@ set -euo pipefail
 CFG_DIR="${WEFF_CFG_DIR:-runs/klaus_quench_weff}"
 if [ -n "${WEFF_MANIFEST:-}" ]; then
     [ -f "$WEFF_MANIFEST" ] || { echo "FATAL: manifest not found: $WEFF_MANIFEST" >&2; exit 1; }
-    mapfile -t CFGS < <(grep -v '"'"'^[[:space:]]*\(#\|$\)'"'"' "$WEFF_MANIFEST")
-    echo "manifest: $WEFF_MANIFEST (${#CFGS[@]} arms)"
+    # Plain bash, no regex: the first version of this line was written through
+    # two layers of quoting, the escape collapsed, and every COMMENT line was
+    # read as a config path -- "14 arms" for a six-arm manifest, and task 1 tried
+    # to open a sentence. A filter that can be mis-escaped will be.
+    CFGS=()
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        _line="${_line%%#*}"
+        _line="$(echo "$_line" | tr -d '[:space:]')"
+        [ -n "$_line" ] && CFGS+=("$_line")
+    done < "$WEFF_MANIFEST"
+    # Every entry must resolve NOW. A manifest naming a file that is not there is
+    # a typo or an unsynced checkout, and both are cheaper to find here than after
+    # the scheduler has handed out task numbers.
+    _missing=0
+    for _c in "${CFGS[@]}"; do
+        [ -f "$_c" ] || { echo "FATAL: manifest entry does not exist: $_c" >&2; _missing=1; }
+    done
+    [ "$_missing" -eq 0 ] || exit 1
+    echo "manifest: $WEFF_MANIFEST (${#CFGS[@]} arms, all resolve)"
 else
     mapfile -t CFGS < <(ls "$CFG_DIR"/*.yaml | sort)
 fi
