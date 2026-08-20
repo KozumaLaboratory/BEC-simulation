@@ -32,8 +32,8 @@ measurements, not tests).
 | 1 | Is `bce2068f` in the ancestor gate? | **Yes**, as `eu-config-field-sign`, and the gate now **executes** (`cli.jl campaign-gate`) instead of being prose |
 | 2 | How many stored runs does the new row disqualify? | **0 marginally.** All 200 gateable runs were already disqualified by older refs; 3 more have no producing commit at all |
 | 3 | Does the field sign move the load-bearing observables? | **Yes, by ×2.2 to ×5.0.** Peak P_{−5,−4} 0.244 → 0.530; peak \|L_z\| 0.020 → 0.101. Nothing depending on either is quotable without re-derivation. §3 |
-| 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is not re-derivable as posed. §3.4 |
-| 7 | What replaces `\|Ω\|/ω_⊥ = 0.468 ± 0.003`? | **`\|Ω*\|/ω_⊥ = 0.68 ± 0.04`** at the anti-aligned preparation, +24.9 % over Ω=0. Two digits, not three. §9.1 |
+| 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is **superseded** — not re-derivable as posed. §3.4 |
+| 7 | What replaces the **superseded** `\|Ω\|/ω_⊥ = 0.468 ± 0.003`? | **`\|Ω*\|/ω_⊥ = 0.68 ± 0.04`** at the anti-aligned preparation, +24.9 % over Ω=0. Two digits, not three. §9.1 |
 | 8 | Is the enhancement chirality-matched, as the sheet says? | **No.** The response is **even in Ω** to ≤ 0.124 %; Ω=0 is the minimum and both senses enhance equally. §9.2 |
 | 9 | Then what is the mechanism? | **Centrifugal, not Coriolis.** A *static* trap weakened to ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to **0.06 %** across the range. **Rotation is not needed** — weaken the radial trap to **0.71 ω_⊥**. §9.3, §10.1 |
 | 10 | Is it density, or the radial confinement? | **Radial.** A density-matched weakening along **z** instead lands *below* the baseline (−36 % of the gain). Same ω̄, opposite sign. §10.4 |
@@ -42,7 +42,8 @@ measurements, not tests).
 | 15 | Was the observable right? | **Not at 10.4 nT.** The peak must be taken *inside the hold*; over the whole trajectory it read the pre-hold transient and 7 of 10 arms were blind. Re-extracted: **0.00 % change at 1.3 / 2.6 / 5.2 nT**, so §9–§11 stand. §12.1 |
 | 16 | Does it survive LHY? | **Yes.** `full_bdg` moves the baseline +0.07 % and the optimum +2.18 %; the enhancement goes +24.9 % → **+27.5 %**. §12.4 |
 | 18 | The field-rotation branch (`eu151_klaus_phi_phys`) | **Two code defects, no physics.** Its GPU path was dead (`spin_density_vector` allocated host arrays → scalar-indexing error); and it reported **`conv = true` having never been asked**, because the rotating-basis GS returns no convergence flag and the writer defaulted it to `true` — so every such run satisfied CAMPAIGN guard 7 by construction. Both fixed and gated. §14 |
-| 17 | Does the static substitution hold at long time? | **Only on the peak.** At 145 ms static and rotating differ by 3.2 % at the peak (vs 0.06 % short) but by **2.25× at the endpoint** — rotation gives a transient, the static trap a *sustained* transfer. §13 |
+| 17 | Does the static substitution hold at long time? | **Yes on the peak; the endpoint is a different question.** At 64³, 145 ms: peak **static 0.49081 > rotating 0.40102 > baseline 0.37973** (+29.3 % over no-intervention). At the endpoint the *rotating* arm is the persistent one (0.40013, 2.23× static) — the opposite of what §13 said. §13's numbers are **RETRACTED** (§15): they were 32³, which inverts both orderings. §17 |
+| 19 | Is the observable still seed-deterministic at 145 ms? | **The peak is; the endpoint is not.** Two seeds at 64³ leave the static peak identical to five decimals and move its **endpoint by 34.2 %** — which swallows the 18.8 % static-vs-baseline endpoint gap, so that one row stays open. §17.1 |
 | 13 | 5.2 nT, resolved at 20 points + 64³ | **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
@@ -1038,6 +1039,11 @@ Only this, and it is deliberately thin:
 > 64³ has n = 1 per point and its baseline arm was **not** run — so 64³ shows the
 > 32³ answer is wrong without establishing the right one.
 
+**Superseded in part on 2026-08-20** — both missing measurements were run. The
+baseline arm and a second seed at 64³ **establish the PEAK ordering** (static >
+rotating > baseline) and leave the **endpoint** ordering still unresolved between
+static and baseline. §17.
+
 ### 15.3 The part that generalises: resolution adequacy is duration-dependent
 
 The short protocol and the long one behave completely differently under the same
@@ -1142,6 +1148,66 @@ have the same shape: **a quantity that was never measured being read through a
 default.** `NaN` announced itself; `true` and `0.0` did not. The energy had been
 missing for the entire life of this path and nothing said so — it took adding the
 report to discover the config produced nothing at all.
+
+---
+
+## 17. The long-time branch at 64³, with the two pieces §15 said were missing
+
+§15 refused to state a replacement ordering for two named reasons: no 64³
+baseline, and n = 1 per point. Both are now run — the baseline, plus a second
+seed on each of the two arms the ordering rests on.
+
+| arm (64³, 100 ω_ref⁻¹) | hold-peak P_adj | endpoint P_adj |
+|---|---:|---:|
+| baseline (ω_eff = 1.000, Ω = 0) | 0.37973 | 0.15112 |
+| **static** (ω_eff = 0.714) | **0.49081** | 0.17952 |
+| **rotating** (Ω = −0.70) | 0.40102 | **0.40013** |
+
+### 17.1 The seed is NOT inert at long time — §10.3 was a short-time statement
+
+Two seeds at 64³, default vs 101:
+
+| | peak | endpoint |
+|---|---:|---:|
+| static | **0.000 %** | **34.2 %** |
+| rotating | 0.63 % | 0.85 % |
+
+§10.3 measured five seeds agreeing to five decimals and proved the knob live, at
+**14.5 ω⁻¹**. It also measured the perturbation *growing* two orders over that
+run, and this is where that goes: after 100 ω⁻¹ the static arm's **endpoint moves
+34 % between two seeds** while its **peak is still identical to five decimals.**
+
+So "the observable is deterministic" was true of the peak and true of that
+duration, and is false of the endpoint here. The same mistake shape as §15 —
+a property measured at one duration, carried to another — caught this time
+because §15 had just made it the thing to check.
+
+### 17.2 What is now established, and what still is not
+
+**Established — the PEAK ordering, at 64³:**
+
+> **static (0.49081) > rotating (0.40102) > baseline (0.37973)**, i.e. the static
+> weakened trap beats no-intervention by **+29.3 %** and beats rotation by
+> **+22.4 %**. The static peak is seed-independent to five decimals, and the
+> gaps are 10–100× the seed scatter on either arm.
+
+**NOT established — the ENDPOINT ordering.** Rotating (0.40013) is 2.23× static
+(0.17952), which is far outside the 34 % seed scatter and is safe. But
+static-vs-baseline at the endpoint is 0.17952 against 0.15112 — **+18.8 %, inside
+the 34.2 % seed scatter on the static arm.** Two seeds cannot separate them. That
+row needs an ensemble, not another resolution.
+
+**§13's original claim stays refuted** on its own terms: it asserted the static
+arm *sustains* and the rotating one decays, and at 64³ the reverse holds — the
+rotating arm is still climbing at 145 ms (peak ≈ endpoint) while the static one
+falls from 0.49081 to 0.17952.
+
+### 17.3 The reading
+
+The static weakened trap produces the **larger cascade**; rotation produces a
+**more persistent** one. Those are different questions and the 32³ data answered
+neither — it inverted both. Which matters depends on what an experiment
+integrates, and this document is not in a position to choose for it.
 
 <!-- REDERIVE -->
 
