@@ -451,6 +451,29 @@ function apply_energy_damping_step!(
 
     # 4. ψ ← ψ·exp(i·phase), with the phase BAND-LIMITED to the C region.
     #
+    # WHAT THE PROJECTED STEP COSTS IN NUMBER — settled 2026-08-20, after being got
+    # wrong twice in opposite directions. Read this before measuring it a third
+    # time; `test/dynamics/test_spgpe.jl` gates it.
+    #
+    # The loss through the caller's projector is a ONE-OFF, not a rate: it is
+    # whatever the SEED carried outside the C region, removed the first time the
+    # projector runs. Measured with a pre-projected seed (P ψ₀ = ψ₀) the total over
+    # 400 steps is 1.1e-13; with the seed carrying 1e-4 outside, the FIRST step
+    # removes 1.0e-4 and every step after it costs 2.6e-16; at 1e-2 the first step
+    # removes 9.9e-3. Doubling dt changes nothing.
+    #
+    # It was read as a RATE (~1.25× the growth rate) because that measurement went
+    # through `apply_spgpe_step!` with a `tracking_cutoff`. A cutoff that moves
+    # every step MANUFACTURES fresh out-of-C content every step, so the one-off is
+    # paid again and again and looks stationary. Flatness in resolution — which was
+    # taken as proof of a scheme property — is also what a one-off shows.
+    #
+    # Consequence for callers: a growth problem does NOT need
+    # `energy_damping=false`. What it needs is a seed inside its own C region;
+    # project it once before starting. If `tracking_cutoff` is used, each cutoff
+    # change legitimately bills the band it swept past — that is `cutoff_outflow`,
+    # reported separately, and it is physics rather than a defect.
+    #
     # The band limit is the load-bearing part, and it was missing. Rooney et al.
     # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the
     # noise it colours both live below the cutoff. With 1/|k| left unrestricted the

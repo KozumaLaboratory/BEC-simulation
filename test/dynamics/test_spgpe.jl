@@ -212,87 +212,130 @@ end
         @test abs(norm_sq(ws) - n0) / n0 < 1e-13        # a real phase cannot change |ψ|²
     end
 
-    @testset "the PROJECTED step's number loss is real, grid-free, and O(growth)" begin
-        # Gate C above calls `apply_energy_damping_step!` DIRECTLY, so no projector
-        # is in the path and the phase is exactly norm-preserving — the file's own
-        # comment says as much. Production goes through `apply_spgpe_step!`, which
-        # projects, and there ψ·e^{iφ} reaches past the cutoff and the projector
-        # removes what it finds. Rooney, Blakie & Bradley PRE 89, 013302 say number
-        # conservation in the projected scheme is approximate; this measures HOW
-        # approximate, because the size is what decides whether the full SPGPE can
-        # be used for a growth problem.
+    @testset "the PROJECTED step's number loss is ONE-OFF, not a rate" begin
+        # WHAT THIS REPLACED, AND WHY THE REPLACEMENT IS DIFFERENT IN KIND.
         #
-        # Measured 2026-08-19 at the #334 operating point (64³, box 24, D = 13,
-        # T = 5, ℳ̄ = 1.6e-3), with µ held at the field's own so the growth drive is
-        # exactly ZERO: N_C fell 11530 → 10199, 11.5 % in 60 ms. Noise off held it
-        # to 0.6 %; scattering off with a drive GREW it 4.7 %. So the channel is the
-        # energy-damping noise through the projector.
+        # An earlier version of this gate measured |dlnN/dt| through
+        # `apply_spgpe_step!` at zero growth drive, found it flat in resolution,
+        # and concluded the projected scattering step loses number "at the order of
+        # the growth rate" — from which docs/guides/spgpe.md told callers a growth
+        # problem must run `energy_damping=false`, and #334's whole ensemble did.
+        # That is retracted. So was the same claim, independently, in PR #351.
         #
-        # HYPOTHESIS TESTED AND REFUTED. ψ and φ are each band-limited to k_cut, so
-        # ψ·e^{iφ} reaches 2k_cut and a grid with k_max < 2k_cut should alias that
-        # content back in rather than lose it cleanly — predicting a collapse at
-        # margin 2. The scan below spans margin 1.40 → 3.72 and the rate is FLAT to
-        # 5 %: 9.34, 9.14, 9.48, 9.60 ×10⁻⁴. Not aliasing. An earlier version that
-        # derived k_cut from the grid appeared to show resolution dependence, and
-        # that was the cutoff moving, not the loss.
+        # The reading failed because a ONE-OFF and a RATE are identical at a single
+        # endpoint, and because the measurement went through a `tracking_cutoff`:
+        # a cutoff that moves every step MANUFACTURES fresh out-of-C content every
+        # step, so a one-off is paid repeatedly and its cumulative curve is a
+        # straight line. Flatness in resolution is what a one-off shows too.
         #
-        # So the loss is a property of the scheme: grid-independent, and about 1.25×
-        # the growth rate 2γµ at this point. The gate pins BOTH facts. Flatness is
-        # the invariant a broken noise normalisation would violate; the ratio band
-        # is recorded rather than aspirational, and `docs/guides/spgpe.md` carries
-        # it as a limit with the consequence — a growth problem must use
-        # `energy_damping=false` (Rooney Eq. 20) or accept a number budget the
-        # scattering term dominates.
+        # So this gate attacks the MECHANISM instead of matching the symptom.
+        # #351's account is that the loss is whatever the SEED had outside the C
+        # region, removed the first time the projector runs. That account makes
+        # three predictions, and all three are asserted below:
         #
-        # Two earlier framings could not fail for the right reason, recorded so they
-        # are not tried again: a TOTAL with an absolute bound passes by being short
-        # (2 internal time units against production's 41.5), and `@info` output is
-        # invisible under a job filtering box-drawing characters, which deleted the
-        # numbers behind the first PASS.
-        kcut_fixed = 3.0
-        function null_drive_rate(n; k_cut=kcut_fixed, T=1.0, steps=1000, dt=0.01)
-            SpinorBEC.scratch_clear!()
-            ws = flowing_state!(scalar_ws(; n=(n, n, n)))
-            # µ is the RESERVOIR's, one thermal energy below the cutoff — the
-            # standard n_T = 1 C-region depth. Deliberately NOT the field's own:
-            # number damping is off, so µ enters only through (ϵ_cut − µ)/T in ℳ̄,
-            # and the field's µ here is 9.26, above ϵ_cut, where
-            # `spgpe_growth_rate` correctly refuses. Deriving the cutoff from the
-            # field would also have moved the scan's own axis with it.
-            ec = 0.5 * k_cut^2
-            mu = ec - T
-            r = SPGPEReservoir(; T, mu, a_s=0.02, k_cut, eps_cut=ec,
-                number_damping=false)
-            γ = spgpe_growth_rate(; T, mu, eps_cut=ec, a_s=0.02)
-            n0 = norm_sq(ws)
-            for s in 1:steps
-                apply_spgpe_step!(ws, r, dt; t=0.0, seed=4200 + s)
+        #   1. pre-project the seed  ⇒  the loss disappears        (causal)
+        #   2. the first step's ΔN   =  the seed's out-of-C weight (proportional)
+        #   3. every later step      =  rounding                   (not a rate)
+        #
+        # Measured 2026-08-20 at 48³ box 18, k_cut = 5.5 (ratio 1.52, #334's own),
+        # M̄ = 1.63e-3, T = 5, noise off, 400 steps: pre-projected 1.1e-13 total;
+        # out-of-C 1.0e-4 → first step 1.0e-4; 9.9e-3 → 9.9e-3; tail 2.6e-16/step
+        # in every arm; doubling dt changes nothing.
+        #
+        # NOISE OFF, and k_cut FINITE. Both are load-bearing. SPGPE noise makes ΔN
+        # a random variable and a factor-2 reading cannot survive being buried in
+        # run-to-run spread. And at k_cut = Inf the C region is everything, the
+        # projector is the identity, and the mechanism cannot fire at all — a null
+        # there says nothing, which is a check that was actually run and reported
+        # before someone pointed out it could not have failed.
+        kc = 5.5
+        n_pts = 48
+        box = 18.0
+
+        """A flowing state carrying a controlled fraction of its norm ABOVE k_cut.
+
+        The knob is the mechanism's own variable, not a proxy for it."""
+        function ed_seed(ws, grid, out_frac)
+            D = ws.spin_matrices.system.n_components
+            n = grid.config.n_points
+            psi = zeros(ComplexF64, n..., D)
+            for I in CartesianIndices(n)
+                x, y, z = grid.x[1][I[1]], grid.x[2][I[2]], grid.x[3][I[3]]
+                r2 = x^2 + y^2 + z^2
+                psi[I, D] = exp(-r2 / 4.5) * cis(0.5x + 0.08r2)
             end
-            (; rate=abs(norm_sq(ws) - n0) / n0 / (steps * dt), growth=2 * γ * mu,
-                margin=(π / (18.0 / n)) / k_cut)
+            if out_frac > 0
+                f = FFTW.fft(psi[:, :, :, D])
+                mask = grid.k_squared .> kc^2
+                hi = zero(f)
+                hi[mask] .= f[mask] .+ 1e-3 * maximum(abs, f)
+                s = sqrt(out_frac * sum(abs2, f[.!mask]) / max(sum(abs2, hi), eps()))
+                psi[:, :, :, D] .= FFTW.ifft(f .+ s .* hi)
+            end
+            copyto!(ws.state.psi, psi)
+            ws
         end
-        rs = [null_drive_rate(n) for n in (24, 32, 48, 64)]
-        Printf.@printf(
-            "\n  projected energy damping at ZERO drive, k_cut = %.1f, growth scale 2γµ = %.3e\n",
-            kcut_fixed, rs[1].growth)
-        for r in rs
-            Printf.@printf("    k_max/k_cut = %.2f   |dlnN/dt| = %.3e   (%.3f × growth)\n",
-                r.margin, r.rate, r.rate / r.growth)
+
+        function ed_trace(; out_frac, dt, nstep, pre_project)
+            SpinorBEC.scratch_clear!()
+            grid = make_grid(GridConfig((n_pts, n_pts, n_pts), (box, box, box)))
+            sp = SimParams(; dt, n_steps=1, imaginary_time=false, save_every=1,
+                normalize_every=0)
+            ws = make_workspace(; grid, atom=Rb87,
+                interactions=InteractionParams(Dict{Int, Float64}(0 => 20.0)),
+                potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
+                fft_flags=FFTW.ESTIMATE)
+            ed_seed(ws, grid, out_frac)
+            pre_project && apply_projected_gp!(ws, kc)
+            D = ws.spin_matrices.system.n_components
+            fk = FFTW.fft(Array(ws.state.psi)[:, :, :, D])
+            w_out = sum(abs2, fk[grid.k_squared .> kc ^ 2]) / sum(abs2, fk)
+            dV = cell_volume(grid)
+            N(ws) = real(sum(abs2, ws.state.psi)) * dV
+            ns = Float64[N(ws)]
+            for _ in 1:nstep
+                apply_energy_damping_step!(ws, 1.628e-3, 5.0, dt; noise=false, k_cut=kc)
+                apply_projected_gp!(ws, kc)
+                push!(ns, N(ws))
+            end
+            (; w_out,
+                first=(ns[1] - ns[2]) / ns[1],
+                tail=(ns[2] - ns[end]) / ns[1] / (length(ns) - 2),
+                total=(ns[1] - ns[end]) / ns[1])
         end
-        # 1. FLAT in resolution. This is the invariant: the noise is normalised
-        #    against the cell volume, so a rate that started to track the grid would
-        #    mean that normalisation had broken. The span is 2.7× in k_max/k_cut.
-        @test rs[1].margin < 1.5 && rs[end].margin > 3.0     # the scan really spans it
-        for r in rs
-            @test isapprox(r.rate, rs[1].rate; rtol=0.15)
+
+        nstep = 120
+        a = ed_trace(; out_frac=0.0, dt=0.01, nstep, pre_project=true)
+        b = ed_trace(; out_frac=1.0e-4, dt=0.01, nstep, pre_project=false)
+        c = ed_trace(; out_frac=1.0e-2, dt=0.01, nstep, pre_project=false)
+        c2 = ed_trace(; out_frac=1.0e-2, dt=0.02, nstep=nstep ÷ 2, pre_project=false)
+        Printf.@printf("\n  projected energy damping, noise off, k_cut = %.1f:\n", kc)
+        for (nm, r) in (("pre-projected", a), ("out 1e-4", b), ("out 1e-2", c),
+            ("out 1e-2, 2dt", c2))
+            Printf.@printf("    %-16s out=%.2e  1st=%.3e  tail/step=%.3e  total=%.3e\n",
+                nm, r.w_out, r.first, r.tail, r.total)
         end
-        # 2. The SIZE, pinned as a band rather than as a target. It is O(1) times
-        #    the growth rate and that is the scheme, not a bug — but a change of
-        #    more than ~2× in either direction means the phase amplitude moved, and
-        #    the number budget of every full-SPGPE run moved with it.
-        for r in rs
-            @test 0.6 < r.rate / r.growth < 2.5
+
+        # 1. CAUSAL. A seed already inside its C region loses nothing — this is the
+        #    assertion the retracted version could not have made, and it is the one
+        #    that distinguishes "explained" from "consistent with".
+        @test a.total < 1.0e-10
+
+        # 2. PROPORTIONAL. The first step removes the seed's out-of-C weight, so the
+        #    knob and the effect track over two decades. A rate would not care what
+        #    the seed carried.
+        @test isapprox(b.first, b.w_out; rtol=0.05)
+        @test isapprox(c.first, c.w_out; rtol=0.05)
+        @test c.first / b.first > 50            # two decades of knob, two of effect
+
+        # 3. NOT A RATE. Everything after the first step is rounding, and doubling
+        #    dt at fixed physical time changes neither the step nor the tail — which
+        #    also rules out an O(dt) discretisation residual.
+        for r in (a, b, c, c2)
+            @test abs(r.tail) < 1.0e-14
         end
+        @test isapprox(c2.first, c.first; rtol=0.05)
+        @test isapprox(c2.total, c.total; rtol=0.05)
     end
 
     @testset "a ramped cutoff does not grow the scratch registry" begin
