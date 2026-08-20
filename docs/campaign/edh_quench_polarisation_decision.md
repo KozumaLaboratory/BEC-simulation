@@ -216,7 +216,8 @@ on the peak, and of the wrong sign — while demonstrably acting on the state
 (overlap 0.95, not 1). The mechanism the whole protocol is built on is absent at
 the polarisation the repaired configs prepare.
 
-**Consequence, and it is the operative one:** `|Ω|/ω_⊥ = 0.468 ± 0.003` is not
+**Consequence, and it is the operative one:** `|Ω|/ω_⊥ = 0.468 ± 0.003` (now
+superseded, §9.1) is not
 "a number that needs re-deriving". It is **not re-derivable as stated** — a
 parabolic optimum cannot be refined out of a flat, slightly negative response.
 Refining Ω at B_z > 0 would be twelve arms fitting a vertex to noise, which is
@@ -366,7 +367,10 @@ This was not in #343's list and is the sharpest thing here.
 > | (init m × Ω sign) reversal symmetry | 3-digit match in both branches  **PASS** |
 
 The two arms are `klaus_quench_omm0p5_keeprot.yaml` and
-`klaus_quench_omp0p5_keeprot_mFplus.yaml`. Reading them at `bce2068f~1` — the
+`klaus_quench_omp0p5_keeprot_mFplus.yaml` — **renamed to
+`klaus_quench_omp0p5_keeprot_mirror.yaml` by `e8dafe8e`** when the corpus was
+retargeted, so the `mFplus` name below is the one valid at each commit discussed
+and is NOT what to look for in the tree today. Reading them at `bce2068f~1` — the
 tree the PASS was measured on — and at HEAD:
 
 | | seed | B_z (prep → hold) | Ω/ω_⊥ | mirror? |
@@ -445,10 +449,11 @@ a different measurement.
 
 | # | item | outcome |
 |---|---|---|
-| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`) | **DONE — §9.1/9.2/9.3.** Not a refinement but a re-posing, and then a replacement: `\|Ω*\|/ω_⊥ = 0.68 ± 0.04`, +24.9 % over Ω=0. The response is **even in Ω**, so the chirality rule is void, and a **static** weakened trap reproduces the whole effect — the operative variable is ω_⊥,eff ≈ 0.73 ω_⊥, not Ω |
-| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | **DONE — §9.4.** 5 of 6 pass on criteria fixed before launch. G6 (N=5×10⁴, P_exc rises) **fails**, for a reason R1 explains. G3 passes at 2.47 %, refuting the sheet's "4-digit match" by two orders of magnitude |
+| R1 | **The Ω operating window** (`\|Ω\|/ω_⊥ = 0.468 ± 0.003 @ 2.6 nT`) | **DONE — §9.1/9.2/9.3.** Not a refinement but a re-posing, and then a replacement; the old value is **superseded**, not refined: `\|Ω*\|/ω_⊥ = 0.68 ± 0.04`, +24.9 % over Ω=0. The response is **even in Ω**, so the chirality rule is void, and a **static** weakened trap reproduces the whole effect — the operative variable is ω_⊥,eff ≈ 0.73 ω_⊥, not Ω |
+| R2 | **The 6 acceptance gates** in `klaus_quench_protocol_spec_2026_05_26.md` | **DONE — §9.4.** 5 of 6 pass on criteria fixed before launch. G6 (N=5×10⁴, P_exc rises) **fails**, for a reason R1 explains. G3 passes at 2.47 %, so the sheet's "4-digit match" is **refuted** by two orders of magnitude |
 
-The `0.3 @ 1.3 nT` and `[0.5, 0.6] @ 5.2 nT` rows were **not** re-derived: they
+The `0.3 @ 1.3 nT` and `[0.5, 0.6] @ 5.2 nT` rows were **not** re-derived here
+(both are **refuted** by the ω_eff scans — §10.2 and §11): they
 are the same prescription at other fields, and §9.3 says the whole family is
 parameterised by the wrong variable. They should be re-posed as a trap-frequency
 scan at each field, not re-fitted in Ω.
@@ -520,7 +525,8 @@ Against the criteria fixed **before** launch:
 | C4 | digits limited by the fit | δ ≈ 0.042 ⇒ two digits, not three | **applied** |
 
 > **|Ω*| / ω_⊥ = 0.68 ± 0.04 at B = 2.6 nT.**
-> This **replaces** `0.468 ± 0.003`. The old value is not recovered, and its
+> This **replaces** `0.468 ± 0.003`, which is **superseded**. The old value is
+> not recovered, and its
 > third significant figure is not supportable at one seed.
 
 ### 9.2 The response is EVEN in Ω — the stated mechanism is not what acts
@@ -531,7 +537,7 @@ Against the criteria fixed **before** launch:
 | 0.30 | 0.56027 | 0.55964 | **0.113 %** |
 | 0.50 | 0.61164 | 0.61088 | **0.124 %** |
 
-The sheet's mechanism is **odd** in Ω — "matched chirality (Ω·sign(m_init) < 0)
+The sheet's **refuted** mechanism is **odd** in Ω — "matched chirality (Ω·sign(m_init) < 0)
 lowers the mode energy", ΔE = −Ω·ℓ. An effect that is even in Ω to 0.12 % cannot
 come from that term. Ω = 0 is the *minimum*; **both** senses of rotation enhance,
 equally.
@@ -598,7 +604,7 @@ for the +30 % the sheet claims. On the adjacent-pair observable the enhancement 
 there: P_adj **+6.4 %** (0.36119 vs 0.33956). The sheet's own row carried
 "(with metric caveat)"; the caveat was load-bearing.
 
-**G3 passes the criterion but refutes the sheet's stated precision.** The sheet
+**G3 passes the criterion, but the sheet's stated precision is refuted.** The sheet
 claims a "4-digit match" between 32³ and 64³. Measured: **+2.47 %** on peak
 P_adj (0.61698 → 0.63223) and +2.05 % on peak P_exc — a **2-digit** agreement,
 two orders of magnitude looser than advertised. That is fine for a converged
@@ -811,7 +817,7 @@ most three fields changed, so there is no bespoke solver to trust:
 |---|---|---|
 | positive control (§2) | — | 16³, DDI off, `initial_state: spin_coherent`, `init_state_params: {init_theta: 1.5708}`, `Bz: ±0.01 Gauss` |
 | §3.2 (4 arms) | `klaus_quench_om0p0.yaml`, `klaus_quench_omm0p5_keeprot.yaml` | sign of every `Bz` incl. both ramp endpoints; `backend` |
-| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mFplus.yaml` | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
+| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mirror.yaml` (called `*_mFplus.yaml` when §3.6 was run; renamed by `e8dafe8e`) | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
 
 Observables, all from the library (no local reimplementation):
 `spin_populations_trajectory` / `psi_snapshots` (`src/workflow/validation/run_observables.jl`)

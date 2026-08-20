@@ -17,74 +17,7 @@ using SpinorBEC
 # whether a LIVE document is CORRECT — no test can — it checks that the
 # partition is honest, so a file cannot quietly be both.
 
-const LIVE_DOCS = [
-    # GENERATED, and gated against the code by
-    # `test_state_doc_is_current.jl` — the only LIVE doc whose
-    # correctness is machine-checked rather than merely asserted.
-    "docs/STATE.md",
-    # The SPGPE Kibble-Zurek record: what reproduces, at what sigma, and under
-    # which invariance checks. LIVE rather than dated because the ladder continues —
-    # step 1 (c1 on) results land here — and freezing a document one is about to
-    # update would be a false label.
-    "docs/validation/spgpe_kz_reproduction.md",
-    "docs/architecture/rotating_basis.md",
-    "docs/archive/README.md",
-    "docs/campaign/CAMPAIGN.md",
-    # Per-claim expansion of CAMPAIGN §5's one-line policy: which live claims the
-    # six unmeasured Eu scattering channels can move. LIVE because the claim set
-    # it partitions is itself live — new type-C entries and new figures land in
-    # registries this file reads (#342).
-    "docs/campaign/as_dependency_map.md",
-    "docs/campaign/fix_list.toml",
-    # The single place the EdH-quench polarisation convention is decided (#343).
-    # LIVE rather than dated on purpose: a convention document that is allowed to
-    # go stale is worse than none, because the thesis reads it as current.
-    "docs/campaign/edh_quench_polarisation_decision.md",
-    # Which of the three things "Klaus" named is meant where (#344). LIVE
-    # because it is a naming rule people are told to follow, and it has its
-    # own gate: test/validation/test_klaus_name_disambiguation.jl.
-    "docs/conventions/klaus_name_disambiguation.md",
-    "docs/conventions/testing_strategy.md",
-    "docs/design/hamiltonian_layered_architecture.md",
-    "docs/design/research_spec_and_provenance_architecture.md",
-    "docs/design/unified_spec_architecture.md",
-    "docs/guides/fast_larmor_regime.md",
-    "docs/guides/lab_user_tutorial.md",
-    "docs/guides/pipeline_cookbook.md",
-    "docs/guides/spgpe.md",
-    "docs/guides/tsubame.md",
-    "docs/index.md",
-    "docs/manuscript/latex_templates/pandoc_workflow.sh",
-    "docs/manuscript/papers/paper3_universal_theorem/sign_pattern_lemma1_general_S.md",
-    "docs/reference/dynamics.md",
-    "docs/reference/yaml_schema_reference.md",
-    "docs/validation/config_metadata_blocks.toml",
-    "docs/validation/config_prose_harvest.toml",
-    # The #337 answer, and the REPLACEMENT for
-    # `docs/validation/full_bdg_scheme_dependence_eu_f6.md`, which was LIVE until
-    # 2026-08-19 and is now dated: its headline verdict ("NOT ANSWERABLE with the
-    # current machinery") was overturned by measurement and its q-table was
-    # computed at 1e-4 of the campaign's field. A document whose main conclusion
-    # no longer holds must not advertise itself as maintained — so this is a
-    # SWAP, not a +1, and the budget below is unchanged.
-    #
-    # LIVE because it is what a reader is sent to: the frozen document opens by
-    # pointing here, and `spatial.jl` / `potentials.jl` cite its measurements.
-    "docs/theory/lhy_scheme_selection_eu_f6.md",
-    # The Klaus 2022 reproduction's evidence: published parameters per figure,
-    # the systematics, the model-selection numbers, and the pre-registered
-    # thresholds. LIVE rather than dated because the gate reads its thresholds
-    # and one row of it is an OPEN disagreement — a reader has to know it is
-    # maintained.
-    "docs/validation/klaus2022_primary_source.md",
-    # Arrived with main 2026-08-04. It calls itself the "single entry point for
-    # what this campaign established, excluded, and could not close", and
-    # matsui_reproduction_status.md now points readers at it — so it is what a
-    # reader is sent to, which is the LIVE test.
-    "docs/validation/matsui_campaign_report.md",
-    "docs/validation/parameter_contract_with_Ueda.md",
-    "docs/validation/step6_ueda_reference_state/reference_state.yaml",
-    "docs/validation/ueda_status.md"]
+include(joinpath(@__DIR__, "helpers", "live_docs.jl"))
 
 const _REPO = normpath(joinpath(@__DIR__, ".."))
 # Match the HEADER, not the word. A live document may legitimately discuss
@@ -134,7 +67,25 @@ _frozen(path) = occursin(_FROZEN_MARK, first(read(joinpath(_REPO, path), String)
         # current. If this number is raised again soon, the question to ask is
         # whether the three should be one document rather than whether the
         # budget should be four.
-        @test length(LIVE_DOCS) <= 31
+        #
+        # 31 → 32 on 2026-08-20 for `docs/campaign/claims.toml`, and the question
+        # above was asked rather than skipped. The answer is that this entry is
+        # not the same KIND of thing as the other 31: it is machine-parsed
+        # fail-closed and its contents drive a gate over the rest of this list,
+        # so "LIVE" is enforced for it and merely asserted for them. It should
+        # also make the budget easier later, not harder — a prose document whose
+        # live claims have been poured into the ledger can be dated, which is the
+        # trade the ledger exists to make.
+        #
+        # 32 -> 33 on 2026-08-20 for `docs/guides/edh_quench_lab_prescription.md`.
+        # This one does not add a document so much as MOVE authority: the frozen
+        # `klaus_protocol_sheet.md` was still issuing lab instructions, and the
+        # cheaper-looking fix (archive it) turned out to cost more — 15 inbound
+        # references, two of them calibration probes inside tests. So the sheet
+        # keeps its path and loses its authority, and the authority needs a live
+        # home. Net effect on the budget question: one frozen document became
+        # genuinely inert, which is what the partition is for.
+        @test length(LIVE_DOCS) <= 33
         @test length(LIVE_DOCS) == length(unique(LIVE_DOCS))
     end
 
