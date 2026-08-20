@@ -18,6 +18,15 @@
 #
 # Idempotent — safe to source multiple times.
 
+# `module` on TSUBAME 4 exits non-zero for a missing modulefile (there is no
+# julia one), so errexit has to come off around it. It must go back ON, and it
+# did not: from 2026-08-08 until 2026-08-20 every submit script that sourced this
+# file ran the REST OF ITSELF unguarded. A job whose julia step errored still
+# reached its final `echo` and reported "done" — verified again on job 8450018.13.
+# The memory recording the 2026-08-08 incident says it was fixed; on this ref it
+# was not, which is why a landed-fix claim has to be anchored to a ref.
+_SBEC_ERREXIT_WAS_SET=0
+case "$-" in *e*) _SBEC_ERREXIT_WAS_SET=1 ;; esac
 set +e   # don't kill the parent shell on `module` failures
 
 # --- Resolve node-local scratch (TSUBAME 4 → 3 fallback → /tmp) -------
@@ -71,3 +80,10 @@ fi
 echo "[tsubame_setup] JULIA_DEPOT_PATH    = $JULIA_DEPOT_PATH"
 echo "[tsubame_setup] SPINORBEC_SCRATCH_DIR = $SPINORBEC_SCRATCH_DIR"
 echo "[tsubame_setup] JULIA_NUM_THREADS   = $JULIA_NUM_THREADS"
+
+# Hand errexit back exactly as we found it. Sourcing this file must not change
+# the caller's failure semantics.
+if [ "${_SBEC_ERREXIT_WAS_SET:-0}" = "1" ]; then
+    set -e
+fi
+unset _SBEC_ERREXIT_WAS_SET

@@ -46,6 +46,10 @@ export JULIAUP_DEPOT_PATH=/gs/fs/tga-kozuma-kouhi/shared/.juliaup
 JULIA="${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}"
 
 source scripts/tsubame_setup.sh
+# Re-arm unconditionally. `tsubame_setup.sh` now restores errexit itself, but a
+# submit script must not depend on the internals of a file it sources — that
+# dependency is what let a failed arm print "done" for twelve days.
+set -euo pipefail
 
 CFG_DIR="${WEFF_CFG_DIR:-runs/klaus_quench_weff}"
 mapfile -t CFGS < <(ls "$CFG_DIR"/*.yaml | sort)
@@ -82,10 +86,20 @@ fi
     # historically) BEFORE two hours of walltime, not after.
     r = inspect_config(cfg)
     for w in r.warnings
-        println("inspect: ", w)
+        println("inspect[", w.severity, "] ", w.title)
     end
-    any(w -> occursin("block", lowercase(string(w))), r.warnings) &&
-        error("pre-flight :block — refusing to launch")
+    # READ THE FIELD. The first version of this line matched the substring
+    # "block" against the printed struct, and every arm died on the q-auto-derive
+    # INFO message, whose text is "Step 1 has no `q:` in its B BLOCK". A severity
+    # is a field (`:error | :warn | :info`); `:block` is the registration
+    # level used by the autopilot pre-flight and is not a ConfigWarning value at all.
+    blockers = filter(w -> w.severity === :error, r.warnings)
+    if !isempty(blockers)
+        for w in blockers
+            println("BLOCKING: ", w.title, " — ", w.message)
+        end
+        error("pre-flight found $(length(blockers)) :error warning(s) — refusing to launch")
+    end
     run_yaml(cfg)
 ' "$CFG"
 
