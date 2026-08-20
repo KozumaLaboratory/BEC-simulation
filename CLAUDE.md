@@ -444,7 +444,7 @@ Measured 2026-08-20: an SPGPE campaign re-derived, from a cluster job that died 
 two days earlier — and then **shipped a documented limit the same PR had already
 retracted**, designing a 96-trajectory ensemble on a limit that does not exist.
 `gh pr list` had been run at the start of that session and #351 was *in the
-output*, its title beginning `feat(spgpe):`, on a task that was entirely SPGPE.
+output*, its title beginning "feat(spgpe)", on a task that was entirely SPGPE.
 
 The failure was not search. **It was not connecting what was already displayed** —
 and two memory notes covering exactly this (`feedback_use_existing_artifacts_first`,
