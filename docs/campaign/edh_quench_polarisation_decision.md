@@ -355,9 +355,16 @@ Its `init_m_idx: 1` is also simply the schema default at p > 0
 nothing was ever chosen there.
 
 **Action for that config: same as the quench family — it needs `init_m_idx: 13`
-at p > 0 (or `p < 0` with `init_m_idx: 1`) to be anti-aligned.** Not done here:
-it is a 32×32×16 GPU rotating-basis run with an 8-point scan, and it has no
-result being quoted, so it is on the re-derivation list rather than in this PR.
+at p > 0 (or `p < 0` with `init_m_idx: 1`) to be anti-aligned.**
+
+> **DONE, and this paragraph was wrong from 2026-08-19 to 2026-08-20.** It said
+> "not done here: … on the re-derivation list rather than in this PR". The change
+> in fact landed in `e8dafe8e`, the same retarget commit — `init_m_idx: 13` is on
+> line 51 of that config today, with the reasoning in its own header. The stale
+> deferral survived because nothing checked the paragraph against the file it
+> describes; it was found by filling the `evidence` column of
+> `docs/campaign/claims.toml` and then RESOLVING the path, which is the whole
+> argument for that column. Claim `edh-phi-phys-config-anti-alignment`, closed.
 
 <!-- DECISION -->
 

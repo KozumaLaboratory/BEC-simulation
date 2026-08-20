@@ -520,8 +520,8 @@ note = """CLOSED 2026-08-20 by annotation, not by moving the file. The archive r
 
 [[claim]]
 id = "edh-phi-phys-config-anti-alignment"
-claim = "`runs/eu151_klaus_phi_phys/config.yaml` needs `init_m_idx: 13` at p > 0 (or p < 0 with `init_m_idx: 1`) to be anti-aligned; as committed it is aligned and therefore on the wrong side for the EdH quench."
-status = "open"
+claim = "`runs/eu151_klaus_phi_phys/config.yaml` needed `init_m_idx: 13` at p > 0 to be anti-aligned. It has it."
+status = "closed"
 type = "A"
 scope = "One config. `init_m_idx: 1` there is the schema default at p > 0 (`run_step_rotating/ground_state.jl:162`), so nothing was ever chosen."
 uncertainty = "unbounded: not measured. The sign bookkeeping is determinate; the consequence for that scan's results is not, because it has no quoted result."
@@ -532,4 +532,4 @@ commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "4.2"
 pr = 392
-note = "Named rather than left implicit. It is a 32×32×16 GPU rotating-basis 8-point scan with no result being quoted, so it was deferred rather than fixed — but a deferral with no row is indistinguishable from an oversight."
+note = """CLOSED 2026-08-20, and it had been closed since 2026-08-19 without anyone noticing. `e8dafe8e` — the same commit that retargeted the quench corpus — set `init_m_idx: 13` on line 51, with the reasoning in the config header. The decision document's section 4.2 went on saying "not done here … on the re-derivation list" for a day, and this row was written faithfully FROM that paragraph. So the ledger inherited a false statement from its source and then caught it, which is the sequence the `evidence` column is for: the row was only checkable because it named a path, and the path resolved to a file that disagreed with the prose. A row whose evidence is prose could not have done this. Section 4.2 corrected in the same change."""

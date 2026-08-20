@@ -52,6 +52,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_mutation_sweep.sh",
     "submit_kz_exponent.sh",
     "submit_eu_bscan.sh",
+    # The static-trap omega_eff array for the EdH quench. One arm per task on
+    # purpose: a shard reaped at h_rt must not take completed neighbours with it.
+    "submit_klaus_weff_scan.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
@@ -154,6 +157,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     # category 3, same as the other `submit_*.sh` above.
     "klaus2022/submit_stripes.sh",
     # ── validation probes still cited as live instruments ──
+    # Generates the omega_eff scan configs. Exists because PR #403 landed two
+    # documents and no configs, so its evidence read `absent` in the claim ledger
+    # -- re-deriving it was a re-derivation, not a re-run.
+    "validation/klaus_weff_scan_gen.jl",
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
     "validation/rk4ip_step_size_probe.jl",
