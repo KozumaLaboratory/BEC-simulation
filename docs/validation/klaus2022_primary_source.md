@@ -455,7 +455,7 @@ that the file is present on your machine.
 | vortices in stripes along B̂ | axis to 5.9°, 4.0× the vortex-free baseline | ✓ |
 | 3 stripes | 3.43 | **within 1** |
 | θ → 0 ⇒ homogeneous ring | order parameter at 1.04× its null | ✓ |
-| magnetostricted AR = 1.03 | **1.16** | ✗ **unexplained** |
+| magnetostricted AR = 1.03 | **1.16** | ✗ **open, and no published uncertainty accounts for it** (§6h: 80.8 % of (AR − 1) would have to go; the largest single axis moves 14.7 % and every published experimental value set at once moves 1.9 %) |
 
 Type **C** for the first five rows. The sixth is an open disagreement, bounded
 by five independent instruments against our own implementation (§6b), and it is
@@ -586,6 +586,73 @@ sentence in Methods, about the experimental apparatus, describing an in-situ
 column-density Gaussian-fit aspect ratio. Steps 2 and 3 — the sensitivity table
 and the LHY magnitude — are the measurement, and until they run, **1.16 vs 1.03
 stays open and quantified, exactly as §6b left it.**
+
+## 6h. The sensitivity table: no published uncertainty accounts for the gap (#406 steps 2-3)
+
+Measured 2026-08-21 on one H100, 64²×32 over a 16 a_ho box (grid-converged for
+AR to five digits against 128²×64, §6b), 8000 ITP steps per arm, one arm per
+cell, ~82 s each. Driver: `scripts/klaus2022/ar_sensitivity.jl`.
+
+The quantity compared is **(AR − 1)**, not AR: AR = 1 means "no
+magnetostriction", so a ratio of ARs would compress the very effect at issue.
+
+| arm | AR | Δ(AR − 1) vs baseline | the published systematic being probed |
+|---|---:|---:|---|
+| **baseline** (a_s = 111 a₀, N = 15000, λ = 2.6, θ = 35°, LHY on, box 16) | **1.15660** | — | — |
+| a_s = 102 a₀ | 1.17623 | **+12.5 %** | 111(9) a₀, i.e. ±8 % |
+| a_s = 120 a₀ | 1.14228 | **−9.1 %** | 111(9) a₀ |
+| N = 10000 | 1.14691 | −6.2 % | theory 15000; experiment ≈ 2×10⁴, unmeasured after 700 ms |
+| N = 20000 | 1.16625 | +6.2 % | " |
+| **λ = 2.756** (50.8, 140) Hz | 1.14504 | **−7.4 %** | the paper states BOTH traps; §6g |
+| λ = 2.4 | 1.17480 | +11.6 % | — |
+| θ = 33° | 1.13955 | −10.9 % | 35°, no error bar published |
+| θ = 37° | 1.17481 | +11.6 % | " |
+| **LHY off** | 1.17965 | **+14.7 %** | the paper's eGPE carries γ_QF; so does ours |
+| box = 20 a_ho | 1.13501 | −13.8 % | §6b measured 1.3 % from 16 → 20 |
+| **every published EXPERIMENTAL value at once** (λ = 2.756, ω_ref = 2π×50.8, N = 20000, a_s = 111) | **1.15361** | **−1.9 %** | — |
+
+**To reach AR = 1.03 from 1.15660, (AR − 1) must fall by 80.8 %.** The largest
+excursion any axis produces is **14.7 %**, and it is LHY, in the wrong
+direction. Every row is annotated `cannot close it alone` by the driver, and
+the driver decides that by comparing against the required 80.8 % rather than by
+a threshold chosen afterwards.
+
+**The combination does not do it either, and that is the row that matters.** A
+one-at-a-time table cannot see two 20 % effects multiplying, so one arm sets
+every published *experimental* value simultaneously — including the λ = 2.756
+mismatch §6g found. It lands at **AR = 1.15361**, i.e. (AR − 1) moves by
+**−1.9 %**: the individual shifts largely cancel.
+
+**What each column settles**, in the form gate 2 asks for — knowing which cells
+are ~zero IS the result:
+
+- **`a_s` is bounded, not exonerated.** ±8 % of a_s buys ∓9–13 % of (AR − 1), so
+  closing an 80.8 % gap would need a_s ≈ 190 a₀ — 9σ outside the published
+  111(9). And a_s was *fitted* by the paper against simulations of this family
+  (§2), so agreement bought by moving it would not be evidence in any case.
+- **`λ` was the one previously-unlisted parameter mismatch (§6g) and it is worth
+  −7.4 %.** Real, in the right direction, and an order of magnitude short. Our
+  runs should nevertheless move to the experimental trap when the number being
+  compared is the experimental one.
+- **LHY (#406 item 3) acts in the expected direction and is the largest single
+  lever: switching it off *raises* (AR − 1) by 14.7 %,** i.e. quantum
+  fluctuations stiffen the cloud against magnetostriction by about an eighth.
+  Both codes have it, so it is not a candidate explanation — but nobody in this
+  repo had measured its size, and now it is measured.
+- **`N` is nearly inert (±6 %)**, which is the useful null: the disagreement is
+  robust to the paper's atom number being unmeasured after 700 ms, and scanning
+  N could not have closed it.
+- **The box systematic (13.8 %) is comparable to the physics knobs**, which is
+  worth remembering before quoting any of them tightly.
+
+**Verdict for #406: the disagreement survives the sensitivity table.** It is not
+a parameter error inside the published uncertainties, singly or in combination.
+Since §6g established that TOF is closed by the paper's own construction and
+that the observable definitions match, what remains is a difference of *model*
+or of *what the published sentence means* — and the sentence, as §6g found,
+carries no error bar and no statement of whether it was measured or computed.
+The row stays **open and quantified**, which is where §6b put it and where the
+evidence still leaves it.
 
 ## 7. What this cannot settle
 
