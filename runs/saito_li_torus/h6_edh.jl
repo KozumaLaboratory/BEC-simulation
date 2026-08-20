@@ -87,6 +87,48 @@ function moment_axis(psi, grid::Grid{3})
 end
 
 """
+Rotate a spinor field by 90 degrees about x, exactly.
+
+    R_x(90): (x, y, z) -> (x, -z, y),  so  psi'(r) = U psi(R^-1 r)
+    with R^-1: (x, y, z) -> (x, z, -y)  and  U = exp(-i (pi/2) F_x).
+
+On an FFT grid x_k = -L/2 + k dx the point -x_k is x_{n-k} (index n wraps to
+0 by periodicity), so the spatial part is an index permutation and the
+rotation is EXACT — no interpolation, no resampling. It requires equal n and
+equal box length in y and z, which is asserted.
+
+Why do this instead of seeding along y and relaxing: at B = 0 the Hamiltonian
+is rotationally invariant, so the orientation is an exact zero mode. A soft,
+imperfectly converged ground state is then free to rotate, and for the F=1
+cell it did — the axis came out along z when the protocol needs y. Rotating an
+already-converged state cannot drift, and the rotated state is stationary by
+symmetry rather than by iteration.
+"""
+function rotate90_x(psi::Array{ComplexF64, 4}, grid::Grid{3}, F::Int)
+    n = grid.config.n_points
+    n[2] == n[3] || error("rotate90_x needs n_y == n_z (got $(n[2]), $(n[3]))")
+    isapprox(grid.config.box_size[2], grid.config.box_size[3]) ||
+        error("rotate90_x needs box_y == box_z")
+    D = 2F + 1
+    U = exp(-1im * (π / 2) * Matrix(spin_matrices(F).Fx))
+    out = similar(psi)
+    ny = n[2]
+    @inbounds for k in 1:n[3], j in 1:n[2], i in 1:n[1]
+        # psi'(x_i, y_j, z_k) = U psi(x_i, z_k, -y_j)
+        jm = mod(ny - (j - 1), ny) + 1        # index of -y_j
+        s = @view psi[i, k, jm, :]
+        for c in 1:D
+            acc = zero(ComplexF64)
+            for d in 1:D
+                acc += U[c, d] * s[d]
+            end
+            out[i, j, k, c] = acc
+        end
+    end
+    out
+end
+
+"""
 Ground state of the torus with its symmetry axis along `axis`, at B = 0.
 
 At B = 0 the Hamiltonian is rotationally invariant, so this must land on the
@@ -95,9 +137,41 @@ gate on the generalized seed: a seed that built the wrong texture for axis != z
 would converge somewhere else.
 """
 function ground_state_axis(; axis=2, n=(64, 64, 64), box=(6.5, 6.5, 6.5),
-    backend=CUDABackend(), iters=4000, cellname="T")
+    backend=CUDABackend(), iters=4000, cellname="T",
+    rotate_from_z::Bool=false)
     cell = merge(cell_for(cellname), (; Bz_mG=0.0))
     b = build_cell(cell; n=n, box=box)
+    if rotate_from_z
+        # converge along z (where nothing is soft), then rotate exactly
+        bz = merge(b, (; psi0=seed_torus(b.grid, b.F; lam=b.lam, sr=b.sr,
+            sz=b.sz, axis=3)))
+        psi_z, ws_z, gs_z = solve_cell(bz; backend=backend, iters=iters)
+        psi_y = rotate90_x(Array(psi_z), b.grid, b.F)
+        by = merge(b, (; psi0=psi_y))
+        # ONE L-BFGS step's worth of polish is not applied: the rotated state
+        # is stationary by symmetry and re-running the solver would re-open the
+        # orientation mode. Its energy is measured instead, and must equal the
+        # z-axis energy.
+        ws_y = make_workspace(; grid=b.grid, atom=b.atom,
+            interactions=InteractionParams(Dict(0 => b.c0); c_lhy=b.c_lhy),
+            zeeman=ZeemanParams(0.0, 0.0),
+            potential=HarmonicTrap(TRAP_OMEGA, TRAP_OMEGA, TRAP_OMEGA),
+            sim_params=SimParams(; dt=1e-4, n_steps=1),
+            enable_ddi=true, c_dd=b.c_dd, secular_ddi=false,
+            ddi_padding=true, ddi_trunc_radius=-1.0, psi_init=psi_y,
+            backend=backend)
+        ez = energy_decomposition(ws_z).total
+        ey = energy_decomposition(ws_y).total
+        println("  rotation gate: E(z-axis) = ", round(ez; digits=10),
+            "  E(rotated) = ", round(ey; digits=10),
+            "  dev = ", round(abs(ey - ez) / abs(ez); sigdigits=3))
+        abs(ey - ez) / abs(ez) < 1e-6 ||
+            error(
+                "rotation changed the energy by $(abs(ey-ez)/abs(ez)) — " *
+                "the rotation is not exact on this grid",
+            )
+        return (by, ws_y.state.psi, ws_y, gs_z)
+    end
     psi0 = seed_torus(b.grid, b.F; lam=b.lam, sr=b.sr, sz=b.sz, axis=axis)
     b = merge(b, (; psi0=psi0))
     psi, ws, gs = solve_cell(b; backend=backend, iters=iters)
@@ -118,6 +192,9 @@ function main(args::Vector{String}=String[])
     # `cell=` selects the physics: "T" is the F=6 extrapolation, "E1" is the
     # paper's OWN Fig. 4 cell (F=1, N=15000, eps_dd=1.2, B_z = 0.05/0.1 mG).
     cellname = get(opts, "cell", "T")
+    # `orient=rotate`: converge along z and rotate 90 deg exactly, instead of
+    # seeding along y and hoping the zero mode does not move.
+    rotate_from_z = get(opts, "orient", "seed") == "rotate"
     dt = parse(Float64, get(opts, "dt", "5.0e-4"))
     t_end = parse(Float64, get(opts, "t_end", smoke ? "0.2" : "10.0"))
     be = get(opts, "backend", "gpu") == "cpu" ? CPUBackend() : CUDABackend()
@@ -132,7 +209,7 @@ function main(args::Vector{String}=String[])
     # ---- 1. B = 0 ground state with the axis along y ---------------------
     b, psi0, ws0, gs0 = ground_state_axis(; axis=2, n=(nn, nn, nn),
         box=(bx, bx, bx), backend=be, iters=(smoke ? 40 : 4000),
-        cellname=cellname)
+        cellname=cellname, rotate_from_z=rotate_from_z)
     m0 = moment_axis(psi0, b.grid)
     e0 = energy_decomposition(ws0)
     @printf("  GS(axis=y): E/N = %.8f   grad_norm = %.3e\n", e0.total,
@@ -300,7 +377,8 @@ function main(args::Vector{String}=String[])
                         (t_ms[i], rec.fx[i], rec.fy[i], rec.fz[i],
                             rec.Lx[i], rec.Ly[i], rec.Lz[i], Jz[i],
                             rad2deg(phi_u[i]), rec.e1[i], rec.e2[i], rec.e3[i],
-                            rec.norm[i], rec.rho_max[i], rec.edge[i]), ","),
+                            rec.norm[i], rec.rho_max[i], rec.edge[i],
+                            rec.cx[i], rec.cy[i], rec.cz[i]), ","),
                 )
             end
         end
