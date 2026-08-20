@@ -71,7 +71,8 @@ a typo warning.
 | `n_steps` | Real [0, 1e9] | 100000 | ITP step cap |
 | `tol` | Real [1e-16, 1.0] | 1e-8 | convergence threshold — **meaning depends on `method`**: for `itp` (the default above) it bounds the relative ENERGY change and is tested only every `save_every = max(1, n_steps ÷ 100)` steps, i.e. 1000 apart at the default `n_steps`; for `lbfgs` it is the gradient norm. This cell said `grad_norm` unconditionally until 2026-08-06. Derived form in `docs/STATE.md`. |
 | `m_lbfgs` | Real [1, 100] | 10 | LBFGS history length |
-| `init_m_idx` | Int [1, 25] | — | which m to seed |
+| `init_m_idx` | Int [1, 25] | Zeeman-lowest of the field ITP runs in | which m to seed. The default follows `prepare_anti_aligned`, NOT the requested `p` — reading the requested one hands the anti-aligned path the seed that field annihilates |
+| `prepare_anti_aligned` | bool | false | rotating_basis only. Relax at **−p**, hand the dynamics **+p**, giving the Zeeman-HIGHEST stretched state the EdH quench needs. `q ∝ \|B\|²` does **not** flip — it is even in the field. Not expressible as a seed choice: ITP is a projector onto the LOWEST state, so `init_m_idx: 13` at p = 26700 underflows (`exp(−1602)`) in ONE step and used to return ψ ≡ 0 from a completed run. The step asserts `sign(⟨F_z⟩) = −sign(p)` on the result |
 | `init_sigma` | Real [0, 100] | — | Gaussian seed σ |
 | `initial_state` | enum (22 names) | polar | named state builder |
 | `init_state_params` | dict | — | extra args for state builder |

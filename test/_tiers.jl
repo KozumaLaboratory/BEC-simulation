@@ -970,6 +970,12 @@ const FULL_EXTRA = [
     # dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
+    # `prepare_anti_aligned`: relax in the reversed field, hand the dynamics the
+    # requested one. Full tier because it runs real ITP arms — but it is the only
+    # gate on WHICH END OF THE ZEEMAN LADDER a run prepares, which is the
+    # controlling variable of the EdH campaign, so it carries its own aligned
+    # control arm rather than asserting one sign in isolation.
+    "rotating_basis/test_anti_aligned_preparation.jl",
     "rotating_basis/test_magnetostir_pipeline_physics.jl",
     # First-principles φ̇≠0 gate: lab-frame pipeline vs exact single-spin
     # reference. Arbitrated the engine retirement — the retired engine's
