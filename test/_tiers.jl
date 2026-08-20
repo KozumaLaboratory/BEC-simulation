@@ -26,6 +26,10 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    # #407: the FFTW MEASURE × Julia-threads × mixed-radix corner, as a
+    # predicate. Gates the advisory's trigger, not the 11.97 GB — a test that
+    # allocated that is a test nobody can run.
+    "test_fft_planning_memory_risk.jl",
     "test_prior_art_dispositions.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
