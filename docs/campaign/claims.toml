@@ -632,3 +632,54 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "16.1"
 pr = 0
 note = """CORRECTS section 14.2, which attributed the missing energy to `run_registry.jl` reading absent keys through defaults. That writer is never reached on this path. The `conv = true` default was real and printed to stdout, but was never STORED — so a guard reading the file finds nothing, which is unknown rather than a pass, and section 14.2's guard-7 claim overstated. The #410 default fix stands on its own path; this is a third writer nobody had checked."""
+# --- eu335 / #383 / #398: the 68.4 µG reading ---------------------------------
+#
+# The SECOND document poured in, and it was chosen for a shape the EdH rows do not
+# have: a claim retracted not because its NUMBER moved but because its READING did.
+# 68.4 ± 0.15 µG is the same measurement before and after; what changed is whether
+# it is a property of the energy landscape or a property of the solver walking it.
+
+[[claim]]
+id = "eu335-68p4-is-a-mean-field-spinodal"
+claim = "68.4 ± 0.15 µG is the flower branch's mean-field spinodal at κ = 1.8 — the branch stops existing there — so a rising B_z ramp must convert by then at ANY rate."
+status = "superseded"
+type = "B"
+scope = "¹⁵¹Eu F = 6, κ = ω_z/ω_⊥ = 1.8, 32³ (64³ bracket [68.0, 68.5] µG), flower branch reached by warm-started L-BFGS continuation in B_z."
+retired_literal = [
+    "spinodal at 68.4 µG",
+    "flower-branch spinodal at κ = 1.8",
+    "flower branch stops existing",
+    "ends at 68.4 ± 0.15 µG",
+]
+replacement_literal = [
+    "loses the flower branch",
+    "continuation loses the branch",
+    "warm-started continuation loses the branch",
+]
+superseded_by = "eu335-68p4-is-where-continuation-loses-the-branch"
+uncertainty = "±0.15 µG at 32³ and [68.0, 68.5] µG at 64³, 0.2 % apart. That bound is on the FIELD at which the continuation stops and was read as a bound on where the branch ends; the reading itself carried no uncertainty at all, which is how it survived."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_spinodal_spectrum.md", "docs/guides/eu_kappa_hysteresis_loop.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_kappa_hysteresis_loop.md"
+section = "5.1"
+pr = 409
+note = """SUPERSEDED 2026-08-20 (#398) by #383's three-quantity test, and the reason it is `superseded` rather than `refuted` is that the number did not move — only what it is a number OF. A saddle-node takes the branch-tangent curvature, the escape direction and the lowest ω to zero together; #383 measured all three on the same cells and none softens (R² linear to rms 0.4 % with its zero at 78.2 µG, ⟨d,Ad⟩ = +3.403 uphill, ω flat to 1.4 %). What is NOT established either way is that the branch survives: λ_min at 68.25 µG is unresolved by both solvers, tracked as #399. The generalisable part: "the continuation loses the branch" and "the branch ends" are different claims about different objects — one about a solver's basin, one about the energy landscape — and a continuation instrument can only ever measure the first."""
+
+[[claim]]
+id = "eu335-68p4-is-where-continuation-loses-the-branch"
+claim = "68.4 ± 0.15 µG is the field at which a warm-started L-BFGS continuation loses the flower branch at κ = 1.8, agreeing to 0.2 % between 32³ and 64³. Nothing in the campaign establishes that the branch ENDS there."
+status = "live"
+type = "B"
+scope = "Same cells as the superseded row: ¹⁵¹Eu F = 6, κ = 1.8, 32³ and 64³, warm-started continuation in B_z. Says nothing about any other κ, and nothing about the polarised branch."
+supersedes = "eu335-68p4-is-a-mean-field-spinodal"
+uncertainty = "±0.15 µG at 32³, bracket [68.0, 68.5] µG at 64³ — 0.2 % apart. This is a bound on a solver-dependent field, so a different warm-start schedule may move it; the grid agreement bounds the discretisation, not the algorithm."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_kappa_hysteresis_loop.md", "docs/guides/eu_spinodal_spectrum.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_spinodal_spectrum.md"
+section = "5.1"
+pr = 409
+note = """Everything #335 delivers that needs only this weaker reading stands unchanged, including the 32³↔64³ agreement of §5.8 and the deliverable itself — the Stern-Gerlach level count (6-7 populated m_F at κ = 1.8 against 3-4 at κ = 0.9, disjoint at all five rates), which never rested on the landscape reading. What is lost is the *at any rate* clause: behind a barrier a fast enough rising ramp carries the flower past 68.4 µG, which is what the predecessor campaign actually observed."""

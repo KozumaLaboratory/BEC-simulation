@@ -247,9 +247,20 @@ Its 20 µG energy, 10.863612, reproduces the independently converged reference
 reached two ways.
 
 **So the loop at κ = 1.8 is one-sided, and this is the campaign's main structural
-finding.** The rising edge is a genuine mean-field **spinodal at 68.4 µG**: the
+finding.** The rising edge is a genuine mean-field ~~**spinodal at 68.4 µG**: the
 flower branch stops existing there, so a rising ramp must convert by then at *any*
-rate. The falling edge is **not** a spinodal — the polarised branch is still a
+rate~~.
+
+> **SUPERSEDED 2026-08-20 (#398, ledger `eu335-68p4-is-a-mean-field-spinodal`).**
+> The struck sentence is the landscape reading, and #383 measured three quantities
+> a saddle-node must take to zero — none of them softens. What survives is the
+> measurement: **68.4 ± 0.15 µG is where the warm-started continuation loses the
+> flower branch.** The *at any rate* consequence does not follow from it. The rest
+> of this paragraph — the falling edge not being a spinodal — is unaffected,
+> because it rests on the polarised branch still being a stationary state, which
+> was checked directly.
+
+The falling edge is **not** a spinodal — the polarised branch is still a
 stationary state at 27.4 µG where the predecessor's falling leg converted, and
 indeed everywhere down to 5 µG. A conversion there is barrier crossing driven by
 whatever excitation the ramp delivered, which means it moves with rate and does
@@ -522,7 +533,7 @@ What the campaign delivers instead, all of it new and all of it falsifiable:
 
 | deliverable | value | where |
 |---|---|---|
-| flower-branch spinodal at κ = 1.8 | **68.4 ± 0.15 µG** at 32³, **[68.0, 68.5] µG** at 64³ — 0.2 % apart | §5.1, §5.8 |
+| ~~flower-branch spinodal at κ = 1.8~~ **SUPERSEDED (#398)** → the field at which the warm-started continuation **loses the flower branch** | **68.4 ± 0.15 µG** at 32³, **[68.0, 68.5] µG** at 64³ — 0.2 % apart. The number is unchanged; what it is a number *of* is not the landscape | §5.1, §5.8 |
 | polarised branch's lower spinodal | **none above 5 µG** — it is a stable minimum throughout | §5.5b |
 | static branch separation at 20 µG | δ⟨F⊥⟩ = **5.06** (5.137 vs 0.075) | §5.1 |
 | κ = 0.9: number of branches | **one** — two continuations from opposite ends agree to 6–7 digits in E | §5.3 |

@@ -30,8 +30,9 @@
 > reading is not supported: the flower branch **ends at 68.4 ± 0.15 µG**, measured
 > statically; it merely takes longer than a ramp to fall once past its spinodal.
 >
-> **AMENDED 2026-08-20 (#398).** That last sentence is the part of this retraction
-> that does not hold. #383 measured three independent quantities at 68.25 µG and
+> **AMENDED 2026-08-20 (#398) — the struck sentence is SUPERSEDED**, ledger row
+> `eu335-68p4-is-a-mean-field-spinodal`. That last sentence is the part of this
+> retraction that does not hold. #383 measured three independent quantities at 68.25 µG and
 > none of them softens — the curvature's zero extrapolates to 78.2 µG, the escape
 > direction is **uphill** by +3.403, and the lowest ω is flat to 1.4 %. So 68.4 µG
 > is where a **warm-started continuation loses the branch**, which is not the same
