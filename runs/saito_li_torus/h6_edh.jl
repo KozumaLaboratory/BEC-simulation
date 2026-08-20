@@ -33,6 +33,21 @@ using SpinorBEC
 using SpinorBEC: SimulationCallbacks, run_simulation!, SimParams, NoPotential
 using Printf
 using LinearAlgebra
+
+# A QUENCH RADIATES, so the static cells' EDGE_MAX = 1e-4 is the wrong bound
+# here: it is calibrated on a relaxed ground state, where anything at the wall
+# is a clipped droplet. Under a B quench a little sound leaves the droplet and
+# reaches the boundary no matter how large the box, and both good E1 runs sit
+# at 4-6e-4 -- so at 1e-4 the gate reddens on correct work, which is how a gate
+# gets ignored rather than obeyed.
+#
+# The bound below is MEASURED, not chosen: box 8 -> 12 at fixed dx and dt (2.25x
+# the wall area) moved mean |f_z| by 0.1 %, from 0.03750 to 0.03746, while the
+# edge fraction fell 6.08e-4 -> 3.88e-4. Radiation at this level demonstrably
+# does not touch the observable. The failure this must still catch -- a droplet
+# that is genuinely unbound and expanding onto the wall -- sat at 9.2e-2, two
+# decades above.
+const EDGE_MAX_DYNAMICS = 1.0e-3
 using FFTW
 using JLD2
 
@@ -210,12 +225,14 @@ function _assert_is_the_torus(ws, b, axis)
     ok_deg = deg_rel < 0.02
     ok_bound = etot < 0
     if !(ok_deg && ok_shape && ok_bound)
-        error("the relaxed state is NOT the torus: moment eigenvalues = " *
-              "$(round.(e; digits=5)), E/N = $(round(etot; digits=6)). " *
-              "degenerate pair: $(ok_deg ? "ok" : "NO (rel gap $(round(deg_rel; sigdigits=3)))"); " *
-              "oblate: $(ok_shape ? "ok" : "NO -- this is prolate"); " *
-              "self-bound: $(ok_bound ? "ok" : "NO -- E/N >= 0, it will expand"). " *
-              "At B=0 the orientation is an exact zero mode; use orient=rotate.")
+        error(
+            "the relaxed state is NOT the torus: moment eigenvalues = " *
+            "$(round.(e; digits=5)), E/N = $(round(etot; digits=6)). " *
+            "degenerate pair: $(ok_deg ? "ok" : "NO (rel gap $(round(deg_rel; sigdigits=3)))"); " *
+            "oblate: $(ok_shape ? "ok" : "NO -- this is prolate"); " *
+            "self-bound: $(ok_bound ? "ok" : "NO -- E/N >= 0, it will expand"). " *
+            "At B=0 the orientation is an exact zero mode; use orient=rotate.",
+        )
     end
     nothing
 end
@@ -364,9 +381,12 @@ function main(args::Vector{String}=String[])
     medge = maximum(rec.edge)
     @printf("  norm drift    = %.3e   (integrator gate)   %s\n", ndrift,
         ndrift < 1e-6 ? "ok" : "*** UNUSABLE: the integrator is not conserving norm")
-    @printf("  max edge frac = %.3e   (box gate)          %s\n", medge,
-        medge < EDGE_MAX ? "ok" :
-        "*** UNUSABLE: the object is on the wall; f_z/L_z here are not the droplet's")
+    @printf("  max edge frac = %.3e   (box gate, dynamics)%s\n", medge,
+        if medge < EDGE_MAX_DYNAMICS
+            "  ok"
+        else
+            "  *** UNUSABLE: the object is on the wall; f_z/L_z here are not the droplet's"
+        end)
     drift = maximum(sqrt.(rec.cx .^ 2 .+ rec.cy .^ 2 .+ rec.cz .^ 2))
     @printf("  max |COM|     = %.3e a_ho  (the rotation angle is measured about the\n", drift)
     @printf("                  box origin, so a drifting droplet mixes orbit into it)\n")
