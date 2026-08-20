@@ -358,11 +358,14 @@ function main(args::Vector{String}=String[])
     end
 
     if !smoke
-        # dt and t_end belong in the NAME: the dt-convergence arm is the same
-        # field at half the step, and a tag that omits dt silently overwrites
-        # the very run it is supposed to be compared with (it did, once).
-        tag = @sprintf("edh_%s_Bz%.0fuG_n%d_dt%.0em_t%.0f", cellname, Bz_mG * 1000, nn,
-            dt * 1e4, t_end)
+        # Every axis a convergence arm can vary belongs in the NAME: the
+        # dt arm is the same field at half the step, and the BOX arm is the
+        # same field in a wider box. A tag that omits one silently overwrites
+        # the very run it is supposed to be compared with (dt did, once; box
+        # was added when h19 showed the dipolar field reaches well past where
+        # the density has died, making the box a live axis here).
+        tag = @sprintf("edh_%s_Bz%.0fuG_n%d_box%.1f_dt%.0em_t%.0f", cellname,
+            Bz_mG * 1000, nn, bx, dt * 1e4, t_end)
         jldsave(joinpath(outdir, "$tag.jld2"); rec=rec, Jz=Jz, phi_u=phi_u,
             t_ms=t_ms, Bz_mG=Bz_mG, p=p, n=nn, box=bx, dt=dt,
             psi_final=Array(ws.state.psi),
