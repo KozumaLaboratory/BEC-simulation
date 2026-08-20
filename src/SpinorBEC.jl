@@ -14,7 +14,7 @@ using Printf
 using Dates
 using SHA
 import JSON
-using SpecialFunctions: erfcx
+using SpecialFunctions: erfcx, erfc
 using Sockets
 # WriteVTK + HTTP are now weak deps (see ext/SpinorBECVTKExt,
 # ext/SpinorBECHTTPExt). No top-level `using` statements for them here.
