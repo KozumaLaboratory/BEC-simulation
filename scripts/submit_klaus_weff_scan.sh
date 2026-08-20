@@ -51,8 +51,21 @@ source scripts/tsubame_setup.sh
 # dependency is what let a failed arm print "done" for twelve days.
 set -euo pipefail
 
+# TASK INDEX -> CONFIG. A positional index over a directory listing is only
+# stable while the directory is. Adding six arms on 2026-08-21 shifted every
+# index, and a requeued job read the list ~13 s before the checkout was synced --
+# had the order been reversed it would have run a DIFFERENT config and written it
+# to a log named for the old one, silently. So: prefer an explicit manifest, a
+# file of config paths that a submission pins at qsub time and that git records.
+# The glob remains the default for a full sweep, where the whole set is the point.
 CFG_DIR="${WEFF_CFG_DIR:-runs/klaus_quench_weff}"
-mapfile -t CFGS < <(ls "$CFG_DIR"/*.yaml | sort)
+if [ -n "${WEFF_MANIFEST:-}" ]; then
+    [ -f "$WEFF_MANIFEST" ] || { echo "FATAL: manifest not found: $WEFF_MANIFEST" >&2; exit 1; }
+    mapfile -t CFGS < <(grep -v '"'"'^[[:space:]]*\(#\|$\)'"'"' "$WEFF_MANIFEST")
+    echo "manifest: $WEFF_MANIFEST (${#CFGS[@]} arms)"
+else
+    mapfile -t CFGS < <(ls "$CFG_DIR"/*.yaml | sort)
+fi
 N=${#CFGS[@]}
 if [ "$N" -eq 0 ]; then
     echo "FATAL: no configs under $CFG_DIR" >&2
