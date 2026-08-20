@@ -97,14 +97,23 @@ ensemble)
     for f in "$SEEDCELL" "$ENDCELL"; do
         [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }
     done
-    # GROWTH-ONLY, and that is a measurement rather than a preference: the
-    # projected scattering step loses number at ~1.25× the growth rate
-    # (`docs/guides/spgpe.md`), which at this operating point took N_C down 11.5 %
-    # in 60 ms with the growth drive set to exactly zero. A condensate cannot be
-    # grown through a window while a "number-conserving" term outruns the growth.
-    # Rooney Eq. (20) — the growth SPGPE — is the sub-theory that answers #334's
-    # question, and it is what carries the M_z-changing exchange that makes
-    # nucleation possible where transport is blocked. Passed through `-v`, not
+    # GROWTH-ONLY. The reason recorded here when the ensemble was launched — "the
+    # projected scattering step loses number at ~1.25× the growth rate" — was
+    # WITHDRAWN on 2026-08-20 and must not be cited: the projected step's loss is
+    # ONE-OFF in the seed's out-of-C weight, and it read as a rate only because a
+    # tracking cutoff manufactures fresh out-of-C content every step. See the
+    # retraction in `src/solvers/spgpe.jl` and `docs/guides/spgpe.md`.
+    #
+    # What survives the retraction is Rooney Eq. (20) being the sub-theory that
+    # answers #334's question, and its carrying the M_z-changing exchange that
+    # makes nucleation possible where transport is blocked. What does NOT survive
+    # is the claim that the full theory was unusable — that was never measured.
+    # It is being measured now: the `fullspgpe` stage runs the full theory on the
+    # same ramp, and it holds N_C flat at f = 0.065 where growth-only reaches
+    # 0.37. Pinning the cutoff does not restore it, so the withdrawn mechanism is
+    # not the explanation either. Until `ed_probe` attributes that stall, this
+    # stage's choice of sub-theory is a stated assumption, not a justified one.
+    # Passed through `-v`, not
     # exported: qsub only forwards the variables it is named, so an `export` here
     # would have left every job running the full theory.
     # ONE trajectory per job, and a 12 h slot for a job that takes ~7 h.
@@ -205,6 +214,15 @@ kcut_fixed)
     q -N nu_kcfix_T${T} -l h_rt=24:00:00 \
       -v NU_KAPPA=1.8,NU_GRID=64,NU_T=$T,NU_DT=$DT,NU_TAU_MS=1300,NU_HOLD_MS=2700,NU_KCUT_FIXED=1,NU_SEEDS_N=1,NU_SEED0=1,NU_SEED_FILE=$SEEDCELL,NU_MU1_FROM=$ENDCELL,NU_OUT=$OUT/nucleate_kcutfixed_T${T} \
       scripts/eu334/submit_nucleate.sh
+    ;;
+
+# Unit-scale probe for the stall seen in the fullspgpe stage. Same setup as the
+# suite's only condensate-growth gate, run at BOTH values of M, so the arms differ
+# in one knob. Cheap and short: this is a debugging instrument, not a measurement
+# of the campaign's physics.
+ed_probe)
+    q -N eu334_edprobe -l h_rt=2:00:00 -v ED_NSTEP=${ED_NSTEP:-25000} \
+      scripts/eu334/submit_ed_probe.sh
     ;;
 
 # Classify every endpoint that has one and no class CSV yet. Idempotent, and

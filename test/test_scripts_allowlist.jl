@@ -101,10 +101,12 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu334/submit_nucleate.sh",
     "eu334/submit_smoke.sh",
     "eu334/submit_classify.sh",
+    "eu334/submit_ed_probe.sh",
     "eu334/window.jl",
     "eu334/nucleation_bifurcation.jl",
     "eu334/nucleate.jl",
     "eu334/classify.jl",
+    "eu334/ed_growth_probe.jl",
     "eu334/viz_eu334.py",
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure

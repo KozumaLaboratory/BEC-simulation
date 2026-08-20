@@ -335,6 +335,65 @@ end
             @test abs(r.tail) < 1.0e-14
         end
         @test isapprox(c2.first, c.first; rtol=0.05)
+
+        # 4. AND THE SCOPE, asserted rather than left to the prose above. Every
+        #    arm so far ran NOISE OFF, which is not the condition callers run.
+        #    Turning the noise on and starting from a PRE-PROJECTED seed — so the
+        #    one-off is already paid and cannot be mistaken for what follows —
+        #    isolates whatever the noise channel does on its own.
+        #
+        #    This is here because the noise-off result was carried into an
+        #    operational conclusion it does not support. `docs/guides/spgpe.md`
+        #    arm D (zero drive, noise ON) lost 11.5 % of N_C in 60 ms while arm E
+        #    (zero drive, noise OFF) lost 0.6 %; the loss needs the noise, and the
+        #    gate that "retracted the rate" never turned it on. Whichever way this
+        #    comes out, the gate now states its own scope instead of a title that
+        #    outruns it.
+        #
+        #    Growth is switched OFF (gamma = 0), not merely balanced, so nothing
+        #    physical can move N and the whole signal belongs to energy damping.
+        function ed_noisy(; nstep, seed)
+            SpinorBEC.scratch_clear!()
+            grid = make_grid(GridConfig((n_pts, n_pts, n_pts), (box, box, box)))
+            sp = SimParams(; dt=0.01, n_steps=1, imaginary_time=false,
+                save_every=1, normalize_every=0)
+            ws = make_workspace(; grid, atom=Rb87,
+                interactions=InteractionParams(Dict{Int, Float64}(0 => 20.0)),
+                potential=HarmonicTrap{3}((1.0, 1.0, 1.0)), sim_params=sp,
+                fft_flags=FFTW.ESTIMATE)
+            ed_seed(ws, grid, 0.0)
+            apply_projected_gp!(ws, kc)
+            dV = cell_volume(grid)
+            n0 = real(sum(abs2, ws.state.psi)) * dV
+            trunc = 0.0
+            res = SPGPEReservoir(; T=5.0, mu=1.0, a_s=0.01, k_cut=kc, gamma=0.0,
+                allow_unphysical_rates=true)
+            for s in 1:nstep
+                r = apply_spgpe_step!(ws, res, 0.01; t=0.0, seed=seed * 100_003 + s,
+                    noise=true)
+                trunc += get(r, :noise_truncated, 0.0)
+            end
+            n1 = real(sum(abs2, ws.state.psi)) * dV
+            (; loss=(n0 - n1) / n0, trunc=trunc / n0)
+        end
+
+        mean_loss(nstep) = sum(ed_noisy(; nstep, seed=s).loss for s in 1:3) / 3
+        l_short = mean_loss(50)
+        l_long = mean_loss(200)
+        Printf.@printf(
+            "  noise ON, pre-projected, gamma=0: 50 steps %.4e | 200 steps %.4e | ratio %.2f\n",
+            l_short, l_long, l_long / max(abs(l_short), eps()))
+
+        # A one-off saturates: 4x the steps returns the same number. A rate scales
+        # with them. The assertion is on the CLASSIFICATION, with the boundary far
+        # from both hypotheses (1x versus 4x), so seed-to-seed spread in the noise
+        # cannot flip it.
+        # The assertion below is deliberately NOT written yet, and this comment is
+        # the reason. Writing `ratio < 2 || ratio > 3` here would pass for almost
+        # every possible measurement — a gate that cannot fail, which is the exact
+        # defect this file's other gates exist to prevent. The number gets measured
+        # first and the boundary gets pinned to what it shows.
+        @test isfinite(l_short) && isfinite(l_long)
         @test isapprox(c2.total, c.total; rtol=0.05)
     end
 
