@@ -239,6 +239,29 @@ that already costs 460 ms/step with the DDI. The 0-D model carries the cooling a
 c-field takes over at 1.85 s; everything before that enters only through $(N,T)$ at the
 handoff.
 
+### The dynamics: the field does not condense at the derived rates
+
+The table above is the equilibrium constraint. Whether the c-field *follows* it is the
+question the SPGPE exists to answer, and the answer at the handoff is no:
+
+| | field | constraint |
+|---|---|---|
+| thermal $C$ region, end of ramp | 34 | 51 |
+| condensate $N_0$, end of ramp | **0.071** | **3498** |
+
+with the constraint satisfiable at all 4977 control steps. **The thermal modes track
+equilibrium to 30 % and the condensate mode does not grow at all.** A broken engine would
+miss both, so what is failing is specifically condensate growth — whose rate is
+$2\gamma(\mu-\varepsilon_0)$.
+
+Whether that is the finite-$\gamma$ lag or a remaining defect is being discriminated by a
+$\gamma$ scan (1×, 10×, 100×, raised through $a_s$ since the rates are derived). **That
+scan was run once before and thrown away**: the $N_0$ estimator read `psi[:,:,:,1]` while
+`thermal_cfield!` seeds the last component, so at $D=13$ it projected an empty array and
+returned $\sim 0$ at every $\gamma$ by construction. It is now checked against a known
+Thomas–Fermi state in $D = 1, 3, 13$ and in both the first and last component, returning
+1.00000 each time.
+
 **Three attempts at this constraint, and only measurement caught the first two.**
 Prescribing $\mu$ from an assumed split prescribes $N_0$. Solving
 $N_I=N_\mathrm{total}-N_C$ with $N_C$ read from the field charges the whole
