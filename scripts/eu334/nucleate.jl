@@ -307,8 +307,26 @@ function main()
     tw = [0.0, TAU, max(TAU + HOLD, TAU + 1e-9)]
     muw = PiecewiseLinearWaveform(tw, [MU0, MU1, MU1])
     Tw = ConstantWaveform(T_RES)
-    kcw = PiecewiseLinearWaveform(tw,
-        [sqrt(2 * (mu + N_T * T_RES)) for mu in (MU0, MU1, MU1)])
+    # `NU_KCUT_FIXED=1` pins the C region at its END value instead of tracking µ.
+    #
+    # This is the arm that attributes the energy-damped run's suppressed growth.
+    # The projected scattering step's number loss is ONE-OFF in the seed's
+    # out-of-C weight (measured; see the retraction in `src/solvers/spgpe.jl`), so
+    # a STATIONARY cutoff pays it once. A cutoff that ramps manufactures fresh
+    # out-of-C content every step, which re-imposes the one-off step after step
+    # and is indistinguishable from a rate in the trajectory alone.
+    #
+    # The existing NULL arm (`NU_MU1_EQ_MU0`) cannot separate this: with the two
+    # µ equal the cutoff is constant by construction, so the very motion under
+    # suspicion is absent. Pinning the cutoff while the DRIVE still runs is what
+    # isolates it. The end value is used because `k_cut < K_MAX` is already
+    # checked at both ends above, so pinning cannot silently leave the grid.
+    kc_of = mu -> sqrt(2 * (mu + N_T * T_RES))
+    kcw = if gets("NU_KCUT_FIXED", "") == "1"
+        ConstantWaveform(kc_of(MU1))
+    else
+        PiecewiseLinearWaveform(tw, [kc_of(mu) for mu in (MU0, MU1, MU1)])
+    end
     # `NU_NO_ED=1` selects the growth-only sub-theory (Rooney Eq. 20). Not a
     # convenience switch: the scattering term is number-conserving only BEFORE the
     # projector, and turning it off is how its residual is attributed rather than
