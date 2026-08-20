@@ -333,7 +333,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # Handed off at three points spanning the peak, since where the field is
         # started changes how much time it has: 1.73 s is where N_0^eq peaks at 4.0e4,
         # 1.85 s is the earliest affordable grid, 1.99 s is comfortably inside.
-        for ts in (1.73, 1.85, 1.99)
+        # ONE handoff per job. Three full ramps in one reservation is ~15 h against a
+        # 6 h wall: the first attempt finished handoff 1 and was SIGKILLed at 21595 s
+        # with the other two unrun, exactly as the three-arm gamma scan was. Same fix,
+        # and the same reason it should have been obvious the first time — one full
+        # ramp had already been measured at ~5 h.
+        for ts in (parse(Float64, get(ENV, "SBEC_T_START", "1.73")),)
             @printf("\n########## handoff at %.2f s ##########\n", ts)
             o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, t_start_s=ts)
             h = isempty(o.hist) ? nothing : o.hist[end]
