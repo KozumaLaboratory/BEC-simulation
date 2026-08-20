@@ -303,15 +303,28 @@ function main(args::Vector{String}=String[])
 
     println()
     println("="^78)
-    @printf("EdH QUENCH  Bz = %.4f mG = %.1f uG   p = %+.6f   F=6 N=15000 eps_dd=1.3\n",
-        Bz_mG, Bz_mG * 1000, p)
+    # Derive the physics line from the cell. It was the LITERAL string
+    # "F=6 N=15000 eps_dd=1.3" until 2026-08-20, so every `cell=E1` run
+    # printed a banner describing a different cell -- and the only way to tell
+    # which had actually run was to recognise p = -2.8627 as g_F = 4.5.
+    @printf("EdH QUENCH  Bz = %.4f mG = %.1f uG   p = %+.6f   cell=%s F=%d N=%d eps_dd=%.2f\n",
+        Bz_mG, Bz_mG * 1000, p, cellname, b.F, b.cell.N, b.cell.eps_dd)
     println("="^78)
     @printf("  %d steps, wall %.1f s (%.2f ms/step), t_end = %.3f = %.2f ms, %d samples\n",
         n_steps, wall, 1000wall / n_steps, t_end, t_end * 1000 / OMEGA_REF, length(rec.t))
-    @printf("  norm drift    = %.3e   (integrator gate)\n",
-        maximum(abs.(rec.norm .- rec.norm[1])))
-    @printf("  max edge frac = %.3e   (box gate; the object must not touch the wall)\n",
-        maximum(rec.edge))
+    # WRITE THE VERDICT, do not print a column and leave the reading to the
+    # reader. On 2026-08-20 a box scan launched without `dt=` picked up the
+    # default 5e-4 -- fine for the F=6 cell it was tuned on, unstable for E1 --
+    # and ran to max edge 9.2e-2 with f_z drifting to -0.40. The number was
+    # right there in the output and got read as data. h3 already had this fixed;
+    # this file did not.
+    ndrift = maximum(abs.(rec.norm .- rec.norm[1]))
+    medge = maximum(rec.edge)
+    @printf("  norm drift    = %.3e   (integrator gate)   %s\n", ndrift,
+        ndrift < 1e-6 ? "ok" : "*** UNUSABLE: the integrator is not conserving norm")
+    @printf("  max edge frac = %.3e   (box gate)          %s\n", medge,
+        medge < EDGE_MAX ? "ok" :
+        "*** UNUSABLE: the object is on the wall; f_z/L_z here are not the droplet's")
     drift = maximum(sqrt.(rec.cx .^ 2 .+ rec.cy .^ 2 .+ rec.cz .^ 2))
     @printf("  max |COM|     = %.3e a_ho  (the rotation angle is measured about the\n", drift)
     @printf("                  box origin, so a drifting droplet mixes orbit into it)\n")
