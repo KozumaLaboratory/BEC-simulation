@@ -112,6 +112,7 @@ const FAST_TESTS = [
     "workflow/test_full_bdg_advisory_fires.jl",
     "workflow/test_no_second_atom_F_table.jl",
     "workflow/test_every_dynamics_path_reports_liveness.jl",
+    "workflow/test_every_dynamics_path_reports_progress.jl",
     "workflow/test_oom_reaches_resource_permanent.jl",
     "workflow/test_preflight_can_fail.jl",
     "workflow/test_slack_alerts_report_delivery.jl",
