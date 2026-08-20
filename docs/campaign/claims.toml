@@ -533,3 +533,36 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "4.2"
 pr = 392
 note = "Named rather than left implicit. It is a 32×32×16 GPU rotating-basis 8-point scan with no result being quoted, so it was deferred rather than fixed — but a deferral with no row is indistinguishable from an oversight."
+
+[[claim]]
+id = "edh-longtime-static-sustains"
+claim = "At 145 ms the rotating arm peaks and collapses back below the baseline while the static weakened trap holds 2.25× it, so rotation gives a transient and the static trap a SUSTAINED transfer."
+status = "refuted"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, hold = 100 ω_ref⁻¹, three arms."
+retired_literal = ["2.25×", "2.25x", "sustained transfer", "a transient"]
+uncertainty = "The claim was stated with its own key number (3.21 % static-vs-rotating at the peak) INSIDE the resolution systematic (2.5 %), and said so. That overlap is what made the 64³ run the obvious next step."
+uncertainty_basis = "grid"
+evidence = ["32³: baseline 0.38532/0.23127, static 0.50790/0.47517, rotating 0.52475/0.21093 (hold-peak/end)"]
+evidence_status = "absent"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "13"
+pr = 410
+note = """REFUTED 2026-08-20 by the 64³ re-run, with NO replacement ordering — see `edh-longtime-not-converged-at-32`. Both orderings invert: static-vs-rotating at the peak goes -3.2 % to +21.6 %, and at the endpoint 2.25× to 0.68×. Per-arm the endpoints move -42.6 % (static) and +91.3 % (rotating). This is not a 3 % divergence being resolved, it is 32³ failing to resolve the branch."""
+
+[[claim]]
+id = "edh-longtime-not-converged-at-32"
+claim = "At a 100 ω_ref⁻¹ hold, 32³ is not resolution-converged: refining to 64³ inverts both the peak and the endpoint ordering of static vs rotating, so NEITHER resolution establishes the long-time ordering."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, one seed. TWO arms at 64³ (static ω_eff=0.714 and rotating Ω=−0.70); the 64³ BASELINE was not run."
+uncertainty = "unbounded: n = 1 at each 64³ point and no 64³ baseline, so this bounds what 32³ CANNOT support without establishing what is true. A third arm and a second seed at 64³ are the missing measurements."
+uncertainty_basis = "grid"
+evidence = ["64³: static 0.49081/0.27262, rotating 0.40358/0.40358 (hold-peak/end) against 32³ 0.50790/0.47517 and 0.52475/0.21093"]
+evidence_status = "absent"
+commit = "32aa5e50"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "15"
+pr = 0
+note = """The part that generalises: grid adequacy is a property of the grid AND the integration time. Under the same 32³→64³ refinement the SHORT protocol (14.5 ω⁻¹) moved by a uniform +2.3 % and the 5.2 nT dip kept 93 % of its depth — shape preserved — while the long one moves -3.4/-23.1/-42.6/+91.3 % and orderings invert. So sections 9-12 are unaffected and only the long-time branch is out of reach at 32³. A convergence check at one duration does not transfer to another."""

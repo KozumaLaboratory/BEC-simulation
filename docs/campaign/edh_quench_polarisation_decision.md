@@ -885,6 +885,11 @@ fields or densities, which were not re-run.
 
 ## 13. Long time (145 ms): the substitution is a short-time statement
 
+> **RETRACTED 2026-08-20 — every ordering below flips sign at 64³. See §15.**
+> The section is kept because the 32³ numbers are real and the retraction is
+> about what they support, not about whether they were measured. Do not quote
+> the endpoint comparison or the "sustained vs transient" reading.
+
 `runs/klaus_quench_long_time/` was **missed by the corpus retarget** — it was
 still `m_minus_F` at B_z > 0, i.e. aligned, until this branch. Retargeted (9
 configs, seed-agreement gate green), then three arms at hold = 100 ω_ref⁻¹
@@ -906,20 +911,26 @@ leans on it.
 
 **On the endpoint, they are qualitatively different, and that is not marginal.**
 The rotating arm peaks and then collapses back to 0.21093 — *below* the baseline's
-0.23127 — while the static arm holds 0.47517, i.e. **2.25×** the rotating one.
-Rotation produces a transient; the weakened static trap produces a *sustained*
-transfer.
+0.23127 — while the static arm holds 0.47517, i.e. ~~**2.25×**~~ the rotating one.
+Rotation produces ~~a transient~~; the weakened static trap produces a
+~~sustained transfer~~.
+<!-- REFUTED 2026-08-20 (§15, claim `edh-longtime-static-sustains`): at 64³ the
+     ratio is 0.68× and the arms swap roles. No replacement ordering exists. -->
+
+> **REFUTED — §15.** At 64³ this ordering inverts: static ÷ rotating at the end is
+> **0.68×**, and it is the *static* arm that decays while the rotating one is
+> still climbing. Neither resolution establishes the long-time ordering.
 
 So the §9.3 substitution ("rotation is fully replaceable by a static weakened
 trap") is a **short-time statement**. At 145 ms the two agree on how high the
 cascade climbs and disagree completely on whether it stays there — and the static
 prescription is the better one on the observable an experiment would actually
-integrate.
+integrate. *(That last clause is **refuted**; see §15.)*
 
 The sheet's long-time rows (`P_exc(end) = 0.958 at 145 ms`) are not directly
 comparable — different cell (`keep_rot`, Ω = −0.5, aligned corpus) — and are not
-re-derived here. What is established is the *ordering*, which is the load-bearing
-part: static > rotating > baseline on sustained transfer.
+re-derived here. The *ordering* was claimed here as the load-bearing part —
+~~static > rotating > baseline on sustained transfer~~ — and is **REFUTED** by §15.
 
 ---
 
@@ -987,6 +998,69 @@ No physics from this branch. What it produced is two defects, one of which was
 silently satisfying a campaign guard. The 8-point production scan is **not**
 launched — it would now run, but on a path whose ground state reports no energy,
 so there would be nothing to check the result against.
+
+---
+
+## 15. RETRACTION — 32³ is not converged for the long-time branch
+
+§13 was published in PR #410 on the strength of three 32³ arms. The two arms its
+conclusion rests on were then re-run at 64³, and **both orderings reverse**.
+
+| | 32³ | 64³ |
+|---|---:|---:|
+| **hold-peak** static (ω_eff = 0.714) | 0.50790 | 0.49081 |
+| **hold-peak** rotating (Ω = −0.70) | 0.52475 | 0.40358 |
+| static vs rotating | **−3.2 %** | **+21.6 %** |
+| **endpoint** static | 0.47517 | 0.27262 |
+| **endpoint** rotating | 0.21093 | 0.40358 |
+| static ÷ rotating at the end (the **refuted** 32³ figure vs 64³) | **2.25×** | **0.68×** |
+
+Per-arm, 32³ → 64³: static peak −3.4 %, rotating peak −23.1 %, static endpoint
+**−42.6 %**, rotating endpoint **+91.3 %**.
+
+### 15.1 What is withdrawn
+
+- **REFUTED — "Rotation gives a transient, the static trap a sustained transfer."**
+  At 64³ it is the *static* arm that decays (0.49081 → 0.27262) and the
+  *rotating* one that is still climbing at 145 ms (peak = end = 0.40358).
+- **"The static prescription is the better one on the observable an experiment
+  would integrate."** Withdrawn — at 64³ the rotating arm ends higher.
+- **"Static and rotating differ by 3.21 %, suggestive of divergence."**
+  Withdrawn. The correct reading is not a 3 % divergence but that **32³ does not
+  resolve this branch at all.**
+
+### 15.2 What replaces it
+
+Only this, and it is deliberately thin:
+
+> **At 145 ms, 32³ is not resolution-converged. Nothing about the long-time
+> ordering of static vs rotating is established at either resolution**, because
+> 64³ has n = 1 per point and its baseline arm was **not** run — so 64³ shows the
+> 32³ answer is wrong without establishing the right one.
+
+### 15.3 The part that generalises: resolution adequacy is duration-dependent
+
+The short protocol and the long one behave completely differently under the same
+refinement:
+
+| | shift under 32³ → 64³ |
+|---|---|
+| short (14.5 ω⁻¹), §11.2 | a **uniform** +2.3 %; the 5.2 nT dip kept **93 %** of its depth, so the *shape* survived |
+| long (100 ω⁻¹), here | **−3.4 / −23.1 / −42.6 / +91.3 %** — not uniform, and orderings invert |
+
+**So §9–§12 are unaffected** — their conclusions rest on shapes and orderings at
+14.5 ω⁻¹, where the refinement was measured to be a uniform offset. It is only the
+long-time branch that 32³ cannot carry. Grid adequacy is not a property of the
+grid alone; it is a property of the grid *and the integration time*, and a
+convergence check done at one duration does not transfer to another.
+
+### 15.4 Why this was caught
+
+Because §13 said its own key number sat inside the resolution uncertainty
+(3.21 % against 2.5 %) and named the missing measurement instead of rounding it
+away. The 64³ run was then the obvious next thing rather than something nobody
+thought to do. **A stated uncertainty that overlaps the claim is a work item, and
+writing it down is what makes it one.**
 
 <!-- REDERIVE -->
 
