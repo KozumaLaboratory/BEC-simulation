@@ -29,6 +29,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     "cli.jl",                      # shim → SpinorBEC.cli_main
     "generate_state.jl",           # docs/STATE.md generator (test-gated)
     "prior_art.py",                # prior-art dispositions (test-gated)
+    "reduce_result_backlog.jl",     # result.jld2 backlog sweep (calls the gated reducer)
     "audit_memory.py",             # memory-store auditor (CLAUDE.md-gated)
     "preflight_invariants.jl",     # physics-invariant preflight battery
     "watch_until_done.sh",         # job watcher with a reachable RED
