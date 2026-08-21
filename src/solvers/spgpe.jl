@@ -35,7 +35,32 @@
 # `dψ = γ(μ − L)ψ dt + dW` with ⟨dW*dW⟩ = 2γT δ_C dt.
 
 export SPGPEReservoir, spgpe_growth_rate, spgpe_scattering_rate, spgpe_rates
-export apply_spgpe_step!, apply_energy_damping_step!, spgpe_callback, tracking_cutoff
+export apply_spgpe_step!,
+    apply_energy_damping_step!, spgpe_callback, tracking_cutoff,
+    field_chemical_potential
+
+"""
+    field_chemical_potential(ws) -> Float64
+
+The c-field's own chemical potential, μ̃ = ⟨ψ|H|ψ⟩ / ⟨ψ|ψ⟩.
+
+This is the quantity the growth term is driven by: Rooney Eq. (23) gives
+dN_C/dt = −2γ(μ̃ − μ_res)N_C, so the drive is the DIFFERENCE and knowing only the
+reservoir's μ says nothing about whether a run is still being driven.
+
+Public because it was hand-rolled in the test suite and needed again in #418,
+where a full-SPGPE run holds N_C flat while μ_res sits above it. "The drive has
+collapsed because μ̃ rose to meet μ_res" is the leading explanation and it was
+UNMEASURABLE from what the runs record — they log the reservoir's μ and not the
+field's. Two hand-rolled copies is where a third gets it subtly different.
+
+Costs one Hψ application, so it belongs at frame cadence, not per step.
+"""
+function field_chemical_potential(ws)
+    hpsi = similar(ws.state.psi)
+    apply_operator_via_registry!(hpsi, ws)
+    real(sum(conj.(ws.state.psi) .* hpsi)) / real(sum(abs2, ws.state.psi))
+end
 
 using Random
 

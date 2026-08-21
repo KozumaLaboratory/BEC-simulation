@@ -221,7 +221,7 @@ function assert_seed_epoch_scalars(seed, ws_n, ws_1)
 end
 
 const COLS = ["t_ms", "N_C", "mu", "T", "eps_cut", "k_cut", "gamma", "M_bar",
-    "fperp", "fz", "Lz", "Sz", "Jz", "cutoff_outflow", "noise_truncated"]
+    "fperp", "fz", "Lz", "Sz", "Jz", "cutoff_outflow", "noise_truncated", "mu_psi"]
 
 function main()
     seed = load_seed()
@@ -352,7 +352,12 @@ function main()
         a = per_atom(h, PRESET_N.grid, ws.fft_plans)
         push!(rows, Any[ws.state.t * MS_PER_TAU, a.N, r.mu, r.T, r.eps_cut, r.k_cut,
             r.gamma, r.M, a.fperp, a.fz, a.Lz, a.Sz, a.Jz,
-            get(r, :cutoff_outflow, NaN), get(r, :noise_truncated, NaN)])
+            get(r, :cutoff_outflow, NaN), get(r, :noise_truncated, NaN),
+            # The FIELD's chemical potential. The growth drive is 2γ(µ_res − µ_ψ)
+            # and only µ_res was recorded, so "the drive collapsed" — the leading
+            # explanation for the #418 stall — could not be checked at all. One Hψ
+            # per frame, not per step.
+            field_chemical_potential(ws)])
     end
     rec!(0, merge(r0, (; cutoff_outflow=NaN, noise_truncated=NaN)))
 
@@ -378,9 +383,9 @@ function main()
             # time, unreadable until the job finished. A stalled job the log
             # cannot explain is the case the line was added for.
             @printf(
-                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
-                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13],
-                r[14], r[15])
+                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f µψ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
+                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[16], r[9],
+                r[13], r[14], r[15])
             flush(stdout)
         end
     end

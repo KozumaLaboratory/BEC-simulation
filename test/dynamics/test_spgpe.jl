@@ -524,10 +524,10 @@ end
             psi[I, D] = exp(-(x^2 + y^2 + z^2) / 8)
         end
         copyto!(ws.state.psi, psi)
-        μ̃ = let hpsi = similar(ws.state.psi)
-            SpinorBEC.apply_operator_via_registry!(hpsi, ws)
-            real(sum(conj.(ws.state.psi) .* hpsi)) / real(sum(abs2, ws.state.psi))
-        end
+        # `field_chemical_potential` rather than a fourth hand-rolled copy: this
+        # was written out here, and again in #418's instrumentation, before the
+        # third site made it a shared function.
+        μ̃ = field_chemical_potential(ws)
         n0 = norm_sq(ws)
         res = SPGPEReservoir(; T=0.0, mu=mu_res, a_s=0.01, k_cut=6.0,
             # Rate chosen for a visible effect in a few steps, not for fidelity:
