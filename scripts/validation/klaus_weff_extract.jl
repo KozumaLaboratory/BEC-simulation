@@ -22,7 +22,8 @@ using Printf
 the point file is absent or carries no dynamics — a missing arm must be visibly
 missing rather than silently skipped.
 """
-function peak_padj(dir::AbstractString; hold_starts_at::Float64=8.98495)
+function peak_padj(dir::AbstractString; hold_duration::Float64=5.5292,
+    dt::Float64=0.005, save_every::Int=100)
     f = joinpath(dir, "point_001.jld2")
     isfile(f) || return nothing
     JLD2.jldopen(f, "r") do g
@@ -33,25 +34,28 @@ function peak_padj(dir::AbstractString; hold_starts_at::Float64=8.98495)
         P = cp isa AbstractMatrix ? cp : permutedims(reduce(hcat, cp))
         adj = [P[i, 2] + P[i, 3] for i in axes(P, 1)]
         # THE PEAK MUST BE TAKEN INSIDE THE HOLD. Over the whole trajectory the
-        # maximum can be the PRE-HOLD TRANSIENT, and at 10.4 nT it is: §12.1 of
-        # the decision document found four arms differing only in the hold
-        # returning peak P_adj = 0.26050 to five decimals, with argmax at frame 29
-        # and the hold starting at 32. The claim is always about the hold.
+        # maximum can be the PRE-HOLD TRANSIENT, and at 10.4 nT it is: §12.1 found
+        # four arms differing only in the hold returning peak P_adj = 0.26050 to
+        # five decimals, argmax at frame 29, hold starting at 32.
         #
-        # This function read the whole trajectory until 2026-08-21 and produced a
-        # `flat baseline with a bump` picture of 10.4 nT that was the transient.
-        # 1.3 / 2.6 / 5.2 nT are unaffected (measured: 0.00 % on all 43 arms) --
-        # only the Zeeman-re-pinned field, where the hold suppresses the cascade
-        # and the transient wins.
+        # THE WINDOW CANNOT COME FROM `times`. `component_populations` is derived
+        # from the psi SNAPSHOTS and `times` from the scalar sampler; they are
+        # different cadences, not an off-by-one (42 against 43 here). Indexing one
+        # by the other is wrong in principle, and the first version of this fix
+        # did exactly that and threw a BoundsError -- which is the lucky outcome,
+        # because an alignment that merely LOOKED plausible would have produced
+        # numbers.
         #
-        # `hold_starts_at` is the sum of the three earlier dynamics durations in
-        # code units (6.9115 + 0.69115 + 1.3823), read from `times` rather than
-        # from a frame index so it survives a change in `save.every`.
-        t = haskey(d, "times") ? collect(d["times"]) : Float64[]
-        idx = isempty(t) ? eachindex(adj) : findall(>=(hold_starts_at), t)
-        isempty(idx) && return nothing
-        k = idx[argmax(adj[idx])]
-        (peak=adj[k], frame=k, nframes=size(P, 1),
+        # The hold is the last dynamics step, so its frames are the last
+        #     floor(hold_duration / (dt * save_every))
+        # of the array, which is derivable from the config alone. For the 8 ms
+        # arms: 5.5292 / (0.005 * 100) = 11.06 -> 11 frames, 42 - 11 = 31, so the
+        # hold starts at frame 32 -- the number §12.1 states independently. That
+        # agreement is the check; without it this is another guess.
+        nhold = max(1, Int(floor(hold_duration / (dt * save_every))))
+        lo = max(1, length(adj) - nhold + 1)
+        k = lo - 1 + argmax(@view adj[lo:end])
+        (peak=adj[k], frame=k, nframes=length(adj), hold_from=lo,
             whole=maximum(adj), whole_frame=argmax(adj))
     end
 end
@@ -75,7 +79,9 @@ function main(args)
         isdir(d) || continue
         c = coords(basename(d))
         c === nothing && continue
-        p = peak_padj(d)
+        # hold_scale is in the directory name, and the window scales with it.
+        hd = occursin("hold2p0x", basename(d)) ? 2 * 5.5292 : 5.5292
+        p = peak_padj(d; hold_duration=hd)
         if p === nothing
             println("MISSING dynamics: ", basename(d))
             continue
