@@ -132,6 +132,12 @@ const A_HO = sqrt(Units.HBAR / (ATOM.mass * PRESET1.omega_ref))
 const A_S_HO = ATOM.a_s / A_HO
 const MS_PER_TAU = 1e3 / PRESET1.omega_ref
 const K_MAX = π / (BOX / GRID_N)
+# The low-k shell the condensate occupies. A trapped cloud spreads over
+# |k| <~ 1/R_TF, so this is set from the trap rather than picked: the seed cells
+# sit at R_TF ~ 4 a_ho in the tight direction, giving k_lo ~ 0.25. Widening it
+# would fold thermal weight into the "condensate" fraction, which is the failure
+# the mean already had; narrowing it understates N0 the way a single mode does.
+const K_LO = getf("NU_K_LO", 0.25)
 
 p_of(B) = Units.bfield_to_p(B * 1e-6, ATOM.g_F, PRESET1.omega_ref)
 
@@ -158,14 +164,43 @@ function per_atom(psi_dev, grid, plans)
     (; N=n, s.fz, s.fperp, Lz, Sz, Jz=Lz + Sz)
 end
 
-"""µ = Re⟨ψ, Ĥ[ψ]ψ⟩ / ⟨ψ,ψ⟩ — normalisation-independent, and the number the
-reservoir has to be told."""
-function chemical_potential(ws)
-    dV = cell_volume(ws.grid)
-    hpsi = similar(ws.state.psi)
-    apply_operator_via_registry!(hpsi, ws)
-    real(sum(conj(ws.state.psi) .* hpsi)) * dV / (real(sum(abs2, ws.state.psi)) * dV)
+"""Fraction of the C-region norm below `k_lo` — the mode-resolved counterpart to
+µ_ψ, which is a MEAN and cannot say whether the condensate mode is growing.
+
+#418 needed this: on #334's ramp both arms carry µ_ψ ≈ 16-20 against µ_res ≈ 8.6,
+so the mean says "damping" in the arm that visibly grows. The growth term is
+γ(µ − L)ψ acting as an operator, so what matters is the occupation of the LOW-k
+modes, not the average over a C region whose high-k content dominates it.
+
+`k_lo` is one over the Thomas-Fermi radius rather than a single k-mode: a trapped
+condensate spreads over |k| ≲ 1/R_TF, so the largest single mode holds a small
+and misleading fraction of N₀ (`test_spgpe.jl` measured 22× understated).
+
+One FFT per frame, on the buffers the run already holds."""
+function lowk_fraction(psi, grid, plans, k_lo)
+    D = size(psi)[end]
+    tot = 0.0
+    lo = 0.0
+    buf = similar(psi, ComplexF64, size(psi)[1:(end - 1)])
+    kc2 = k_lo^2
+    for c in 1:D
+        buf .= selectdim(psi, ndims(psi), c)
+        plans.forward * buf
+        w = abs2.(buf)
+        tot += sum(w)
+        lo += sum(w[grid.k_squared .<= kc2])
+    end
+    tot > 0 ? lo / tot : NaN
 end
+
+"""µ = Re⟨ψ, Ĥ[ψ]ψ⟩ / ⟨ψ,ψ⟩ — normalisation-independent, and the number the
+reservoir has to be told.
+
+Delegates: this script had its own copy and `field_chemical_potential` was added
+to the package for the same quantity, which is the third-copy problem the latter's
+docstring warns about — committed while writing that warning. The formulas were
+identical (the dV cancels) so nothing was wrong, and that was luck."""
+chemical_potential(ws) = field_chemical_potential(ws)
 
 make_ws(psi, interactions, c_dd; n_steps=0) = make_workspace(;
     grid=PRESET_N.grid, atom=ATOM, interactions=interactions,
@@ -221,7 +256,8 @@ function assert_seed_epoch_scalars(seed, ws_n, ws_1)
 end
 
 const COLS = ["t_ms", "N_C", "mu", "T", "eps_cut", "k_cut", "gamma", "M_bar",
-    "fperp", "fz", "Lz", "Sz", "Jz", "cutoff_outflow", "noise_truncated"]
+    "fperp", "fz", "Lz", "Sz", "Jz", "cutoff_outflow", "noise_truncated", "mu_psi",
+    "lowk_frac"]
 
 function main()
     seed = load_seed()
@@ -352,7 +388,15 @@ function main()
         a = per_atom(h, PRESET_N.grid, ws.fft_plans)
         push!(rows, Any[ws.state.t * MS_PER_TAU, a.N, r.mu, r.T, r.eps_cut, r.k_cut,
             r.gamma, r.M, a.fperp, a.fz, a.Lz, a.Sz, a.Jz,
-            get(r, :cutoff_outflow, NaN), get(r, :noise_truncated, NaN)])
+            get(r, :cutoff_outflow, NaN), get(r, :noise_truncated, NaN),
+            # The FIELD's chemical potential. The growth drive is 2γ(µ_res − µ_ψ)
+            # and only µ_res was recorded, so "the drive collapsed" — the leading
+            # explanation for the #418 stall — could not be checked at all. One Hψ
+            # per frame, not per step.
+            field_chemical_potential(ws),
+            # The mode-resolved half. µ_psi is a mean and says "damping" in the arm
+            # that grows; this says whether the low-k modes are actually filling.
+            lowk_fraction(ws.state.psi, PRESET_N.grid, ws.fft_plans, K_LO)])
     end
     rec!(0, merge(r0, (; cutoff_outflow=NaN, noise_truncated=NaN)))
 
@@ -378,9 +422,9 @@ function main()
             # time, unreadable until the job finished. A stalled job the log
             # cannot explain is the case the line was added for.
             @printf(
-                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
-                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[9], r[13],
-                r[14], r[15])
+                "    %6.1f%%  t=%7.1f ms  N_C=%8.0f (f=%.4f)  µ=%.3f µψ=%.3f  ⟨F⊥⟩=%.4f  J_z=%+.4f  out=%.3g trunc=%.3g\n",
+                100 * step / n_steps, r[1], r[2], r[2] / NATOMS, r[3], r[16], r[9],
+                r[13], r[14], r[15])
             flush(stdout)
         end
     end

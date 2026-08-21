@@ -108,6 +108,11 @@ const FAST_TESTS = [
     "workflow/test_run_root_env.jl",
     "workflow/test_config_zeeman_seed_agreement.jl",
     "workflow/test_calibration_edge_cases.jl",
+    # A one-sided bound is the only grounding method here that can say WHICH
+    # side of a disagreement is wrong; `differential` only says there is one.
+    # Its own convergence test was value-only and stopped on the first simplex
+    # straddling the minimum, so the start-point sweep is the load-bearing case.
+    "workflow/test_variational_bound.jl",
     "workflow/test_loss_block_edge_cases.jl",
     "workflow/test_dynamics_lhy_plumbing.jl",
     "workflow/test_dynamics_lhy_normalisation.jl",
