@@ -18,8 +18,37 @@ using SpinorBEC
 #
 # gamma is deliberately far above its physical value here: the EQUILIBRIUM does
 # not depend on it, only the time taken to reach it, and the point is to reach it.
+# THE FIXTURE IS INTENSIVE, WHICH IS WHY IT COULD BE SHRUNK (#305).
+#
+# Every assertion below is on a RATIO — N/N_TF, N/N_rj — and the physics is set
+# by (mu, T, c0), which are a chemical potential, a temperature and a coupling,
+# none of them extensive. The only constraint tying n to L is that the grid must
+# resolve the cut, `pi*n/L > k_cut`, so n and L shrink TOGETHER at fixed n/L and
+# the work falls as n^3.
+#
+# That is an argument, and an argument is not evidence, so it was run at three
+# fixtures before being changed (2026-08-22, 10-core box):
+#
+#   n=48 L=10.0    N/N_TF = 1.9104 / 0.8760 / 0.9598   N/N_rj = 2.2873   1032 s
+#   n=32 L=6.5     N/N_TF = 1.8931 / 0.8842 / 0.9606   N/N_rj = 2.2639    174 s
+#   n=24 L=5.0     N/N_TF = 1.8858 / 0.8687 / 0.9525   N/N_rj = 2.2592     80 s
+#
+# All four ratios agree to within 1.3 % across an 8x range in box volume, and the
+# `condensed` selector is false/true/true in all three. n=32 was taken rather
+# than n=24 because its deviations are the smaller (<= 1.0 %) and because the
+# Rayleigh-Jeans prediction is a MODE SUM: shrinking the box thins the C-region
+# mode sphere, and this file's whole subject is a discrepancy against that sum.
+#
+# WHY `steps` WAS NOT ALSO CUT. The N(step) traces say it would break the test:
+# at c0 = 0.002 the run is still climbing 3 % between step 6000 and step 8000 at
+# every fixture. 8000 is not generous, it is barely enough, and the `settled`
+# check passes on a 10 % tolerance rather than on a plateau.
+#
+# Cost on the CI runner: this file was 2432 s (run 32300172779), 23 % of the
+# whole `full` tier and the single file that made its makespan unschedulable
+# (#304). At 5.9x it is ~410 s.
 @testset "SPGPE equilibrium atom number vs the Rayleigh-Jeans mode sum" begin
-    n, L = 48, 10.0
+    n, L = 32, 6.5
     mu, T, c0 = 15.0, 80.0, 0.19
     k_cut = sqrt(2 * (mu + T))
     grid = make_grid(GridConfig((n, n, n), (L, L, L)))
@@ -132,16 +161,28 @@ using SpinorBEC
 
         if rj.condensed
             # mu above the Hartree-Fock floor: the thermal-only sum does not
-            # apply and Thomas-Fermi is what to check. Measured 0.876 (c0 = 0.02)
-            # and 0.960 (c0 = 0.002), so 0.15 is the tolerance the data supports.
-            # It was rtol = 1.0, which admits anything inside a factor of two and
-            # passed the 1.91 below without objecting.
+            # apply and Thomas-Fermi is what to check. Measured 0.884 (c0 = 0.02)
+            # and 0.961 (c0 = 0.002) at this fixture, so 0.15 is the tolerance
+            # the data supports. It was rtol = 1.0, which admits anything inside
+            # a factor of two and passed the 1.89 below without objecting.
             @test r.N≈N_TF rtol=0.15
         else
-            # c0 = 0.19 lands here and matches NEITHER convention: 2.29x the
-            # Rayleigh-Jeans mode sum (150819 vs 65936) and 1.91x Thomas-Fermi
-            # (vs 78947). The header's question — "one of the two is wrong" — is
+            # c0 = 0.19 lands here and matches NEITHER convention: 2.26x the
+            # Rayleigh-Jeans mode sum (41044 vs 18130) and 1.89x Thomas-Fermi
+            # (vs 21682). The header's question — "one of the two is wrong" — is
             # still open at the strong-coupling end, and nothing here resolves it.
+            #
+            # WHAT THE FIXTURE SCAN DID SETTLE (2026-08-22, #305): the ratio is
+            # not a finite-size or mode-count artifact. It is 2.2873 at n=48
+            # L=10.0, 2.2639 at n=32 L=6.5 and 2.2592 at n=24 L=5.0 — three box
+            # volumes spanning 8x, agreeing to 1.2 %. Together with the cutoff
+            # convention, already excluded above at 12 % against a factor of 6.7,
+            # that leaves the two candidates the header names: a real error, or
+            # Hartree-Fock failing at c0*n = 28.6 against T = 80, an interaction
+            # it has no right to describe. Discriminating them needs a cell that
+            # is BOTH uncondensed and weakly interacting, and lowering c0 at
+            # fixed mu condenses the gas instead — which is why the three-coupling
+            # scan this file already runs cannot separate them.
             #
             # `@test_broken` rather than a deleted cell or a loosened bound: the
             # discrepancy stays visible, stays measured, and turns the suite RED

@@ -1130,13 +1130,22 @@ const _COST = Dict{String, Float64}(
     "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
     # One 24³ ground state + 100 dynamics steps through the YAML entry point.
     "workflow/test_scalar_egpe_yaml.jl" => 40.0,
-    # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
-    # against the 3.0 s default it had been taking. The default made it the
-    # LAST file handed out, which is the worst possible order for the one
-    # file that sets the makespan on its own. The absolute number is
-    # machine-dependent and the ordering it buys is not — nothing else in
-    # any tier is within a factor of four of it.
-    "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
+    # 460, runner-calibrated, after the fixture shrank from n=48 L=10.0 to
+    # n=32 L=6.5 (#305). Derivation rather than a guess: this file measured
+    # 2432 s on the CI runner (run 32300172779) against 1032 s on the 10-core
+    # box, a 2.36x ratio; the new fixture measures 195 s there, so 195 * 2.36
+    # ~= 460 s here. The 3.2x ratio quoted on `test_itp_dt_limited_advisory`
+    # above is that file's own pair, not a constant — measure the pair you have.
+    #
+    # It was 1266.0, a real measurement on the wrong machine (2026-08-02,
+    # 10-core box), and before that the 3.0 s default, which made the one file
+    # that set the makespan on its own the LAST one handed out.
+    #
+    # It is no longer that file. At 2432 s it was 23 % of the whole `full`
+    # tier and made the makespan unschedulable: the floor was
+    # max(2432, 8067/3) = 2689 s against a 2700 s cap (#304). At 460 s nothing
+    # dominates and the floor is ~2130 s.
+    "dynamics/test_spgpe_equilibrium_number.jl" => 460.0,
     # Measured, not guessed. An unregistered file is handed out as 3.0, not as
     # "probably small", and the 1266 s entry above exists because a heavy file
     # carrying a 3.0 estimate went out last and blew the 15-minute job.

@@ -74,9 +74,17 @@ jobs:
       #
       # 4200 s puts real margin under the 2689 s floor and still leaves 20 min
       # of the 90-minute job budget for checkout, setup and precompile.
-      # `dynamics/test_spgpe_equilibrium_number.jl` is 23 % of the tier's whole
-      # workload on its own and is worth making cheaper at the source (#305);
-      # this is the sizing fix, not that one.
+      #
+      # The source fix landed in the same PR (#305): that file's fixture shrank
+      # from n=48 L=10.0 to n=32 L=6.5 — every assertion in it is on an
+      # INTENSIVE ratio, verified unchanged to 1.0 % across three box sizes —
+      # taking it from 2432 s to ~460 s. Nothing dominates the tier now and the
+      # floor is ~2130 s, which would fit the old 2700 s cap.
+      #
+      # The cap stays at 4200 anyway. It costs nothing when the tier is healthy,
+      # and 2700 was chosen the same way the last one was: by what fitted at the
+      # time. A cap that only works while nothing gets slower is the arrangement
+      # this job has already failed under twice.
       SPINORBEC_TEST_TIMEOUT: "4200"
     steps:
       - uses: actions/checkout@v4
