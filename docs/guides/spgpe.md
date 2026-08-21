@@ -285,8 +285,33 @@ has not been isolated on its own — at 10× $\gamma$ the field still empties, f
 to 198.
 
 **So: this evaporation ramp allows $4\times10^4$ condensed atoms thermodynamically, and
-the c-field does not reach them, because the ramp empties the classical region faster
-than the derived reservoir rates refill it.**
+the c-field does not reach them.** *Why* it does not is two different things at two
+different handoffs, and the single-mechanism sentence this paragraph carried until
+2026-08-21 was taken from the earlier one alone.
+
+Compare the two handoffs at the **same trajectory time**, where the C-region populations
+are nearly equal:
+
+| handoff | $N_C$ at start | $N_C$ at $t\approx7100$ | lost | $N_0$ | $f_0$ |
+|---|---|---|---|---|---|
+| 1.73 s | 2397 | 606 | **75 %** | 0.37 | 0.001 |
+| 1.85 s | 657 | 580 | **12 %** | **10.8** | 0.019 |
+
+Same number of atoms in C, thirty times the condensate — and the 1.73 s run has been
+running *longer*, so it is not short of time. What differs is what it went through:
+starting at $\epsilon_\mathrm{cut}=31$ it loses three quarters of the C region as the
+cutoff shrinks, while the later handoff skips that stretch and loses an eighth.
+
+- **Early handoff — the C region empties.** The cutoff tracks $T$ down through a large
+  range and the projector removes atoms faster than the reservoir refills them.
+- **Late handoff — coherence, not population.** Slowing the *same* $(N,T)$ path 3× leaves
+  $N_C$ essentially unchanged (580 → 590, 444 → 446) and multiplies $N_0$ by 7× and 2.9×
+  at the two points measured so far. Slowing does not put more atoms in C; it lets the
+  ones already there become coherent.
+
+The slowdown run is a **numerical** experiment, not a ramp design: a genuinely slower ramp
+costs more three-body loss and would lower $N_\mathrm{total}$ everywhere. It isolates the
+rate of cutoff change from the loss a slower ramp would incur.
 
 The $\gamma$ scan **was run once before and thrown away**: the $N_0$ estimator read
 `psi[:,:,:,1]` while `thermal_cfield!` seeds the last component, so at $D=13$ it projected
