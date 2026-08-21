@@ -54,8 +54,16 @@ function peak_padj(dir::AbstractString; hold_duration::Float64=5.5292,
         # agreement is the check; without it this is another guess.
         nhold = max(1, Int(floor(hold_duration / (dt * save_every))))
         lo = max(1, length(adj) - nhold + 1)
-        k = lo - 1 + argmax(@view adj[lo:end])
+        w = @view adj[lo:end]
+        k = lo - 1 + argmax(w)
+        # THREE READINGS OF ONE HOLD. At 10.4 nT the peak is not well-posed — its
+        # maximum sits at the window's first frames, where the decaying pre-hold
+        # transient still dominates, and the value moves 37 % with the cut. The
+        # answer is not to pick a window but to keep all three and refuse an
+        # ordering they disagree on. They fail differently: `peak` is contaminated
+        # by the transient, `mean` is diluted by it, `final` is a single sample.
         (peak=adj[k], frame=k, nframes=length(adj), hold_from=lo,
+            mean=sum(w) / length(w), final=adj[end],
             whole=maximum(adj), whole_frame=argmax(adj))
     end
 end
