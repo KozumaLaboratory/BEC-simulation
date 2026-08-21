@@ -566,11 +566,23 @@ end
         Printf.@printf(
             "  both reservoirs (M=1, γ=0.05, T=0.05): µ̃ %.4f → %.4f  (scattering alone: %.4f → %.4f)\n",
             g0, g1, b0, b1)
-        # No direction asserted: the question is whether adding the growth
-        # reservoir REVERSES the cooling the control just demonstrated, and that
-        # is what the printed pair answers. Asserting before reading it is the
-        # error this file has now recorded four times in one day.
-        @test isfinite(g1)
+        # MEASURED 2026-08-21. Adding the growth reservoir does not reverse the
+        # cooling — it deepens it by two orders:
+        #
+        #   scattering alone   65.8286 → 65.3417   −0.74 %
+        #   BOTH reservoirs    65.8286 → 26.2414   −60 %
+        #
+        # So a scalar field under the full pair COOLS, hard. #334's ramp heats by
+        # a factor 6 under the same pair. The two-reservoir interaction is
+        # therefore NOT the cause either, and the scalar setting has now cleared
+        # every part of the SPGPE machinery in turn: the projector, the moving
+        # cutoff, energy damping alone, the scattering drift/noise pair, and the
+        # two reservoirs together.
+        #
+        # What the scalar setting does not have is the DDI and #334's own ramp and
+        # seed. Those are what is left, and this arm is the evidence that they are
+        # what is left rather than an assumption that they are.
+        @test g1 < g0 - 0.1 * abs(g0)     # the pair cools, and not marginally
     end
 
     @testset "quiet damping rate matches −ℳ̄∫d³k|k·j̃|²/|k|" begin
