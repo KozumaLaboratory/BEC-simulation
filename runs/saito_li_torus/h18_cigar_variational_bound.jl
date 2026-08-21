@@ -29,7 +29,7 @@
 using SpinorBEC
 using SpinorBEC: make_workspace, energy_decomposition, InteractionParams,
     ZeemanParams, HarmonicTrap, SimParams, ATOM_REGISTRY, Units, cell_volume,
-    total_density
+    total_density, variational_bound
 using Printf, LinearAlgebra
 
 include(joinpath(@__DIR__, "h3_cells.jl"))
@@ -93,41 +93,6 @@ function zeeman_paper_units(bc, bmg)
     p * bc.F / PAPER_UNIT_IN_HW
 end
 
-"Nelder-Mead on log-widths; the two-parameter surface does not need more."
-function minimize_gauss(f)
-    x = [log(0.35), log(2.0)]
-    simplex = [x, x .+ [0.25, 0.0], x .+ [0.0, 0.25]]
-    val = [f(exp(s[1]), exp(s[2])) for s in simplex]
-    for _ in 1:600
-        o = sortperm(val)
-        simplex, val = simplex[o], val[o]
-        c = (simplex[1] .+ simplex[2]) ./ 2
-        xr = c .+ (c .- simplex[3])
-        fr = f(exp(xr[1]), exp(xr[2]))
-        if fr < val[1]
-            xe = c .+ 2 .* (c .- simplex[3])
-            fe = f(exp(xe[1]), exp(xe[2]))
-            simplex[3], val[3] = fe < fr ? (xe, fe) : (xr, fr)
-        elseif fr < val[2]
-            simplex[3], val[3] = xr, fr
-        else
-            xc = c .+ 0.5 .* (simplex[3] .- c)
-            fc = f(exp(xc[1]), exp(xc[2]))
-            if fc < val[3]
-                simplex[3], val[3] = xc, fc
-            else
-                simplex[2] = (simplex[1] .+ simplex[2]) ./ 2
-                simplex[3] = (simplex[1] .+ simplex[3]) ./ 2
-                val[2] = f(exp(simplex[2][1]), exp(simplex[2][2]))
-                val[3] = f(exp(simplex[3][1]), exp(simplex[3][2]))
-            end
-        end
-        maximum(val) - minimum(val) < 1e-13 && break
-    end
-    i = argmin(val)
-    (exp(simplex[i][1]), exp(simplex[i][2]), val[i])
-end
-
 "Build the same Gaussian on the grid and read the PRODUCTION functional."
 function e_gauss_production(a, b, cell; n, box)
     bc = build_cell(cell; n=n, box=box)
@@ -178,10 +143,15 @@ function main()
         bc.c0, bc.c_dd, bc.c_lhy, bc.p)
     println("="^76)
 
+    # log-widths so the search is unconstrained; the shared minimizer is
+    # `SpinorBEC.variational_bound` (src/workflow/validation/), not a copy
+    # living here -- this file was where it was written and is now its caller.
     fcl =
-        (a, b) -> e_gauss_closed(a, b; c0=bc.c0, c_dd=bc.c_dd,
+        u -> e_gauss_closed(exp(u[1]), exp(u[2]); c0=bc.c0, c_dd=bc.c_dd,
             c_lhy=bc.c_lhy, eps_dd=cell.eps_dd, p=bc.p, F=F).total
-    a, b, e_hw = minimize_gauss(fcl)
+    vb = variational_bound(fcl, [log(0.35), log(2.0)])
+    vb.converged || error("the Gaussian minimization did not converge")
+    a, b, e_hw = exp(vb.params[1]), exp(vb.params[2]), vb.bound
     d = e_gauss_closed(a, b; c0=bc.c0, c_dd=bc.c_dd, c_lhy=bc.c_lhy,
         eps_dd=cell.eps_dd, p=bc.p, F=F)
 

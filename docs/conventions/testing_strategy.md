@@ -9,7 +9,7 @@ This document is the authority on what a test in this repository is allowed to
 claim, how the suite is kept prunable, and what to do when it goes red. It is
 the *why*; `test/runtests.jl` and `test/_tiers.jl` are the *what runs*.
 
-## 1. The five ways to ground a claim
+## 1. The six ways to ground a claim
 
 Without a measurement, correctness can only come from these. Every test must be
 one of them, and must say which.
@@ -21,6 +21,7 @@ one of them, and must say which.
 | `invariant` | a conserved or algebraic property holds | machine epsilon × condition number |
 | `metamorphic` | an observable transforms correctly under a symmetry | machine epsilon |
 | `differential` | two independent statements of the same physics agree | machine epsilon, or a stated model gap |
+| `bound` | a claimed extremum is on the achievable side of a trial value | none — it is an inequality |
 
 `order` is the strongest tool available here and the most underused. It needs no
 true answer at all: for the Strang sandwich the one-step error must fall as
@@ -30,6 +31,37 @@ changes the constant and passes a threshold test; a wrong *operator ordering*
 changes the exponent, and only an order test sees it. `_YOSHIDA_W0` is exactly
 this shape: breaking $\sum_i w_i = 1$ leaves every single-$\Delta t$ tolerance
 green.
+
+`bound` is the only one of the six that can say **which side** of a disagreement
+is wrong. `differential` establishes that two statements disagree and stops
+there; when the other statement is a published number there is no third
+implementation to break the tie. A trial wave function breaks it, because
+evaluated on the *same* functional it is a strict upper bound on that
+functional's minimum — so a reported ground state lying **above** it is not the
+minimum, whoever computed it. Nothing has to converge and neither side has to be
+trusted; the only precondition is that both are minimizing the same functional,
+which is the caller's to establish term by term against the source.
+
+It is one-sided, and that is both the point and the limit: a claim above the
+bound is refuted, a claim below it is merely *allowed*, never confirmed. Two
+consequences worth stating in any report that uses it. **A weak bound is a
+stronger result** — if a crude trial family already beats the claim, the true
+minimum is further below still, so quote the slack between the bound and your
+own solution. And **the trial family must lie in the claim's sector**: a
+polarized Gaussian bounds a polarized branch and says nothing about a vortex
+branch it cannot represent.
+
+`SpinorBEC.variational_bound` implements it, including the discipline that
+matters — supply a second independent statement of the functional as
+`cross_check` and the *least binding* of the two is returned, so the verdict
+does not depend on which of them is the more accurate. Worked example, against
+a published figure: `runs/saito_li_torus/h18_cigar_variational_bound.jl`, where
+a two-parameter Gaussian beat a paper's reported branch at every field it was
+drawn at. Gated by `test/workflow/test_variational_bound.jl`, whose positive
+control is a trial family that *contains* the exact answer (harmonic
+oscillator, bound must equal $E_0$ exactly, not merely bracket it) and whose
+complementary control is one that does not (quartic, bound must sit strictly
+above a separately diagonalised minimum).
 
 `metamorphic` is the second most underused. Translate the state and the trap
 together and the energy must not move; rotate the spinor and the field together
