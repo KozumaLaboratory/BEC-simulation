@@ -486,6 +486,27 @@ end
             join(round.(es; digits=4), " → "))
         @test all(isfinite, es)
 
+        # POSITIVE CONTROL FIRST. The same call, with a scattering rate large
+        # enough to act in 400 steps: if this does not cool, the arm cannot detect
+        # cooling and any null below is about the arm, not about the physics.
+        # `M` is set explicitly here rather than derived — the derived rate at
+        # these parameters is what made the first attempt measure nothing.
+        function cool_trace(; M, T, nstep=400)
+            SpinorBEC.scratch_clear!()
+            w = flowing_state!(scalar_ws())
+            w.state.psi .*= 3.0
+            r = SPGPEReservoir(; T, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.0, M,
+                allow_unphysical_rates=true)
+            a = field_chemical_potential(w)
+            for k in 1:nstep
+                apply_spgpe_step!(w, r, 0.002; t=0.0, seed=8000 + k, noise=true)
+            end
+            (a, field_chemical_potential(w))
+        end
+        (c0, c1) = cool_trace(; M=1.0, T=0.05)
+        Printf.@printf("  positive control (M=1, T=0.05): µ̃ %.4f → %.4f\n", c0, c1)
+        @test c1 < c0 - 1.0e-3 * abs(c0)     # the arm CAN see cooling
+
         # MEASURED 2026-08-21 and the arm is UNDER-POWERED, recorded here rather
         # than deleted because the null is the finding:
         #
