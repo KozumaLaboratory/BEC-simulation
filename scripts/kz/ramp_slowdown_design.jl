@@ -25,7 +25,14 @@ for s in (0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0)
     ramp = stretch(euv3_evaporation_ramp(), s)
     p = EvapParams(; a_s=Eu151.a_s, tau_bg=15.0, K3=1.61e-40)
     r = run_evaporation_bec(trap, ramp, p; N0=3.5e6, T0=50e-6, save_every=2)
-    ω = 2π * 100.0                      # fixed reference so mu_eq is comparable
+    # The trajectory's OWN trap frequency. A fixed reference looked like the way to keep
+    # mu_eq comparable across slowdowns and was simply wrong: 2pi*100 puts T_int at 10450
+    # where the real omega_bar gives 1762, six times too hot, and the constraint then
+    # reports N_0 = 0 at every point of every ramp. The trap ramp is identical across
+    # slowdowns — only the time axis is stretched — so omega_bar carries no bias here.
+    ω = r.omega_bar[1]
+    # -1 rather than 0, so a trajectory that never condenses reports N0_peak = 0 with
+    # its own first point rather than silently looking like a peak of zero.
     best = (N0=-1.0, t=NaN, N=NaN, T=NaN, mu=NaN)
     for i in eachindex(r.t)
         r.N[i] > 0 && r.T[i] > 0 || continue
