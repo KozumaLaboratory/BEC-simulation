@@ -564,8 +564,8 @@ end
         end
         (g0, g1) = both_trace(; M=1.0, gam=0.05, T=0.05)
         Printf.@printf(
-            "  both reservoirs (M=1, γ=0.05, T=0.05): µ̃ %.4f → %.4f  " *
-                "(scattering alone: %.4f → %.4f)\n", g0, g1, b0, b1)
+            "  both reservoirs (M=1, γ=0.05, T=0.05): µ̃ %.4f → %.4f  (scattering alone: %.4f → %.4f)\n",
+            g0, g1, b0, b1)
         # No direction asserted: the question is whether adding the growth
         # reservoir REVERSES the cooling the control just demonstrated, and that
         # is what the printed pair answers. Asserting before reading it is the
