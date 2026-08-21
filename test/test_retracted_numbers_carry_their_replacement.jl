@@ -84,8 +84,12 @@ end
     # ledger may record one, but it must say so.
     for c in claims
         c.prediction === nothing && continue
-        @test c.prediction_registered in ("before", "after")
-        @test c.prediction_outcome in ("hit", "miss", "pending")
+        @test c.prediction_registered in ("before", "after")   # not a closed set worth a constant: two values, no growth pressure
+        # From the constant, not a copy of it: this line asserted the old
+        # three-value tuple and went red when `moot` was added -- a second
+        # declaration of a closed set is the defect the ledger exists to stop,
+        # and it had grown one inside the ledger's own gate.
+        @test c.prediction_outcome in SpinorBEC.CLAIM_PREDICTION_OUTCOMES
     end
 end
 

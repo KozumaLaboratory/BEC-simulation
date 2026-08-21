@@ -446,8 +446,8 @@ section = "11.4"
 pr = 403
 prediction = "If the dip is a resonance, its ω_eff position must move again at B = 10.4 nT. If it does not move, the resonance reading is wrong."
 prediction_registered = "before"
-prediction_outcome = "miss"
-note = """REFUTED 2026-08-21 BECAUSE ITS PREMISE DISSOLVED, not because the test disagreed. The 10.4 nT arm was run, and the answer is that there is no dip at 5.2 nT to move: the two-branch structure was a truncation artifact (see `edh-5p2nt-ordering-is-hold-dependent`). `prediction_outcome = "miss"` is the closest the closed set allows and it OVERSTATES what happened — a miss implies the test ran and came out the other way. It did not; the question stopped being askable. That the vocabulary cannot say this cleanly is itself worth recording: a prediction can fail by being answered wrongly or by being about something that turns out not to exist, and the ledger currently conflates them. What the 10.4 nT arms DID find is a real, resolved feature at the same ω_eff — `edh-104nt-bump-at-0p65` — which no prediction covered."""
+prediction_outcome = "moot"
+note = """REFUTED 2026-08-21 BECAUSE ITS PREMISE DISSOLVED, not because the test disagreed. The 10.4 nT arm was run, and the answer is that there is no dip at 5.2 nT to move: the two-branch structure was a truncation artifact (see `edh-5p2nt-ordering-is-hold-dependent`). `prediction_outcome = "moot"`: the test RAN and the prediction turned out to be about something that does not exist. It was `miss` for one commit, which credits the prediction with a test it never got — a miss is evidence against the MECHANISM a prediction names, a moot is evidence against the OBSERVATION it was built on, and the second is the larger correction. The vocabulary gained the word because this row needed it; before that any later tally would have read this as a wrong guess rather than a refuted premise. What the 10.4 nT arms DID find is a real, resolved feature at the same ω_eff — `edh-104nt-bump-at-0p65` — which no prediction covered."""
 
 # --- Acceptance gates and the precision claims they touch --------------------
 
@@ -844,3 +844,113 @@ doc = "docs/guides/eu_lambda_min_resolved.md"
 section = "5"
 pr = 420
 note = """This is the direct evidence #398 said would settle the reading and #383 could not obtain — both solvers there returned values one tenth of their own uncertainty. It supports `eu335-68p4-is-where-continuation-loses-the-branch` and closes off the saddle-node reading with a fourth independent quantity, after the branch-tangent curvature, the escape direction and the lowest ω. What it does NOT establish is where the flower branch actually ends: a minimum at 68.25 µG says the branch has not ended AT 68.25 µG, and the next converged cell up the field axis does not exist."""
+
+# --- Second document poured in: docs/theory/lhy_scheme_selection_eu_f6.md (#337)
+#
+# Chosen because it is a DIFFERENT SUBSYSTEM. The column set was fixed by the EdH
+# quench arc, and a schema that only fits the document it was designed from is not
+# a schema. What it exercises that the EdH rows did not: a claim whose scope is a
+# THRESHOLD rather than a grid ("above 105 µG the question does not arise"), a
+# ratio quoted against a value in the code's own docstring, and two rows where the
+# uncertainty IS the finding.
+#
+# What did not fit, recorded rather than smoothed: this document's claims are
+# largely CONDITIONAL ("use X when |⟨F⟩|/F ≈ 1"), and `claim` is one sentence with
+# no condition field, so the condition has to live inside the sentence. That works
+# and reads badly. If a third document also arrives conditional, the schema wants
+# a `applies_when` column rather than more prose.
+
+[[claim]]
+id = "lhy-eu-f6-ambiguity-is-1p3-percent"
+claim = "The ε_LHY scheme ambiguity for ¹⁵¹Eu at F=6 is ≤ 1.3 %, not O(1): a beyond-mean-field result here IS quotable with an error bar."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6 at the campaign coupling. Measured by repairing the counterterm bookkeeping `full_bdg` warns about (S1 vs S3) rather than by asserting it."
+uncertainty = "1.3 % is itself the uncertainty — this row exists to bound the ambiguity, so the number and the error bar are the same object. Negative control present: wherever the spectrum is real, S3 ≡ S1 identically, so the `c_dd = 0` rows prove the comparison can return zero."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "3"
+pr = 0
+note = "Answers #337 against a premise that was too strong. The issue asked whether ε_LHY is ill-posed at F=6; it is not, and the way to find out was to repair the mismatch the code already warned about rather than to argue from the literature."
+
+[[claim]]
+id = "lhy-eu-f6-field-closes-the-question"
+claim = "Above B ≈ 105 µG the m = −F mean field is dynamically stable and ε_LHY carries no scheme dependence at all, so the scheme question does not arise. It closes through p, not through q."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6, m = −F. A THRESHOLD, not a grid or a duration — the claim is about which side of 105 µG a run sits on."
+uncertainty = "The threshold is read off a B-scan of the BdG spectrum (0 / 44 / 100 µG), so it is located to roughly the scan spacing and should be quoted as ≈ 105 µG, not 105. Bounded below by the 100 µG row still showing an unstable m = −F direction at 0.5530."
+uncertainty_basis = "grid"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "2.1"
+pr = 0
+note = "Supersedes a verdict that was wrong for a UNIT reason: `linear_zeeman_p` takes tesla and the campaign YAML writes Gauss, so a dismissal table read p and q low by 10⁴ and 10⁸. The row printed as 1 G was in fact 100 µG. A dimensional slip that survives because every number in the table is slipped the same way is not visible from inside the table."
+
+[[claim]]
+id = "lhy-eps-varies-2p7x-with-polarisation"
+claim = "ε_LHY varies by a factor 2.68 with the DDI (3.72 contact-only) between |⟨F⟩|/F = 1 and 0 at the campaign coupling — not the ~20 % `spatial.jl` records."
+status = "live"
+type = "B"
+scope = "Along ζ(α) = cos α|m=+F⟩ + sin α|m=0⟩ at c1_ratio = 1/36. The ratio RIDES ON c1_ratio: it is 1.38 at c1_ratio = 0 and 2.68 at 1/36, so a measurement taken near zero coupling would have looked small and been quoted as general."
+uncertainty = "unbounded: a single sweep at one coupling, with no grid or seed replication. What IS bounded is the direction and the order of magnitude — 2.68 against a recorded ~20 % is a factor 13, far outside anything replication would move."
+uncertainty_basis = "none"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "7.2"
+pr = 0
+note = "The consequence is a rule, not a number: never give one ansatz's functional to a state of different |⟨F⟩|. At c1_ratio = 0 every g_S collapses to c₀ and the two contact closed forms coincide, so the residual 1.38 there is the DDI alone — which is why the docstring's figure is not merely stale but was measured in a regime where the effect is absent."
+
+[[claim]]
+id = "lhy-scheme-moves-the-boundary-21x"
+claim = "The choice of LHY scheme moves the FM/polar phase boundary by a factor 21 in δc1*: 3.4e-4 for a single functional against 7.3e-3 when each branch uses its own ansatz. `spatial` lands with the latter (6.6e-3)."
+status = "live"
+type = "B"
+scope = "At the reference point c1_ratio = 0.027, converted through each arm's own median |∂ΔE/∂c1| and the field slope 0.0311 per µG. In µG: +0.40 against +9.9."
+uncertainty = "Positive control passes and is quantitative: ×30 on the scalar amplitude moves the gap 5.7× further than ×1 and converts to 4.1e-3 in c1_ratio, four times the 1e-3 pre-launch threshold. Sub-linear in amplitude because the cloud relaxes against the added repulsion — expected, and the reason a control has to be RUN rather than reasoned about."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "5.4"
+pr = 0
+
+[[claim]]
+id = "lhy-mean-field-fm-polar-line-at-1over36"
+claim = "The mean-field FM/polar line at `c1_ratio ≈ 1/36` is not defensible: LHY does not displace that boundary, it CREATES it."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6 at the campaign coupling. A statement about which term is responsible for a boundary, not about where the boundary sits."
+uncertainty = "unbounded as a location — this row asserts the mechanism, not a number. The boundary's POSITION is `lhy-scheme-moves-the-boundary-21x`, which does carry one."
+uncertainty_basis = "none"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "5.3"
+pr = 0
+note = "Load-bearing for anything that quotes a mean-field FM/polar transition for Eu: there is no mean-field crossing to quote."
+
+[[claim]]
+id = "lhy-spatial-residual-was-1-minus-1-over-N"
+claim = "`spatial_lhy_residual` compared an n_atoms = N table against an UNDIVIDED BdG reference, so it returned ≈ 1 − 1/N — exactly 1.0000 on converged Eu states."
+status = "closed"
+type = "A"
+scope = "One function. Every existing test ran at the default n_atoms = 1, where the defect is invisible."
+uncertainty = "Not a measured quantity: a scale factor, either present or not. The replacement gate asserts the residual is INVARIANT under n_atoms, which a scale bug cannot satisfy."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "6"
+pr = 0
+note = "CLOSED — fixed, and gated by a case that runs at n_atoms = 50000. Kept rather than deleted because the shape recurs: a defect invisible at every tested value of a parameter is not caught by more tests at that value. It would have been reported as `a 100 % residual`, i.e. the spatial approximation collapsing, which is a physics conclusion drawn from a missing division."

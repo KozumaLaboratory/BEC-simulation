@@ -44,7 +44,8 @@ using TOML
 
 export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
-    CLAIM_RETRACTION_MARKERS, claim_ledger_link_errors, claim_by_id, retired_literals,
+    CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, claim_ledger_link_errors, claim_by_id,
+    retired_literals,
     unmarked_retired_literal_sites
 
 """
@@ -84,6 +85,33 @@ How the `uncertainty` field was obtained. `none` is legal and means the claim is
 unbounded — it must then be paired with an `uncertainty` that says so in words.
 """
 const CLAIM_UNCERTAINTY_BASES = ("fit", "grid", "dt", "seed", "control", "none")
+
+"""
+    CLAIM_PREDICTION_OUTCOMES
+
+What became of a registered prediction.
+
+  `hit`      — the test ran and the prediction held
+  `miss`     — the test ran and it did not
+  `pending`  — not tested yet
+  `moot`     — the test RAN and the prediction turned out to be about something
+               that does not exist
+
+`moot` was added 2026-08-21 because the closed set could not say what had
+happened. The prediction was: *"if the 5.2 nT dip is a resonance, its ω_eff
+position must move at 10.4 nT"*. The 10.4 nT arms ran — and the dip itself turned
+out to be a truncation artifact, so there was nothing to relocate. Recording that
+as `miss` credits the prediction with a test it never got, and reads in any later
+tally as a hypothesis that was checked and failed. It was not checked; the
+question stopped being askable.
+
+The distinction is not bookkeeping. A `miss` is evidence against the MECHANISM a
+prediction names. A `moot` is evidence against the OBSERVATION the prediction was
+built on — a different and usually larger correction. A ledger that cannot
+separate them will, over enough rows, read as a series of wrong guesses rather
+than as one refuted premise.
+"""
+const CLAIM_PREDICTION_OUTCOMES = ("hit", "miss", "pending", "moot")
 
 """
     CLAIM_EVIDENCE_STATUSES
@@ -254,11 +282,11 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                 ),
             )
         pred_out = _opt(r, "prediction_outcome")
-        pred_out === nothing || pred_out in ("hit", "miss", "pending") ||
+        pred_out === nothing || pred_out in CLAIM_PREDICTION_OUTCOMES ||
             throw(
                 ArgumentError(
-                    "$path claim `$id`: prediction_outcome must be " *
-                    "`hit`, `miss` or `pending`",
+                    "$path claim `$id`: prediction_outcome must be one of " *
+                    join(CLAIM_PREDICTION_OUTCOMES, ", "),
                 ),
             )
         ev = get(r, "evidence", String[])
