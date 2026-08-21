@@ -538,6 +538,39 @@ end
         # (no growth term, and production's growth noise at T = 10 injects
         # heavily), scalar, no DDI.
         @test abs(es[end] - es[1]) < 1e-2 * abs(es[1])   # it barely moves — as expected
+
+        # BOTH RESERVOIRS, which is what production runs and what the arms above
+        # each miss half of. #334's three trajectories already bracket it:
+        #
+        #   ED off, noise on   µ_ψ 15.9 → 17.7   nearly flat
+        #   ED on,  noise off  (the T = 0 gate)  cools
+        #   ED on,  noise on   µ_ψ 8.5 → 51.7    a factor 6
+        #
+        # So the heating needs BOTH, and the scalar arm above cleared the
+        # scattering pair alone. What it did not have is γ ≠ 0 — the growth
+        # reservoir, whose noise at T = 10 injects heavily. This runs the pair.
+        (b0, b1) = cool_trace(; M=1.0, T=0.05, nstep=400)
+        function both_trace(; M, gam, T, nstep=400)
+            SpinorBEC.scratch_clear!()
+            w = flowing_state!(scalar_ws())
+            w.state.psi .*= 3.0
+            r = SPGPEReservoir(; T, mu=1.0, a_s=0.01, k_cut=5.0, gamma=gam, M,
+                allow_unphysical_rates=true)
+            a = field_chemical_potential(w)
+            for k in 1:nstep
+                apply_spgpe_step!(w, r, 0.002; t=0.0, seed=9000 + k, noise=true)
+            end
+            (a, field_chemical_potential(w))
+        end
+        (g0, g1) = both_trace(; M=1.0, gam=0.05, T=0.05)
+        Printf.@printf(
+            "  both reservoirs (M=1, γ=0.05, T=0.05): µ̃ %.4f → %.4f  " *
+                "(scattering alone: %.4f → %.4f)\n", g0, g1, b0, b1)
+        # No direction asserted: the question is whether adding the growth
+        # reservoir REVERSES the cooling the control just demonstrated, and that
+        # is what the printed pair answers. Asserting before reading it is the
+        # error this file has now recorded four times in one day.
+        @test isfinite(g1)
     end
 
     @testset "quiet damping rate matches −ℳ̄∫d³k|k·j̃|²/|k|" begin
