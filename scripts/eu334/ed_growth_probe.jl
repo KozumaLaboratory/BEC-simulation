@@ -33,9 +33,32 @@ using Printf
 
 const OMEGA, A_S = 1.0, 0.02
 const C0 = 4π * A_S
-const MU, T_RES, GAMMA, DT = 3.0, 1.0, 0.1, 0.002
+const GAMMA, DT = 0.1, 0.002
+
+# `ED_MU` / `ED_T` move the RESERVOIR to production's corner. #418's exclusion
+# list is now complete except for one entry — "#334's own ramp and seed" — and
+# the reading that survives is that the seed is a converged branch cell at
+# µ_ψ = 8.48 while a T = 10 reservoir demands an equilibrium far above it, so the
+# heating that closes the gap eats the condensate. If that is right it is PHYSICS
+# ("no condensate above f = 0.066 fits in a T = 10 C region"), not a defect.
+#
+# The probe's own corner is T = 1, µ = 3; production is T = 10, µ_res ~ 8-12.
+# Those are the two axes that can be moved without leaving the unit-scale setting
+# that makes this debuggable in minutes, and they are the pair #418 named as the
+# likely combination. The lattice and the ramp are deliberately NOT moved here:
+# changing four things at once is how the last three suspects took four rounds.
+#
+# THE SEED IS THE ARM. `ED_SEED=converged` relaxes a ground state at the
+# reservoir's own µ and hands THAT to the SPGPE, instead of starting from
+# `fill!(psi, 0)` and letting the noise build one. Everything else is held. If
+# the stall reproduces only under `converged`, the seed carries it and #418
+# closes as physics; if it stalls from vacuum too, the (T, µ) corner does, and
+# the seed is exonerated the way F = 6 and the DDI were.
+const MU = parse(Float64, get(ENV, "ED_MU", "3.0"))
+const T_RES = parse(Float64, get(ENV, "ED_T", "1.0"))
 const K_CUT = sqrt(2 * (MU + T_RES))
 const NSTEP = parse(Int, get(ENV, "ED_NSTEP", "25000"))
+const SEED_MODE = get(ENV, "ED_SEED", "vacuum")
 
 # `ED_ATOM=eu151` runs the SAME probe at F = 6, 13 components, DDI off.
 #
@@ -85,7 +108,7 @@ function ground_mode(grid, dV, n_tf)
     (phi, d)
 end
 
-function arm(grid, dV, phi, d, energy_damping::Bool)
+function arm(grid, dV, phi, d, n_tf, energy_damping::Bool)
     ws = make_workspace(; grid, atom=ATOM,
         interactions=InteractionParams(Dict{Int, Float64}(0 => C0)),
         potential=HarmonicTrap{3}((OMEGA, OMEGA, OMEGA)),
@@ -100,7 +123,19 @@ function arm(grid, dV, phi, d, energy_damping::Bool)
         allow_unphysical_rates=true) :
           SPGPEReservoir(; T=T_RES, mu=MU, a_s=A_S, k_cut=K_CUT, gamma=GAMMA, M=0.0,
         allow_unphysical_rates=true)
+    # The one knob #418 has left. `vacuum` is the arm every previous round ran:
+    # the condensate is built by the reservoir out of nothing. `converged` hands
+    # the SPGPE a state that is ALREADY the ground state at this µ — production's
+    # situation, where the seed is a converged branch cell — so the reservoir's
+    # job is to keep it rather than to make it.
     fill!(ws.state.psi, 0)
+    if SEED_MODE == "converged"
+        # phi is the normalised ground mode; put N_TF-worth of atoms in it, which
+        # is what the growth-only arm reaches unaided. Starting AT the answer is
+        # the point: if the full theory cannot hold what growth-only builds, the
+        # stall is not a failure to grow.
+        @views ws.state.psi[:, :, :, d] .= phi .* sqrt(n_tf)
+    end
 
     out = 0.0
     trunc = 0.0
@@ -124,10 +159,14 @@ function main()
     π / minimum(grid.dx) > K_CUT || error("grid does not resolve the C region")
     (phi, d) = ground_mode(grid, dV, n_tf)
 
-    @printf("atom = %s (D = %d)  c_dd = %.4g  N_TF = %.1f  steps = %d  M = physical vs 0\n",
-        ATOM === Rb87 ? "Rb87" : "Eu151", Int(2 * ATOM.F + 1), C_DD, n_tf, NSTEP)
+    # Every knob in the output line, because the whole value of this probe is that
+    # exactly one of them differs between the arm being read and the arm it is
+    # being compared against — and a remembered configuration is not a control.
+    @printf("atom = %s (D = %d)  c_dd = %.4g  mu = %.3g  T = %.3g  seed = %s  N_TF = %.1f  steps = %d  M = physical vs 0\n",
+        ATOM === Rb87 ? "Rb87" : "Eu151", Int(2 * ATOM.F + 1), C_DD, MU, T_RES,
+        SEED_MODE, n_tf, NSTEP)
     for (name, ed) in (("growth-only (M=0)", false), ("full (M != 0)", true))
-        a = arm(grid, dV, phi, d, ed)
+        a = arm(grid, dV, phi, d, n_tf, ed)
         @printf("  %-18s N0 = %8.1f (%.3f N_TF)  N_C = %8.1f  out = %.4g  trunc = %.4g\n",
             name, a.n0, a.n0 / n_tf, a.n_c, a.out, a.trunc)
         flush(stdout)
