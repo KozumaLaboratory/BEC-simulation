@@ -1492,10 +1492,28 @@ for.
 ### 18.4 What is not claimed
 
 Gated at F=1 on 8³. The mechanism is the sign of one Zeeman coefficient and does
-not depend on F — but **no production-scale arm has been run through this path
-yet**, so the ¹⁵¹Eu numbers in §3 and §4 are still the aligned-preparation ones.
-`runs/eu151_klaus_phi_phys/config.yaml` now carries the key; it has not been
-re-run.
+not depend on F.
+
+**The production-scale arm HAS now been run (2026-08-22, #423).** All 8
+`phi.rate` points of `runs/eu151_klaus_phi_phys` at 32 × 32 × 16, F = 6, D = 13,
+with DDI and `lhy: scalar` — TSUBAME job 8461716, 82 min, `rc = 0`:
+
+| point | `phi.rate` | `converged` | `energy` | `mz_actual` |
+|---|---:|---|---:|---:|
+| 001–008 | 1.0 … 18.0 | `true` (8/8) | −160177.72 (8/8) | **−6.0000 (8/8)** |
+
+The runtime anti-aligned assertion held on every point, so the preparation is not
+a one-arm result any more. `energy` is identical across the scan because the scan
+varies only `phi.rate` in the *dynamics* steps — the ground state is the same
+state eight times, which is itself the check that the scan axis is where it is
+supposed to be. (The 12 × 12 × 8 mechanism check gave −160174.95; the difference
+is the grid.)
+
+**What is still the aligned preparation: §3 and §4's ¹⁵¹Eu numbers.** Those are
+*dynamics* observables and this run's trajectories have not been reduced into
+them. The two preparations are different physics rather than an old and a new
+value, so when they are replaced the aligned numbers stay beside them, labelled.
+The trajectories are on disk under `runs/eu151_klaus_phi_phys/phi_*/`.
 
 <!-- REDERIVE -->
 
