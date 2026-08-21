@@ -98,10 +98,21 @@ CFG="${CFGS[$((IDX - 1))]}"
 
 echo "[$(date +%H:%M:%S)] task $IDX/$N  ->  $CFG"
 
-# Self-stop before the scheduler kills us. A run reaped at h_rt writes nothing
-# and reports nothing; one that stops itself at 85 % leaves a readable partial
-# and a reason. `h_rt` is 2 h here, so the budget is 6120 s.
-export SPINORBEC_WALLTIME_BUDGET_S="${SPINORBEC_WALLTIME_BUDGET_S:-6120}"
+# NOT IMPLEMENTED — and this block claimed otherwise for a day.
+#
+# It used to read "self-stop before the scheduler kills us ... one that stops
+# itself at 85 % leaves a readable partial and a reason", and exported
+# SPINORBEC_WALLTIME_BUDGET_S. **Nothing in src/ reads that variable.** The export
+# did nothing, the header asserted a behaviour the tree does not have, and it was
+# reported upward twice as if it were live.
+#
+# Left as an explicit gap rather than deleted, because the gap is real: a run
+# reaped at h_rt writes nothing and reports nothing, which is item 2 of the
+# session plan ("walltime 耐性とジョブ層の記録") and is still open. Implementing it
+# means a callback in the dynamics loop that checks elapsed time against a budget
+# and returns cleanly — not an environment variable nobody consumes.
+#
+# export SPINORBEC_WALLTIME_BUDGET_S=...   # <- would be a no-op; do not re-add
 
 if [ "${WEFF_SMOKE:-0}" = "1" ]; then
     echo "SMOKE: rendering every code path with a truncated ITP, not a result."
