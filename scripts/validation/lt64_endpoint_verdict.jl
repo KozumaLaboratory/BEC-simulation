@@ -18,6 +18,19 @@
 #    10 (§12.1). The endpoint needs no window, but the peak is reported beside it
 #    and must not be wrong.
 #
+#    THE WINDOW CONSTANTS ARE THIS SUITE'S, AND GETTING THEM WRONG IS SILENT.
+#    The hold step of `lt64_ens_*.yaml` is `duration: 100.0, dt: 0.005,
+#    save.every: 1000`, so nhold = 100.0/(0.005*1000) = 20 frames. The first run
+#    of this script used `save_every = 100`, which gives nhold = 200 — longer
+#    than the array — so `lo` clamped to 1 and every "hold-peak" was really a
+#    whole-trajectory argmax. It printed a baseline peak of 0.50571 at frame 20
+#    against the 0.37973 the README records, and the static arms matched their
+#    recorded 0.49081 exactly, so the disagreement was visible only because ONE
+#    of the three groups had a stored number to check against.
+#
+#    That is why `peak_frame` is in the output. A peak at the first frame of the
+#    window is a decaying transient; at the last, a truncation. Read it.
+#
 # 2. **It never silently drops an arm.** A missing or unfinished arm is named and
 #    counted. n is what actually landed, and if n < 7 per arm the criterion
 #    cannot be applied at all — the README says so — and this says so too rather
@@ -42,7 +55,7 @@ const N_MIN = 7
 `(peak, endpoint)` P_adj for one run directory, or a String naming the failure.
 """
 function arm_values(dir::AbstractString; hold_duration::Float64=100.0,
-    dt::Float64=0.005, save_every::Int=100)
+    dt::Float64=0.005, save_every::Int=1000)
     f = joinpath(dir, "point_001.jld2")
     isfile(f) || return "no point_001.jld2"
     JLD2.jldopen(f, "r") do g
