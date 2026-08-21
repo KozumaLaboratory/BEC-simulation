@@ -37,8 +37,24 @@ const MU, T_RES, GAMMA, DT = 3.0, 1.0, 0.1, 0.002
 const K_CUT = sqrt(2 * (MU + T_RES))
 const NSTEP = parse(Int, get(ENV, "ED_NSTEP", "25000"))
 
+# `ED_ATOM=eu151` runs the SAME probe at F = 6, 13 components, DDI off.
+#
+# #418: the full theory stalls on #334's ramp (N_C flat at f = 0.065 where
+# growth-only reaches 0.37) and three explanations are already excluded by
+# measurement — the projector's number loss (common-mode across the arms), the
+# moving cutoff (pinning changes N_C by 5 parts in 3271), and energy damping in
+# general (this probe, scalar, condenses at BOTH values of M: 0.586 vs 0.543 of
+# N_TF). What is left is specific to that configuration: F = 6, the DDI, or the
+# ramp itself.
+#
+# This separates the first from the other two. Everything is held at the scalar
+# probe's values except the spin: same grid, same trap, same reservoir, DDI OFF,
+# only c0 in the interactions. If the stall reproduces here it is the spinor; if
+# it does not, F = 6 is exonerated and the DDI or the ramp carries it.
+const ATOM = get(ENV, "ED_ATOM", "rb87") == "eu151" ? Eu151 : Rb87
+
 function ground_mode(grid, dV, n_tf)
-    gs = find_ground_state(; grid, atom=Rb87,
+    gs = find_ground_state(; grid, atom=ATOM,
         interactions=InteractionParams(Dict{Int, Float64}(0 => C0 * n_tf)),
         potential=HarmonicTrap{3}((OMEGA, OMEGA, OMEGA)), dt=0.002, n_steps=3000,
         tol=1e-10, initial_state=:m_minus_F, verbose=false)
@@ -49,7 +65,7 @@ function ground_mode(grid, dV, n_tf)
 end
 
 function arm(grid, dV, phi, d, energy_damping::Bool)
-    ws = make_workspace(; grid, atom=Rb87,
+    ws = make_workspace(; grid, atom=ATOM,
         interactions=InteractionParams(Dict{Int, Float64}(0 => C0)),
         potential=HarmonicTrap{3}((OMEGA, OMEGA, OMEGA)),
         sim_params=SimParams(; dt=DT, n_steps=1, imaginary_time=false,
@@ -85,7 +101,8 @@ function main()
     π / minimum(grid.dx) > K_CUT || error("grid does not resolve the C region")
     (phi, d) = ground_mode(grid, dV, n_tf)
 
-    @printf("N_TF = %.1f   steps = %d   M = physical vs 0\n", n_tf, NSTEP)
+    @printf("atom = %s (D = %d)   N_TF = %.1f   steps = %d   M = physical vs 0\n",
+        ATOM === Rb87 ? "Rb87" : "Eu151", Int(2 * ATOM.F + 1), n_tf, NSTEP)
     for (name, ed) in (("growth-only (M=0)", false), ("full (M != 0)", true))
         a = arm(grid, dV, phi, d, ed)
         @printf("  %-18s N0 = %8.1f (%.3f N_TF)  N_C = %8.1f  out = %.4g  trunc = %.4g\n",
