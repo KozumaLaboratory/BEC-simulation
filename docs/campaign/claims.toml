@@ -668,21 +668,25 @@ note = """Replaces the ordering `edh-longtime-static-sustains` asserted and `edh
 
 [[claim]]
 id = "edh-longtime-endpoint-ordering-unresolved"
-claim = "At 100 ω_ref⁻¹ and 64³ the endpoint separates rotating (0.40013) from static (0.17952) by 2.23x, which is safe, but does NOT separate static from baseline (0.17952 vs 0.15112, +18.8 %) because the static endpoint moves 34.2 % between two seeds."
-status = "open"
+claim = "RESOLVED by the n=8 ensemble (#424): at 100 ω_ref⁻¹ and 64³ the statically weakened trap DOES beat no-intervention at the endpoint — mean 0.27869 against 0.15094, +84.6 %, at 5.01 SE_diff. The two-seed reading that could not separate them (+18.8 %) was a sample of a distribution whose pooled sd is 0.05098."
+status = "live"
 type = "B"
 scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³. The endpoint at long hold only; the peak at the same points IS resolved (`edh-longtime-peak-ordering-at-64`)."
-uncertainty = "unbounded on the static-vs-baseline row: n = 2 seeds gives a spread (34.2 %) but no distribution, so 18.8 % is inside it and no confidence can be attached. Closing it needs an ensemble on both arms, not a finer grid — the grid is already the refined one."
+uncertainty = "n = 8 per arm, pooled sd 0.05098 (the pre-run n=2 estimate was 0.0658, so n=8 was sufficient rather than lucky), SE_diff 0.02549, |diff|/SE = 5.01 against the 2.0 threshold fixed before launch. The three groups have wildly different spreads and that is the result's shape: baseline sd 0.00020 (0.13 % of mean), rotating sd 0.00230 (0.57 %), static sd 0.07210 (26 %). ALL of the endpoint uncertainty lives in the static arm; the arms it is compared against are essentially deterministic."
 uncertainty_basis = "seed"
-evidence = ["64³ endpoint P_adj: baseline 0.15112, static 0.17952 (seed 101) / 0.27262 (default), rotating 0.40013 / 0.40358", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh"]
-evidence_status = "partial"
+evidence = ["64³ endpoint P_adj, n=8/8/4: baseline mean 0.15094 sd 0.00020, static mean 0.27869 sd 0.07210, rotating mean 0.40416 sd 0.00230", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh", "scripts/validation/lt64_endpoint_verdict.jl"]
+evidence_status = "in_tree"
 commit = "6bb97bb2"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "17.2"
 pr = 0
 note = """Recorded as `open` rather than left out, because the absence of a statement here is exactly what a reader would otherwise supply from the peak row. The rotating-vs-static factor of 2.23 IS outside the scatter and is safe to quote; the static-vs-baseline one is not. Same shape as `edh-longtime-not-converged-at-32`: a quantity measured on one axis (peak) does not transfer to another (endpoint), just as one duration did not transfer to another.
 
-THE RUN THAT WOULD CLOSE IT IS PREPARED AND NOT SPENT (2026-08-21). 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+THE RUN THAT WOULD HAVE CLOSED IT WAS PREPARED AND NOT SPENT (2026-08-21), AND WAS THEN RUN (2026-08-22, #424, TSUBAME 8459280, 20/20 arms rc=0). Kept verbatim because the sizing and the criterion were fixed before launch and that is what makes the verdict a measurement. 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+
+CLOSED 2026-08-22. The criterion was applied as written, by a script that carries the 2.0 threshold as a constant so it could not be re-fitted: |diff|/SE = 5.01, ESTABLISHED, static ABOVE baseline by +84.6 %. The pooled sd came back SMALLER than the pre-run estimate (0.05098 against 0.0658), so the "n = 8 does not reach 2 sigma, it would need N" branch did not fire.
+
+THE PEAK COLUMN OF THAT RUN IS NOT QUOTABLE AND THE ARGMAX SAYS WHY. With the window derived from the config (hold 100.0, dt 0.005, save.every 1000 -> 20 frames of 39, so the hold starts at frame 20), the baseline maximum lands at frame 20 and rotating at 21 — the first and second frames of the window, where the decaying pre-hold transient still dominates. Only static's is interior (frame 31), and only static's matches its recorded value (0.49081, exactly). This is the §12.1 condition again, and it is the reason the peak numbers in `runs/klaus_quench_long_time_ensemble/README.md` should not be compared against this run's peak column. It does not touch the verdict: the endpoint is `adj[end]` and needs no window.
 
 NOT LAUNCHED because it is ~5.2 points of a 19.24 group balance (~27 %) with another session spending concurrently, and this is a secondary row — the peak ordering it might be confused with is already established and unaffected. anko made that call; the numbers are in the README so the next person does not re-derive the decision.
 
