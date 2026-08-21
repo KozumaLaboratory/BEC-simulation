@@ -222,6 +222,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "validation/klaus_weff_extract.jl",
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
+    # #444 — radial cloud size across an omega_eff scan. The observable that
+    # settled 10.4 nT: population readings disagreed with each other, the cloud
+    # explained it, and the data was already in the cache.
+    "validation/klaus_weff_cloud_size.jl",
     "validation/rk4ip_step_size_probe.jl",
     "validation/rk4ip_time_to_solution_gpu.jl",
     "validation/scan_job_cost_breakdown.jl",
