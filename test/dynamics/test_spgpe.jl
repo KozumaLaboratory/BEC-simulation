@@ -522,9 +522,22 @@ end
         # degenerate check produces, which is the error this suite keeps catching
         # elsewhere. `@test_broken` would claim the mechanism is broken; it is not
         # established that anything here is.
-        @info "energy damping with noise is under-powered at this rate — " *
-            "needs a positive control before it can assert a direction" es
-        @test abs(es[end] - es[1]) < 1e-2 * abs(es[1])   # what IS true: it barely moves
+        # The control above cools by 0.74 % at M̄ = 1, so this null is READABLE
+        # rather than uninformative: the derived rate here is 600× smaller, 400
+        # steps cannot show it, and the arm is not broken — it is being asked over
+        # the wrong duration.
+        #
+        # CONSEQUENCE FOR #334's STALL. Extrapolating the control's rate to
+        # production (M̄ = 1.628e-3, ~1e6 steps) gives a few per cent of COOLING
+        # across a whole trajectory. The stall carries µ_ψ from 8.48 to 51.68, a
+        # factor 6 of HEATING. The energy-damping drift/noise pair, alone in a
+        # scalar field, is the wrong SIGN and the wrong MAGNITUDE to be the cause.
+        #
+        # What this arm does NOT cover, written down so the next reader does not
+        # repeat today's error of using a measurement past its conditions: γ = 0
+        # (no growth term, and production's growth noise at T = 10 injects
+        # heavily), scalar, no DDI.
+        @test abs(es[end] - es[1]) < 1e-2 * abs(es[1])   # it barely moves — as expected
     end
 
     @testset "quiet damping rate matches −ℳ̄∫d³k|k·j̃|²/|k|" begin
