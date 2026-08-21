@@ -1116,7 +1116,16 @@ const _COST = Dict{String, Float64}(
     # why it belongs nowhere near FAST: it timed the fast job out at 15 min and the
     # run came back "cancelled", which reads as infrastructure rather than as a test
     # that is too slow for the tier it was put in.
-    "dynamics/test_energy_damping_cayley.jl" => 750.0,
+    # 1723, MEASURED on the runner (run 32509634483). It is now the HEAVIEST
+    # single file in the tier — the role `test_spgpe_equilibrium_number.jl` had
+    # before #305 shrank it — and 750 under-estimated it by 2.3x, which put it
+    # in the wrong place in the hand-out order.
+    #
+    # 750 came from "four testsets at ~3 min each", an argument about the file
+    # rather than a measurement of it, and the comment below still records the
+    # incident that argument was written for. Left in place because the reason
+    # it does not belong in FAST is unchanged; only the number moved.
+    "dynamics/test_energy_damping_cayley.jl" => 1723.0,
     "dynamics/test_number_conserving_spgpe.jl" => 240.0,
     "dynamics/test_energy_damping_buffer_reuse.jl" => 120.0,
     "dynamics/test_mu_lda_constraint.jl" => 60.0,
@@ -1130,12 +1139,19 @@ const _COST = Dict{String, Float64}(
     "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
     # One 24³ ground state + 100 dynamics steps through the YAML entry point.
     "workflow/test_scalar_egpe_yaml.jl" => 40.0,
-    # 460, runner-calibrated, after the fixture shrank from n=48 L=10.0 to
-    # n=32 L=6.5 (#305). Derivation rather than a guess: this file measured
-    # 2432 s on the CI runner (run 32300172779) against 1032 s on the 10-core
-    # box, a 2.36x ratio; the new fixture measures 195 s there, so 195 * 2.36
-    # ~= 460 s here. The 3.2x ratio quoted on `test_itp_dt_limited_advisory`
-    # above is that file's own pair, not a constant — measure the pair you have.
+    # 1141, MEASURED on the runner (run 32509634483) after the fixture shrank
+    # from n=48 L=10.0 to n=32 L=6.5 (#305). Was 2432 s, so the shrink bought
+    # 2.13x here.
+    #
+    # This entry said 460 for about an hour, and that number was derived rather
+    # than measured: the old fixture was 2432 s on the runner against 1032 s on
+    # the 10-core box, so a 2.36x ratio was applied to the new fixture's 195 s
+    # local. The real runner time is 1141 s and the real ratio is 5.85x. THE
+    # LOCAL-TO-RUNNER RATIO IS NOT A PROPERTY OF THE MACHINE PAIR — it moved by
+    # 2.5x for the same file under nothing but a grid change, presumably because
+    # a smaller problem spends a larger fraction of itself in fixed costs the
+    # 4-vCPU runner pays differently. Scale a local measurement only to get an
+    # ORDERING; overwrite it with a runner number as soon as one exists.
     #
     # It was 1266.0, a real measurement on the wrong machine (2026-08-02,
     # 10-core box), and before that the 3.0 s default, which made the one file
