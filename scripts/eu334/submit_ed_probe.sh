@@ -14,5 +14,6 @@ source "${EU334_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu334}/scripts/eu334/_prea
 
 export ED_NSTEP="${ED_NSTEP:-25000}"
 export ED_ATOM="${ED_ATOM:-rb87}"
+export ED_CDD="${ED_CDD:-0.0}"
 
 "$SPINORBEC_TSUBAME_JULIA" --project=. scripts/eu334/ed_growth_probe.jl
