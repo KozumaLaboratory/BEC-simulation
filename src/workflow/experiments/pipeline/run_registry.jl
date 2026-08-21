@@ -956,6 +956,14 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
         rethrow(err)
     end
 
+    # TIER 1, and it must run BEFORE the reduction below: it needs the frames,
+    # and the whole point is that it outlives them.
+    try
+        write_coarse_fields(run_dir, psi_file)
+    catch err
+        @warn "coarse field emit failed (non-fatal)" run_dir exception=err
+    end
+
     # The sibling `result.jld2` is a SUMMARY (PR #195). It only becomes one once
     # a real point file carries the frames, which is exactly here — the auto-save
     # in `run_pipeline` wrote it before this file existed, so it could not know.
