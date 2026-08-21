@@ -206,14 +206,14 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 ## Test tiers
 
-File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
+Tier lists in `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 278 files
-- `CI_EXTRA` — 141 files
-- `FULL_EXTRA` — 78 files
-- `PHYSICS_TESTS` — 7 files
-- `ORACLE_TESTS` — 92 files
-- `INTEGRATION_TESTS` — 55 files
+- `FAST_TESTS`
+- `CI_EXTRA`
+- `FULL_EXTRA`
+- `PHYSICS_TESTS`
+- `ORACLE_TESTS`
+- `INTEGRATION_TESTS`
 
 ## Validation ladder — instruments present on disk
 
