@@ -1,0 +1,91 @@
+# Static-trap ω_eff scan @ canonical EdH protocol (hold_only, delay=2 ms,
+# B_hold = 10.4 nT, m=+F).  ω_⊥,eff / ω_⊥ = 1.000
+# Source: scripts/validation/klaus_weff_scan_gen.jl
+#
+# anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
+#   state. Measured 2026-08-19 (#343): rotation contrast +16.5 % anti-aligned
+#   against -0.45 % aligned. Authority:
+#   docs/campaign/edh_quench_polarisation_decision.md
+#
+# NO ROTATION ANYWHERE. The enhancement is centrifugal, not Coriolis (§9.3): a
+#   static radial trap at ω_eff reproduces the rotating result to 0.06 % across
+#   the range. `rotating_frame_omega` is 0.0 in every step; the hold step
+#   overrides `potential:` instead.
+#
+# Built-in control: at ω_eff = 1.000 this must return the unweakened baseline.
+#   If the per-step `potential:` override were silently ignored, EVERY arm would
+#   return that same value — so a flat scan is a plumbing failure, not a null.
+#
+# hold_scale = 2.0. At 1.0 the peak of peak-P_adj lands on the LAST
+#   streamed frame for much of the scan, which is a truncation and not a peak:
+#   the published 5.2 nT dip compares a resolved maximum (frame 38/42) against
+#   boundary values (42/42). Arms with hold_scale > 1 exist to show whether the
+#   structure survives once both sides peak inside the window.
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions: {N_atoms: 10000, omega_ref: 691.1504}
+
+pipeline:
+  - ground_state:
+      atom: Eu151
+      grid: {n: [64, 64, 64], box: [12.0, 12.0, 12.0]}
+      potential: {type: harmonic, omega: [1.0, 1.0, 1.181818]}
+      interactions:
+        N_atoms: 10000
+        omega_ref: 691.1504
+        c1_ratio: 0.02778
+      ddi: {enabled: true, secular: true}
+      lhy: {kind: none}
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      gauge_fix: false
+      initial_state: m_plus_F
+      init_sigma: 1.5
+      dt: 0.005
+      n_steps: 3000
+      tol: 1.0e-9
+
+  - dynamics:   # rotation_prep (hold-only: no rotation)
+      duration: 6.9115
+      dt: 0.005
+      rotating_frame_omega: 0.0
+      B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      seed_amplitude: 1.0e-6
+      seed_k_cut: 2.5
+      save: {every: 100, psi: true, precision: f64}
+
+  - dynamics:   # B_quench
+      duration: 0.69115
+      dt: 0.001
+      rotating_frame_omega: 0.0
+      B: {Bz: {from: 0.01, to: 0.00010400000000000001, duration: 0.6911504}, theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save: {every: 50, psi: true, precision: f64}
+
+  - dynamics:   # hold pre-delay (unweakened trap, 2 ms)
+      duration: 1.3823
+      dt: 0.005
+      rotating_frame_omega: 0.0
+      B: {Bz: "0.00010400000000000001 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save: {every: 50, psi: true, precision: f64}
+
+  - dynamics:   # hold with the RADIALLY WEAKENED static trap (16.0 ms)
+      duration: 11.0584
+      dt: 0.005
+      rotating_frame_omega: 0.0
+      potential: {type: harmonic, omega: [1.0000, 1.0000, 1.181818]}
+      B: {Bz: "0.00010400000000000001 Gauss", theta: 0.0, phi: 0.0}
+      ddi: {enabled: true, secular: false}
+      lhy: {kind: none}
+      save: {every: 100, psi: true, precision: f64}
+
+  - analyze:
+      - phase_classify: {}
+      - winding_map: {}
+      - energy_decomposition: {}
