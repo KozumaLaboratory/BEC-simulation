@@ -124,7 +124,7 @@ checking either.
 
 - admits: `src/workflow/experiment.jl:253`
 - admits: `src/workflow/experiments/pipeline/run_registry.jl:625`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:878`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:910`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
 - **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 
@@ -208,7 +208,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 276 files
+- `FAST_TESTS` — 278 files
 - `CI_EXTRA` — 141 files
 - `FULL_EXTRA` — 78 files
 - `PHYSICS_TESTS` — 7 files
@@ -279,7 +279,7 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
-| `src/workflow/` | 5 | 176 |
+| `src/workflow/` | 5 | 177 |
 | `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 

@@ -850,7 +850,39 @@ directory if it doesn't exist.
 function _move_scratch_to_final(tmp_path::String, final_path::String)
     final_dir = dirname(final_path)
     isdir(final_dir) || mkpath(final_dir)
+    _assert_readable_jld2(tmp_path)
     mv(tmp_path, final_path; force=true)
+end
+
+"""Reopen the file we just wrote and confirm it can be read.
+
+On 2026-07-29 the `tga-kozuma-kouhi` /gs/fs group quota hit 1000.04 GB and two
+`p1mov_dyn_*` runs wrote TRUNCATED point files — `EOFError: read end of file` on
+reopen — and then reported `"completed": true, "oom_killed": false,
+"exception_type": null`. Both `_exit_summary.json` files are stamped within one
+second of each other, so this was the volume filling, not two independent kills.
+A full quota surfaces as EDQUOT / SIGBUS and never as "disk full"
+(`gotcha_tsubame_gsfs_quota_full_edquot_sigbus_2026_07_29`), and here it did not
+surface at all: the write returned, the move succeeded, and the run declared
+success over a file nobody could open.
+
+The check costs one open of a file that was just written and is still in page
+cache, against a multi-GB write. Throwing here is the point — the caller already
+removes the scratch file and rethrows, so a failed write becomes a failed run
+instead of a successful run with no data. The two runs above were found six
+months later by a storage sweep, which is the wrong time to learn it."""
+function _assert_readable_jld2(path::String)
+    endswith(path, ".jld2") || return nothing
+    try
+        jldopen(f -> length(keys(f)), path, "r")
+    catch err
+        error(
+            "wrote $path but cannot read it back ($(typeof(err))) — the write " *
+            "did not survive. A full group quota does this and reports nothing; " *
+            "check `t4-user-info disk group`, not `df`.",
+        )
+    end
+    nothing
 end
 
 """
@@ -954,6 +986,14 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     catch err
         isfile(tmp_file) && rm(tmp_file; force=true)
         rethrow(err)
+    end
+
+    # TIER 1, and it must run BEFORE the reduction below: it needs the frames,
+    # and the whole point is that it outlives them.
+    try
+        write_coarse_fields(run_dir, psi_file)
+    catch err
+        @warn "coarse field emit failed (non-fatal)" run_dir exception=err
     end
 
     # The sibling `result.jld2` is a SUMMARY (PR #195). It only becomes one once
