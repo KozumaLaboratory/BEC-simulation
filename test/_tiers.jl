@@ -59,6 +59,7 @@ const FAST_TESTS = [
     "workflow/test_result_jld2_summary.jl",
     "workflow/test_run_provenance.jl",
     "workflow/test_coarse_fields.jl",
+    "workflow/test_written_files_are_readable.jl",
     "workflow/test_converged_absent_is_not_a_pass.jl",
     # A declared mirror pair must flip EVERY axial quantity (Omega, m AND B_z).
     # bce2068f repaired two configs correctly one at a time and broke the mirror
