@@ -210,8 +210,7 @@ function main(args)
                     L.weff, L.hold, a.padj_peak)
             else
                 b = rows[m][2]
-                @printf("  w_eff=%.3f : 1x %.5f -> %s %.5f   (ratio %.4f) | " *
-                        "expansion %.4f -> %.4f\n",
+                @printf("  w_eff=%.3f : 1x %.5f -> %s %.5f   (ratio %.4f) | expansion %.4f -> %.4f\n",
                     L.weff, b.padj_peak, L.hold, a.padj_peak,
                     a.padj_peak / b.padj_peak, b.expansion, a.expansion)
             end
