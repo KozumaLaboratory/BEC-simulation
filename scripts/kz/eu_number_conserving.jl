@@ -260,8 +260,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # Handoff scaled with the ramp, so the field starts at the same FRACTION of the
         # evaporation rather than at the same wall-clock second — 1.85/2.4 of the way in.
         rs = parse(Float64, get(ENV, "SBEC_RAMP_SCALE", "0.5"))
-        @printf("\n########## ramp_scale %.2fx ##########\n", rs)
-        o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0,
+        sd = parse(Int, get(ENV, "SBEC_SEED", "9001"))
+        @printf("\n########## ramp_scale %.2fx  seed %d ##########\n", rs, sd)
+        # One seed per job. The first pass measured 27.8 at 0.5x against 39.7 at 1x —
+        # pointing against the halved ramp — but both are under 1.2% of their own
+        # equilibrium, so it is a comparison of two small numbers with no scatter
+        # attached. Two points once already carried this arc to the opposite conclusion.
+        o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, seed=sd,
             t_start_s=(1.85 / 2.4) * 2.4 * rs, ramp_scale=rs)
         h = isempty(o.hist) ? nothing : o.hist[end]
         if h !== nothing
