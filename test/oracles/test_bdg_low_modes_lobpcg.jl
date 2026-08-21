@@ -115,10 +115,22 @@ end
     ψ = copy(ws.state.psi)
     prm = constrained_hessian_params(ws, ψ)
 
+    # BOTH ARMS NAME THEIR PRECONDITIONER. This one took the default until
+    # 2026-08-21 and was therefore the `:kinetic` arm only for as long as
+    # `:kinetic` was the default — the moment #397 moved it, this testset became
+    # `:combined` against `:combined`, i.e. an equivalence gate comparing a run
+    # to itself, and it would have gone on passing. (Caught by the negative
+    # control at the bottom of this file, which is what that control is for.)
+    #
+    # The general shape is the one this repo has recorded before: a bit-identical
+    # A/B is PLUMBING, not physics. An arm that inherits a default is not an arm.
     kin = trapped_bdg_low_modes(ws, ψ; nev=2, block=8, max_iter=200, tol=1e-7,
-        params=prm, rng=MersenneTwister(3))
+        precond=:kinetic, params=prm, rng=MersenneTwister(3))
     comb = trapped_bdg_low_modes(ws, ψ; nev=2, block=8, max_iter=200, tol=1e-7,
         precond=:combined, params=prm, rng=MersenneTwister(3))
+    # Non-degeneracy of the comparison itself, asserted before anything is
+    # concluded from it: the two metrics must actually take different paths.
+    @test kin.iterations != comb.iterations
 
     both = [k for k in 1:2 if kin.converged_modes[k] && comb.converged_modes[k]]
     @test !isempty(both)                       # or the comparison below is free
