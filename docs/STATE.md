@@ -123,8 +123,8 @@ checking either.
 **4 sites admit a cached payload; 1 re-derives its verdict.**
 
 - admits: `src/workflow/experiment.jl:253`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:854`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:625`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:878`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
 - **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 
@@ -208,7 +208,7 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 272 files
+- `FAST_TESTS` — 274 files
 - `CI_EXTRA` — 141 files
 - `FULL_EXTRA` — 77 files
 - `PHYSICS_TESTS` — 7 files
