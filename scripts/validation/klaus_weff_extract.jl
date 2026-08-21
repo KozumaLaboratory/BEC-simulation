@@ -22,7 +22,7 @@ using Printf
 the point file is absent or carries no dynamics — a missing arm must be visibly
 missing rather than silently skipped.
 """
-function peak_padj(dir::AbstractString)
+function peak_padj(dir::AbstractString; hold_starts_at::Float64=8.98495)
     f = joinpath(dir, "point_001.jld2")
     isfile(f) || return nothing
     JLD2.jldopen(f, "r") do g
@@ -32,7 +32,27 @@ function peak_padj(dir::AbstractString)
         cp = d["component_populations"]
         P = cp isa AbstractMatrix ? cp : permutedims(reduce(hcat, cp))
         adj = [P[i, 2] + P[i, 3] for i in axes(P, 1)]
-        (peak=maximum(adj), frame=argmax(adj), nframes=size(P, 1))
+        # THE PEAK MUST BE TAKEN INSIDE THE HOLD. Over the whole trajectory the
+        # maximum can be the PRE-HOLD TRANSIENT, and at 10.4 nT it is: §12.1 of
+        # the decision document found four arms differing only in the hold
+        # returning peak P_adj = 0.26050 to five decimals, with argmax at frame 29
+        # and the hold starting at 32. The claim is always about the hold.
+        #
+        # This function read the whole trajectory until 2026-08-21 and produced a
+        # `flat baseline with a bump` picture of 10.4 nT that was the transient.
+        # 1.3 / 2.6 / 5.2 nT are unaffected (measured: 0.00 % on all 43 arms) --
+        # only the Zeeman-re-pinned field, where the hold suppresses the cascade
+        # and the transient wins.
+        #
+        # `hold_starts_at` is the sum of the three earlier dynamics durations in
+        # code units (6.9115 + 0.69115 + 1.3823), read from `times` rather than
+        # from a frame index so it survives a change in `save.every`.
+        t = haskey(d, "times") ? collect(d["times"]) : Float64[]
+        idx = isempty(t) ? eachindex(adj) : findall(>=(hold_starts_at), t)
+        isempty(idx) && return nothing
+        k = idx[argmax(adj[idx])]
+        (peak=adj[k], frame=k, nframes=size(P, 1),
+            whole=maximum(adj), whole_frame=argmax(adj))
     end
 end
 
@@ -70,8 +90,9 @@ function main(args)
         base = findfirst(r -> r.weff == 1.0, sel)
         for r in sel
             rel = base === nothing ? NaN : 100 * (r.peak - sel[base].peak) / sel[base].peak
-            @printf("  weff %.3f   peak P_adj %.5f   frame %2d/%2d   %+6.2f %% vs weff=1\n",
-                r.weff, r.peak, r.frame, r.nframes, rel)
+            flag = r.peak == r.whole ? "  " : " *"   # * = whole-trajectory max was the transient
+            @printf("  weff %.3f   in-hold %.5f  frame %2d/%2d%s  whole %.5f (f%2d)  %+6.2f %% vs weff=1\n",
+                r.weff, r.peak, r.frame, r.nframes, flag, r.whole, r.whole_frame, rel)
         end
         # The positive control. If the per-step `potential:` override were
         # ignored, every arm would return the SAME number -- so a flat scan is a
