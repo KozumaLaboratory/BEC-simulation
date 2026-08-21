@@ -895,6 +895,127 @@ enhancement does not merely survive, it grows slightly. **The `lhy: none` caveat
 is discharged for this conclusion** — though not for absolute values at other
 fields or densities, which were not re-run.
 
+
+### 12.5 5.2 nT, read as a cloud: the same mechanism, wearing a different mask — 2026-08-22
+
+§12.2 explained the 10.4 nT `ω_eff` structure as a **breathing phase**, and closed
+by naming the obvious next move: *"That does not by itself refute the 5.2 nT
+reading, which has not been measured this way — but it is now the hypothesis to
+beat there, and it is cheap to test from the same cached snapshots."* (#444).
+
+It was cheap. **No new runs** — 24 cached arms, 20 at the 8 ms hold and 4 at
+16 ms, read with `scripts/validation/klaus_weff_cloud_size.jl`.
+
+**The verdict: the 5.2 nT two-branch structure is a breathing/truncation phase,
+not a resonance.** The hold-doubling test does not merely move the ratios, it
+**inverts the ordering**.
+
+#### The three registered predictions
+
+Registered in #444 *before* the measurement.
+
+**(1) Radial expansion has structure in ω_eff, and its extrema correspond to
+P_adj's. — CONFIRMED, with the correspondence in the form the mechanism predicts
+rather than the form the prediction guessed.**
+
+| ω_eff | r(end)/r(hold₀) | P_adj peak | argmax frame |
+|---:|---:|---:|---:|
+| 0.420 | 1.3587 | 0.44336 | 42 |
+| 0.500 | 1.1123 | 0.49823 | 42 |
+| 0.550 | 1.0081 | **0.51387** ← branch 1 | 42 |
+| 0.570 | 0.9892 | 0.51300 | 42 |
+| **0.600** | **0.9868** ← minimum | 0.50568 | 42 |
+| 0.620 | 1.0039 | 0.49592 | 42 |
+| **0.650** | 1.0466 | **0.48791** ← valley | **38** |
+| 0.714 | 1.1267 | 0.49958 | 38 |
+| **0.770** | **1.1441** ← maximum | **0.50252** ← branch 2 | 38 |
+| 0.850 | 1.1206 | 0.49290 | 38 |
+| 0.950 | 1.0487 | 0.45968 | 37 |
+| 1.000 | 1.0520 | 0.43935 | 37 |
+
+Expansion is a single clean oscillation: it falls from 1.359 to a **minimum of
+0.9868 at ω_eff = 0.600** — the cloud *contracts* over the hold in a narrow window
+0.570–0.620 — rises to a **maximum of 1.1441 at 0.770**, and falls again. That is
+structure, and it is not subtle: the swing is 38 %.
+
+**(2) The arms whose P_adj peaks inside the hold coincide with the least-expanded
+group. — The literal prediction is degenerate here, and #444 said so in advance.
+The refined version holds exactly.**
+
+All 20 arms take their maximum inside the hold window, so "inside vs outside" —
+the discriminator that split 10.4 nT four-to-twenty-two — carries no information
+at 5.2 nT. #444 anticipated this and noted that *the difference is itself
+information*.
+
+It is. The **argmax frame** splits the arms cleanly into two groups, and the split
+sits exactly at the valley:
+
+- **ω_eff ≤ 0.620 → frame 42**, the *last* frame. These arms are still rising when
+  the hold ends: the peak is a **truncation**, not a maximum.
+- **ω_eff ≥ 0.650 → frame 38 or 37**, an interior frame. These arms have turned
+  over inside the hold.
+
+The boundary is between 0.620 and 0.650 — the valley is at 0.650. And the
+contraction window (0.570–0.620) is the last stretch before the boundary.
+
+**This is the 10.4 nT mechanism, unchanged.** §12.2: *"where the cloud is
+compressed at the end of the window the density is high, the cascade is still
+running, and the maximum lands on the last frame; everywhere else the cloud
+expands, density falls, the cascade stalls."* At 5.2 nT the compressed arms are
+0.570–0.620, they are exactly the ones still rising at frame 42, and the cascade
+stalls the moment the cloud starts expanding again. Two independent readings —
+the argmax frame of `P_adj`, and the radial dynamics — pick out the same boundary,
+just as they picked out the same four arms at 10.4 nT.
+
+**(3) Doubling the hold moves the structure. A resonance cannot. — CONFIRMED, and
+more strongly than at 10.4 nT.**
+
+| ω_eff | 8 ms `P_adj` | 16 ms `P_adj` | ratio |
+|---:|---:|---:|---:|
+| 0.550 | 0.51387 | 0.59152 | 1.151 |
+| **0.650** | **0.48791** | **0.62804** | **1.287** |
+| 0.770 | 0.50252 | 0.51448 | 1.024 |
+| 1.000 | 0.43935 | 0.48069 | 1.094 |
+
+The ratios are not equal — 1.024 to 1.287 — so the structure is hold-dependent.
+But the sharper statement is the **ordering**:
+
+```
+ 8 ms:  0.550 (0.514)  >  0.770 (0.503)  >  0.650 (0.488)   ← 0.650 is the VALLEY
+16 ms:  0.650 (0.628)  >  0.550 (0.592)  >  0.770 (0.514)   ← 0.650 is the PEAK
+```
+
+**The valley becomes the maximum.** A resonance in the cascade is a property of
+the field and the trap; it does not care how long you watch. An arm that had just
+turned over at 8 ms has the most left to give at 16 ms, which is precisely what a
+phase does.
+
+#### The control
+
+`ω_eff = 1.000` never changes the trap during the hold, and its cloud still
+breathes: r(end)/r(hold₀) = **1.0520** at 8 ms and **0.9914** at 16 ms. Whatever
+is driving the oscillation, it is not the weakening of the trap — it is the
+quench. Same conclusion as §12.2, independently at the second field.
+
+#### What this closes and what it does not
+
+`edh-two-branches-5p2nt` was already `refuted` as a truncation artifact
+(§11.5). This supplies the **mechanism** behind that refutation and the
+independent cloud-side evidence for it, at the field where it had never been
+measured. `edh-weff-structure-is-breathing-phase-not-resonance` now holds at
+**both** fields.
+
+**Not closed:** `edh-104nt-observable-not-window-robust` still stands — none of
+this produces a window-independent definition of the observable, it explains why
+the window matters. And no optimum is quotable at either field; §12.3's verdict
+is untouched.
+
+**The ordering lesson, restated because it worked twice.** At 10.4 nT the
+populations were re-read seven ways and every reading disagreed with the others;
+the cloud settled it in one pass. At 5.2 nT the same thing has now happened, from
+data that had been sitting in the cache since the first scan. **Look at a
+different quantity before inventing another reading of the one you have.**
+
 ---
 
 ## 13. Long time (145 ms): the substitution is a short-time statement

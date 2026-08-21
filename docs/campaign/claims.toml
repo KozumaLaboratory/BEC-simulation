@@ -1392,4 +1392,49 @@ P_adj, and the radial dynamics — pick out the same four arms.
 It also removes the reason to look for a cascade resonance at either field: a structure in
 ω_eff at fixed hold length is what a breathing phase looks like. That does not by itself
 refute the 5.2 nT reading, which has not been measured this way — but it is now the
-hypothesis to beat there, and it is cheap to test from the same cached snapshots."""
+hypothesis to beat there, and it is cheap to test from the same cached snapshots.
+MEASURED 2026-08-22 (#444, §12.5): it was cheap, and 5.2 nT behaves the same way.
+See `edh-5p2nt-structure-is-breathing-phase-not-resonance` — same mechanism, and
+there the hold-doubling test inverts the ORDERING rather than merely moving it."""
+
+[[claim]]
+id = "edh-5p2nt-structure-is-breathing-phase-not-resonance"
+quantity = "origin of the weff structure @ B=5.2nT"
+claim = "The ω_eff structure at B = 5.2 nT has the same origin as at 10.4 nT — a breathing phase sampled at fixed hold length, not a cascade resonance. Radial expansion over the hold is a single oscillation with a minimum of 0.9868 at ω_eff = 0.600 (the cloud CONTRACTS over 0.570–0.620) and a maximum of 1.1441 at 0.770; the P_adj argmax frame jumps from the last frame (42/42, a truncation) to an interior frame (38/42) exactly at the ω_eff = 0.650 valley; and doubling the hold INVERTS the ordering, taking 0.650 from valley to maximum."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 5.2 nT, 20 arms over ω_eff ∈ [0.42, 1.00] at the 8 ms hold plus 4 at 16 ms. Read from cached snapshots — no new runs."
+uncertainty = "The EXISTENCE of the structure is bounded well clear of any floor: expansion swings 0.9868 → 1.3587 (38 %) against a dt/2 reproducibility floor of 0.029 %, and the hold-doubling ratios run 1.024 → 1.287. The POSITIONS are quantised by the ω_eff grid — 0.02–0.05 wide near the extrema — so 'minimum at 0.600' means 'at the sampled point 0.600', with no fit and no interval. The 16 ms arms are themselves truncated (3 of 4 peak at frame 53/53), so their VALUES bound the inversion but are not converged."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p600_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "scripts/validation/klaus_weff_cloud_size.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.5"
+pr = 0
+prediction = "If the 5.2 nT two-branch structure is a breathing phase, (1) radial expansion must have structure in ω_eff, (2) the arms whose P_adj peaks inside the hold must coincide with the least-expanded group, and (3) doubling the hold must move the structure — which a resonance cannot do."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = """Registered in #444 before the measurement. (1) and (3) hit outright. (2) hit in the
+form the MECHANISM predicts rather than the form the prediction guessed, and #444 had
+already flagged that: at 5.2 nT all 20 arms peak inside the hold, so 'inside vs outside' —
+the discriminator that split 10.4 nT four-to-twenty-two — is degenerate here. The
+information is in the argmax FRAME, which splits the arms at exactly the valley.
+
+Same mechanism, both fields: where the cloud is compressed the density is high, the
+cascade is still running and the maximum lands on the last frame; where it expands the
+density falls, the cascade stalls and the maximum moves inside. At 10.4 nT that picked out
+four arms; at 5.2 nT it picks out a boundary at ω_eff = 0.650.
+
+The sharpest single number is the ORDERING inversion, not the ratios. At 8 ms
+0.550 > 0.770 > 0.650; at 16 ms 0.650 > 0.550 > 0.770. A resonance is a property of the
+field and the trap and does not care how long you watch.
+
+Does NOT close `edh-104nt-observable-not-window-robust`: this explains why the window
+matters, it does not supply a window-independent observable. Does not restore an optimum
+at either field — §12.3 stands.
+
+Method note, because it worked twice: the populations were re-read seven ways at 10.4 nT
+and every reading disagreed with the others; the cloud settled it in one pass, from data
+already in the cache. Look at a different quantity before inventing another reading of the
+one you have."""
