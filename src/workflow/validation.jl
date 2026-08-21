@@ -38,3 +38,4 @@ include("validation/run_observables.jl")        # snapshot trajectories + collap
 include("validation/scalar_summary.jl")          # run_scalar_summary + write_run_summary (catalog fuel)
 include("validation/campaign_gate.jl")          # CAMPAIGN.md §4 guard 1, executed rather than described
 include("validation/claim_ledger.jl")           # a claim's status as a FIELD, not as prose
+include("validation/variational_bound.jl")    # one-sided bound: which side of a disagreement is wrong
