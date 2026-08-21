@@ -7,11 +7,12 @@
 # `-o` must name an EXISTING directory or the job never starts.
 #$ -cwd
 #$ -l gpu_1=1
-#$ -l h_rt=2:00:00
+#$ -l h_rt=4:00:00
 #$ -j y
 #$ -o logs/tsubame/
 source "${EU334_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu334}/scripts/eu334/_preamble.sh"
 
 export ED_NSTEP="${ED_NSTEP:-25000}"
+export ED_ATOM="${ED_ATOM:-rb87}"
 
 "$SPINORBEC_TSUBAME_JULIA" --project=. scripts/eu334/ed_growth_probe.jl
