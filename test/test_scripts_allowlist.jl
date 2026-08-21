@@ -149,6 +149,10 @@ const _SCRIPTS_ALLOWLIST = Set([
     "kz/energy_damping_dt_convergence.jl",
     # Removes the ramp: fixed (mu, T, eps_cut) at the ramp's end values, to separate
     # "the field cannot condense here" from "the ramp does not leave time for it".
+    # The DESIGN question the c-field slowdown cannot answer: a real slower ramp pays
+    # more three-body loss, so it scans the 0-D model over a stretched time axis and
+    # reads the peak equilibrium N_0 off the same LDA constraint.
+    "kz/ramp_slowdown_design.jl",
     "kz/fixed_point_condensation.jl",
     "kz/eu_cost.jl",
     "kz/eu_equilibrium_N0.jl",
