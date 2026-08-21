@@ -86,14 +86,13 @@ function main()
                 :error
             end
         else
-            # The same predicate the writer uses, without writing: ask it on a
-            # scratch COPY so a dry run cannot modify anything by construction.
-            mktempdir() do d
-                cp(res, joinpath(d, "result.jld2"))
-                # a hardlink would let the real file be rewritten; copy is the point
-                symlink(abspath(point), joinpath(d, basename(point)))
-                make_result_a_summary!(d, joinpath(d, basename(point)))
-            end
+            # The same call, `dry=true`. The first version built a stand-in — a
+            # copied result.jld2 and a SYMLINK to the point file in a temp dir —
+            # and every directory came back `:skipped`, because the symlink
+            # tripped a guard the real call would never see. It also copied a 9 GB
+            # file per directory to preview it. A preview that reconstructs the
+            # conditions is a second implementation, and it was already wrong.
+            make_result_a_summary!(dir, point; dry=true)
         end
         counts[st] = get(counts, st, 0) + 1
         if st === :summarised

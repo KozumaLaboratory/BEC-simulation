@@ -95,6 +95,56 @@ end
         end
     end
 
+    @testset "dry=true gives the SAME verdict and writes nothing" begin
+        # The backlog sweep previews with this. Its first version built a stand-in
+        # instead — a copied result.jld2 plus a symlink to the point file — and
+        # every directory came back `:skipped` because the symlink tripped a guard
+        # the real call never sees. `0.0 GB recoverable` from a check that could
+        # not fire. So the preview must be the same call, and that must be gated.
+        mktempdir() do d
+            res, pt = joinpath(d, "result.jld2"), joinpath(d, "point_001.jld2")
+            _write_frames(res; n=4)
+            _write_frames(pt; n=4)
+            before = filesize(res)
+            @test make_result_a_summary!(d, pt; dry=true) === :summarised
+            @test filesize(res) == before                      # nothing written
+            @test jldopen(f -> haskey(f, "$_GRP/n_snapshots"), res, "r")
+            # and the wet call agrees with what the dry one predicted
+            @test make_result_a_summary!(d, pt) === :summarised
+        end
+        # a refusal must be predicted as a refusal, not just as "not summarised"
+        mktempdir() do d
+            res, pt = joinpath(d, "result.jld2"), joinpath(d, "point_001.jld2")
+            _write_frames(res; n=6)
+            _write_frames(pt; n=3)
+            @test make_result_a_summary!(d, pt; dry=true) === :not_covered
+            @test make_result_a_summary!(d, pt) === :not_covered
+        end
+    end
+
+    @testset "REFUSES a file it cannot open" begin
+        # Found by the backlog sweep: `jldopen` threw on a result.jld2 in the tree
+        # and took the whole pass down. Refusing is the only safe verdict — and it
+        # must NOT be `:already_summary`, which reads as "done" and would let a
+        # truncated file be counted as reduced.
+        mktempdir() do d
+            res, pt = joinpath(d, "result.jld2"), joinpath(d, "point_001.jld2")
+            _write_frames(pt; n=3)
+            write(res, "not a JLD2 file at all")
+            @test make_result_a_summary!(d, pt) === :unreadable
+            @test read(res, String) == "not a JLD2 file at all"   # untouched
+        end
+        # and the same when it is the POINT file that will not open: the coverage
+        # claim cannot be checked, so the frames stay where they are
+        mktempdir() do d
+            res, pt = joinpath(d, "result.jld2"), joinpath(d, "point_001.jld2")
+            _write_frames(res; n=3)
+            write(pt, "truncated")
+            @test make_result_a_summary!(d, pt) === :unreadable
+            @test jldopen(f -> f["$_GRP/n_snapshots"], res, "r") == 3
+        end
+    end
+
     @testset "inert when there is no result.jld2" begin
         mktempdir() do d
             pt = joinpath(d, "point_001.jld2")

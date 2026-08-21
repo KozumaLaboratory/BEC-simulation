@@ -557,11 +557,16 @@ REFUSES rather than guesses, because the failure is silent data loss:
   - the point file has no frames, or fewer, or a  → `:not_covered`
     different spatial shape / component count
   - already stripped                              → `:already_summary`
+  - either file will not open (truncated, held,   → `:unreadable`
+    killed mid-write)
+
+`dry=true` runs every check and returns the verdict WITHOUT writing.
 
 Keys only — no frame is ever read, so the check costs milliseconds against files
 of several GB.
 """
-function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractString)
+function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractString;
+    dry::Bool=false)
     res = joinpath(run_dir, "result.jld2")
     (isfile(res) && !islink(res)) || return :skipped
     (isfile(point_file) && !islink(point_file)) || return :skipped
@@ -574,16 +579,36 @@ function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractStr
     samefile(res, point_file) && return :skipped
 
     grp = "dynamics/psi_snapshots_streamed"
-    meta(path) = jldopen(path, "r") do f
-        haskey(f, "$grp/n_snapshots") || return nothing
-        (n=Int(f["$grp/n_snapshots"]),
-            shape=f["$grp/spatial_shape"], comps=f["$grp/n_components"])
-    end
+    # A file that will not OPEN is distinct from one with no frames, and the
+    # backlog sweep found the difference the hard way: `jldopen` threw on a
+    # `result.jld2` in the tree and took the whole pass down. Truncated writes,
+    # a kill mid-save, a file another process holds — all real, all reasons to
+    # REFUSE rather than to rewrite. Returning `:already_summary` for an
+    # unreadable file would be worse than throwing: it reads as "done".
+    meta(path) =
+        try
+            jldopen(path, "r") do f
+                haskey(f, "$grp/n_snapshots") || return (; missing_frames=true)
+                (n=Int(f["$grp/n_snapshots"]),
+                    shape=f["$grp/spatial_shape"], comps=f["$grp/n_components"])
+            end
+        catch
+            nothing
+        end
     rm_ = meta(res)
-    rm_ === nothing && return :already_summary
+    rm_ === nothing && return :unreadable
+    haskey(rm_, :missing_frames) && return :already_summary
     pm = meta(point_file)
-    pm === nothing && return :not_covered
+    pm === nothing && return :unreadable
+    haskey(pm, :missing_frames) && return :not_covered
     (pm.n >= rm_.n && pm.shape == rm_.shape && pm.comps == rm_.comps) || return :not_covered
+
+    # `dry` returns the verdict from the SAME checks, one line before the rewrite.
+    # The alternative — a caller reproducing the conditions to preview them — is
+    # how a preview starts disagreeing with the act. The backlog sweep's first
+    # version did exactly that and reported `:skipped` for every directory,
+    # because the stand-in it built tripped a guard the real call would not.
+    dry && return :summarised
 
     tmp = res * ".summary.tmp"
     isfile(tmp) && rm(tmp; force=true)
