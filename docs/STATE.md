@@ -123,8 +123,8 @@ checking either.
 **4 sites admit a cached payload; 1 re-derives its verdict.**
 
 - admits: `src/workflow/experiment.jl:253`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:601`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:854`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:625`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:878`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
 - **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
 

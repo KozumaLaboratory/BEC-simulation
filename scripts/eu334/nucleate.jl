@@ -399,7 +399,13 @@ function main()
         T=T_RES, mu0=MU0, mu1=MU1, tau_ms=TAU_MS, hold_ms=HOLD_MS, seed=SEED,
         noise=NOISE, f_seed=seed.f, grid_n_points=(GRID_N, GRID_N, GRID_N),
         grid_box_size=(BOX, BOX, BOX), n_atoms_norm=NATOMS, dt=DT, every=EVERY,
-        wall_s=wall, seed_file=SEED_FILE)
+        wall_s=wall, seed_file=SEED_FILE,
+        # WHICH CODE PRODUCED THIS. Measured 2026-08-21: these files carried every
+        # physics parameter and the seed, and nothing about the code — so a
+        # trajectory was reproducible only from a session someone still remembered.
+        # `git_dirty` is the load-bearing field; a hash from a dirty tree names a
+        # commit that does not describe what ran.
+        provenance=run_provenance())
     @printf("  wrote %s/{traj,psi}_%s\n", OUT, tag)
 end
 

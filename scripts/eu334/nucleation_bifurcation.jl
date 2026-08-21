@@ -266,7 +266,11 @@ function walk(name, dirn, anchor; init_state=:m_minus_F)
         jldsave(joinpath(OUT, @sprintf("%s_f%06.4f.jld2", name, f)); psi=r.psi, f=f,
             n_atoms=r.n_atoms, E_total=r.E, fperp=r.fperp, Jz=r.Jz,
             grid_n_points=(GRID_N, GRID_N, GRID_N), grid_box_size=(BOX, BOX, BOX),
-            B_uG=B_UG, kappa=KAPPA, pin_bx=PIN)
+            B_uG=B_UG, kappa=KAPPA, pin_bx=PIN,
+            # Which code produced this — see nucleate.jl. These cells are the
+            # REFERENCE TABLE every classification is measured against, so a cell
+            # whose provenance is unknown makes every verdict built on it unknown.
+            provenance=run_provenance())
     end
     writedlm(joinpath(OUT, "$name.csv"), vcat(permutedims(COLS), permutedims.(rows)...), '\t')
     rows
