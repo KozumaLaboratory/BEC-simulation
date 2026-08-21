@@ -242,7 +242,11 @@ kcut_fixed)
 # in one knob. Cheap and short: this is a debugging instrument, not a measurement
 # of the campaign's physics.
 ed_probe)
-    q -N eu334_edprobe -l h_rt=2:00:00 -v ED_NSTEP=${ED_NSTEP:-25000} \
+    # ARGUMENT, because the whole point is comparing the two: the scalar arm
+    # already condenses at both values of M, so the F = 6 arm is what separates
+    # "the spinor" from "the DDI or the ramp" in #418.
+    q -N eu334_edprobe_${2:-rb87} -l h_rt=4:00:00 \
+      -v ED_NSTEP=${ED_NSTEP:-25000},ED_ATOM=${2:-rb87} \
       scripts/eu334/submit_ed_probe.sh
     ;;
 
