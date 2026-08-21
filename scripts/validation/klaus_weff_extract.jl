@@ -82,7 +82,7 @@ function main(args)
         end
         push!(rows, (; c..., p...))
     end
-    isempty(rows) && (println("no arms found under $root"); return)
+    isempty(rows) && (println("no arms found under $root"); return nothing)
 
     for fld in sort(unique(r.field_nt for r in rows))
         sel = sort([r for r in rows if r.field_nt == fld]; by=r -> r.weff)
@@ -91,7 +91,8 @@ function main(args)
         for r in sel
             rel = base === nothing ? NaN : 100 * (r.peak - sel[base].peak) / sel[base].peak
             flag = r.peak == r.whole ? "  " : " *"   # * = whole-trajectory max was the transient
-            @printf("  weff %.3f   in-hold %.5f  frame %2d/%2d%s  whole %.5f (f%2d)  %+6.2f %% vs weff=1\n",
+            @printf(
+                "  weff %.3f   in-hold %.5f  frame %2d/%2d%s  whole %.5f (f%2d)  %+6.2f %% vs weff=1\n",
                 r.weff, r.peak, r.frame, r.nframes, flag, r.whole, r.whole_frame, rel)
         end
         # The positive control. If the per-step `potential:` override were

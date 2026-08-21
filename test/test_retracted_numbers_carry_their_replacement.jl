@@ -254,3 +254,38 @@ end
         @test !any(s -> endswith(s.file, "marked_at_use.md"), found)
     end
 end
+
+@testset "the ledger's coverage of the documents it cites does not go backwards" begin
+    # The gate the 2026-08-21 incident asked for. `quantity` can only make two ROWS
+    # collide; it cannot see a section that was never poured, and the section that
+    # refuted the method in use was one of 47 unpoured out of 70.
+    #
+    # A ratchet rather than a target: pinning this at "everything" would make it
+    # unmeetable and it would be deleted, which is the failure mode this project
+    # has recorded for gates that are too strict.
+    using TOML
+    doc = TOML.parsefile(claim_ledger_path())
+    pinned = Dict(r["doc"] => Int(r["covered"]) for r in get(doc, "coverage", []))
+    @test !isempty(pinned)
+
+    actual = ledger_section_coverage(; repo=_REPO)
+    @test !isempty(actual)
+
+    for r in actual
+        haskey(pinned, r.doc) || begin
+            println("  cited but not in the coverage ratchet: ", r.doc,
+                " (", r.covered, "/", r.total, ") — add a [[coverage]] row")
+            @test false
+            continue
+        end
+        r.covered >= pinned[r.doc] || println("  coverage FELL for ", r.doc, ": ",
+            r.covered, " < pinned ", pinned[r.doc], ". Uncovered: ",
+            join(r.uncovered, " "))
+        @test r.covered >= pinned[r.doc]
+    end
+
+    # Positive control: a ratchet that cannot detect a fall is not a ratchet.
+    @test any(r -> r.covered < r.total, actual)   # there IS debt to protect
+    fell = [r for r in actual if r.covered < get(pinned, r.doc, 0) + 1_000_000]
+    @test length(fell) == length(actual)          # the comparison is live
+end

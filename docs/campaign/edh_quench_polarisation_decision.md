@@ -1049,27 +1049,49 @@ the axes they covered; the axis nobody registered was **hold duration**.
 **Not claimed:** the 16 ms values are converged. Three of the four still peak at
 53/53. This section bounds what is *not* true; it quotes no replacement optimum.
 
-### 11.6 At 10.4 nT there IS a resolved feature, and the prediction's premise is gone
+### 11.6 RETRACTED — this section was written against a refuted observable
+
+> **RETRACTED 2026-08-21, the same day it was written.** Every number below took
+> the peak over the WHOLE trajectory. §12.1 had established a day earlier
+> (`97ec124e`) that at 10.4 nT this reads the **pre-hold transient**, and stated
+> the rule: the claim is about the hold, so the peak must be taken inside it.
+>
+> The `flat baseline at 0.27574` is that transient. Read in the hold the baseline
+> is **0.20139** and the enhancement is **+49.5 %** — §12.2, which had already
+> reported it as a clean single peak rather than a bump on a plateau.
+>
+> §12 was in `main` and was merged into this branch before this section was
+> written. It was read for CONFLICTS and not for CONTENT: git reported none, and
+> there was none, because two sections of one document disagreeing is not a
+> textual conflict. Kept struck rather than deleted, because the failure is more
+> useful than the absence — and because the ledger now carries the two gates that
+> make it structural (`quantity` collision, and the coverage ratchet that would
+> have forced §12 into a row for this one to collide with).
 
 | ω_eff | 8 ms | 16 ms | frame (16 ms) |
 |---:|---:|---:|---|
 | 0.650 | 0.30101 | **0.33758** | **44/53 — inside the window** |
-| 1.000 | 0.27574 | 0.27574 | 32/53 |
+| 1.000 | ~~0.27574~~ | ~~0.27574~~ | 32/53 — **SUPERSEDED**, this is the transient; in-hold baseline is 0.20139 (§12.2) |
 
-The 10.4 nT bump at ω_eff ≈ 0.65 peaks *inside* the hold, +22.4 % over baseline,
+~~The 10.4 nT bump at ω_eff ≈ 0.65 peaks inside the hold, +22.4 % over baseline,
 and the baseline is identical to five digits at both hold durations — genuinely
-saturated rather than still climbing. 16 of the 20 arms sit at 0.2755 within 1e-4
+saturated rather than still climbing.~~ 16 of the 20 arms sit at 0.2755 within 1e-4
 across a 3× change in radial trap frequency, which at 5.2 nT moves the observable
 by 17 %. That is `B_hold = 10 nT → Zeeman re-pinning`, which the sheet's own
 validation chain already recorded; it was looked up rather than reported as a
 surprise.
 
-**The registered prediction cannot be answered, because its premise dissolved.**
-It read: *"if the dip is a resonance, its ω_eff position must move again at
-10.4 nT."* There is no dip at 5.2 nT to move. This is neither a hit nor a miss,
-and recording it as a miss would credit the prediction with a test it never got.
-`edh-5p2nt-dip-is-a-resonance` is `refuted` for that reason, not for a measured
-disagreement.
+**On the prediction — also retracted.** This section argued the registered
+prediction "cannot be answered, because its premise dissolved". §12.3 had already
+tested it properly and found it **FAILS**: the prediction was ω_eff,dip ∝ B, whose
+informative arm is 2.6 nT, where a dip near ω_eff ≈ 0.325 was predicted and the
+curve rises monotonically through it (0.45976 → 0.47682). 10.4 nT predicts an
+*absence*, which is the easy half and confirms nothing. I ran the easy half and
+concluded the question was unaskable. `edh-5p2nt-dip-is-a-resonance` carries
+`prediction_outcome = "miss"`.
+
+**A registered prediction should name which arm is informative at the time it is
+registered**, or the cheap arm gets run and a null gets read as agreement.
 
 **Generalises:** when an observable is *maximum over the trajectory*, the argmax
 index is part of the measurement. An argmax at the boundary says the run ended too

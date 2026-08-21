@@ -45,6 +45,7 @@ using TOML
 export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
     CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, claim_ledger_link_errors, claim_by_id,
+    ledger_section_coverage,
     retired_literals,
     unmarked_retired_literal_sites
 
@@ -130,7 +131,10 @@ One `[[claim]]` row of `docs/campaign/claims.toml`.
 
 `uncertainty` is a String and never `nothing`: the parser rejects a row without
 one. `superseded_by` and `supersedes` are `nothing` when unset, which is a
-different fact from `""`. `retired_literal` is a (possibly empty) vector — a
+different fact from `""`. `supersedes` is a vector: one row can genuinely replace several, and it does here —
+`edh-5p2nt-ordering-is-hold-dependent` retires both the two-branch structure and the
+search for its mechanism, because the structure it was a mechanism FOR does not exist.
+`retired_literal` is likewise a (possibly empty) vector — a
 retracted claim usually survives in more than one wording, and the lab
 instruction and the mechanism sentence are different points of use.
 """
@@ -148,8 +152,9 @@ struct LedgerClaim
     doc::String
     section::String
     pr::Union{Nothing, Int}
-    supersedes::Union{Nothing, String}
+    supersedes::Vector{String}
     superseded_by::Union{Nothing, String}
+    quantity::Union{Nothing, String}
     retired_literal::Vector{String}
     replacement_literal::Vector{String}
     prediction::Union{Nothing, String}
@@ -302,7 +307,8 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                 _required(r, "commit", i, path), _required(r, "doc", i, path),
                 _required(r, "section", i, path),
                 prnum isa Integer ? Int(prnum) : nothing,
-                _opt(r, "supersedes"), _opt(r, "superseded_by"), retired,
+                _strvec(r, "supersedes", id, path), _opt(r, "superseded_by"),
+                _opt(r, "quantity"), retired,
                 _strvec(r, "replacement_literal", id, path),
                 _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note")),
         )
@@ -334,15 +340,16 @@ function claim_ledger_link_errors(claims::AbstractVector{LedgerClaim})
     errs = String[]
     ids = Set(c.id for c in claims)
     for c in claims
-        for (field, target) in (("supersedes", c.supersedes),
-            ("superseded_by", c.superseded_by))
+        for (field, target) in vcat([("supersedes", t) for t in c.supersedes],
+            [("superseded_by", c.superseded_by)])
             target === nothing && continue
             target == c.id && push!(errs, "claim `$(c.id)`: $field points at itself")
             target in ids ||
                 push!(errs, "claim `$(c.id)`: $field = `$target`, which is not a claim id")
         end
-        if c.supersedes !== nothing && c.supersedes in ids
-            other = claim_by_id(claims, c.supersedes)
+        for sid in c.supersedes
+            sid in ids || continue
+            other = claim_by_id(claims, sid)
             other.superseded_by == c.id || push!(
                 errs,
                 "claim `$(c.id)` supersedes `$(other.id)`, but `$(other.id)` names " *
@@ -358,7 +365,7 @@ function claim_ledger_link_errors(claims::AbstractVector{LedgerClaim})
         end
         if c.superseded_by !== nothing && c.superseded_by in ids
             other = claim_by_id(claims, c.superseded_by)
-            other.supersedes == c.id || push!(
+            c.id in other.supersedes || push!(
                 errs,
                 "claim `$(c.id)` names `$(other.id)` as its successor, but " *
                 "`$(other.id)` does not declare `supersedes = \"$(c.id)\"`.",
@@ -373,6 +380,34 @@ function claim_ledger_link_errors(claims::AbstractVector{LedgerClaim})
                 "starts flattering itself.",
             )
         end
+    end
+    # TWO ROWS MAY NOT ASSERT DIFFERENT VALUES OF ONE QUANTITY.
+    #
+    # This is the gate that would have caught 2026-08-21. `edh-104nt-bump-at-0p65`
+    # measured peak P_adj at 10.4 nT over the whole trajectory; §12.2 had measured
+    # the same quantity inside the hold a day earlier and got a different number.
+    # Nothing collided, because §12 was never poured into the ledger and a row can
+    # only collide with a row. Pouring is enforced by the coverage ratchet;
+    # collision is enforced here.
+    #
+    # Only NON-RETIRED rows participate: a superseded row is supposed to disagree
+    # with its successor, and that is the one disagreement the ledger exists to
+    # record rather than forbid.
+    byq = Dict{String, Vector{String}}()
+    for c in claims
+        c.quantity === nothing && continue
+        c.status in ("live", "scoped", "open") || continue
+        push!(get!(byq, c.quantity, String[]), c.id)
+    end
+    for (q, ids) in byq
+        length(ids) > 1 && push!(
+            errs,
+            "quantity `$q` is asserted by $(length(ids)) non-retired rows " *
+            "($(join(sort(ids), ", "))). Two live rows about one measured " *
+            "quantity is the state this ledger exists to make unrepresentable: " *
+            "one of them supersedes the other, or they are different quantities " *
+            "and the strings should say so.",
+        )
     end
     errs
 end
@@ -511,6 +546,48 @@ function unmarked_retired_literal_sites(;
                 )
             end
         end
+    end
+    out
+end
+
+"""
+    ledger_section_coverage(; claims, repo) -> Vector{NamedTuple}
+
+Per cited document: `(doc, total, covered, uncovered)` over its numbered sections.
+
+**Why this is a gate and not a report.** On 2026-08-21 a row was added measuring a
+quantity that a section of the SAME document had already measured, by a method
+that same section had refuted the day before. Nothing collided, because the
+`quantity` gate can only compare a row against a row — and 47 of that document's
+70 sections had never been poured. A ledger that cites a document and covers a
+third of it can be read as complete, and was.
+
+The ratchet in `claims.toml`'s `[[coverage]]` table pins the current number per
+document. It may rise and must not fall, so adding sections to a cited document
+without pouring them is red. That is deliberately weaker than "cover everything"
+— the debt is real and demanding it in one commit would get the gate deleted —
+and deliberately stronger than a report nobody reads.
+"""
+function ledger_section_coverage(;
+    claims::AbstractVector{LedgerClaim}=claim_ledger(),
+    repo::AbstractString=normpath(joinpath(@__DIR__, "..", "..", "..")))
+    out = NamedTuple[]
+    for d in sort(unique(c.doc for c in claims if endswith(c.doc, ".md")))
+        path = joinpath(repo, d)
+        isfile(path) || continue
+        secs = String[]
+        for l in readlines(path)
+            m = match(r"^#{2,3} (\d+(?:\.\d+)?)\.? ", l)
+            m === nothing || push!(secs, m.captures[1])
+        end
+        isempty(secs) && continue
+        cov = Set(c.section for c in claims if c.doc == d)
+        unc = [x for x in unique(secs) if !(x in cov)]
+        push!(
+            out,
+            (doc=d, total=length(unique(secs)),
+                covered=length(unique(secs)) - length(unc), uncovered=unc),
+        )
     end
     out
 end

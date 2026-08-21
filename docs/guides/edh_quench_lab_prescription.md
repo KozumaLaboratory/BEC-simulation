@@ -70,10 +70,20 @@ one seed.
 Three fields, three different kinds of answer, and only one of them is a number.
 That is the finding, not a failure to converge.
 
-**Also at 10.4 nT** (2026-08-21): a resolved local maximum at ω_eff ≈ 0.65,
-+22.4 % over a flat, Zeeman-re-pinned baseline, peaking inside the hold window.
-Resolved, unlike the 5.2 nT arms — but a single point at one field, with no grid
-check. Not a prescription.
+**At 10.4 nT** the ω_eff response is a **clean single peak at ω_eff = 0.650,
++49.5 %** over ω_eff = 1 — the largest *relative* enhancement of any field
+measured, on the *smallest absolute* transfer (0.30 against 0.66 at 2.6 nT).
+Zeeman re-pinning costs a factor 2 in absolute signal but does not close the
+channel, and weakening the trap helps proportionally more where it is nearly
+closed. **Quote both numbers or neither**: the relative figure alone sends an
+experimentalist to the worst field.
+
+> An earlier version of this paragraph said **+22.4 %** over a flat baseline of
+> 0.27574. That is **SUPERSEDED**: the peak had been taken over the whole
+> trajectory, which at this field reads the pre-hold transient rather than the
+> hold. Read inside the hold the baseline is 0.20139. §12.1, §12.2.
+
+Not a prescription: 32³, one seed, no grid check at this field.
 
 ## 4. What bounds these numbers
 
