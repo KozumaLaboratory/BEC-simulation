@@ -304,14 +304,31 @@ cutoff shrinks, while the later handoff skips that stretch and loses an eighth.
 
 - **Early handoff — the C region empties.** The cutoff tracks $T$ down through a large
   range and the projector removes atoms faster than the reservoir refills them.
-- **Late handoff — coherence, not population.** Slowing the *same* $(N,T)$ path 3× leaves
-  $N_C$ essentially unchanged (580 → 590, 444 → 446) and multiplies $N_0$ by 7× and 2.9×
-  at the two points measured so far. Slowing does not put more atoms in C; it lets the
-  ones already there become coherent.
+- **Late handoff — coherence, not population.** $N_C$ is set by the trajectory and the
+  cutoff, not by how fast either moves: slowing the *same* $(N,T)$ path 3× leaves it
+  essentially unchanged (580 → 590, 444 → 446, 363 → 355). What changes is the coherent
+  fraction of it.
+
+**Slowing does NOT help, and the first two points said it did.** Matched trajectory times,
+handoff 1.85 s:
+
+| $t$ | 7076 | 7280 | 7485 | 7689 | 7893 | 8097 |
+|---|---|---|---|---|---|---|
+| 1× $N_0$ | 10.8 | 20.3 | **41.8** | **64.8** | **68.1** | **49.5** |
+| 3× $N_0$ | **75.1** | **59.8** | 34.0 | 28.1 | 22.4 | 20.3 |
+
+The 3× run starts ahead — it has had three times as long to build anything by the first
+marker — and then **declines monotonically** while the 1× run climbs to $f_0 = 0.255$ and
+overtakes it from the third point on. A verdict taken at either end is the opposite of the
+one taken at the other, and the two-point version of this paragraph said 7× and 2.9× in
+favour of slowing.
 
 The slowdown run is a **numerical** experiment, not a ramp design: a genuinely slower ramp
-costs more three-body loss and would lower $N_\mathrm{total}$ everywhere. It isolates the
-rate of cutoff change from the loss a slower ramp would incur.
+costs more three-body loss and would lower $N_\mathrm{total}$ everywhere. That was scanned
+separately and points the same way — $N_0^\mathrm{eq}$ at the peak falls monotonically
+from $6.0\times10^4$ at 0.5× to $1.4\times10^4$ at 5×, so **loss dominates and a faster
+ramp is better on both counts**. 0.5× already exceeds the measured $5.02\times10^4$, and
+with no turnover in $[0.5, 5]$ that scan found its own edge rather than an optimum.
 
 The $\gamma$ scan **was run once before and thrown away**: the $N_0$ estimator read
 `psi[:,:,:,1]` while `thermal_cfield!` seeds the last component, so at $D=13$ it projected
