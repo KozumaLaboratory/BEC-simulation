@@ -20,7 +20,11 @@ stretch(r::FortRamp, s::Real) = FortRamp(r.times .* s, r.powers_W)
 
 @printf("%-7s %-11s %-11s %-9s %-11s %-11s %-9s\n",
     "slow", "duration", "N at peak", "T (nK)", "mu_eq", "N0_peak", "t_peak")
-for s in (0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0)
+# No turnover in 0.5-5x: N0_peak falls monotonically with slowdown, so loss dominates
+# everywhere in that range and the optimum is at or below 0.5x. Extended downward until
+# it turns over — a scan that only ever rises toward its own edge has not found an
+# optimum, it has found its edge.
+for s in (0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 1.0)
     trap = euv3_evap_trap()
     ramp = stretch(euv3_evaporation_ramp(), s)
     p = EvapParams(; a_s=Eu151.a_s, tau_bg=15.0, K3=1.61e-40)
