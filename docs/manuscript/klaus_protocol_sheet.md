@@ -233,7 +233,7 @@ EdH channels that rotation can then act on.
    from this step; the live prescription is docs/guides/edh_quench_lab_prescription.md.
                                    ~~|Ω| / ω_⊥ ≈ 0.3      at B = 1.3 nT~~   REFUTED, **no replacement** — there is no operating window at 1.3 nT (+1.8 %, flat). Do not re-fit.
                                    ~~|Ω| / ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT~~   SUPERSEDED → static trap at ω_⊥,eff/ω_⊥ = 0.71 (|Ω*|/ω_⊥ = 0.68 ± 0.04 if you must use Ω).
-                                   ~~|Ω| / ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT~~   REFUTED — maps to ω_eff ∈ [0.80, 0.87], a declining shoulder below BOTH maxima. Replacement is a shape: two branches, global max ω_eff ≈ 0.55.
+                                   ~~|Ω| / ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT~~   REFUTED. The `two branches / global max ω_eff ≈ 0.55` reading that replaced it is ALSO REFUTED (2026-08-21): the ordering inverts with hold duration, so nothing is quotable at this field.
    The "off-diagonal is sub-optimal" reading went with them.
 
 7. Keep rotation on for           ≥ 8 ms after rotation onset.
