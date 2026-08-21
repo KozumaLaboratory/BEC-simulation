@@ -54,10 +54,31 @@ function peak_padj(dir::AbstractString; hold_duration::Float64=5.5292,
         # agreement is the check; without it this is another guess.
         nhold = max(1, Int(floor(hold_duration / (dt * save_every))))
         lo = max(1, length(adj) - nhold + 1)
-        k = lo - 1 + argmax(@view adj[lo:end])
+        w = @view adj[lo:end]
+        k = lo - 1 + argmax(w)
+        # THREE READINGS OF ONE HOLD. At 10.4 nT the peak is not well-posed — its
+        # maximum sits at the window's first frames, where the decaying pre-hold
+        # transient still dominates, and the value moves 37 % with the cut. The
+        # answer is not to pick a window but to keep all three and refuse an
+        # ordering they disagree on. They fail differently: `peak` is contaminated
+        # by the transient, `mean` is diluted by it, `final` is a single sample.
         (peak=adj[k], frame=k, nframes=length(adj), hold_from=lo,
+            mean=sum(w) / length(w), final=adj[end],
             whole=maximum(adj), whole_frame=argmax(adj))
     end
+end
+
+"""Rank correlation between two readings — do they ORDER the arms alike?"""
+function _spearman(a::AbstractVector, b::AbstractVector)
+    n = length(a)
+    n < 2 && return NaN
+    ra = sortperm(sortperm(a))
+    rb = sortperm(sortperm(b))
+    ma, mb = sum(ra) / n, sum(rb) / n
+    num = sum((ra[i] - ma) * (rb[i] - mb) for i in 1:n)
+    da = sqrt(sum((ra[i] - ma)^2 for i in 1:n))
+    db = sqrt(sum((rb[i] - mb)^2 for i in 1:n))
+    (da == 0 || db == 0) ? NaN : num / (da * db)
 end
 
 """Parse `klaus_weff0p714_B5p2nT_<hash>` back into its two scan coordinates."""
@@ -98,8 +119,8 @@ function main(args)
             rel = base === nothing ? NaN : 100 * (r.peak - sel[base].peak) / sel[base].peak
             flag = r.peak == r.whole ? "  " : " *"   # * = whole-trajectory max was the transient
             @printf(
-                "  weff %.3f   in-hold %.5f  frame %2d/%2d%s  whole %.5f (f%2d)  %+6.2f %% vs weff=1\n",
-                r.weff, r.peak, r.frame, r.nframes, flag, r.whole, r.whole_frame, rel)
+                "  weff %.3f   peak %.5f (f%2d)  mean %.5f  final %.5f%s  %+6.2f %%\n",
+                r.weff, r.peak, r.frame, r.mean, r.final, flag, rel)
         end
         # The positive control. If the per-step `potential:` override were
         # ignored, every arm would return the SAME number -- so a flat scan is a
@@ -111,6 +132,23 @@ function main(args)
             println("  !! is not reaching the hold step. This is NOT a physical null.")
         elseif length(sel) > 1
             @printf("  control OK: spread %.5f over %d arms\n", spread, length(sel))
+        end
+
+        # DOES THE ORDERING SURVIVE THE DEFINITION? Rank the arms by each reading.
+        # If the three disagree, the ordering is a property of the extraction and
+        # no optimum should be quoted from this field — which is the state 10.4 nT
+        # was in when a number was published from it twice.
+        if length(sel) > 2
+            pv = [r.peak for r in sel]
+            mv = [r.mean for r in sel]
+            fv = [r.final for r in sel]
+            topw(v) = sel[argmax(v)].weff
+            agree = topw(pv) == topw(mv) == topw(fv)
+            @printf("  argmax weff: peak %.3f  mean %.3f  final %.3f  -> %s\n",
+                topw(pv), topw(mv), topw(fv),
+                agree ? "AGREE" : "DISAGREE - quote no optimum at this field")
+            @printf("  rank corr: (peak,mean) %.3f   (peak,final) %.3f\n",
+                _spearman(pv, mv), _spearman(pv, fv))
         end
     end
 
