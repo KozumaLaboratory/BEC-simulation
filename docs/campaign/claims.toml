@@ -1339,3 +1339,57 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "9.4"
 pr = 392
 note = "Recorded because it is the number anyone sizing a grid check will guess wrong in the expensive direction, and because it is what made the cancelled 64³ job look affordable."
+
+# --- The mechanism, found by measuring the cloud instead of the populations ----
+
+[[claim]]
+id = "edh-quench-excites-a-breathing-mode"
+claim = "The B quench leaves the cloud breathing, and ω_eff sets the breathing FREQUENCY, not whether it breathes: the ω_eff = 1.000 arm — whose trap is never changed — oscillates in radial RMS radius with a period of ~5 frames, while ω_eff = 0.650 oscillates with ~11."
+status = "live"
+quantity = "radial breathing @ B=10.4nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, radial RMS radius over the hold, read from cached snapshots. Seen at both hold lengths."
+uncertainty = "unbounded: the periods were read off by eye from 11 and 22 samples with no fit, so `~5` and `~11` frames carry no interval. What IS bounded is the EXISTENCE of the oscillation — the ω_eff = 1.000 trace runs 2.885 → 1.999 → 2.693 → 1.984 → 3.163, swings of 30-40 % against a dt/2 reproducibility floor of 0.029 %."
+uncertainty_basis = "none"
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = "The ω_eff = 1.000 arm is the control that makes this a statement about the QUENCH: its trap is identical before and during the hold, so an oscillation there cannot be caused by weakening the trap."
+
+[[claim]]
+id = "edh-weff-structure-is-breathing-phase-not-resonance"
+claim = "The ω_eff structure at B = 10.4 nT is a phase sample of the breathing mode at a fixed hold length, not a resonance in the cascade: radial expansion over the hold has a minimum at ω_eff ≈ 0.59-0.62 where the cloud CONTRACTS, and doubling the hold moves the ratios."
+status = "live"
+quantity = "origin of the weff structure @ B=10.4nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, 26 arms over ω_eff ∈ [0.15, 1.00] at the 8 ms hold plus two at 16 ms."
+uncertainty = "The ratio r(end)/r(hold start) runs 1.571 (ω_eff = 0.200) → 0.949 (0.590, the minimum) → 1.140 (0.830) → 1.097 (1.000). Doubling the hold moves it from 0.989 to 1.006 at ω_eff = 0.650 and from 1.096 to 1.033 at 1.000 — a resonance would not move. The first 11 frames of the 8 ms and 16 ms holds agree exactly, which is the check that the window extraction is right."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p590_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+prediction = "If the structure is a breathing phase rather than a resonance, doubling the hold must move the expansion ratio; a resonance would leave it where it is."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = """NOT a supersession of `edh-104nt-peak-reads-the-transient-for-80-percent`, and it was
+written as one for a minute until the link checker refused it. That row is still true —
+22 of 26 arms take their maximum at frame 32 — and this one EXPLAINS it. Explanation and
+replacement are different relations, and the ledger only has vocabulary for the second.
+
+THIS EXPLAINS THE POPULATION I HAD RECORDED AS UNEXPLAINED. The four arms whose `peak`
+falls in the hold interior — 0.590, 0.620, 0.650, 0.680 — are EXACTLY the four with the
+smallest radial expansion, three of them contracting. Where the cloud is compressed at the
+end of the window the density is high, the cascade is still running, and the maximum lands
+on the last frame; everywhere else the cloud expands, density falls, the cascade stalls and
+the maximum is the pre-hold transient. Two independent readings — the argmax frame of
+P_adj, and the radial dynamics — pick out the same four arms.
+It also removes the reason to look for a cascade resonance at either field: a structure in
+ω_eff at fixed hold length is what a breathing phase looks like. That does not by itself
+refute the 5.2 nT reading, which has not been measured this way — but it is now the
+hypothesis to beat there, and it is cheap to test from the same cached snapshots."""
