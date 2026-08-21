@@ -44,7 +44,7 @@ measurements, not tests).
 | 18 | The field-rotation branch (`eu151_klaus_phi_phys`) | **Two code defects, no physics.** Its GPU path was dead (`spin_density_vector` allocated host arrays → scalar-indexing error); and it reported **`conv = true` having never been asked**, because the rotating-basis GS returns no convergence flag and the writer defaulted it to `true` — so every such run satisfied CAMPAIGN guard 7 by construction. Both fixed and gated. §14 |
 | 17 | Does the static substitution hold at long time? | **Yes on the peak; the endpoint is a different question.** At 64³, 145 ms: peak **static 0.49081 > rotating 0.40102 > baseline 0.37973** (+29.3 % over no-intervention). At the endpoint the *rotating* arm is the persistent one (0.40013, 2.23× static) — the opposite of what §13 said. §13's numbers are **RETRACTED** (§15): they were 32³, which inverts both orderings. §17 |
 | 19 | Is the observable still seed-deterministic at 145 ms? | **The peak is; the endpoint is not.** Two seeds at 64³ leave the static peak identical to five decimals and move its **endpoint by 34.2 %** — which swallows the 18.8 % static-vs-baseline endpoint gap, so that one row stays open. §17.1 |
-| 13 | 5.2 nT, resolved at 20 points + 64³ | **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
+| 13 | 5.2 nT, resolved at 20 points + 64³ | **REFUTED 2026-08-21 — the ordering inverts with hold duration; see §11.5.** As reported: **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
 | 4b | Is `eu151_klaus_phi_phys` really "the one Eu arc on the other side"? | **No.** `p > 0` puts m=+F at the *bottom*, so it is aligned like everything else — and therefore on the wrong side for the EdH quench. #343 §2's premise was an m-label comparison across two field parameterisations. §4.2 |
@@ -356,9 +356,16 @@ Its `init_m_idx: 1` is also simply the schema default at p > 0
 nothing was ever chosen there.
 
 **Action for that config: same as the quench family — it needs `init_m_idx: 13`
-at p > 0 (or `p < 0` with `init_m_idx: 1`) to be anti-aligned.** Not done here:
-it is a 32×32×16 GPU rotating-basis run with an 8-point scan, and it has no
-result being quoted, so it is on the re-derivation list rather than in this PR.
+at p > 0 (or `p < 0` with `init_m_idx: 1`) to be anti-aligned.**
+
+> **DONE, and this paragraph was wrong from 2026-08-19 to 2026-08-20.** It said
+> "not done here: … on the re-derivation list rather than in this PR". The change
+> in fact landed in `e8dafe8e`, the same retarget commit — `init_m_idx: 13` is on
+> line 51 of that config today, with the reasoning in its own header. The stale
+> deferral survived because nothing checked the paragraph against the file it
+> describes; it was found by filling the `evidence` column of
+> `docs/campaign/claims.toml` and then RESOLVING the path, which is the whole
+> argument for that column. Claim `edh-phi-phys-config-anti-alignment`, closed.
 
 <!-- DECISION -->
 
@@ -738,6 +745,7 @@ narrow ones. Densified to 20 points, plus two 64³ arms.
 | 0.620 | 0.49592 | 0.950 | 0.45968 |
 | **0.650** | **0.48790** ← dip | 1.000 | 0.43930 |
 
+**REFUTED — §11.5: this ordering inverts with hold duration.**
 Global maximum at ω_eff ≈ 0.55, **+17.0 %** over ω_eff = 1. Secondary maximum at
 ω_eff ≈ 0.77. Dip between them at ω_eff ≈ 0.65, **5.06 %** below the global
 maximum — about 170× the dt/2 reproducibility floor (0.029 %) and infinitely
@@ -767,7 +775,7 @@ its depth. So the two-branch structure is physical at this resolution, and what
 
 | | criterion | outcome |
 |---|---|---|
-| D1 | two maxima separated by a dip > 1 % ⇒ report two branches, quote no single optimum | dip is **4.70 %** at 64³ ⇒ **TWO BRANCHES**, no single optimum quoted |
+| D1 | two maxima separated by a dip > 1 % ⇒ report two branches, quote no single optimum | dip is **4.70 %** at 64³ ⇒ **TWO BRANCHES**, no single optimum quoted — **REFUTED §11.5**: the dip is a truncation and D1 fired on it because D1 never looked at the argmax |
 | D2 | vertex only from a ≥5-pt fit with negative curvature | **not applicable** — D1 fired first |
 | D3 | digits from the fit | not applicable |
 | D4 | structure must survive 64³ | **survives**, 93 % of depth retained |
@@ -777,14 +785,19 @@ its depth. So the two-branch structure is physical at this resolution, and what
 `[0.5, 0.6] at 5.2 nT` was written in Ω. In ω_eff that is
 √(1−0.5²) … √(1−0.6²) = **[0.80, 0.87]** — which in this scan is a *declining*
 shoulder (0.50070 → 0.49290), below **both** maxima. The global maximum sits at
-ω_eff ≈ 0.55, i.e. |Ω| ≈ 0.84, well outside the old window.
+ω_eff ≈ 0.55, i.e. |Ω| ≈ 0.84, well outside the old window. (That maximum is
+itself **refuted** — §11.5 — but the old window stays below the response at both
+hold durations, so its refutation survives.)
 
 So §10.2's "neither confirmed nor replaced" upgrades to **refuted**, and the
 replacement is not a number but a shape: *two branches, global maximum at
 ω_⊥,eff ≈ 0.55 ω_⊥*.
 
-**Hypothesis, and it has a cheap test.** At 2.6 nT the curve is a clean single
-peak with no dip; doubling the field introduces one. That is what a resonance
+**Hypothesis, and it has a cheap test.** *(The test was run on 2026-08-21 and the
+hypothesis is **refuted** — but by its premise dissolving rather than by the
+measurement disagreeing: there is no dip at 5.2 nT to relocate. §11.5, §11.6.)*
+At 2.6 nT the curve is a clean single peak with no dip; doubling the field
+introduces one. That is what a resonance
 entering the sampled window looks like — plausibly between the Zeeman splitting
 and the radial mode spacing, both of which the field and ω_⊥,eff set. The test
 is one more field: if the dip is a resonance, its ω_eff position must move again
@@ -1000,6 +1013,67 @@ silently satisfying a campaign guard. The 8-point production scan is **not**
 launched — it would now run, but on a path whose ground state reports no energy,
 so there would be nothing to check the result against.
 
+### 11.5 The two branches do not survive the hold duration — 2026-08-21
+
+§11 varied the grid (D4) and read the dip as physical because it survived 64³ with
+93 % of its depth. **The grid was the wrong axis.** Refining the grid cannot move
+the point at which the hold ENDS, and that is where the structure came from.
+
+Look at the argmax, which §11 printed and nobody read. At the 8 ms hold, ω_eff
+0.420 through 0.620 all peak at **frame 42 of 42** — the last streamed frame. A
+maximum reported at the boundary is a truncation, not a peak. The dip at 0.650
+peaks at 38/42 and *is* resolved. So the published two-branch structure compared
+one resolved maximum against a row of boundary values.
+
+Doubling the hold to 16 ms **inverts the ordering**:
+
+| ω_eff | 8 ms | frame | 16 ms | frame |
+|---:|---:|---|---:|---|
+| 0.550 | 0.51387 | 42/42 | 0.59152 | 53/53 |
+| **0.650** | **0.48791** | 38/42 | **0.62804** | 53/53 |
+| 0.770 | 0.50252 | 38/42 | 0.51448 | 53/53 |
+| 1.000 | 0.43935 | 37/42 | 0.48069 | 50/53 |
+
+ω_eff = 0.650 goes from **5.05 % below** 0.550 to **6.2 % above** it. The point
+that was the dip is now the maximum. An ordering that inverts with hold duration
+is not a property of the response, so **`two branches` is REFUTED** and no ω_eff
+optimum is quotable at 5.2 nT.
+
+**The 20-arm re-run reproduced §11 to five digits** (0.51387 / 0.48791 / 0.50252 /
+0.43935 against 0.51390 / 0.48790 / 0.50252 / 0.43930) from configs committed for
+the first time in `runs/klaus_quench_weff/`. That confirms the pipeline and says
+nothing about whether the observable was resolved — it reproduced the same
+truncation. D1 and D4 were both fixed before launch and both fired correctly on
+the axes they covered; the axis nobody registered was **hold duration**.
+
+**Not claimed:** the 16 ms values are converged. Three of the four still peak at
+53/53. This section bounds what is *not* true; it quotes no replacement optimum.
+
+### 11.6 At 10.4 nT there IS a resolved feature, and the prediction's premise is gone
+
+| ω_eff | 8 ms | 16 ms | frame (16 ms) |
+|---:|---:|---:|---|
+| 0.650 | 0.30101 | **0.33758** | **44/53 — inside the window** |
+| 1.000 | 0.27574 | 0.27574 | 32/53 |
+
+The 10.4 nT bump at ω_eff ≈ 0.65 peaks *inside* the hold, +22.4 % over baseline,
+and the baseline is identical to five digits at both hold durations — genuinely
+saturated rather than still climbing. 16 of the 20 arms sit at 0.2755 within 1e-4
+across a 3× change in radial trap frequency, which at 5.2 nT moves the observable
+by 17 %. That is `B_hold = 10 nT → Zeeman re-pinning`, which the sheet's own
+validation chain already recorded; it was looked up rather than reported as a
+surprise.
+
+**The registered prediction cannot be answered, because its premise dissolved.**
+It read: *"if the dip is a resonance, its ω_eff position must move again at
+10.4 nT."* There is no dip at 5.2 nT to move. This is neither a hit nor a miss,
+and recording it as a miss would credit the prediction with a test it never got.
+`edh-5p2nt-dip-is-a-resonance` is `refuted` for that reason, not for a measured
+disagreement.
+
+**Generalises:** when an observable is *maximum over the trajectory*, the argmax
+index is part of the measurement. An argmax at the boundary says the run ended too
+early, and comparing two such numbers compares two truncations.
 ---
 
 ## 15. RETRACTION — 32³ is not converged for the long-time branch

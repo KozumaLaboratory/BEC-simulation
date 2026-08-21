@@ -341,7 +341,7 @@ claim = "|Ω|/ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT."
 status = "refuted"
 superseded_by = "edh-two-branches-5p2nt"
 retired_literal = ["[0.5, 0.6]"]
-replacement_literal = ["two branches", "TWO BRANCHES"]
+replacement_literal = ["hold duration", "hold-duration"]
 type = "B"
 scope = "Was: the 5.2 nT row of the three-field prescription table."
 uncertainty = "unbounded: quoted from a 3-point scan with no fit uncertainty."
@@ -356,12 +356,18 @@ note = "In ω_eff the old window is [0.80, 0.87], which the 20-point scan resolv
 
 [[claim]]
 id = "edh-two-branches-5p2nt"
-claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65. No single optimum is quoted."
-status = "live"
+claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65."
+status = "refuted"
 supersedes = "edh-window-5p2nt-0p5-0p6"
+superseded_by = "edh-5p2nt-ordering-is-hold-dependent"
+retired_literal = ["TWO BRANCHES", "ω_eff ≈ 0.55"]
+# NOT the bare "two branches": it is ordinary English and matched git branches in
+# unified_spec_architecture.md and code branches in parameter_contract_with_Ueda.md.
+# The uppercase form and the numeral are specific to this claim.
+replacement_literal = ["hold duration", "hold-duration"]
 type = "B"
 scope = "32³ for the 20-point shape, 64³ for the dip and the adjacent peak. CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT."
-uncertainty = "Dip depth 5.06 % at 32³ and 4.70 % at 64³ — 93 % retained, against a dt/2 reproducibility floor of 0.029 % (≈170×) and a seed floor of 0.000 % over 5 live seeds. Both points shift up by the same ~2.3 % under refinement, matching the one-signed +2.47 % offset G3 measured at 2.6 nT, so 32³ errs in OFFSET and not in SHAPE. The branch POSITIONS carry no fit uncertainty — they are sampled points on a 20-cell grid, spacing 0.02-0.05."
+uncertainty = "REFUTED 2026-08-21 on an axis the original never varied. The 64³ check (D4) moved the GRID; it could not move the TRUNCATION, and the truncation was the problem: at the 8 ms hold, ω_eff 0.42-0.62 all peak on the LAST streamed frame (42/42), so the reported structure compared boundary values against one resolved maximum (0.650, frame 38/42). Doubling the hold to 16 ms REVERSES the ordering — 0.650 goes from 5.05 % BELOW 0.550 to 6.2 % ABOVE it. An ordering that inverts with hold duration is not a property of the response."
 uncertainty_basis = "grid"
 evidence = ["20 static-trap ω_eff arms at 5.2 nT; 2 arms at 64³ (ω_eff = 0.550, 0.650)"]
 evidence_status = "absent"
@@ -372,12 +378,62 @@ pr = 403
 prediction = "D1: if two maxima are separated by a dip > 1 %, report two branches and quote no single optimum. D4: the structure must survive 64³ or it is a grid artifact."
 prediction_registered = "before"
 prediction_outcome = "hit"
-note = "The replacement for the old row is a SHAPE, not a number — which is why D2 and D3 (the parabolic fit and its digit count) are marked not-applicable rather than skipped: D1 fired first, and ordering the criteria before launch is what made that automatic. `evidence_status = absent`: #403 committed two documents and no configs, so the 22 arms behind this row do not resolve in the tree."
+note = """The values reproduce exactly — a 20-arm re-run from committed configs at
+`c5ac5e67` returns 0.51387 / 0.48791 / 0.50252 / 0.43935 against the published
+0.51390 / 0.48790 / 0.50252 / 0.43930. Reproducing it to five digits did not make it
+true: it reproduced the same truncation. That is the useful lesson here — an exact
+re-run confirms the pipeline and says nothing about whether the observable was
+resolved. D1 and D4 were both fixed before launch and both fired correctly on the
+axes they covered; the axis nobody registered was hold duration."""
+
+
+[[claim]]
+id = "edh-5p2nt-ordering-is-hold-dependent"
+claim = "At B = 5.2 nT the ordering of peak P_adj across ω_eff INVERTS between an 8 ms and a 16 ms hold: ω_eff = 0.650 goes from 5.05 % below 0.550 to 6.2 % above it. No ω_eff optimum is quotable at 5.2 nT."
+status = "live"
+supersedes = "edh-two-branches-5p2nt"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT, four ω_eff points (0.550 / 0.650 / 0.770 / 1.000) at each of two hold durations."
+uncertainty = "The INVERSION is far outside any floor: 0.48791 → 0.62804 at ω_eff = 0.650 while 0.51387 → 0.59152 at 0.550, against a dt/2 floor of 0.029 % and a seed floor of 0.000 %. The 16 ms VALUES are not converged either — three of the four still peak at the last streamed frame (53/53), only ω_eff = 1.000 resolves (50/53). So this row bounds what is NOT true and deliberately quotes no optimum."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/manifest_hold2x.txt", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff0p550_B5p2nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "c5ac5e67"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11.5"
+pr = 0
+note = """The diagnostic was the `frame` column, which the original analysis printed and
+nobody read: a peak reported at frame 42 of 42 is a truncation, not a peak. Both sides
+of the published dip had to be compared at the same resolution before the dip meant
+anything, and they never were. Generalises past this instance: when an observable is
+`maximum over the trajectory`, the argmax index IS part of the measurement, and an
+argmax at the boundary is a statement that the run ended too early."""
+
+[[claim]]
+id = "edh-104nt-bump-at-0p65"
+claim = "At B = 10.4 nT there is a resolved local maximum at ω_eff ≈ 0.65, +22.4 % over a flat baseline, and it peaks INSIDE the hold window."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 10.4 nT. 20 points at 8 ms, two of them repeated at 16 ms."
+uncertainty = "At 16 ms the ω_eff = 0.650 arm peaks at frame 44/53 — inside the window, so this one IS resolved, unlike the 5.2 nT arms. 0.33758 against a baseline of 0.27574. The baseline is identical to five digits at 8 ms and 16 ms (0.27574 both), i.e. genuinely saturated rather than still rising. Grid remains unbounded here: no 64³ arm was run at this field."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "c5ac5e67"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11.5"
+pr = 0
+note = """The flat baseline is not a surprise and was looked up rather than reported as
+one: `klaus_protocol_sheet.md` already records `B_hold = 10 nT | Zeeman re-pinning
+(signal → baseline)`. 16 of the 20 arms sit at 0.2755 within 1e-4 across a 3× change in
+radial trap frequency, which at 5.2 nT moves the observable by 17 %. That is the cascade
+being re-pinned, and the bump is the one place a channel still opens."""
 
 [[claim]]
 id = "edh-5p2nt-dip-is-a-resonance"
 claim = "The 5.2 nT dip is a resonance entering the sampled window — plausibly between the Zeeman splitting and the radial mode spacing, both of which the field and ω_eff set."
-status = "suggested"
+status = "refuted"
+retired_literal = ["dip is a resonance", "resonance entering the sampled window"]
 type = "B"
 scope = "Hypothesis. The observation it explains is that 2.6 nT is a clean single peak and doubling the field introduces a dip."
 uncertainty = "unbounded: not measured. Two fields is not a trend."
@@ -390,8 +446,8 @@ section = "11.4"
 pr = 403
 prediction = "If the dip is a resonance, its ω_eff position must move again at B = 10.4 nT. If it does not move, the resonance reading is wrong."
 prediction_registered = "before"
-prediction_outcome = "pending"
-note = "One arm settles it. Registered here so the answer is a residual against a written prediction rather than a description of whatever the run returns."
+prediction_outcome = "miss"
+note = """REFUTED 2026-08-21 BECAUSE ITS PREMISE DISSOLVED, not because the test disagreed. The 10.4 nT arm was run, and the answer is that there is no dip at 5.2 nT to move: the two-branch structure was a truncation artifact (see `edh-5p2nt-ordering-is-hold-dependent`). `prediction_outcome = "miss"` is the closest the closed set allows and it OVERSTATES what happened — a miss implies the test ran and came out the other way. It did not; the question stopped being askable. That the vocabulary cannot say this cleanly is itself worth recording: a prediction can fail by being answered wrongly or by being about something that turns out not to exist, and the ledger currently conflates them. What the 10.4 nT arms DID find is a real, resolved feature at the same ω_eff — `edh-104nt-bump-at-0p65` — which no prediction covered."""
 
 # --- Acceptance gates and the precision claims they touch --------------------
 
@@ -522,8 +578,8 @@ note = """CLOSED 2026-08-20 by annotation, not by moving the file. The archive r
 
 [[claim]]
 id = "edh-phi-phys-config-anti-alignment"
-claim = "`runs/eu151_klaus_phi_phys/config.yaml` needs `init_m_idx: 13` at p > 0 (or p < 0 with `init_m_idx: 1`) to be anti-aligned; as committed it is aligned and therefore on the wrong side for the EdH quench."
-status = "open"
+claim = "`runs/eu151_klaus_phi_phys/config.yaml` needed `init_m_idx: 13` at p > 0 to be anti-aligned. It has it."
+status = "closed"
 type = "A"
 scope = "One config. `init_m_idx: 1` there is the schema default at p > 0 (`run_step_rotating/ground_state.jl:162`), so nothing was ever chosen."
 uncertainty = "unbounded: not measured. The sign bookkeeping is determinate; the consequence for that scan's results is not, because it has no quoted result."
@@ -534,7 +590,7 @@ commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "4.2"
 pr = 392
-note = "Named rather than left implicit. It is a 32×32×16 GPU rotating-basis 8-point scan with no result being quoted, so it was deferred rather than fixed — but a deferral with no row is indistinguishable from an oversight."
+note = """CLOSED 2026-08-20, and it had been closed since 2026-08-19 without anyone noticing. `e8dafe8e` — the same commit that retargeted the quench corpus — set `init_m_idx: 13` on line 51, with the reasoning in the config header. The decision document's section 4.2 went on saying "not done here … on the re-derivation list" for a day, and this row was written faithfully FROM that paragraph. So the ledger inherited a false statement from its source and then caught it, which is the sequence the `evidence` column is for: the row was only checkable because it named a path, and the path resolved to a file that disagreed with the prose. A row whose evidence is prose could not have done this. Section 4.2 corrected in the same change."""
 
 [[claim]]
 id = "edh-longtime-static-sustains"

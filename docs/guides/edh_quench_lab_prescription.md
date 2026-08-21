@@ -65,10 +65,15 @@ one seed.
 |---|---|---|
 | **1.3 nT** | — | **No operating window exists.** +1.8 % across a flat range in ω_eff ∈ [0.65, 1.0]. This is an absence, not a gap: there is nothing to relocate the old `≈ 0.3` to. **Do not re-fit it.** |
 | **2.6 nT** | **ω_⊥,eff / ω_⊥ = 0.71** | The prescription. +24.9 % over the unweakened trap. |
-| **5.2 nT** | two branches, global max at ω_eff ≈ 0.55 | Old `[0.5, 0.6]` **REFUTED**. **No single optimum is quoted.** Secondary max at ≈ 0.77, dip between them at ≈ 0.65 that survives 64³ with 93 % of its depth. The replacement for the old `[0.5, 0.6]` row is a *shape*, not a number. |
+| **5.2 nT** | — | **Nothing is quotable.** Old `[0.5, 0.6]` **REFUTED**, and so is the `two branches` reading that replaced it: the ω_eff ordering **INVERTS with hold duration** (ω_eff 0.650 is 5.05 % *below* 0.550 at 8 ms and 6.2 % *above* it at 16 ms). Do not set a value at this field from simulation yet. §11.5. |
 
 Three fields, three different kinds of answer, and only one of them is a number.
 That is the finding, not a failure to converge.
+
+**Also at 10.4 nT** (2026-08-21): a resolved local maximum at ω_eff ≈ 0.65,
++22.4 % over a flat, Zeeman-re-pinned baseline, peaking inside the hold window.
+Resolved, unlike the 5.2 nT arms — but a single point at one field, with no grid
+check. Not a prescription.
 
 ## 4. What bounds these numbers
 
