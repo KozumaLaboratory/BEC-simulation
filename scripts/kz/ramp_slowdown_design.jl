@@ -30,7 +30,11 @@ for s in (0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0)
     # where the real omega_bar gives 1762, six times too hot, and the constraint then
     # reports N_0 = 0 at every point of every ramp. The trap ramp is identical across
     # slowdowns — only the time axis is stretched — so omega_bar carries no bias here.
-    ω = r.omega_bar[1]
+    # From the trap and ramp, the way zero_d_trajectory does it. EvapBecResult has no
+    # omega_bar — that field is on EvapResult, a different return type, and reaching for
+    # it threw. Same mistake as reading r.t_BEC when the field is r.t_bec: the two result
+    # types are easy to confuse and neither name is wrong on its own.
+    ω = evap_trap_grid(trap, ramp).ωg[1]
     # -1 rather than 0, so a trajectory that never condenses reports N0_peak = 0 with
     # its own first point rather than silently looking like a peak of zero.
     best = (N0=-1.0, t=NaN, N=NaN, T=NaN, mu=NaN)
