@@ -11,9 +11,12 @@
 #$ -l h_rt=2:00:00
 #$ -j y
 #$ -o logs/tsubame/
-ROOT="${AS_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/iss408}"
+# The long-lived klaus2022 campaign worktree, not the scratch one #406 was run
+# from — that one was removed after the campaign and a default pointing at it
+# would `cd` into nothing.
+ROOT="${AS_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/klaus2022}"
 export EU335_ROOT="$ROOT"
-export EU335_OUT="${AS_RUNS:-/gs/fs/tga-kozuma-kouhi/uk07267/runs/iss408}"
+export EU335_OUT="${AS_RUNS:-/gs/fs/tga-kozuma-kouhi/uk07267/runs/klaus2022}"
 source "$ROOT/scripts/eu_hysteresis/_preamble.sh"
 
 export AS_OUT="${AS_OUT:-$EU335_OUT/ar_sensitivity}"
