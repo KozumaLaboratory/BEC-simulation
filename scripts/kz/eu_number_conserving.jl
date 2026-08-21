@@ -70,8 +70,9 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_nT::Float64=3.0, seed::Int=9001, dt::Float64=0.02,
     t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend(),
     number_damping::Bool=true, energy_damping::Bool=true,
-    gamma_mult::Float64=1.0, cayley_iters::Int=2)
-    traj = zero_d_trajectory(; K3)
+    gamma_mult::Float64=1.0, cayley_iters::Int=2, slowdown::Float64=1.0,
+    ramp_scale::Float64=1.0)
+    traj = zero_d_trajectory(; K3, ramp_scale)
     r = traj.r
     # Internal units: the 0-D model is in SI, the field is in units of omega_ref.
     ω_ref = traj.omega_of(r.t[1])
@@ -115,6 +116,16 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     # (N, T) at the handoff, so a condensate that would have formed earlier is
     # excluded by construction.
     t0_int = t_start_s * ω_ref
+    # `slowdown` traverses the SAME (N, T) path over `slowdown` times as much field time.
+    # The mechanism the ramp verdict points at is that eps_cut tracks T down faster than
+    # the reservoir refills C, so the field arrives empty — 34 atoms against the 2858 a
+    # fixed-point run starts with. If that is right, giving the same path more time must
+    # help; if it does not, the mechanism is wrong.
+    #
+    # NOT a physical ramp design: a real slower ramp costs more three-body loss, so
+    # N_total(t) would be lower everywhere. This isolates the RATE of cutoff change from
+    # the loss that a slower ramp would incur, and only the first is being tested here.
+    traj_t(tf) = t0_int + (tf - t0_int) / slowdown
     T_hot = T_of(t0_int)
     # eps_cut must TRACK T. Fixing it at the handoff value leaves the cutoff at 23.3
     # while T falls 7.28 -> 2.28, i.e. ten thermal energies above mu by the end, and
@@ -128,9 +139,9 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_of = tq -> 1.5 + eps_cut_nT * T_of(tq)
     eps_cut_hot = eps_cut_of(t0_int)
     k_cut = sqrt(2 * eps_cut_hot)
-    ts_ec = collect(range(t0_int, t_int[end]; length=64))
+    ts_ec = collect(range(t0_int, t0_int + slowdown * (t_int[end] - t0_int); length=64))
     k_cut_wave = PiecewiseLinearWaveform(ts_ec,
-        [sqrt(2 * eps_cut_of(tq)) for tq in ts_ec])
+        [sqrt(2 * eps_cut_of(traj_t(tq))) for tq in ts_ec])
     eps_cut = eps_cut_hot
     grid = make_grid(GridConfig((n, n, n), (box, box, box)))
     k_max = π * n / box
@@ -188,20 +199,21 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     bad = Ref(0)
     # The controller must use the SAME cutoff the projector does, or it solves for a
     # mu against an I region that is not the one the field sees.
-    cb = number_conserving_callback(mu_ref, N_of, T_of, eps_cut_of; every=25,
+    cb = number_conserving_callback(mu_ref, tf -> N_of(traj_t(tf)),
+        tf -> T_of(traj_t(tf)), tf -> eps_cut_of(traj_t(tf)); every=25,
         counter=bad, t_offset=t0_int, c0_lda=c0_field)
     res = SPGPEReservoir(; T=FunctionWaveform(T_of), mu=FeedbackWaveform(mu_ref),
         a_s=0.007 * gamma_mult, k_cut=k_cut_wave, gamma=NaN, M=NaN,  # DERIVED
         number_damping, energy_damping, allow_unphysical_rates=(gamma_mult != 1.0))
 
     dV = cell_volume(grid)
-    n_steps = round(Int, t_frac * (t_int[end] - t0_int) / dt)
+    n_steps = round(Int, t_frac * slowdown * (t_int[end] - t0_int) / dt)
     marks = round.(Int, n_steps .* (0.1:0.1:1.0))
     hist = NamedTuple[]
     for s in 1:n_steps
         split_step!(ws)
         # Absolute ramp time: N_of and T_of must be read where the run actually is.
-        apply_spgpe_step!(ws, res, dt; t=t0_int + s * dt, seed=seed + s,
+        apply_spgpe_step!(ws, res, dt; t=traj_t(t0_int + s * dt), seed=seed + s,
             cayley_iters=cayley_iters)
         cb(ws, s)
         if s in marks
@@ -221,7 +233,7 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
             push!(hist, (; t=t0_int + s * dt, N_C=NC, N0=N0_all, N0_seedcomp=N0,
                 N_tot=N_of(t0_int + s * dt),
                 mu=mu_ref[], T=T_of(t0_int + s * dt)))
-            ta = t0_int + s * dt
+            ta = traj_t(t0_int + s * dt)
             @printf("  t=%8.1f N_tot=%-10.4g N_C=%-10.4g N0=%-10.4g f0=%-6.3f mu=%-8.3f T=%-7.3f eps_cut=%-7.2f unsat=%d\n",
                 ta, N_of(ta), NC, N0_all, N0_all / max(NC, 1), mu_ref[], T_of(ta),
                 eps_cut_of(ta), bad[])
@@ -236,6 +248,49 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if mode == "smoke"
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
+
+    elseif mode == "halframp"
+        # Does the c-field reach the number the halved ramp allows?
+        #
+        # The design scan says the peak equilibrium N_0 is 6.01e4 at 0.5x against 4.41e4
+        # at 1x, and the quasi-static check clears 0.5x at 74.2 collisions per e-folding.
+        # That is a THERMODYNAMIC target. On the 1x ramp the field reaches 0.071 of a
+        # constraint 3498, so a better target is not by itself a better outcome.
+        #
+        # Handoff scaled with the ramp, so the field starts at the same FRACTION of the
+        # evaporation rather than at the same wall-clock second — 1.85/2.4 of the way in.
+        rs = parse(Float64, get(ENV, "SBEC_RAMP_SCALE", "0.5"))
+        sd = parse(Int, get(ENV, "SBEC_SEED", "9001"))
+        @printf("\n########## ramp_scale %.2fx  seed %d ##########\n", rs, sd)
+        # One seed per job. The first pass measured 27.8 at 0.5x against 39.7 at 1x —
+        # pointing against the halved ramp — but both are under 1.2% of their own
+        # equilibrium, so it is a comparison of two small numbers with no scatter
+        # attached. Two points once already carried this arc to the opposite conclusion.
+        o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, seed=sd,
+            t_start_s=(1.85 / 2.4) * 2.4 * rs, ramp_scale=rs)
+        h = isempty(o.hist) ? nothing : o.hist[end]
+        if h !== nothing
+            g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02, eps_cut=1.5 + 3 * h.T)
+            @printf("  END  N_C=%.4g  field N0=%.4g  eq N0=%.4g  ratio=%.5f\n",
+                h.N_C, h.N0, g.N0, h.N0 / max(g.N0, 1))
+        end
+        @printf("  unsatisfiable: %d of %d\n", o.unsat, o.n_cb)
+
+    elseif mode == "slowramp"
+        # Does giving the same (N, T) path more time let the field keep up?
+        # Handoff 1.85 s at slowdown 1 is already measured: N_0 = 39.7 against a
+        # constraint 3498. SBEC_SLOWDOWN selects the arm, one per job — three full ramps
+        # in one reservation hit the 6-hour wall twice in this arc.
+        sd = parse(Float64, get(ENV, "SBEC_SLOWDOWN", "3.0"))
+        @printf("\n########## slowdown %.1fx, handoff 1.85 s ##########\n", sd)
+        o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0, t_start_s=1.85, slowdown=sd)
+        h = isempty(o.hist) ? nothing : o.hist[end]
+        if h !== nothing
+            g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02, eps_cut=1.5 + 3 * h.T)
+            @printf("  END  N_C=%.4g  field N0=%.4g  eq N0=%.4g  ratio=%.5f  (1x gave 39.7)\n",
+                h.N_C, h.N0, g.N0, h.N0 / max(g.N0, 1))
+        end
+        @printf("  unsatisfiable: %d of %d\n", o.unsat, o.n_cb)
 
     elseif mode == "gammascan2"
         # Is "the field does not condense" the finite-gamma lag, or another defect?

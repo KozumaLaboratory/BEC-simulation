@@ -214,12 +214,18 @@ Evaluated along the euv3 trajectory:
 | 1.992 | 5485 | 118 | 3.47 | 5157 | 0.94 |
 | 2.390 | 3576 | 64 | 2.95 | 3513 | 0.98 |
 
-**The peak is $N_0\approx4.0\times10^4$ at $t=1.73$ s, 80 % of the measured
+**The peak is $N_0 = 4.41\times10^4$ at $t=1.70$ s, 88 % of the measured
 $5.02\times10^4$** (PRL 129, 223401) — and it falls monotonically after that to
 $3.5\times10^3$ at the end of the ramp. Running the evaporation to completion throws
-condensate away: past 1.73 s the losses beat the cooling. So "optimising" this ramp
+condensate away: past 1.70 s the losses beat the cooling. So "optimising" this ramp
 means **stopping it at the peak**, and the 0-D model's own final $N_0=1789$ (3.6 % of
 measured) is the value at the wrong end of a curve rather than a failure of the model.
+
+> **The table above samples the trajectory at 18 points and therefore misses the peak.**
+> It reports $4.01\times10^4$ at $t=1.726$; scanning every point finds
+> $4.41\times10^4$ at $t=1.702$, between two of its rows. The two numbers were 10 %
+> apart and the difference is sampling, not physics — the finer scan is the one to
+> quote. Both are produced by the same constraint from the same trajectory.
 
 **Three caveats, none of them small.**
 
@@ -285,8 +291,77 @@ has not been isolated on its own — at 10× $\gamma$ the field still empties, f
 to 198.
 
 **So: this evaporation ramp allows $4\times10^4$ condensed atoms thermodynamically, and
-the c-field does not reach them, because the ramp empties the classical region faster
-than the derived reservoir rates refill it.**
+the c-field does not reach them.** *Why* it does not is two different things at two
+different handoffs, and the single-mechanism sentence this paragraph carried until
+2026-08-21 was taken from the earlier one alone.
+
+Compare the two handoffs at the **same trajectory time**, where the C-region populations
+are nearly equal:
+
+| handoff | $N_C$ at start | $N_C$ at $t\approx7100$ | lost | $N_0$ | $f_0$ |
+|---|---|---|---|---|---|
+| 1.73 s | 2397 | 606 | **75 %** | 0.37 | 0.001 |
+| 1.85 s | 657 | 580 | **12 %** | **10.8** | 0.019 |
+
+Same number of atoms in C, thirty times the condensate — and the 1.73 s run has been
+running *longer*, so it is not short of time. What differs is what it went through:
+starting at $\epsilon_\mathrm{cut}=31$ it loses three quarters of the C region as the
+cutoff shrinks, while the later handoff skips that stretch and loses an eighth.
+
+- **Early handoff — the C region empties.** The cutoff tracks $T$ down through a large
+  range and the projector removes atoms faster than the reservoir refills them.
+- **Late handoff — coherence, not population.** $N_C$ is set by the trajectory and the
+  cutoff, not by how fast either moves: slowing the *same* $(N,T)$ path 3× leaves it
+  essentially unchanged (580 → 590, 444 → 446, 363 → 355). What changes is the coherent
+  fraction of it.
+
+**Slowing does NOT help, and the first two points said it did.** Matched trajectory times,
+handoff 1.85 s:
+
+| $t$ | 7076 | 7280 | 7485 | 7689 | 7893 | 8097 |
+|---|---|---|---|---|---|---|
+| 1× $N_0$ | 10.8 | 20.3 | **41.8** | **64.8** | **68.1** | **49.5** |
+| 3× $N_0$ | **75.1** | **59.8** | 34.0 | 28.1 | 22.4 | 20.3 |
+
+The 3× run starts ahead — it has had three times as long to build anything by the first
+marker — and then **declines monotonically** while the 1× run climbs to $f_0 = 0.255$ and
+overtakes it from the third point on. A verdict taken at either end is the opposite of the
+one taken at the other, and the two-point version of this paragraph said 7× and 2.9× in
+favour of slowing.
+
+### The design answer: halve the ramp
+
+Stretching the `FortRamp` time axis (same beam powers, more time) and reading the peak
+equilibrium $N_0$ off the same constraint:
+
+| slow | duration | $N_0^\mathrm{peak}$ | coll / e-fold | |
+|---|---|---|---|---|
+| 0.05× | 0.12 s | 3.29e4 | 0.020 | **INVALID** |
+| 0.10× | 0.24 s | 1.85e4 | 0.026 | **INVALID** |
+| 0.20× | 0.48 s | 3.41e4 | 0.054 | **INVALID** |
+| 0.30× | 0.72 s | 5.99e4 | 30.6 | OK |
+| **0.50×** | **1.2 s** | **6.01e4** | 74.2 | OK |
+| 1.00× | 2.4 s | 4.41e4 | 122 | OK |
+| 2.00× | 4.8 s | 2.83e4 | 161 | OK |
+
+**Halving the ramp is worth +36 %** — $4.41\times10^4 \to 6.01\times10^4$, above the
+measured $5.02\times10^4$ — and the optimum is a broad valley over 0.3–0.5×.
+
+The fast end is **not** physics. `condensate.jl` assumes "standard quasi-static
+two-component evaporation", and below 0.3× the trap depth outruns thermalisation: 0.02 to
+0.05 elastic collisions per e-folding of the depth against the conventional requirement of
+a few. That is exactly the region where $N_0^\mathrm{peak}$ goes non-monotone
+(3.29 → 1.85 → 1.64 → 3.41e4), which is what a model looks like when asked outside its
+assumptions — and it is why the validity column exists here rather than the recommendation
+being quoted from the first table alone. The recommended 0.3–0.5× sits at 30.6 and 74.2,
+comfortably inside.
+
+The slowdown run is a **numerical** experiment, not a ramp design: a genuinely slower ramp
+costs more three-body loss and would lower $N_\mathrm{total}$ everywhere. That was scanned
+separately and points the same way — $N_0^\mathrm{eq}$ at the peak falls monotonically
+from $6.0\times10^4$ at 0.5× to $1.4\times10^4$ at 5×, so **loss dominates and a faster
+ramp is better on both counts**. 0.5× already exceeds the measured $5.02\times10^4$, and
+with no turnover in $[0.5, 5]$ that scan found its own edge rather than an optimum.
 
 The $\gamma$ scan **was run once before and thrown away**: the $N_0$ estimator read
 `psi[:,:,:,1]` while `thermal_cfield!` seeds the last component, so at $D=13$ it projected
