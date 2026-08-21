@@ -58,6 +58,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     # purpose: a shard reaped at h_rt must not take completed neighbours with it.
     "submit_klaus_weff_scan.sh",
     "submit_lt64_endpoint_ensemble.sh",
+    # #423 — eu151_klaus_phi_phys at production scale with the anti-aligned
+    # preparation. One job, not an array: `run_yaml` has no point selection, so
+    # the 8-point scan is indivisible from outside; it IS resumable, so a
+    # walltime kill costs only the point it was inside.
+    "submit_edh_phi_phys_anti_aligned.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
