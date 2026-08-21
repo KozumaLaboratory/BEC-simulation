@@ -18,6 +18,7 @@
 include("io/io.jl")
 include("io/unitful_support.jl")
 include("io/save_rotating_result.jl")
+include("io/coarse_fields.jl")      # Tier 1: what survives deleting the frames
 include("io/vtk_export.jl")
 include("io/measurement_provenance.jl")  # provenance stamp + refusal for measurement outputs
 include("io/run_summary.jl")
