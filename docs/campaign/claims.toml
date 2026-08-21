@@ -1083,8 +1083,12 @@ note = "Superseded the next day: there is no structure to explain. The mechanism
 
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
-covered = 26
-note = "70 sections. §12 poured 2026-08-21 as the correction to the incident above."
+covered = 27
+note = """70 sections. §12 poured 2026-08-21 as the correction to the incident above; §9.1,
+§10.1, §10.2 and §12.1 followed the same day. The ratchet moved only 26 -> 27 for four new
+rows because most cite sections already covered — which is the honest arithmetic and worth
+seeing: pouring rows is not the same as covering sections, and a ledger can grow while its
+coverage does not."""
 
 [[coverage]]
 doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
@@ -1159,3 +1163,121 @@ robustness. `peak` can only place its argmax among the 4 interior arms — the o
 all pinned at the same transient value — so the argmax and the ranking come from different
 populations. An agreement produced that way says nothing about the other 16."""
 
+
+[[claim]]
+id = "edh-optimum-not-quotable-at-either-field"
+claim = "Neither B = 5.2 nT nor B = 10.4 nT yields a quotable ω_eff optimum: three readings of the same cached arms place the argmax at three different points, and at 10.4 nT the mean-reading argmax sits on the scan boundary."
+status = "live"
+quantity = "weff optimum @ EdH quench, 5.2 and 10.4 nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned. Readings: peak-in-hold, mean-over-hold, hold endpoint. All from cache, no recompute."
+uncertainty = "argmax by reading — 5.2 nT: 0.550 (peak at the 8 ms hold), 0.650 (peak over all arms), 0.750 (mean); 10.4 nT: 0.650 (peak, mean, final agree) against 0.350 for the mean over the 20-arm scan, which is the LOWER EDGE of the sampled range. A boundary argmax is not an optimum — it says the range does not contain one."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p750_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = """`mean` is NOT hereby declared the right reading. It is a different physical quantity —
+the hold average, diluted by the same transient that contaminates `peak` — and picking it
+because it is well-posed would be choosing a definition to get an answer, which is the
+error this whole thread is about. What the mean reading DOES establish is negative and
+solid: under a reading with no free parameter, 5.2 nT is a single broad maximum with no dip
+and no second branch, +6.3 % rather than the published +17.0 %, and 10.4 nT has no interior
+maximum at all. Three readings, three argmaxes, one of them on the boundary."""
+
+[[claim]]
+id = "edh-104nt-scan-range-excludes-the-mean-optimum"
+claim = "The 10.4 nT ω_eff scan does not contain its own mean-reading optimum: the mean rises monotonically toward the lower edge (0.350, +10.6 %) and the interior is a minimum at 0.790 (−11.6 %)."
+status = "open"
+quantity = "weff scan range @ B=10.4nT"
+type = "A"
+scope = "The 20-arm 8 ms scan over ω_eff ∈ [0.350, 1.000] at 10.4 nT."
+uncertainty = "A boundary argmax carries no interval — the optimum is somewhere below 0.350 or there is none. The shape between 0.500 and 0.650 is nearly flat (+1.97 % to +2.78 %), so the rise toward the edge is the only structure with any amplitude."
+uncertainty_basis = "grid"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = """OPEN, and the cheap next step is arms below ω_eff = 0.350 — NOT a 64³ grid check, which
+was the queued job before this. Grid-refining a scan whose optimum is outside its own range
+would have measured resolution against a boundary artifact. The 64³ arms stay cancelled
+until a reading and a range are settled. Note also that the centrifugal limit bounds this
+from below: ω_eff = √(1−Ω²) → 0 as |Ω| → ω_⊥, so a static trap below ~0.3 is a very weak
+radial trap and the cloud size becomes the constraint."""
+
+# --- §9, §10 and §12 poured 2026-08-21. The coverage ratchet exists because §12
+#     being unpoured is what let a refuted method be used again; leaving the
+#     sections either side of it unpoured would be the same bet on a different
+#     number.
+
+[[claim]]
+id = "edh-2p6nt-omega-scan-has-an-interior-maximum"
+claim = "At B = 2.6 nT the Ω scan has an interior maximum at |Ω| = 0.70 (peak P_adj 0.65905, +24.9 % over Ω = 0), falling to 0.441 at |Ω| = 1.00."
+status = "live"
+quantity = "peak_P_adj @ B=2.6nT, Omega-scan, 32cubed"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, 20 Ω cells. Whole-trajectory and in-hold peaks are IDENTICAL at this field (§12.1, measured on all 16 arms), so the reading is not in question here as it is at 10.4 nT."
+uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = −2.70, fit rms 4.7e-3. Criteria C1-C4 fixed before launch: interior maximum required, > 5 % enhancement, ≥5-point fit with negative curvature and interior vertex, digits limited by the fit."
+uncertainty_basis = "fit"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p7_holdonly_delay2ms_refine.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.1"
+pr = 392
+note = "This field is the one where the observable is not contested, which is why it remains the anchor while 5.2 and 10.4 nT are unquotable."
+
+[[claim]]
+id = "edh-2p6nt-static-scan-reproduces-the-rotating-one"
+claim = "At B = 2.6 nT a static weakened trap reproduces the rotating scan at every matched ω_eff, worst disagreement 0.06 % across ω_eff ∈ [0.6, 1.0] — not only at the optimum."
+status = "live"
+quantity = "static-vs-rotating agreement @ B=2.6nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, four matched points."
+uncertainty = "0.00 / 0.06 / 0.06 / 0.04 % at ω_eff = 1.000 / 0.750 / 0.714 / 0.600, against a dt/2 reproducibility floor of 0.029 %. The agreement is at the floor, i.e. as good as the method can show."
+uncertainty_basis = "dt"
+evidence = ["34 static-trap arms, §10.1"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.1"
+pr = 392
+note = "The substitution is what makes ω_eff the scan variable at all. It holds at 2.6 nT; §17 (another session) finds it splits at long hold, where the peak agrees and the endpoint does not."
+
+[[claim]]
+id = "edh-1p3nt-has-no-operating-window"
+claim = "At B = 1.3 nT there is no operating window: +1.8 % across a flat range in ω_eff ∈ [0.65, 1.0]. The absence is the finding, and `|Ω|/ω_⊥ ≈ 0.3 at 1.3 nT` has no replacement."
+status = "live"
+quantity = "weff optimum @ B=1.3nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 7 arms. Whole-trajectory and in-hold peaks identical on all 7 (§12.1)."
+uncertainty = "+1.8 % over a flat range against a dt/2 floor of 0.029 % — resolved as a rise, but far below the 24.9 % at 2.6 nT. Bounded as an absence rather than a value: no fit was attempted because there is no interior maximum to fit."
+uncertainty_basis = "dt"
+evidence = ["7 static-trap arms at 1.3 nT, §10.2"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.2"
+pr = 392
+note = "Do not re-fit. A flat +1.8 % has a numerical argmax and quoting it would manufacture a prescription out of the noise floor — the same move the 5.2 nT two-branch reading made with more amplitude."
+
+[[claim]]
+id = "edh-observable-correction-touched-one-field-only"
+claim = "Re-extracting the peak inside the hold changed 10.4 nT and nothing else: 0.00 % on all 43 arms at 1.3, 2.6 and 5.2 nT, against 7 of 10 arms moving by up to −23 % at 10.4 nT."
+status = "live"
+quantity = "in-hold vs whole-trajectory peak, per field"
+type = "A"
+scope = "Every arm measured up to 2026-08-20, re-extracted from cache with no recompute."
+uncertainty = "Exact zeros, not small numbers: the two readings coincide arm-for-arm at the three lower fields. That is what makes the correction diagnostic rather than a global rescaling — it isolates the Zeeman-re-pinned field, where the hold suppresses the cascade and the transient wins."
+uncertainty_basis = "control"
+evidence = ["docs/campaign/edh_quench_polarisation_decision.md"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.1"
+pr = 410
+note = "The reason §9, §10 and §11 survive an instrument correction of this size is measured here, not assumed. Worth keeping as a row because 'the fix only touched one field' is exactly the kind of claim that gets asserted without the table."
