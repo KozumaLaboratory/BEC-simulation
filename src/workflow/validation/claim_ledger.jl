@@ -90,29 +90,22 @@ const CLAIM_UNCERTAINTY_BASES = ("fit", "grid", "dt", "seed", "control", "none")
 """
     CLAIM_PREDICTION_OUTCOMES
 
-What became of a registered prediction.
+What became of a registered prediction: `hit` / `miss` / `pending`.
 
-  `hit`      — the test ran and the prediction held
-  `miss`     — the test ran and it did not
-  `pending`  — not tested yet
-  `moot`     — the test RAN and the prediction turned out to be about something
-               that does not exist
+**There was a fourth, `moot`, for one day.** It was added 2026-08-21 for a row
+whose prediction I believed could not be answered because its premise had
+dissolved. It could be answered: §12.3 had already tested it on its informative
+arm and it failed. I had run the arm that predicts an ABSENCE, not read the
+section that ran the other one, and then extended the taxonomy to fit that.
 
-`moot` was added 2026-08-21 because the closed set could not say what had
-happened. The prediction was: *"if the 5.2 nT dip is a resonance, its ω_eff
-position must move at 10.4 nT"*. The 10.4 nT arms ran — and the dip itself turned
-out to be a truncation artifact, so there was nothing to relocate. Recording that
-as `miss` credits the prediction with a test it never got, and reads in any later
-tally as a hypothesis that was checked and failed. It was not checked; the
-question stopped being askable.
-
-The distinction is not bookkeeping. A `miss` is evidence against the MECHANISM a
-prediction names. A `moot` is evidence against the OBSERVATION the prediction was
-built on — a different and usually larger correction. A ledger that cannot
-separate them will, over enough rows, read as a series of wrong guesses rather
-than as one refuted premise.
+Removed rather than kept-in-case. A category invented to describe a misdiagnosis
+describes the analyst and not the world, and it would have sat here as a
+plausible-looking option for the next person with an inconvenient outcome. If a
+prediction ever genuinely becomes unanswerable, the row can say so in `note` and
+the case for a fourth value can be made from an instance rather than from a
+hypothetical.
 """
-const CLAIM_PREDICTION_OUTCOMES = ("hit", "miss", "pending", "moot")
+const CLAIM_PREDICTION_OUTCOMES = ("hit", "miss", "pending")
 
 """
     CLAIM_EVIDENCE_STATUSES
