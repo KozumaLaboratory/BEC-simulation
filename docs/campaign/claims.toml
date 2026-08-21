@@ -1281,3 +1281,61 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "12.1"
 pr = 410
 note = "The reason §9, §10 and §11 survive an instrument correction of this size is measured here, not assumed. Worth keeping as a row because 'the fix only touched one field' is exactly the kind of claim that gets asserted without the table."
+
+[[claim]]
+id = "sec12-extraction-method-not-in-the-tree"
+claim = "§12.2's numbers are reproducible but its METHOD is not: the tree carries the values and not the code that produced them, and the window they correspond to (hold frames 34-42) is not derivable from the config."
+status = "open"
+quantity = "provenance of the 12.2 extraction"
+type = "A"
+scope = "The 10.4 nT in-hold re-extraction of 2026-08-20 (`97ec124e`). Not a statement about the numbers, which reproduce exactly."
+uncertainty = "Reproduced to five decimals: max over hold frames 34-42 gives 0.20139 at ω_eff = 1.000, matching §12.2. But frames 32-42 is what the config implies — prep 13 + quench 13 + pre-delay 5 = 31, and the arm-to-arm spread is exactly 0.000000 at frames 30-31 and 0.000213 at 32 — so the two-frame difference has no derivation, only a value that matches."
+uncertainty_basis = "control"
+evidence = ["scripts/validation/klaus_weff_extract.jl"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 410
+note = """This is `evidence_status = absent` applied to a METHOD rather than to data, and it is the
+sharper version: absent arms can be re-run, an absent extraction has to be re-derived, and
+re-deriving it from which value matches is how a window gets chosen to fit an answer. I did
+exactly that for one commit before catching it.
+What closes this is not archaeology. `scripts/validation/klaus_weff_extract.jl` is now in
+the tree, computes three readings, and derives its window from the config with the frame
+arithmetic written down — so from here the method travels with the number. §12.2's own two
+frames remain unexplained and its numbers should be quoted with the window stated."""
+
+[[claim]]
+id = "edh-g4-mirror-agrees-to-five-decimals"
+claim = "The repaired mirror pair agrees to < 1e-5 on peak P_adj (0.61698 vs 0.61698), stronger than the `3-digit match` the sheet claimed for the pre-repair pair."
+status = "live"
+quantity = "mirror pair agreement @ 2.6nT"
+type = "A"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, the two `*_keeprot*` arms. Acceptance gate G4."
+uncertainty = "< 1e-5 relative, i.e. below the dt/2 reproducibility floor of 0.029 % by three orders. Bounded by the comparison itself; there is no fit."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "Both members now sit at the anti-aligned preparation, so the pair is mirror-correct AND in the regime where the enhancement exists — the two were separate repairs."
+
+[[claim]]
+id = "edh-cost-64cubed-is-5x-not-8x"
+claim = "A 64³ arm costs 5.1× a 32³ one (3026 s against ~590 s on the same core), not the 8× the cell count suggests, because the FFT work does not scale linearly and the run is partly memory-bound at 3.0 GB RSS."
+status = "live"
+quantity = "64cubed vs 32cubed walltime ratio"
+type = "A"
+scope = "klaus_quench protocol, CPU, 8 ms hold. A cost model, not physics."
+uncertainty = "unbounded: two timings, one core, no repetition — nothing here bounds the ratio. It is an order-of-magnitude planning number, and the gate refusing the first wording is the point: `two timings and no repetition` reads like a bound and is not one."
+uncertainty_basis = "none"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "Recorded because it is the number anyone sizing a grid check will guess wrong in the expensive direction, and because it is what made the cancelled 64³ job look affordable."
