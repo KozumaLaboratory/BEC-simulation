@@ -82,6 +82,17 @@ function bayesian_optimize(
     bounds::Vector{Tuple{Float64, Float64}};
     n_init::Int=5,
     n_iter::Int=25,
+    # A BUDGET IS NOT A STOPPING RULE. `n_iter` alone answers "when do we stop?"
+    # with "when the loop counter runs out", and the returned object looked the
+    # same either way — so a map that ran out of budget read as a finished map.
+    # `acq_tol` is the declared criterion: the acquisition value at the point the
+    # scan is ABOUT to sample is how much the model still expects to learn, so
+    # when the most informative point left in the whole domain is below tolerance
+    # for `acq_patience` consecutive iterations, there is nothing left to learn at
+    # this resolution. Default `nothing` keeps the old behaviour and still reports
+    # `:budget_exhausted`, which is the half that matters most.
+    acq_tol::Union{Nothing, Float64}=nothing,
+    acq_patience::Int=3,
     minimise::Bool=true,
     ℓ::Union{Nothing, Float64}=nothing,
     n_grid::Int=100,
@@ -107,6 +118,9 @@ function bayesian_optimize(
     # Pre-build candidate mesh
     axis_grids = [collect(range(b[1], b[2]; length=n_grid)) for b in bounds]
 
+    acq_history = Float64[]
+    stop_reason = :budget_exhausted
+    below = 0
     for it in 1:n_iter
         y_best = minimise ? minimum(y) : maximum(y)
         # Evaluate EI on a grid
@@ -114,18 +128,40 @@ function bayesian_optimize(
         μ, σ² = gp_predict(X, y, candidates; ℓ=ℓ_use)
         ei = expected_improvement(μ, σ², y_best; minimise=minimise)
         i_best = argmax(ei)
+        acq = ei[i_best]
+        push!(acq_history, acq)
         p_next = candidates[i_best, :]
         y_next = Float64(eval_fn(p_next))
         X = vcat(X, p_next')
         push!(y, y_next)
         verbose && println(
             "iter $it: p=$(round.(p_next; digits=3)) y=$(round(y_next; digits=4)) " *
-            "best=$(round(minimise ? minimum(y) : maximum(y); digits=4))",
+            "best=$(round(minimise ? minimum(y) : maximum(y); digits=4)) " *
+            "acq=$(round(acq; sigdigits=3))",
         )
+
+        # Checked AFTER the sample, not before: the acquisition value describes
+        # the point just taken, so stopping on it without taking it would discard
+        # the evaluation that justified the decision.
+        if acq_tol !== nothing
+            below = acq < acq_tol ? below + 1 : 0
+            if below >= acq_patience
+                stop_reason = :acquisition_below_tol
+                verbose && println(
+                    "stopping: acquisition < $(acq_tol) for $(acq_patience) " *
+                    "consecutive iterations (iter $it of $n_iter)")
+                break
+            end
+        end
     end
 
     i_opt = minimise ? argmin(y) : argmax(y)
-    return (best_p=X[i_opt, :], best_y=y[i_opt], X_history=X, y_history=y)
+    # `stop_reason` is not decoration. `:budget_exhausted` means the scan was cut
+    # off, and a caller that treats it as `:acquisition_below_tol` is reporting a
+    # truncation as a result — the same shape as an absent convergence flag
+    # written as `true`.
+    return (best_p=X[i_opt, :], best_y=y[i_opt], X_history=X, y_history=y,
+        stop_reason=stop_reason, n_evaluations=length(y), acq_history=acq_history)
 end
 
 # Build a regular d-dim mesh from per-axis 1D grids; rows are points.
