@@ -51,4 +51,17 @@ fi
 
 # A GPU job that silently falls back to CPU produces numbers 50× later and looks
 # like a slow queue rather than a broken environment.
-"$JULIA" --project=. -e 'using CUDA; @assert CUDA.functional() "CUDA not functional — would silently run on CPU"; println("CUDA OK: ", CUDA.name(CUDA.device()))'
+#
+# `EU334_NO_GPU=1` is for the jobs that genuinely never touch a CUDA path — the
+# unit-scale probes, which do not `import CUDA` and pass no backend, so there is
+# no fallback to be silent about. It must be set by the SUBMIT SCRIPT beside its
+# `-l cpu_16=1`, so the declaration and the reservation are one edit apart and
+# cannot drift: a job asking for a GPU and skipping this check is the exact
+# failure the assertion exists for.
+#
+# Default is still to assert. Opting out has to be deliberate and visible.
+if [ "${EU334_NO_GPU:-0}" = "1" ]; then
+    echo "[preamble] EU334_NO_GPU=1 — CPU-only job, skipping the CUDA assertion"
+else
+    "$JULIA" --project=. -e 'using CUDA; @assert CUDA.functional() "CUDA not functional — would silently run on CPU"; println("CUDA OK: ", CUDA.name(CUDA.device()))'
+fi

@@ -18,6 +18,11 @@
 #$ -l h_rt=4:00:00
 #$ -j y
 #$ -o logs/tsubame/
+# Declared here, one line from the `-l cpu_16=1` above, so the reservation and
+# the claim cannot drift apart. The preamble asserts CUDA by default because a
+# GPU job falling back to CPU looks like a slow queue; this probe has no CUDA
+# path to fall back FROM.
+export EU334_NO_GPU=1
 source "${EU334_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/eu334}/scripts/eu334/_preamble.sh"
 
 export ED_NSTEP="${ED_NSTEP:-25000}"
