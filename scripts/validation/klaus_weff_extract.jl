@@ -22,7 +22,8 @@ using Printf
 the point file is absent or carries no dynamics — a missing arm must be visibly
 missing rather than silently skipped.
 """
-function peak_padj(dir::AbstractString)
+function peak_padj(dir::AbstractString; hold_duration::Float64=5.5292,
+    dt::Float64=0.005, save_every::Int=100)
     f = joinpath(dir, "point_001.jld2")
     isfile(f) || return nothing
     JLD2.jldopen(f, "r") do g
@@ -32,7 +33,30 @@ function peak_padj(dir::AbstractString)
         cp = d["component_populations"]
         P = cp isa AbstractMatrix ? cp : permutedims(reduce(hcat, cp))
         adj = [P[i, 2] + P[i, 3] for i in axes(P, 1)]
-        (peak=maximum(adj), frame=argmax(adj), nframes=size(P, 1))
+        # THE PEAK MUST BE TAKEN INSIDE THE HOLD. Over the whole trajectory the
+        # maximum can be the PRE-HOLD TRANSIENT, and at 10.4 nT it is: §12.1 found
+        # four arms differing only in the hold returning peak P_adj = 0.26050 to
+        # five decimals, argmax at frame 29, hold starting at 32.
+        #
+        # THE WINDOW CANNOT COME FROM `times`. `component_populations` is derived
+        # from the psi SNAPSHOTS and `times` from the scalar sampler; they are
+        # different cadences, not an off-by-one (42 against 43 here). Indexing one
+        # by the other is wrong in principle, and the first version of this fix
+        # did exactly that and threw a BoundsError -- which is the lucky outcome,
+        # because an alignment that merely LOOKED plausible would have produced
+        # numbers.
+        #
+        # The hold is the last dynamics step, so its frames are the last
+        #     floor(hold_duration / (dt * save_every))
+        # of the array, which is derivable from the config alone. For the 8 ms
+        # arms: 5.5292 / (0.005 * 100) = 11.06 -> 11 frames, 42 - 11 = 31, so the
+        # hold starts at frame 32 -- the number §12.1 states independently. That
+        # agreement is the check; without it this is another guess.
+        nhold = max(1, Int(floor(hold_duration / (dt * save_every))))
+        lo = max(1, length(adj) - nhold + 1)
+        k = lo - 1 + argmax(@view adj[lo:end])
+        (peak=adj[k], frame=k, nframes=length(adj), hold_from=lo,
+            whole=maximum(adj), whole_frame=argmax(adj))
     end
 end
 
@@ -55,14 +79,16 @@ function main(args)
         isdir(d) || continue
         c = coords(basename(d))
         c === nothing && continue
-        p = peak_padj(d)
+        # hold_scale is in the directory name, and the window scales with it.
+        hd = occursin("hold2p0x", basename(d)) ? 2 * 5.5292 : 5.5292
+        p = peak_padj(d; hold_duration=hd)
         if p === nothing
             println("MISSING dynamics: ", basename(d))
             continue
         end
         push!(rows, (; c..., p...))
     end
-    isempty(rows) && (println("no arms found under $root"); return)
+    isempty(rows) && (println("no arms found under $root"); return nothing)
 
     for fld in sort(unique(r.field_nt for r in rows))
         sel = sort([r for r in rows if r.field_nt == fld]; by=r -> r.weff)
@@ -70,8 +96,10 @@ function main(args)
         base = findfirst(r -> r.weff == 1.0, sel)
         for r in sel
             rel = base === nothing ? NaN : 100 * (r.peak - sel[base].peak) / sel[base].peak
-            @printf("  weff %.3f   peak P_adj %.5f   frame %2d/%2d   %+6.2f %% vs weff=1\n",
-                r.weff, r.peak, r.frame, r.nframes, rel)
+            flag = r.peak == r.whole ? "  " : " *"   # * = whole-trajectory max was the transient
+            @printf(
+                "  weff %.3f   in-hold %.5f  frame %2d/%2d%s  whole %.5f (f%2d)  %+6.2f %% vs weff=1\n",
+                r.weff, r.peak, r.frame, r.nframes, flag, r.whole, r.whole_frame, rel)
         end
         # The positive control. If the per-step `potential:` override were
         # ignored, every arm would return the SAME number -- so a flat scan is a

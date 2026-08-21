@@ -1,0 +1,17 @@
+# The 10.4 nT bump, on the axis that killed the 5.2 nT one.
+#
+# `edh-104nt-bump-at-0p65` is live and resolved IN TIME (peaks at frame 44/53 at a
+# 16 ms hold, unlike every 5.2 nT arm). It has never been checked against the
+# GRID. Having just watched the 5.2 nT two-branch structure dissolve on an axis
+# its criteria never varied, a feature with one untested axis left is not a
+# feature to leave alone.
+#
+# Two arms, because a bump is a CONTRAST and needs its baseline at the same
+# resolution: quoting a 64^3 peak against a 32^3 baseline would compare two
+# different measurements. The baseline is also the control -- it is pinned by
+# Zeeman re-pinning and read 0.27574 at both hold durations at 32^3, so a 64^3
+# value far from that says the comparison moved, not the bump.
+#
+# Cost: 64^3 was 5.1x a 32^3 arm at the 8 ms hold; at 16 ms expect ~100 min each.
+runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_n64_hold2p0x.yaml
+runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_n64_hold2p0x.yaml

@@ -70,10 +70,30 @@ one seed.
 Three fields, three different kinds of answer, and only one of them is a number.
 That is the finding, not a failure to converge.
 
-**Also at 10.4 nT** (2026-08-21): a resolved local maximum at ω_eff ≈ 0.65,
-+22.4 % over a flat, Zeeman-re-pinned baseline, peaking inside the hold window.
-Resolved, unlike the 5.2 nT arms — but a single point at one field, with no grid
-check. Not a prescription.
+**At 10.4 nT nothing is quotable yet**, and the reason is the observable rather
+than the physics. `peak P_adj in the hold` is not well-posed at this field: the
+hold-window maximum sits at the window's first frames, where the decaying
+pre-hold transient still dominates. The baseline reads 0.27574 over hold frames
+32–42 — a value **superseded** as a standalone result — and 0.20139 over 34–42 — a 37 % swing, both being "the peak in the
+hold". The shape is a single peak at ω_eff ≈ 0.650 on either window; the NUMBER
+is not settled. See `edh-104nt-observable-not-window-robust` (open).
+
+On the 34–42 window it reads a **single peak at ω_eff = 0.650, +49.5 %**
+over ω_eff = 1 — the largest *relative* enhancement of any field
+measured, on the *smallest absolute* transfer (0.30 against 0.66 at 2.6 nT).
+Zeeman re-pinning costs a factor 2 in absolute signal but does not close the
+channel, and weakening the trap helps proportionally more where it is nearly
+closed. **Quote both numbers or neither**: the relative figure alone sends an
+experimentalist to the worst field.
+
+> An earlier version of this paragraph said **+22.4 %** over a flat baseline of
+> 0.27574, from a whole-trajectory peak — **SUPERSEDED**, that reads the transient.
+> A second version simply swapped in 0.20139 and called it corrected, which
+> replaced one window-dependent number with another. The hold boundary is now
+> measured (frames 32–42; the spread across arms is exactly 0.000000 at 30–31 and
+> 0.000213 at 32), and the dependence on where the window is cut is the finding.
+
+Not a prescription: 32³, one seed, no grid check at this field.
 
 ## 4. What bounds these numbers
 
