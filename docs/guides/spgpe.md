@@ -214,12 +214,18 @@ Evaluated along the euv3 trajectory:
 | 1.992 | 5485 | 118 | 3.47 | 5157 | 0.94 |
 | 2.390 | 3576 | 64 | 2.95 | 3513 | 0.98 |
 
-**The peak is $N_0\approx4.0\times10^4$ at $t=1.73$ s, 80 % of the measured
+**The peak is $N_0 = 4.41\times10^4$ at $t=1.70$ s, 88 % of the measured
 $5.02\times10^4$** (PRL 129, 223401) — and it falls monotonically after that to
 $3.5\times10^3$ at the end of the ramp. Running the evaporation to completion throws
-condensate away: past 1.73 s the losses beat the cooling. So "optimising" this ramp
+condensate away: past 1.70 s the losses beat the cooling. So "optimising" this ramp
 means **stopping it at the peak**, and the 0-D model's own final $N_0=1789$ (3.6 % of
 measured) is the value at the wrong end of a curve rather than a failure of the model.
+
+> **The table above samples the trajectory at 18 points and therefore misses the peak.**
+> It reports $4.01\times10^4$ at $t=1.726$; scanning every point finds
+> $4.41\times10^4$ at $t=1.702$, between two of its rows. The two numbers were 10 %
+> apart and the difference is sampling, not physics — the finer scan is the one to
+> quote. Both are produced by the same constraint from the same trajectory.
 
 **Three caveats, none of them small.**
 
