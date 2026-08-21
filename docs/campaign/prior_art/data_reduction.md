@@ -1,6 +1,6 @@
 # Prior art — data_reduction
 
-> **FROZEN 2026-08-20.** A snapshot of the open work on data_reduction as of that
+> **FROZEN 2026-08-21.** A snapshot of the open work on data_reduction as of that
 > date. Re-run the generator when picking the topic up again; existing
 > dispositions are preserved.
 

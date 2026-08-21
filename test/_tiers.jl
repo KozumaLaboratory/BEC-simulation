@@ -65,6 +65,9 @@ const FAST_TESTS = [
     # bce2068f repaired two configs correctly one at a time and broke the mirror
     # relationship between them; nothing recorded that they were a pair (#343).
     "workflow/test_mirror_pairs_flip_every_axial_quantity.jl",
+    # A budget is not a stopping rule. The scan must report `:budget_exhausted`
+    # distinctly from `:acquisition_below_tol`, with both controls (#57, item 6).
+    "workflow/test_scan_says_why_it_stopped.jl",
     "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
