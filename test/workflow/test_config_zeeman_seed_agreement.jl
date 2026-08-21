@@ -159,6 +159,31 @@ undeclared ones keep being reported.
 """
 const _ANTIALIGNED = r"^#\s*anti-aligned-seed:\s*\S"m
 
+"""
+    _prepared_of(gs, atom) -> :plus_F | :minus_F | nothing | :unresolved
+
+What the step HANDS DOWNSTREAM, which is not always what it seeds.
+
+`prepare_anti_aligned: true` relaxes at `-p` and returns the ground state of the
+REVERSED field — i.e. the opposite end of the ladder from `_m_lowest`, whatever
+was seeded. Reading the seed alone here reports the aligned answer for a step
+that deliberately produces the anti-aligned state.
+
+It also has to be consulted before `_seed_of` returns `nothing`: with the flag
+set there is normally NO `init_m_idx` (the default follows the reversed field),
+so a seed-only gate skips the step entirely — and the config that motivated this
+gate would become invisible to it, which is worse than a wrong answer.
+"""
+function _prepared_of(gs, atom)
+    if get(gs, "prepare_anti_aligned", false) === true
+        lowest = _m_lowest(gs, atom)
+        lowest === nothing && return nothing
+        lowest === :unresolved && return :unresolved
+        return lowest === :plus_F ? :minus_F : :plus_F
+    end
+    _seed_of(gs, atom)
+end
+
 function _scan_configs(root)
     disagree = String[]        # seed and field disagree, undeclared
     declared = String[]        # disagree, but the file says so and why
@@ -169,7 +194,10 @@ function _scan_configs(root)
             endswith(f, ".yaml") || continue
             path = joinpath(dir, f)
             raw = read(path, String)
-            anti = occursin(_ANTIALIGNED, raw)
+            # A comment OR the key. The key is the better declaration — it is
+            # the mechanism rather than an annotation about it, and it cannot
+            # drift away from what the run does.
+            anti_comment = occursin(_ANTIALIGNED, raw)
             data = try
                 YAML.load_file(path)
             catch
@@ -183,7 +211,8 @@ function _scan_configs(root)
                 gs = step["ground_state"]
                 gs isa AbstractDict || continue
                 atom = _atom_of(gs)
-                seed = _seed_of(gs, atom)
+                anti = anti_comment || get(gs, "prepare_anti_aligned", false) === true
+                seed = _prepared_of(gs, atom)
                 seed === nothing && continue
                 lowest = _m_lowest(gs, atom)
                 lowest === nothing && continue
@@ -250,15 +279,31 @@ end
             atom = _atom_of(gs)
             @test atom !== nothing
             # `H = -p·F_z` with p > 0 puts m=+F at the BOTTOM of the ladder, so
-            # the ANTI-ALIGNED seed here is m=-F — `init_m_idx: 13`, retargeted
-            # 2026-08-19 from the schema default of 1. #343 §2 read this config
-            # as "the only Eu arc on the opposite side"; it was not — comparing m
-            # labels across two field parameterisations is what made it look that
-            # way — and it was on the wrong side for a different reason.
-            @test _m_lowest(gs, atom) === :plus_F     # p > 0 ⇒ m=+F is lowest
-            @test _seed_of(gs, atom) === :minus_F     # …so m=-F is the highest
-            # Deliberate, and it must SAY so, or the gate is right to flag it.
-            @test occursin(_ANTIALIGNED, read(p, String))
+            # the FIELD is unchanged and still favours m=+F. What changed on
+            # 2026-08-20 is the preparation: `prepare_anti_aligned: true` relaxes
+            # at -p and hands the dynamics +p, so the state produced is m=-F —
+            # the Zeeman-HIGHEST end the EdH cascade needs.
+            #
+            # The route matters and is the reason this canary exists. 2026-08-19
+            # tried `init_m_idx: 13` for the same goal; ITP ANNIHILATES that seed
+            # (exp(-12·p·dt) = exp(-1602) underflows in one step) and the run
+            # completed on ψ ≡ 0 with E = 0.0. Imaginary time is a projector onto
+            # the LOWEST state, so the anti-aligned end is not reachable by
+            # choosing a seed — only by reversing the field it relaxes in.
+            @test _m_lowest(gs, atom) === :plus_F        # p > 0 ⇒ m=+F is lowest
+            @test _prepared_of(gs, atom) === :minus_F    # …and the prep inverts it
+
+            # THE GATE MUST STILL SEE THIS STEP. With the flag set there is no
+            # `init_m_idx`, so a seed-only reading returns `nothing` and the
+            # scanner skips the very config it was built for — a coverage hole
+            # that would look exactly like a pass.
+            @test _seed_of(gs, atom) === nothing
+            @test _prepared_of(gs, atom) !== nothing
+
+            # The key is the declaration; the comment is not needed and is not
+            # there. Pinned so the two spellings cannot both drift in.
+            @test get(gs, "prepare_anti_aligned", false) === true
+            @test !occursin(_ANTIALIGNED, read(p, String))
         end
     end
 

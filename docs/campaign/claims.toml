@@ -538,7 +538,9 @@ commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "10.3"
 pr = 392
-note = "Consequence: the seed axis carries no uncertainty to quote for this family, so every `uncertainty` field above is bounded by grid/dt instead. The `noise_seed` knob was initially wired to the wrong step and produced the same all-identical table for a wrong reason; that was found and fixed before these numbers."
+note = """Consequence: the seed axis carries no uncertainty to quote for this family, so every `uncertainty` field above is bounded by grid/dt instead. The `noise_seed` knob was initially wired to the wrong step and produced the same all-identical table for a wrong reason; that was found and fixed before these numbers.
+
+CAVEAT NOW MEASURED, 2026-08-20. The scope's warning about longer holds was not hypothetical: at 100 ω_ref⁻¹ and 64³ a second seed moves the static arm's ENDPOINT by 34.2 % (0.27262 → 0.17952) while leaving its PEAK identical to five decimals (0.49081 both). So the determinism is a property of the peak, and the endpoint at long time carries a seed uncertainty large enough to swallow an 18.8 % arm separation — see `edh-longtime-endpoint-ordering-unresolved`. Rows bounded by grid/dt above remain correct for the short protocol; a long-hold endpoint must quote a seed bound."""
 
 [[claim]]
 id = "edh-corpus-is-one-seed-32cubed-lhy-none"
@@ -589,3 +591,126 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "4.2"
 pr = 392
 note = """CLOSED 2026-08-20, and it had been closed since 2026-08-19 without anyone noticing. `e8dafe8e` — the same commit that retargeted the quench corpus — set `init_m_idx: 13` on line 51, with the reasoning in the config header. The decision document's section 4.2 went on saying "not done here … on the re-derivation list" for a day, and this row was written faithfully FROM that paragraph. So the ledger inherited a false statement from its source and then caught it, which is the sequence the `evidence` column is for: the row was only checkable because it named a path, and the path resolved to a file that disagreed with the prose. A row whose evidence is prose could not have done this. Section 4.2 corrected in the same change."""
+
+[[claim]]
+id = "edh-longtime-static-sustains"
+claim = "At 145 ms the rotating arm peaks and collapses back below the baseline while the static weakened trap holds 2.25× it, so rotation gives a transient and the static trap a SUSTAINED transfer."
+status = "refuted"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, hold = 100 ω_ref⁻¹, three arms."
+retired_literal = ["2.25×", "2.25x", "sustained transfer", "a transient"]
+uncertainty = "The claim was stated with its own key number (3.21 % static-vs-rotating at the peak) INSIDE the resolution systematic (2.5 %), and said so. That overlap is what made the 64³ run the obvious next step."
+uncertainty_basis = "grid"
+evidence = ["32³: baseline 0.38532/0.23127, static 0.50790/0.47517, rotating 0.52475/0.21093 (hold-peak/end)"]
+evidence_status = "absent"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "13"
+pr = 410
+note = """REFUTED 2026-08-20 by the 64³ re-run, with NO replacement ordering — see `edh-longtime-not-converged-at-32`. Both orderings invert: static-vs-rotating at the peak goes -3.2 % to +21.6 %, and at the endpoint 2.25× to 0.68×. Per-arm the endpoints move -42.6 % (static) and +91.3 % (rotating). This is not a 3 % divergence being resolved, it is 32³ failing to resolve the branch."""
+
+[[claim]]
+id = "edh-longtime-not-converged-at-32"
+claim = "At a 100 ω_ref⁻¹ hold, 32³ is not resolution-converged: refining to 64³ inverts both the peak and the endpoint ordering of static vs rotating, so NEITHER resolution establishes the long-time ordering."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU. THREE arms at 64³ (baseline, static ω_eff=0.714, rotating Ω=−0.70), two seeds on the static and rotating arms."
+uncertainty = "Bounds what 32³ cannot support; it does not by itself establish the 64³ answer. The two measurements it named as missing — a baseline arm and a second seed — were run on 2026-08-20 and are `edh-longtime-peak-ordering-at-64` (established) and `edh-longtime-endpoint-ordering-unresolved` (still not)."
+uncertainty_basis = "grid"
+evidence = ["64³: static 0.49081/0.27262, rotating 0.40358/0.40358 (hold-peak/end) against 32³ 0.50790/0.47517 and 0.52475/0.21093"]
+evidence_status = "absent"
+commit = "32aa5e50"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "15"
+pr = 0
+note = """The part that generalises: grid adequacy is a property of the grid AND the integration time. Under the same 32³→64³ refinement the SHORT protocol (14.5 ω⁻¹) moved by a uniform +2.3 % and the 5.2 nT dip kept 93 % of its depth — shape preserved — while the long one moves -3.4/-23.1/-42.6/+91.3 % and orderings invert. So sections 9-12 are unaffected and only the long-time branch is out of reach at 32³. A convergence check at one duration does not transfer to another."""
+
+[[claim]]
+id = "edh-longtime-peak-ordering-at-64"
+claim = "At a 100 ω_ref⁻¹ hold and 64³ the hold-peak ordering is static (0.49081) > rotating (0.40102) > baseline (0.37973): the statically weakened trap beats no-intervention by +29.3 % and beats rotation by +22.4 %."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³, 100 ω_ref⁻¹ hold. The PEAK only — the endpoint ordering at the same duration is a separate and unresolved row."
+uncertainty = "The static peak is seed-independent to five decimals (0.49081 at two seeds) and the rotating peak moves 0.63 %, so the 22.4 % and 29.3 % gaps are 35-100x the seed scatter. Not grid-bounded: this IS the refined grid, and 32³ gave the opposite static-vs-rotating sign, so no statement is carried over from there."
+uncertainty_basis = "seed"
+evidence = ["64³ hold-peak P_adj: baseline 0.37973, static 0.49081, rotating 0.40102; static seed 101 vs default both 0.49081"]
+evidence_status = "absent"
+commit = "6bb97bb2"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "17.2"
+pr = 0
+note = """Replaces the ordering `edh-longtime-static-sustains` asserted and `edh-longtime-not-converged-at-32` refused to restate — but only for the peak, and with the opposite reading of what the two arms do. The original claim was that the static arm SUSTAINS and the rotating one decays; at 64³ the rotating arm is the persistent one (peak ~= endpoint, still climbing at 145 ms) and the static one falls from 0.49081 to 0.17952. Larger cascade and more persistent cascade are different questions and 32³ answered neither."""
+
+[[claim]]
+id = "edh-longtime-endpoint-ordering-unresolved"
+claim = "At 100 ω_ref⁻¹ and 64³ the endpoint separates rotating (0.40013) from static (0.17952) by 2.23x, which is safe, but does NOT separate static from baseline (0.17952 vs 0.15112, +18.8 %) because the static endpoint moves 34.2 % between two seeds."
+status = "open"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³. The endpoint at long hold only; the peak at the same points IS resolved (`edh-longtime-peak-ordering-at-64`)."
+uncertainty = "unbounded on the static-vs-baseline row: n = 2 seeds gives a spread (34.2 %) but no distribution, so 18.8 % is inside it and no confidence can be attached. Closing it needs an ensemble on both arms, not a finer grid — the grid is already the refined one."
+uncertainty_basis = "seed"
+evidence = ["64³ endpoint P_adj: baseline 0.15112, static 0.17952 (seed 101) / 0.27262 (default), rotating 0.40013 / 0.40358", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh"]
+evidence_status = "partial"
+commit = "6bb97bb2"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "17.2"
+pr = 0
+note = """Recorded as `open` rather than left out, because the absence of a statement here is exactly what a reader would otherwise supply from the peak row. The rotating-vs-static factor of 2.23 IS outside the scatter and is safe to quote; the static-vs-baseline one is not. Same shape as `edh-longtime-not-converged-at-32`: a quantity measured on one axis (peak) does not transfer to another (endpoint), just as one duration did not transfer to another.
+
+THE RUN THAT WOULD CLOSE IT IS PREPARED AND NOT SPENT (2026-08-21). 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+
+NOT LAUNCHED because it is ~5.2 points of a 19.24 group balance (~27 %) with another session spending concurrently, and this is a secondary row — the peak ordering it might be confused with is already established and unaffected. anko made that call; the numbers are in the README so the next person does not re-derive the decision.
+
+Two API facts were established the expensive way and are recorded so the next author does not invent them again: `cli.jl launch` takes `[<batch>] <run_name>` and has NO `--smoke`, and `run_yaml` has NO point selection. The second is why this is 20 single-arm configs rather than 3 seed-scans — a `scan:` cannot be split across array tasks."""
+
+[[claim]]
+id = "edh-phi-phys-anti-aligned-needs-field-reversal"
+claim = "The anti-aligned preparation cannot be produced by ITP on the fast-Larmor rotating-basis path: at p = 26700 the Zeeman-shifted factor for the highest m is exp(-12·p·dt) = exp(-1602), which underflows in ONE step and returns ψ identically zero. It needs the state relaxed at the OPPOSITE field sign and the field reversed for the dynamics — a pipeline change, not a config key."
+status = "live"
+type = "A"
+scope = "`runs/eu151_klaus_phi_phys/config.yaml`, p = 26700, dt = 0.005, F = 6. Quantitative, so it does NOT generalise: the klaus_quench spinor corpus has p ≈ 148, per-step factor exp(-8.9), renormalised every step and never underflowing."
+uncertainty = "Four control arms — init_m_idx in {1, 13} x ITP in {100, 1500} — separate the candidate causes: both init_m_idx=13 arms give 0 of 212992 non-zero entries and ‖ψ‖² = 0.0, both init_m_idx=1 arms give ‖ψ‖² = 4.096 and E = -160177.6. The seed, not the ITP length, is what decides it."
+uncertainty_basis = "control"
+evidence = ["runs/eu151_klaus_phi_phys/config.yaml", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.3"
+pr = 0
+note = """SUPERSEDES the deferral in `edh-phi-phys-config-anti-alignment`, which proposed `init_m_idx: 13` as the repair. That was set on 2026-08-19 and reverted on 2026-08-20 once the energy was reported at all — the run had been completing on ψ ≡ 0 with E = 0.0 and saying nothing. The underflow is a hard error naming the mechanism and the remedy.
+
+IMPLEMENTED 2026-08-20 as `prepare_anti_aligned` — see `edh-anti-aligned-prep-implemented`. This row stays `live` because the claim it makes is about ITP, not about the config: imaginary time still cannot produce the anti-aligned state, and the new key does not change that. It relaxes in a DIFFERENT field."""
+
+[[claim]]
+id = "edh-anti-aligned-prep-implemented"
+claim = "`prepare_anti_aligned: true` on a `kind: rotating_basis` ground_state relaxes at -p and hands the dynamics +p, producing the Zeeman-HIGHEST stretched state that the EdH quench needs. Only `p` reverses; `q ∝ |B|²` is even in the field and does not."
+status = "live"
+type = "A"
+scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F, but no production-scale arm has been run through it yet."
+uncertainty = "Directional, not numeric: an ALIGNED control arm in the same field comes out with sign(⟨F_z⟩) = +sign(p) and the anti-aligned arm with -sign(p), at both signs of p, each stretched to |⟨F_z⟩| = F within 0.05. A single arm could not tell the preparation from the sign convention assumed while reading it."
+uncertainty_basis = "control"
+evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.yaml"]
+evidence_status = "in_tree"
+commit = "0"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "18"
+pr = 0
+note = """The step now ASSERTS the outcome at runtime — `sign(⟨F_z⟩) = -sign(p)` or it throws — rather than trusting the construction. That is deliberate: the defect this replaces was a run that COMPLETED and returned ψ ≡ 0, and a preparation that quietly hands back the ALIGNED state is the same class and would invert every conclusion drawn from it. `⟨F_z⟩` along B̂ is also recorded in every result now (`rotating_basis_fz_along_b`), because which end of the ladder a run started from was the controlling variable of this whole campaign and nothing was reporting it.
+
+The canary needed strengthening: the first version used p = 400, where exp(-2·F·p·dt) = exp(-8) is renormalised away every step and the arm completes. Only a SINGLE-STEP underflow (exponent > 708) is the inexpressible case."""
+
+[[claim]]
+id = "rotating-basis-result-writer-omitted-energy"
+claim = "`save_rotating_basis_result!` — the writer that owns result.jld2 for BOTH `kind: rotating_basis` and `kind: spinor`-with-dynamics — wrote neither `energy` nor `converged`, so both keys were ABSENT from every dynamics run's result file."
+status = "live"
+type = "A"
+scope = "All runs written through `save_rotating_basis_result!` (runner.jl:294), which is every pipeline carrying a dynamics history."
+uncertainty = "unbounded: this is a code-shape claim, not a measured quantity — the writer either emits the key or it does not, and it did not. What is NOT bounded is how many stored runs are affected, because runs/ is untracked."
+uncertainty_basis = "none"
+evidence = ["src/workflow/io/save_rotating_result.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.1"
+pr = 0
+note = """CORRECTS section 14.2, which attributed the missing energy to `run_registry.jl` reading absent keys through defaults. That writer is never reached on this path. The `conv = true` default was real and printed to stdout, but was never STORED — so a guard reading the file finds nothing, which is unknown rather than a pass, and section 14.2's guard-7 claim overstated. The #410 default fix stands on its own path; this is a third writer nobody had checked."""

@@ -28,6 +28,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
     "cli.jl",                      # shim → SpinorBEC.cli_main
     "generate_state.jl",           # docs/STATE.md generator (test-gated)
+    "prior_art.py",                # prior-art dispositions (test-gated)
     "audit_memory.py",             # memory-store auditor (CLAUDE.md-gated)
     "preflight_invariants.jl",     # physics-invariant preflight battery
     "watch_until_done.sh",         # job watcher with a reachable RED
@@ -55,6 +56,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     # The static-trap omega_eff array for the EdH quench. One arm per task on
     # purpose: a shard reaped at h_rt must not take completed neighbours with it.
     "submit_klaus_weff_scan.sh",
+    "submit_lt64_endpoint_ensemble.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
@@ -103,10 +105,12 @@ const _SCRIPTS_ALLOWLIST = Set([
     "eu334/submit_nucleate.sh",
     "eu334/submit_smoke.sh",
     "eu334/submit_classify.sh",
+    "eu334/submit_ed_probe.sh",
     "eu334/window.jl",
     "eu334/nucleation_bifurcation.jl",
     "eu334/nucleate.jl",
     "eu334/classify.jl",
+    "eu334/ed_growth_probe.jl",
     "eu334/viz_eu334.py",
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
@@ -135,6 +139,31 @@ const _SCRIPTS_ALLOWLIST = Set([
     "kz/run_mdamplong.sh",
     "kz/run_mdampproj.sh",
     "kz/submit_kz_spin1.sh",
+    # The number-constraint arc (2026-08-19). Each of these is a measurement whose
+    # result is quoted in a commit message or in docs/guides/spgpe.md, kept so the
+    # number can be re-measured rather than trusted:
+    #   handoff_window          where the c-field can take over from the 0-D model
+    #   eu_number_conserving    the closed-loop evaporation driver
+    #   eu_equilibrium_N0       N_0 the constraint predicts along the ramp
+    #   n0_estimator_check      the N_0 estimator against a known TF state, per component
+    #   mu_constraint_continuity  the non-monotonicity that killed the level-sum form
+    #   mu_lda_allocation       where 36 GB came from (answer: not here)
+    #   energy_damping_dt_convergence / _clean_conservation  one-time vs per-step loss
+    "kz/energy_damping_clean_conservation.jl",
+    "kz/energy_damping_dt_convergence.jl",
+    # Removes the ramp: fixed (mu, T, eps_cut) at the ramp's end values, to separate
+    # "the field cannot condense here" from "the ramp does not leave time for it".
+    "kz/fixed_point_condensation.jl",
+    "kz/eu_cost.jl",
+    "kz/eu_equilibrium_N0.jl",
+    "kz/eu_number_conserving.jl",
+    "kz/eu_prof.jl",
+    "kz/handoff_window.jl",
+    "kz/mu_constraint_continuity.jl",
+    "kz/mu_lda_allocation.jl",
+    "kz/n0_estimator_check.jl",
+    "kz/submit_eu_nc.sh",
+    "kz/submit_kz_mode.sh",
     "kz/submit_kz_torus.sh",
     "kz/submit_kz_torus_sharded.sh",
     "kz/sync_tsubame.sh",

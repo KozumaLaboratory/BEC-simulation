@@ -91,13 +91,22 @@ Keys the spinor ground-state runner never reads.
 `_run_step` methods), so this one only ever sees `spinor`. The rest belong to
 those other paths: `dtype` is the rotating-basis mixed-precision switch,
 `species_A`/`species_B` are the binary GP's two components, and `F` /
-`gauge_fix` / `init_m_idx` / `init_sigma` are rotating-basis knobs. Including any
-of them in the id would over-discriminate — safe, but a false statement about
-what this computation depends on.
+`gauge_fix` / `init_m_idx` / `init_sigma` / `prepare_anti_aligned` are
+rotating-basis knobs. Including any of them in the id would over-discriminate —
+safe, but a false statement about what this computation depends on.
+
+`prepare_anti_aligned` is the sharpest of those and is worth naming, because it
+is the one key here that CHANGES THE PHYSICS rather than the numerics: it
+relaxes at `-p` instead of `+p`, giving the opposite end of the Zeeman ladder.
+It belongs in this bucket anyway, and the reason is the bucket's own definition
+— the SPINOR runner does not read it. Its effect on the rotating-basis
+artifact_id is that path's problem, and the rotating-basis GS is not
+content-addressed through `GS_SCHEMA` admission at all. If that ever changes,
+this key moves buckets and the counts below make it a deliberate edit.
 """
 const AX_NOT_ON_PATH = Set([
     "kind", "dtype", "species_A", "species_B", "F", "gauge_fix",
-    "init_m_idx", "init_sigma",
+    "init_m_idx", "init_sigma", "prepare_anti_aligned",
 ])
 
 const AX_BUCKETS = (

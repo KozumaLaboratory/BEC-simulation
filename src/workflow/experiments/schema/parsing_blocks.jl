@@ -291,13 +291,26 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
         end
     end
 
-    # ε_dd
-    eps_dd = atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    # ε_dd of the run AS CONFIGURED. This read `compute_a_dd(atom)/atom.a_s`
+    # — the atom's pair, blind to a `c_total` / `ddi.c_dd` override — and that
+    # value is what the LHY auto-derivation below keys on. The banner was
+    # taught to print the effective ratio; the DERIVATION still used the
+    # intrinsic one, so a droplet config got its contact term from the override
+    # and its LHY term from the registry a_s.
+    # `effective_eps_dd` inverts the same two coupling formulas, so it returns
+    # the atom's own ratio whenever nothing is overridden.
+    eps_dd = if isnan(c_dd_val)
+        atom.a_s > 0 ? compute_a_dd(atom) / atom.a_s : 0.0
+    else
+        effective_eps_dd(atom.F, c_total, c_dd_val)
+    end
+    a_s_over_a_ho = effective_a_s_over_a_ho(c_total, N_atoms)
 
     # LHY config — preferred path is the `lhy:` block (added in C5). Legacy
     # The resolver normalises the user-facing `lhy:` block into the internal fields
     # so downstream make_workspace / run_step plumbing is unchanged.
-    _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho)
+    _resolve_lhy_block!(p, inter, atom, c_dd_val, eps_dd, N_atoms, a_ho;
+        a_s_over_a_ho)
 
     # l_z: derive from trap ratio if quasi_2d and not specified
     pot = get(p, "potential", nothing)
@@ -319,8 +332,11 @@ function _resolve_derived_params!(p::Dict, atom; verbose::Bool=true)
         # whenever a config overrides c_total or c_dd, which is exactly what a
         # droplet study does. Printing only the intrinsic one reported
         # ε_dd=0.5402 for a run at 1.3000 (issue #336).
-        eps_dd_eff = c_total > 0 && !isnan(c_dd_val) ?
-                     c_dd_val * atom.F^2 / (3 * c_total) : eps_dd
+        # via `effective_eps_dd` rather than inline, so the banner and the LHY
+        # derivation above cannot drift apart — they are the same ratio.
+        eps_dd_eff =
+            c_total > 0 && !isnan(c_dd_val) ?
+            effective_eps_dd(atom.F, c_total, c_dd_val) : eps_dd
         println(
             "  Derived: c_total=$(round(c_total; digits=1))" *
             (
@@ -353,7 +369,8 @@ end
 # run_step continues to read — these slots are no longer user-visible because
 # the schema rejects them.
 function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
-    eps_dd::Float64, N_atoms::Int, a_ho::Float64)
+    eps_dd::Float64, N_atoms::Int, a_ho::Float64;
+    a_s_over_a_ho::Float64=NaN)
     lhy_block = get(p, "lhy", nothing)
     lhy_block isa Dict || return nothing
 
@@ -379,11 +396,22 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # equivalently c_lhy/c₀ = (32/3)√((a_s/a_ho)³N/π), which reproduces the
     # textbook ratio μ_LHY/μ_contact = (32/3)√(n_SI·a_s³/π).
     # test/oracles/test_scalar_lhy_si_roundtrip.jl gates exactly that.
+    #
+    # `a_s_over_a_ho` is the run's EFFECTIVE ratio, inverted from the c_total
+    # actually in force. It read `atom.a_s / a_ho` until 2026-08-19, so a config
+    # that overrode `interactions.c_total` got an LHY coefficient built from a
+    # different scattering length than its own contact term — for
+    # `runs/saito_li_torus/config.yaml` (a_s 110 a₀ → 45.7 a₀ for ε_dd = 1.3)
+    # that is 8.98× in `(a_s/a_ho)^{5/2}` alone, 3.52× after the Q₅ factor, on
+    # the one term the droplet's existence depends on. The 6 other c_total-
+    # overriding configs in `runs/` pin at the natural value (verified to
+    # ≤ 6.6e-6), so they are unaffected.
     if (kind == "scalar" || kind == "quasi_2d") && !haskey(lhy_block, "c_lhy")
         ddi_active = !isnan(c_dd_val) && c_dd_val > 0
+        ratio = isfinite(a_s_over_a_ho) ? a_s_over_a_ho : atom.a_s / a_ho
         if N_atoms > 0 && isfinite(a_ho) && a_ho > 0
             lhy_block["c_lhy"] = scalar_lhy_coefficient(
-                atom.a_s / a_ho, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
+                ratio, N_atoms; eps_dd=(ddi_active ? eps_dd : 0.0)
             )
         else
             # Cannot derive without N and a_ho. Must not be silent — that is the

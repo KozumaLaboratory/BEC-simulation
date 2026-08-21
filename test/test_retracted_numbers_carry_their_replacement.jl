@@ -182,6 +182,47 @@ end
     @test sites == NamedTuple[]
 end
 
+@testset "a neighbouring table row's marker does not shield an unmarked one" begin
+    # Measured 2026-08-20, in the very document this gate exists for. The §0
+    # verdict table's row 17 stated the REFUTED `2.25×` bare, and one line below
+    # it row 13 said "**refuted**" about an unrelated claim. Proximity was
+    # satisfied, so the gate was green over a live table asserting a refuted
+    # result in the present tense — the exact failure it was built to catch,
+    # surviving inside it.
+    #
+    # The rule that fixes it: in a markdown table the window is the line, because
+    # a row is one claim and its neighbours are always other claims. Prose keeps
+    # the loose window; a gate that reddens on correct writing gets deleted.
+    claims = claim_ledger()
+    c = claim_by_id(claims, "edh-longtime-static-sustains")
+    @test c !== nothing
+    lit = first(c.retired_literal)
+
+    mktempdir() do d
+        shielded = joinpath(d, "shielded.md")
+        marked = joinpath(d, "marked.md")
+        write(shielded,
+            "| 17 | long time | the endpoint differs by $lit at 145 ms. |\n" *
+            "| 13 | 5.2 nT | the old window is **refuted**, not merely unresolved. |\n")
+        write(marked,
+            "| 17 | long time | $lit is **RETRACTED**; see the 64³ re-run. |\n" *
+            "| 13 | 5.2 nT | the old window is **refuted**, not merely unresolved. |\n")
+
+        # Red must be reachable, and green must be too — a rule that reddens on
+        # a correctly-marked row is worse than the hole it closes. `marked` also
+        # pins the casing fold: it says RETRACTED, and the marker list carries
+        # `retracted` in lower case only.
+        @test length(unmarked_retired_literal_sites(files=[shielded])) == 1
+        @test unmarked_retired_literal_sites(files=[marked]) == NamedTuple[]
+
+        # And prose must keep the loose window, or the fix has quietly become a
+        # different, stricter gate than the one argued for.
+        prose = joinpath(d, "prose.md")
+        write(prose, "This result is **RETRACTED**.\n\nThe endpoint ratio was $lit.\n")
+        @test unmarked_retired_literal_sites(files=[prose]) == NamedTuple[]
+    end
+end
+
 @testset "the point-of-use gate can see the defect it was built for" begin
     # Red must be reachable before any green above is worth anything. The probe
     # is the REAL shape: a retracted literal in a protocol step, with the

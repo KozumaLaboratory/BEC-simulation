@@ -79,6 +79,71 @@ in the loss rate on a grid with headroom above the cutoff.
 per-step draw is `seed + s`. Separated by 1, four "independent" runs were one noise
 sequence shifted by a step, and gave `⟨W⟩` = 2.25 with every sign the same.
 
+## Anchor for the spinor step: the c1 = 0 limit
+
+Step 1 has no published number to check against. The literature splits either side
+of it — the toroidal SPGPE winding work is scalar (McDonald & Bradley PRA 92,
+033616), the spin-1 winding work is `T = 0` GPE (Uhlmann, Schützhold & Fischer;
+Saito et al.), and the spin-1 SPGPE work is equilibrium BKT in 2D (Underwood &
+Blakie). A spin-1 SPGPE thermal quench on a torus fitted for a winding exponent
+appears to be unpublished, which puts step 1 in the same position as the retracted
+`α = 0.93`: a measurement with no external check.
+
+**The anchor is the `c1 = 0` limit, and it is not "the scalar case".** At `c1 = 0`
+the three components still share the density mean field `c₀n` and the reservoir
+noise still fills all of them, so the system is an SU(3)-symmetric three-component
+mixture, not one scalar field. What survives the limit is the *universality class*
+of a single component's phase transition: with the spin channel switched off, each
+component's phase orders independently apart from the shared mean field, so `τ₀` and
+the amplitude change but the exponent does not.
+
+So the prediction, recorded before the run:
+
+> `β` from the per-component winding at `c1 = 0`, three components, must agree with
+> the scalar `β = 0.1327 ± 0.0109` — and the amplitude need not.
+
+If it does, the spinor path is continuously connected to a reproduced published
+number and a `c1 ≠ 0` result can be read as a departure from it. If it does not,
+either the spinor plumbing changes something it should not, or the reasoning above
+is wrong; both have to be settled before any `c1 ≠ 0` exponent is quoted.
+
+**Result: it failed at 5.3 σ, and the reasoning was wrong.** 320 trajectories per
+point, one provenance record across all 16 shards:
+
+| `τ_Q` | 1000 | 3000 | 10⁴ | 3×10⁴ | 10⁵ |
+|---|---|---|---|---|---|
+| `σ(W)` | 2.143 | 1.997 | 1.814 | 1.820 | 1.909 |
+
+`β = 0.0280 ± 0.0152`, and `σ(W)` is not monotone — it falls, then rises over the
+last two rates.
+
+The error is in the choice of observable. At `c1 = 0` the three components are freely
+interconvertible, nothing penalising the movement of atoms between them, so a single
+component's winding is **not topologically protected**: it can unwind by population
+transfer as well as by a phase slip. That relaxation channel does not exist in the
+scalar case and washing out the `τ_Q` dependence is what it would do — a nearly flat
+`σ(W)` is its signature. What total number conservation does protect at `c1 = 0` is
+the **mass** winding of `Σ_c ψ_c`, and the per-component winding is what was run.
+
+Rejected explanation: that three components at `c1 = 0` is an O(6) model against the
+scalar's O(2), so the class differs. At mean field both give `ν = 1/2`, `z = 2` and
+therefore `β = 0.125`, which does not account for 0.028; the measured scalar 0.1327
+sits close to that mean-field value.
+
+The anchor is being rerun on the mass winding. Until it lands, no `c1 ≠ 0` exponent
+can be quoted in either direction.
+
+Two further anchors exist and are cheaper than a new physics claim:
+
+- **`σ(W) ∝ √L`** for spin vortices, which Uhlmann et al. establish at `T = 0`. The
+  size-scan machinery already measured exactly this for the scalar case
+  (`σ(W)` went 1.26 → 2.38 → 2.62 for `L` = 200 → 400 → 800 against a `√L`
+  prediction of 1.26 → 1.78 → 2.52).
+- **Two scaling regimes from magnetisation conservation** (Świsłocki, Witkowska,
+  Dziarmaga & Matuszewski, PRL 110, 045303). Contact interactions conserve
+  magnetisation, so this applies directly and predicts the exponent splits rather
+  than shifting smoothly.
+
 ## Open: the residual number loss
 
 Exact number conservation is not available in the projected scheme — the product

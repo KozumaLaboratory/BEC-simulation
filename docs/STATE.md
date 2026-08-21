@@ -149,7 +149,7 @@ to their own default), and that qualification is judgement, not derived.
 | knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |
 |---|---|---|---|
 | `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / 4000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
-| `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 (schema `1.0e-8`) |
+| `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 / 1.0e-9 (schema `1.0e-8`) |
 | `m_lbfgs` | 20 | 20 | 10 (schema `10`) |
 
 **`m_lbfgs` is the live trap.** Both Julia entries default to 20 and
@@ -208,12 +208,12 @@ of these fails `test/test_docs_examples_avoid_removed_keys.jl`.
 
 File counts from `test/_tiers.jl`. Membership is explicit — no auto-discovery.
 
-- `FAST_TESTS` — 268 files
-- `CI_EXTRA` — 139 files
-- `FULL_EXTRA` — 74 files
+- `FAST_TESTS` — 272 files
+- `CI_EXTRA` — 141 files
+- `FULL_EXTRA` — 77 files
 - `PHYSICS_TESTS` — 7 files
 - `ORACLE_TESTS` — 92 files
-- `INTEGRATION_TESTS` — 53 files
+- `INTEGRATION_TESTS` — 55 files
 
 ## Validation ladder — instruments present on disk
 

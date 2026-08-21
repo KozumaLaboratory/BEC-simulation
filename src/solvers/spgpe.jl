@@ -310,6 +310,7 @@ log the reservoir trajectory.
 function apply_spgpe_step!(
     ws::Workspace{N}, res::SPGPEReservoir, dt::Real;
     t::Real=ws.state.t, seed::Union{Nothing, Int}=nothing, noise::Bool=true,
+    cayley_iters::Int=0,
 ) where {N}
     r = spgpe_rates(res, t)
     dt_f = Float64(dt)
@@ -329,7 +330,7 @@ function apply_spgpe_step!(
         apply_energy_damping_step!(
             ws, r.M, r.T, dt_f;
             seed=seed === nothing ? nothing : seed + 7_919, noise=noise,
-            k_cut=r.k_cut,
+            k_cut=r.k_cut, cayley_iters=cayley_iters,
         )
     end
     # Projection last, so both noises are projected within the same step — the
@@ -405,6 +406,7 @@ energy decreases monotonically. That sign is the oracle for this term.
 function apply_energy_damping_step!(
     ws::Workspace{N}, M::Real, T::Real, dt::Real;
     seed::Union{Nothing, Int}=nothing, noise::Bool=true, k_cut::Real=Inf,
+    cayley_iters::Int=0,
 ) where {N}
     M_f = Float64(M)
     M_f > 0 || return nothing
@@ -451,6 +453,47 @@ function apply_energy_damping_step!(
 
     # 4. ψ ← ψ·exp(i·phase), with the phase BAND-LIMITED to the C region.
     #
+    # WHAT THE PROJECTED STEP COSTS IN NUMBER — settled 2026-08-20, after being got
+    # wrong twice in opposite directions. Read this before measuring it a third
+    # time; `test/dynamics/test_spgpe.jl` gates it.
+    #
+    # It depends on the NOISE, and every wrong answer so far came from stating one
+    # sub-case as the whole:
+    #
+    #   noise OFF -> ONE-OFF. Whatever the SEED carried outside the C region,
+    #     removed the first time the projector runs. Pre-projected seed (P ψ₀ = ψ₀):
+    #     1.1e-13 total over 400 steps. Seed carrying 1e-4 outside: the FIRST step
+    #     removes 1.0e-4, every step after costs 2.6e-16. At 1e-2, 9.9e-3 on step
+    #     one. Doubling dt changes nothing.
+    #
+    #   noise ON  -> A RATE. Pre-projected seed so the one-off is already paid,
+    #     γ = 0 so nothing physical can move N: 1.0853e-4 over 50 steps, 4.3821e-4
+    #     over 200. Ratio 4.04 against the 4.00 of exact proportionality.
+    #
+    # The first reading called it a rate (~1.25× the growth rate) on the strength of
+    # flatness in resolution, which supports neither case — a one-off is flat too —
+    # and through a `tracking_cutoff`, which moves every step and so MANUFACTURES
+    # fresh out-of-C content, paying the one-off again and again. The retraction
+    # that followed then generalised the noise-off measurement past its own stated
+    # scope. Right conclusion for production, wrong evidence; then right evidence,
+    # wrong scope.
+    #
+    # Consequence for callers: with noise on, a growth problem DOES pay a continuing
+    # loss here, so `energy_damping=false` stays the conservative choice for one.
+    # Independently of that, give it a seed inside its own C region — project once
+    # before starting. If `tracking_cutoff` is used, each cutoff change legitimately
+    # bills the band it swept past: that is `cutoff_outflow`, reported separately,
+    # and it is physics rather than a defect.
+    #
+    # AND THE PROJECTOR IS NOT WHAT STALLS A GROWTH RUN. On #334's ramp the full
+    # theory falls 11530 -> 3287 while growth-only rises 11530 -> 29601, and the two
+    # projector channels are the SAME in both (outflow 9886 vs 9986, truncated 31435
+    # vs 31256, sampled identically). A common-mode cost cannot produce a divergent
+    # outcome. Pinning the cutoff changes N_C by 5 parts in 3271, so cutoff motion is
+    # out too. What remains is the energy-damping DRIFT acting on the field —
+    # 2γ(µ_res − µ_ψ) shrinks as µ_ψ rises — and whether that is correct physics or a
+    # defect is OPEN. These numbers exclude the projector; they establish nothing.
+    #
     # The band limit is the load-bearing part, and it was missing. Rooney et al.
     # Eq. (15) carries δ_C(k,−k') in the noise correlator, so the kernel and the
     # noise it colours both live below the cutoff. With 1/|k| left unrestricted the
@@ -478,10 +521,96 @@ function apply_energy_damping_step!(
     # norm-preserving before projection, with the projector's bite made small by
     # band-limiting rather than argued away.
     plans.inverse * phase_k
+    # The EXPONENTIAL, and the number loss it costs is accepted here.
+    #
+    # The increment form `psi += i phi psi` was tried, measured, and reverted. It is the
+    # form the projector wants — Rooney, Blakie & Bradley (PRE 89, 013302) evaluate the
+    # scattering term inside the restricted basis so the increment is in C — and it does
+    # cut the loss, 4.53e-3 to 2.45e-3 per unit time. But it multiplies the norm by
+    # (1 + phi^2) every step and DIVERGES: the projector-composition gate went NaN at
+    # t = 200 where the dt scan, run to t = 20, showed nothing. A 20-unit scan does not
+    # test stability, and that is why the improvement looked free.
+    #
+    # `cis(phi)` is pointwise norm-preserving and stable. What it costs is that
+    # `exp(i phi)` is not band-limited even when `phi` is, so the product carries weight
+    # above the cutoff and the caller's projector removes it — 4.53e-3 per unit time,
+    # flat across dt from 0.02 to 0.001 (0.06% over a factor of twenty), so not a
+    # step-size artefact. That is the known cost of implementing the projector on a full
+    # grid rather than in a spectral basis, which the gate's own comment already stated.
+    #
+    # Neither form is right. Closing this needs the C-region mode coefficients, not a
+    # choice between these two.
+    if cayley_iters <= 0
+        for c in 1:D
+            idx = _component_slice(N, n_pts, c)
+            psi_c = view(psi, idx...)
+            @. psi_c *= cis(real(phase_k))
+        end
+    else
+        _cayley_phase_step!(ws, phase_k, n_pts, D, Float64(k_cut), cayley_iters)
+    end
+    nothing
+end
+
+"""
+    _cayley_phase_step!(ws, phase_k, n_pts, D, k_cut, iters)
+
+Apply `ψ → ψ + i P{φ (ψ + ψ')/2}` by Picard iteration — the midpoint (Cayley) form of
+the projected phase operator.
+
+# Why this rather than `ψ *= cis(φ)`
+
+The energy-damping term is `∂ψ = −i P{ψ V_ε} dt` and the projector sits on the PRODUCT.
+With `P` self-adjoint, `ψ ∈ C` and `V_ε` real,
+
+    dN/dt = 2 Re[−i ∫ ψ* P{ψV_ε}] = 2 Re[−i ∫ (Pψ)* ψV_ε] = 2 Re[−i ∫ |ψ|²V_ε] = 0
+
+exactly, in any basis. So number conservation does not need the spectral-Galerkin
+representation — I concluded it did, and that was wrong. `P(iφ)P` restricted to `C` is
+skew-Hermitian, and the Cayley transform of a skew-Hermitian operator is unitary, so the
+midpoint form conserves the norm exactly ON `C` and is stable.
+
+The two forms that do not work, both measured:
+
+  `ψ *= cis(φ)`      pointwise norm-preserving and stable, but a FINITE rotation:
+                     `exp(iφ)` is not band-limited even when `φ` is, so the product
+                     carries weight above the cutoff and the caller's projector removes
+                     it. 4.53e-3 per unit time, flat across dt 0.02 → 0.001.
+  `ψ += iφψ`         the projector's form, cuts the loss to 2.45e-3, but explicit — and
+                     Rooney, Blakie & Bradley use a weak SEMI-implicit Euler precisely
+                     because a multiplicative term needs it.
+
+`iters` Picard sweeps give an error `O(φ^(iters+1))`; `φ ∝ ℳ̄ dt`, so two is ample and
+the iteration converges for `|φ| < 2`. The projection is a k-space mask, two FFTs per
+sweep per component, so this costs ~2× the term's existing transform count — paid only
+when asked for.
+"""
+function _cayley_phase_step!(
+    ws::Workspace, phase_k, n_pts::NTuple{N, Int}, D::Int, k_cut::Float64, iters::Int
+) where {N}
+    psi = ws.state.psi
+    plans = ws.fft_plans
+    RT = real(eltype(psi))
+    kc2 = isfinite(k_cut) ? RT(k_cut^2) : RT(Inf)
+    _, _, ksq, _ = _energy_damping_buffers(ws, n_pts, k_cut)
+    psi_old = scratch_get!(:cay_old, (typeof(psi), n_pts)) do
+        _similar(ws.backend, psi, eltype(psi), n_pts...)
+    end
+    work = scratch_get!(:cay_work, (typeof(psi), n_pts)) do
+        _similar(ws.backend, psi, eltype(psi), n_pts...)
+    end
     for c in 1:D
         idx = _component_slice(N, n_pts, c)
         psi_c = view(psi, idx...)
-        @. psi_c *= cis(real(phase_k))
+        copyto!(psi_old, psi_c)
+        for _ in 1:iters
+            # work = φ (ψ_old + ψ_current)/2, then projected to C.
+            @. work = im * real(phase_k) * (psi_old + psi_c) / 2
+            plans.forward * work
+            @. work = ifelse(ksq <= kc2, work, zero(eltype(work)))
+            plans.inverse * work
+            @. psi_c = psi_old + work
+        end
     end
     nothing
 end
@@ -514,6 +643,18 @@ function _energy_damping_buffers(
     ws::Workspace, n_pts::NTuple{N, Int}, k_cut::Float64=Inf
 ) where {N}
     psi = ws.state.psi
+    # Both sides of this merge removed k_cut from the key independently. What it
+    # cost here: the cutoff TRACKS the temperature, so keying on its value allocated a
+    # fresh buffer set every step and retained the old — 2.0 MB per step at 44^3 over
+    # ~17000 steps, the 36.6 GB that killed three cluster runs with exit 137. The
+    # control loop was the suspect and measured 1.3 GB of it
+    # (scripts/kz/mu_lda_allocation.jl); being refuted is what sent the search here.
+    #
+    # main's refill is taken over the one written on this branch: it rebuilds kinv
+    # unconditionally instead of guarding on a cached last-cutoff, and it floors with
+    # floatmin rather than eps(kc2). The guarded version had a real bug — k_cut = Inf is
+    # the default, eps(Inf) is NaN, and the whole buffer went NaN whenever the cutoff was
+    # unrestricted. One broadcast per call beside the step's FFTs is not worth a cache.
     RT = real(eltype(psi))
     key = (typeof(psi), n_pts)
     divj = scratch_get!(:ed_divj, key) do

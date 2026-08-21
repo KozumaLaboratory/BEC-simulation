@@ -32,8 +32,8 @@ measurements, not tests).
 | 1 | Is `bce2068f` in the ancestor gate? | **Yes**, as `eu-config-field-sign`, and the gate now **executes** (`cli.jl campaign-gate`) instead of being prose |
 | 2 | How many stored runs does the new row disqualify? | **0 marginally.** All 200 gateable runs were already disqualified by older refs; 3 more have no producing commit at all |
 | 3 | Does the field sign move the load-bearing observables? | **Yes, by ×2.2 to ×5.0.** Peak P_{−5,−4} 0.244 → 0.530; peak \|L_z\| 0.020 → 0.101. Nothing depending on either is quotable without re-derivation. §3 |
-| 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is not re-derivable as posed. §3.4 |
-| 7 | What replaces `\|Ω\|/ω_⊥ = 0.468 ± 0.003`? | **`\|Ω*\|/ω_⊥ = 0.68 ± 0.04`** at the anti-aligned preparation, +24.9 % over Ω=0. Two digits, not three. §9.1 |
+| 3b | Does the *rotation enhancement* survive the corrected field sign? | **No.** +15.8 % pre-fix vs **−0.45 %** post-fix, with the Ω knob proved live at both. `\|Ω\|/ω_⊥ = 0.468 ± 0.003` is **superseded** — not re-derivable as posed. §3.4 |
+| 7 | What replaces the **superseded** `\|Ω\|/ω_⊥ = 0.468 ± 0.003`? | **`\|Ω*\|/ω_⊥ = 0.68 ± 0.04`** at the anti-aligned preparation, +24.9 % over Ω=0. Two digits, not three. §9.1 |
 | 8 | Is the enhancement chirality-matched, as the sheet says? | **No.** The response is **even in Ω** to ≤ 0.124 %; Ω=0 is the minimum and both senses enhance equally. §9.2 |
 | 9 | Then what is the mechanism? | **Centrifugal, not Coriolis.** A *static* trap weakened to ω_eff = √(ω_⊥²−Ω²) reproduces the whole effect to **0.06 %** across the range. **Rotation is not needed** — weaken the radial trap to **0.71 ω_⊥**. §9.3, §10.1 |
 | 10 | Is it density, or the radial confinement? | **Radial.** A density-matched weakening along **z** instead lands *below* the baseline (−36 % of the gain). Same ω̄, opposite sign. §10.4 |
@@ -42,7 +42,8 @@ measurements, not tests).
 | 15 | Was the observable right? | **Not at 10.4 nT.** The peak must be taken *inside the hold*; over the whole trajectory it read the pre-hold transient and 7 of 10 arms were blind. Re-extracted: **0.00 % change at 1.3 / 2.6 / 5.2 nT**, so §9–§11 stand. §12.1 |
 | 16 | Does it survive LHY? | **Yes.** `full_bdg` moves the baseline +0.07 % and the optimum +2.18 %; the enhancement goes +24.9 % → **+27.5 %**. §12.4 |
 | 18 | The field-rotation branch (`eu151_klaus_phi_phys`) | **Two code defects, no physics.** Its GPU path was dead (`spin_density_vector` allocated host arrays → scalar-indexing error); and it reported **`conv = true` having never been asked**, because the rotating-basis GS returns no convergence flag and the writer defaulted it to `true` — so every such run satisfied CAMPAIGN guard 7 by construction. Both fixed and gated. §14 |
-| 17 | Does the static substitution hold at long time? | **Only on the peak.** At 145 ms static and rotating differ by 3.2 % at the peak (vs 0.06 % short) but by **2.25× at the endpoint** — rotation gives a transient, the static trap a *sustained* transfer. §13 |
+| 17 | Does the static substitution hold at long time? | **Yes on the peak; the endpoint is a different question.** At 64³, 145 ms: peak **static 0.49081 > rotating 0.40102 > baseline 0.37973** (+29.3 % over no-intervention). At the endpoint the *rotating* arm is the persistent one (0.40013, 2.23× static) — the opposite of what §13 said. §13's numbers are **RETRACTED** (§15): they were 32³, which inverts both orderings. §17 |
+| 19 | Is the observable still seed-deterministic at 145 ms? | **The peak is; the endpoint is not.** Two seeds at 64³ leave the static peak identical to five decimals and move its **endpoint by 34.2 %** — which swallows the 18.8 % static-vs-baseline endpoint gap, so that one row stays open. §17.1 |
 | 13 | 5.2 nT, resolved at 20 points + 64³ | **REFUTED 2026-08-21 — the ordering inverts with hold duration; see §11.5.** As reported: **Two branches**, global max at ω_eff ≈ 0.55 (+17.0 %), secondary at ≈ 0.77, dip at ≈ 0.65 that **survives 64³** with 93 % of its depth. No single optimum quoted (criterion D1). The old `[0.5, 0.6]` maps to ω_eff ∈ [0.80, 0.87] — a declining shoulder below both maxima, so it is **refuted**, not merely unresolved. §11 |
 | 12 | How much of §9 is seed noise? | **None.** 5 seeds agree to 5 decimals, and the seed was *proved live* (state overlap 0.9999997, growing to 1.9e−5). The observable is deterministic here; grid/dt remain the real uncertainty (G3: 2.5 %). §10.3 |
 | 4 | Align the rotation-assisted EdH quench series to m=−F? | **No — and stop saying it in `m`.** The measured criterion is *aligned vs anti-aligned with B*. the EdH quench needs the **anti-aligned (Zeeman-highest)** state; under the project's +B_z that is m=+F. §4 |
@@ -774,7 +775,7 @@ its depth. So the two-branch structure is physical at this resolution, and what
 
 | | criterion | outcome |
 |---|---|---|
-| D1 | two maxima separated by a dip > 1 % ⇒ report two branches, quote no single optimum | dip is **4.70 %** at 64³ ⇒ **TWO BRANCHES**, no single optimum quoted |
+| D1 | two maxima separated by a dip > 1 % ⇒ report two branches, quote no single optimum | dip is **4.70 %** at 64³ ⇒ **TWO BRANCHES**, no single optimum quoted — **REFUTED §11.5**: the dip is a truncation and D1 fired on it because D1 never looked at the argmax |
 | D2 | vertex only from a ≥5-pt fit with negative curvature | **not applicable** — D1 fired first |
 | D3 | digits from the fit | not applicable |
 | D4 | structure must survive 64³ | **survives**, 93 % of depth retained |
@@ -898,6 +899,11 @@ fields or densities, which were not re-run.
 
 ## 13. Long time (145 ms): the substitution is a short-time statement
 
+> **RETRACTED 2026-08-20 — every ordering below flips sign at 64³. See §15.**
+> The section is kept because the 32³ numbers are real and the retraction is
+> about what they support, not about whether they were measured. Do not quote
+> the endpoint comparison or the "sustained vs transient" reading.
+
 `runs/klaus_quench_long_time/` was **missed by the corpus retarget** — it was
 still `m_minus_F` at B_z > 0, i.e. aligned, until this branch. Retargeted (9
 configs, seed-agreement gate green), then three arms at hold = 100 ω_ref⁻¹
@@ -919,20 +925,26 @@ leans on it.
 
 **On the endpoint, they are qualitatively different, and that is not marginal.**
 The rotating arm peaks and then collapses back to 0.21093 — *below* the baseline's
-0.23127 — while the static arm holds 0.47517, i.e. **2.25×** the rotating one.
-Rotation produces a transient; the weakened static trap produces a *sustained*
-transfer.
+0.23127 — while the static arm holds 0.47517, i.e. ~~**2.25×**~~ the rotating one.
+Rotation produces ~~a transient~~; the weakened static trap produces a
+~~sustained transfer~~.
+<!-- REFUTED 2026-08-20 (§15, claim `edh-longtime-static-sustains`): at 64³ the
+     ratio is 0.68× and the arms swap roles. No replacement ordering exists. -->
+
+> **REFUTED — §15.** At 64³ this ordering inverts: static ÷ rotating at the end is
+> **0.68×**, and it is the *static* arm that decays while the rotating one is
+> still climbing. Neither resolution establishes the long-time ordering.
 
 So the §9.3 substitution ("rotation is fully replaceable by a static weakened
 trap") is a **short-time statement**. At 145 ms the two agree on how high the
 cascade climbs and disagree completely on whether it stays there — and the static
 prescription is the better one on the observable an experiment would actually
-integrate.
+integrate. *(That last clause is **refuted**; see §15.)*
 
 The sheet's long-time rows (`P_exc(end) = 0.958 at 145 ms`) are not directly
 comparable — different cell (`keep_rot`, Ω = −0.5, aligned corpus) — and are not
-re-derived here. What is established is the *ordering*, which is the load-bearing
-part: static > rotating > baseline on sustained transfer.
+re-derived here. The *ordering* was claimed here as the load-bearing part —
+~~static > rotating > baseline on sustained transfer~~ — and is **REFUTED** by §15.
 
 ---
 
@@ -1062,6 +1074,285 @@ disagreement.
 **Generalises:** when an observable is *maximum over the trajectory*, the argmax
 index is part of the measurement. An argmax at the boundary says the run ended too
 early, and comparing two such numbers compares two truncations.
+---
+
+## 15. RETRACTION — 32³ is not converged for the long-time branch
+
+§13 was published in PR #410 on the strength of three 32³ arms. The two arms its
+conclusion rests on were then re-run at 64³, and **both orderings reverse**.
+
+| | 32³ | 64³ |
+|---|---:|---:|
+| **hold-peak** static (ω_eff = 0.714) | 0.50790 | 0.49081 |
+| **hold-peak** rotating (Ω = −0.70) | 0.52475 | 0.40358 |
+| static vs rotating | **−3.2 %** | **+21.6 %** |
+| **endpoint** static | 0.47517 | 0.27262 |
+| **endpoint** rotating | 0.21093 | 0.40358 |
+| static ÷ rotating at the end (the **refuted** 32³ figure vs 64³) | **2.25×** | **0.68×** |
+
+Per-arm, 32³ → 64³: static peak −3.4 %, rotating peak −23.1 %, static endpoint
+**−42.6 %**, rotating endpoint **+91.3 %**.
+
+### 15.1 What is withdrawn
+
+- **REFUTED — "Rotation gives a transient, the static trap a sustained transfer."**
+  At 64³ it is the *static* arm that decays (0.49081 → 0.27262) and the
+  *rotating* one that is still climbing at 145 ms (peak = end = 0.40358).
+- **"The static prescription is the better one on the observable an experiment
+  would integrate."** Withdrawn — at 64³ the rotating arm ends higher.
+- **"Static and rotating differ by 3.21 %, suggestive of divergence."**
+  Withdrawn. The correct reading is not a 3 % divergence but that **32³ does not
+  resolve this branch at all.**
+
+### 15.2 What replaces it
+
+Only this, and it is deliberately thin:
+
+> **At 145 ms, 32³ is not resolution-converged. Nothing about the long-time
+> ordering of static vs rotating is established at either resolution**, because
+> 64³ has n = 1 per point and its baseline arm was **not** run — so 64³ shows the
+> 32³ answer is wrong without establishing the right one.
+
+**Superseded in part on 2026-08-20** — both missing measurements were run. The
+baseline arm and a second seed at 64³ **establish the PEAK ordering** (static >
+rotating > baseline) and leave the **endpoint** ordering still unresolved between
+static and baseline. §17.
+
+### 15.3 The part that generalises: resolution adequacy is duration-dependent
+
+The short protocol and the long one behave completely differently under the same
+refinement:
+
+| | shift under 32³ → 64³ |
+|---|---|
+| short (14.5 ω⁻¹), §11.2 | a **uniform** +2.3 %; the 5.2 nT dip kept **93 %** of its depth, so the *shape* survived |
+| long (100 ω⁻¹), here | **−3.4 / −23.1 / −42.6 / +91.3 %** — not uniform, and orderings invert |
+
+**So §9–§12 are unaffected** — their conclusions rest on shapes and orderings at
+14.5 ω⁻¹, where the refinement was measured to be a uniform offset. It is only the
+long-time branch that 32³ cannot carry. Grid adequacy is not a property of the
+grid alone; it is a property of the grid *and the integration time*, and a
+convergence check done at one duration does not transfer to another.
+
+### 15.4 Why this was caught
+
+Because §13 said its own key number sat inside the resolution uncertainty
+(3.21 % against 2.5 %) and named the missing measurement instead of rounding it
+away. The 64³ run was then the obvious next thing rather than something nobody
+thought to do. **A stated uncertainty that overlaps the claim is a work item, and
+writing it down is what makes it one.**
+
+---
+
+## 16. Correcting §14.2, and why ITP cannot prepare the anti-aligned state
+
+§14.2 said the rotating-basis `E = NaN` and `conv = true` came from
+`run_registry.jl` reading absent keys through defaults. **The `conv = true` half
+of that is wrong**, and finding out why produced the sharpest result in this
+document.
+
+### 16.1 What §14.2 got wrong
+
+The `E=NaN conv=true` I quoted was the runner's **stdout**, not the file. Reading
+the file directly: `keys: psi, dynamics` — **`energy` and `converged` are ABSENT
+entirely.** My probe used `get(fh, "energy", NaN)` and I read its own default back
+as a diverged run.
+
+The cause is a **third writer**. `save_rotating_basis_result!`
+(`src/workflow/io/save_rotating_result.jl`) owns `result.jld2` for both
+`kind: rotating_basis` *and* `kind: spinor`-with-dynamics (`runner.jl:294`), and
+it wrote neither key. So `run_registry.jl`'s defaults — the thing §14.2 blamed —
+were never reached on this path at all.
+
+**Corrected statement.** The `converged = true` default was real and did print,
+but no rotating-basis run ever *stored* it, so the guard-7 claim in §14.2
+overstated: a guard reading the file finds nothing, which is `unknown`, not a
+pass. The #410 fix to the default remains right; it was simply not the fix for
+*this* path. Both writers now behave: absent stays absent, present gets written.
+
+### 16.2 With the energy finally reported, the config was producing nothing
+
+`ground_state.jl` now computes `total_energy(ws)` and a convergence flag from the
+μ movement against `tol` — a key the schema accepted and **nobody read**, so
+`tol: 1.0e-9` had been inert. Four arms, seed × ITP length:
+
+| `init_m_idx` | ITP | E | conv | ‖ψ‖² | non-zero entries |
+|---|---:|---:|---|---:|---|
+| 1 (aligned) | 100 | −160177.62 | false | 4.096 | 212992/212992 |
+| 1 (aligned) | 1500 | −160177.72 | **true** | 4.096 | 212992/212992 |
+| **13 (anti-aligned)** | 100 | **0.0** | false | **0.0** | **0/212992** |
+| **13 (anti-aligned)** | 1500 | **0.0** | false | **0.0** | **0/212992** |
+
+**ψ is identically zero** — all 212992 entries — and the run completed and
+returned it as a result.
+
+### 16.3 §4.2's prescription is unrealisable, and structurally so
+
+ITP applies `exp(−H dt)` with the Zeeman shift subtracting `min(E_m)`, so the
+lowest m gets factor 1 and the highest gets `exp(−(E_max−E_min) dt)`. Here that
+is `exp(−12·p·dt) = exp(−1602)`, which **underflows Float64 in one step**. The
+`n_before > 0` guard then skipped renormalisation and the loop ran to completion
+on zeros.
+
+> **Imaginary time is a projector onto the LOWEST state. The anti-aligned
+> preparation is the FURTHEST state from it. §4.2's `init_m_idx: 13` is not a
+> configuration choice that was wrong — it is not expressible by ITP at all.**
+
+The klaus_quench (spinor) corpus is unaffected and the reason is quantitative:
+there `p ≈ 148`, so the per-step factor is `exp(−8.9)`, renormalised every step
+and never underflowing. This only bites at the fast-Larmor `p = 26700`.
+
+### 16.4 What changed
+
+- `init_m_idx` reverted to `1` in `runs/eu151_klaus_phi_phys/config.yaml`, with
+  the reason at the line. The config is **knowingly aligned**, i.e. on the wrong
+  side for the EdH quench, and says so rather than claiming an anti-alignment it
+  cannot have.
+- **The underflow is now a hard error**, naming the mechanism and the remedy. A
+  zero wavefunction is not a result and must not complete.
+- The real repair is a **pipeline** change: relax the stretched state as the
+  ground state of the *opposite* field sign, then reverse the field for the
+  dynamics — which is also what an experiment does (pump, then reverse). Tracked
+  as `edh-phi-phys-anti-aligned-needs-field-reversal`; **not implemented here.**
+
+### 16.5 The pattern, third time in this document
+
+§12.1 (peak read outside the hold), §15 (32³ read as converged), and this one all
+have the same shape: **a quantity that was never measured being read through a
+default.** `NaN` announced itself; `true` and `0.0` did not. The energy had been
+missing for the entire life of this path and nothing said so — it took adding the
+report to discover the config produced nothing at all.
+
+---
+
+## 17. The long-time branch at 64³, with the two pieces §15 said were missing
+
+§15 refused to state a replacement ordering for two named reasons: no 64³
+baseline, and n = 1 per point. Both are now run — the baseline, plus a second
+seed on each of the two arms the ordering rests on.
+
+| arm (64³, 100 ω_ref⁻¹) | hold-peak P_adj | endpoint P_adj |
+|---|---:|---:|
+| baseline (ω_eff = 1.000, Ω = 0) | 0.37973 | 0.15112 |
+| **static** (ω_eff = 0.714) | **0.49081** | 0.17952 |
+| **rotating** (Ω = −0.70) | 0.40102 | **0.40013** |
+
+### 17.1 The seed is NOT inert at long time — §10.3 was a short-time statement
+
+Two seeds at 64³, default vs 101:
+
+| | peak | endpoint |
+|---|---:|---:|
+| static | **0.000 %** | **34.2 %** |
+| rotating | 0.63 % | 0.85 % |
+
+§10.3 measured five seeds agreeing to five decimals and proved the knob live, at
+**14.5 ω⁻¹**. It also measured the perturbation *growing* two orders over that
+run, and this is where that goes: after 100 ω⁻¹ the static arm's **endpoint moves
+34 % between two seeds** while its **peak is still identical to five decimals.**
+
+So "the observable is deterministic" was true of the peak and true of that
+duration, and is false of the endpoint here. The same mistake shape as §15 —
+a property measured at one duration, carried to another — caught this time
+because §15 had just made it the thing to check.
+
+### 17.2 What is now established, and what still is not
+
+**Established — the PEAK ordering, at 64³:**
+
+> **static (0.49081) > rotating (0.40102) > baseline (0.37973)**, i.e. the static
+> weakened trap beats no-intervention by **+29.3 %** and beats rotation by
+> **+22.4 %**. The static peak is seed-independent to five decimals, and the
+> gaps are 10–100× the seed scatter on either arm.
+
+**NOT established — the ENDPOINT ordering.** Rotating (0.40013) is 2.23× static
+(0.17952), which is far outside the 34 % seed scatter and is safe. But
+static-vs-baseline at the endpoint is 0.17952 against 0.15112 — **+18.8 %, inside
+the 34.2 % seed scatter on the static arm.** Two seeds cannot separate them. That
+row needs an ensemble, not another resolution.
+
+**§13's original claim stays refuted** on its own terms: it asserted the static
+arm *sustains* and the rotating one decays, and at 64³ the reverse holds — the
+rotating arm is still climbing at 145 ms (peak ≈ endpoint) while the static one
+falls from 0.49081 to 0.17952.
+
+### 17.3 The reading
+
+The static weakened trap produces the **larger cascade**; rotation produces a
+**more persistent** one. Those are different questions and the 32³ data answered
+neither — it inverted both. Which matters depends on what an experiment
+integrates, and this document is not in a position to choose for it.
+
+---
+
+## 18. The anti-aligned preparation, implemented
+
+§16.3 said the repair was a pipeline change and not a config key, and left it
+unimplemented. It is now `prepare_anti_aligned: true` on a `kind:
+rotating_basis` ground_state.
+
+### 18.1 What it does
+
+Relax at **−p**, hand the dynamics **+p**. The Zeeman-lowest state of −B is the
+Zeeman-highest state of +B, so the result is the anti-aligned stretched state —
+and it is a genuine ground state of the full interacting problem in the field it
+was relaxed in, not an excited state anyone had to construct. It is also what an
+experiment does.
+
+**Only `p` reverses.** `q ∝ |B|²` is **even** in the field, so reversing B leaves
+it alone; flipping it too would relax in a different quadratic Zeeman than the
+dynamics runs in — a different Hamiltonian, not a reversed field. The tilde basis
+`U_B(θ,φ)` is likewise unchanged: it is built from the field **axis**, and
+reversing the field along that axis is exactly what negating `p` does.
+
+Three places had to agree, and two of them are the kind that would have been
+silently wrong:
+
+| | why it matters |
+|---|---|
+| the ITP Zeeman uses `p_itp` | the actual reversal |
+| the **handoff** keeps `p_z` | if it carried `p_itp` the quench would run in the reversed field and be the aligned case under the other name — invisible in the ground state, wrong in everything after it |
+| the **default seed** follows `p_itp` | reading the requested `p` there hands the anti-aligned path the one seed that field annihilates. The underflow, re-introduced by the default |
+
+### 18.2 It asserts its own outcome
+
+The step throws unless `sign(⟨F_z⟩) = −sign(p)` at the requested field. That is
+not belt-and-braces: the defect this replaces was a run that **completed** and
+returned ψ ≡ 0, and a preparation that quietly returns the *aligned* state is the
+same class of failure — it would invert every conclusion drawn from the run while
+looking entirely healthy.
+
+`⟨F_z⟩` along B̂ is now recorded on every rotating-basis run
+(`rotating_basis_fz_along_b`), alongside `rotating_basis_prepare_anti_aligned`
+and `rotating_basis_p_itp`. **Which end of the Zeeman ladder a run started from
+is the controlling variable of this entire document** (§3, §4) and nothing was
+writing it down.
+
+### 18.3 The gate, and the canary that was too weak
+
+`test/rotating_basis/test_anti_aligned_preparation.jl` (full tier) pins all five
+points above, each against an **aligned control arm in the same field** and at
+both signs of `p` — one arm cannot distinguish "anti-aligned" from "the sign
+convention I assumed while reading it".
+
+Its RED canary needed strengthening after its first run **passed when it should
+have failed**. The original used `p = 400`, giving `exp(−2Fp·dt) = exp(−8)` per
+step — which the loop **renormalises away**, so the arm completes happily. Only a
+**single-step** underflow is the inexpressible case: Float64 dies below
+`exp(−708)`, i.e. `p > 35400` at F=1, `dt=0.01`. Production clears it by 2×
+(`exp(−1602)`).
+
+That distinction is the physics, not a test artefact: **a strong field is
+survivable and a very strong one is not**, and only the second cannot be asked
+for.
+
+### 18.4 What is not claimed
+
+Gated at F=1 on 8³. The mechanism is the sign of one Zeeman coefficient and does
+not depend on F — but **no production-scale arm has been run through this path
+yet**, so the ¹⁵¹Eu numbers in §3 and §4 are still the aligned-preparation ones.
+`runs/eu151_klaus_phi_phys/config.yaml` now carries the key; it has not been
+re-run.
 
 <!-- REDERIVE -->
 
