@@ -153,6 +153,8 @@ const _SCRIPTS_ALLOWLIST = Set([
     # more three-body loss, so it scans the 0-D model over a stretched time axis and
     # reads the peak equilibrium N_0 off the same LDA constraint.
     "kz/ramp_slowdown_design.jl",
+    # Whether the 0-D model is still quasi-static at the ramps that scan recommends.
+    "kz/ramp_quasistatic_validity.jl",
     "kz/fixed_point_condensation.jl",
     "kz/eu_cost.jl",
     "kz/eu_equilibrium_N0.jl",
