@@ -70,9 +70,17 @@ const SPGPE_ATOM = Rb87
 The euv3 two-component evaporation, plus `ω̄(t)` reconstructed on the same grid
 `spgpe_reservoir` uses.
 """
-function zero_d_trajectory(; N0_load=3.5e6, T0_load=50e-6, K3=1.61e-40, save_every=2)
+function zero_d_trajectory(; N0_load=3.5e6, T0_load=50e-6, K3=1.61e-40, save_every=2,
+    ramp_scale=1.0)
     trap = euv3_evap_trap()
-    ramp = euv3_evaporation_ramp()
+    # ramp_scale stretches the time axis, holding the beam powers. The design scan puts
+    # the peak equilibrium N_0 at 0.3-0.5x — 6.01e4 against 4.41e4 at 1x — and the
+    # quasi-static check clears both (30.6 and 74.2 elastic collisions per e-folding of
+    # the trap depth, against 0.02-0.05 below 0.3x where the model is not valid). This is
+    # how the c-field is asked whether it reaches the number the constraint names.
+    ramp = let r0 = euv3_evaporation_ramp()
+        ramp_scale == 1.0 ? r0 : FortRamp(r0.times .* ramp_scale, r0.powers_W)
+    end
     p = EvapParams(; a_s=Eu151.a_s, tau_bg=15.0, K3=K3)
     r = run_evaporation_bec(trap, ramp, p; N0=N0_load, T0=T0_load, save_every)
     g = evap_trap_grid(trap, ramp)

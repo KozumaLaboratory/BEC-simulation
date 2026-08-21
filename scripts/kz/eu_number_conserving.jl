@@ -70,8 +70,9 @@ function run_nc(; n::Int=48, box::Float64=16.0, K3::Float64=1.61e-40,
     eps_cut_nT::Float64=3.0, seed::Int=9001, dt::Float64=0.02,
     t_frac::Float64=1.0, t_start_s::Float64=1.85, backend=CPUBackend(),
     number_damping::Bool=true, energy_damping::Bool=true,
-    gamma_mult::Float64=1.0, cayley_iters::Int=2, slowdown::Float64=1.0)
-    traj = zero_d_trajectory(; K3)
+    gamma_mult::Float64=1.0, cayley_iters::Int=2, slowdown::Float64=1.0,
+    ramp_scale::Float64=1.0)
+    traj = zero_d_trajectory(; K3, ramp_scale)
     r = traj.r
     # Internal units: the 0-D model is in SI, the field is in units of omega_ref.
     ω_ref = traj.omega_of(r.t[1])
@@ -247,6 +248,28 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if mode == "smoke"
         out = run_nc(; n=44, box=10.0, t_frac=0.05)
         @printf("\nunsatisfiable: %d of %d\n", out.unsat, out.n_cb)
+
+    elseif mode == "halframp"
+        # Does the c-field reach the number the halved ramp allows?
+        #
+        # The design scan says the peak equilibrium N_0 is 6.01e4 at 0.5x against 4.41e4
+        # at 1x, and the quasi-static check clears 0.5x at 74.2 collisions per e-folding.
+        # That is a THERMODYNAMIC target. On the 1x ramp the field reaches 0.071 of a
+        # constraint 3498, so a better target is not by itself a better outcome.
+        #
+        # Handoff scaled with the ramp, so the field starts at the same FRACTION of the
+        # evaporation rather than at the same wall-clock second — 1.85/2.4 of the way in.
+        rs = parse(Float64, get(ENV, "SBEC_RAMP_SCALE", "0.5"))
+        @printf("\n########## ramp_scale %.2fx ##########\n", rs)
+        o = run_nc(; n=44, box=10.0, dt=0.02, t_frac=1.0,
+            t_start_s=(1.85 / 2.4) * 2.4 * rs, ramp_scale=rs)
+        h = isempty(o.hist) ? nothing : o.hist[end]
+        if h !== nothing
+            g = mu_from_total_lda(h.N_tot; T=h.T, c0=0.02, eps_cut=1.5 + 3 * h.T)
+            @printf("  END  N_C=%.4g  field N0=%.4g  eq N0=%.4g  ratio=%.5f\n",
+                h.N_C, h.N0, g.N0, h.N0 / max(g.N0, 1))
+        end
+        @printf("  unsatisfiable: %d of %d\n", o.unsat, o.n_cb)
 
     elseif mode == "slowramp"
         # Does giving the same (N, T) path more time let the field keep up?
