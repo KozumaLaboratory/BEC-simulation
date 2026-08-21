@@ -14,7 +14,9 @@
 #$ -o logs/tsubame/
 set -euo pipefail
 
-ROOT="${FP_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/iss408}"
+# The long-lived klaus2022 campaign worktree, not the scratch one #407 was run
+# from — that one was removed after the campaign.
+ROOT="${FP_ROOT:-/gs/fs/tga-kozuma-kouhi/uk07267/klaus2022}"
 export SPINORBEC_TSUBAME_JULIA="${SPINORBEC_TSUBAME_JULIA:-/gs/fs/tga-kozuma-kouhi/shared/.juliaup/bin/julia}"
 JULIA="$SPINORBEC_TSUBAME_JULIA"
 export JULIA_DEPOT_PATH="${T4_TMPDIR:-/tmp}/.julia:/gs/fs/tga-kozuma-kouhi/shared/.julia"
