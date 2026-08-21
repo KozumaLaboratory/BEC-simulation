@@ -112,8 +112,13 @@ const _SCRIPTS_ALLOWLIST = Set([
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
     # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/_cells.jl",
     "eu_spectrum/branch_spectrum.jl",
     "eu_spectrum/submit_spectrum.sh",
+    # #397 (which consumer owns the preconditioner default) + #399 (does λ_min
+    # converge on the polarised branch) — same knob, same cells, one job.
+    "eu_spectrum/precond_ab.jl",
+    "eu_spectrum/submit_precond_ab.sh",
     # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
     "eu_isotope_q/q_boundary.jl",
     "eu_isotope_q/magnon_gap.jl",
@@ -182,6 +187,17 @@ const _SCRIPTS_ALLOWLIST = Set([
     # (700 ms - 1.1 s, Fig. 4c), one seed per job. A cluster submit wrapper —
     # category 3, same as the other `submit_*.sh` above.
     "klaus2022/submit_stripes.sh",
+    # #407: the FFTW thread × grid RSS pathology (36.9 GB at 48³ against 1.15 GB
+    # at 128³, same thread count). The workaround shipped with #405; this is the
+    # mechanism, and it is a repo script rather than a one-off because the same
+    # trap is waiting for every other campaign that sets a thread count.
+    "klaus2022/fftw_thread_probe.jl",
+    "klaus2022/submit_fftw_probe.sh",
+    # #406: the magnetostricted-AR sensitivity table (1.16 against a published
+    # 1.03). A table before a scan, per CLAUDE.md gate 2 — most cells are ~zero
+    # and knowing WHICH is the result.
+    "klaus2022/ar_sensitivity.jl",
+    "klaus2022/submit_ar_sensitivity.sh",
     # ── validation probes still cited as live instruments ──
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",

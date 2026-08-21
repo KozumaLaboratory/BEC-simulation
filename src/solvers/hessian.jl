@@ -317,37 +317,56 @@ that refresh the reported values lagged the returned block by one LOBPCG step.
 
 Keywords: `nev`, `block` (≥ nev+2), `max_iter`, `tol` (residual stop),
 `α_pre` (kinetic shift, defaults to `max(|μ|, 1e-3)`), `precond`
-(`:kinetic` default, or `:combined` for `P_V^½ P_K P_V^½` — the real-space
-stiffness `V_trap + c₀n` that the kinetic-only inverse leaves alone), `α_v`
-(the `P_V` regulariser, same default), `ε`+`order` (HvP), `extra_nullspace`,
-`rng`. A preconditioner changes the iteration and not the spectrum, so the two
-`precond` arms must agree on λ — gated.
+(**`:combined` default** — `P_V^½ P_K P_V^½`, which adds the real-space stiffness
+`V_trap + c₀n` that the kinetic-only inverse leaves alone — or `:kinetic` for the
+Fourier-only metric), `α_v` (the `P_V` regulariser, same default), `ε`+`order`
+(HvP), `extra_nullspace`, `rng`. A preconditioner changes the iteration and not
+the spectrum, so the two `precond` arms must agree on λ — gated by
+`test/oracles/test_bdg_low_modes_lobpcg.jl`.
 
-**Use `:combined` on interaction-dominated states; the default is not it because
-one measurement is not a mandate.** Measured on ¹⁵¹Eu 32³ × 13 at B = 68.25 µG
-(H100, `nev=4`, same seed, same wall clock): the lowest Ritz value came back
-1.85e-3 with `:kinetic` and 4.87e-7 with `:combined` at `max_iter=200`, and
-7.62e-8 at 400. Ritz values converge from ABOVE, so those are upper bounds on
-λ_min and the improvement is 3800× at equal cost — the difference between
-"λ_min ≤ 2e-3" and "λ_min ≤ 8e-8". The kinetic arm does not descend further with
-more iterations; it is preconditioning the wrong stiffness. The default stays
-`:kinetic` because changing it moves every gate-2 stability verdict, which
-deserves its own measurement across those consumers rather than an inference
-from one state.
+**THE DEFAULT IS `:combined` SINCE 2026-08-21 (#397), and the reason it was not
+before is worth reading, because it was a wrong premise rather than a wrong
+measurement.** The previous docstring said the default stayed `:kinetic`
+"because changing it moves every gate-2 stability verdict". It cannot: this
+function has exactly one consumer under `src/` — `trapped_bdg_frequencies`,
+which uses its eigenVECTORS as a reduction subspace and never reads the sign of
+λ — and `check(::StabilitySpec, ws, ψ)` runs `trapped_bdg_lowest_eigenvalue`, a
+bare Lanczos with no `precond` keyword at all. Verified by execution, not by
+grep: starving the Lanczos to `niter=1` moves the verdict (`pass` →
+`indeterminate`) while the block's own knob cannot.
 
-VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. The
-preconditioner's convergence ADVANTAGE is NOT yet realised at Eu production
-scale — there the stiffness is interaction-dominated (`c₀·n~2343`), which the
-kinetic-only `(½k²+α)⁻¹` does not capture (production run: `ρ~2` at max_iter=40,
-worse than Lanczos). A combined kinetic+potential preconditioner and L_z
-symmetry-sector decomposition (one anomalous mode per `m` ⇒ recovered relative
-gap) are the documented next step; do NOT trust a production λ_min from this
-until it reports `converged=true`.
+The three things #397 asked to measure before moving the default, measured
+(¹⁵¹Eu 32³ × 13, six stored eu335 cells, H100, `nev=4`, `block=10`, same seed,
+`scripts/eu_spectrum/precond_ab.jl`):
+
+| B [µG] | `:kinetic` @ 2000 | `:combined` @ 2000 |
+|---:|---|---|
+| 5 | not converged, 760 s | not converged, 763 s |
+| 20 | not converged, 810 s | **converged in 1479 it, 584 s** |
+| 25 | not converged, 812 s | **converged in 1241 it, 492 s** |
+| 60 | converged in 1508 it, 605 s | **converged in 525 it, 202 s** |
+| 100 | converged in 647 it, 271 s | **converged in 264 it, 103 s** |
+| 68.25 (flower) | converged in 1288 it, 518 s | **converged in 401 it, 167 s** |
+
+`:combined` certifies 5 cells to `:kinetic`'s 3, is 1.4–3.1× faster where both
+certify, and is never slower. Where both converge they agree — to 15 digits at
+100 µG, 7 at 68.25, 5 at 60 — which is the equivalence claim holding at
+production scale rather than only on the CI fixture. And on the small GAPPED
+fixture, where the kinetic metric is already right and the extra 2 FFTs could
+have cost, it still wins: 16 iterations / 0.041 s against 30 / 0.089 s. That was
+the one stated reason to expect a loss.
+
+VALIDITY REGIME: correctness gated (≡ Lanczos λ_min) on gapped states. **What
+binds a production λ_min is now the OPERATOR, not the solver**: with widths down
+to ~1e-14 the Hessian's own finite-difference construction (`ε`, default 1e-5)
+is the larger error, so a SIGN read at |λ| ≲ 1e-7 needs an `ε` control before it
+means anything. `converged=true` says the iteration finished, not that the
+number is accurate to its width.
 """
 function trapped_bdg_low_modes(
     ws, ψ;
     nev::Int=1, block::Int=8, max_iter::Int=30, tol::Float64=1e-6,
-    α_pre::Union{Nothing, Float64}=nothing, precond::Symbol=:kinetic,
+    α_pre::Union{Nothing, Float64}=nothing, precond::Symbol=:combined,
     α_v::Union{Nothing, Float64}=nothing, ε::Float64=1e-5, order::Int=2,
     extra_nullspace=nothing, params=nothing, rng=Random.default_rng(),
 )
@@ -378,7 +397,11 @@ function trapped_bdg_low_modes(
     #
     # A preconditioner changes the ITERATION, never the SPECTRUM — so the two
     # arms must return the same λ, and `test_bdg_low_modes_lobpcg.jl` asserts
-    # exactly that. Default is unchanged (`:kinetic`).
+    # exactly that. `:combined` is the DEFAULT since #397 measured it across the
+    # six eu335 cells: 5 certified against 3, 1.4-3.1× faster where both
+    # certify, never slower, and it also wins on the gapped fixture where the
+    # extra 2 FFTs could have cost. `:kinetic` is kept as a knob and as the
+    # other side of the equivalence gate, not as a fallback.
     α_V = α_v === nothing ? max(abs(p.μ), 1e-3) : α_v
     sqrt_pv = precond === :combined ? build_precond_sqrt_pv(ws, ψ, α_V) : nothing
     Tprec(v) = project(

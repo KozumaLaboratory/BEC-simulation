@@ -397,7 +397,11 @@ LHY. Give the dynamics step an `interactions: {N_atoms: …, omega_ref: …}` (t
     # live_monitor defaults ON (every=50). Disable explicitly with
     # `live_monitor: false` for batch / TSUBAME / no-dashboard runs.
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
-    extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live)
+    # Progress + ETA (#408). Deliberately NOT hung off `live_monitor:`, which the
+    # comment two lines up tells batch users to switch off — that is precisely
+    # the job that ran silent for 110 minutes. Env-gated, default on.
+    cb_progress = _build_progress_reporter("dynamics", n_steps, duration)
+    extra_cb = _compose_callbacks(cb_sgpe, cb_pgp, cb_photon, cb_live, cb_progress)
 
     # `spin_step:` picks how the V half-step realizes its spin rotations.
     # Scoped to this step and restored afterwards, so one dynamics phase

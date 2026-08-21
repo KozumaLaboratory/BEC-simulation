@@ -51,32 +51,39 @@ using JLD2: jldopen
 using Printf
 using Random
 
-getf(k, d) = haskey(ENV, k) ? parse(Float64, ENV[k]) : d
-const KAPPA = getf("SP_KAPPA", 1.8)
-const GRID_N = Int(getf("SP_GRID", 32))
-const BOX = getf("SP_BOX", 24.0)
-const PIN = getf("SP_PIN", 0.002)
+# The preset, the stored-cell reader and the workspace a cell was converged in
+# live in ONE place — `precond_ab.jl` (#397/#399) reads the same cells, and two
+# copies of `cell_workspace` differing in `ddi_padding` would give one cell two
+# λ_min with nothing to say which was which.
+include(joinpath(@__DIR__, "_cells.jl"))
+
 const NEV = Int(getf("SP_NEV", 6))
 const BLOCK = Int(getf("SP_BLOCK", NEV + 6))
 const MAXITER = Int(getf("SP_MAXITER", 40))
-# λ_min comes from the bare LANCZOS, not from the block. `trapped_bdg_low_modes`
-# says so in its own VALIDITY REGIME: at Eu production the stiffness is
-# interaction-dominated (c₀n ≈ 2343) and the kinetic-only preconditioner does not
-# capture it. Measured here on the 68.25 µG cell, block LOBPCG at max_iter=25
-# returned λ_min = 1.68 with a Kato–Temple width of 5.7 — an unresolved number,
-# correctly refused by the convergence gate. Lanczos with full reorthogonalisation
-# early-stops on the same certificate and costs ~2 gradient evals per iteration.
+# λ_min comes from the bare LANCZOS here, and that choice is now HISTORICAL
+# rather than forced. When this campaign ran, block LOBPCG at max_iter=25 on the
+# 68.25 µG cell returned λ_min = 1.68 with a Kato–Temple width of 5.7 — an
+# unresolved number, correctly refused by the convergence gate — because the
+# kinetic-only preconditioner does not capture an interaction-dominated
+# stiffness (c₀n ≈ 2343).
+#
+# #397 measured the block again with `:combined` and a real iteration budget:
+# on this very cell it CONVERGES, in 401 iterations / 167 s, to
+# λ_min = 7.621335e-08 ± 3e-10 — and the kinetic arm gets there too (1288
+# iterations, 518 s), agreeing to 7 digits. So the block is no longer the
+# unresolved instrument this comment used to describe. The Lanczos arm is kept
+# because it is what `check(::StabilitySpec)` actually runs, i.e. it is the
+# gate-2 number, and because two independent eigensolvers on one operator is the
+# point.
 const LANCZOS_NITER = Int(getf("SP_LANCZOS_NITER", 300))
 const LANCZOS_ATOL = getf("SP_LANCZOS_ATOL", 1e-6)
-# `:combined` adds the real-space stiffness (V_trap + c₀n) the kinetic-only
-# inverse leaves alone — the documented next step after this campaign measured
-# the wall at width/value ≈ 10 on these very cells.
-const PRECOND = Symbol(get(ENV, "SP_PRECOND", "kinetic"))
+# Follows the function default, which is `:combined` since #397. Overridable to
+# `kinetic` for the other side of the equivalence gate.
+const PRECOND = Symbol(get(ENV, "SP_PRECOND", "combined"))
 const HESS_TOL = getf("SP_HESS_TOL", 1e-6)
 const FD_EPS = getf("SP_FD_EPS", 1e-5)
 const FD_EPS2 = haskey(ENV, "SP_FD_EPS2") && !isempty(ENV["SP_FD_EPS2"]) ?
                 parse(Float64, ENV["SP_FD_EPS2"]) : NaN
-const PADDING = get(ENV, "SP_PADDING", "0") == "1"
 const STAT_TOL = getf("SP_STATIONARY_TOL", 1e-4)
 const FIT_BMIN = getf("SP_FIT_BMIN", 55.0)
 # The fit and the softening claim are about the FLOWER branch, which is the one
@@ -88,60 +95,6 @@ const BSP_REF = getf("SP_BSP_REF", 68.4)
 const BSP_TOL = getf("SP_BSP_TOL", 0.3)
 const OUT = get(ENV, "SP_OUT", "figs/eu_spectrum/branch")
 mkpath(OUT)
-
-# Matching #335: the states were converged with dealiasing off, and a state
-# converged under a different Hamiltonian is not stationary under this one.
-SpinorBEC.DEALIAS_2_3_ENABLED[] = get(ENV, "SP_DEALIAS", "0") == "1"
-
-const HAS_GPU = CUDA.functional()
-const BACKEND = HAS_GPU ? CUDABackend() : CPUBackend()
-const PRESET = eu151_preset(; n_pts=(GRID_N, GRID_N, GRID_N), box=(BOX, BOX, BOX),
-    trap_ratios=(1.0, 1.0, KAPPA))
-const ATOM = PRESET.atom
-
-p_of(B_uG) = Units.bfield_to_p(B_uG * 1e-6, ATOM.g_F, PRESET.omega_ref)
-
-struct BlindSpectrum <: Exception
-    msg::String
-end
-Base.showerror(io::IO, e::BlindSpectrum) = print(io, "BlindSpectrum: ", e.msg)
-
-"""ψ and its recorded (B, ε), with the parameter-epoch check every consumer of a
-stored state owes — same contract as `eu_hysteresis/branch_stability.jl`, because
-the Hessian is even less forgiving than a hold: on a state that is not stationary
-here, μ is not the chemical potential and λ_min is not a stability verdict."""
-function load_cell(path)
-    isfile(path) || error("no such cell: $path")
-    jldopen(path, "r") do f
-        g(k, d) = haskey(f, k) ? f[k] : d
-        for (nm, got, want) in (("c0", g("c0", NaN), PRESET.interactions.c[0]),
-            ("c1", g("c1", NaN), PRESET.interactions.c[1]),
-            ("c_dd", g("c_dd", NaN), PRESET.c_dd))
-            isnan(got) && continue
-            abs(got - want) / max(abs(want), 1e-30) < 1e-8 ||
-                error("cell/preset mismatch on $nm: $got vs $want — $path")
-        end
-        n = g("grid_n_points", nothing)
-        n === nothing || first(n) == GRID_N ||
-            error("cell grid $(first(n)) ≠ $GRID_N — $path")
-        (; psi=Array{ComplexF64}(f["psi"]), B=Float64(g("B_uG", NaN)),
-            pin=Float64(g("pin_bx", g("pin_eps", PIN))),
-            fperp0=Float64(g("fperp", NaN)), E0=Float64(g("E_total", g("E", NaN))))
-    end
-end
-
-"""The workspace the cell was converged in: same trap, same pin, same DDI kernel.
-`imaginary_time` is irrelevant here (nothing is propagated) but the Hamiltonian is
-not."""
-function cell_workspace(psi, B_uG, ε)
-    make_workspace(; grid=PRESET.grid, atom=ATOM,
-        interactions=PRESET.interactions, potential=PRESET.potential,
-        zeeman=static_zeeman(; Bz=p_of(B_uG), Bx=ε, q=0.0),
-        sim_params=SimParams(; dt=0.002, n_steps=1, imaginary_time=true),
-        psi_init=Array{ComplexF64}(psi), enable_ddi=true, c_dd=PRESET.c_dd,
-        secular_ddi=false, backend=BACKEND, ddi_padding=PADDING,
-        ddi_trunc_radius=-1.0)
-end
 
 """Both axes of one cell, over ONE Hessian block (the frequency reduction reuses
 the eigenvectors, so the expensive part is paid once)."""
@@ -256,15 +209,7 @@ end
 
 # --------------------------------------------------------------------- driver
 
-cells = let s = get(ENV, "SP_CELLS", "")
-    v = isempty(s) ? String[] : String.(split(s, r"[,;]"))
-    n = get(ENV, "SP_CELLS_N", "")
-    isempty(n) || length(v) == parse(Int, n) || error("""
-        SP_CELLS parsed $(length(v)) entries but SP_CELLS_N says $n.
-        A list passed through `qsub -v` is cut at the first comma — use `;`.""")
-    v
-end
-isempty(cells) && error("SP_CELLS is empty — nothing to measure")
+cells = parse_cells()
 
 @printf("""
 Branch spectrum: κ=%.2f grid=%d³ box=%.1f  %s

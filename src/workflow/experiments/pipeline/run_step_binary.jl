@@ -154,8 +154,13 @@ end
     dV_bin = prod(grid.dx)
     cb_live = _build_binary_live_callback(get(p, "live_monitor", true),
         live_status_path, dV_bin)
+    # Progress + ETA (#408). Not conditional on `save_psi` and not on
+    # `live_monitor:`, for the same reason liveness is not: a knob about output
+    # must not be able to switch off the thing that tells you the run is alive.
+    cb_progress = _build_progress_reporter(
+        "binary", max(1, round(Int, duration / dt)), duration)
     n_saves = Ref(0)
-    on_save = if (save_psi || cb_live !== nothing)
+    on_save = if (save_psi || cb_live !== nothing || cb_progress !== nothing)
         function _on(s)
             n_saves[] += 1
             if save_psi
@@ -164,6 +169,7 @@ end
                 push!(psi_B_snaps, copy(s.psi_B))
             end
             cb_live === nothing || cb_live(s, n_saves[])
+            _progress!(cb_progress, s.step, s.t)
             return nothing
         end
     else

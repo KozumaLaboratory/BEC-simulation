@@ -37,6 +37,10 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    # #407: the FFTW MEASURE × Julia-threads × mixed-radix corner, as a
+    # predicate. Gates the advisory's trigger, not the 11.97 GB — a test that
+    # allocated that is a test nobody can run.
+    "test_fft_planning_memory_risk.jl",
     "test_prior_art_dispositions.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
@@ -124,6 +128,7 @@ const FAST_TESTS = [
     "workflow/test_full_bdg_advisory_fires.jl",
     "workflow/test_no_second_atom_F_table.jl",
     "workflow/test_every_dynamics_path_reports_liveness.jl",
+    "workflow/test_every_dynamics_path_reports_progress.jl",
     "workflow/test_oom_reaches_resource_permanent.jl",
     "workflow/test_preflight_can_fail.jl",
     "workflow/test_slack_alerts_report_delivery.jl",
@@ -955,6 +960,13 @@ const FULL_EXTRA = [
     # broadcast propagator it replaces. Every production Eu run is tabulated and
     # every one of them took the fallback; GPU-only.
     "gpu/test_gpu_tabulated_lhy_fused_diagonal_parity.jl",
+    # #339's spectrum instruments (`trapped_bdg_frequencies`, `bragg_response`)
+    # shipped with two oracles and a green CI and had NEVER RUN ON A GPU — both
+    # oracles are 1D/F=1/CPU, and `ndim ≥ 2` is required before the rotation
+    # generator is reached at all. The first device use was #383's production
+    # job, which died on the first call. 3D is the requirement here, not a
+    # preference.
+    "gpu/test_gpu_bdg_instrument_parity.jl",
     # Bit-identity of the fused `diag·SM·DDI·SM·diag` half-step against the
     # operator-by-operator one, plus one arm per eligibility rule. GPU-only
     # (the fused realization is a CUDA kernel); no-op on CPU-only CI.

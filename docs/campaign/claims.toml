@@ -658,3 +658,133 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "16.1"
 pr = 0
 note = """CORRECTS section 14.2, which attributed the missing energy to `run_registry.jl` reading absent keys through defaults. That writer is never reached on this path. The `conv = true` default was real and printed to stdout, but was never STORED — so a guard reading the file finds nothing, which is unknown rather than a pass, and section 14.2's guard-7 claim overstated. The #410 default fix stands on its own path; this is a third writer nobody had checked."""
+# --- eu335 / #383 / #398: the 68.4 µG reading ---------------------------------
+#
+# The SECOND document poured in, and it was chosen for a shape the EdH rows do not
+# have: a claim retracted not because its NUMBER moved but because its READING did.
+# 68.4 ± 0.15 µG is the same measurement before and after; what changed is whether
+# it is a property of the energy landscape or a property of the solver walking it.
+
+[[claim]]
+id = "eu335-68p4-is-a-mean-field-spinodal"
+claim = "68.4 ± 0.15 µG is the flower branch's mean-field spinodal at κ = 1.8 — the branch stops existing there — so a rising B_z ramp must convert by then at ANY rate."
+status = "superseded"
+type = "B"
+scope = "¹⁵¹Eu F = 6, κ = ω_z/ω_⊥ = 1.8, 32³ (64³ bracket [68.0, 68.5] µG), flower branch reached by warm-started L-BFGS continuation in B_z."
+retired_literal = [
+    "spinodal at 68.4 µG",
+    "flower-branch spinodal at κ = 1.8",
+    "flower branch stops existing",
+    "ends at 68.4 ± 0.15 µG",
+]
+replacement_literal = [
+    "loses the flower branch",
+    "continuation loses the branch",
+    "warm-started continuation loses the branch",
+]
+superseded_by = "eu335-68p4-is-where-continuation-loses-the-branch"
+uncertainty = "±0.15 µG at 32³ and [68.0, 68.5] µG at 64³, 0.2 % apart. That bound is on the FIELD at which the continuation stops and was read as a bound on where the branch ends; the reading itself carried no uncertainty at all, which is how it survived."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_spinodal_spectrum.md", "docs/guides/eu_kappa_hysteresis_loop.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_kappa_hysteresis_loop.md"
+section = "5.1"
+pr = 409
+note = """SUPERSEDED 2026-08-20 (#398) by #383's three-quantity test, and the reason it is `superseded` rather than `refuted` is that the number did not move — only what it is a number OF. A saddle-node takes the branch-tangent curvature, the escape direction and the lowest ω to zero together; #383 measured all three on the same cells and none softens (R² linear to rms 0.4 % with its zero at 78.2 µG, ⟨d,Ad⟩ = +3.403 uphill, ω flat to 1.4 %). What is NOT established either way is that the branch survives: λ_min at 68.25 µG is unresolved by both solvers, tracked as #399. The generalisable part: "the continuation loses the branch" and "the branch ends" are different claims about different objects — one about a solver's basin, one about the energy landscape — and a continuation instrument can only ever measure the first."""
+
+[[claim]]
+id = "eu335-68p4-is-where-continuation-loses-the-branch"
+claim = "68.4 ± 0.15 µG is the field at which a warm-started L-BFGS continuation loses the flower branch at κ = 1.8, agreeing to 0.2 % between 32³ and 64³. Nothing in the campaign establishes that the branch ENDS there."
+status = "live"
+type = "B"
+scope = "Same cells as the superseded row: ¹⁵¹Eu F = 6, κ = 1.8, 32³ and 64³, warm-started continuation in B_z. Says nothing about any other κ, and nothing about the polarised branch."
+supersedes = "eu335-68p4-is-a-mean-field-spinodal"
+uncertainty = "±0.15 µG at 32³, bracket [68.0, 68.5] µG at 64³ — 0.2 % apart. This is a bound on a solver-dependent field, so a different warm-start schedule may move it; the grid agreement bounds the discretisation, not the algorithm."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_kappa_hysteresis_loop.md", "docs/guides/eu_spinodal_spectrum.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_spinodal_spectrum.md"
+section = "5.1"
+pr = 409
+note = """Everything #335 delivers that needs only this weaker reading stands unchanged, including the 32³↔64³ agreement of §5.8 and the deliverable itself — the Stern-Gerlach level count (6-7 populated m_F at κ = 1.8 against 3-4 at κ = 0.9, disjoint at all five rates), which never rested on the landscape reading. What is lost is the *at any rate* clause: behind a barrier a fast enough rising ramp carries the flower past 68.4 µG, which is what the predecessor campaign actually observed."""
+
+# --- #407: the FFTW planner's memory, and the hypothesis it was not ------------
+#
+# A type-A pair, and the reason they are here rather than only in CLAUDE.md is
+# that the RSS table has now been restated three times (the submit script's
+# header, the issue body, this campaign) and each restatement is a copy. The
+# `retired_literal` on the refuted row is what stops the killed hypothesis being
+# quoted back as a candidate.
+
+[[claim]]
+id = "fftw-mixed-radix-planner-memory"
+claim = "FFTW's MEASURE planner allocates gigabytes for a NON-POWER-OF-TWO transform when Julia has real threads: 1.66 GB at 48³ rising to 11.97 GB at 98³, against 0.35 GB at 64³ and 0.38 GB at 128³. The axis is the radix, not the grid size and not the thread count."
+status = "live"
+type = "A"
+scope = "TSUBAME cpu_16 (16 of 384 cores), Julia 1.12.6, FFTW.jl, `julia -t 16`, FFTW 16 threads, cubic complex in-place 3D plans, one process per point. Not measured on other machines; the same corner did NOT appear on a 10-core local box in #405."
+uncertainty = "One process per point and one point per (n, threads, flags) cell — no repeats, so the numbers carry no scatter estimate. What IS bounded is the ordering: the two power-of-two sizes are 4.7-34× below every mixed-radix neighbour, which no plausible run-to-run scatter closes. `ru_maxrss` is a high-water mark, so each figure is an upper bound on that process's peak and an exact one for the comparison being made."
+uncertainty_basis = "control"
+evidence = ["scripts/klaus2022/fftw_thread_probe.jl", "scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """Three conditions, each shown necessary by removing it: MEASURE (ESTIMATE gives 0.33-0.36 GB at every size), REAL Julia threads (`julia -t 1` gives 0.26-0.30 GB at every size EVEN WITH FFTW reporting 16 threads — FFTW.jl runs its parallel loop through Julia's threadpool), and a non-power-of-two length. The consequence for this repo is that `make_fft_plans` / `make_rfft_plans` DEFAULT to MEASURE and `src/analysis/dipole_field.jl` plans the DDI work shape that way, i.e. the path every eGPE ground state runs. Not auto-downgraded to ESTIMATE: that would change the throughput of every production run to fix a corner recognisable in advance, and one call is not a throughput measurement. `SPINORBEC_FFT_PLAN=estimate` is the deliberate opt-out; `fft_planning_memory_risk` is the predicate and `test_fft_planning_memory_risk.jl` gates it in both directions on all three axes."""
+
+[[claim]]
+id = "fftw-visible-cpu-count-hypothesis"
+claim = "The 36.9 GB at 48³ is caused by a library sizing per-thread scratch from the node's CPU count (`/proc/cpuinfo` = 384) rather than from the job's cgroup allocation (16)."
+status = "refuted"
+type = "A"
+scope = "Same cells as `fftw-mixed-radix-planner-memory`. The taskset arm narrows the VISIBLE set without changing the allocation, which was already 16."
+retired_literal = [
+    "visible-CPU count (384 on the node) is a candidate",
+    "reads /proc/cpuinfo (384) rather than the cgroup (16)",
+    "a library reads `/proc/cpuinfo` (384) rather than the cgroup (16)",
+]
+uncertainty = "unbounded: this is a refutation by counterexample, not a measurement of a quantity. Three sizes were run under `taskset`; two reproduce the blow-up with the affinity mask at 16 and the third (128³, a power of two) is cheap as always."
+uncertainty_basis = "none"
+evidence = ["scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """REFUTED 2026-08-21. Narrowing the visible CPU set to 16 with `taskset` leaves 48³ at 2.26 GB and 96³ at 8.38 GB — if anything slightly worse than the unnarrowed 1.66 and 6.73 GB. The count was never the mechanism. Worth keeping as a row rather than deleting, because it is a PLAUSIBLE hypothesis with a well-known general form (libraries that read the node instead of the cgroup) and it will be proposed again by anyone who meets the symptom without the radix table in hand. The first version of the probe could not have refuted it either: it ran at `julia -t 1`, where nothing blows up at all, so its `taskset` rows would have been a null on top of a null."""
+
+# --- #397 / #399: lambda_min on the weak-field Eu branches ---------------------
+
+[[claim]]
+id = "eu-lambda-min-certified-on-polarised-branch"
+claim = "With `precond=:combined` and `max_iter=2000` the constrained Hessian's λ_min converges with a solver certificate on 5 of 6 weak-field Eu cells, and its SIGN is resolved above the finite-difference floor at three of them — 100 µG (+7.1595e-02), 20 µG (+4.0e-07) and the 68.25 µG flower cell (+7.6e-08 to +8.4e-08). All three are minima along every direction the block resolves."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6, κ=1.8, 32³×13, box 24 a_ho, pin ε=0.002, unpadded DDI, dealiasing off, one seed, `nev=4` — so 'minimum' means 'along every direction a 4-dimensional block resolved'. 25 and 60 µG are NOT resolved; 5 µG does not converge at all."
+uncertainty = "Two finite-difference steps (1e-5, 3e-5) bound the operator's own error by their difference: 6.7e-09 at 20 µG, 7.5e-09 at 68.25 µG, 1.4e-07 at 100 µG. The solver widths (1e-14 to 3e-10) are an order of magnitude or more BELOW that and are not the binding uncertainty. Two points give a sensitivity, not a convergence order."
+uncertainty_basis = "control"
+evidence = ["docs/guides/eu_lambda_min_resolved.md", "scripts/eu_spectrum/precond_ab.jl"]
+evidence_status = "in_tree"
+commit = "65f4da78"
+doc = "docs/guides/eu_lambda_min_resolved.md"
+section = "5"
+pr = 420
+note = """The load-bearing part is what the FD control REVOKED. The first pass reported `λ_min = -1.77e-09` at 25 µG and `-8.88e-09` at 60 µG, both `converged = true` with widths of ~1e-14, and the driver printed "SADDLE — proven" for each. Re-running the same arm at ε = 3e-5 gave +5.47e-09 and +8.46e-09: BOTH SIGNS INVERT. They were numbers below the instrument's floor read as though they were above it, and the `converged` flag was truthful — about the solver. What generalises: once an iterative eigensolver's width drops below the accuracy of the operator it is solving, `converged` stops being the thing to check and the discretisation control becomes it."""
+
+[[claim]]
+id = "eu335-68p4-flower-is-still-a-minimum"
+claim = "At 68.25 µG — the last flower cell before #335's continuation loses the branch — λ_min is converged and POSITIVE (+7.62e-08 at ε=1e-5, +8.37e-08 at ε=3e-5), i.e. 11× its own finite-difference sensitivity. The state is an energetic minimum there, which a saddle-node forbids."
+status = "live"
+type = "B"
+scope = "One cell, one seed, 32³, `nev=4`. Says nothing about fields above 68.5 µG, where no converged flower cell exists to measure."
+uncertainty = "±3e-10 from the solver; ±7.5e-09 from the ε control, which is the binding one. λ/|Δ| = 11."
+uncertainty_basis = "control"
+evidence = ["docs/guides/eu_lambda_min_resolved.md"]
+evidence_status = "in_tree"
+commit = "65f4da78"
+doc = "docs/guides/eu_lambda_min_resolved.md"
+section = "5"
+pr = 420
+note = """This is the direct evidence #398 said would settle the reading and #383 could not obtain — both solvers there returned values one tenth of their own uncertainty. It supports `eu335-68p4-is-where-continuation-loses-the-branch` and closes off the saddle-node reading with a fourth independent quantity, after the branch-tangent curvature, the escape direction and the lowest ω. What it does NOT establish is where the flower branch actually ends: a minimum at 68.25 µG says the branch has not ended AT 68.25 µG, and the next converged cell up the field axis does not exist."""
