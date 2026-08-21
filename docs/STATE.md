@@ -22,7 +22,7 @@
 
 ## Split-step: the forward outer-potential chain
 
-Read from `OUTER_CHAIN` (`src/hamiltonian/integrator/split_step.jl:622`), the Tuple both directions derive from:
+Read from `OUTER_CHAIN` (`src/hamiltonian/integrator/split_step.jl`), the Tuple both directions derive from:
 `_outer_operators_fwd!` runs it as declared, `_outer_operators_bwd!` runs
 `reverse` of it. **9 substeps.** Each auto-skips when its
 coupling is ≈ 0.
@@ -48,20 +48,20 @@ Each declares its sign in one coefficient function in the file named.
 
 | # | registry symbol | struct | defined at |
 |---|---|---|---|
-| 1 | `kinetic` | `KineticTerm` | `src/hamiltonian/terms/kinetic.jl:13` |
-| 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl:7` |
-| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl:227` |
-| 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl:33` |
-| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl:147` |
-| 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl:8` |
-| 7 | `lhy` | `LHYTerm` | `src/hamiltonian/terms/lhy/lhy_term.jl:7` |
-| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl:294` |
-| 9 | `raman` | `RamanTerm` | `src/hamiltonian/terms/raman.jl:78` |
-| 10 | `light_shift` | `LightShiftTerm` | `src/hamiltonian/terms/light_shift/light_shift_term.jl:8` |
-| 11 | `coriolis` | `CoriolisTerm` | `src/hamiltonian/terms/coriolis.jl:11` |
-| 12 | `magnetic_gradient` | `MagneticGradientTerm` | `src/hamiltonian/terms/magnetic_gradient.jl:29` |
-| 13 | `spatial_zeeman` | `SpatialZeemanTerm` | `src/hamiltonian/terms/spatial_zeeman.jl:21` |
-| 14 | `loss` | `LossTerm` | `src/hamiltonian/terms/loss.jl:210` |
+| 1 | `kinetic` | `KineticTerm` | `src/hamiltonian/terms/kinetic.jl` |
+| 2 | `trap` | `TrapTerm` | `src/hamiltonian/terms/trap/trap.jl` |
+| 3 | `zeeman` | `ZeemanTerm` | `src/hamiltonian/terms/zeeman.jl` |
+| 4 | `density_c0` | `DensityC0Term` | `src/hamiltonian/terms/contact/contact.jl` |
+| 5 | `spin_c1` | `SpinC1Term` | `src/hamiltonian/terms/contact/contact.jl` |
+| 6 | `ddi` | `DDITerm` | `src/hamiltonian/terms/ddi/ddi_term.jl` |
+| 7 | `lhy` | `LHYTerm` | `src/hamiltonian/terms/lhy/lhy_term.jl` |
+| 8 | `tensor` | `TensorTerm` | `src/hamiltonian/terms/contact/contact.jl` |
+| 9 | `raman` | `RamanTerm` | `src/hamiltonian/terms/raman.jl` |
+| 10 | `light_shift` | `LightShiftTerm` | `src/hamiltonian/terms/light_shift/light_shift_term.jl` |
+| 11 | `coriolis` | `CoriolisTerm` | `src/hamiltonian/terms/coriolis.jl` |
+| 12 | `magnetic_gradient` | `MagneticGradientTerm` | `src/hamiltonian/terms/magnetic_gradient.jl` |
+| 13 | `spatial_zeeman` | `SpatialZeemanTerm` | `src/hamiltonian/terms/spatial_zeeman.jl` |
+| 14 | `loss` | `LossTerm` | `src/hamiltonian/terms/loss.jl` |
 
 ## The B → p sign
 
@@ -122,11 +122,11 @@ checking either.
 
 **4 sites admit a cached payload; 1 re-derives its verdict.**
 
-- admits: `src/workflow/experiment.jl:253`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:625`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:910`
-- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:549`
-- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:606`
+- admits: `src/workflow/experiment.jl:_admitted_result_path`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_yaml_scan`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_yaml_single`
+- admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:_run_step`
+- **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:_run_step`
 
 Whether that ratio is a gap is judgement — `:unmarked` being a HIT is a dated
 migration allowance argued at `src/model/complete.jl`, not an oversight — so
