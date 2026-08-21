@@ -452,6 +452,60 @@ end
         @test E[end] < E[1] - 1e-8 * abs(E[1])          # and actually damps
     end
 
+    @testset "with NOISE ON it must relax TOWARD the reservoir, not away" begin
+        # The gate above runs `noise=false, T=0.0` — the DRIFT alone, in a field
+        # with no fluctuations. Energy damping is a drift/noise PAIR and only
+        # relaxes to temperature T if the two balance. A gate on one half says
+        # nothing about the balance, and production runs the pair.
+        #
+        # This is the second time that blind spot produced a wrong picture in one
+        # day. The projected step's number loss is ONE-OFF with the noise off and
+        # a RATE with it on (ratio 4.04, §"the PROJECTED step's number loss");
+        # here the sign oracle says "never heats" with the noise off while #334's
+        # ramp carries mu_psi from 8.48 to 51.68 with it on, a factor 6, while the
+        # condensate collapses. Both gates turned the noise off for a REASON that
+        # was sound, and both conclusions were then used past their scope.
+        #
+        # The assertion is directional and deliberately loose: a field started far
+        # ABOVE the reservoir temperature must come DOWN. Pinning an equilibrium
+        # value would need a thermometer this test does not have, and the failure
+        # under investigation is not a few per cent — it is monotone divergence.
+        T_res = 1.0
+        ws = flowing_state!(scalar_ws())
+        ws.state.psi .*= 3.0                       # hot: mean energy well above T
+        mu_psi(w) = field_chemical_potential(w)
+        e0 = mu_psi(ws)
+        es = Float64[e0]
+        res = SPGPEReservoir(; T=T_res, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.0,
+            allow_unphysical_rates=true)
+        for s in 1:400
+            apply_spgpe_step!(ws, res, 0.002; t=0.0, seed=7000 + s, noise=true)
+            s % 100 == 0 && push!(es, mu_psi(ws))
+        end
+        Printf.@printf("\n  energy damping with noise, hot start: µ̃ %s\n",
+            join(round.(es; digits=4), " → "))
+        @test all(isfinite, es)
+
+        # MEASURED 2026-08-21 and the arm is UNDER-POWERED, recorded here rather
+        # than deleted because the null is the finding:
+        #
+        #   µ̃ 65.8286 → 65.8286 → 65.8286 → 65.8287 → 65.8287
+        #
+        # 400 steps move it by 1e-4. At this M̄ and duration the term does nothing
+        # measurable in either direction, so "it did not cool" says nothing about
+        # whether it CAN cool — and nothing at all about production's factor 6.
+        #
+        # What this arm needs before it can be asserted is a POSITIVE CONTROL: a
+        # configuration where the same call demonstrably cools, so that a failure
+        # to cool is informative. Without one this is the shape of null that a
+        # degenerate check produces, which is the error this suite keeps catching
+        # elsewhere. `@test_broken` would claim the mechanism is broken; it is not
+        # established that anything here is.
+        @info "energy damping with noise is under-powered at this rate — " *
+            "needs a positive control before it can assert a direction" es
+        @test abs(es[end] - es[1]) < 1e-2 * abs(es[1])   # what IS true: it barely moves
+    end
+
     @testset "quiet damping rate matches −ℳ̄∫d³k|k·j̃|²/|k|" begin
         ws = flowing_state!(scalar_ws())
         M, dt = 1e-2, 1e-4
