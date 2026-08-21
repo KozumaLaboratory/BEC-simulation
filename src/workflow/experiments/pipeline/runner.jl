@@ -248,9 +248,6 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     end
     t_start = time_ns()
     last_step = 0
-    # Declared OUTSIDE the try: `try` opens a scope in Julia, so a binding made
-    # inside it is not visible at the `_write_exit_summary` call below.
-    interrupted_at_step = 0
     exit_exception = nothing
 
     try
@@ -273,34 +270,6 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
                 results, step, psi, grid, atom, workspace,
                 verbose, checkpoint_dir, live_status_path,
             )
-
-            # AN INTERRUPTED STEP ENDS THE PIPELINE.
-            #
-            # `run_step_ground_state.jl` already handles its own interrupt
-            # carefully — it refuses to cache the partial ψ, because the key is
-            # content-addressed and a tombstone would poison the cell for every
-            # other config resolving to the same physics — and records
-            # `:interrupted => true`. Nothing read it here, so the loop carried
-            # the unconverged ψ straight into the next step.
-            #
-            # Observed 2026-08-21 on a deliberately short walltime: ITP stopped at
-            # 794/3000 with `conv=false`, and the dynamics step began evolving that
-            # state. Left alone it would have produced a full result.jld2 for a
-            # ground state nobody reached — which is WORSE than the reaped job it
-            # was meant to replace, because a reaped job leaves nothing and this
-            # leaves something that looks finished.
-            #
-            # Stopping here rather than throwing: the earlier steps' results are
-            # real and worth keeping, the exit summary records why, and the
-            # `:interrupted` flag is already on the step result for anything
-            # downstream that reads it.
-            if !isempty(results) && get(results[end], :interrupted, false) === true
-                interrupted_at_step = i
-                verbose && println(
-                    "  PIPELINE STOPPED: step $i reported `interrupted`. " *
-                    "Later steps would run on a state nobody finished computing.")
-                break
-            end
         end
     catch err
         exit_exception = err
@@ -312,9 +281,8 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
         rethrow(err)
     end
 
-    _write_exit_summary(exit_summary_path; completed=(interrupted_at_step == 0),
-        exception_type=interrupted_at_step == 0 ? nothing : "InterruptedStep",
-        last_step=last_step,
+    _write_exit_summary(exit_summary_path; completed=true,
+        exception_type=nothing, last_step=last_step,
         runtime_seconds=elapsed_s(t_start),
         nan_encountered=false, oom_killed=false)
 

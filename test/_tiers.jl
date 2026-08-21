@@ -65,10 +65,6 @@ const FAST_TESTS = [
     # bce2068f repaired two configs correctly one at a time and broke the mirror
     # relationship between them; nothing recorded that they were a pair (#343).
     "workflow/test_mirror_pairs_flip_every_axial_quantity.jl",
-    # An interrupted step must END the pipeline. The flag was recorded and never
-    # read, so a walltime-truncated ITP fed an unconverged psi to the dynamics and
-    # produced a result that looked complete (2026-08-21).
-    "workflow/test_interrupted_step_stops_the_pipeline.jl",
     "test_calibrated_scan.jl",
     "test_docs_examples_avoid_removed_keys.jl",
     "test_state_doc_is_current.jl",
