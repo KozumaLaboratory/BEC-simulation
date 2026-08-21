@@ -36,7 +36,11 @@ jobs:
   heavy:
     name: Heavy YAML (Julia 1.12, tier=full)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 100, not 90: the per-worker cap below is 4200 s = 70 min, and run
+    # 32415817639 spent 7 min on checkout + setup + precompile before the first
+    # worker started. 90 would leave 13 min for a step measured at 7, which is
+    # the same absent-margin the cap itself had.
+    timeout-minutes: 100
     env:
       SPINORBEC_TEST_TIER: full
       SPINORBEC_RUN_HEAVY_YAML: "true"
@@ -50,12 +54,41 @@ jobs:
       # the per-push tiers; `full` on a 4-vCPU runner is 6317 s of measured work
       # (run 30668378491), i.e. a perfectly-packed makespan of ~1580 s — 12 %
       # of headroom, and any imbalance eats it. That run died with all four
-      # workers killed at the cap and ZERO assertion failures. 2700 s keeps the
-      # hang guard well inside the 90-minute job timeout while leaving the
-      # margin the arithmetic says this tier needs.
-      SPINORBEC_TEST_TIMEOUT: "2700"
+      # workers killed at the cap and ZERO assertion failures.
+      #
+      # 2700 s was then not enough either, and the arithmetic says it never
+      # could have been. Measured on run 32415817639 (2026-08-20): 471 files
+      # completed carrying 8067 s of work, plus
+      # `dynamics/test_spgpe_equilibrium_number.jl`, which run 32300172779
+      # timed at 40m31s = 2432 s ON THIS RUNNER. That one file cannot be
+      # split, so the makespan is bounded below by max(2432, 8067/3 = 2689) =
+      # 2689 s — ELEVEN SECONDS under the cap. The tier was not intermittently
+      # slow, it was sitting on the boundary, which is why the streak reads as
+      # flaky rather than as a sizing error.
+      #
+      # (The three files the 08-20 log lists beside it as never completing —
+      # `test_{itp,rtp}_ddi_strang_save_every.jl`, `test_yoshida_ddi_order.jl` —
+      # are 12.7 / 4.4 / 7.8 s. They were not slow; they were claimed in the
+      # last seconds before their workers were killed. Reading "never completed"
+      # as "too slow" would have sent the fix at the wrong four files.)
+      #
+      # 4200 s puts real margin under the 2689 s floor and still leaves 20 min
+      # of the 90-minute job budget for checkout, setup and precompile.
+      # `dynamics/test_spgpe_equilibrium_number.jl` is 23 % of the tier's whole
+      # workload on its own and is worth making cheaper at the source (#305);
+      # this is the sizing fix, not that one.
+      SPINORBEC_TEST_TIMEOUT: "4200"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `full` runs `test_campaign_fix_list_gate.jl`, whose ancestor check is
+          # `git merge-base --is-ancestor <2026-06-ref> HEAD`. Under the default
+          # `fetch-depth: 1` that fails for want of the commit, so the gate
+          # reported all 16 fix-list refs dead and its own canary disqualified.
+          # `ci.yml` has carried `fetch-depth: 0` since the gate landed; this job
+          # never got it, and the gate's `_shallow()` predicate exists precisely
+          # to say so in one line instead of surfacing as a raw git error.
+          fetch-depth: 0
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.12"
