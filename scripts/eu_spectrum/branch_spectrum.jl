@@ -60,19 +60,26 @@ include(joinpath(@__DIR__, "_cells.jl"))
 const NEV = Int(getf("SP_NEV", 6))
 const BLOCK = Int(getf("SP_BLOCK", NEV + 6))
 const MAXITER = Int(getf("SP_MAXITER", 40))
-# λ_min comes from the bare LANCZOS, not from the block. `trapped_bdg_low_modes`
-# says so in its own VALIDITY REGIME: at Eu production the stiffness is
-# interaction-dominated (c₀n ≈ 2343) and the kinetic-only preconditioner does not
-# capture it. Measured here on the 68.25 µG cell, block LOBPCG at max_iter=25
-# returned λ_min = 1.68 with a Kato–Temple width of 5.7 — an unresolved number,
-# correctly refused by the convergence gate. Lanczos with full reorthogonalisation
-# early-stops on the same certificate and costs ~2 gradient evals per iteration.
+# λ_min comes from the bare LANCZOS here, and that choice is now HISTORICAL
+# rather than forced. When this campaign ran, block LOBPCG at max_iter=25 on the
+# 68.25 µG cell returned λ_min = 1.68 with a Kato–Temple width of 5.7 — an
+# unresolved number, correctly refused by the convergence gate — because the
+# kinetic-only preconditioner does not capture an interaction-dominated
+# stiffness (c₀n ≈ 2343).
+#
+# #397 measured the block again with `:combined` and a real iteration budget:
+# on this very cell it CONVERGES, in 401 iterations / 167 s, to
+# λ_min = 7.621335e-08 ± 3e-10 — and the kinetic arm gets there too (1288
+# iterations, 518 s), agreeing to 7 digits. So the block is no longer the
+# unresolved instrument this comment used to describe. The Lanczos arm is kept
+# because it is what `check(::StabilitySpec)` actually runs, i.e. it is the
+# gate-2 number, and because two independent eigensolvers on one operator is the
+# point.
 const LANCZOS_NITER = Int(getf("SP_LANCZOS_NITER", 300))
 const LANCZOS_ATOL = getf("SP_LANCZOS_ATOL", 1e-6)
-# `:combined` adds the real-space stiffness (V_trap + c₀n) the kinetic-only
-# inverse leaves alone — the documented next step after this campaign measured
-# the wall at width/value ≈ 10 on these very cells.
-const PRECOND = Symbol(get(ENV, "SP_PRECOND", "kinetic"))
+# Follows the function default, which is `:combined` since #397. Overridable to
+# `kinetic` for the other side of the equivalence gate.
+const PRECOND = Symbol(get(ENV, "SP_PRECOND", "combined"))
 const HESS_TOL = getf("SP_HESS_TOL", 1e-6)
 const FD_EPS = getf("SP_FD_EPS", 1e-5)
 const FD_EPS2 = haskey(ENV, "SP_FD_EPS2") && !isempty(ENV["SP_FD_EPS2"]) ?

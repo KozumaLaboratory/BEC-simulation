@@ -52,6 +52,13 @@
 > tracked as #399. Until then the honest phrasing is **"the field at which the
 > continuation loses the flower branch"**, and this document's own use of
 > "spinodal" should be read with that substitution throughout §5.1.
+>
+> **RESOLVED 2026-08-21 (#399), and it does not rescue the spinodal reading.**
+> `docs/guides/eu_lambda_min_resolved.md`: at 68.25 µG the constrained Hessian's
+> λ_min converges to **+7.6e-08 (ε = 1e-5) / +8.4e-08 (ε = 3e-5)** with widths of
+> 3e-10 — positive, and 11× its own finite-difference sensitivity. A saddle-node
+> takes it through zero. The substitution above stands and is now backed by a
+> converged eigenvalue rather than by three non-softening proxies alone.
 
 ## 1. What is being delivered, and why it is worth the compute
 

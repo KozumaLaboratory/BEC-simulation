@@ -129,4 +129,24 @@ end
 
     @test_throws ArgumentError trapped_bdg_low_modes(ws, ψ; precond=:bogus,
         params=prm, max_iter=1)
+
+    # THE DEFAULT IS `:combined` (#397), pinned BEHAVIOURALLY rather than by
+    # reading the signature: same seed, same everything, no `precond` keyword,
+    # must reproduce the `:combined` arm exactly. A signature check would pass
+    # against a default that had been renamed but not rewired.
+    #
+    # It was `:kinetic` until 2026-08-21, on the stated ground that changing it
+    # "moves every gate-2 stability verdict". It cannot — `check(::StabilitySpec)`
+    # runs `trapped_bdg_lowest_eigenvalue`, which has no `precond` keyword, and
+    # this function's only `src/` consumer is `trapped_bdg_frequencies`, which
+    # reads eigenVECTORS. Measured across six ¹⁵¹Eu 32³ cells, `:combined`
+    # certifies 5 to `:kinetic`'s 3, is 1.4-3.1× faster where both certify, and
+    # wins on this gapped fixture too (16 iterations against 30).
+    dflt = trapped_bdg_low_modes(ws, ψ; nev=2, block=8, max_iter=200, tol=1e-7,
+        params=prm, rng=MersenneTwister(3))
+    @test dflt.λ == comb.λ
+    @test dflt.iterations == comb.iterations
+    # …and is NOT the kinetic arm. Asserted so the equality above cannot be
+    # satisfied by the two arms having become the same thing.
+    @test dflt.iterations != kin.iterations
 end
