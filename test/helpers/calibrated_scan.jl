@@ -38,7 +38,7 @@
 # It throws `BlindScan` if either probe disagrees, naming which one. A scan that
 # cannot see its own positive control is not evidence, so it is not returned.
 
-export BlindScan, calibrated_scan, count_matches, tree_files
+export BlindScan, calibrated_scan, count_matches, tree_files, git_corpus
 
 """
     BlindScan
@@ -134,4 +134,41 @@ function tree_files(root; ext=".jl", skip=(".git", "node_modules", "worktrees"))
         end
     end
     sort(out)
+end
+
+"""
+    git_corpus(repo, pathspec...) -> Set{String}
+
+The files git WILL judge: everything in the index, plus everything in the
+working tree that is not ignored. Repo-relative paths.
+
+Use this, never a bare `git ls-files`, whenever a gate's corpus is "the files
+in this repo".
+
+WHY, because the difference bites in the green direction. `git ls-files` lists
+the INDEX. A gate whose corpus is the index, run against a working tree where
+the new file has not been `git add`-ed yet, is not judging a smaller set — it is
+judging a set from which the file under test has been REMOVED. So it reports
+"no unlisted files" and passes, and CI, which sees a committed tree, fails on
+exactly the file the gate exists to catch. That happened on 2026-08-21 (#422,
+#425): a new `scripts/` submit script was written, the allowlist gate was run
+and was green, "allowlist gate passes" was reported, and CI went red on the
+first push.
+
+The blindness is not a missing check, it is a corpus that answers a different
+question than the one asked, which is why it cannot be fixed by remembering to
+`git add` first. `--others --exclude-standard` adds the untracked-and-not-
+ignored files — precisely the new work — while `.gitignore`d clutter
+(`mcp/.venv`, editor droppings) stays out, which is the only thing the bare
+`ls-files` was ever wanted for.
+
+Note the deleted case is deliberately included: a file in the index but no
+longer on disk stays in the corpus, so "stale allowlist entry" gates still fire.
+Callers that need on-disk existence should intersect with `isfile`.
+"""
+function git_corpus(repo, pathspec...)
+    args = isempty(pathspec) ? String[] : ["--", pathspec...]
+    out = read(Cmd(`git ls-files --cached --others --exclude-standard $args`;
+            dir=repo), String)
+    Set(split(out, '\n'; keepempty=false))
 end
