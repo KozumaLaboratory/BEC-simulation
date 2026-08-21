@@ -1,5 +1,6 @@
-export save_rotating_basis_result!, summarize_rotating_basis_result,
-    launch_experiment
+export save_rotating_basis_result!,
+    summarize_rotating_basis_result,
+    launch_experiment, make_result_a_summary!
 
 """
     summarize_rotating_basis_result(io, result; label="")
@@ -522,4 +523,121 @@ function save_rotating_basis_result!(
     end
 
     out_path
+end
+
+"""
+    make_result_a_summary!(run_dir, point_file) -> Symbol
+
+Rewrite `<run_dir>/result.jld2` WITHOUT its per-frame payload, once a real point
+file provably carries the same frames.
+
+WHY. `result.jld2` is a **summary artifact** — anko's decision on PR #195, which
+closed an attempt to collapse it into a symlink precisely because that would have
+changed the design rather than fixed a bug. What the same PR measured is that the
+summary is not one: 9.11 GB against point_001's 9.55 GB, carrying all 750 frames.
+Across the group volume that is 148.4 GB in 136 `result.jld2` files, ~11 % of the
+1.3 TB in use. Dropping the frames is what makes the file match its stated role,
+and it was left on record as the change to make instead.
+
+The dashboard keeps working without a redirect: `_resolve_snapshot_source` returns
+the requested path when it has its own streams, and the point file does.
+
+NOTE — the dashboard's own docstring says the opposite ("point_NNN gets only the
+static final ψ + scalar traces, per-frame volumes live in sibling result.jld2").
+Two statements of the intended layout existed and disagreed; today NEITHER holds,
+because both files are full. This follows the owner's explicit decision, and the
+docstring is corrected in the same commit rather than left to contradict it.
+
+REFUSES rather than guesses, because the failure is silent data loss:
+
+  - `result.jld2` absent, or a symlink            → `:skipped`
+  - the point file is a symlink (rotating-basis   → `:skipped`
+    runs point at `result.jld2`, so its frames
+    are the ONLY copy)
+  - the point file has no frames, or fewer, or a  → `:not_covered`
+    different spatial shape / component count
+  - already stripped                              → `:already_summary`
+  - either file will not open (truncated, held,   → `:unreadable`
+    killed mid-write)
+
+`dry=true` runs every check and returns the verdict WITHOUT writing.
+
+Keys only — no frame is ever read, so the check costs milliseconds against files
+of several GB.
+"""
+function make_result_a_summary!(run_dir::AbstractString, point_file::AbstractString;
+    dry::Bool=false)
+    res = joinpath(run_dir, "result.jld2")
+    (isfile(res) && !islink(res)) || return :skipped
+    (isfile(point_file) && !islink(point_file)) || return :skipped
+    # `samefile` is the load-bearing one — canaried 2026-08-21: removing it lets
+    # the rotating-basis case strip its own only copy, and the gate goes red with
+    # `KeyError: dynamics/psi_snapshots_streamed`. The `islink` check above is
+    # REDUNDANT with it (a symlinked point file is the same file) and is kept as a
+    # cheap early exit, not as protection. Removing `islink` alone changes nothing,
+    # which is why that arm of the canary did not fire.
+    samefile(res, point_file) && return :skipped
+
+    grp = "dynamics/psi_snapshots_streamed"
+    # A file that will not OPEN is distinct from one with no frames, and the
+    # backlog sweep found the difference the hard way: `jldopen` threw on a
+    # `result.jld2` in the tree and took the whole pass down. Truncated writes,
+    # a kill mid-save, a file another process holds — all real, all reasons to
+    # REFUSE rather than to rewrite. Returning `:already_summary` for an
+    # unreadable file would be worse than throwing: it reads as "done".
+    meta(path) =
+        try
+            jldopen(path, "r") do f
+                haskey(f, "$grp/n_snapshots") || return (; missing_frames=true)
+                (n=Int(f["$grp/n_snapshots"]),
+                    shape=f["$grp/spatial_shape"], comps=f["$grp/n_components"])
+            end
+        catch
+            nothing
+        end
+    rm_ = meta(res)
+    rm_ === nothing && return :unreadable
+    haskey(rm_, :missing_frames) && return :already_summary
+    pm = meta(point_file)
+    pm === nothing && return :unreadable
+    haskey(pm, :missing_frames) && return :not_covered
+    (pm.n >= rm_.n && pm.shape == rm_.shape && pm.comps == rm_.comps) || return :not_covered
+
+    # `dry` returns the verdict from the SAME checks, one line before the rewrite.
+    # The alternative — a caller reproducing the conditions to preview them — is
+    # how a preview starts disagreeing with the act. The backlog sweep's first
+    # version did exactly that and reported `:skipped` for every directory,
+    # because the stand-in it built tripped a guard the real call would not.
+    dry && return :summarised
+
+    tmp = res * ".summary.tmp"
+    isfile(tmp) && rm(tmp; force=true)
+    try
+        jldopen(res, "r") do src
+            jldopen(tmp, "w") do dst
+                _copy_except!(dst, src, "", "dynamics/psi_snapshots_streamed")
+            end
+        end
+        mv(tmp, res; force=true)
+    catch err
+        isfile(tmp) && rm(tmp; force=true)
+        rethrow(err)
+    end
+    :summarised
+end
+
+# Recursive key copy that skips one group. JLD2 has no "copy all but" primitive,
+# and reconstructing the file by listing top-level keys alone would silently flatten
+# the `dynamics/` group the readers index into.
+function _copy_except!(dst, src, prefix::String, skip::String)
+    for k in keys(src)
+        path = isempty(prefix) ? String(k) : prefix * "/" * String(k)
+        path == skip && continue
+        v = src[k]
+        if v isa JLD2.Group
+            _copy_except!(dst, v, path, skip)
+        else
+            dst[path] = v
+        end
+    end
 end

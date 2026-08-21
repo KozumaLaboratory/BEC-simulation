@@ -106,12 +106,20 @@ end
 Base.showerror(io::IO, e::NoPsiAvailable) = print(io, "NoPsiAvailable: ", e.msg)
 
 """Return the path that actually carries the streamed dynamics snapshots
-for `jld2_path`. The lab-frame spinor pipeline writes only the static
-final ψ + scalar traces to point_NNN.jld2, while the per-frame spinor
-volumes live in sibling result.jld2 (canonical streamed layout). If
-the requested file has its own snapshots (rotating_basis path, or a
-older run that embedded them) return it unchanged; otherwise
-redirect to the sibling result.jld2 when present."""
+for `jld2_path`.
+
+CORRECTED 2026-08-21. This said the lab-frame spinor pipeline writes only the
+static final ψ + scalar traces to point_NNN.jld2 with the per-frame volumes in
+sibling result.jld2. That was one of TWO statements of the intended layout that
+disagreed — anko's, on PR #195, is that `result.jld2` is a SUMMARY — and neither
+described the tree, where both files carried every frame (9.11 GB against 9.55 GB
+on a 750-frame run, 148.4 GB across 136 pairs).
+
+The layout now enforced by `make_result_a_summary!`: **the point file carries the
+frames, result.jld2 is the summary.** The resolution order below already serves
+it — the requested file has its own streams, so it is returned unchanged — and
+the sibling redirect stays for rotating-basis runs (whose point_NNN is a symlink
+at result.jld2) and for runs written before the reduction."""
 function _resolve_snapshot_source(jld2_path::String)
     try
         has_streams = jldopen(jld2_path, "r") do f
