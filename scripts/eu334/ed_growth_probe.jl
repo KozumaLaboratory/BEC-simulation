@@ -62,7 +62,17 @@ const ATOM = get(ENV, "ED_ATOM", "rb87") == "eu151" ? Eu151 : Rb87
 # One knob against the same control. `c_dd = 0` is the arm already measured, so
 # the comparison is against a number this probe produced rather than against a
 # remembered one.
-const C_DD = parse(Float64, get(ENV, "ED_CDD", "0.0"))
+# DERIVED, not picked. The production preset carries c_dd/c0 = 0.0900 (c_dd =
+# 211.02 against c0 = 2343.6, unit-norm with N folded in), and that RATIO is what
+# transfers between normalisations — the absolute numbers do not. Against this
+# probe's C0 = 4pi*a_s it gives 0.0226.
+#
+# The first attempt passed 0.1 by hand, which is 4.4x that. It was killed rather
+# than run: an arm whose knob nobody derived answers about the knob.
+const C_DD_OVER_C0_PRODUCTION = 0.0900
+const C_DD = parse(Float64,
+    get(ENV, "ED_CDD", "0.0")) == -1.0 ? C_DD_OVER_C0_PRODUCTION * C0 :
+             parse(Float64, get(ENV, "ED_CDD", "0.0"))
 
 function ground_mode(grid, dV, n_tf)
     gs = find_ground_state(; grid, atom=ATOM,
