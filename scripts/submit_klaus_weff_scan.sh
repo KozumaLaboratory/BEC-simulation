@@ -98,17 +98,42 @@ CFG="${CFGS[$((IDX - 1))]}"
 
 echo "[$(date +%H:%M:%S)] task $IDX/$N  ->  $CFG"
 
-# Self-stop before the scheduler kills us. A run reaped at h_rt writes nothing
-# and reports nothing; one that stops itself at 85 % leaves a readable partial
-# and a reason. `h_rt` is 2 h here, so the budget is 6120 s.
-export SPINORBEC_WALLTIME_BUDGET_S="${SPINORBEC_WALLTIME_BUDGET_S:-6120}"
+# WALLTIME SELF-STOP — reusing the interrupt path that already exists.
+#
+# A run reaped at h_rt writes nothing and reports nothing. `run_loops.jl` already
+# handles this correctly for Ctrl-C: it catches InterruptException, sets
+# `interrupted[] = true` BEFORE saving (so a failure inside the snapshot cannot
+# leave the run looking complete), trims the traces, saves a final snapshot, and
+# `run_step_dynamics.jl` records `:interrupted`. That path is tested.
+#
+# So the implementation is not new code. It is sending ourselves SIGINT before the
+# scheduler sends SIGKILL: `timeout --signal=INT` at 85 % of h_rt, then
+# --kill-after as a backstop if the interrupt lands inside a long ccall and the
+# process does not unwind.
+#
+# An earlier version of this block exported SPINORBEC_WALLTIME_BUDGET_S and
+# claimed the same behaviour. Nothing in src/ read that variable; the export was a
+# no-op and the claim was repeated in a commit message and upward twice.
+WALL_S="${WALL_S:-7200}"                       # must match -l h_rt
+BUDGET_S=$(( WALL_S * 85 / 100 ))
+echo "walltime: h_rt=${WALL_S}s, self-interrupt at ${BUDGET_S}s"
+
+# JOB-LAYER RECORD. Written before the run and completed after, so a task that
+# never comes back is distinguishable from one that finished: absence of the
+# `finished` line IS the signal. `qacct` has this too, but only until it is
+# rotated, and only for someone who knows the job id.
+JOBREC="logs/tsubame/jobrec.${JOB_ID:-local}.${SGE_TASK_ID:-1}.tsv"
+printf "started\t%s\tjob=%s\ttask=%s\thost=%s\tcfg=%s\n" \
+    "$(date -Is)" "${JOB_ID:-none}" "${SGE_TASK_ID:-1}" "$(hostname)" "$CFG" >> "$JOBREC"
 
 if [ "${WEFF_SMOKE:-0}" = "1" ]; then
     echo "SMOKE: rendering every code path with a truncated ITP, not a result."
     export SPINORBEC_SMOKE=1
 fi
 
-"$JULIA" --project=. -e '
+set +e
+timeout --signal=INT --kill-after=120 "$BUDGET_S" \
+    "$JULIA" --project=. -e '
     using SpinorBEC
     cfg = ARGS[1]
     # Pre-flight before the expensive part: the inspector is the thing that
@@ -133,4 +158,20 @@ fi
     run_yaml(cfg)
 ' "$CFG"
 
-echo "[$(date +%H:%M:%S)] task $IDX done: $CFG"
+RC=$?
+set -e
+
+# Distinguish the three outcomes rather than printing one word for all of them.
+# `timeout` reports 124 when it fired, and the run has saved a partial and marked
+# it interrupted; 137 means --kill-after had to escalate, which means the
+# interrupt did not unwind and there IS no partial.
+case "$RC" in
+    0)   OUTCOME="completed" ;;
+    124) OUTCOME="self_interrupted_at_budget" ;;
+    137) OUTCOME="killed_after_interrupt_ignored" ;;
+    *)   OUTCOME="failed_rc_$RC" ;;
+esac
+printf "finished\t%s\trc=%s\toutcome=%s\tcfg=%s\n" \
+    "$(date -Is)" "$RC" "$OUTCOME" "$CFG" >> "$JOBREC"
+echo "[$(date +%H:%M:%S)] task $IDX $OUTCOME (rc=$RC): $CFG"
+[ "$RC" -eq 0 ] || [ "$RC" -eq 124 ] || exit "$RC"
