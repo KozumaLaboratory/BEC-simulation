@@ -452,6 +452,139 @@ end
         @test E[end] < E[1] - 1e-8 * abs(E[1])          # and actually damps
     end
 
+    @testset "with NOISE ON it must relax TOWARD the reservoir, not away" begin
+        # The gate above runs `noise=false, T=0.0` — the DRIFT alone, in a field
+        # with no fluctuations. Energy damping is a drift/noise PAIR and only
+        # relaxes to temperature T if the two balance. A gate on one half says
+        # nothing about the balance, and production runs the pair.
+        #
+        # This is the second time that blind spot produced a wrong picture in one
+        # day. The projected step's number loss is ONE-OFF with the noise off and
+        # a RATE with it on (ratio 4.04, §"the PROJECTED step's number loss");
+        # here the sign oracle says "never heats" with the noise off while #334's
+        # ramp carries mu_psi from 8.48 to 51.68 with it on, a factor 6, while the
+        # condensate collapses. Both gates turned the noise off for a REASON that
+        # was sound, and both conclusions were then used past their scope.
+        #
+        # The assertion is directional and deliberately loose: a field started far
+        # ABOVE the reservoir temperature must come DOWN. Pinning an equilibrium
+        # value would need a thermometer this test does not have, and the failure
+        # under investigation is not a few per cent — it is monotone divergence.
+        T_res = 1.0
+        ws = flowing_state!(scalar_ws())
+        ws.state.psi .*= 3.0                       # hot: mean energy well above T
+        mu_psi(w) = field_chemical_potential(w)
+        e0 = mu_psi(ws)
+        es = Float64[e0]
+        res = SPGPEReservoir(; T=T_res, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.0,
+            allow_unphysical_rates=true)
+        for s in 1:400
+            apply_spgpe_step!(ws, res, 0.002; t=0.0, seed=7000 + s, noise=true)
+            s % 100 == 0 && push!(es, mu_psi(ws))
+        end
+        Printf.@printf("\n  energy damping with noise, hot start: µ̃ %s\n",
+            join(round.(es; digits=4), " → "))
+        @test all(isfinite, es)
+
+        # POSITIVE CONTROL FIRST. The same call, with a scattering rate large
+        # enough to act in 400 steps: if this does not cool, the arm cannot detect
+        # cooling and any null below is about the arm, not about the physics.
+        # `M` is set explicitly here rather than derived — the derived rate at
+        # these parameters is what made the first attempt measure nothing.
+        function cool_trace(; M, T, nstep=400)
+            SpinorBEC.scratch_clear!()
+            w = flowing_state!(scalar_ws())
+            w.state.psi .*= 3.0
+            r = SPGPEReservoir(; T, mu=1.0, a_s=0.01, k_cut=5.0, gamma=0.0, M,
+                allow_unphysical_rates=true)
+            a = field_chemical_potential(w)
+            for k in 1:nstep
+                apply_spgpe_step!(w, r, 0.002; t=0.0, seed=8000 + k, noise=true)
+            end
+            (a, field_chemical_potential(w))
+        end
+        (c0, c1) = cool_trace(; M=1.0, T=0.05)
+        Printf.@printf("  positive control (M=1, T=0.05): µ̃ %.4f → %.4f\n", c0, c1)
+        @test c1 < c0 - 1.0e-3 * abs(c0)     # the arm CAN see cooling
+
+        # MEASURED 2026-08-21 and the arm is UNDER-POWERED, recorded here rather
+        # than deleted because the null is the finding:
+        #
+        #   µ̃ 65.8286 → 65.8286 → 65.8286 → 65.8287 → 65.8287
+        #
+        # 400 steps move it by 1e-4. At this M̄ and duration the term does nothing
+        # measurable in either direction, so "it did not cool" says nothing about
+        # whether it CAN cool — and nothing at all about production's factor 6.
+        #
+        # What this arm needs before it can be asserted is a POSITIVE CONTROL: a
+        # configuration where the same call demonstrably cools, so that a failure
+        # to cool is informative. Without one this is the shape of null that a
+        # degenerate check produces, which is the error this suite keeps catching
+        # elsewhere. `@test_broken` would claim the mechanism is broken; it is not
+        # established that anything here is.
+        # The control above cools by 0.74 % at M̄ = 1, so this null is READABLE
+        # rather than uninformative: the derived rate here is 600× smaller, 400
+        # steps cannot show it, and the arm is not broken — it is being asked over
+        # the wrong duration.
+        #
+        # CONSEQUENCE FOR #334's STALL. Extrapolating the control's rate to
+        # production (M̄ = 1.628e-3, ~1e6 steps) gives a few per cent of COOLING
+        # across a whole trajectory. The stall carries µ_ψ from 8.48 to 51.68, a
+        # factor 6 of HEATING. The energy-damping drift/noise pair, alone in a
+        # scalar field, is the wrong SIGN and the wrong MAGNITUDE to be the cause.
+        #
+        # What this arm does NOT cover, written down so the next reader does not
+        # repeat today's error of using a measurement past its conditions: γ = 0
+        # (no growth term, and production's growth noise at T = 10 injects
+        # heavily), scalar, no DDI.
+        @test abs(es[end] - es[1]) < 1e-2 * abs(es[1])   # it barely moves — as expected
+
+        # BOTH RESERVOIRS, which is what production runs and what the arms above
+        # each miss half of. #334's three trajectories already bracket it:
+        #
+        #   ED off, noise on   µ_ψ 15.9 → 17.7   nearly flat
+        #   ED on,  noise off  (the T = 0 gate)  cools
+        #   ED on,  noise on   µ_ψ 8.5 → 51.7    a factor 6
+        #
+        # So the heating needs BOTH, and the scalar arm above cleared the
+        # scattering pair alone. What it did not have is γ ≠ 0 — the growth
+        # reservoir, whose noise at T = 10 injects heavily. This runs the pair.
+        (b0, b1) = cool_trace(; M=1.0, T=0.05, nstep=400)
+        function both_trace(; M, gam, T, nstep=400)
+            SpinorBEC.scratch_clear!()
+            w = flowing_state!(scalar_ws())
+            w.state.psi .*= 3.0
+            r = SPGPEReservoir(; T, mu=1.0, a_s=0.01, k_cut=5.0, gamma=gam, M,
+                allow_unphysical_rates=true)
+            a = field_chemical_potential(w)
+            for k in 1:nstep
+                apply_spgpe_step!(w, r, 0.002; t=0.0, seed=9000 + k, noise=true)
+            end
+            (a, field_chemical_potential(w))
+        end
+        (g0, g1) = both_trace(; M=1.0, gam=0.05, T=0.05)
+        Printf.@printf(
+            "  both reservoirs (M=1, γ=0.05, T=0.05): µ̃ %.4f → %.4f  (scattering alone: %.4f → %.4f)\n",
+            g0, g1, b0, b1)
+        # MEASURED 2026-08-21. Adding the growth reservoir does not reverse the
+        # cooling — it deepens it by two orders:
+        #
+        #   scattering alone   65.8286 → 65.3417   −0.74 %
+        #   BOTH reservoirs    65.8286 → 26.2414   −60 %
+        #
+        # So a scalar field under the full pair COOLS, hard. #334's ramp heats by
+        # a factor 6 under the same pair. The two-reservoir interaction is
+        # therefore NOT the cause either, and the scalar setting has now cleared
+        # every part of the SPGPE machinery in turn: the projector, the moving
+        # cutoff, energy damping alone, the scattering drift/noise pair, and the
+        # two reservoirs together.
+        #
+        # What the scalar setting does not have is the DDI and #334's own ramp and
+        # seed. Those are what is left, and this arm is the evidence that they are
+        # what is left rather than an assumption that they are.
+        @test g1 < g0 - 0.1 * abs(g0)     # the pair cools, and not marginally
+    end
+
     @testset "quiet damping rate matches −ℳ̄∫d³k|k·j̃|²/|k|" begin
         ws = flowing_state!(scalar_ws())
         M, dt = 1e-2, 1e-4
