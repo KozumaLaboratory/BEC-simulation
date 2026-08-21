@@ -889,10 +889,20 @@ function render()
         "; all counts " * join(["$(t[1])=$(t[2])" for t in tiers], " "))
     p("## Test tiers")
     p()
-    p("File counts from `$trel`. Membership is explicit — no auto-discovery.")
+    # The tier LISTS, not their sizes. `test/_tiers.jl` is the SSoT and a count is
+    # one `grep -c` away, but printing it here made this document stale every time
+    # a test file was added — on the PR that added it, and on every long-lived
+    # branch the moment main added one. Six round trips in one day (#426); one of
+    # them a merge conflict that cannot be resolved by hand, because a derived
+    # value has no correct side.
+    #
+    # The floor assertion above still READS the counts, so a tier collapsing to
+    # nothing is still caught. What is dropped is publishing a number that changes
+    # under everyone and tells a reader nothing the file does not.
+    p("Tier lists in `$trel`. Membership is explicit — no auto-discovery.")
     p()
-    for (name, n) in tiers
-        p("- `$name` — $n files")
+    for (name, _) in tiers
+        p("- `$name`")
     end
     p()
 
