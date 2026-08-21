@@ -323,6 +323,33 @@ overtakes it from the third point on. A verdict taken at either end is the oppos
 one taken at the other, and the two-point version of this paragraph said 7× and 2.9× in
 favour of slowing.
 
+### The design answer: halve the ramp
+
+Stretching the `FortRamp` time axis (same beam powers, more time) and reading the peak
+equilibrium $N_0$ off the same constraint:
+
+| slow | duration | $N_0^\mathrm{peak}$ | coll / e-fold | |
+|---|---|---|---|---|
+| 0.05× | 0.12 s | 3.29e4 | 0.020 | **INVALID** |
+| 0.10× | 0.24 s | 1.85e4 | 0.026 | **INVALID** |
+| 0.20× | 0.48 s | 3.41e4 | 0.054 | **INVALID** |
+| 0.30× | 0.72 s | 5.99e4 | 30.6 | OK |
+| **0.50×** | **1.2 s** | **6.01e4** | 74.2 | OK |
+| 1.00× | 2.4 s | 4.41e4 | 122 | OK |
+| 2.00× | 4.8 s | 2.83e4 | 161 | OK |
+
+**Halving the ramp is worth +36 %** — $4.41\times10^4 \to 6.01\times10^4$, above the
+measured $5.02\times10^4$ — and the optimum is a broad valley over 0.3–0.5×.
+
+The fast end is **not** physics. `condensate.jl` assumes "standard quasi-static
+two-component evaporation", and below 0.3× the trap depth outruns thermalisation: 0.02 to
+0.05 elastic collisions per e-folding of the depth against the conventional requirement of
+a few. That is exactly the region where $N_0^\mathrm{peak}$ goes non-monotone
+(3.29 → 1.85 → 1.64 → 3.41e4), which is what a model looks like when asked outside its
+assumptions — and it is why the validity column exists here rather than the recommendation
+being quoted from the first table alone. The recommended 0.3–0.5× sits at 30.6 and 74.2,
+comfortably inside.
+
 The slowdown run is a **numerical** experiment, not a ramp design: a genuinely slower ramp
 costs more three-body loss and would lower $N_\mathrm{total}$ everywhere. That was scanned
 separately and points the same way — $N_0^\mathrm{eq}$ at the peak falls monotonically
