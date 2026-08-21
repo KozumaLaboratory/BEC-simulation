@@ -280,6 +280,11 @@ const GS_SCHEMA = Dict{String, FieldSpec}(
     "B_direction" => FieldSpec(; type=Dict),        # rotating_basis path
     "F" => FieldSpec(; type=Integer, range=(0, 12)),   # rotating_basis F override
     "gauge_fix" => FieldSpec(; type=Bool, default=true),  # rotating_basis
+    # Relax at the REVERSED field, hand the dynamics the requested one. The only
+    # way to obtain the anti-aligned (Zeeman-highest) state, because imaginary
+    # time is a projector onto the LOWEST state — see run_step_rotating/
+    # ground_state.jl. Not a seed choice: `init_m_idx` cannot express it.
+    "prepare_anti_aligned" => FieldSpec(; type=Bool, default=false),
     "init_m_idx" => FieldSpec(; type=Integer, range=(1, 25)),
     "init_sigma" => FieldSpec(; type=Number, range=(0.0, 100.0)),
     "method" => FieldSpec(; type=String, default="itp", enum=["itp", "lbfgs"]),

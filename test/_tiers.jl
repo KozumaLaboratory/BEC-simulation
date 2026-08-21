@@ -3,6 +3,17 @@
 # like test_tier_membership.jl still sees FAST_TESTS / MANUAL_TESTS_ALLOWLIST
 # / select_tests when it runs inside a parallel chunk process. Tier
 # membership stays explicit (CLAUDE.md commitment #7).
+#
+# EDITING THIS FILE MEANS REGENERATING docs/STATE.md:
+#
+#     julia --project=. scripts/generate_state.jl
+#
+# `test_state_doc_is_current.jl` counts the tiers and fails when the committed
+# doc disagrees, printing the command. It caught a two-file drift on this
+# branch — committed CI_EXTRA 143 against a derived 141 — because the doc was
+# regenerated during a merge and the tiers were edited AFTERWARDS. The gate
+# does its job; what it cannot do is fire before the commit, so the ordering
+# is written here where the edit happens.
 
 # ── Fast tier: pure unit tests, no find_ground_state / run_simulation ──
 const FAST_TESTS = [
@@ -334,6 +345,8 @@ const FAST_TESTS = [
     # side of this conflict would have put it back and reddened CI again — a union
     # of both sides is not a resolution when one side is a fix.
     "dynamics/test_spgpe_projector_composition.jl",
+    "dynamics/test_mu_from_total_number.jl",
+    "dynamics/test_mu_equilibrium_constraint.jl",
     "workflow/test_measurement_provenance.jl",
     "hamiltonian/test_majorana.jl",
     "analysis/test_diagnostics.jl",
@@ -455,6 +468,11 @@ const FAST_TESTS = [
 
 # ── CI tier: fast + core integration tests that run ITP/RTP ──
 const CI_EXTRA = [
+    # Evolve a field, so they are not FAST. The cayley gate alone runs four
+    # testsets at ~3 min each; putting it in FAST timed the job out at 15 min
+    # and cancelled it, which reads as "CI cancelled" rather than "too slow".
+    "dynamics/test_energy_damping_buffer_reuse.jl",
+    "dynamics/test_mu_lda_constraint.jl",
     # (physics block × solver path) table: the term must be LIVE on the
     # Workspace after a YAML run, on every path. Drives run_config, so `ci`
     # rather than `fast`. Replaces the per-incident plumbing files — a new path
@@ -850,6 +868,12 @@ const CI_EXTRA = [
 
 # ── Full tier: everything (ci + remaining heavy tests) ──
 const FULL_EXTRA = [
+    # Measured: 750 s and 240 s. They were in FAST (timed that job out at 15 min),
+    # then in CI_EXTRA (timed integration out at 30 min). Twelve minutes of the
+    # integration budget for two files is not a per-PR gate; they run in `full` and on
+    # TSUBAME, where they were developed and where their numbers were measured.
+    "dynamics/test_energy_damping_cayley.jl",
+    "dynamics/test_number_conserving_spgpe.jl",
     # 1266 s on its own — three independent SPGPE equilibrium solves at
     # n = 48, each run to steady state from both directions. It was in
     # FAST_TESTS, where the job budget is 15 min: no worker count can help,
@@ -948,6 +972,12 @@ const FULL_EXTRA = [
     # dict-based analyzers.
     "rotating_basis/test_rotating_basis_analyzers.jl",
     "rotating_basis/test_rotating_basis_pipeline_parsing.jl",
+    # `prepare_anti_aligned`: relax in the reversed field, hand the dynamics the
+    # requested one. Full tier because it runs real ITP arms — but it is the only
+    # gate on WHICH END OF THE ZEEMAN LADDER a run prepares, which is the
+    # controlling variable of the EdH campaign, so it carries its own aligned
+    # control arm rather than asserting one sign in isolation.
+    "rotating_basis/test_anti_aligned_preparation.jl",
     "rotating_basis/test_magnetostir_pipeline_physics.jl",
     # First-principles φ̇≠0 gate: lab-frame pipeline vs exact single-spin
     # reference. Arbitrated the engine retirement — the retired engine's
@@ -1059,6 +1089,16 @@ const INTEGRATION_TESTS = filter(t -> !startswith(t, "oracles/"), CI_EXTRA)
 # renamed/retired test can't leave dead weight in the balancer.
 const _DEFAULT_COST = 3.0
 const _COST = Dict{String, Float64}(
+    # Measured on TSUBAME. The cayley gate is four testsets at ~3 min each, which is
+    # why it belongs nowhere near FAST: it timed the fast job out at 15 min and the
+    # run came back "cancelled", which reads as infrastructure rather than as a test
+    # that is too slow for the tier it was put in.
+    "dynamics/test_energy_damping_cayley.jl" => 750.0,
+    "dynamics/test_number_conserving_spgpe.jl" => 240.0,
+    "dynamics/test_energy_damping_buffer_reuse.jl" => 120.0,
+    "dynamics/test_mu_lda_constraint.jl" => 60.0,
+    "dynamics/test_mu_from_total_number.jl" => 8.0,
+    "dynamics/test_mu_equilibrium_constraint.jl" => 8.0,
     # Three coarse-grid scalar-eGPE ITP solves for the magnetostriction
     # direction oracle; the rest is table lookups against a stored JSON.
     "validation/test_klaus2022_vortex_stripes.jl" => 25.0,

@@ -1,4 +1,5 @@
 export classical_field_equilibrium, thermal_cfield!
+export incoherent_lda, mu_from_total_lda
 
 """
     classical_field_equilibrium(; T, mu, c0, omega=1.0, n_T=1.0, rmax, nr) -> (; r, n0, nth, N0, Nth, T_c_crossed)
@@ -142,4 +143,94 @@ function thermal_cfield!(
         n_loc > 0 && (psi[I, comp] = sqrt(n_loc) * buf[I])
     end
     real(sum(abs2, psi)) * cell_volume(grid)
+end
+
+"""
+    incoherent_lda(; T, mu, c0, eps_cut, omega=1.0, rmax, nr) -> Float64
+
+Semiclassical Hartree–Fock population of the I region: every phase-space cell above
+`eps_cut`, with the Bose occupation taken at the **effective** chemical potential
+
+    μ_eff(r) = μ − V(r) − 2c₀[n_c(r) + ñ(r)]
+
+so `N_I = ∫d³r ∫_{|p|>p_c} d³p/(2π)³ [exp((p²/2 − μ_eff)/T) − 1]⁻¹`,
+`p_c(r) = √(2(ϵ_cut − V − 2c₀n))`.
+
+# Why the effective potential, and why a level sum was wrong
+
+An earlier version summed discrete harmonic levels with occupation `1/(e^{(ε−μ)/T}−1)`
+and skipped every level below `μ`. That is not an approximation, it is a different
+problem: the total then jumped down as `μ` crossed a level — measured in
+`scripts/kz/mu_constraint_continuity.jl`, `N_C^th` fell 377 → 258 between μ = 2.375
+and 2.5, and the whole constraint became NON-MONOTONE, which is why a 200-iteration
+bisection returned 2.34 for 2.5.
+
+There are no levels to skip. Inside the condensate the Thomas–Fermi relation
+`μ = V + c₀n_c + 2c₀ñ` makes `μ_eff = −c₀n_c ≤ 0`, so the Bose argument
+`z = e^{βμ_eff}` never reaches 1 and the occupation never diverges. The exchange
+factor of 2 attaches to the thermal density and not the condensate density — Popov /
+Zaremba–Griffin–Nikuni; see Giorgini, Pitaevskii & Stringari, cond-mat/9704014.
+"""
+function incoherent_lda(; T::Real, mu::Real, c0::Real, eps_cut::Real,
+    omega::Real=1.0, rmax::Real=12.0, nr::Int=600, n_bose::Int=48)
+    T > 0 || return 0.0
+    eq = classical_field_equilibrium(; T, mu, c0, omega, n_T=(eps_cut - mu) / T,
+        rmax, nr)
+    r = eq.r
+    dr = step(r)
+    β = 1 / Float64(T)
+    s = 0.0
+    for i in eachindex(r)
+        V = 0.5 * Float64(omega)^2 * r[i]^2
+        n = eq.n0[i] + eq.nth[i]
+        μ_eff = Float64(mu) - V - 2 * Float64(c0) * n
+        pc2 = 2 * (Float64(eps_cut) - V - 2 * Float64(c0) * n)
+        pc = pc2 > 0 ? sqrt(pc2) : 0.0
+        # (1/2π²)∫_{pc}^∞ p² Σ_j exp(−j(p²/2 − μ_eff)/T) dp, term by term. The upper
+        # tail of each Gaussian moment is closed-form, so no quadrature in p.
+        acc = 0.0
+        for j in 1:n_bose
+            a = j * β
+            z = exp(j * β * μ_eff)
+            z < 1e-16 && break
+            # ∫_pc^∞ p² e^{−a p²/2} dp = pc e^{−a pc²/2}/a + √(π/2)erfc(pc√(a/2))/a^{3/2}
+            tail = pc * exp(-a * pc^2 / 2) / a +
+                   sqrt(π / 2) * erfc(pc * sqrt(a / 2)) / a^1.5
+            acc += z * tail
+        end
+        s += (acc / (2π^2)) * 4π * r[i]^2 * dr
+    end
+    s
+end
+
+"""
+    mu_from_total_lda(N_total; T, c0, eps_cut, omega=1.0, rmax, nr) -> (; mu, N0, Nth_C, N_I)
+
+Solve `N₀(μ) + ñ_C(μ) + N_I(μ) = N_total` with every region evaluated at the same `μ`
+through the self-consistent effective potential.
+
+`N₀` and `ñ_C` come from [`classical_field_equilibrium`](@ref) — the C region is a
+classical field, so its occupation is Rayleigh–Jeans and not Bose — and `N_I` from
+[`incoherent_lda`](@ref). The condensate number is an OUTPUT: it is whatever the
+constraint leaves once the thermal regions take their share at that `μ`.
+"""
+function mu_from_total_lda(N_total::Real; T::Real, c0::Real, eps_cut::Real,
+    omega::Real=1.0, rmax::Real=12.0, nr::Int=400, rtol::Real=1e-6, iters::Int=80)
+    (N_total <= 0 || T <= 0) && return (; mu=NaN, N0=NaN, Nth_C=NaN, N_I=NaN)
+    function parts(mu)
+        eq = classical_field_equilibrium(; T, mu, c0, omega,
+            n_T=(Float64(eps_cut) - mu) / Float64(T), rmax, nr)
+        NI = incoherent_lda(; T, mu, c0, eps_cut, omega, rmax, nr)
+        (; N0=eq.N0, Nth_C=eq.Nth, N_I=NI, tot=eq.N0 + eq.Nth + NI)
+    end
+    lo, hi = -20.0 * Float64(T), Float64(eps_cut)
+    parts(hi).tot >= N_total || return (; mu=NaN, N0=NaN, Nth_C=NaN, N_I=NaN)
+    for _ in 1:iters
+        mid = 0.5 * (lo + hi)
+        (parts(mid).tot < N_total) ? (lo = mid) : (hi = mid)
+        abs(hi - lo) <= rtol * max(abs(hi), 1.0) && break
+    end
+    mu = 0.5 * (lo + hi)
+    p = parts(mu)
+    (; mu, p.N0, p.Nth_C, p.N_I)
 end
