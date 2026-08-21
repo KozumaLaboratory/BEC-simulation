@@ -55,6 +55,18 @@ UNMEASURABLE from what the runs record — they log the reservoir's μ and not t
 field's. Two hand-rolled copies is where a third gets it subtly different.
 
 Costs one Hψ application, so it belongs at frame cadence, not per step.
+
+WHAT IT IS NOT. This is a MEAN, and it does not tell you whether N_C will grow.
+The growth term is γ(µ − L)ψ acting as an OPERATOR: low-energy modes see Lψ below
+µ and grow while the mean, dominated by the C region's hot high-k content, sits
+far above it. Measured on #334's ramp — both arms carry µ̃ ≈ 16-20 against
+µ_res ≈ 8.6, and the growth-only arm GROWS anyway. A scalar cannot answer a
+mode-resolved question, and reading it as "the drive" produced a wrong conclusion
+that its own control refuted.
+
+What it does measure is the field's mean energy per atom, which is a thermometer:
+with energy damping on it climbs 6× faster than without, coincident with the
+condensate decaying.
 """
 function field_chemical_potential(ws)
     hpsi = similar(ws.state.psi)

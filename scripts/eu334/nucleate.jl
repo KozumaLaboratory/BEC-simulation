@@ -159,13 +159,13 @@ function per_atom(psi_dev, grid, plans)
 end
 
 """µ = Re⟨ψ, Ĥ[ψ]ψ⟩ / ⟨ψ,ψ⟩ — normalisation-independent, and the number the
-reservoir has to be told."""
-function chemical_potential(ws)
-    dV = cell_volume(ws.grid)
-    hpsi = similar(ws.state.psi)
-    apply_operator_via_registry!(hpsi, ws)
-    real(sum(conj(ws.state.psi) .* hpsi)) * dV / (real(sum(abs2, ws.state.psi)) * dV)
-end
+reservoir has to be told.
+
+Delegates: this script had its own copy and `field_chemical_potential` was added
+to the package for the same quantity, which is the third-copy problem the latter's
+docstring warns about — committed while writing that warning. The formulas were
+identical (the dV cancels) so nothing was wrong, and that was luck."""
+chemical_potential(ws) = field_chemical_potential(ws)
 
 make_ws(psi, interactions, c_dd; n_steps=0) = make_workspace(;
     grid=PRESET_N.grid, atom=ATOM, interactions=interactions,
