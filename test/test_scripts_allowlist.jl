@@ -53,6 +53,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_mutation_sweep.sh",
     "submit_kz_exponent.sh",
     "submit_eu_bscan.sh",
+    "submit_lt64_endpoint_ensemble.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
