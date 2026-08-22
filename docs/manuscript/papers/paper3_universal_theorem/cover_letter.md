@@ -94,7 +94,7 @@ correction has been computed only case-by-case. Our work:
 - M. Ueda, Y. Kawaguchi — foundational spinor BEC reviews
 - F. Cinti, T. Macrì — LHY droplets, beyond-mean-field
 - M. Lima, A. Pelster — dipolar LHY
-- T. Kozuma, B. Lev — Eu / Dy experimental programs
+- M. Kozuma, B. Lev — Eu / Dy experimental programs
 - N. Cooper — group-theoretic spinor BEC
 
 ### Audit & reproducibility
