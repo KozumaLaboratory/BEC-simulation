@@ -98,7 +98,7 @@ deterministic dynamics itself.
 - A. Polkovnikov (Boston) — TWA validity theory
 - Y. Castin (LKB) — particle-conserving Bogoliubov, Sinatra criterion
 - T. Macrì, F. Cinti — dipolar BEC droplets
-- T. Kozuma (Tokyo Tech) — ${}^{151}$Eu experimental program
+- M. Kozuma (Science Tokyo) — ${}^{151}$Eu experimental program
 - L. Tarruell, J. Beugnon — dipolar BEC experiments
 
 ### Companion submissions

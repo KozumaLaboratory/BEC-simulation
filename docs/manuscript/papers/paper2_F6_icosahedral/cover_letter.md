@@ -22,8 +22,8 @@ mean-field theory have remained unaddressed analytically.
 
 ¹⁵¹Eu has emerged as the strongest-dipolar bosonic system experimentally
 accessible (μ_Eu ≈ 7μ_B, dipole-dipole length larger than scalar scattering
-length at zero field), with active laboratory programs (Kozuma group, Tokyo
-Tech, others) preparing the F=6 spinor BEC. Theoretical predictions for ¹⁵¹Eu
+length at zero field), with active laboratory programs (Kozuma group, Science
+Tokyo, others) preparing the F=6 spinor BEC. Theoretical predictions for ¹⁵¹Eu
 phase diagrams rely on mean-field Gross-Pitaevskii calculations whose
 quantitative accuracy near the icosahedral / cyclic / polar phase boundaries
 is unknown without the next-to-leading LHY correction.
@@ -82,7 +82,7 @@ spin-channel contributions that those scalar-LHY treatments cannot capture.
 ### Suitable referees
 
 - Y. Kawaguchi (Kyoto), M. Ueda (RIKEN) — foundational spinor BEC
-- T. Kozuma (Tokyo Tech) — ¹⁵¹Eu experimental program
+- M. Kozuma (Science Tokyo) — ¹⁵¹Eu experimental program
 - L. Tarruell, J. Beugnon — dipolar BEC LHY experiments
 - N. Cooper — group-theoretic approaches to spinor BEC
 
