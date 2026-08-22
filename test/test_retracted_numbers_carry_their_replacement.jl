@@ -289,3 +289,135 @@ end
     fell = [r for r in actual if r.covered < get(pinned, r.doc, 0) + 1_000_000]
     @test length(fell) == length(actual)          # the comparison is live
 end
+
+@testset "a retraction rests on something the tree can resolve" begin
+    # THE CORRECTION IS A CLAIM TOO, and this project keeps forgetting it.
+    # Eight times in the PR history a retraction was itself wrong and had to be
+    # withdrawn:
+    #
+    #   #197  called BOTH factorial claims refuted; one of them survived.
+    #   #215  "the NaN mechanism covers the eps_dd domain" — it does not.
+    #   #295  acted on a regenerate-or-retract list built with the broken matcher
+    #         #288 documents, so TWO documents retracted claims they did not
+    #         need to. The data was sitting on disk the whole time.
+    #   #358  the attribution correction said the paper "does not exist", eight
+    #         lines above a citation to the same arXiv number.
+    #   #411  "the loss is one-off" — measured with `noise=false`, generalised to
+    #         production, and the gate itself said so.
+    #   #436  the correction was premature TWICE, replacing one window-dependent
+    #         number with a different window-dependent number.
+    #   #442  "relaxing the ramp helps" — reversed by #446 at 0.05 sigma.
+    #
+    # The common shape is not haste. It is that a retraction was allowed to rest
+    # on PROSE — a reading, a list, an inference — while the claim it killed had
+    # to rest on a run. The ledger already carries the two fields that say
+    # whether a row rests on anything (`evidence_status`, `uncertainty_basis`);
+    # nothing required them of the row doing the killing.
+    #
+    # So: a row that is CURRENTLY BELIEVED and supersedes another must have
+    # evidence that resolves in this tree, and a stated basis for its
+    # uncertainty. Deliberately NOT required of `refuted`/`superseded` rows —
+    # a retraction that was later itself retracted is a real outcome the ledger
+    # exists to hold (`edh-two-branches-5p2nt` is exactly that), and demanding
+    # live evidence from a dead row would push people to delete it.
+    #
+    # It does not check that the evidence SAYS what the row claims. It checks
+    # that a replacement cannot be made out of nothing, which is what #295 was.
+    grounded(status, supersedes, evidence_status, uncertainty_basis) =
+        isempty(supersedes) || status in ("superseded", "refuted") ||
+        (evidence_status == "in_tree" && uncertainty_basis != "none")
+
+    # Controls on the predicate, before it is pointed at the ledger. Both
+    # failure modes of #295 must be visible, and an ordinary row must pass —
+    # a rule that reddens on correct writing is a rule that gets deleted.
+    @test !grounded("live", ["x"], "absent", "control")     # nothing to re-read
+    @test !grounded("live", ["x"], "in_tree", "none")       # nothing bounds it
+    @test grounded("live", ["x"], "in_tree", "control")     # the good case
+    @test grounded("live", String[], "absent", "none")      # supersedes nothing
+    @test grounded("refuted", ["x"], "absent", "none")      # itself withdrawn
+
+    claims = claim_ledger()
+    believed = [
+        c for c in claims
+              if !isempty(c.supersedes) && !(c.status in ("superseded", "refuted"))
+    ]
+    # Non-vacuity: if no live row supersedes anything, the arm below is a green
+    # over an empty set and says nothing.
+    @test !isempty(believed)
+
+    ungrounded = [
+        c for c in believed
+        if !grounded(c.status, c.supersedes, c.evidence_status,
+            c.uncertainty_basis)
+    ]
+    isempty(ungrounded) || println(
+        "  these rows retract another claim without resolvable grounds:\n    ",
+        join(
+            [
+                "$(c.id)  (evidence_status=$(c.evidence_status), " *
+                "uncertainty_basis=$(c.uncertainty_basis)) supersedes " *
+                join(c.supersedes, ", ") for c in ungrounded
+            ], "\n    "),
+        "\n  → point `evidence` at runs in this tree and give the number a basis, ",
+        "or leave the old row live and say what is unresolved.")
+    @test ungrounded == LedgerClaim[]
+end
+
+@testset "a refutation with no replacement carries its own grounds" begin
+    # THE HOLE IN THE ARM ABOVE, and it was the bigger half. That arm binds the
+    # row doing the KILLING, so it reaches only retractions that produced a
+    # replacement. FOUR of the thirteen retired rows have no `superseded_by` at
+    # all — `edh-window-1p3nt-0p3` (there is no operating window at 1.3 nT, so
+    # the old `≈0.3` has nowhere to move to), `edh-5p2nt-dip-is-a-resonance`,
+    # `edh-longtime-static-sustains`, `fftw-visible-cpu-count-hypothesis`.
+    #
+    # "Refuted with no replacement" is a real outcome and the ledger exists to
+    # hold it. It is also the shape with the LEAST redundancy in the tree: when
+    # a replacement exists the successor row carries the measurement and the arm
+    # above checks it; when there is none, nothing else says why this died. So
+    # the row itself has to, or the retraction is exactly the prose-grounded
+    # kind #295 acted on.
+    #
+    # `note` and `pr`, NOT `evidence_status`. A refuted row's `evidence` field
+    # describes what the DEAD claim rested on, and demanding `in_tree` there
+    # would ask people to preserve the very runs that turned out to support
+    # nothing. What is wanted is a pointer to the work that killed it. `commit`
+    # is deliberately not accepted as a substitute: 9 of the 13 retired rows
+    # carry the literal string "unknown" there, so a rule keyed on it would be
+    # satisfied by a value that names nothing.
+    self_grounded(status, superseded_by, note, pr) =
+        !(status in ("superseded", "refuted")) || superseded_by !== nothing ||
+        (note !== nothing && !isempty(strip(note)) && pr !== nothing)
+
+    # Controls on the predicate, before it is pointed at the ledger.
+    @test !self_grounded("refuted", nothing, "measured at 64³", nothing)  # no PR
+    @test !self_grounded("refuted", nothing, nothing, 410)                # no note
+    @test !self_grounded("refuted", nothing, "   ", 410)                  # blank note
+    @test self_grounded("refuted", nothing, "measured at 64³", 410)       # good
+    @test self_grounded("refuted", "a-successor", nothing, nothing)       # successor carries it
+    @test self_grounded("live", nothing, nothing, nothing)                # not a retraction
+
+    claims = claim_ledger()
+    bare = [
+        c for c in claims
+              if c.status in ("superseded", "refuted") && c.superseded_by === nothing
+    ]
+    # Non-vacuity in BOTH directions: there must be bare retirements to bind,
+    # and non-bare ones too, or the split is not doing any work.
+    @test !isempty(bare)
+    @test any(
+        c -> c.status in ("superseded", "refuted") && c.superseded_by !== nothing,
+        claims)
+
+    naked = [c for c in bare if !self_grounded(c.status, c.superseded_by, c.note, c.pr)]
+    isempty(naked) || println(
+        "  refuted with no replacement AND no grounds of its own:\n    ",
+        join(
+            [
+                "$(c.id)  (note=$(c.note === nothing ? "-" : "set"), pr=$(c.pr))"
+                for c in naked
+            ], "\n    "),
+        "\n  → say in `note` what measurement killed it, and give the `pr`. ",
+        "Nothing else in the tree carries it for a row with no successor.")
+    @test naked == LedgerClaim[]
+end
