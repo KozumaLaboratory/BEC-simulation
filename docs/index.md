@@ -73,6 +73,7 @@ docs/
 | Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
 | Whether a stored `runs/` result can still be quoted | `validation/stored_results_vintage_audit.md` |
 | Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
+| Whether a mistake you are about to make has a class, a count and a gate already | `campaign/pr_mistake_census_2026_08_22.md` (frozen; `scripts/pr_mistake_census.py` re-derives it) |
 | Which polarisation an EdH / rotation-assisted run must prepare, and why the m label alone is not the answer | `campaign/edh_quench_polarisation_decision.md` |
 | Whether a claim survives the ¹⁵¹Eu `a_S` measurement, or waits for it | `campaign/as_dependency_map.md` |
 | Dipolar supersolid tube (type-C reproduction) | `validation/dipolar_supersolid_tube.md` |

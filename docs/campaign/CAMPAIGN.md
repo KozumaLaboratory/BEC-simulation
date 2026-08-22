@@ -255,6 +255,13 @@ ordering is worth *more* when execution is cheap, not less.
 - Use **subagents** for read-only breadth (e.g. "audit all docs for stale limit claims").
   Keep the main context for the edit.
 - **Bounded reading.** Each prompt lists the files to read. Do not read `runs/` wholesale.
+- **Before treating a defect as new, check whether it has a class.**
+  `pr_mistake_census_2026_08_22.md` folds PR #1–#446 into eight recurring classes
+  and names the gate standing over each. Every class has one; the point of
+  looking is to find out that the thing you just hit is already understood, and
+  which gate should have caught it. The document is FROZEN — the present is held
+  by the gates, and if the two disagree the gate wins. `scripts/pr_mistake_census.py`
+  re-derives it (`--verify-doc`, `--extract --since <n>`, `--counts`).
 - If the session degrades or exceeds its turn estimate by ~2×: **write a handoff note to
   `docs/archive/` and stop.** Do not push through.
 - Respect `.githooks/pre-commit`, `.JuliaFormatter.toml`, and `CLAUDE.md`
