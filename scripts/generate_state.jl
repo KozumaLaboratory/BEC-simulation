@@ -144,7 +144,11 @@ function ham_terms()
             end
             ln > 0 && break
         end
-        push!(rows, (string(sym), found, ln > 0 ? "$home:$ln" : "(struct not found)"))
+        # The FILE, not file:line — same reason as `callsites` above. The struct
+        # name is already the first column, so the line number added nothing that
+        # was not already there, and cost a round trip whenever anything above it
+        # moved.
+        push!(rows, (string(sym), found, ln > 0 ? home : "(struct not found)"))
     end
     rows
 end
@@ -366,6 +370,18 @@ function admission_facts()
         m === nothing && continue
         push!(prov, (m.captures[2], m.captures[1], n))
     end
+    # A site is named by its ENCLOSING FUNCTION, not by a line number.
+    #
+    # Line numbers made this document stale on essentially every PR that touches
+    # src/: adding one function 30 lines above a call site rewrites the anchor
+    # without changing anything it describes. That cost a regenerate-and-push
+    # round trip five times in one day (#426), and a merge conflict that cannot be
+    # resolved by hand — the value is derived, so neither side of the conflict is
+    # right.
+    #
+    # A symbol goes stale when the function is RENAMED, which is the case where
+    # the surrounding prose should be re-read anyway. That is the difference
+    # between an anchor that tracks the thing and one that tracks its position.
     function callsites(fname)
         out = String[]
         for (root, _, fs) in walkdir(joinpath(ROOT, "src"))
@@ -373,14 +389,17 @@ function admission_facts()
             for f in fs
                 endswith(f, ".jl") || continue
                 path = joinpath(root, f)
-                for (n, l) in enumerate(eachline(path))
+                enclosing = "(top level)"
+                for l in eachline(path)
+                    fm = match(r"^\s*function\s+([A-Za-z_][A-Za-z0-9_!]*)", l)
+                    fm === nothing || (enclosing = fm.captures[1])
                     startswith(strip(l), "#") && continue
                     occursin(Regex("\\b" * fname * "\\("), l) || continue
-                    push!(out, relpath(path, ROOT) * ":" * string(n))
+                    push!(out, relpath(path, ROOT) * ":" * enclosing)
                 end
             end
         end
-        out
+        unique(out)
     end
     (prov, callsites("admit_payload"), callsites("verify_verdict"))
 end
@@ -625,7 +644,9 @@ function render()
         "are all unconditional in the source)")
     p("## Split-step: the forward outer-potential chain")
     p()
-    p("Read from `OUTER_CHAIN` (`$rel:$ln`), the Tuple both directions derive from:")
+    # `$ln` was a line number for the same reason and with the same cost; the
+    # constant's own name is the stable anchor.
+    p("Read from `OUTER_CHAIN` (`$rel`), the Tuple both directions derive from:")
     p("`_outer_operators_fwd!` runs it as declared, `_outer_operators_bwd!` runs")
     p("`reverse` of it. **$(length(ops)) substeps.** Each auto-skips when its")
     p("coupling is ≈ 0.")
@@ -868,10 +889,20 @@ function render()
         "; all counts " * join(["$(t[1])=$(t[2])" for t in tiers], " "))
     p("## Test tiers")
     p()
-    p("File counts from `$trel`. Membership is explicit — no auto-discovery.")
+    # The tier LISTS, not their sizes. `test/_tiers.jl` is the SSoT and a count is
+    # one `grep -c` away, but printing it here made this document stale every time
+    # a test file was added — on the PR that added it, and on every long-lived
+    # branch the moment main added one. Six round trips in one day (#426); one of
+    # them a merge conflict that cannot be resolved by hand, because a derived
+    # value has no correct side.
+    #
+    # The floor assertion above still READS the counts, so a tier collapsing to
+    # nothing is still caught. What is dropped is publishing a number that changes
+    # under everyone and tells a reader nothing the file does not.
+    p("Tier lists in `$trel`. Membership is explicit — no auto-discovery.")
     p()
-    for (name, n) in tiers
-        p("- `$name` — $n files")
+    for (name, _) in tiers
+        p("- `$name`")
     end
     p()
 

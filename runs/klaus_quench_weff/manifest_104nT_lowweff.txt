@@ -1,0 +1,24 @@
+# Below the lower edge of the 10.4 nT scan.
+#
+# The mean reading — no free parameter once the hold is fixed — rises
+# monotonically toward omega_eff = 0.350, which is the LOWER EDGE of the sampled
+# range, with the interior a minimum at 0.790. A boundary argmax is not an
+# optimum: it says the range does not contain one. These six arms extend it.
+#
+# NOT a 64^3 grid check, which was the queued job before this and is still
+# cancelled. Refining the resolution of a scan whose optimum lies outside its own
+# range measures resolution against a boundary artifact.
+#
+# Physical floor, and it is real: omega_eff = sqrt(1 - Omega^2), so these
+# correspond to |Omega| = 0.94 to 0.99 — at the centrifugal limit the effective
+# radial trap vanishes and the cloud is no longer bound in the plane. As a STATIC
+# trap there is no rotation, but the same weak radial confinement applies, so the
+# arms near 0.15 are expected to be dominated by expansion rather than by the
+# cascade. If the mean keeps rising all the way down, that is the signature of
+# the cloud leaving the trap, not of a better operating point.
+runs/klaus_quench_weff/klaus_weff0p150_B10p4nT.yaml
+runs/klaus_quench_weff/klaus_weff0p200_B10p4nT.yaml
+runs/klaus_quench_weff/klaus_weff0p250_B10p4nT.yaml
+runs/klaus_quench_weff/klaus_weff0p280_B10p4nT.yaml
+runs/klaus_quench_weff/klaus_weff0p310_B10p4nT.yaml
+runs/klaus_quench_weff/klaus_weff0p340_B10p4nT.yaml

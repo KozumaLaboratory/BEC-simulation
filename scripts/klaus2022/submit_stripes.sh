@@ -108,11 +108,37 @@ echo "results=$KLAUS_RESULTS"
 # not have met (jobs 8445116/7/8, all `execd enforced h_rt limit` at 7195 s).
 # Writing the caveat is not measuring it.
 #
-# STILL NOT EXPLAINED: why 16 threads costs 36.9 GB at 48^3 and 1.15 GB at
-# 128^3 — a 19x LARGER problem using 32x LESS memory at the same thread count.
-# "Small grid x many threads is pathological" is as far as the measurements go.
-# The same `-t 16` with FFTW at 16 also peaks at 1.12 GB locally on a 10-core
-# box, so the visible-CPU count (384 on the node) is a candidate; untested.
+# EXPLAINED 2026-08-21 (#407), and the axis was not the thread count.
+#
+# `scripts/klaus2022/fftw_thread_probe.jl`, one process per point, cpu_16,
+# `julia -t 16`, FFTW 16 threads, MEASURE, cubic complex in-place:
+#
+#   n     48     50     54     64     80     96     98     128
+#   radix 2^4*3  2*5^2  2*3^3  2^6    2^4*5  2^5*3  2*7^2  2^7
+#   RSS   1.66   2.40   3.01   0.35   4.26   6.73   11.97  0.38   GB
+#
+# THE ONLY CHEAP SIZES ARE THE POWERS OF TWO. "19x larger, 32x less memory" is
+# arithmetic once the axis is the RADIX rather than n: 128 is 2^7 and 48 is not.
+# Among mixed-radix sizes the cost grows with n, as per-thread planner scratch
+# should.
+#
+# Three things are required, and removing any one removes it:
+#   * MEASURE (at ESTIMATE every size above is 0.33-0.36 GB)
+#   * REAL Julia threads — at `julia -t 1` with FFTW still reporting 16 threads
+#     every size is 0.26-0.30 GB. FFTW.jl runs its parallel loop through Julia's
+#     threadpool, so -t 1 serialises the planner. THIS IS THE AXIS THE ISSUE DID
+#     NOT HAVE, and the first pass of the probe ran at -t 1 and reported a clean
+#     flat null about a configuration nobody had run.
+#   * a non-power-of-two length.
+#
+# REFUTED: the "library reads /proc/cpuinfo (384) not the cgroup (16)" guess.
+# Narrowing the visible set with taskset to 16 CPUs does NOT fix it — 48^3 still
+# takes 2.26 GB, 96^3 8.38 GB, with the affinity mask at 16.
+#
+# So the knob in this script is not wrong, it is coincidental: production is
+# 128^3, a power of two, where 16 threads is safe AND fastest; the smoke is
+# 48x48x24, where it is not. `make_fft_plans` now warns on the combination, and
+# `SPINORBEC_FFT_PLAN=estimate` is the deliberate opt-out.
 #
 # The first failure was a SIGSEGV inside FFTW's threaded spawn loop (8444494)
 # and the stack trace pointed at FFTW as a bug. TWO FAILURE MODES FROM ONE

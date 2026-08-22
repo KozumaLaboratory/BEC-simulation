@@ -237,7 +237,9 @@ resolvable excitation does not notice the branch end at all.
 
 ## 6. Answer
 
-**The spectrum does not see a spinodal at 68.4 µG.** Three measurements, none of
+**The spectrum does not see a spinodal at 68.4 µG.** This section is what
+SUPERSEDED the landscape reading — ledger row `eu335-68p4-is-a-mean-field-spinodal`
+→ `eu335-68p4-is-where-continuation-loses-the-branch`. Three measurements, none of
 which needed a converged eigenvalue:
 
 1. the curvature along the branch, 2.62 → 2.12 over 61→67 µG, extrapolating to

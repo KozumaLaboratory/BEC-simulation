@@ -117,6 +117,32 @@ a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
   comes from a different extractor, and I did not confirm the two definitions
   agree. Quoting the ratio would repeat the Fig 3 error of comparing a
   time-maximum against a final-state value because both were called "peak".
+
+  **CHECKED 2026-08-22 (#281). They do not agree, in three independent ways,
+  and the caution was right.** Reading both definitions rather than inferring
+  them — the retired one from `runs/eu151_edh_v2/extract_trajectory.jl` at
+  `e2159486^`, the live one from `src/workflow/experiment_observables.jl:43`:
+
+  | | stored `DeltaFz` | live `Fz_drift` |
+  |---|---|---|
+  | normalisation | **per atom** — `Fz_per_N[i] = Fz[i] / norms[i]` | **total** `F_z`, not divided by anything |
+  | time reduction | **endpoint** difference, `[end] − [1]` | **maximum over the trajectory**, `max\|·\|` |
+  | sign | signed | absolute value |
+
+  Any one of the three would make the ratio meaningless. The first is decisive
+  *on these particular arms*: they are the lossy ones, ending at **51.6 %** and
+  **24.4 %** of their initial atom number, so dividing by `norms[i]` versus not
+  is a factor of ~2 and ~4 by the end of the run. A −4.3 % agreement between two
+  quantities that differ by a factor of four is a coincidence, and reporting it
+  would have been the Fig 3 error exactly.
+
+  **It is reconstructible, and that is a separate job.** The stored block keeps
+  both `Fz_per_N` and `N_over_N0`, so the total series is
+  `Fz[i] = Fz_per_N[i] · N_over_N0[i] · norms[1]`, and a like-for-like
+  `max\|Fz[i] − Fz[1]\|` follows once `norms[1]` is pinned from the config. That
+  needs the stored `trajectory.json` for these two cells, which is not what this
+  re-derivation was scoped to open. Recorded here so the next person does not
+  re-derive the obstruction.
 - **`peak_max` has no stored counterpart** for these two configs. Their stored
   summaries contain `N_trajectory` and nothing else, so there is no like-for-like
   density number to put beside the main panel's table.
@@ -127,5 +153,8 @@ a single `N_trajectory` block (`Fz_per_N`, `DeltaFz`, `N_final_ratio`, …);
   is re-derived in the table above (−26.0 %), not a separate run — so the slice
   moves with it and does not need its own cell.
 - The n96/n128 rungs, deliberately, for the reason above.
-- ΔF_z on the lossy arms, pending a check that the two extractors define it the
-  same way.
+- ΔF_z on the lossy arms. The check is DONE (above, 2026-08-22): the two
+  extractors do **not** define it the same way — per-atom vs total, endpoint vs
+  time-maximum, signed vs absolute — so the comparison is not merely unconfirmed,
+  it is invalid as posed. Reconstructing a like-for-like number is possible from
+  the stored `Fz_per_N` × `N_over_N0` series and is scoped out here.

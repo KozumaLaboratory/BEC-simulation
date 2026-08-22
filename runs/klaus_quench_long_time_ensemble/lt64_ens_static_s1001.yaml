@@ -1,0 +1,131 @@
+# 64^3 long-time endpoint ensemble -- arm `static`, seed 1001.
+#
+# omega_perp = 0.714, Omega = 0.0 during the 100 omega_ref^-1 hold, grid 64^3.
+#
+# ONE ARM PER FILE, on purpose. `run_yaml` has no point selection -- it runs a
+# whole `scan:` and skips points already on disk -- so a `scan:` over seeds
+# cannot be split across array tasks, and a walltime kill mid-scan would leave
+# the tail unrun. Sequentially, 8 arms x ~4.5 h exceeds any walltime.
+#
+# `noise_seed` is on pipeline[1], the step carrying `seed_amplitude`. IT IS READ
+# NOWHERE ELSE: on the hold it is inert and every seed returns bit-identical
+# numbers, which looks exactly like a deterministic observable. Measured
+# 2026-08-19.
+#
+# WHY, SIZING and the REJECTION CRITERION: see README.md in this directory. The
+# criterion is fixed BEFORE launch and must not be re-fitted to what lands.
+#
+# anti-aligned-seed: inherited from the base cell -- the EdH cascade only runs
+#   from the Zeeman-HIGHEST stretched state (Kawaguchi-Saito-Ueda PRL 96,
+#   080405). Authority: docs/campaign/edh_quench_polarisation_decision.md
+
+defaults:
+  kind: spinor
+  backend: cpu
+  interactions:
+    N_atoms: 10000
+    omega_ref: 691.1504
+pipeline:
+- ground_state:
+    atom: Eu151
+    grid:
+      n:
+      - 64
+      - 64
+      - 64
+      box:
+      - 12.0
+      - 12.0
+      - 12.0
+    potential:
+      type: harmonic
+      omega:
+      - 1.0
+      - 1.0
+      - 1.181818
+    interactions:
+      N_atoms: 10000
+      omega_ref: 691.1504
+      c1_ratio: 0.02778
+    ddi:
+      enabled: true
+      secular: true
+    lhy:
+      kind: none
+    B:
+      Bz: 0.01 Gauss
+      theta: 0.0
+      phi: 0.0
+    gauge_fix: false
+    initial_state: m_plus_F
+    init_sigma: 1.5
+    dt: 0.005
+    n_steps: 3000
+    tol: 1.0e-09
+- dynamics:
+    duration: 6.9115
+    dt: 0.005
+    rotating_frame_omega: 0.0
+    B:
+      Bz: 0.01 Gauss
+      theta: 0.0
+      phi: 0.0
+    ddi:
+      enabled: true
+      secular: false
+    lhy:
+      kind: none
+    seed_amplitude: 1.0e-06
+    seed_k_cut: 2.5
+    save:
+      every: 200
+      psi: true
+      precision: f64
+    noise_seed: 1001
+- dynamics:
+    duration: 0.69115
+    dt: 0.001
+    rotating_frame_omega: 0.0
+    B:
+      Bz:
+        from: 0.01
+        to: 2.6e-05
+        duration: 0.6911504
+      theta: 0.0
+      phi: 0.0
+    ddi:
+      enabled: true
+      secular: false
+    lhy:
+      kind: none
+    save:
+      every: 50
+      psi: true
+      precision: f64
+- dynamics:
+    duration: 100.0
+    dt: 0.005
+    rotating_frame_omega: 0.0
+    B:
+      Bz: 2.6e-5 Gauss
+      theta: 0.0
+      phi: 0.0
+    ddi:
+      enabled: true
+      secular: false
+    lhy:
+      kind: none
+    save:
+      every: 1000
+      psi: true
+      precision: f64
+    potential:
+      type: harmonic
+      omega:
+      - 0.714
+      - 0.714
+      - 1.181818
+- analyze:
+  - phase_classify: {}
+  - winding_map: {}
+  - energy_decomposition: {}

@@ -191,7 +191,7 @@ note = "The old value is not recovered by the re-derivation. It is not a less pr
 id = "edh-omega-window-2p6nt"
 claim = "|Ω*|/ω_⊥ = 0.68 ± 0.04 at B = 2.6 nT, +24.9 % over Ω = 0. Two significant figures, not three."
 status = "live"
-supersedes = "edh-omega-window-0p468"
+supersedes = ["edh-omega-window-0p468"]
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, hold-only + 2 ms delay, ANTI-ALIGNED preparation, 20 Ω cells."
 uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = -2.70, fit rms 4.7e-3. Separately, the OBSERVABLE carries a +2.47 % one-signed grid systematic (32³→64³); that does not move the vertex but does bound any absolute P_adj quoted with it."
@@ -233,7 +233,7 @@ pr = 392
 id = "edh-response-even-in-omega"
 claim = "The response is EVEN in Ω to ≤ 0.124 %: both senses of rotation enhance identically and Ω = 0 is the minimum. Chirality is irrelevant to this observable."
 status = "live"
-supersedes = "edh-chirality-matched"
+supersedes = ["edh-chirality-matched"]
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, |Ω| ∈ {0.1, 0.3, 0.5}."
 uncertainty = "0.071 / 0.113 / 0.124 % at |Ω| = 0.1 / 0.3 / 0.5, against a dt/2 reproducibility floor of 0.029 %. The residual asymmetry is ~4× the floor, i.e. small but resolved — it is not exactly zero."
@@ -341,7 +341,7 @@ claim = "|Ω|/ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT."
 status = "refuted"
 superseded_by = "edh-two-branches-5p2nt"
 retired_literal = ["[0.5, 0.6]"]
-replacement_literal = ["two branches", "TWO BRANCHES"]
+replacement_literal = ["hold duration", "hold-duration"]
 type = "B"
 scope = "Was: the 5.2 nT row of the three-field prescription table."
 uncertainty = "unbounded: quoted from a 3-point scan with no fit uncertainty."
@@ -356,12 +356,19 @@ note = "In ω_eff the old window is [0.80, 0.87], which the 20-point scan resolv
 
 [[claim]]
 id = "edh-two-branches-5p2nt"
-claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65. No single optimum is quoted."
-status = "live"
-supersedes = "edh-window-5p2nt-0p5-0p6"
+quantity = "peak_P_adj @ B=5.2nT, weff-ordering"
+claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65."
+status = "refuted"
+supersedes = ["edh-window-5p2nt-0p5-0p6"]
+superseded_by = "edh-5p2nt-ordering-is-hold-dependent"
+retired_literal = ["TWO BRANCHES", "ω_eff ≈ 0.55"]
+# NOT the bare "two branches": it is ordinary English and matched git branches in
+# unified_spec_architecture.md and code branches in parameter_contract_with_Ueda.md.
+# The uppercase form and the numeral are specific to this claim.
+replacement_literal = ["hold duration", "hold-duration"]
 type = "B"
 scope = "32³ for the 20-point shape, 64³ for the dip and the adjacent peak. CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT."
-uncertainty = "Dip depth 5.06 % at 32³ and 4.70 % at 64³ — 93 % retained, against a dt/2 reproducibility floor of 0.029 % (≈170×) and a seed floor of 0.000 % over 5 live seeds. Both points shift up by the same ~2.3 % under refinement, matching the one-signed +2.47 % offset G3 measured at 2.6 nT, so 32³ errs in OFFSET and not in SHAPE. The branch POSITIONS carry no fit uncertainty — they are sampled points on a 20-cell grid, spacing 0.02-0.05."
+uncertainty = "REFUTED 2026-08-21 on an axis the original never varied. The 64³ check (D4) moved the GRID; it could not move the TRUNCATION, and the truncation was the problem: at the 8 ms hold, ω_eff 0.42-0.62 all peak on the LAST streamed frame (42/42), so the reported structure compared boundary values against one resolved maximum (0.650, frame 38/42). Doubling the hold to 16 ms REVERSES the ordering — 0.650 goes from 5.05 % BELOW 0.550 to 6.2 % ABOVE it. An ordering that inverts with hold duration is not a property of the response."
 uncertainty_basis = "grid"
 evidence = ["20 static-trap ω_eff arms at 5.2 nT; 2 arms at 64³ (ω_eff = 0.550, 0.650)"]
 evidence_status = "absent"
@@ -372,12 +379,77 @@ pr = 403
 prediction = "D1: if two maxima are separated by a dip > 1 %, report two branches and quote no single optimum. D4: the structure must survive 64³ or it is a grid artifact."
 prediction_registered = "before"
 prediction_outcome = "hit"
-note = "The replacement for the old row is a SHAPE, not a number — which is why D2 and D3 (the parabolic fit and its digit count) are marked not-applicable rather than skipped: D1 fired first, and ordering the criteria before launch is what made that automatic. `evidence_status = absent`: #403 committed two documents and no configs, so the 22 arms behind this row do not resolve in the tree."
+note = """The values reproduce exactly — a 20-arm re-run from committed configs at
+`c5ac5e67` returns 0.51387 / 0.48791 / 0.50252 / 0.43935 against the published
+0.51390 / 0.48790 / 0.50252 / 0.43930. Reproducing it to five digits did not make it
+true: it reproduced the same truncation. That is the useful lesson here — an exact
+re-run confirms the pipeline and says nothing about whether the observable was
+resolved. D1 and D4 were both fixed before launch and both fired correctly on the
+axes they covered; the axis nobody registered was hold duration."""
+
+
+[[claim]]
+id = "edh-5p2nt-ordering-is-hold-dependent"
+quantity = "peak_P_adj @ B=5.2nT, weff-ordering"
+claim = "At B = 5.2 nT the ordering of peak P_adj across ω_eff INVERTS between an 8 ms and a 16 ms hold: ω_eff = 0.650 goes from 5.05 % below 0.550 to 6.2 % above it. No ω_eff optimum is quotable at 5.2 nT."
+status = "live"
+supersedes = ["edh-two-branches-5p2nt", "edh-5p2nt-second-branch-has-no-mechanism"]
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT, four ω_eff points (0.550 / 0.650 / 0.770 / 1.000) at each of two hold durations."
+uncertainty = "The INVERSION is far outside any floor: 0.48791 → 0.62804 at ω_eff = 0.650 while 0.51387 → 0.59152 at 0.550, against a dt/2 floor of 0.029 % and a seed floor of 0.000 %. The 16 ms VALUES are not converged either — three of the four still peak at the last streamed frame (53/53), only ω_eff = 1.000 resolves (50/53). So this row bounds what is NOT true and deliberately quotes no optimum."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/manifest_hold2x.txt", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff0p550_B5p2nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "c5ac5e67"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11.5"
+pr = 0
+note = """The diagnostic was the `frame` column, which the original analysis printed and
+nobody read: a peak reported at frame 42 of 42 is a truncation, not a peak. Both sides
+of the published dip had to be compared at the same resolution before the dip meant
+anything, and they never were. Generalises past this instance: when an observable is
+`maximum over the trajectory`, the argmax index IS part of the measurement, and an
+argmax at the boundary is a statement that the run ended too early."""
+
+[[claim]]
+id = "edh-104nt-bump-at-0p65"
+quantity = "peak_P_adj @ B=10.4nT, weff-scan, 32cubed, hold=8ms"
+claim = "At B = 10.4 nT there is a resolved local maximum at ω_eff ≈ 0.65, +22.4 % over a flat baseline, and it peaks INSIDE the hold window."
+status = "superseded"
+superseded_by = "edh-104nt-single-peak-in-hold"
+retired_literal = ["0.27574"]
+# NOT "+22.4 %": that percentage also names an unrelated quantity in the same
+# document — static vs rotating at long time, §17 — and a literal that matches a
+# different measurement is a predicate wider than the thing it hunts. The baseline
+# VALUE is unique to this claim.
+replacement_literal = ["+49.5 %", "0.20139"]
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 10.4 nT. 20 points at 8 ms, two of them repeated at 16 ms."
+uncertainty = "WRONG OBSERVABLE. The peak was taken over the WHOLE trajectory; at 10.4 nT that reads the pre-hold transient, which §12.1 had established a day earlier. The `flat baseline at 0.27574` is the transient, not a saturated cascade. Read in the hold the baseline is 0.20139 and the enhancement is +49.5 %."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "c5ac5e67"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "11.5"
+pr = 0
+note = """SUPERSEDED 2026-08-21, and the correction was ALREADY IN THE TREE when this row
+was written. §12.1 (`97ec124e`, 2026-08-20) measured that a whole-trajectory peak reads
+the pre-hold transient at 10.4 nT — four arms differing only in the hold returned 0.26050
+to five decimals, argmax frame 29, hold starting 32 — and stated the rule: the claim is
+about the hold, so the peak must be taken inside it. I merged that section into my branch
+and then wrote a contradicting one, because I read main for CONFLICTS and not for CONTENT.
+git reported no conflict, and there was none: two sections of one document disagreeing is
+not a textual conflict. What makes this preventable rather than regrettable is that §12
+was NOT IN THE LEDGER — 47 of the document's 70 sections were unpoured — so there was no
+row for a new row to collide with. Hence `quantity` and the coverage ratchet."""
+
 
 [[claim]]
 id = "edh-5p2nt-dip-is-a-resonance"
 claim = "The 5.2 nT dip is a resonance entering the sampled window — plausibly between the Zeeman splitting and the radial mode spacing, both of which the field and ω_eff set."
-status = "suggested"
+status = "refuted"
+retired_literal = ["dip is a resonance", "resonance entering the sampled window"]
 type = "B"
 scope = "Hypothesis. The observation it explains is that 2.6 nT is a clean single peak and doubling the field introduces a dip."
 uncertainty = "unbounded: not measured. Two fields is not a trend."
@@ -390,8 +462,17 @@ section = "11.4"
 pr = 403
 prediction = "If the dip is a resonance, its ω_eff position must move again at B = 10.4 nT. If it does not move, the resonance reading is wrong."
 prediction_registered = "before"
-prediction_outcome = "pending"
-note = "One arm settles it. Registered here so the answer is a residual against a written prediction rather than a description of whatever the run returns."
+prediction_outcome = "miss"
+note = """REFUTED 2026-08-21 BECAUSE ITS PREMISE DISSOLVED, not because the test disagreed. The 10.4 nT arm was run, and the answer is that there is no dip at 5.2 nT to move: the two-branch structure was a truncation artifact (see `edh-5p2nt-ordering-is-hold-dependent`). `prediction_outcome = "miss"`, and it took two corrections to get there. §12.3
+(2026-08-20) had ALREADY tested this properly and found it fails: the prediction was
+ω_eff,dip ∝ B, whose informative arm is 2.6 nT — predicted dip near ω_eff ≈ 0.325,
+measured 0.250→0.375 rising monotonically (0.45976, 0.46412, 0.46681, 0.47068, 0.47682).
+10.4 nT predicts "no dip in range", which is the easy half: a null that confirms nothing.
+I ran the easy half, did not read §12.3, and concluded the question was unaskable — then
+added a `moot` value to the schema to describe that, and REMOVED it again the same day
+once the misdiagnosis was clear. The lesson is sharper than the word: I
+extended a schema to fit a situation I had misdiagnosed, which is how a taxonomy acquires
+categories that describe the analyst rather than the world."""
 
 # --- Acceptance gates and the precision claims they touch --------------------
 
@@ -417,7 +498,7 @@ pr = 392
 id = "edh-grid-convergence-2-digit"
 claim = "32³ → 64³ moves peak P_adj by +2.47 % and peak P_exc by +2.05 %, one-signed. That is 2-digit agreement, two orders of magnitude looser than 4-digit."
 status = "live"
-supersedes = "edh-grid-convergence-4-digit"
+supersedes = ["edh-grid-convergence-4-digit"]
 type = "A"
 scope = "klaus_quench protocol, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT. Confirmed one-signed at 5.2 nT too (+2.15 %, +2.54 %)."
 uncertainty = "The residual is the uncertainty: ±2.5 % is the floor on any absolute observable quoted from a 32³ arm in this family. It dwarfs the seed (0.000 %) and dt/2 (0.029 %) floors."
@@ -453,7 +534,7 @@ note = "`retired_literal` is deliberately the bare observable name and NOT a num
 id = "edh-g6-omega-concentrates-not-creates"
 claim = "Ω does not create excitation, it concentrates it. Peak P_exc is flat to |Ω| ≈ 0.6 while P_adj rises 24 %; at N = 5×10⁴ the cascade is already saturated (P_exc = 0.816), so P_exc has no headroom and the enhancement appears on P_adj (+6.4 %)."
 status = "live"
-supersedes = "edh-g6-pexc-rises-at-matsui-n"
+supersedes = ["edh-g6-pexc-rises-at-matsui-n"]
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, N = 5×10⁴."
 uncertainty = "P_exc measured at 0.81531 vs 0.81613, i.e. -0.10 % — resolved against the 0.029 % dt/2 floor and therefore a genuine null rather than an unresolved one. P_adj +6.4 % (0.36119 vs 0.33956) carries the 2.5 % grid systematic."
@@ -482,7 +563,9 @@ commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "10.3"
 pr = 392
-note = "Consequence: the seed axis carries no uncertainty to quote for this family, so every `uncertainty` field above is bounded by grid/dt instead. The `noise_seed` knob was initially wired to the wrong step and produced the same all-identical table for a wrong reason; that was found and fixed before these numbers."
+note = """Consequence: the seed axis carries no uncertainty to quote for this family, so every `uncertainty` field above is bounded by grid/dt instead. The `noise_seed` knob was initially wired to the wrong step and produced the same all-identical table for a wrong reason; that was found and fixed before these numbers.
+
+CAVEAT NOW MEASURED, 2026-08-20. The scope's warning about longer holds was not hypothetical: at 100 ω_ref⁻¹ and 64³ a second seed moves the static arm's ENDPOINT by 34.2 % (0.27262 → 0.17952) while leaving its PEAK identical to five decimals (0.49081 both). So the determinism is a property of the peak, and the endpoint at long time carries a seed uncertainty large enough to swallow an 18.8 % arm separation — see `edh-longtime-endpoint-ordering-unresolved`. Rows bounded by grid/dt above remain correct for the short protocol; a long-hold endpoint must quote a seed bound."""
 
 [[claim]]
 id = "edh-corpus-is-one-seed-32cubed-lhy-none"
@@ -520,8 +603,8 @@ note = """CLOSED 2026-08-20 by annotation, not by moving the file. The archive r
 
 [[claim]]
 id = "edh-phi-phys-config-anti-alignment"
-claim = "`runs/eu151_klaus_phi_phys/config.yaml` needs `init_m_idx: 13` at p > 0 (or p < 0 with `init_m_idx: 1`) to be anti-aligned; as committed it is aligned and therefore on the wrong side for the EdH quench."
-status = "open"
+claim = "`runs/eu151_klaus_phi_phys/config.yaml` needed `init_m_idx: 13` at p > 0 to be anti-aligned. It has it."
+status = "closed"
 type = "A"
 scope = "One config. `init_m_idx: 1` there is the schema default at p > 0 (`run_step_rotating/ground_state.jl:162`), so nothing was ever chosen."
 uncertainty = "unbounded: not measured. The sign bookkeeping is determinate; the consequence for that scan's results is not, because it has no quoted result."
@@ -532,7 +615,7 @@ commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "4.2"
 pr = 392
-note = "Named rather than left implicit. It is a 32×32×16 GPU rotating-basis 8-point scan with no result being quoted, so it was deferred rather than fixed — but a deferral with no row is indistinguishable from an oversight."
+note = """CLOSED 2026-08-20, and it had been closed since 2026-08-19 without anyone noticing. `e8dafe8e` — the same commit that retargeted the quench corpus — set `init_m_idx: 13` on line 51, with the reasoning in the config header. The decision document's section 4.2 went on saying "not done here … on the re-derivation list" for a day, and this row was written faithfully FROM that paragraph. So the ledger inherited a false statement from its source and then caught it, which is the sequence the `evidence` column is for: the row was only checkable because it named a path, and the path resolved to a file that disagreed with the prose. A row whose evidence is prose could not have done this. Section 4.2 corrected in the same change."""
 
 [[claim]]
 id = "edh-longtime-static-sustains"
@@ -556,8 +639,8 @@ id = "edh-longtime-not-converged-at-32"
 claim = "At a 100 ω_ref⁻¹ hold, 32³ is not resolution-converged: refining to 64³ inverts both the peak and the endpoint ordering of static vs rotating, so NEITHER resolution establishes the long-time ordering."
 status = "live"
 type = "B"
-scope = "2.6 nT, anti-aligned, CPU, one seed. TWO arms at 64³ (static ω_eff=0.714 and rotating Ω=−0.70); the 64³ BASELINE was not run."
-uncertainty = "unbounded: n = 1 at each 64³ point and no 64³ baseline, so this bounds what 32³ CANNOT support without establishing what is true. A third arm and a second seed at 64³ are the missing measurements."
+scope = "2.6 nT, anti-aligned, CPU. THREE arms at 64³ (baseline, static ω_eff=0.714, rotating Ω=−0.70), two seeds on the static and rotating arms."
+uncertainty = "Bounds what 32³ cannot support; it does not by itself establish the 64³ answer. The two measurements it named as missing — a baseline arm and a second seed — were run on 2026-08-20 and are `edh-longtime-peak-ordering-at-64` (established) and `edh-longtime-endpoint-ordering-unresolved` (still not)."
 uncertainty_basis = "grid"
 evidence = ["64³: static 0.49081/0.27262, rotating 0.40358/0.40358 (hold-peak/end) against 32³ 0.50790/0.47517 and 0.52475/0.21093"]
 evidence_status = "absent"
@@ -566,3 +649,796 @@ doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "15"
 pr = 0
 note = """The part that generalises: grid adequacy is a property of the grid AND the integration time. Under the same 32³→64³ refinement the SHORT protocol (14.5 ω⁻¹) moved by a uniform +2.3 % and the 5.2 nT dip kept 93 % of its depth — shape preserved — while the long one moves -3.4/-23.1/-42.6/+91.3 % and orderings invert. So sections 9-12 are unaffected and only the long-time branch is out of reach at 32³. A convergence check at one duration does not transfer to another."""
+
+[[claim]]
+id = "edh-longtime-peak-ordering-at-64"
+claim = "At a 100 ω_ref⁻¹ hold and 64³ the hold-peak ordering is static (0.49081) > rotating (0.40102) > baseline (0.37973): the statically weakened trap beats no-intervention by +29.3 % and beats rotation by +22.4 %."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³, 100 ω_ref⁻¹ hold. The PEAK only — the endpoint ordering at the same duration is a separate and unresolved row."
+uncertainty = "The static peak is seed-independent to five decimals (0.49081 at two seeds) and the rotating peak moves 0.63 %, so the 22.4 % and 29.3 % gaps are 35-100x the seed scatter. Not grid-bounded: this IS the refined grid, and 32³ gave the opposite static-vs-rotating sign, so no statement is carried over from there."
+uncertainty_basis = "seed"
+evidence = ["64³ hold-peak P_adj: baseline 0.37973, static 0.49081, rotating 0.40102; static seed 101 vs default both 0.49081"]
+evidence_status = "absent"
+commit = "6bb97bb2"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "17.2"
+pr = 0
+note = """Replaces the ordering `edh-longtime-static-sustains` asserted and `edh-longtime-not-converged-at-32` refused to restate — but only for the peak, and with the opposite reading of what the two arms do. The original claim was that the static arm SUSTAINS and the rotating one decays; at 64³ the rotating arm is the persistent one (peak ~= endpoint, still climbing at 145 ms) and the static one falls from 0.49081 to 0.17952. Larger cascade and more persistent cascade are different questions and 32³ answered neither."""
+
+[[claim]]
+id = "edh-longtime-endpoint-ordering-unresolved"
+claim = "RESOLVED by the n=8 ensemble (#424): at 100 ω_ref⁻¹ and 64³ the statically weakened trap DOES beat no-intervention at the endpoint — mean 0.27869 against 0.15094, +84.6 %, at 5.01 SE_diff. The two-seed reading that could not separate them (+18.8 %) was a sample of a distribution whose pooled sd is 0.05098."
+status = "live"
+type = "B"
+scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³. The endpoint at long hold only; the peak at the same points IS resolved (`edh-longtime-peak-ordering-at-64`)."
+uncertainty = "n = 8 per arm, pooled sd 0.05098 (the pre-run n=2 estimate was 0.0658, so n=8 was sufficient rather than lucky), SE_diff 0.02549, |diff|/SE = 5.01 against the 2.0 threshold fixed before launch. The three groups have wildly different spreads and that is the result's shape: baseline sd 0.00020 (0.13 % of mean), rotating sd 0.00230 (0.57 %), static sd 0.07210 (26 %). ALL of the endpoint uncertainty lives in the static arm; the arms it is compared against are essentially deterministic."
+uncertainty_basis = "seed"
+evidence = ["64³ endpoint P_adj, n=8/8/4: baseline mean 0.15094 sd 0.00020, static mean 0.27869 sd 0.07210, rotating mean 0.40416 sd 0.00230", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh", "scripts/validation/lt64_endpoint_verdict.jl"]
+evidence_status = "in_tree"
+commit = "6bb97bb2"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "17.2"
+pr = 0
+note = """Recorded as `open` rather than left out, because the absence of a statement here is exactly what a reader would otherwise supply from the peak row. The rotating-vs-static factor of 2.23 IS outside the scatter and is safe to quote; the static-vs-baseline one is not. Same shape as `edh-longtime-not-converged-at-32`: a quantity measured on one axis (peak) does not transfer to another (endpoint), just as one duration did not transfer to another.
+
+THE RUN THAT WOULD HAVE CLOSED IT WAS PREPARED AND NOT SPENT (2026-08-21), AND WAS THEN RUN (2026-08-22, #424, TSUBAME 8459280, 20/20 arms rc=0). Kept verbatim because the sizing and the criterion were fixed before launch and that is what makes the verdict a measurement. 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+
+CLOSED 2026-08-22. The criterion was applied as written, by a script that carries the 2.0 threshold as a constant so it could not be re-fitted: |diff|/SE = 5.01, ESTABLISHED, static ABOVE baseline by +84.6 %. The pooled sd came back SMALLER than the pre-run estimate (0.05098 against 0.0658), so the "n = 8 does not reach 2 sigma, it would need N" branch did not fire.
+
+THE PEAK COLUMN OF THAT RUN IS NOT QUOTABLE AND THE ARGMAX SAYS WHY. With the window derived from the config (hold 100.0, dt 0.005, save.every 1000 -> 20 frames of 39, so the hold starts at frame 20), the baseline maximum lands at frame 20 and rotating at 21 — the first and second frames of the window, where the decaying pre-hold transient still dominates. Only static's is interior (frame 31), and only static's matches its recorded value (0.49081, exactly). This is the §12.1 condition again, and it is the reason the peak numbers in `runs/klaus_quench_long_time_ensemble/README.md` should not be compared against this run's peak column. It does not touch the verdict: the endpoint is `adj[end]` and needs no window.
+
+NOT LAUNCHED because it is ~5.2 points of a 19.24 group balance (~27 %) with another session spending concurrently, and this is a secondary row — the peak ordering it might be confused with is already established and unaffected. anko made that call; the numbers are in the README so the next person does not re-derive the decision.
+
+Two API facts were established the expensive way and are recorded so the next author does not invent them again: `cli.jl launch` takes `[<batch>] <run_name>` and has NO `--smoke`, and `run_yaml` has NO point selection. The second is why this is 20 single-arm configs rather than 3 seed-scans — a `scan:` cannot be split across array tasks."""
+
+[[claim]]
+id = "edh-phi-phys-anti-aligned-needs-field-reversal"
+claim = "The anti-aligned preparation cannot be produced by ITP on the fast-Larmor rotating-basis path: at p = 26700 the Zeeman-shifted factor for the highest m is exp(-12·p·dt) = exp(-1602), which underflows in ONE step and returns ψ identically zero. It needs the state relaxed at the OPPOSITE field sign and the field reversed for the dynamics — a pipeline change, not a config key."
+status = "live"
+type = "A"
+scope = "`runs/eu151_klaus_phi_phys/config.yaml`, p = 26700, dt = 0.005, F = 6. Quantitative, so it does NOT generalise: the klaus_quench spinor corpus has p ≈ 148, per-step factor exp(-8.9), renormalised every step and never underflowing."
+uncertainty = "Four control arms — init_m_idx in {1, 13} x ITP in {100, 1500} — separate the candidate causes: both init_m_idx=13 arms give 0 of 212992 non-zero entries and ‖ψ‖² = 0.0, both init_m_idx=1 arms give ‖ψ‖² = 4.096 and E = -160177.6. The seed, not the ITP length, is what decides it."
+uncertainty_basis = "control"
+evidence = ["runs/eu151_klaus_phi_phys/config.yaml", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.3"
+pr = 0
+note = """SUPERSEDES the deferral in `edh-phi-phys-config-anti-alignment`, which proposed `init_m_idx: 13` as the repair. That was set on 2026-08-19 and reverted on 2026-08-20 once the energy was reported at all — the run had been completing on ψ ≡ 0 with E = 0.0 and saying nothing. The underflow is a hard error naming the mechanism and the remedy.
+
+IMPLEMENTED 2026-08-20 as `prepare_anti_aligned` — see `edh-anti-aligned-prep-implemented`. This row stays `live` because the claim it makes is about ITP, not about the config: imaginary time still cannot produce the anti-aligned state, and the new key does not change that. It relaxes in a DIFFERENT field."""
+
+[[claim]]
+id = "edh-anti-aligned-prep-implemented"
+claim = "`prepare_anti_aligned: true` on a `kind: rotating_basis` ground_state relaxes at -p and hands the dynamics +p, producing the Zeeman-HIGHEST stretched state that the EdH quench needs. Only `p` reverses; `q ∝ |B|²` is even in the field and does not."
+status = "live"
+type = "A"
+scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F. RUN AT PRODUCTION SCALE 2026-08-22 (#423): all 8 `phi.rate` points of `runs/eu151_klaus_phi_phys` at 32×32×16, F=6, D=13, DDI + LHY scalar, TSUBAME job 8461716, 82 min, rc=0 — every point `converged = true`, `energy = −160177.72` finite, and `mz_actual = −6.0000` on all eight, i.e. the runtime anti-aligned assertion held across the whole scan."
+uncertainty = "Directional, not numeric: an ALIGNED control arm in the same field comes out with sign(⟨F_z⟩) = +sign(p) and the anti-aligned arm with -sign(p), at both signs of p, each stretched to |⟨F_z⟩| = F within 0.05. A single arm could not tell the preparation from the sign convention assumed while reading it."
+uncertainty_basis = "control"
+evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.yaml"]
+evidence_status = "in_tree"
+commit = "0"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "18"
+pr = 0
+note = """The step now ASSERTS the outcome at runtime — `sign(⟨F_z⟩) = -sign(p)` or it throws — rather than trusting the construction. That is deliberate: the defect this replaces was a run that COMPLETED and returned ψ ≡ 0, and a preparation that quietly hands back the ALIGNED state is the same class and would invert every conclusion drawn from it. `⟨F_z⟩` along B̂ is also recorded in every result now (`rotating_basis_fz_along_b`), because which end of the ladder a run started from was the controlling variable of this whole campaign and nothing was reporting it.
+
+The canary needed strengthening: the first version used p = 400, where exp(-2·F·p·dt) = exp(-8) is renormalised away every step and the arm completes. Only a SINGLE-STEP underflow (exponent > 708) is the inexpressible case."""
+
+[[claim]]
+id = "rotating-basis-result-writer-omitted-energy"
+claim = "`save_rotating_basis_result!` — the writer that owns result.jld2 for BOTH `kind: rotating_basis` and `kind: spinor`-with-dynamics — wrote neither `energy` nor `converged`, so both keys were ABSENT from every dynamics run's result file."
+status = "live"
+type = "A"
+scope = "All runs written through `save_rotating_basis_result!` (runner.jl:294), which is every pipeline carrying a dynamics history."
+uncertainty = "unbounded: this is a code-shape claim, not a measured quantity — the writer either emits the key or it does not, and it did not. What is NOT bounded is how many stored runs are affected, because runs/ is untracked."
+uncertainty_basis = "none"
+evidence = ["src/workflow/io/save_rotating_result.jl"]
+evidence_status = "in_tree"
+commit = "e11b0291"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "16.1"
+pr = 0
+note = """CORRECTS section 14.2, which attributed the missing energy to `run_registry.jl` reading absent keys through defaults. That writer is never reached on this path. The `conv = true` default was real and printed to stdout, but was never STORED — so a guard reading the file finds nothing, which is unknown rather than a pass, and section 14.2's guard-7 claim overstated. The #410 default fix stands on its own path; this is a third writer nobody had checked."""
+# --- eu335 / #383 / #398: the 68.4 µG reading ---------------------------------
+#
+# The SECOND document poured in, and it was chosen for a shape the EdH rows do not
+# have: a claim retracted not because its NUMBER moved but because its READING did.
+# 68.4 ± 0.15 µG is the same measurement before and after; what changed is whether
+# it is a property of the energy landscape or a property of the solver walking it.
+
+[[claim]]
+id = "eu335-68p4-is-a-mean-field-spinodal"
+claim = "68.4 ± 0.15 µG is the flower branch's mean-field spinodal at κ = 1.8 — the branch stops existing there — so a rising B_z ramp must convert by then at ANY rate."
+status = "superseded"
+type = "B"
+scope = "¹⁵¹Eu F = 6, κ = ω_z/ω_⊥ = 1.8, 32³ (64³ bracket [68.0, 68.5] µG), flower branch reached by warm-started L-BFGS continuation in B_z."
+retired_literal = [
+    "spinodal at 68.4 µG",
+    "flower-branch spinodal at κ = 1.8",
+    "flower branch stops existing",
+    "ends at 68.4 ± 0.15 µG",
+]
+replacement_literal = [
+    "loses the flower branch",
+    "continuation loses the branch",
+    "warm-started continuation loses the branch",
+]
+superseded_by = "eu335-68p4-is-where-continuation-loses-the-branch"
+uncertainty = "±0.15 µG at 32³ and [68.0, 68.5] µG at 64³, 0.2 % apart. That bound is on the FIELD at which the continuation stops and was read as a bound on where the branch ends; the reading itself carried no uncertainty at all, which is how it survived."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_spinodal_spectrum.md", "docs/guides/eu_kappa_hysteresis_loop.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_kappa_hysteresis_loop.md"
+section = "5.1"
+pr = 409
+note = """SUPERSEDED 2026-08-20 (#398) by #383's three-quantity test, and the reason it is `superseded` rather than `refuted` is that the number did not move — only what it is a number OF. A saddle-node takes the branch-tangent curvature, the escape direction and the lowest ω to zero together; #383 measured all three on the same cells and none softens (R² linear to rms 0.4 % with its zero at 78.2 µG, ⟨d,Ad⟩ = +3.403 uphill, ω flat to 1.4 %). What is NOT established either way is that the branch survives: λ_min at 68.25 µG is unresolved by both solvers, tracked as #399. The generalisable part: "the continuation loses the branch" and "the branch ends" are different claims about different objects — one about a solver's basin, one about the energy landscape — and a continuation instrument can only ever measure the first."""
+
+[[claim]]
+id = "eu335-68p4-is-where-continuation-loses-the-branch"
+claim = "68.4 ± 0.15 µG is the field at which a warm-started L-BFGS continuation loses the flower branch at κ = 1.8, agreeing to 0.2 % between 32³ and 64³. Nothing in the campaign establishes that the branch ENDS there."
+status = "live"
+type = "B"
+scope = "Same cells as the superseded row: ¹⁵¹Eu F = 6, κ = 1.8, 32³ and 64³, warm-started continuation in B_z. Says nothing about any other κ, and nothing about the polarised branch."
+supersedes = ["eu335-68p4-is-a-mean-field-spinodal"]
+uncertainty = "±0.15 µG at 32³, bracket [68.0, 68.5] µG at 64³ — 0.2 % apart. This is a bound on a solver-dependent field, so a different warm-start schedule may move it; the grid agreement bounds the discretisation, not the algorithm."
+uncertainty_basis = "grid"
+evidence = ["docs/guides/eu_kappa_hysteresis_loop.md", "docs/guides/eu_spinodal_spectrum.md"]
+evidence_status = "in_tree"
+commit = "bace6f12"
+doc = "docs/guides/eu_spinodal_spectrum.md"
+section = "5.1"
+pr = 409
+note = """Everything #335 delivers that needs only this weaker reading stands unchanged, including the 32³↔64³ agreement of §5.8 and the deliverable itself — the Stern-Gerlach level count (6-7 populated m_F at κ = 1.8 against 3-4 at κ = 0.9, disjoint at all five rates), which never rested on the landscape reading. What is lost is the *at any rate* clause: behind a barrier a fast enough rising ramp carries the flower past 68.4 µG, which is what the predecessor campaign actually observed."""
+
+# --- #407: the FFTW planner's memory, and the hypothesis it was not ------------
+#
+# A type-A pair, and the reason they are here rather than only in CLAUDE.md is
+# that the RSS table has now been restated three times (the submit script's
+# header, the issue body, this campaign) and each restatement is a copy. The
+# `retired_literal` on the refuted row is what stops the killed hypothesis being
+# quoted back as a candidate.
+
+[[claim]]
+id = "fftw-mixed-radix-planner-memory"
+claim = "FFTW's MEASURE planner allocates gigabytes for a NON-POWER-OF-TWO transform when Julia has real threads: 1.66 GB at 48³ rising to 11.97 GB at 98³, against 0.35 GB at 64³ and 0.38 GB at 128³. The axis is the radix, not the grid size and not the thread count."
+status = "live"
+type = "A"
+scope = "TSUBAME cpu_16 (16 of 384 cores), Julia 1.12.6, FFTW.jl, `julia -t 16`, FFTW 16 threads, cubic complex in-place 3D plans, one process per point. Not measured on other machines; the same corner did NOT appear on a 10-core local box in #405."
+uncertainty = "One process per point and one point per (n, threads, flags) cell — no repeats, so the numbers carry no scatter estimate. What IS bounded is the ordering: the two power-of-two sizes are 4.7-34× below every mixed-radix neighbour, which no plausible run-to-run scatter closes. `ru_maxrss` is a high-water mark, so each figure is an upper bound on that process's peak and an exact one for the comparison being made."
+uncertainty_basis = "control"
+evidence = ["scripts/klaus2022/fftw_thread_probe.jl", "scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """Three conditions, each shown necessary by removing it: MEASURE (ESTIMATE gives 0.33-0.36 GB at every size), REAL Julia threads (`julia -t 1` gives 0.26-0.30 GB at every size EVEN WITH FFTW reporting 16 threads — FFTW.jl runs its parallel loop through Julia's threadpool), and a non-power-of-two length. The consequence for this repo is that `make_fft_plans` / `make_rfft_plans` DEFAULT to MEASURE and `src/analysis/dipole_field.jl` plans the DDI work shape that way, i.e. the path every eGPE ground state runs. Not auto-downgraded to ESTIMATE: that would change the throughput of every production run to fix a corner recognisable in advance, and one call is not a throughput measurement. `SPINORBEC_FFT_PLAN=estimate` is the deliberate opt-out; `fft_planning_memory_risk` is the predicate and `test_fft_planning_memory_risk.jl` gates it in both directions on all three axes."""
+
+[[claim]]
+id = "fftw-visible-cpu-count-hypothesis"
+claim = "The 36.9 GB at 48³ is caused by a library sizing per-thread scratch from the node's CPU count (`/proc/cpuinfo` = 384) rather than from the job's cgroup allocation (16)."
+status = "refuted"
+type = "A"
+scope = "Same cells as `fftw-mixed-radix-planner-memory`. The taskset arm narrows the VISIBLE set without changing the allocation, which was already 16."
+retired_literal = [
+    "visible-CPU count (384 on the node) is a candidate",
+    "reads /proc/cpuinfo (384) rather than the cgroup (16)",
+    "a library reads `/proc/cpuinfo` (384) rather than the cgroup (16)",
+]
+uncertainty = "unbounded: this is a refutation by counterexample, not a measurement of a quantity. Three sizes were run under `taskset`; two reproduce the blow-up with the affinity mask at 16 and the third (128³, a power of two) is cheap as always."
+uncertainty_basis = "none"
+evidence = ["scripts/klaus2022/submit_fftw_probe.sh"]
+evidence_status = "in_tree"
+commit = "9d4ad07d"
+doc = "CLAUDE.md"
+section = "Cost model + execution discipline"
+pr = 420
+note = """REFUTED 2026-08-21. Narrowing the visible CPU set to 16 with `taskset` leaves 48³ at 2.26 GB and 96³ at 8.38 GB — if anything slightly worse than the unnarrowed 1.66 and 6.73 GB. The count was never the mechanism. Worth keeping as a row rather than deleting, because it is a PLAUSIBLE hypothesis with a well-known general form (libraries that read the node instead of the cgroup) and it will be proposed again by anyone who meets the symptom without the radix table in hand. The first version of the probe could not have refuted it either: it ran at `julia -t 1`, where nothing blows up at all, so its `taskset` rows would have been a null on top of a null."""
+
+# --- #397 / #399: lambda_min on the weak-field Eu branches ---------------------
+
+[[claim]]
+id = "eu-lambda-min-certified-on-polarised-branch"
+claim = "With `precond=:combined` and `max_iter=2000` the constrained Hessian's λ_min converges with a solver certificate on 5 of 6 weak-field Eu cells, and its SIGN is resolved above the finite-difference floor at three of them — 100 µG (+7.1595e-02), 20 µG (+4.0e-07) and the 68.25 µG flower cell (+7.6e-08 to +8.4e-08). All three are minima along every direction the block resolves."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6, κ=1.8, 32³×13, box 24 a_ho, pin ε=0.002, unpadded DDI, dealiasing off, one seed, `nev=4` — so 'minimum' means 'along every direction a 4-dimensional block resolved'. 25 and 60 µG are NOT resolved; 5 µG does not converge at all."
+uncertainty = "Two finite-difference steps (1e-5, 3e-5) bound the operator's own error by their difference: 6.7e-09 at 20 µG, 7.5e-09 at 68.25 µG, 1.4e-07 at 100 µG. The solver widths (1e-14 to 3e-10) are an order of magnitude or more BELOW that and are not the binding uncertainty. Two points give a sensitivity, not a convergence order."
+uncertainty_basis = "control"
+evidence = ["docs/guides/eu_lambda_min_resolved.md", "scripts/eu_spectrum/precond_ab.jl"]
+evidence_status = "in_tree"
+commit = "65f4da78"
+doc = "docs/guides/eu_lambda_min_resolved.md"
+section = "5"
+pr = 420
+note = """The load-bearing part is what the FD control REVOKED. The first pass reported `λ_min = -1.77e-09` at 25 µG and `-8.88e-09` at 60 µG, both `converged = true` with widths of ~1e-14, and the driver printed "SADDLE — proven" for each. Re-running the same arm at ε = 3e-5 gave +5.47e-09 and +8.46e-09: BOTH SIGNS INVERT. They were numbers below the instrument's floor read as though they were above it, and the `converged` flag was truthful — about the solver. What generalises: once an iterative eigensolver's width drops below the accuracy of the operator it is solving, `converged` stops being the thing to check and the discretisation control becomes it."""
+
+[[claim]]
+id = "eu335-68p4-flower-is-still-a-minimum"
+claim = "At 68.25 µG — the last flower cell before #335's continuation loses the branch — λ_min is converged and POSITIVE (+7.62e-08 at ε=1e-5, +8.37e-08 at ε=3e-5), i.e. 11× its own finite-difference sensitivity. The state is an energetic minimum there, which a saddle-node forbids."
+status = "live"
+type = "B"
+scope = "One cell, one seed, 32³, `nev=4`. Says nothing about fields above 68.5 µG, where no converged flower cell exists to measure."
+uncertainty = "±3e-10 from the solver; ±7.5e-09 from the ε control, which is the binding one. λ/|Δ| = 11."
+uncertainty_basis = "control"
+evidence = ["docs/guides/eu_lambda_min_resolved.md"]
+evidence_status = "in_tree"
+commit = "65f4da78"
+doc = "docs/guides/eu_lambda_min_resolved.md"
+section = "5"
+pr = 420
+note = """This is the direct evidence #398 said would settle the reading and #383 could not obtain — both solvers there returned values one tenth of their own uncertainty. It supports `eu335-68p4-is-where-continuation-loses-the-branch` and closes off the saddle-node reading with a fourth independent quantity, after the branch-tangent curvature, the escape direction and the lowest ω. What it does NOT establish is where the flower branch actually ends: a minimum at 68.25 µG says the branch has not ended AT 68.25 µG, and the next converged cell up the field axis does not exist."""
+
+# --- Second document poured in: docs/theory/lhy_scheme_selection_eu_f6.md (#337)
+#
+# Chosen because it is a DIFFERENT SUBSYSTEM. The column set was fixed by the EdH
+# quench arc, and a schema that only fits the document it was designed from is not
+# a schema. What it exercises that the EdH rows did not: a claim whose scope is a
+# THRESHOLD rather than a grid ("above 105 µG the question does not arise"), a
+# ratio quoted against a value in the code's own docstring, and two rows where the
+# uncertainty IS the finding.
+#
+# What did not fit, recorded rather than smoothed: this document's claims are
+# largely CONDITIONAL ("use X when |⟨F⟩|/F ≈ 1"), and `claim` is one sentence with
+# no condition field, so the condition has to live inside the sentence. That works
+# and reads badly. If a third document also arrives conditional, the schema wants
+# a `applies_when` column rather than more prose.
+
+[[claim]]
+id = "lhy-eu-f6-ambiguity-is-1p3-percent"
+claim = "The ε_LHY scheme ambiguity for ¹⁵¹Eu at F=6 is ≤ 1.3 %, not O(1): a beyond-mean-field result here IS quotable with an error bar."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6 at the campaign coupling. Measured by repairing the counterterm bookkeeping `full_bdg` warns about (S1 vs S3) rather than by asserting it."
+uncertainty = "1.3 % is itself the uncertainty — this row exists to bound the ambiguity, so the number and the error bar are the same object. Negative control present: wherever the spectrum is real, S3 ≡ S1 identically, so the `c_dd = 0` rows prove the comparison can return zero."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "3"
+pr = 0
+note = "Answers #337 against a premise that was too strong. The issue asked whether ε_LHY is ill-posed at F=6; it is not, and the way to find out was to repair the mismatch the code already warned about rather than to argue from the literature."
+
+[[claim]]
+id = "lhy-eu-f6-field-closes-the-question"
+claim = "Above B ≈ 105 µG the m = −F mean field is dynamically stable and ε_LHY carries no scheme dependence at all, so the scheme question does not arise. It closes through p, not through q."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6, m = −F. A THRESHOLD, not a grid or a duration — the claim is about which side of 105 µG a run sits on."
+uncertainty = "The threshold is read off a B-scan of the BdG spectrum (0 / 44 / 100 µG), so it is located to roughly the scan spacing and should be quoted as ≈ 105 µG, not 105. Bounded below by the 100 µG row still showing an unstable m = −F direction at 0.5530."
+uncertainty_basis = "grid"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "2.1"
+pr = 0
+note = "Supersedes a verdict that was wrong for a UNIT reason: `linear_zeeman_p` takes tesla and the campaign YAML writes Gauss, so a dismissal table read p and q low by 10⁴ and 10⁸. The row printed as 1 G was in fact 100 µG. A dimensional slip that survives because every number in the table is slipped the same way is not visible from inside the table."
+
+[[claim]]
+id = "lhy-eps-varies-2p7x-with-polarisation"
+claim = "ε_LHY varies by a factor 2.68 with the DDI (3.72 contact-only) between |⟨F⟩|/F = 1 and 0 at the campaign coupling — not the ~20 % `spatial.jl` records."
+status = "live"
+type = "B"
+scope = "Along ζ(α) = cos α|m=+F⟩ + sin α|m=0⟩ at c1_ratio = 1/36. The ratio RIDES ON c1_ratio: it is 1.38 at c1_ratio = 0 and 2.68 at 1/36, so a measurement taken near zero coupling would have looked small and been quoted as general."
+uncertainty = "unbounded: a single sweep at one coupling, with no grid or seed replication. What IS bounded is the direction and the order of magnitude — 2.68 against a recorded ~20 % is a factor 13, far outside anything replication would move."
+uncertainty_basis = "none"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "7.2"
+pr = 0
+note = "The consequence is a rule, not a number: never give one ansatz's functional to a state of different |⟨F⟩|. At c1_ratio = 0 every g_S collapses to c₀ and the two contact closed forms coincide, so the residual 1.38 there is the DDI alone — which is why the docstring's figure is not merely stale but was measured in a regime where the effect is absent."
+
+[[claim]]
+id = "lhy-scheme-moves-the-boundary-21x"
+claim = "The choice of LHY scheme moves the FM/polar phase boundary by a factor 21 in δc1*: 3.4e-4 for a single functional against 7.3e-3 when each branch uses its own ansatz. `spatial` lands with the latter (6.6e-3)."
+status = "live"
+type = "B"
+scope = "At the reference point c1_ratio = 0.027, converted through each arm's own median |∂ΔE/∂c1| and the field slope 0.0311 per µG. In µG: +0.40 against +9.9."
+uncertainty = "Positive control passes and is quantitative: ×30 on the scalar amplitude moves the gap 5.7× further than ×1 and converts to 4.1e-3 in c1_ratio, four times the 1e-3 pre-launch threshold. Sub-linear in amplitude because the cloud relaxes against the added repulsion — expected, and the reason a control has to be RUN rather than reasoned about."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "5.4"
+pr = 0
+
+[[claim]]
+id = "lhy-mean-field-fm-polar-line-at-1over36"
+claim = "The mean-field FM/polar line at `c1_ratio ≈ 1/36` is not defensible: LHY does not displace that boundary, it CREATES it."
+status = "live"
+type = "B"
+scope = "¹⁵¹Eu F=6 at the campaign coupling. A statement about which term is responsible for a boundary, not about where the boundary sits."
+uncertainty = "unbounded as a location — this row asserts the mechanism, not a number. The boundary's POSITION is `lhy-scheme-moves-the-boundary-21x`, which does carry one."
+uncertainty_basis = "none"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "5.3"
+pr = 0
+note = "Load-bearing for anything that quotes a mean-field FM/polar transition for Eu: there is no mean-field crossing to quote."
+
+[[claim]]
+id = "lhy-spatial-residual-was-1-minus-1-over-N"
+claim = "`spatial_lhy_residual` compared an n_atoms = N table against an UNDIVIDED BdG reference, so it returned ≈ 1 − 1/N — exactly 1.0000 on converged Eu states."
+status = "closed"
+type = "A"
+scope = "One function. Every existing test ran at the default n_atoms = 1, where the defect is invisible."
+uncertainty = "Not a measured quantity: a scale factor, either present or not. The replacement gate asserts the residual is INVARIANT under n_atoms, which a scale bug cannot satisfy."
+uncertainty_basis = "control"
+evidence = ["docs/theory/lhy_scheme_selection_eu_f6.md"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+section = "6"
+pr = 0
+note = "CLOSED — fixed, and gated by a case that runs at n_atoms = 50000. Kept rather than deleted because the shape recurs: a defect invisible at every tested value of a parameter is not caught by more tests at that value. It would have been reported as `a 100 % residual`, i.e. the spatial approximation collapsing, which is a physics conclusion drawn from a missing division."
+
+# --- §12, poured 2026-08-21 because its ABSENCE is what let a refuted method
+#     be used again. These four rows are the correction to my own work.
+
+[[claim]]
+id = "edh-peak-must-be-taken-inside-the-hold"
+claim = "The quoted observable is the peak of P_adj INSIDE the hold, not over the whole streamed trajectory. Over the whole trajectory the maximum can be the pre-hold transient."
+status = "live"
+type = "A"
+scope = "Every EdH-quench arm. It BITES only where the hold suppresses the cascade — measured: 0.00 % change on all 43 arms at 1.3 / 2.6 / 5.2 nT, and 7 of 10 arms moved by up to −23 % at 10.4 nT."
+uncertainty = "Not a measured quantity — a definition. Its violation IS measurable and was: four 10.4 nT arms differing only in the hold returned peak P_adj = 0.26050 to five decimals, which is impossible unless the maximum precedes the hold. Argmax at frame 29, hold starting at frame 32."
+uncertainty_basis = "control"
+evidence = ["scripts/validation/klaus_weff_extract.jl"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.1"
+pr = 410
+note = """Four identical five-decimal numbers across arms that differ is the signature, and it
+is worth naming as a class: when a knob is varied and the observable does not move AT ALL,
+the first hypothesis is that the observable is not looking where the knob acts. The
+re-extraction was from cache — no recompute — which is why an instrument correction of this
+size cost minutes. `klaus_weff_extract.jl` read the whole trajectory until 2026-08-21 and
+now takes the window from `times`, printing both values with a marker when they differ."""
+
+[[claim]]
+id = "edh-104nt-single-peak-in-hold"
+quantity = "peak_P_adj @ B=10.4nT, weff-scan, 32cubed, hold=8ms"
+claim = "At B = 10.4 nT, read inside the hold, the ω_eff response is a CLEAN SINGLE PEAK with its maximum at ω_eff = 0.650, +49.5 % over ω_eff = 1 — the largest relative enhancement of any field measured, on the smallest absolute transfer."
+status = "scoped"
+supersedes = ["edh-104nt-bump-at-0p65"]
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 10.4 nT, 10 arms. **Peak over hold frames 34-42**, and the row is scoped to that window because the number depends on it — see `edh-104nt-observable-not-window-robust`."
+uncertainty = "WINDOW-DEPENDENT, and that dominates everything else: the same arms give a baseline of 0.27574 over hold frames 32-42 and 0.20139 over 34-42, a 37 % difference, both being `the peak in the hold`. 0.30101 at ω_eff = 0.650 against 0.20139 at 1.000 on the 34-42 window. Absolute transfer is roughly half the 2.6 nT value (0.66), which is Zeeman re-pinning costing a factor 2 — real, but it does not close the channel. Grid unbounded: no 64³ arm at this field. Hold duration also unbounded at the corrected observable."
+uncertainty_basis = "grid"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 410
+note = "Weakening the trap helps proportionally MORE where the channel is nearly closed — the largest relative gain sits on the smallest absolute signal. A prescription quoting the relative number without the absolute one would send an experimentalist to the worst field."
+
+[[claim]]
+id = "edh-resonance-reading-refuted-at-2p6nt"
+claim = "The resonance reading of the 5.2 nT dip predicted ω_eff,dip ∝ B, and it FAILS on its informative arm: at 2.6 nT a dip was predicted near ω_eff ≈ 0.325 and the measured curve rises monotonically through it."
+status = "live"
+type = "B"
+scope = "2.6 nT, ω_eff ∈ [0.250, 0.375], five points, read inside the hold."
+uncertainty = "0.45976 / 0.46412 / 0.46681 / 0.47068 / 0.47682 — monotone, no interior minimum, against a dt/2 floor of 0.029 %. The prediction was registered BEFORE the runs."
+uncertainty_basis = "dt"
+evidence = ["docs/campaign/edh_quench_polarisation_decision.md"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.3"
+pr = 410
+prediction = "ω_eff,dip ∝ B: at 10.4 nT the dip moves to ω_eff ≈ 1.30 (out of range, so none observable); at 2.6 nT it moves to ω_eff ≈ 0.325."
+prediction_registered = "before"
+prediction_outcome = "miss"
+note = """The two arms are not equally informative and the difference is the whole lesson. 10.4 nT
+predicts an ABSENCE, which any number of mechanisms produce; 2.6 nT predicts a specific
+interior minimum, which almost nothing produces by accident. Testing the absence first and
+stopping there is how a prediction gets confirmed by a null. A registered prediction should
+name WHICH arm is informative at the time it is registered, or the cheap arm will be run."""
+
+[[claim]]
+id = "edh-5p2nt-second-branch-has-no-mechanism"
+claim = "Whatever produced the second branch at 5.2 nT is unexplained: it is a measured structure without a mechanism, not a mechanism awaiting confirmation."
+status = "superseded"
+superseded_by = "edh-5p2nt-ordering-is-hold-dependent"
+retired_literal = ["measured structure without a mechanism"]
+replacement_literal = ["hold duration", "hold-duration"]
+type = "B"
+scope = "Was: the honest position after the resonance reading was refuted, while the structure itself was still believed."
+uncertainty = "unbounded: a statement that no mechanism is known, which carries no number."
+uncertainty_basis = "none"
+evidence = ["docs/campaign/edh_quench_polarisation_decision.md"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.3"
+pr = 410
+note = "Superseded the next day: there is no structure to explain. The mechanism hunt was well-posed given what was believed, and the thing that dissolved it was varying the hold — an axis neither the structure nor the hunt for its mechanism had touched."
+
+# --- Coverage ratchet ---------------------------------------------------------
+#
+# `covered` is how many numbered sections of each cited document have at least one
+# row. It may RISE and must not FALL, so adding a section to a document this
+# ledger cites, without pouring it, is red.
+#
+# WHY, measured rather than argued. On 2026-08-21 a row was added asserting a
+# quantity that §12.2 of the FIRST document had already measured — by a method
+# §12.1 had refuted the day before. The `quantity` gate did not fire because a row
+# can only collide with a row, and 47 of that document's 70 sections had never
+# been poured. A ledger citing a document and covering a third of it reads as
+# complete, and did.
+#
+# The numbers are low on purpose: pinning them at "everything" would make the gate
+# unmeetable and it would be deleted. Raise them as documents are poured; the gate
+# only forbids going backwards.
+
+[[coverage]]
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+covered = 27
+note = """70 sections. §12 poured 2026-08-21 as the correction to the incident above; §9.1,
+§10.1, §10.2 and §12.1 followed the same day. The ratchet moved only 26 -> 27 for four new
+rows because most cite sections already covered — which is the honest arithmetic and worth
+seeing: pouring rows is not the same as covering sections, and a ledger can grow while its
+coverage does not."""
+
+[[coverage]]
+doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
+covered = 6
+note = "18 sections. The second document poured; the decision + the ambiguity + criteria B/C/D."
+
+[[coverage]]
+doc = "docs/guides/eu_kappa_hysteresis_loop.md"
+covered = 1
+note = "15 sections. Cited by one row from another session; not poured."
+
+[[coverage]]
+doc = "docs/guides/eu_lambda_min_resolved.md"
+covered = 1
+note = "6 sections. Same."
+
+[[coverage]]
+doc = "docs/guides/eu_spinodal_spectrum.md"
+covered = 1
+note = "9 sections. Same."
+
+[[claim]]
+id = "edh-104nt-observable-not-window-robust"
+claim = "At B = 10.4 nT `peak P_adj in the hold` does not measure the hold for 16 of 20 arms: their maximum falls on frame 32, the hold's FIRST frame, where the decaying pre-hold transient still dominates. It is not merely window-dependent — for 80 % of the scan it is reading a different physical quantity."
+status = "open"
+quantity = "peak_P_adj @ B=10.4nT, observable definition"
+type = "A"
+scope = "B = 10.4 nT only. At 1.3 / 2.6 / 5.2 nT the whole-trajectory and in-hold peaks are identical on all 43 arms (§12.1), so the observable is well-posed there and every claim at those fields stands."
+uncertainty = "MEASURED, not argued. The hold boundary is frames 32-42: prep 13 + quench 13 + pre-delay 5 = 31 frames by construction, and the spread across 20 arms differing ONLY in the hold trap is exactly 0.000000 at frames 30-31 and 0.000213 at frame 32 — a zero-to-nonzero transition at the predicted boundary, which fixes the geometry independently. But 0.000213 across a 3× change in radial trap frequency means the trap has not yet acted at frame 32, so the maximum there is the transient's tail. Baseline: 0.27574 over 32-42, 0.20139 over 34-42."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = """OPEN because I closed it twice and both closures were premature. First I quoted
+0.27574 from a whole-trajectory peak, which §12.1 had already refuted. Then I swapped in
+§12.2's 0.20139 and declared myself corrected — which replaced one window-dependent number
+with another rather than noticing that the dependence IS the finding. §12's extraction code
+is not in the tree (only its numbers are), so the 34-42 choice cannot be read, only
+inferred, and inferring it from which value matches is the exact error this whole day was
+about. What would close this: define the observable without a free window — the endpoint,
+or the peak of the hold response after subtracting the transient, or a cut justified by
+something other than agreement with a previous answer."""
+
+[[claim]]
+id = "edh-104nt-peak-reads-the-transient-for-80-percent"
+claim = "At B = 10.4 nT the peak-in-hold reading takes frame 32 — the hold's first frame — for 16 of 20 arms, and those peak values RISE monotonically with ω_eff, opposite to the physical trend. Ranking the scan by `peak` therefore ranks the transient."
+status = "live"
+type = "A"
+scope = "B = 10.4 nT, 20 arms at the 8 ms hold. Not a statement about 1.3 / 2.6 / 5.2 nT, where §12.1 measured the whole-trajectory and in-hold peaks identical on all 43 arms."
+uncertainty = "Counts, not estimates: 16 arms with argmax at frame 32 (the set of argmax frames over those 16 is exactly {32}), 4 with argmax at 42. Rank correlation between `peak` and `mean` is -0.507 over all 20, -0.797 over the 16 edge arms, and -0.400 over the 4 interior ones — the last on n = 4, which is one rank swap and decides nothing."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+prediction = "If the negative peak-vs-mean rank correlation comes from `peak` reading the transient on the flat arms, then (1) those arms have argmax at frame 32, (2) their peak values rise monotonically with ω_eff, and (3) restricting to arms with argmax >= 34 makes the correlation positive."
+prediction_registered = "before"
+prediction_outcome = "miss"
+note = """(1) and (2) HOLD; (3) FAILS — the interior correlation is -0.400, not positive, though on
+n = 4 it decides nothing either way. A fourth expectation stated alongside them, that the
+edge `mean` would fall monotonically with ω_eff, also fails: `mean` is not monotone. So the
+mechanism is established for the edge population and the interior remains unexplained.
+Recorded with the misses because a prediction that is 2-for-4 and reported as confirmed is
+how a mechanism gets believed.
+CONSEQUENCE FOR `AGREE`: the three readings agreeing on argmax = 0.650 is NOT evidence of
+robustness. `peak` can only place its argmax among the 4 interior arms — the other 16 are
+all pinned at the same transient value — so the argmax and the ranking come from different
+populations. An agreement produced that way says nothing about the other 16."""
+
+
+[[claim]]
+id = "edh-optimum-not-quotable-at-either-field"
+claim = "Neither B = 5.2 nT nor B = 10.4 nT yields a quotable ω_eff optimum: three readings of the same cached arms place the argmax at three different points, and at 10.4 nT the mean-reading argmax sits on the scan boundary."
+status = "live"
+quantity = "weff optimum @ EdH quench, 5.2 and 10.4 nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned. Readings: peak-in-hold, mean-over-hold, hold endpoint. All from cache, no recompute."
+uncertainty = "argmax by reading — 5.2 nT: 0.550 (peak at the 8 ms hold), 0.650 (peak over all arms), 0.750 (mean); 10.4 nT: 0.650 (peak, mean, final agree) against 0.350 for the mean over the 20-arm scan, which is the LOWER EDGE of the sampled range. A boundary argmax is not an optimum — it says the range does not contain one."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p750_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = """`mean` is NOT hereby declared the right reading. It is a different physical quantity —
+the hold average, diluted by the same transient that contaminates `peak` — and picking it
+because it is well-posed would be choosing a definition to get an answer, which is the
+error this whole thread is about. What the mean reading DOES establish is negative and
+solid: under a reading with no free parameter, 5.2 nT is a single broad maximum with no dip
+and no second branch, +6.3 % rather than the published +17.0 %, and 10.4 nT has no interior
+maximum at all. Three readings, three argmaxes, one of them on the boundary."""
+
+[[claim]]
+id = "edh-104nt-scan-range-excludes-the-mean-optimum"
+claim = "The 10.4 nT ω_eff scan does not contain its own mean-reading optimum: the mean rises monotonically toward the lower edge (0.350, +10.6 %) and the interior is a minimum at 0.790 (−11.6 %)."
+status = "open"
+quantity = "weff scan range @ B=10.4nT"
+type = "A"
+scope = "The 20-arm 8 ms scan over ω_eff ∈ [0.350, 1.000] at 10.4 nT."
+uncertainty = "A boundary argmax carries no interval — the optimum is somewhere below 0.350 or there is none. The shape between 0.500 and 0.650 is nearly flat (+1.97 % to +2.78 %), so the rise toward the edge is the only structure with any amplitude."
+uncertainty_basis = "grid"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = """OPEN, and the cheap next step is arms below ω_eff = 0.350 — NOT a 64³ grid check, which
+was the queued job before this. Grid-refining a scan whose optimum is outside its own range
+would have measured resolution against a boundary artifact. The 64³ arms stay cancelled
+until a reading and a range are settled. Note also that the centrifugal limit bounds this
+from below: ω_eff = √(1−Ω²) → 0 as |Ω| → ω_⊥, so a static trap below ~0.3 is a very weak
+radial trap and the cloud size becomes the constraint."""
+
+# --- §9, §10 and §12 poured 2026-08-21. The coverage ratchet exists because §12
+#     being unpoured is what let a refuted method be used again; leaving the
+#     sections either side of it unpoured would be the same bet on a different
+#     number.
+
+[[claim]]
+id = "edh-2p6nt-omega-scan-has-an-interior-maximum"
+claim = "At B = 2.6 nT the Ω scan has an interior maximum at |Ω| = 0.70 (peak P_adj 0.65905, +24.9 % over Ω = 0), falling to 0.441 at |Ω| = 1.00."
+status = "live"
+quantity = "peak_P_adj @ B=2.6nT, Omega-scan, 32cubed"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, 20 Ω cells. Whole-trajectory and in-hold peaks are IDENTICAL at this field (§12.1, measured on all 16 arms), so the reading is not in question here as it is at 10.4 nT."
+uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = −2.70, fit rms 4.7e-3. Criteria C1-C4 fixed before launch: interior maximum required, > 5 % enhancement, ≥5-point fit with negative curvature and interior vertex, digits limited by the fit."
+uncertainty_basis = "fit"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p7_holdonly_delay2ms_refine.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.1"
+pr = 392
+note = "This field is the one where the observable is not contested, which is why it remains the anchor while 5.2 and 10.4 nT are unquotable."
+
+[[claim]]
+id = "edh-2p6nt-static-scan-reproduces-the-rotating-one"
+claim = "At B = 2.6 nT a static weakened trap reproduces the rotating scan at every matched ω_eff, worst disagreement 0.06 % across ω_eff ∈ [0.6, 1.0] — not only at the optimum."
+status = "live"
+quantity = "static-vs-rotating agreement @ B=2.6nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, four matched points."
+uncertainty = "0.00 / 0.06 / 0.06 / 0.04 % at ω_eff = 1.000 / 0.750 / 0.714 / 0.600, against a dt/2 reproducibility floor of 0.029 %. The agreement is at the floor, i.e. as good as the method can show."
+uncertainty_basis = "dt"
+evidence = ["34 static-trap arms, §10.1"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.1"
+pr = 392
+note = "The substitution is what makes ω_eff the scan variable at all. It holds at 2.6 nT; §17 (another session) finds it splits at long hold, where the peak agrees and the endpoint does not."
+
+[[claim]]
+id = "edh-1p3nt-has-no-operating-window"
+claim = "At B = 1.3 nT there is no operating window: +1.8 % across a flat range in ω_eff ∈ [0.65, 1.0]. The absence is the finding, and `|Ω|/ω_⊥ ≈ 0.3 at 1.3 nT` has no replacement."
+status = "live"
+quantity = "weff optimum @ B=1.3nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 7 arms. Whole-trajectory and in-hold peaks identical on all 7 (§12.1)."
+uncertainty = "+1.8 % over a flat range against a dt/2 floor of 0.029 % — resolved as a rise, but far below the 24.9 % at 2.6 nT. Bounded as an absence rather than a value: no fit was attempted because there is no interior maximum to fit."
+uncertainty_basis = "dt"
+evidence = ["7 static-trap arms at 1.3 nT, §10.2"]
+evidence_status = "absent"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "10.2"
+pr = 392
+note = "Do not re-fit. A flat +1.8 % has a numerical argmax and quoting it would manufacture a prescription out of the noise floor — the same move the 5.2 nT two-branch reading made with more amplitude."
+
+[[claim]]
+id = "edh-observable-correction-touched-one-field-only"
+claim = "Re-extracting the peak inside the hold changed 10.4 nT and nothing else: 0.00 % on all 43 arms at 1.3, 2.6 and 5.2 nT, against 7 of 10 arms moving by up to −23 % at 10.4 nT."
+status = "live"
+quantity = "in-hold vs whole-trajectory peak, per field"
+type = "A"
+scope = "Every arm measured up to 2026-08-20, re-extracted from cache with no recompute."
+uncertainty = "Exact zeros, not small numbers: the two readings coincide arm-for-arm at the three lower fields. That is what makes the correction diagnostic rather than a global rescaling — it isolates the Zeeman-re-pinned field, where the hold suppresses the cascade and the transient wins."
+uncertainty_basis = "control"
+evidence = ["docs/campaign/edh_quench_polarisation_decision.md"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.1"
+pr = 410
+note = "The reason §9, §10 and §11 survive an instrument correction of this size is measured here, not assumed. Worth keeping as a row because 'the fix only touched one field' is exactly the kind of claim that gets asserted without the table."
+
+[[claim]]
+id = "sec12-extraction-method-not-in-the-tree"
+claim = "§12.2's numbers are reproducible but its METHOD is not: the tree carries the values and not the code that produced them, and the window they correspond to (hold frames 34-42) is not derivable from the config."
+status = "open"
+quantity = "provenance of the 12.2 extraction"
+type = "A"
+scope = "The 10.4 nT in-hold re-extraction of 2026-08-20 (`97ec124e`). Not a statement about the numbers, which reproduce exactly."
+uncertainty = "Reproduced to five decimals: max over hold frames 34-42 gives 0.20139 at ω_eff = 1.000, matching §12.2. But frames 32-42 is what the config implies — prep 13 + quench 13 + pre-delay 5 = 31, and the arm-to-arm spread is exactly 0.000000 at frames 30-31 and 0.000213 at 32 — so the two-frame difference has no derivation, only a value that matches."
+uncertainty_basis = "control"
+evidence = ["scripts/validation/klaus_weff_extract.jl"]
+evidence_status = "in_tree"
+commit = "97ec124e"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 410
+note = """This is `evidence_status = absent` applied to a METHOD rather than to data, and it is the
+sharper version: absent arms can be re-run, an absent extraction has to be re-derived, and
+re-deriving it from which value matches is how a window gets chosen to fit an answer. I did
+exactly that for one commit before catching it.
+What closes this is not archaeology. `scripts/validation/klaus_weff_extract.jl` is now in
+the tree, computes three readings, and derives its window from the config with the frame
+arithmetic written down — so from here the method travels with the number. §12.2's own two
+frames remain unexplained and its numbers should be quoted with the window stated."""
+
+[[claim]]
+id = "edh-g4-mirror-agrees-to-five-decimals"
+claim = "The repaired mirror pair agrees to < 1e-5 on peak P_adj (0.61698 vs 0.61698), stronger than the `3-digit match` the sheet claimed for the pre-repair pair."
+status = "live"
+quantity = "mirror pair agreement @ 2.6nT"
+type = "A"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, the two `*_keeprot*` arms. Acceptance gate G4."
+uncertainty = "< 1e-5 relative, i.e. below the dt/2 reproducibility floor of 0.029 % by three orders. Bounded by the comparison itself; there is no fit."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "Both members now sit at the anti-aligned preparation, so the pair is mirror-correct AND in the regime where the enhancement exists — the two were separate repairs."
+
+[[claim]]
+id = "edh-cost-64cubed-is-5x-not-8x"
+claim = "A 64³ arm costs 5.1× a 32³ one (3026 s against ~590 s on the same core), not the 8× the cell count suggests, because the FFT work does not scale linearly and the run is partly memory-bound at 3.0 GB RSS."
+status = "live"
+quantity = "64cubed vs 32cubed walltime ratio"
+type = "A"
+scope = "klaus_quench protocol, CPU, 8 ms hold. A cost model, not physics."
+uncertainty = "unbounded: two timings, one core, no repetition — nothing here bounds the ratio. It is an order-of-magnitude planning number, and the gate refusing the first wording is the point: `two timings and no repetition` reads like a bound and is not one."
+uncertainty_basis = "none"
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml"]
+evidence_status = "in_tree"
+commit = "b2d746cc"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "9.4"
+pr = 392
+note = "Recorded because it is the number anyone sizing a grid check will guess wrong in the expensive direction, and because it is what made the cancelled 64³ job look affordable."
+
+# --- The mechanism, found by measuring the cloud instead of the populations ----
+
+[[claim]]
+id = "edh-quench-excites-a-breathing-mode"
+claim = "The B quench leaves the cloud breathing, and ω_eff sets the breathing FREQUENCY, not whether it breathes: the ω_eff = 1.000 arm — whose trap is never changed — oscillates in radial RMS radius with a period of ~5 frames, while ω_eff = 0.650 oscillates with ~11."
+status = "live"
+quantity = "radial breathing @ B=10.4nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, radial RMS radius over the hold, read from cached snapshots. Seen at both hold lengths."
+uncertainty = "unbounded: the periods were read off by eye from 11 and 22 samples with no fit, so `~5` and `~11` frames carry no interval. What IS bounded is the EXISTENCE of the oscillation — the ω_eff = 1.000 trace runs 2.885 → 1.999 → 2.693 → 1.984 → 3.163, swings of 30-40 % against a dt/2 reproducibility floor of 0.029 %."
+uncertainty_basis = "none"
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+note = "The ω_eff = 1.000 arm is the control that makes this a statement about the QUENCH: its trap is identical before and during the hold, so an oscillation there cannot be caused by weakening the trap."
+
+[[claim]]
+id = "edh-weff-structure-is-breathing-phase-not-resonance"
+claim = "The ω_eff structure at B = 10.4 nT is a phase sample of the breathing mode at a fixed hold length, not a resonance in the cascade: radial expansion over the hold has a minimum at ω_eff ≈ 0.59-0.62 where the cloud CONTRACTS, and doubling the hold moves the ratios."
+status = "live"
+quantity = "origin of the weff structure @ B=10.4nT"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, 26 arms over ω_eff ∈ [0.15, 1.00] at the 8 ms hold plus two at 16 ms."
+uncertainty = "The ratio r(end)/r(hold start) runs 1.571 (ω_eff = 0.200) → 0.949 (0.590, the minimum) → 1.140 (0.830) → 1.097 (1.000). Doubling the hold moves it from 0.989 to 1.006 at ω_eff = 0.650 and from 1.096 to 1.033 at 1.000 — a resonance would not move. The first 11 frames of the 8 ms and 16 ms holds agree exactly, which is the check that the window extraction is right."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p590_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.2"
+pr = 0
+prediction = "If the structure is a breathing phase rather than a resonance, doubling the hold must move the expansion ratio; a resonance would leave it where it is."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = """NOT a supersession of `edh-104nt-peak-reads-the-transient-for-80-percent`, and it was
+written as one for a minute until the link checker refused it. That row is still true —
+22 of 26 arms take their maximum at frame 32 — and this one EXPLAINS it. Explanation and
+replacement are different relations, and the ledger only has vocabulary for the second.
+
+THIS EXPLAINS THE POPULATION I HAD RECORDED AS UNEXPLAINED. The four arms whose `peak`
+falls in the hold interior — 0.590, 0.620, 0.650, 0.680 — are EXACTLY the four with the
+smallest radial expansion, three of them contracting. Where the cloud is compressed at the
+end of the window the density is high, the cascade is still running, and the maximum lands
+on the last frame; everywhere else the cloud expands, density falls, the cascade stalls and
+the maximum is the pre-hold transient. Two independent readings — the argmax frame of
+P_adj, and the radial dynamics — pick out the same four arms.
+It also removes the reason to look for a cascade resonance at either field: a structure in
+ω_eff at fixed hold length is what a breathing phase looks like. That does not by itself
+refute the 5.2 nT reading, which has not been measured this way — but it is now the
+hypothesis to beat there, and it is cheap to test from the same cached snapshots.
+MEASURED 2026-08-22 (#444, §12.5): it was cheap, and 5.2 nT behaves the same way.
+See `edh-5p2nt-structure-is-breathing-phase-not-resonance` — same mechanism, and
+there the hold-doubling test inverts the ORDERING rather than merely moving it."""
+
+[[claim]]
+id = "edh-5p2nt-structure-is-breathing-phase-not-resonance"
+quantity = "origin of the weff structure @ B=5.2nT"
+claim = "The ω_eff structure at B = 5.2 nT has the same origin as at 10.4 nT — a breathing phase sampled at fixed hold length, not a cascade resonance. Radial expansion over the hold is a single oscillation with a minimum of 0.9868 at ω_eff = 0.600 (the cloud CONTRACTS over 0.570–0.620) and a maximum of 1.1441 at 0.770; the P_adj argmax frame jumps from the last frame (42/42, a truncation) to an interior frame (38/42) exactly at the ω_eff = 0.650 valley; and doubling the hold INVERTS the ordering, taking 0.650 from valley to maximum."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 5.2 nT, 20 arms over ω_eff ∈ [0.42, 1.00] at the 8 ms hold plus 4 at 16 ms. Read from cached snapshots — no new runs."
+uncertainty = "The EXISTENCE of the structure is bounded well clear of any floor: expansion swings 0.9868 → 1.3587 (38 %) against a dt/2 reproducibility floor of 0.029 %, and the hold-doubling ratios run 1.024 → 1.287. The POSITIONS are quantised by the ω_eff grid — 0.02–0.05 wide near the extrema — so 'minimum at 0.600' means 'at the sampled point 0.600', with no fit and no interval. The 16 ms arms are themselves truncated (3 of 4 peak at frame 53/53), so their VALUES bound the inversion but are not converged."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p600_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "scripts/validation/klaus_weff_cloud_size.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.5"
+pr = 0
+prediction = "If the 5.2 nT two-branch structure is a breathing phase, (1) radial expansion must have structure in ω_eff, (2) the arms whose P_adj peaks inside the hold must coincide with the least-expanded group, and (3) doubling the hold must move the structure — which a resonance cannot do."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = """Registered in #444 before the measurement. (1) and (3) hit outright. (2) hit in the
+form the MECHANISM predicts rather than the form the prediction guessed, and #444 had
+already flagged that: at 5.2 nT all 20 arms peak inside the hold, so 'inside vs outside' —
+the discriminator that split 10.4 nT four-to-twenty-two — is degenerate here. The
+information is in the argmax FRAME, which splits the arms at exactly the valley.
+
+Same mechanism, both fields: where the cloud is compressed the density is high, the
+cascade is still running and the maximum lands on the last frame; where it expands the
+density falls, the cascade stalls and the maximum moves inside. At 10.4 nT that picked out
+four arms; at 5.2 nT it picks out a boundary at ω_eff = 0.650.
+
+The sharpest single number is the ORDERING inversion, not the ratios. At 8 ms
+0.550 > 0.770 > 0.650; at 16 ms 0.650 > 0.550 > 0.770. A resonance is a property of the
+field and the trap and does not care how long you watch.
+
+Does NOT close `edh-104nt-observable-not-window-robust`: this explains why the window
+matters, it does not supply a window-independent observable. Does not restore an optimum
+at either field — §12.3 stands.
+
+Method note, because it worked twice: the populations were re-read seven ways at 10.4 nT
+and every reading disagreed with the others; the cloud settled it in one pass, from data
+already in the cache. Look at a different quantity before inventing another reading of the
+one you have."""

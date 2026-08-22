@@ -216,9 +216,13 @@ const _ROTATING_ACTUAL_INTEGRATOR = "strang"
     # writer as the standard path (`_emit_live_status`), so the keys cannot drift
     # apart again.
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
+    # Progress + ETA (#408). Separate from `live_monitor:` on purpose — see
+    # `progress_reporter.jl`.
+    cb_progress = _build_progress_reporter("rotating_basis", n_steps, n_steps * dt_rtp)
     _record =
         (step, t) -> begin
             cb_live === nothing || cb_live(ws, step, times_arr, Float64[])
+            _progress!(cb_progress, step, t)
             if step == 1 || step % save_every == 0
                 push!(times_arr, t)
                 push!(norms_arr, sqrt(sum(abs2, ws.state.psi) * dV))

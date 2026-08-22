@@ -84,8 +84,12 @@ end
     # ledger may record one, but it must say so.
     for c in claims
         c.prediction === nothing && continue
-        @test c.prediction_registered in ("before", "after")
-        @test c.prediction_outcome in ("hit", "miss", "pending")
+        @test c.prediction_registered in ("before", "after")   # not a closed set worth a constant: two values, no growth pressure
+        # From the constant, not a copy of it: this line asserted the old
+        # three-value tuple and went red when `moot` was added -- a second
+        # declaration of a closed set is the defect the ledger exists to stop,
+        # and it had grown one inside the ledger's own gate.
+        @test c.prediction_outcome in SpinorBEC.CLAIM_PREDICTION_OUTCOMES
     end
 end
 
@@ -182,6 +186,47 @@ end
     @test sites == NamedTuple[]
 end
 
+@testset "a neighbouring table row's marker does not shield an unmarked one" begin
+    # Measured 2026-08-20, in the very document this gate exists for. The §0
+    # verdict table's row 17 stated the REFUTED `2.25×` bare, and one line below
+    # it row 13 said "**refuted**" about an unrelated claim. Proximity was
+    # satisfied, so the gate was green over a live table asserting a refuted
+    # result in the present tense — the exact failure it was built to catch,
+    # surviving inside it.
+    #
+    # The rule that fixes it: in a markdown table the window is the line, because
+    # a row is one claim and its neighbours are always other claims. Prose keeps
+    # the loose window; a gate that reddens on correct writing gets deleted.
+    claims = claim_ledger()
+    c = claim_by_id(claims, "edh-longtime-static-sustains")
+    @test c !== nothing
+    lit = first(c.retired_literal)
+
+    mktempdir() do d
+        shielded = joinpath(d, "shielded.md")
+        marked = joinpath(d, "marked.md")
+        write(shielded,
+            "| 17 | long time | the endpoint differs by $lit at 145 ms. |\n" *
+            "| 13 | 5.2 nT | the old window is **refuted**, not merely unresolved. |\n")
+        write(marked,
+            "| 17 | long time | $lit is **RETRACTED**; see the 64³ re-run. |\n" *
+            "| 13 | 5.2 nT | the old window is **refuted**, not merely unresolved. |\n")
+
+        # Red must be reachable, and green must be too — a rule that reddens on
+        # a correctly-marked row is worse than the hole it closes. `marked` also
+        # pins the casing fold: it says RETRACTED, and the marker list carries
+        # `retracted` in lower case only.
+        @test length(unmarked_retired_literal_sites(files=[shielded])) == 1
+        @test unmarked_retired_literal_sites(files=[marked]) == NamedTuple[]
+
+        # And prose must keep the loose window, or the fix has quietly become a
+        # different, stricter gate than the one argued for.
+        prose = joinpath(d, "prose.md")
+        write(prose, "This result is **RETRACTED**.\n\nThe endpoint ratio was $lit.\n")
+        @test unmarked_retired_literal_sites(files=[prose]) == NamedTuple[]
+    end
+end
+
 @testset "the point-of-use gate can see the defect it was built for" begin
     # Red must be reachable before any green above is worth anything. The probe
     # is the REAL shape: a retracted literal in a protocol step, with the
@@ -208,4 +253,39 @@ end
         # Negative control: a line carrying its own marker must NOT be.
         @test !any(s -> endswith(s.file, "marked_at_use.md"), found)
     end
+end
+
+@testset "the ledger's coverage of the documents it cites does not go backwards" begin
+    # The gate the 2026-08-21 incident asked for. `quantity` can only make two ROWS
+    # collide; it cannot see a section that was never poured, and the section that
+    # refuted the method in use was one of 47 unpoured out of 70.
+    #
+    # A ratchet rather than a target: pinning this at "everything" would make it
+    # unmeetable and it would be deleted, which is the failure mode this project
+    # has recorded for gates that are too strict.
+    using TOML
+    doc = TOML.parsefile(claim_ledger_path())
+    pinned = Dict(r["doc"] => Int(r["covered"]) for r in get(doc, "coverage", []))
+    @test !isempty(pinned)
+
+    actual = ledger_section_coverage(; repo=_REPO)
+    @test !isempty(actual)
+
+    for r in actual
+        haskey(pinned, r.doc) || begin
+            println("  cited but not in the coverage ratchet: ", r.doc,
+                " (", r.covered, "/", r.total, ") — add a [[coverage]] row")
+            @test false
+            continue
+        end
+        r.covered >= pinned[r.doc] || println("  coverage FELL for ", r.doc, ": ",
+            r.covered, " < pinned ", pinned[r.doc], ". Uncovered: ",
+            join(r.uncovered, " "))
+        @test r.covered >= pinned[r.doc]
+    end
+
+    # Positive control: a ratchet that cannot detect a fall is not a ratchet.
+    @test any(r -> r.covered < r.total, actual)   # there IS debt to protect
+    fell = [r for r in actual if r.covered < get(pinned, r.doc, 0) + 1_000_000]
+    @test length(fell) == length(actual)          # the comparison is live
 end

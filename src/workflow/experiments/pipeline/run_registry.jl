@@ -1,6 +1,6 @@
 # --- Run Registry: resumable YAML-driven experiments ---
 
-export run_yaml, run_status, list_runs, compute_run_dir
+export run_yaml, run_status, list_runs, compute_run_dir, run_provenance
 
 # Directory-per-run design: 1 config.yaml ↔ 1 directory containing one
 # self-contained JLD2 per scan point. Re-running the same YAML skips files
@@ -41,6 +41,30 @@ function compute_run_dir(yaml_path::String; base_dir::String=default_run_root())
     basename_no_ext = splitext(basename(yaml_path))[1]
     joinpath(base_dir, "$(basename_no_ext)_$(hash16)")
 end
+
+"""
+    run_provenance() -> Dict{String,Any}
+
+Which code produced a file: git hash, whether the tree was dirty, Julia version
+and threads, host, platform.
+
+PUBLIC because the pipeline is not the only writer. `run_yaml` outputs carry this
+under `env/`, but campaign scripts write their own JLD2 and carried NONE of it —
+measured 2026-08-21 on `scripts/eu334/nucleate.jl` output, which holds every
+physics parameter and the seed (`B_uG`, `kappa`, `mu0`, `mu1`, `tau_ms`, `seed`,
+`seed_file`, …) and not one fact about the code that ran. The seed makes a
+trajectory reproducible only if you also know what it was fed to.
+
+The asymmetry ran the other way from what was assumed: the pipeline has the
+provenance and keeps the seed in its config; the scripts have the seed and no
+provenance. Both halves are needed once files outlive the session that wrote
+them, which is the whole premise of deleting anything later.
+
+`git_dirty` is the load-bearing field. A hash from a dirty tree names a commit
+that does not describe the code that ran, and silently — so a run recorded as
+reproducible would not be.
+"""
+run_provenance() = _env_metadata()
 
 function _env_metadata()
     git_hash = try
@@ -826,7 +850,39 @@ directory if it doesn't exist.
 function _move_scratch_to_final(tmp_path::String, final_path::String)
     final_dir = dirname(final_path)
     isdir(final_dir) || mkpath(final_dir)
+    _assert_readable_jld2(tmp_path)
     mv(tmp_path, final_path; force=true)
+end
+
+"""Reopen the file we just wrote and confirm it can be read.
+
+On 2026-07-29 the `tga-kozuma-kouhi` /gs/fs group quota hit 1000.04 GB and two
+`p1mov_dyn_*` runs wrote TRUNCATED point files — `EOFError: read end of file` on
+reopen — and then reported `"completed": true, "oom_killed": false,
+"exception_type": null`. Both `_exit_summary.json` files are stamped within one
+second of each other, so this was the volume filling, not two independent kills.
+A full quota surfaces as EDQUOT / SIGBUS and never as "disk full"
+(`gotcha_tsubame_gsfs_quota_full_edquot_sigbus_2026_07_29`), and here it did not
+surface at all: the write returned, the move succeeded, and the run declared
+success over a file nobody could open.
+
+The check costs one open of a file that was just written and is still in page
+cache, against a multi-GB write. Throwing here is the point — the caller already
+removes the scratch file and rethrows, so a failed write becomes a failed run
+instead of a successful run with no data. The two runs above were found six
+months later by a storage sweep, which is the wrong time to learn it."""
+function _assert_readable_jld2(path::String)
+    endswith(path, ".jld2") || return nothing
+    try
+        jldopen(f -> length(keys(f)), path, "r")
+    catch err
+        error(
+            "wrote $path but cannot read it back ($(typeof(err))) — the write " *
+            "did not survive. A full group quota does this and reports nothing; " *
+            "check `t4-user-info disk group`, not `df`.",
+        )
+    end
+    nothing
 end
 
 """
@@ -930,6 +986,27 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     catch err
         isfile(tmp_file) && rm(tmp_file; force=true)
         rethrow(err)
+    end
+
+    # TIER 1, and it must run BEFORE the reduction below: it needs the frames,
+    # and the whole point is that it outlives them.
+    try
+        write_coarse_fields(run_dir, psi_file)
+    catch err
+        @warn "coarse field emit failed (non-fatal)" run_dir exception=err
+    end
+
+    # The sibling `result.jld2` is a SUMMARY (PR #195). It only becomes one once
+    # a real point file carries the frames, which is exactly here — the auto-save
+    # in `run_pipeline` wrote it before this file existed, so it could not know.
+    # Non-fatal and key-only; refuses unless the point file provably covers it.
+    try
+        st = make_result_a_summary!(run_dir, psi_file)
+        verbose && st === :summarised &&
+            println("  result.jld2 reduced to a summary (frames live in ",
+                basename(psi_file), ")")
+    catch err
+        @warn "result.jld2 summary reduction failed (non-fatal)" run_dir exception=err
     end
 
     # Catalog fuel (non-fatal) — see scan-path emit for rationale.

@@ -97,6 +97,11 @@ function active_learn_phase_scan(
     bounds::Vector{Tuple{Float64, Float64}};
     n_init::Int=5,
     n_iter::Int=50,
+    # Declared stopping criterion, forwarded to the BO loop. `nothing` means the
+    # scan stops when the budget runs out and SAYS SO in `stop_reason`; it never
+    # reports a truncated map as a resolved one.
+    acq_tol::Union{Nothing, Float64}=nothing,
+    acq_patience::Int=3,
     temperature::Float64=0.1,
     ℓ::Union{Nothing, Float64}=nothing,
     n_grid::Int=50,
@@ -139,7 +144,8 @@ function active_learn_phase_scan(
     end
 
     bayesian_optimize(obj_fn, bounds;
-        n_init, n_iter, minimise=false, ℓ, n_grid, seed, verbose)
+        n_init, n_iter, minimise=false, ℓ, n_grid, seed, verbose,
+        acq_tol, acq_patience)
 end
 
 """

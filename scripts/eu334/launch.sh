@@ -242,7 +242,15 @@ kcut_fixed)
 # in one knob. Cheap and short: this is a debugging instrument, not a measurement
 # of the campaign's physics.
 ed_probe)
-    q -N eu334_edprobe -l h_rt=2:00:00 -v ED_NSTEP=${ED_NSTEP:-25000} \
+    # ARGUMENT, because the whole point is comparing the two: the scalar arm
+    # already condenses at both values of M, so the F = 6 arm is what separates
+    # "the spinor" from "the DDI or the ramp" in #418.
+    # ED_MU / ED_T / ED_SEED are the LAST suspect: #334's own ramp and seed.
+    # Pass them through the environment rather than as more positional arguments —
+    # the third slot is already `ED_CDD` and a fourth positional would make the
+    # job name and the configuration disagree the first time someone skips one.
+    q -N eu334_edprobe_${2:-rb87}_${3:-nodd}_${ED_SEED:-vacuum} -l h_rt=4:00:00 \
+      -v ED_NSTEP=${ED_NSTEP:-25000},ED_ATOM=${2:-rb87},ED_CDD=${3:-0.0},ED_MU=${ED_MU:-3.0},ED_T=${ED_T:-1.0},ED_SEED=${ED_SEED:-vacuum} \
       scripts/eu334/submit_ed_probe.sh
     ;;
 

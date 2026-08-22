@@ -66,6 +66,29 @@ All five live inside one `save:` mapping (`SAVE_SCHEMA`). The flat spellings
 
 Snapshots land at `dynamics/psi_snapshots_streamed/frame_NNNNN`. Set `SPINORBEC_SCRATCH_DIR` to redirect the scratch `.tmp`.
 
+## Progress and ETA (#408)
+
+Every dynamics path — standard, `binary`, `rotating_basis`, `scalar_egpe` —
+prints a wall-clock-throttled progress line, **on by default**:
+
+```
+[scalar_egpe]  t = 0.44/1.10 (40.0 %)  step 176000/440000  elapsed 44m01s  left 1h06m  ETA 18:32:07
+```
+
+| variable | default | meaning |
+|---|---|---|
+| `SPINORBEC_PROGRESS` | on | set to `quiet` / `off` / `0` / `false` / `no` / `none` to silence. Any other value leaves it on |
+| `SPINORBEC_PROGRESS_INTERVAL` | `60` | seconds between lines. A malformed or non-positive value falls back to 60 rather than throwing |
+
+Three things about it are deliberate. The cadence is **wall-clock, not step
+count** — a step cadence floods at 32³ and goes silent at 128³, and 128³ is
+where the silence costs something. The ETA is a **clock time**, because `h_rt`
+is a clock time and "66 minutes left" has to be added to now by hand before the
+two can be compared. And it is **not** a YAML key and not tied to
+`live_monitor:`: `live_monitor` is documented as the thing batch runs switch
+off, which is exactly the hand-submitted `qsub` job that ran 110 minutes in
+silence and then died on `h_rt`.
+
 ## Hamiltonian overrides (per phase)
 
 Each of these falls back to the previous step's value if omitted:

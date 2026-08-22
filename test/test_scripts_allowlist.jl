@@ -23,12 +23,18 @@ using SpinorBEC
 # silently disarms the gate below. `calibrated_scan` caught exactly that: its
 # positive control stopped matching when Printf was absent from Main.
 using Printf
+# `git_corpus` — the corpus this gate judges must be the one CI judges. Included
+# at top level, not inside the testset that needs it, because two later testsets
+# in this file include the same helper and the first use must not depend on
+# which of them ran.
+include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
 
 const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
     "cli.jl",                      # shim → SpinorBEC.cli_main
     "generate_state.jl",           # docs/STATE.md generator (test-gated)
     "prior_art.py",                # prior-art dispositions (test-gated)
+    "reduce_result_backlog.jl",     # result.jld2 backlog sweep (calls the gated reducer)
     "audit_memory.py",             # memory-store auditor (CLAUDE.md-gated)
     "preflight_invariants.jl",     # physics-invariant preflight battery
     "watch_until_done.sh",         # job watcher with a reachable RED
@@ -53,6 +59,15 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_mutation_sweep.sh",
     "submit_kz_exponent.sh",
     "submit_eu_bscan.sh",
+    # The static-trap omega_eff array for the EdH quench. One arm per task on
+    # purpose: a shard reaped at h_rt must not take completed neighbours with it.
+    "submit_klaus_weff_scan.sh",
+    "submit_lt64_endpoint_ensemble.sh",
+    # #423 — eu151_klaus_phi_phys at production scale with the anti-aligned
+    # preparation. One job, not an array: `run_yaml` has no point selection, so
+    # the 8-point scan is indivisible from outside; it IS resumable, so a
+    # walltime kill costs only the point it was inside.
+    "submit_edh_phi_phys_anti_aligned.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
@@ -111,8 +126,13 @@ const _SCRIPTS_ALLOWLIST = Set([
     # ── active campaign: branch spectrum / spinodal (docs/guides/eu_spinodal_spectrum.md, #339) ──
     # Reads #335's cells and shares its _preamble.sh — the two campaigns measure
     # the SAME states, one by continuation and one by the second variation.
+    "eu_spectrum/_cells.jl",
     "eu_spectrum/branch_spectrum.jl",
     "eu_spectrum/submit_spectrum.sh",
+    # #397 (which consumer owns the preconditioner default) + #399 (does λ_min
+    # converge on the polarised branch) — same knob, same cells, one job.
+    "eu_spectrum/precond_ab.jl",
+    "eu_spectrum/submit_precond_ab.sh",
     # ── active campaign: Eu isotope q prediction (docs/guides/eu_isotope_q_prediction.md, #341) ──
     "eu_isotope_q/q_boundary.jl",
     "eu_isotope_q/magnon_gap.jl",
@@ -187,9 +207,35 @@ const _SCRIPTS_ALLOWLIST = Set([
     # (700 ms - 1.1 s, Fig. 4c), one seed per job. A cluster submit wrapper —
     # category 3, same as the other `submit_*.sh` above.
     "klaus2022/submit_stripes.sh",
+    # #407: the FFTW thread × grid RSS pathology (36.9 GB at 48³ against 1.15 GB
+    # at 128³, same thread count). The workaround shipped with #405; this is the
+    # mechanism, and it is a repo script rather than a one-off because the same
+    # trap is waiting for every other campaign that sets a thread count.
+    "klaus2022/fftw_thread_probe.jl",
+    "klaus2022/submit_fftw_probe.sh",
+    # #406: the magnetostricted-AR sensitivity table (1.16 against a published
+    # 1.03). A table before a scan, per CLAUDE.md gate 2 — most cells are ~zero
+    # and knowing WHICH is the result.
+    "klaus2022/ar_sensitivity.jl",
+    "klaus2022/submit_ar_sensitivity.sh",
     # ── validation probes still cited as live instruments ──
+    # Generates the omega_eff scan configs. Exists because PR #403 landed two
+    # documents and no configs, so its evidence read `absent` in the claim ledger
+    # -- re-deriving it was a re-derivation, not a re-run.
+    "validation/klaus_weff_scan_gen.jl",
+    # Classification, deliberately separate from the trajectory jobs: a shard
+    # reaped at h_rt never reads its own completed work.
+    "validation/klaus_weff_extract.jl",
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
+    # #444 — radial cloud size across an omega_eff scan. The observable that
+    # settled 10.4 nT: population readings disagreed with each other, the cloud
+    # explained it, and the data was already in the cache.
+    "validation/klaus_weff_cloud_size.jl",
+    # #424 — applies the endpoint criterion that was fixed before the 20 arms
+    # launched. The threshold is a constant in the file so it cannot be
+    # re-fitted to whatever landed.
+    "validation/lt64_endpoint_verdict.jl",
     "validation/rk4ip_step_size_probe.jl",
     "validation/rk4ip_time_to_solution_gpu.jl",
     "validation/scan_job_cost_breakdown.jl",
@@ -207,10 +253,14 @@ const _SCRIPTS_ALLOWLIST = Set([
             push!(on_disk, rel == "." ? f : joinpath(rel, f))
         end
     end
-    # ignore local-only clutter that is not tracked by git (e.g. mcp/.venv)
-    tracked = Set(split(read(`git -C $root ls-files scripts`, String), '\n';
-        keepempty=false))
-    on_disk = Set(f for f in on_disk if ("scripts/" * f) in tracked)
+    # Ignore local-only clutter that git is told to ignore (e.g. mcp/.venv) —
+    # and NOTHING else. This was `git ls-files scripts`, the index alone, which
+    # also dropped every file the author had not `git add`-ed yet: the gate went
+    # green on the very PRs it exists to judge, then CI went red (#422/#425).
+    # `git_corpus` is the index PLUS unignored working-tree files; see its
+    # docstring for why the failure lands on the green side.
+    known = git_corpus(root, "scripts")
+    on_disk = Set(f for f in on_disk if ("scripts/" * f) in known)
 
     extra = sort(collect(setdiff(on_disk, _SCRIPTS_ALLOWLIST)))
     stale = sort(collect(setdiff(_SCRIPTS_ALLOWLIST, on_disk)))

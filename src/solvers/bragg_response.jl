@@ -74,6 +74,13 @@ locations `peak_omega_density` / `peak_omega_spin` with their weights, and:
 
 The kick is unitary, so the norm is conserved exactly by construction and
 `norm_drift` measures the propagator alone.
+
+DEVICE. Runs on CPU and CUDA since `test/gpu/test_gpu_bdg_instrument_parity.jl`
+— **and did not before it.** `kick` and `probe` are built from `grid.x`, a host
+`Vector` on a GPU workspace, and were broadcast against `ws.state.psi` in two
+places; the note that the two-argument `mapreduce` "stays GPU-legal" was true of
+the call shape and false of its arguments. CI has no GPU, so a green suite does
+not exercise the device path; the verification of record is a manual GPU run.
 """
 function bragg_response(
     ws, ψ0;
@@ -103,26 +110,39 @@ function bragg_response(
     mvals = Float64.(sys.m_values)          # c=1 ↦ m=F, c=D ↦ m=−F
     dV = cell_volume(ws.grid)
 
-    # cos(k·r) and e^{−ik·r} on the grid, built once.
+    # cos(k·r) and e^{−ik·r} on the grid, built once, then MOVED TO ψ's device.
+    #
+    # `ws.grid.x[d]` is a host `Vector` even for a GPU workspace, so both of
+    # these come out as host `Array`s — and broadcasting a host array against a
+    # device array does NOT fall back to the CPU, it fails to compile the kernel
+    # ("passing non-bitstype argument"). That is the same defect `_lz_action`
+    # carried into #383's first real GPU use of `trapped_bdg_frequencies`, and
+    # this file had it twice: once in the kick and once inside `_sample!`, where
+    # the two-argument `mapreduce` is GPU-legal only when BOTH arguments live on
+    # the device. Gated by `test/gpu/test_gpu_bdg_instrument_parity.jl`.
     kr = zeros(Float64, n_pts)
     for d in 1:ndim
         shp = ntuple(i -> i == d ? n_pts[d] : 1, ndim)
         kr .+= k_vec[d] .* reshape(ws.grid.x[d], shp)
     end
-    kick = cos.(kr)
-    probe = cis.(-kr)
+    kick = _to_device(ws.backend, cos.(kr))
+    probe = _to_device(ws.backend, cis.(-kr))
 
     # Unitary impulse. Both kick operators are diagonal, so this is a per-voxel
     # phase: exp(−i·A·cos(k·r)·m) with m = 1 (density) or m = m_values[c] (spin_z).
-    ψ = copy(ψ0)
+    #
+    # Applied AFTER the copy into `ws.state.psi` rather than to a copy of `ψ0`:
+    # `ψ0` may be a host array handed to a GPU workspace, and this way the
+    # kicked array is on the same device as `kick` by construction instead of by
+    # the caller's discipline. It also drops one full-size temporary.
+    copyto!(ws.state.psi, ψ0)
     for c in 1:D
         w = channel === :density ? 1.0 : mvals[c]
         w == 0.0 && continue
         idx = _component_slice(ndim, n_pts, c)
-        view(ψ, idx...) .*= cis.(-amplitude .* w .* kick)
+        view(ws.state.psi, idx...) .*= cis.(-amplitude .* w .* kick)
     end
 
-    copyto!(ws.state.psi, ψ)
     ws.state.t = 0.0
     n_steps = max(round(Int, t_total / dt), 2 * sample_every)
     norm0 = real(sum(abs2, ws.state.psi)) * dV

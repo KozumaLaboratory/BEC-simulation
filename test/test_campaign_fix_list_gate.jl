@@ -79,6 +79,19 @@ const _NOT_A_CORRECTION = Dict(
         "vintage of the corpus being gated, i.e. an input to the verdict",
     "306ef71a" => "producing commit of 32 stored runs (2026-05-21); same role",
     "e8168dcb" => "producing commit of 9 stored runs (2026-05-23); same role",
+    # §12.1's instrument correction: the peak must be taken INSIDE the hold, not
+    # over the whole trajectory. Not a correction a run must descend from -- the
+    # runs are fine and only the READING was wrong, which is why every affected
+    # number was re-extracted from cache with no recompute. Same role as
+    # ed3be749: a docs commit reporting a measurement, cited for provenance.
+    #
+    # It is cited here rather than merely listed because it is the commit a later
+    # session used a refuted method in front of. The gate asked what it is; this
+    # is the answer, and the answer is "not a fix-list ref".
+    "97ec124e" =>
+        "the observable correction (peak inside the hold) plus long-time arms; " *
+        "corrects the reading, not the runs -- all affected numbers were " *
+        "re-extracted from cache",
 )
 
 @testset "campaign fix list — parses, and every ref is real" begin

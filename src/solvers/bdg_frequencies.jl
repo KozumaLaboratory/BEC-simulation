@@ -257,6 +257,14 @@ manifold and a small `nev` lands entirely inside it** (six ω < 1e-5 modes with
 large residuals, correctly reported); raise `nev` past it, deflate it with
 `extra_nullspace`, or gap it with `q > 0` before reading a spectrum there.
 
+DEVICE. Runs on CPU and CUDA. **The GPU path is gated by
+`test/gpu/test_gpu_bdg_instrument_parity.jl`, which CI cannot run — CI has no
+GPU, so a green suite says nothing about it.** That file is 3D on purpose: the
+rotation generator `(x∂_y − y∂_x)ψ` is only reached at `ndim ≥ 2`, and it was
+this function's one host-array leak — found not by a test but by the first real
+device use, a 32³ × 13 cell on an H100 (#383), which failed to compile the
+kernel rather than falling back.
+
 VALIDITY REGIME. Gated in the uniform limit against `bogoliubov_spectrum` and
 against the analytic F=1 polar density/magnon closed forms
 (`test/oracles/test_trapped_bdg_frequencies.jl`). The reduction is exact when

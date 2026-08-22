@@ -1,13 +1,17 @@
 # test/_inventory.jl — what does each test file actually ground?
 #
-# A simulator with no experiment to check it against can only be grounded four
-# ways (Roache's verification hierarchy, plus differential testing):
+# A simulator with no experiment to check it against can only be grounded six
+# ways (Roache's verification hierarchy, plus differential and bound testing).
+# The count said "four" while listing five until 2026-08-21 — see CLAUDE.md on
+# restated enumerations.
 #
 #   :exact         compared against a closed form computed IN the test
 #   :order         error scaling under refinement matches the theoretical rate
 #   :invariant     a conserved / algebraic property holds (norm, hermiticity, …)
 #   :metamorphic   an observable transforms correctly under a symmetry
 #   :differential  two independent statements of the same physics agree
+#   :bound         a claimed extremum is on the achievable side of a trial value
+#                  — the only one that says WHICH side of a disagreement is wrong
 #
 # Everything else is NOT validation:
 #
@@ -35,6 +39,24 @@ isdefined(@__MODULE__, :FAST_TESTS) || include(joinpath(_INV_DIR, "_tiers.jl"))
 # proposed for deletion.
 
 const _MARKERS = [
+    # One-sided: a trial value bounds an extremum, so a claim on the wrong side
+    # of it is refuted without either side having to be trusted. Distinct from
+    # :differential, which establishes disagreement but not fault.
+    # Deliberately NARROW, unlike its neighbours. The generous version of this
+    # group (`\bvariational\b`, a bare "upper bound") credited 20 files, of
+    # which one was actually bound-grounded — it swallowed every order test that
+    # writes "bound" about its error and every LHY file with a variational
+    # ansatz. Over-crediting is the safe direction for a group that pulls files
+    # OUT of the deletion bucket, but :bound sits second in `_ORDER`, so a loose
+    # match here RELABELS a correctly-classified order/exact test.
+    :bound => [
+        r"variational_bound",
+        r"strict(ly)? (upper|lower) bound"i,
+        r"cannot (be|lie|sit) (below|above)"i,
+        # NOT a bare "trial state": `test_scalar_ddi_transverse_pad.jl` builds
+        # an "analytic trial state" to compute an exact reference, which is
+        # :exact grounding, not a bound. A real bound test calls the helper.
+    ],
     :order => [
         r"convergence"i, r"\border\b.{0,40}(≈|==|isapprox|@test)"i,
         r"refine"i, r"\bslope\b"i, r"log\(.{0,30}err"i,
@@ -118,7 +140,7 @@ const _MARKERS = [
 # Gates whose subject is the SUITE, not the physics: coverage meta-tests, static
 # source scans, doc-citation ratchets. They ground nothing about the simulator
 # and are not meant to — but they are not pins or spellings either, and calling
-# them :pin marks them for pruning. Checked BEFORE :pin/:api, after the five
+# them :pin marks them for pruning. Checked BEFORE :pin/:api, after the six
 # grounding labels.
 const _META_MARKERS = [
     r"meta[-_ ]?test"i, r"\bcoverage\b"i, r"every\s+\w+\s+is\s+(gated|in|listed)"i,
@@ -257,7 +279,7 @@ function inventory(root::String=_INV_DIR)
     [_scan(root, f) for f in files]
 end
 
-const _ORDER = [:order, :differential, :metamorphic, :invariant, :exact,
+const _ORDER = [:order, :bound, :differential, :metamorphic, :invariant, :exact,
     :meta, :pin, :api, :unclassified]
 
 _row(k, n, tot, cost) = println("  ", rpad(string(k), 16),

@@ -188,6 +188,11 @@ runs/**/*.json
 runs/**/*.pdf
 runs/**/*.aux
 runs/**/*.txt
+# ...but a submission manifest is an INPUT, not run output. `git add -A` reported
+# success while silently dropping one on 2026-08-21 and the array died on the
+# scheduler with "manifest not found" -- caught only because the submit script
+# fails closed on a missing manifest.
+!runs/**/manifest_*.txt
 
 # macOS Finder metadata + Python bytecode caches (never source-of-truth)
 .DS_Store

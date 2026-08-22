@@ -65,10 +65,35 @@ one seed.
 |---|---|---|
 | **1.3 nT** | — | **No operating window exists.** +1.8 % across a flat range in ω_eff ∈ [0.65, 1.0]. This is an absence, not a gap: there is nothing to relocate the old `≈ 0.3` to. **Do not re-fit it.** |
 | **2.6 nT** | **ω_⊥,eff / ω_⊥ = 0.71** | The prescription. +24.9 % over the unweakened trap. |
-| **5.2 nT** | two branches, global max at ω_eff ≈ 0.55 | Old `[0.5, 0.6]` **REFUTED**. **No single optimum is quoted.** Secondary max at ≈ 0.77, dip between them at ≈ 0.65 that survives 64³ with 93 % of its depth. The replacement for the old `[0.5, 0.6]` row is a *shape*, not a number. |
+| **5.2 nT** | — | **Nothing is quotable.** Old `[0.5, 0.6]` **REFUTED**, and so is the `two branches` reading that replaced it: the ω_eff ordering **INVERTS with hold duration** (ω_eff 0.650 is 5.05 % *below* 0.550 at 8 ms and 6.2 % *above* it at 16 ms). Do not set a value at this field from simulation yet. §11.5. |
 
 Three fields, three different kinds of answer, and only one of them is a number.
 That is the finding, not a failure to converge.
+
+**At 10.4 nT nothing is quotable yet**, and the reason is the observable rather
+than the physics. `peak P_adj in the hold` is not well-posed at this field: the
+hold-window maximum sits at the window's first frames, where the decaying
+pre-hold transient still dominates. The baseline reads 0.27574 over hold frames
+32–42 — a value **superseded** as a standalone result — and 0.20139 over 34–42 — a 37 % swing, both being "the peak in the
+hold". The shape is a single peak at ω_eff ≈ 0.650 on either window; the NUMBER
+is not settled. See `edh-104nt-observable-not-window-robust` (open).
+
+On the 34–42 window it reads a **single peak at ω_eff = 0.650, +49.5 %**
+over ω_eff = 1 — the largest *relative* enhancement of any field
+measured, on the *smallest absolute* transfer (0.30 against 0.66 at 2.6 nT).
+Zeeman re-pinning costs a factor 2 in absolute signal but does not close the
+channel, and weakening the trap helps proportionally more where it is nearly
+closed. **Quote both numbers or neither**: the relative figure alone sends an
+experimentalist to the worst field.
+
+> An earlier version of this paragraph said **+22.4 %** over a flat baseline of
+> 0.27574, from a whole-trajectory peak — **SUPERSEDED**, that reads the transient.
+> A second version simply swapped in 0.20139 and called it corrected, which
+> replaced one window-dependent number with another. The hold boundary is now
+> measured (frames 32–42; the spread across arms is exactly 0.000000 at 30–31 and
+> 0.000213 at 32), and the dependence on where the window is cut is the finding.
+
+Not a prescription: 32³, one seed, no grid check at this field.
 
 ## 4. What bounds these numbers
 

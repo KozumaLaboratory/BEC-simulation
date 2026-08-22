@@ -269,9 +269,16 @@ end
 
     B_func = t -> stir_axis(stir, t)
     t = 0.0
+    # Progress + ETA (#408). This is the path whose silence cost 2 h × 3 jobs on
+    # 2026-08-20: it printed `Step 2/2: ScalarEGPEDynamicsStep` and then nothing
+    # for 110 minutes. Its own `verbose` line below fires every `save_every*10`
+    # steps, which at 128³ is once per many minutes and carries neither a
+    # fraction nor an ETA.
+    cb_progress = _build_progress_reporter("scalar_egpe", n_steps, duration)
     for step_i in 1:n_steps
         split_step_scalar!(ws, dt, t, B_func)
         t += dt
+        _progress!(cb_progress, step_i, t)
         if step_i % save_every == 0 || step_i == n_steps
             record!(t)
             isfinite(norms[end]) || throw(ErrorException(

@@ -36,6 +36,7 @@ include("experiments/analyzers.jl")
 include("experiments/pipeline/pipeline_analyzers.jl")
 include("experiments/pipeline/pipeline_dispatch.jl")
 include("experiments/pipeline/pipeline_callbacks.jl")
+include("experiments/pipeline/progress_reporter.jl")
 include("experiments/pipeline/runner.jl")
 include("experiments/pipeline/resolve_gs.jl")   # ONE resolution of a ground_state: block
 include("experiments/pipeline/run_step_ground_state.jl")
