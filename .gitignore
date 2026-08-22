@@ -221,3 +221,6 @@ mutation_out/
 
 # lock files of the single-instance guard in the run drivers
 runs/**/.*.lock
+
+# PR-census cache (scripts/pr_mistake_census.py --refresh rebuilds it)
+.pr_census_cache.json

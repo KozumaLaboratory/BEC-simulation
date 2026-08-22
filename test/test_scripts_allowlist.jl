@@ -34,6 +34,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "cli.jl",                      # shim → SpinorBEC.cli_main
     "generate_state.jl",           # docs/STATE.md generator (test-gated)
     "prior_art.py",                # prior-art dispositions (test-gated)
+    # The PR mistake census, re-derivable. The FROZEN document says re-measuring
+    # is cheaper than re-reading; that was false while the mining lived in a
+    # scratch directory, and this is what makes it true. `--verify-doc` checks
+    # the committed document's own citations resolve.
+    "pr_mistake_census.py",
     "reduce_result_backlog.jl",     # result.jld2 backlog sweep (calls the gated reducer)
     "audit_memory.py",             # memory-store auditor (CLAUDE.md-gated)
     "preflight_invariants.jl",     # physics-invariant preflight battery
