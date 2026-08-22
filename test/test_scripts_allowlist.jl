@@ -23,6 +23,11 @@ using SpinorBEC
 # silently disarms the gate below. `calibrated_scan` caught exactly that: its
 # positive control stopped matching when Printf was absent from Main.
 using Printf
+# `git_corpus` — the corpus this gate judges must be the one CI judges. Included
+# at top level, not inside the testset that needs it, because two later testsets
+# in this file include the same helper and the first use must not depend on
+# which of them ran.
+include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
 
 const _SCRIPTS_ALLOWLIST = Set([
     # ── entry points / hard test gates ──
@@ -58,6 +63,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     # purpose: a shard reaped at h_rt must not take completed neighbours with it.
     "submit_klaus_weff_scan.sh",
     "submit_lt64_endpoint_ensemble.sh",
+    # #423 — eu151_klaus_phi_phys at production scale with the anti-aligned
+    # preparation. One job, not an array: `run_yaml` has no point selection, so
+    # the 8-point scan is indivisible from outside; it IS resumable, so a
+    # walltime kill costs only the point it was inside.
+    "submit_edh_phi_phys_anti_aligned.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
@@ -218,6 +228,14 @@ const _SCRIPTS_ALLOWLIST = Set([
     "validation/klaus_weff_extract.jl",
     "validation/matsui_dataset_to_csv.jl",
     "validation/rk4ip_gpu_cost_probe.jl",
+    # #444 — radial cloud size across an omega_eff scan. The observable that
+    # settled 10.4 nT: population readings disagreed with each other, the cloud
+    # explained it, and the data was already in the cache.
+    "validation/klaus_weff_cloud_size.jl",
+    # #424 — applies the endpoint criterion that was fixed before the 20 arms
+    # launched. The threshold is a constant in the file so it cannot be
+    # re-fitted to whatever landed.
+    "validation/lt64_endpoint_verdict.jl",
     "validation/rk4ip_step_size_probe.jl",
     "validation/rk4ip_time_to_solution_gpu.jl",
     "validation/scan_job_cost_breakdown.jl",
@@ -235,10 +253,14 @@ const _SCRIPTS_ALLOWLIST = Set([
             push!(on_disk, rel == "." ? f : joinpath(rel, f))
         end
     end
-    # ignore local-only clutter that is not tracked by git (e.g. mcp/.venv)
-    tracked = Set(split(read(`git -C $root ls-files scripts`, String), '\n';
-        keepempty=false))
-    on_disk = Set(f for f in on_disk if ("scripts/" * f) in tracked)
+    # Ignore local-only clutter that git is told to ignore (e.g. mcp/.venv) —
+    # and NOTHING else. This was `git ls-files scripts`, the index alone, which
+    # also dropped every file the author had not `git add`-ed yet: the gate went
+    # green on the very PRs it exists to judge, then CI went red (#422/#425).
+    # `git_corpus` is the index PLUS unignored working-tree files; see its
+    # docstring for why the failure lands on the green side.
+    known = git_corpus(root, "scripts")
+    on_disk = Set(f for f in on_disk if ("scripts/" * f) in known)
 
     extra = sort(collect(setdiff(on_disk, _SCRIPTS_ALLOWLIST)))
     stale = sort(collect(setdiff(_SCRIPTS_ALLOWLIST, on_disk)))

@@ -668,21 +668,25 @@ note = """Replaces the ordering `edh-longtime-static-sustains` asserted and `edh
 
 [[claim]]
 id = "edh-longtime-endpoint-ordering-unresolved"
-claim = "At 100 ω_ref⁻¹ and 64³ the endpoint separates rotating (0.40013) from static (0.17952) by 2.23x, which is safe, but does NOT separate static from baseline (0.17952 vs 0.15112, +18.8 %) because the static endpoint moves 34.2 % between two seeds."
-status = "open"
+claim = "RESOLVED by the n=8 ensemble (#424): at 100 ω_ref⁻¹ and 64³ the statically weakened trap DOES beat no-intervention at the endpoint — mean 0.27869 against 0.15094, +84.6 %, at 5.01 SE_diff. The two-seed reading that could not separate them (+18.8 %) was a sample of a distribution whose pooled sd is 0.05098."
+status = "live"
 type = "B"
 scope = "2.6 nT, anti-aligned, CPU, `lhy: none`, 64³. The endpoint at long hold only; the peak at the same points IS resolved (`edh-longtime-peak-ordering-at-64`)."
-uncertainty = "unbounded on the static-vs-baseline row: n = 2 seeds gives a spread (34.2 %) but no distribution, so 18.8 % is inside it and no confidence can be attached. Closing it needs an ensemble on both arms, not a finer grid — the grid is already the refined one."
+uncertainty = "n = 8 per arm, pooled sd 0.05098 (the pre-run n=2 estimate was 0.0658, so n=8 was sufficient rather than lucky), SE_diff 0.02549, |diff|/SE = 5.01 against the 2.0 threshold fixed before launch. The three groups have wildly different spreads and that is the result's shape: baseline sd 0.00020 (0.13 % of mean), rotating sd 0.00230 (0.57 %), static sd 0.07210 (26 %). ALL of the endpoint uncertainty lives in the static arm; the arms it is compared against are essentially deterministic."
 uncertainty_basis = "seed"
-evidence = ["64³ endpoint P_adj: baseline 0.15112, static 0.17952 (seed 101) / 0.27262 (default), rotating 0.40013 / 0.40358", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh"]
-evidence_status = "partial"
+evidence = ["64³ endpoint P_adj, n=8/8/4: baseline mean 0.15094 sd 0.00020, static mean 0.27869 sd 0.07210, rotating mean 0.40416 sd 0.00230", "runs/klaus_quench_long_time_ensemble/", "scripts/submit_lt64_endpoint_ensemble.sh", "scripts/validation/lt64_endpoint_verdict.jl"]
+evidence_status = "in_tree"
 commit = "6bb97bb2"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 section = "17.2"
 pr = 0
 note = """Recorded as `open` rather than left out, because the absence of a statement here is exactly what a reader would otherwise supply from the peak row. The rotating-vs-static factor of 2.23 IS outside the scatter and is safe to quote; the static-vs-baseline one is not. Same shape as `edh-longtime-not-converged-at-32`: a quantity measured on one axis (peak) does not transfer to another (endpoint), just as one duration did not transfer to another.
 
-THE RUN THAT WOULD CLOSE IT IS PREPARED AND NOT SPENT (2026-08-21). 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+THE RUN THAT WOULD HAVE CLOSED IT WAS PREPARED AND NOT SPENT (2026-08-21), AND WAS THEN RUN (2026-08-22, #424, TSUBAME 8459280, 20/20 arms rc=0). Kept verbatim because the sizing and the criterion were fixed before launch and that is what makes the verdict a measurement. 20 committed configs (8 baseline + 8 static + 4 rotating, seeds 1001-1008) and an array submit script. Sizing fixed BEFORE launch: sd = 0.0658 at n = 2, difference of means 0.0750, SE_diff = sd*sqrt(2/n), so n = 7 reaches 2 sigma and n = 8 is what is committed; fewer than 7 cannot answer the question at all. Rejection criterion also fixed before launch and written into `runs/klaus_quench_long_time_ensemble/README.md`: ESTABLISHED only if the difference of means is at least 2*SE_diff using the sd POOLED FROM THOSE RUNS, and if the pooled sd comes back much larger than 0.0658 the answer is "n = 8 does not reach 2 sigma, it would need N", not a re-fitted criterion.
+
+CLOSED 2026-08-22. The criterion was applied as written, by a script that carries the 2.0 threshold as a constant so it could not be re-fitted: |diff|/SE = 5.01, ESTABLISHED, static ABOVE baseline by +84.6 %. The pooled sd came back SMALLER than the pre-run estimate (0.05098 against 0.0658), so the "n = 8 does not reach 2 sigma, it would need N" branch did not fire.
+
+THE PEAK COLUMN OF THAT RUN IS NOT QUOTABLE AND THE ARGMAX SAYS WHY. With the window derived from the config (hold 100.0, dt 0.005, save.every 1000 -> 20 frames of 39, so the hold starts at frame 20), the baseline maximum lands at frame 20 and rotating at 21 — the first and second frames of the window, where the decaying pre-hold transient still dominates. Only static's is interior (frame 31), and only static's matches its recorded value (0.49081, exactly). This is the §12.1 condition again, and it is the reason the peak numbers in `runs/klaus_quench_long_time_ensemble/README.md` should not be compared against this run's peak column. It does not touch the verdict: the endpoint is `adj[end]` and needs no window.
 
 NOT LAUNCHED because it is ~5.2 points of a 19.24 group balance (~27 %) with another session spending concurrently, and this is a secondary row — the peak ordering it might be confused with is already established and unaffected. anko made that call; the numbers are in the README so the next person does not re-derive the decision.
 
@@ -711,7 +715,7 @@ id = "edh-anti-aligned-prep-implemented"
 claim = "`prepare_anti_aligned: true` on a `kind: rotating_basis` ground_state relaxes at -p and hands the dynamics +p, producing the Zeeman-HIGHEST stretched state that the EdH quench needs. Only `p` reverses; `q ∝ |B|²` is even in the field and does not."
 status = "live"
 type = "A"
-scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F, but no production-scale arm has been run through it yet."
+scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F. RUN AT PRODUCTION SCALE 2026-08-22 (#423): all 8 `phi.rate` points of `runs/eu151_klaus_phi_phys` at 32×32×16, F=6, D=13, DDI + LHY scalar, TSUBAME job 8461716, 82 min, rc=0 — every point `converged = true`, `energy = −160177.72` finite, and `mz_actual = −6.0000` on all eight, i.e. the runtime anti-aligned assertion held across the whole scan."
 uncertainty = "Directional, not numeric: an ALIGNED control arm in the same field comes out with sign(⟨F_z⟩) = +sign(p) and the anti-aligned arm with -sign(p), at both signs of p, each stretched to |⟨F_z⟩| = F within 0.05. A single arm could not tell the preparation from the sign convention assumed while reading it."
 uncertainty_basis = "control"
 evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.yaml"]
@@ -1392,4 +1396,49 @@ P_adj, and the radial dynamics — pick out the same four arms.
 It also removes the reason to look for a cascade resonance at either field: a structure in
 ω_eff at fixed hold length is what a breathing phase looks like. That does not by itself
 refute the 5.2 nT reading, which has not been measured this way — but it is now the
-hypothesis to beat there, and it is cheap to test from the same cached snapshots."""
+hypothesis to beat there, and it is cheap to test from the same cached snapshots.
+MEASURED 2026-08-22 (#444, §12.5): it was cheap, and 5.2 nT behaves the same way.
+See `edh-5p2nt-structure-is-breathing-phase-not-resonance` — same mechanism, and
+there the hold-doubling test inverts the ORDERING rather than merely moving it."""
+
+[[claim]]
+id = "edh-5p2nt-structure-is-breathing-phase-not-resonance"
+quantity = "origin of the weff structure @ B=5.2nT"
+claim = "The ω_eff structure at B = 5.2 nT has the same origin as at 10.4 nT — a breathing phase sampled at fixed hold length, not a cascade resonance. Radial expansion over the hold is a single oscillation with a minimum of 0.9868 at ω_eff = 0.600 (the cloud CONTRACTS over 0.570–0.620) and a maximum of 1.1441 at 0.770; the P_adj argmax frame jumps from the last frame (42/42, a truncation) to an interior frame (38/42) exactly at the ω_eff = 0.650 valley; and doubling the hold INVERTS the ordering, taking 0.650 from valley to maximum."
+status = "live"
+type = "B"
+scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 5.2 nT, 20 arms over ω_eff ∈ [0.42, 1.00] at the 8 ms hold plus 4 at 16 ms. Read from cached snapshots — no new runs."
+uncertainty = "The EXISTENCE of the structure is bounded well clear of any floor: expansion swings 0.9868 → 1.3587 (38 %) against a dt/2 reproducibility floor of 0.029 %, and the hold-doubling ratios run 1.024 → 1.287. The POSITIONS are quantised by the ω_eff grid — 0.02–0.05 wide near the extrema — so 'minimum at 0.600' means 'at the sampled point 0.600', with no fit and no interval. The 16 ms arms are themselves truncated (3 of 4 peak at frame 53/53), so their VALUES bound the inversion but are not converged."
+uncertainty_basis = "control"
+evidence = ["runs/klaus_quench_weff/klaus_weff0p600_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "scripts/validation/klaus_weff_cloud_size.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/edh_quench_polarisation_decision.md"
+section = "12.5"
+pr = 0
+prediction = "If the 5.2 nT two-branch structure is a breathing phase, (1) radial expansion must have structure in ω_eff, (2) the arms whose P_adj peaks inside the hold must coincide with the least-expanded group, and (3) doubling the hold must move the structure — which a resonance cannot do."
+prediction_registered = "before"
+prediction_outcome = "hit"
+note = """Registered in #444 before the measurement. (1) and (3) hit outright. (2) hit in the
+form the MECHANISM predicts rather than the form the prediction guessed, and #444 had
+already flagged that: at 5.2 nT all 20 arms peak inside the hold, so 'inside vs outside' —
+the discriminator that split 10.4 nT four-to-twenty-two — is degenerate here. The
+information is in the argmax FRAME, which splits the arms at exactly the valley.
+
+Same mechanism, both fields: where the cloud is compressed the density is high, the
+cascade is still running and the maximum lands on the last frame; where it expands the
+density falls, the cascade stalls and the maximum moves inside. At 10.4 nT that picked out
+four arms; at 5.2 nT it picks out a boundary at ω_eff = 0.650.
+
+The sharpest single number is the ORDERING inversion, not the ratios. At 8 ms
+0.550 > 0.770 > 0.650; at 16 ms 0.650 > 0.550 > 0.770. A resonance is a property of the
+field and the trap and does not care how long you watch.
+
+Does NOT close `edh-104nt-observable-not-window-robust`: this explains why the window
+matters, it does not supply a window-independent observable. Does not restore an optimum
+at either field — §12.3 stands.
+
+Method note, because it worked twice: the populations were re-read seven ways at 10.4 nT
+and every reading disagreed with the others; the cloud settled it in one pass, from data
+already in the cache. Look at a different quantity before inventing another reading of the
+one you have."""

@@ -37,6 +37,7 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    "test_index_backed_gates_see_untracked.jl",
     # #407: the FFTW MEASURE × Julia-threads × mixed-radix corner, as a
     # predicate. Gates the advisory's trigger, not the 11.97 GB — a test that
     # allocated that is a test nobody can run.
@@ -1115,7 +1116,16 @@ const _COST = Dict{String, Float64}(
     # why it belongs nowhere near FAST: it timed the fast job out at 15 min and the
     # run came back "cancelled", which reads as infrastructure rather than as a test
     # that is too slow for the tier it was put in.
-    "dynamics/test_energy_damping_cayley.jl" => 750.0,
+    # 1723, MEASURED on the runner (run 32509634483). It is now the HEAVIEST
+    # single file in the tier — the role `test_spgpe_equilibrium_number.jl` had
+    # before #305 shrank it — and 750 under-estimated it by 2.3x, which put it
+    # in the wrong place in the hand-out order.
+    #
+    # 750 came from "four testsets at ~3 min each", an argument about the file
+    # rather than a measurement of it, and the comment below still records the
+    # incident that argument was written for. Left in place because the reason
+    # it does not belong in FAST is unchanged; only the number moved.
+    "dynamics/test_energy_damping_cayley.jl" => 1723.0,
     "dynamics/test_number_conserving_spgpe.jl" => 240.0,
     "dynamics/test_energy_damping_buffer_reuse.jl" => 120.0,
     "dynamics/test_mu_lda_constraint.jl" => 60.0,
@@ -1129,13 +1139,29 @@ const _COST = Dict{String, Float64}(
     "oracles/test_dipolar_magnetostriction_magnitude.jl" => 369.0,
     # One 24³ ground state + 100 dynamics steps through the YAML entry point.
     "workflow/test_scalar_egpe_yaml.jl" => 40.0,
-    # Measured here, not on the runner (2026-08-02, 10-core box): 1266 s,
-    # against the 3.0 s default it had been taking. The default made it the
-    # LAST file handed out, which is the worst possible order for the one
-    # file that sets the makespan on its own. The absolute number is
-    # machine-dependent and the ordering it buys is not — nothing else in
-    # any tier is within a factor of four of it.
-    "dynamics/test_spgpe_equilibrium_number.jl" => 1266.0,
+    # 1141, MEASURED on the runner (run 32509634483) after the fixture shrank
+    # from n=48 L=10.0 to n=32 L=6.5 (#305). Was 2432 s, so the shrink bought
+    # 2.13x here.
+    #
+    # This entry said 460 for about an hour, and that number was derived rather
+    # than measured: the old fixture was 2432 s on the runner against 1032 s on
+    # the 10-core box, so a 2.36x ratio was applied to the new fixture's 195 s
+    # local. The real runner time is 1141 s and the real ratio is 5.85x. THE
+    # LOCAL-TO-RUNNER RATIO IS NOT A PROPERTY OF THE MACHINE PAIR — it moved by
+    # 2.5x for the same file under nothing but a grid change, presumably because
+    # a smaller problem spends a larger fraction of itself in fixed costs the
+    # 4-vCPU runner pays differently. Scale a local measurement only to get an
+    # ORDERING; overwrite it with a runner number as soon as one exists.
+    #
+    # It was 1266.0, a real measurement on the wrong machine (2026-08-02,
+    # 10-core box), and before that the 3.0 s default, which made the one file
+    # that set the makespan on its own the LAST one handed out.
+    #
+    # It is no longer that file. At 2432 s it was 23 % of the whole `full`
+    # tier and made the makespan unschedulable: the floor was
+    # max(2432, 8067/3) = 2689 s against a 2700 s cap (#304). At 460 s nothing
+    # dominates and the floor is ~2130 s.
+    "dynamics/test_spgpe_equilibrium_number.jl" => 460.0,
     # Measured, not guessed. An unregistered file is handed out as 3.0, not as
     # "probably small", and the 1266 s entry above exists because a heavy file
     # carrying a 3.0 estimate went out last and blew the 15-minute job.

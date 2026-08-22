@@ -135,8 +135,28 @@ using SpinorBEC
               abs(res_fixed.energies[end]) < 0.01
     end
 
-    @testset "YAML adaptive_dt parsing" begin
-        yaml = """
+    # `dynamics.adaptive_dt` is REFUSED, and these testsets assert the refusal.
+    #
+    # They used to assert that it PARSES — three testsets reading the numbers
+    # back out of `cfg.steps[i].params["adaptive_dt"]`. That surface was retired
+    # deliberately in bfcaf3db: the schema validated five numeric fields with
+    # ranges, and nothing under `src/workflow` ever constructed
+    # `AdaptiveDtParams` or called `run_simulation_yoshida!`, so a config asking
+    # for adaptive stepping validated cleanly and then ran at fixed `dt`. An
+    # accuracy knob that is accepted and discarded is worse than one that does
+    # not exist.
+    #
+    # The retirement did not update these testsets, and per-PR CI could not see
+    # it: this file is in `FULL_EXTRA`, which only the nightly runs. They went
+    # red on 2026-08-01 and stayed red for 92 consecutive nightly runs (#304).
+    # That is the cost of a gate whose tier no PR executes — the defect is
+    # three weeks old and its author's own docstring says "refusing breaks
+    # nothing in the tree", which was true of `runs/` and false of `test/`.
+    #
+    # Adaptive stepping remains available and is exercised above, through the
+    # Julia API it actually lives on.
+    @testset "YAML `dynamics.adaptive_dt` is refused, not silently ignored" begin
+        _cfg(dyn_body) = """
         pipeline:
           - ground_state:
               atom: Rb87
@@ -153,99 +173,53 @@ using SpinorBEC
           - dynamics:
               duration: 1.0
               dt: 0.01
+        $dyn_body
               B:
                 p: 0.0
                 q: 0.0
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
+        """
+
+        # THE PASS DIRECTION FIRST. A `dynamics:` block with no `adaptive_dt`
+        # must still parse — this is the case that matters most, because a
+        # guard that reddens on ordinary configs is a guard someone deletes.
+        ok = load_config_from_string(_cfg(""))
+        @test ok isa PipelineConfig
+        @test length(ok.steps) == 2
+        @test !haskey(ok.steps[2].params, "adaptive_dt")
+
+        # Every shape the retired surface accepted is refused: fully specified,
+        # partially specified, and empty. The empty-dict arm is the one a
+        # `haskey`-based guard is most likely to miss.
+        fully = """
               adaptive_dt:
                 dt_init: 0.005
                 dt_min: 0.0001
                 dt_max: 0.05
                 tol: 0.002
-              B:
-                p: 0.0
-                q: 0.0
         """
-        cfg = load_config_from_string(yaml)
-        @test cfg isa PipelineConfig
-        @test length(cfg.steps) == 3
-        # Fixed phase: no adaptive_dt
-        @test !haskey(cfg.steps[2].params, "adaptive_dt")
-        # Adaptive phase: has adaptive_dt params
-        ad = cfg.steps[3].params["adaptive_dt"]
-        @test ad["dt_init"] == 0.005
-        @test ad["dt_min"] == 0.0001
-        @test ad["dt_max"] == 0.05
-        @test ad["tol"] == 0.002
-    end
-
-    @testset "YAML adaptive_dt error_mode parsing" begin
-        yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              adaptive_dt:
-                tol: 0.001
-              B:
-                p: 0.0
-                q: 0.0
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
+        partial = """
               adaptive_dt:
                 tol: 0.001
                 error_mode: richardson
-              B:
-                p: 0.0
-                q: 0.0
         """
-        cfg = load_config_from_string(yaml)
-        @test cfg.steps[2].params["adaptive_dt"]["tol"] == 0.001
-        @test get(cfg.steps[2].params["adaptive_dt"], "error_mode", nothing) === nothing
-        @test cfg.steps[3].params["adaptive_dt"]["error_mode"] == "richardson"
-    end
+        empty = "      adaptive_dt: {}"
 
-    @testset "YAML adaptive_dt defaults" begin
-        yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.002
-              adaptive_dt: {}
-              B:
-                p: 0.0
-                q: 0.0
-        """
-        cfg = load_config_from_string(yaml)
-        @test cfg isa PipelineConfig
-        @test haskey(cfg.steps[2].params, "adaptive_dt")
+        for (label, body) in
+            (("fully specified", fully), ("partial", partial), ("empty", empty))
+            @testset "$label" begin
+                err = try
+                    load_config_from_string(_cfg(body))
+                    nothing
+                catch e
+                    e
+                end
+                @test err isa ArgumentError
+                # The message has to route the user somewhere, or the refusal
+                # just costs them the run without telling them what to do.
+                @test occursin("adaptive_dt", err.msg)
+                @test occursin("run_simulation_yoshida!", err.msg)
+            end
+        end
     end
 
     @testset "IntegratorConfig type" begin
