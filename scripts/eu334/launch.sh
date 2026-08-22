@@ -250,7 +250,7 @@ ed_probe)
     # the third slot is already `ED_CDD` and a fourth positional would make the
     # job name and the configuration disagree the first time someone skips one.
     q -N eu334_edprobe_${2:-rb87}_${3:-nodd}_${ED_SEED:-vacuum} -l h_rt=4:00:00 \
-      -v ED_NSTEP=${ED_NSTEP:-25000},ED_ATOM=${2:-rb87},ED_CDD=${3:-0.0},ED_MU=${ED_MU:-3.0},ED_T=${ED_T:-1.0},ED_SEED=${ED_SEED:-vacuum} \
+      -v ED_NSTEP=${ED_NSTEP:-25000},ED_ATOM=${2:-rb87},ED_CDD=${3:-0.0},ED_MU=${ED_MU:-3.0},ED_T=${ED_T:-1.0},ED_SEED=${ED_SEED:-vacuum},ED_MU_RAMP=${ED_MU_RAMP:-0.0},ED_N=${ED_N:-24},ED_BOX=${ED_BOX:-10.0} \
       scripts/eu334/submit_ed_probe.sh
     ;;
 
