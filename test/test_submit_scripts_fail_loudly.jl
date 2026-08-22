@@ -369,3 +369,110 @@ end
     end
     @test length(_NO_STATUS_PATH_BY_DESIGN) <= 8
 end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The same property, one layer up: a CI JOB may not report success for a stage
+# it could not run.
+#
+# `state-doc-drift` (`.github/workflows/ci.yml`) regenerates `docs/STATE.md` on
+# `main` after every merge and opens a PR when the committed copy has drifted —
+# the #394 / #431 failure, where two PRs each regenerate against their own base,
+# the text merge does not conflict, and the result matches neither. Both PRs are
+# green; only the merge result breaks, so no in-branch gate can reach it.
+#
+# That job is a MONITOR, and this repo has shipped five monitors that could only
+# return the verdict being hoped for. So its verdicts are proved reachable here
+# rather than by having been tried once: the real `run:` block is lifted out of
+# the workflow, only the three things needing a network or the package are
+# stubbed, and it is driven through every path. The stub targets are asserted to
+# be present, so an edit that renames them fails loudly instead of quietly
+# testing an unstubbed script.
+using YAML
+
+const _CI_YML = joinpath(_REPO, ".github", "workflows", "ci.yml")
+
+function _drift_run_block()
+    wf = YAML.load_file(_CI_YML)
+    job = get(wf["jobs"], "state-doc-drift", nothing)
+    job === nothing && return nothing
+    for s in job["steps"]
+        get(s, "name", "") == "Regenerate and report" && return s["run"]
+    end
+    nothing
+end
+
+"Run the job's real script against a stub generator; return (exit code, output)."
+function _drive_drift(script, generator_body)
+    mktempdir() do d
+        mkpath(joinpath(d, "docs"))
+        write(joinpath(d, "docs", "STATE.md"), repeat("X", 13_000))
+        write(joinpath(d, "_gen_stub.sh"), generator_body)
+        mkpath(joinpath(d, "bin"))
+        gh = joinpath(d, "bin", "gh")
+        # `gh pr list` returns nothing (no open PR) so the create path is taken.
+        write(
+            gh,
+            "#!/bin/bash\nif [ \"\$2\" = \"list\" ]; then echo \"\"; " *
+            "else echo \"[stub] gh \$*\"; fi\n",
+        )
+        chmod(gh, 0o755)
+        for c in (`git init -q`, `git add -A`,
+            `git -c user.email=t@t -c user.name=t commit -qm base`)
+            run(pipeline(Cmd(c; dir=d); stdout=devnull, stderr=devnull))
+        end
+        write(joinpath(d, "script.sh"), script)
+        out = IOBuffer()
+        p = run(
+            pipeline(
+                Cmd(`bash script.sh`; dir=d,
+                    env=Dict("BRANCH" => "chore/state-doc-drift",
+                        "GITHUB_SHA" => "deadbeef",
+                        "PATH" => joinpath(d, "bin") * ":" * ENV["PATH"],
+                        "HOME" => d));
+                stdout=out, stderr=out); wait=false)
+        wait(p)
+        (p.exitcode, String(take!(out)))
+    end
+end
+
+@testset "the STATE.md drift job can return every verdict it claims" begin
+    raw = _drift_run_block()
+    @test raw !== nothing            # the job still exists under that name
+
+    # Only these three touch the network or the package. Asserting they are
+    # PRESENT is the difference between stubbing the script and stubbing
+    # nothing: a rename would otherwise leave this driving an unstubbed job.
+    stubs = [
+        "julia --project=. scripts/generate_state.jl" => "bash ./_gen_stub.sh",
+        "git push -f origin \"\$BRANCH\"" => "echo '[stub] git push'",
+    ]
+    script = raw
+    for (from, to) in stubs
+        @test occursin(from, script)
+        script = replace(script, from => to)
+    end
+
+    # NO DRIFT — the only path that may be green.
+    rc, out = _drive_drift(script, "#!/bin/bash\n:\n")
+    @test rc == 0
+    @test occursin("is current", out)
+
+    # DRIFT — must be red, and must have gone through the PR path.
+    rc, out = _drive_drift(script,
+        "#!/bin/bash\nprintf 'Y%.0s' {1..13000} > docs/STATE.md\n")
+    @test rc != 0
+    @test occursin("DRIFT", out)
+    @test occursin("gh", out)        # a PR was proposed, not just a red
+
+    # THE GENERATOR PRODUCED A STUB — "no drift" and "could not look" must not
+    # print the same thing. This is the arm the whole job rests on.
+    rc, out = _drive_drift(script, "#!/bin/bash\necho tiny > docs/STATE.md\n")
+    @test rc != 0
+    @test occursin("REFUSING", out)
+    @test !occursin("is current", out)
+
+    # THE GENERATOR DIED — `set -e` must stop before any verdict is printed.
+    rc, out = _drive_drift(script, "#!/bin/bash\nexit 3\n")
+    @test rc == 3
+    @test !occursin("is current", out)
+end
