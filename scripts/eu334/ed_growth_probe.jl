@@ -29,6 +29,7 @@
 
 using SpinorBEC
 using FFTW
+using FFTW: fft, fftshift
 using Printf
 
 const OMEGA, A_S = 1.0, 0.02
@@ -59,6 +60,32 @@ const T_RES = parse(Float64, get(ENV, "ED_T", "1.0"))
 const K_CUT = sqrt(2 * (MU + T_RES))
 const NSTEP = parse(Int, get(ENV, "ED_NSTEP", "25000"))
 const SEED_MODE = get(ENV, "ED_SEED", "vacuum")
+
+# `ED_SEED0` offsets the noise stream. Two runs of the SAME configuration came
+# back N0 = 272.2 and 726.1 (2.7x) on 2026-08-22, on different nodes. The probe's
+# stream is deterministic (`ED_SEED0 + s`), so that is not seed scatter — the
+# likeliest reading is that the F=6 + DDI arm is dynamically chaotic and
+# amplifies bitwise-different-but-equal arithmetic. Either way the arm cannot be
+# quoted at n = 1, and this knob is what makes an ensemble possible.
+const SEED0 = parse(Int, get(ENV, "ED_SEED0", "90000"))
+
+# `ED_MU_RAMP` is #418's LAST untested difference, and after the 2x2 factorial it
+# is the last one full stop.
+#
+# The factorial (2026-08-22) cleared the reservoir corner, the seed, and their
+# interaction: full/growth came back 0.93-1.06 in all four cells against
+# production's 9.0x and 37x. Everything about the CONFIGURATION is now exonerated
+# — projector, moving cutoff, energy damping, F=6, DDI, the scattering pair, both
+# reservoirs, (T, mu), the seed. What is left is that production RAMPS mu while
+# this probe holds it fixed.
+#
+# `ED_MU_RAMP=<mu_end>` sweeps mu linearly from MU to mu_end across the run, the
+# shape #334 drives (8.48 -> 11.72 over 1300 ms). The reservoir is rebuilt each
+# step, which is the honest way to do it: k_cut depends on mu, so a ramp that
+# held k_cut fixed would be a different experiment and would silently re-answer
+# the cutoff-motion question that was already excluded.
+const MU_RAMP_END = parse(Float64, get(ENV, "ED_MU_RAMP", "0.0"))
+const MU_RAMPS = MU_RAMP_END > 0.0
 
 # `ED_ATOM=eu151` runs the SAME probe at F = 6, 13 components, DDI off.
 #
@@ -118,11 +145,14 @@ function arm(grid, dV, phi, d, n_tf, energy_damping::Bool)
         ddi_padding=false, ddi_trunc_radius=-1.0)
     # M = 0.0 is the growth-only sub-theory; omitting M lets the reservoir use its
     # own physical scattering rate. One knob between the arms.
-    res = energy_damping ?
-          SPGPEReservoir(; T=T_RES, mu=MU, a_s=A_S, k_cut=K_CUT, gamma=GAMMA,
-        allow_unphysical_rates=true) :
-          SPGPEReservoir(; T=T_RES, mu=MU, a_s=A_S, k_cut=K_CUT, gamma=GAMMA, M=0.0,
-        allow_unphysical_rates=true)
+    # Built per-mu so the ramp arm can rebuild it; identical to the old inline
+    # form when mu does not move.
+    mkres(mu) = energy_damping ?
+                SPGPEReservoir(; T=T_RES, mu=mu, a_s=A_S, k_cut=sqrt(2 * (mu + T_RES)),
+        gamma=GAMMA, allow_unphysical_rates=true) :
+                SPGPEReservoir(; T=T_RES, mu=mu, a_s=A_S, k_cut=sqrt(2 * (mu + T_RES)),
+        gamma=GAMMA, M=0.0, allow_unphysical_rates=true)
+    res = mkres(MU)
     # The one knob #418 has left. `vacuum` is the arm every previous round ran:
     # the condensate is built by the reservoir out of nothing. `converged` hands
     # the SPGPE a state that is ALREADY the ground state at this µ — production's
@@ -140,8 +170,12 @@ function arm(grid, dV, phi, d, n_tf, energy_damping::Bool)
     out = 0.0
     trunc = 0.0
     for s in 1:NSTEP
+        if MU_RAMPS
+            # Linear in step index, the same shape #334's FortRamp drives mu on.
+            res = mkres(MU + (MU_RAMP_END - MU) * (s - 1) / (NSTEP - 1))
+        end
         split_step!(ws)
-        r = apply_spgpe_step!(ws, res, DT; t=0.0, seed=90_000 + s)
+        r = apply_spgpe_step!(ws, res, DT; t=0.0, seed=SEED0 + s)
         out += get(r, :cutoff_outflow, 0.0)
         trunc += get(r, :noise_truncated, 0.0)
         @views for c in 1:(d - 1)
@@ -149,11 +183,45 @@ function arm(grid, dV, phi, d, n_tf, energy_damping::Bool)
         end
     end
     psi = Array(view(ws.state.psi, :, :, :, d))
-    (n0=abs2(sum(conj.(phi) .* psi) * dV), n_c=sum(abs2, psi) * dV, out=out, trunc=trunc)
+
+    # WHERE IN k THE POPULATION SITS. #418 found that F=6 and the DDI are each
+    # harmless alone and together drive the cutoff outflow up 786x. A total
+    # outflow says it happens; it does not say whether the C region is bleeding
+    # from its EDGE (population pushed to high k, then cut) or uniformly.
+    #
+    # Radial bins of |psi(k)|^2 as a fraction of the norm, in units of k_cut, so
+    # arms with different k_cut are comparable. The outermost bin is the one the
+    # projector acts on.
+    kb = zeros(4)
+    let ph = fftshift(fft(ws.state.psi)), kmax = K_CUT
+        n = size(ws.state.psi)
+        for I in CartesianIndices(ph)
+            # k from the shifted index, per axis, in the grid's own units
+            k2 = 0.0
+            for ax in 1:3
+                L_ax = grid.config.box_size[ax]
+                idx = I[ax] - (n[ax] ÷ 2) - 1
+                k2 += (2π * idx / L_ax)^2
+            end
+            f = sqrt(k2) / kmax
+            b = f < 0.25 ? 1 : f < 0.5 ? 2 : f < 0.8 ? 3 : 4
+            kb[b] += abs2(ph[I])
+        end
+        t = sum(kb)
+        t > 0 && (kb ./= t)
+    end
+
+    (n0=abs2(sum(conj.(phi) .* psi) * dV), n_c=sum(abs2, psi) * dV, out=out,
+        trunc=trunc, kbins=kb)
 end
 
 function main()
-    grid = make_grid(GridConfig((24, 24, 24), (10.0, 10.0, 10.0)))
+    # #418's remaining axis after every mechanism was exonerated: SCALE. The
+    # probe is 24^3 box 10 and production is 64^3 box 24, and nothing has yet
+    # varied that. Defaults reproduce every arm run so far.
+    gn = parse(Int, get(ENV, "ED_N", "24"))
+    gb = parse(Float64, get(ENV, "ED_BOX", "10.0"))
+    grid = make_grid(GridConfig((gn, gn, gn), (gb, gb, gb)))
     dV = cell_volume(grid)
     n_tf = ((2 * MU / OMEGA)^2.5) / (15 * A_S)
     π / minimum(grid.dx) > K_CUT || error("grid does not resolve the C region")
@@ -162,13 +230,17 @@ function main()
     # Every knob in the output line, because the whole value of this probe is that
     # exactly one of them differs between the arm being read and the arm it is
     # being compared against — and a remembered configuration is not a control.
-    @printf("atom = %s (D = %d)  c_dd = %.4g  mu = %.3g  T = %.3g  seed = %s  N_TF = %.1f  steps = %d  M = physical vs 0\n",
-        ATOM === Rb87 ? "Rb87" : "Eu151", Int(2 * ATOM.F + 1), C_DD, MU, T_RES,
+    @printf("grid = %d^3 box %.3g   seed0 = %d\n", gn, gb, SEED0)
+    @printf("atom = %s (D = %d)  c_dd = %.4g  mu = %.3g%s  T = %.3g  seed = %s  N_TF = %.1f  steps = %d  M = physical vs 0\n",
+        ATOM === Rb87 ? "Rb87" : "Eu151", Int(2 * ATOM.F + 1), C_DD, MU,
+        MU_RAMPS ? @sprintf("->%.3g", MU_RAMP_END) : "", T_RES,
         SEED_MODE, n_tf, NSTEP)
     for (name, ed) in (("growth-only (M=0)", false), ("full (M != 0)", true))
         a = arm(grid, dV, phi, d, n_tf, ed)
         @printf("  %-18s N0 = %8.1f (%.3f N_TF)  N_C = %8.1f  out = %.4g  trunc = %.4g\n",
             name, a.n0, a.n0 / n_tf, a.n_c, a.out, a.trunc)
+        @printf("  %-18s |psi(k)|^2 by |k|/k_cut:  <0.25 %.4f | 0.25-0.5 %.4f | 0.5-0.8 %.4f | >0.8 %.4f\n",
+            "", a.kbins[1], a.kbins[2], a.kbins[3], a.kbins[4])
         flush(stdout)
     end
 end
