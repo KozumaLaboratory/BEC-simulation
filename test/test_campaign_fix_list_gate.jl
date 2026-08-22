@@ -69,6 +69,15 @@ const _NOT_A_CORRECTION = Dict(
         "the docs commit that MEASURED q at both ends of the band; the " *
         "correction it reports is eu-quadratic-zeeman-geometry, already listed",
     "f2352c7f" => "docs cross-reference of duplicated LHY arms; corrects prose, not code",
+    # Cited by the PR #1-#446 mistake census as the commit whose DELETION two
+    # #335 instruments kept `include`-ing (the class `test_scripts_allowlist.jl`
+    # gates). It is a refactor — `scripts/eu_ramp_common.jl` and its siblings
+    # absorbed into `src/analysis` and `src/workflow/io` — so no result changes
+    # across it and nothing needs to descend from it. Named for provenance of a
+    # file MOVE, which is the same role as ed3be749 and f2352c7f.
+    "99a876e3" =>
+        "the 2026-08-18 scripts absorption; cited as the commit that deleted " *
+        "`scripts/eu_ramp_common.jl`, a relocation rather than a physics fix",
     # edh_quench_polarisation_decision.md §1.1 — provenance of a MEASUREMENT, and
     # of the runs it measured. None is a correction anything must descend from.
     "b2d746cc" =>
