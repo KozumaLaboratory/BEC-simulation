@@ -170,7 +170,7 @@ out.bo.best_p          # [duration_scale, final_power_scale, warp_γ]
 #     a schedule the lab can actually run. On the experiment-matched defaults it finds
 #     N_BEC ≈ 3.2× the lab ramp by evaporating HARDER EARLY (steeper initial power
 #     drop, at high collision rate). The "η stays in a valid 4.5–11 range" this line
-#     used to claim was false: η_start is 2.07 at these defaults (see above).
+#     used to claim is SUPERSEDED: η_start is 2.07 at these defaults (see above).
 trap = euv3_evap_trap(); p = EvapParams(; a_s=Eu151.a_s, tau_bg=15, K3=1.61e-40)
 out = optimize_ramp_monotone(trap, p, euv3_evaporation_ramp(); N0=3.5e6, T0=50e-6)
 out.ramp               # the optimized, monotone-decreasing FortRamp; out.fracs are the drops

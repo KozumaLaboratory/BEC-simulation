@@ -209,7 +209,7 @@ Evaluated along the euv3 trajectory:
 | $t$ (s) | $N$ | $T$ (nK) | $\mu_\mathrm{eq}$ | $N_0^\mathrm{eq}$ | $f_0$ |
 |---|---|---|---|---|---|
 | 1.594 | 8.60e4 | 780 | 7.33 | 2.35e4 | 0.27 |
-| **1.726** | 5.34e4 | 434 | 8.13 | **4.01e4** | 0.75 |
+| **1.726** | 5.34e4 | 434 | 8.13 | **4.01e4** — **superseded**, the peak is 4.41e4 at 1.702 (below) | 0.75 |
 | 1.859 | 1.29e4 | 197 | 4.83 | 1.15e4 | 0.89 |
 | 1.992 | 5485 | 118 | 3.47 | 5157 | 0.94 |
 | 2.390 | 3576 | 64 | 2.95 | 3513 | 0.98 |
@@ -221,8 +221,9 @@ condensate away: past 1.70 s the losses beat the cooling. So "optimising" this r
 means **stopping it at the peak**, and the 0-D model's own final $N_0=1789$ (3.6 % of
 measured) is the value at the wrong end of a curve rather than a failure of the model.
 
-> **The table above samples the trajectory at 18 points and therefore misses the peak.**
-> It reports $4.01\times10^4$ at $t=1.726$; scanning every point finds
+> **The table above samples the trajectory at 18 points and therefore misses the peak,
+> so its own peak row is superseded by the full scan.**
+> It reports $4.01\times10^4$ at $t=1.726$ — **superseded**; scanning every point finds
 > $4.41\times10^4$ at $t=1.702$, between two of its rows. The two numbers were 10 %
 > apart and the difference is sampling, not physics — the finer scan is the one to
 > quote. Both are produced by the same constraint from the same trajectory.
@@ -327,7 +328,7 @@ The 3× run starts ahead — it has had three times as long to build anything by
 marker — and then **declines monotonically** while the 1× run climbs to $f_0 = 0.255$ and
 overtakes it from the third point on. A verdict taken at either end is the opposite of the
 one taken at the other, and the two-point version of this paragraph said 7× and 2.9× in
-favour of slowing.
+favour of slowing — **refuted**, by the same six points.
 
 ### The design answer: halve the ramp
 
@@ -359,8 +360,8 @@ field's condensate not at all — **the ramp scale sets the target and nothing e
 Whatever limits the c-field here is on the field's side, not in how many atoms the
 thermodynamics would allow.
 
-The first single trajectory read 27.8 against 39.7 and looked like halving being *worse*;
-the seed-to-seed scatter is ±12, the same size as that difference. The seeds were run
+The first single trajectory read 27.8 against 39.7 and looked like halving being *worse* —
+**refuted**; the seed-to-seed scatter is ±12, the same size as that difference. The seeds were run
 before the claim, not after someone asked for them — this arc had already published the
 opposite conclusion from two points of one run.
 
