@@ -76,11 +76,22 @@ ARGS=(--probe "$MUT_PROBE" --workers "${MUT_WORKERS:-8}"
 [ -n "${MUT_SHARD:-}" ] && ARGS+=(--shard "${MUT_SHARD//_//}")
 
 $JULIA --project=. --startup-file=no test/mutation/run.jl "${ARGS[@]}" 2>&1
-echo "MUT_RC=$?"
+MUT_RC=$?
+echo "MUT_RC=$MUT_RC"
 
 # The harness restores src itself and says so; this is the independent check.
 # A dirty tree here means a worker died mid-mutation and the next job would
 # read the DEFECT as if it were the code.
-echo "dirty_after=$(git status --porcelain -- src | wc -l)   # must be 0"
+DIRTY_AFTER=$(git status --porcelain -- src | wc -l)
+echo "dirty_after=$DIRTY_AFTER   # must be 0"
 git status --porcelain -- src
 echo "ALL DONE $(date)"
+# A left-behind mutation poisons the NEXT job, so it fails this one even when the
+# harness itself returned 0 — and the harness's own status is not thrown away on
+# a final `echo`. 2 rather than reusing MUT_RC, so the two causes stay distinct
+# in `qacct`.
+if [ "$DIRTY_AFTER" -ne 0 ]; then
+    echo "REFUSING to report success: src/ left dirty by the mutation harness"
+    exit 2
+fi
+exit "$MUT_RC"

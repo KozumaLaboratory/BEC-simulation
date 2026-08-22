@@ -28,5 +28,9 @@ for kind in (nothing, :polar_contact)
     println("    step ok, norm=", sum(abs2, ws.state.psi)); flush(stdout)
 end
 println("SMOKE ok")'
-echo "rc=$?"
+RC=$?
+echo "rc=$RC"
 echo "ALL DONE $(date)"
+# A smoke test that cannot fail the job is not a smoke test: this runs BEFORE a
+# multi-hour launch, and its whole value is refusing that launch.
+exit "$RC"

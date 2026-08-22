@@ -37,6 +37,11 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    # A job script may not report success for a stage that failed. `set +e` in
+    # `tsubame_setup.sh` went unrestored for twelve days and covered two
+    # failures with GREENs; the property is EXECUTED here, because grepping for
+    # `set -e` is what the two preambles did and their reading rotted.
+    "test_submit_scripts_fail_loudly.jl",
     "test_index_backed_gates_see_untracked.jl",
     # #407: the FFTW MEASURE × Julia-threads × mixed-radix corner, as a
     # predicate. Gates the advisory's trigger, not the 11.97 GB — a test that
