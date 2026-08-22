@@ -1452,6 +1452,210 @@ and every reading disagreed with the others; the cloud settled it in one pass, f
 already in the cache. Look at a different quantity before inventing another reading of the
 one you have."""
 
+# --- The ¹⁵¹Eu evaporation arc (issue #75) ----------------------------------
+#
+# The third document poured. Opened 2026-08-22 while writing the arc up as one
+# wiki article, which is what made the gap visible: the retractions were being
+# tracked in a page OUTSIDE the repository, where no gate reaches them.
+#
+# The arc is a two-layer answer and the layers must not be quoted as one. The
+# THERMODYNAMIC layer says how many atoms the ramp allows; the DYNAMICAL layer
+# says how many the classical field actually collects. They disagree by three
+# orders of magnitude, and that disagreement is the result, not an error.
+
+[[claim]]
+id = "eu-evap-thermodynamic-peak-4p41e4"
+claim = "The euv3 ramp allows a peak of N₀ = 4.41×10⁴ condensed atoms at t = 1.70 s — 88 % of the measured 5.02×10⁴ — and falls monotonically to 3.5×10³ by the end of the ramp, so optimising this ramp means stopping it at the peak."
+status = "live"
+type = "C"
+quantity = "peak equilibrium N_0 on the euv3 evaporation trajectory"
+supersedes = ["eu-evap-peak-18-point-sample"]
+scope = "The semiclassical Hartree-Fock constraint (Popov / Zaremba-Griffin-Nikuni) evaluated at EVERY point of one 0-D euv3 trajectory. Equilibrium, not dynamics — whether the field can follow is `eu-evap-cfield-does-not-collect-the-target`, and it cannot. N_total(t) is 0-D output and carries the K₃ systematic."
+uncertainty = "Trajectory-sampling error bounded at 10 % by the two scans themselves (18 points reads 4.01e4, every point reads 4.41e4). The K₃ systematic on N_total is NOT folded in: K₃ moves the total, not whether a condensate exists — see `eu-evap-k3-outside-universal-vdw-band`."
+uncertainty_basis = "grid"
+evidence = ["scripts/kz/eu_number_conserving.jl", "scripts/kz/mu_lda_allocation.jl", "src/solvers/thermal_cfield.jl"]
+evidence_status = "in_tree"
+commit = "e09020de"
+doc = "docs/guides/spgpe.md"
+section = "The number-conserving formulation, and what it gives"
+pr = 442
+note = "The 0-D model's own final N₀ = 1789 (3.6 % of measured) is the value at the WRONG END of this curve, not a failure of the model. That distinction is the whole content of the row."
+
+[[claim]]
+id = "eu-evap-peak-18-point-sample"
+claim = "The peak equilibrium N₀ on the euv3 trajectory is 4.01×10⁴ at t = 1.726 s."
+status = "superseded"
+superseded_by = "eu-evap-thermodynamic-peak-4p41e4"
+type = "C"
+scope = "Same constraint, same trajectory — sampled at 18 points."
+uncertainty = "10 % low. The two numbers are produced by the same constraint from the same trajectory; the difference is sampling, not physics."
+uncertainty_basis = "grid"
+evidence = ["scripts/kz/eu_number_conserving.jl", "src/solvers/thermal_cfield.jl"]
+evidence_status = "in_tree"
+commit = "e09020de"
+doc = "docs/guides/spgpe.md"
+section = "The number-conserving formulation, and what it gives"
+pr = 442
+retired_literal = ["4.01e4", "4.01\\times10^4"]
+replacement_literal = ["4.41e4", "4.41\\times10^4"]
+note = "Kept because the 18-point table is still the readable one and is still in the document; the row it straddles is the one that must never be quoted as the peak."
+
+[[claim]]
+id = "eu-evap-halve-the-ramp-plus-36pct"
+claim = "Halving the euv3 ramp raises the peak equilibrium N₀ by 36 %, 4.41×10⁴ → 6.01×10⁴, with a broad optimum over 0.3–0.5×."
+status = "scoped"
+type = "B"
+quantity = "ramp-time scaling that maximises peak equilibrium N_0"
+scope = "Stretching the `FortRamp` TIME AXIS at fixed beam powers — a numerical experiment, not a ramp design. Valid only at and above 0.3×: below that the trap depth outruns thermalisation (0.02-0.05 elastic collisions per e-folding against the conventional requirement of a few) and `condensate.jl`'s quasi-static assumption is void. The recommended 0.3-0.5× sits at 30.6 and 74.2 collisions per e-folding."
+uncertainty = "unbounded: a one-trajectory scan with no repeat. The DIRECTION is corroborated independently — a 3-parameter Bayesian search over the same ramp finds duration monotone with +42 % at ≈0.4×, and adding a finite-evaporation-rate penalty turns that knife-edge into an interior optimum at ≈0.6× worth +22 %. Three instruments, one direction, three different magnitudes."
+uncertainty_basis = "none"
+evidence = ["scripts/kz/ramp_slowdown_design.jl", "scripts/kz/ramp_quasistatic_validity.jl", "docs/guides/eu_shape_finite_t.md"]
+evidence_status = "in_tree"
+commit = "29815c56"
+doc = "docs/guides/spgpe.md"
+section = "The design answer: halve the ramp"
+pr = 442
+note = "`scoped` rather than `live` because the non-monotone N₀ below 0.3× (3.29 → 1.85 → 1.64 → 3.41e4) is what a model looks like when asked outside its assumptions, and the first version of this table had no validity column. A genuinely slower ramp also costs more three-body loss, which the time-axis stretch does not model — scanned separately and pointing the same way."
+
+[[claim]]
+id = "eu-evap-cfield-does-not-collect-the-target"
+claim = "Doubling the thermodynamic target by halving the ramp does not move the c-field's condensate at all: 41.1 ± 14.3 atoms at 0.5× against 41.6 ± 10.9 at 1.0×, three seeds each, a difference of 0.05σ. The rate limit is on the field's side, not in how many atoms the thermodynamics allows."
+status = "live"
+type = "B"
+quantity = "c-field N_0 at end of ramp, 0.5x vs 1.0x euv3"
+scope = "Full SPGPE (growth + energy damping) with both coefficients derived from the reservoir, handoff at 1.85 s, three seeds per arm. A NULL — and the seeds were run before the claim was written, not after someone asked."
+uncertainty = "± 14.3 and ± 10.9 (sd over 3 seeds); the difference is 0.5 ± 10.4, i.e. 0.05σ. Seed-limited, and the seed floor is the same size as the effect the earlier one-trajectory reading reported."
+uncertainty_basis = "seed"
+evidence = ["scripts/kz/eu_number_conserving.jl", "scripts/kz/fixed_point_condensation.jl"]
+evidence_status = "in_tree"
+commit = "cc8e0e20"
+doc = "docs/guides/spgpe.md"
+section = "The design answer: halve the ramp"
+pr = 446
+note = "The positive control that this is not a broken solver: at the SAME end conditions held fixed the field condenses to f₀ = 0.56 and is still rising, and on the ramp the thermal modes track equilibrium to 30 % while the condensate mode does not grow at all. A broken engine misses both."
+
+[[claim]]
+id = "eu-evap-slowing-helps-by-7x"
+claim = "Slowing the ramp 3x improves the c-field condensate by 7x (2.9x on a second reading)."
+status = "refuted"
+type = "B"
+scope = "Read from the first TWO markers of a six-marker trajectory pair."
+uncertainty = "Not a bound — a sign error. Over six matched markers the 3x run declines monotonically while the 1x run climbs to f₀ = 0.255 and overtakes it from the third point on. A verdict taken at either end is the opposite of the one taken at the other."
+uncertainty_basis = "control"
+evidence = ["scripts/kz/ramp_slowdown_design.jl", "scripts/kz/eu_number_conserving.jl"]
+evidence_status = "in_tree"
+commit = "cc8e0e20"
+doc = "docs/guides/spgpe.md"
+section = "The dynamics: the field does not condense at the derived rates"
+pr = 446
+retired_literal = ["7× and 2.9×"]
+replacement_literal = ["Slowing does NOT help"]
+note = "Killed by extending the same comparison from two matched markers to six, in `scripts/kz/ramp_slowdown_design.jl`. No successor row: the replacement is not another number but the absence of one — over the full six the ordering inverts, so there is no ratio to quote in either direction. `eu-evap-halving-the-ramp-is-worse` is the same mistake made once more from one seed, and `eu-evap-cfield-does-not-collect-the-target` is what the properly-seeded comparison actually returned: 0.05 sigma."
+
+[[claim]]
+id = "eu-evap-halving-the-ramp-is-worse"
+claim = "Halving the ramp makes the c-field condensate worse: 27.8 against 39.7."
+status = "refuted"
+type = "B"
+scope = "One seed per arm."
+uncertainty = "The seed-to-seed scatter is ±12, the same size as the reported difference. Refuted by running two more seeds per arm."
+uncertainty_basis = "seed"
+evidence = ["scripts/kz/ramp_slowdown_design.jl", "scripts/kz/eu_number_conserving.jl"]
+evidence_status = "in_tree"
+commit = "cc8e0e20"
+doc = "docs/guides/spgpe.md"
+section = "The design answer: halve the ramp"
+pr = 446
+retired_literal = ["27.8 against 39.7"]
+replacement_literal = ["41.1 ± 14.3"]
+note = "Recorded as a pair with `eu-evap-slowing-helps-by-7x` on purpose: the same document produced both errors from the same cause — a verdict read off a sample smaller than its own scatter. The second time, the seeds were run BEFORE the claim, which is the only reason this row says `refuted` instead of the document saying it."
+
+[[claim]]
+id = "eu-evap-k3-outside-universal-vdw-band"
+claim = "No K₃ inside the universal van der Waals band reproduces the measured ¹⁵¹Eu endpoint: matching 5.02×10⁴ needs K₃ ≈ 2.45×10⁻⁴⁰ m⁶/s at T₀ = 50 µK and ≈ 2.74×10⁻⁴⁰ at 18 µK, against a band top of K₃ = 3Cℏa⁴/m ≤ 9.7×10⁻⁴¹ at C = 67, a = 110 a₀. The endpoint gap is a model deficiency, not a parameter to tune."
+status = "live"
+type = "C"
+quantity = "K_3 required to reproduce the measured euv3 endpoint"
+scope = "0-D two-component model with the exact all-η LRW rate and ⟨n²⟩ = 8/21 n₀², swept over K₃ ∈ [10⁻⁴²·³, 10⁻³⁹·³] at both loading anchors. The band top is the zero-range Efimov result; finite-range corrections move it by a few per cent, not by 2.5×."
+uncertainty = "The 2.5× exceedance is far outside the band's own width, which is the full [0, 67] oscillation in C and is already taken at its maximum. Independently re-evaluated 2026-08-22: 3 × 67.1 × ℏa⁴/m = 9.7×10⁻⁴¹ m⁶/s for ¹⁵¹Eu at a = 110 a₀."
+uncertainty_basis = "control"
+evidence = ["docs/guides/figures/eu_evap_k3_band_exclusion.jl"]
+evidence_status = "in_tree"
+commit = "7318b458"
+doc = "docs/guides/evaporation_model.md"
+section = "Robustness — the optimum is near a cliff"
+pr = 442
+note = "The deficiency is LOCATED, not merely asserted: the K₃ loss law itself is correct ab initio — a closed-system 3D decay fits N₀^1.796 against the 0-D N₀^1.800 — and the density profile is TF-accurate to ~2 %. What is missing is the formation dynamics, because the 0-D model forms the BEC while the trap is still tight. That is the same hole the SPGPE sees directly from the other side."
+
+[[claim]]
+id = "eu-evap-eta-start-is-2p07"
+claim = "The shipped euv3 defaults start evaporation at η = U/(k_BT₀) = 2.07, BELOW the η ≈ 4 floor at which evaporation can start, and re-anchoring T₀ does not lift it — both self-consistent epoch choices land at ≈ 2."
+status = "live"
+type = "C"
+quantity = "eta_start on the shipped euv3 defaults"
+supersedes = ["eu-evap-eta-window-4p5-to-11"]
+scope = "`evaporation_summary(run_euv3_evaporation()).eta_start`, the shipped defaults. 2022 trap + T₀ = 50 µK gives 2.07; 2023 trap + T₀ = 18 µK gives 2.02; the MIXED pairing gives 5.75 and is an epoch-mixing artefact, not a third option."
+uncertainty = "Exact for the model: 2.0682, one deterministic call. What is uncertain is the apparatus, not the number — the 2023-07 notebook measured η_start = 3.7 directly in a configuration where the model gives 10.5, the same 2.84× that separates the two epochs' trap depths."
+uncertainty_basis = "control"
+evidence = ["src/solvers/evaporation/euv3.jl", "test/solvers/test_evaporation.jl", "docs/guides/evaporation_model.md"]
+evidence_status = "in_tree"
+commit = "b672e1ba"
+doc = "docs/guides/evaporation_model.md"
+section = "Is the trap capable of runaway evaporation?"
+pr = 442
+note = "Found by running the very call the document tells the reader to make. Consequence for everything downstream: treat absolute numbers from the defaults as suspect, and quote ratio-type conclusions instead."
+
+[[claim]]
+id = "eu-evap-eta-window-4p5-to-11"
+claim = "η stays in a valid 4.5–11 range over the euv3 ramp."
+status = "superseded"
+superseded_by = "eu-evap-eta-start-is-2p07"
+type = "C"
+scope = "Asserted for the shipped euv3 defaults, in four places in the guide."
+uncertainty = "Wrong by more than a factor of two at the start, and on the wrong side of the eta_min = 4 floor — which changes the KIND of statement it is, not its precision."
+uncertainty_basis = "control"
+evidence = ["docs/guides/evaporation_model.md"]
+evidence_status = "in_tree"
+commit = "b672e1ba"
+doc = "docs/guides/evaporation_model.md"
+section = "Is the trap capable of runaway evaporation?"
+pr = 442
+retired_literal = ["4.5–11"]
+replacement_literal = ["2.07"]
+
+[[claim]]
+id = "eu-evap-condensate-n2-moment-is-8-over-21"
+claim = "The atom-weighted mean-square density of a Thomas-Fermi condensate is ⟨n²⟩ = ∫n³/∫n = (8/21)n₀², which with n₀ ∝ N₀^(2/5) gives the three-body attractor dN₀/dt = -γN₀^(9/5), hence N₀ → [(4/5)γt]^(-5/4) — independent of the initial atom number."
+status = "live"
+type = "B"
+quantity = "TF condensate mean-square density coefficient"
+scope = "Any Thomas-Fermi condensate. Aspect-ratio invariant, so it survives DDI deformation."
+uncertainty = "Exact — a ratio of Beta integrals, B(3/2,4)/B(3/2,2). Confirmed numerically two independent ways: a TF seed measures 0.381 = 8/21 rather than 0.571 = 4/7, and a closed-system 3D SGPE decay fits the resulting exponent to 1.796 against the predicted 1.800."
+uncertainty_basis = "control"
+evidence = ["src/solvers/evaporation/condensate.jl", "docs/theory/eu_evaporation_three_body_theory.md"]
+evidence_status = "in_tree"
+commit = "a5c7db4d"
+doc = "docs/theory/eu_evaporation_three_body_theory.md"
+section = "BEC 数を決めるアトラクタ"
+pr = 442
+note = "Carried as (4/7)n₀² until 2026-07-25 — a 1.5× over-loss. 4/7 is the MEAN density ⟨n⟩/n₀ = ∫n²/∫n, a different moment, so this was a moment error and not an arithmetic one; it moved the headline trap-shaping gain from 1.46× to 1.63×. Deliberately NO `retired_literal`: `4/7` is too common a string to hunt for without reddening on unrelated text, and the retracted form lives in deleted code rather than in a quotable number. A row whose retraction cannot be gated should say so rather than declare a literal that would get the gate deleted."
+
+[[claim]]
+id = "eu-evap-trap-shaping-gain-not-poured"
+claim = "The trap-shaping half of this arc — the 1.63× joint waist + Feshbach gain, the m_ω ≳ 0.6 gravity floor, the 1.28× three-dimensional SGPE confirmation of the waist mechanism — is not in this ledger."
+status = "open"
+type = "B"
+scope = "docs/guides/eu_evaporation_optimization.md, FROZEN 2026-07-28, plus the 3D shape work in docs/guides/eu_shape_finite_t.md."
+uncertainty = "unbounded: that is the content of the row. Those numbers have never had their scope, their uncertainty or their evidence status written into a field, and the guide holding them is frozen."
+uncertainty_basis = "none"
+evidence = ["docs/guides/eu_evaporation_optimization.md"]
+evidence_status = "in_tree"
+commit = "5dd7092d"
+doc = "docs/guides/spgpe.md"
+section = "Known limits"
+pr = 442
+note = "Recorded rather than poured, because pouring it honestly needs the 3D SGPE arm re-read and its gravity-free symmetric trap stated as a scope restriction, and that is a session's work rather than a paragraph. An `open` row is what makes a deferral distinguishable from an oversight — the same argument the `closed` status exists for, one step earlier."
+
 [[claim]]
 id = "saito-li-edh-response-1p75x"
 quantity = "EdH magnetisation response ratio vs Li-Saito Fig 4b @ 0.05 mG"
@@ -1489,3 +1693,7 @@ in this session puts the ground state at that field on the POLARISED branch (<F_
 E = -7.8527) rather than the torus (E = -1.6557). The quench there drives the system off-branch,
 which is why its edge density reaches 7.7e-2 and corr(f_z, L_z) flips from -0.99 to +0.22."""
 
+[[coverage]]
+doc = "docs/theory/eu_evaporation_three_body_theory.md"
+covered = 0
+note = "1 section by the numbering regex — and it is a false positive: the heading is '0 次元の限界と、これから', a Japanese prose heading that happens to start with a digit. Pinned at 0 so the ratchet still guards a real fall if the document is ever numbered."
