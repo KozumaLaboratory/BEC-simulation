@@ -1095,6 +1095,15 @@ seeing: pouring rows is not the same as covering sections, and a ledger can grow
 coverage does not."""
 
 [[coverage]]
+doc = "runs/saito_li_torus/README.md"
+covered = 1
+note = """5 sections cite this file. Poured 2026-08-22 by the EdH retraction
+(`saito-li-edh-response-1p75x`): "continued 6" is the section whose table states 0.03750, and it
+is the one covered. The other four — the torus reproduction, the Fig 3 cigar verdict, Fig 5, and
+the DDI f(kappa) box oracle — carry no ledger row yet and are the honest gap. Note the retraction
+does NOT reach them: only the EdH response number failed to reproduce."""
+
+[[coverage]]
 doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
 covered = 6
 note = "18 sections. The second document poured; the decision + the ambiguity + criteria B/C/D."
@@ -1645,6 +1654,43 @@ doc = "docs/guides/spgpe.md"
 section = "Known limits"
 pr = 442
 note = "Recorded rather than poured, because pouring it honestly needs the 3D SGPE arm re-read and its gravity-free symmetric trap stated as a scope restriction, and that is a session's work rather than a paragraph. An `open` row is what makes a deferral distinguishable from an oversight — the same argument the `closed` status exists for, one step earlier."
+
+[[claim]]
+id = "saito-li-edh-response-1p75x"
+quantity = "EdH magnetisation response ratio vs Li-Saito Fig 4b @ 0.05 mG"
+claim = "RETRACTED: the 1.75x ratio between our EdH magnetisation response and Li-Saito Fig 4(b) at 0.05 mG rests on ours = 0.03750, and that value does not reproduce on current code AT ITS OWN RECORDED SETTINGS."
+status = "refuted"
+retired_literal = ["0.03750", "0.03722"]
+type = "C"
+scope = "runs/saito_li_torus, the EdH quench arm at B_z = 0.05 mG, 14.5 ms window, mean |f_z| over t > 3 ms. Binds README 'continued 6' and h16_digitise_fig4b.py's OURS dict."
+uncertainty = "The NON-REPRODUCTION is bounded well clear of any floor: re-run at the recorded settings (box 8 / n 80 / dt 2e-4 / orient=rotate / t_end 10) gives 0.2778 +/- 0.0185, a factor 7.4, against a per-sample scatter of 6.7 %. Four independent routes agree within 27 % on 0.22-0.28 — static response 0.2214 (no dynamics at all), the 0.025 mG dynamic arm doubled 0.2627 (that arm PASSES every gate, edge 3.6e-4), box-10 dynamic 0.2805, box-8 dynamic 0.2778. What is NOT bounded is the replacement value itself: three of those four are box-gate-marginal (edge 1.3-1.5e-3), and only the 0.025 mG arm is clean."
+uncertainty_basis = "control"
+evidence = ["runs/saito_li_torus/cells/stiff_n64_Bz0p025.yaml", "runs/saito_li_torus/cells/stiff_n64_Bz0p050.yaml", "runs/saito_li_torus/h6_edh.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "runs/saito_li_torus/README.md"
+section = "1"
+pr = 0
+note = """THE DIAGNOSTIC IS THE EDGE DENSITY, NOT f_z. At identical box / n / dt / orient the
+re-run reports max edge frac 1.546e-3 against the record's 6.08e-4 — 2.5x. Edge density is a
+property of the evolved STATE, not of the analysis window, so this is not the same trajectory
+read differently. Something in the state being propagated changed between the record and now,
+and that has not been identified.
+
+WHAT THIS DOES AND DOES NOT SETTLE. It does NOT explain the 1.75x — it removes it, by showing
+the numerator is not reproducible. Rebuilt from a reproducing value the discrepancy against the
+paper would be ~13x, i.e. possibly much LARGER. That is a report that the problem may be worse,
+not a diagnosis.
+
+It also does not license quoting 0.2778. Only the 0.025 mG arm passes every gate; the 0.05 mG
+arms are edge-marginal at both box 8 and box 10, and #435's own warning stands — the edge-density
+gate does not guarantee the DDI box, which must be set by h19_ddi_fkappa_oracle.jl's f(kappa)
+comparison.
+
+The 0.10 mG comparison point is separately void and NOT for want of a bigger box: the static scan
+in this session puts the ground state at that field on the POLARISED branch (<F_z> = -5.851,
+E = -7.8527) rather than the torus (E = -1.6557). The quench there drives the system off-branch,
+which is why its edge density reaches 7.7e-2 and corr(f_z, L_z) flips from -0.99 to +0.22."""
 
 [[coverage]]
 doc = "docs/theory/eu_evaporation_three_body_theory.md"

@@ -78,12 +78,28 @@ set by dt rather than by the Hamiltonian. This is why `method: lbfgs`.
 | 64³ box 6 | 0.0732 μm | −1.5754124 | 0.513 | 0.812 μm | 1.0e-4 |
 | 96³ box 6 | 0.0488 μm | −1.5754124 | 0.516 | 0.817 μm | 9.4e-5 |
 | 88³ box 8 | 0.0709 μm | −1.5754118 | 0.513 | 0.825 μm | 2.7e-7 |
+| **128³ box 6** | **0.0366 μm** | **−1.5754124** | **0.516** | **0.819 μm** | **8.8e-5** |
 
-Energy is identical to 7 digits across a 1.5× refinement in dx **and** a 1.33×
-enlargement of the box at fixed resolution; the radius moves 1.6 % over both.
+Energy is identical to 7 digits across a **2.0× refinement in dx** and a 1.33×
+enlargement of the box at fixed resolution; the radius moves 1.6 % over all four.
 The 88³ box-8 cell is the box test proper — the box grows while dx does not —
 and its edge density is 2.7e-7 of the peak, so the object is self-bound rather
 than held by the periodic boundary.
+
+The 128³ cell was added 2026-08-22 (#376) and is the flat fourth point it was
+expected to be: same energy to 7 digits, peak ρ/N and r_peak inside the spread
+the other three already showed. It also re-checks the two structural facts at
+the finest grid — every one of the 13 components winds with **v_m = −m** at
+r_peak, and **J_z = L_z = F_z = 0** — so flux closure is not a coarse-grid
+artefact. Against the published profile it sits at peak ρ/N +1.5 %, r_peak
++0.5 %, FWHM_hi 0.0 %.
+
+**WHERE THIS STOPPED, stated rather than implied.** dx = 0.0366 μm. The paper's
+grid is ≈ 0.01 μm, which at box 6 a_ho would need n ≈ 468 — not run and not
+planned. So this is a four-point convergence line down to **3.7× coarser than
+the paper**, and the phrase "converged" is not claimed at the paper's spacing.
+The F = 6 object is ~3× the size of the F = 1 one, which is the reason to expect
+the coarser grid to suffice, and that is an expectation, not a measurement.
 
 Every cell reaches the L-BFGS energy-comparison floor at |∇E| ≈ 3e-6 and so
 reports `converged=false`. That flag means "tol=1e-9 was below what the method
@@ -695,7 +711,7 @@ COM ドリフトは 0.76 → **0.10 a_ho** に改善。
 
 | B_z | \|f_z\| こちら | \|L_z\| こちら | 論文 \|F_z\| | 比 | max\|J_z\| | edge |
 |---|---|---|---|---|---|---|
-| 50 µG | 0.03750 ± 0.00073 | 0.03722 ± 0.00075 | ~0.020 | **1.87** | 7.7e-4 | 6.1e-4 |
+| 50 µG | ~~0.03750 ± 0.00073~~ **retracted** — not reproducible; → 0.2778 ± 0.0185 (#435) | ~~0.03722 ± 0.00075~~ | ~0.020 | ~~**1.87**~~ | 7.7e-4 | 6.1e-4 |
 | 100 µG | 0.09698 ± 0.00420 | 0.09175 ± 0.00431 | ~0.040 | **2.42** | 9.8e-3 | **3.1e-3** ✗ |
 
 **構造は正しい**: ⟨f_z⟩ と ⟨L_z⟩ が同じ大きさで逆向き（50 µG で swing が
@@ -793,9 +809,19 @@ Fig. 3(c) と同じ較正つき digitiser（`h16_digitise_fig4b.py`）にかけ�
 
 **論文自身が 0 に保つ量で縦軸が較正される**のがこのパネルの利点。
 
+
+> **⚠ retracted 2026-08-22 — `0.03750` は再現しません。** 記録の設定そのもの
+> （box 8 / n 80 / dt 2e-4 / `orient=rotate` / t_end 10）で走らせると
+> **`0.2778 ± 0.0185`**（7.4 倍）。決め手は f_z ではなく**端密度**で、
+> 同一設定なのに **1.546e-3 対 6.08e-4（2.5 倍）** — 端密度は解析ではなく
+> **状態**の性質なので、進化している状態自体が違います。
+> 独立 4 経路が 27 % 以内で一致して同じ側を指します: 静的応答 **0.2214**、
+> 全ゲート通過の 0.025 mG × 2 = **0.2627**、box 10 動的 **0.2805**、
+> box 8 動的 **0.2778**。**下の数値と、それから導かれた比は引用しないでください。** #435
+
 | B_z | 論文 \|F_z\| | こちら | 比 |
 |---|---|---|---|
-| 0.05 mG | 0.0214 | 0.03750 | **1.75** |
+| 0.05 mG | 0.0214 | ~~0.03750~~ **retracted** → **0.2778** | ~~1.75~~ → **13.0** |
 | 0.10 mG | 0.0493 | 0.09698 | 1.97（箱ゲート落ち、不採用） |
 
 **箱収束している 0.05 mG で 1.75 倍。** 目視の 2.42 は私の読み取り誤差だった
@@ -1050,9 +1076,19 @@ F_z CALIBRATION FAILED: cigar F_z is not near 1
 
 dx = 0.10 a_ho、dt = 2e-4、t_end = 10、`orient=rotate` を固定し、箱だけを変える:
 
+
+> **⚠ retracted 2026-08-22 — `0.03750` は再現しません。** 記録の設定そのもの
+> （box 8 / n 80 / dt 2e-4 / `orient=rotate` / t_end 10）で走らせると
+> **`0.2778 ± 0.0185`**（7.4 倍）。決め手は f_z ではなく**端密度**で、
+> 同一設定なのに **1.546e-3 対 6.08e-4（2.5 倍）** — 端密度は解析ではなく
+> **状態**の性質なので、進化している状態自体が違います。
+> 独立 4 経路が 27 % 以内で一致して同じ側を指します: 静的応答 **0.2214**、
+> 全ゲート通過の 0.025 mG × 2 = **0.2627**、box 10 動的 **0.2805**、
+> box 8 動的 **0.2778**。**下の数値と、それから導かれた比は引用しないでください。** #435
+
 | | mean \|f_z\| (t > 3 ms) | sd | max edge | max\|J_z\| |
 |---|---|---|---|---|
-| box = 8, n = 80 | **0.03750** | 0.00073 | 6.08e-4 | 7.74e-4 |
+| box = 8, n = 80 | ~~0.03750~~ **retracted** → **0.2778** | 0.00073 → 0.0185 | 6.08e-4 → **1.546e-3** | 7.74e-4 |
 | box = 12, n = 120 | **0.03746** | 0.00037 | 3.88e-4 | 6.73e-4 |
 | 変化 | **−0.1 %** | | | |
 
