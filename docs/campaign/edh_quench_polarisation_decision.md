@@ -358,6 +358,22 @@ nothing was ever chosen there.
 **Action for that config: same as the quench family — it needs `init_m_idx: 13`
 at p > 0 (or `p < 0` with `init_m_idx: 1`) to be anti-aligned.**
 
+> **SUPERSEDED, and then DONE.** The prescription above is unrealisable at this
+> field and §16.3 shows why: ITP is a projector onto the LOWEST state, so
+> `init_m_idx: 13` at p = 26700 gives `exp(-2·F·p·dt) = exp(-1602)`, which
+> underflows Float64 in one step. The run COMPLETED and returned 212992 exact
+> zeros with E = 0.0. It was not a wrong configuration, it was inexpressible.
+>
+> `prepare_anti_aligned: true` replaces it (#421): relax at `-p`, hand the
+> dynamics `+p`. The Zeeman-lowest state of `-B` is the Zeeman-highest state of
+> `+B`, and it is a true ground state of the field it was relaxed in.
+>
+> **Run at production scale 2026-08-22 (#423): 8/8 `phi.rate` points, all
+> `mz_actual = -6.0000`, all `converged`, E = -160177.72 finite.** See §18.4 for
+> the table. This paragraph is kept rather than rewritten because the reasoning
+> it contains — that p > 0 puts m = +F at the bottom — is correct and is what
+> made the config's problem visible; only its ACTION line was overtaken.
+
 > **DONE, and this paragraph was wrong from 2026-08-19 to 2026-08-20.** It said
 > "not done here: … on the re-derivation list rather than in this PR". The change
 > in fact landed in `e8dafe8e`, the same retarget commit — `init_m_idx: 13` is on
