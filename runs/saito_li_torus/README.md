@@ -78,12 +78,28 @@ set by dt rather than by the Hamiltonian. This is why `method: lbfgs`.
 | 64³ box 6 | 0.0732 μm | −1.5754124 | 0.513 | 0.812 μm | 1.0e-4 |
 | 96³ box 6 | 0.0488 μm | −1.5754124 | 0.516 | 0.817 μm | 9.4e-5 |
 | 88³ box 8 | 0.0709 μm | −1.5754118 | 0.513 | 0.825 μm | 2.7e-7 |
+| **128³ box 6** | **0.0366 μm** | **−1.5754124** | **0.516** | **0.819 μm** | **8.8e-5** |
 
-Energy is identical to 7 digits across a 1.5× refinement in dx **and** a 1.33×
-enlargement of the box at fixed resolution; the radius moves 1.6 % over both.
+Energy is identical to 7 digits across a **2.0× refinement in dx** and a 1.33×
+enlargement of the box at fixed resolution; the radius moves 1.6 % over all four.
 The 88³ box-8 cell is the box test proper — the box grows while dx does not —
 and its edge density is 2.7e-7 of the peak, so the object is self-bound rather
 than held by the periodic boundary.
+
+The 128³ cell was added 2026-08-22 (#376) and is the flat fourth point it was
+expected to be: same energy to 7 digits, peak ρ/N and r_peak inside the spread
+the other three already showed. It also re-checks the two structural facts at
+the finest grid — every one of the 13 components winds with **v_m = −m** at
+r_peak, and **J_z = L_z = F_z = 0** — so flux closure is not a coarse-grid
+artefact. Against the published profile it sits at peak ρ/N +1.5 %, r_peak
++0.5 %, FWHM_hi 0.0 %.
+
+**WHERE THIS STOPPED, stated rather than implied.** dx = 0.0366 μm. The paper's
+grid is ≈ 0.01 μm, which at box 6 a_ho would need n ≈ 468 — not run and not
+planned. So this is a four-point convergence line down to **3.7× coarser than
+the paper**, and the phrase "converged" is not claimed at the paper's spacing.
+The F = 6 object is ~3× the size of the F = 1 one, which is the reason to expect
+the coarser grid to suffice, and that is an expectation, not a measurement.
 
 Every cell reaches the L-BFGS energy-comparison floor at |∇E| ≈ 3e-6 and so
 reports `converged=false`. That flag means "tol=1e-9 was below what the method

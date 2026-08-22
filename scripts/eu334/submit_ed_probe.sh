@@ -32,5 +32,12 @@ export ED_CDD="${ED_CDD:-0.0}"
 export ED_MU="${ED_MU:-3.0}"
 export ED_T="${ED_T:-1.0}"
 export ED_SEED="${ED_SEED:-vacuum}"
+# 0 = fixed mu (every arm so far). >0 ramps MU -> that value across the run.
+export ED_MU_RAMP="${ED_MU_RAMP:-0.0}"
+# The last axis: scale. Defaults are the 24^3 box 10 every arm so far used.
+export ED_N="${ED_N:-24}"
+export ED_BOX="${ED_BOX:-10.0}"
+# Noise-stream offset, so the F=6 + DDI arm can be run as an ensemble.
+export ED_SEED0="${ED_SEED0:-90000}"
 
 "$SPINORBEC_TSUBAME_JULIA" --project=. scripts/eu334/ed_growth_probe.jl
