@@ -564,4 +564,9 @@ Known limits, unchanged by this work:
   condensate is possible; above it the equilibrium size follows from
   $\mu=\varepsilon_0+c_0n_0$. `mu_branch=:thermal` does not escape this — it caps
   $\mu$ at $0<\varepsilon_0$ and forbids condensation outright. Atom-number questions
-  need a number-conserving formulation, which is not implemented.
+  need a number-conserving formulation. **This bullet said "which is not implemented"
+  until 2026-08-22; that has been false since 2026-08-07** — the semiclassical
+  Hartree–Fock constraint is `mu_from_total_lda` (`src/solvers/thermal_cfield.jl`),
+  driven into a run by `number_conserving_callback`, and it is what the
+  number-conserving section above measures. The limit that survives is narrower: a
+  run whose `mu` is a prescribed `Waveform` still prescribes $N_0$.
