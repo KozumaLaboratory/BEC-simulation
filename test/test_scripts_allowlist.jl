@@ -68,6 +68,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     # the 8-point scan is indivisible from outside; it IS resumable, so a
     # walltime kill costs only the point it was inside.
     "submit_edh_phi_phys_anti_aligned.sh",
+    # #376 — one runs/saito_li_torus/cells/*.yaml resolution cell. On TSUBAME
+    # rather than the local card: 128³ x D=13 keeps 8.12 GiB of L-BFGS history
+    # at the default m, and dropping m for one point of a four-point convergence
+    # line would make that point answer a different question.
+    "submit_saito_torus_cell.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
     "tsubame/submit_gpu_smoke.sh",
