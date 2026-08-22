@@ -347,6 +347,23 @@ equilibrium $N_0$ off the same constraint:
 **Halving the ramp is worth +36 %** — $4.41\times10^4 \to 6.01\times10^4$, above the
 measured $5.02\times10^4$ — and the optimum is a broad valley over 0.3–0.5×.
 
+**The c-field does not collect it. Three seeds each, end of ramp:**
+
+| ramp | seeds | mean ± sd | equilibrium |
+|---|---|---|---|
+| 0.5× | 27.8 / 56.3 / 39.2 | **41.1 ± 14.3** | **7102** |
+| 1.0× | 39.7 / 31.8 / 53.4 | **41.6 ± 10.9** | 3498 |
+
+Difference $0.5 \pm 10.4$, i.e. **0.05σ**. Doubling the thermodynamic target moves the
+field's condensate not at all — **the ramp scale sets the target and nothing else.**
+Whatever limits the c-field here is on the field's side, not in how many atoms the
+thermodynamics would allow.
+
+The first single trajectory read 27.8 against 39.7 and looked like halving being *worse*;
+the seed-to-seed scatter is ±12, the same size as that difference. The seeds were run
+before the claim, not after someone asked for them — this arc had already published the
+opposite conclusion from two points of one run.
+
 The fast end is **not** physics. `condensate.jl` assumes "standard quasi-static
 two-component evaporation", and below 0.3× the trap depth outruns thermalisation: 0.02 to
 0.05 elastic collisions per e-folding of the depth against the conventional requirement of
