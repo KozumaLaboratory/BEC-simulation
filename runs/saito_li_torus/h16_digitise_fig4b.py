@@ -31,7 +31,16 @@ PAGE, SCALE = 3, 12
 OUT = pathlib.Path(__file__).parent / "out"
 
 # ours, |f_z| and |L_z| averaged over t > 3 ms (n=80, box=8.0, rotated GS)
-OURS = {50: (0.03750, 0.03722), 100: (0.09698, 0.09175)}
+# RETRACTED 2026-08-22 (#435): 0.03750 does not reproduce. Re-run at the
+# RECORDED settings (box 8 / n 80 / dt 2e-4 / orient=rotate / t_end 10) gives
+# 0.2778 +/- 0.0185 -- 7.4x -- and the edge density differs 2.5x (1.546e-3 vs
+# 6.08e-4) at identical settings, so the evolved STATE differs, not the reading.
+# Four independent routes agree within 27 % on ~0.22-0.28: static response
+# 0.2214, the fully-gate-passing 0.025 mG arm doubled 0.2627, box-10 0.2805,
+# box-8 0.2778. The 100 uG entry was already box-gate-failed and unadopted.
+# Do not use this dict until the values are regenerated.
+OURS_RETRACTED = {50: (0.03750, 0.03722), 100: (0.09698, 0.09175)}
+OURS = {50: (0.2778, None), 100: (None, None)}
 
 BLUE = (40, 60, 200)      # 0.05 mG
 RED = (220, 40, 40)       # 0.1 mG
