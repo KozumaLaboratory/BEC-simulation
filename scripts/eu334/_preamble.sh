@@ -7,11 +7,16 @@
 # Usage, after the UGE directives:
 #     source "${EU334_ROOT:-…}/scripts/eu334/_preamble.sh"
 #
-# NOTE: do NOT `source scripts/tsubame_setup.sh` from here. It runs `set +e` (to
-# survive `module` failures) and never restores it, so every submit script that
-# sources it loses `set -e` for the rest of the job: a middle stage can fail and
-# the job still exits 0 through its final `echo`. That covered two failures with
-# GREENs on 2026-08-08.
+# NOTE: this preamble does not `source scripts/tsubame_setup.sh`, and does the
+# same work inline. The original reason was that `tsubame_setup.sh` ran `set +e`
+# (to survive `module` failures) and never restored it, so every submit script
+# sourcing it lost `set -e` for the rest of the job — a middle stage could fail
+# and the job still exit 0 through its final `echo`. That covered two failures
+# with GREENs on 2026-08-08.
+#
+# THAT IS NO LONGER TRUE OF THE TREE: `tsubame_setup.sh` saves and restores the
+# caller's errexit, and `test/test_submit_scripts_fail_loudly.jl` executes that
+# property with a canary. Staying inline is now a choice, not a workaround.
 
 set -euo pipefail
 

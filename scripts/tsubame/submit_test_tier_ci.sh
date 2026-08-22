@@ -6,9 +6,11 @@
 #$ -o /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #$ -e /gs/fs/tga-kozuma-kouhi/uk07267/logs/
 #
-# See also submit_test_tier.sh, which takes the tier as a parameter, makes its
-# own checkout, and propagates the suite's return code. This one ends with an
-# `echo`, so `qacct` reports exit_status 0 for a red suite.
+# See also submit_test_tier.sh, which takes the tier as a parameter and makes its
+# own checkout. This one used to end with an `echo`, so `qacct` reported
+# exit_status 0 for a red suite — the defect was written in this header and left
+# unfixed for weeks, which is why the property is now gated
+# (test/test_submit_scripts_fail_loudly.jl) rather than described.
 #
 # Full `ci` tier. Main's required checks are fast + oracles + formatter only, so
 # a green PR says nothing about `ci` — run this before merging anything under
@@ -35,5 +37,10 @@ echo "tier=$SPINORBEC_TEST_TIER workers=$SPINORBEC_TEST_WORKERS"
 $JULIA --project=. -e 'using Pkg; Pkg.instantiate()' 2>&1 | tail -5
 
 $JULIA --project=. -e 'using Pkg; Pkg.test()' 2>&1
-echo "TEST_RC=$?"
+RC=$?
+echo "TEST_RC=$RC"
 echo "ALL DONE $(date)"
+# The job's exit status IS the suite's. `echo` last means qacct reports 0 for a
+# red suite, and exit_status was the only signal available for job 8309102 until
+# someone found its log.
+exit "$RC"
