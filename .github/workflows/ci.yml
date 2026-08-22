@@ -378,8 +378,15 @@ jobs:
     name: STATE.md drift (post-merge)
     runs-on: ubuntu-latest
     needs: changes
+    # `code || docs`, MATCHING the condition of the gate this job repairs.
+    # `test_state_doc_is_current.jl` sits in the fast tier, which runs on
+    # `code || docs` — so gating the repair on `code` alone would make it
+    # narrower than the failure it exists to answer, and a merge whose combined
+    # diff is markdown-only (two PRs each regenerating STATE.md, which IS a .md)
+    # would drift with nothing regenerating it. Being narrower than the thing
+    # you repair is the same silent hole one layer over.
     if: >-
-      needs.changes.outputs.code == 'true'
+      (needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true')
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
     timeout-minutes: 25
