@@ -85,7 +85,17 @@ _frozen(path) = occursin(_FROZEN_MARK, first(read(joinpath(_REPO, path), String)
         # keeps its path and loses its authority, and the authority needs a live
         # home. Net effect on the budget question: one frozen document became
         # genuinely inert, which is what the partition is for.
-        @test length(LIVE_DOCS) <= 33
+        # 33 -> 34 on 2026-08-25 for `docs/guides/local_run_environment.md`, and
+        # the question above was asked. It is not a fourth document about one
+        # tangle; it is the LOCAL half of a pair whose other half
+        # (`tsubame.md`) is already LIVE, and merging them would produce a guide
+        # about two machines that share no mechanism. What forces LIVE rather
+        # than a date is that its claims are SAFETY claims — swap cannot be
+        # touched, an overrun kills instead of hanging — and a dated safety
+        # guarantee still reads as a guarantee. Its "verified / not verified"
+        # section is the same shape: it already had to be rewritten once, when a
+        # TSUBAME job refuted the memory rung it had called unverified.
+        @test length(LIVE_DOCS) <= 34
         @test length(LIVE_DOCS) == length(unique(LIVE_DOCS))
     end
 

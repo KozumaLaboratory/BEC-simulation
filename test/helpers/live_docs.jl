@@ -55,6 +55,15 @@ const LIVE_DOCS = [
     # be wrong; it may not be the only place an instruction lives.
     "docs/guides/edh_quench_lab_prescription.md",
     "docs/guides/lab_user_tutorial.md",
+    # The local counterpart of `tsubame.md`: where a run goes when it is not
+    # going to the cluster. LIVE rather than dated because what it states is a
+    # SAFETY property — this host cannot be pushed into swap, and an overrun
+    # kills rather than hangs — and a stale safety guarantee is worse than an
+    # absent one: the reader keeps running under a promise nobody is holding.
+    # It also carries the only prose statement of which scheduler rungs have
+    # been executed on real hardware (UGE yes, SLURM/PBS no), which is exactly
+    # the kind of line that must not silently outlive its measurement.
+    "docs/guides/local_run_environment.md",
     "docs/guides/pipeline_cookbook.md",
     "docs/guides/spgpe.md",
     "docs/guides/tsubame.md",
