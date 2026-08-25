@@ -26,7 +26,7 @@ const _HB_ROOT = dirname(@__DIR__)
         @test !isempty(b.cpu_origin)
         @test !isempty(b.memory_origin)
         @test b.cpu_source in (:slurm, :uge, :pbs, :cgroup, :affinity, :override)
-        @test b.memory_source in (:slurm, :cgroup, :memavailable, :override)
+        @test b.memory_source in (:slurm, :uge, :cgroup, :memavailable, :override)
     end
 
     @testset "the affinity reader agrees with the kernel's own answer" begin
@@ -100,6 +100,54 @@ const _HB_ROOT = dirname(@__DIR__)
             "NSLOTS" => nothing, "SLURM_JOB_CPUS_PER_NODE" => "72(x2)") do
             @test detect_host_budget().cpu_threads == 72
         end
+    end
+
+    # Every literal below was COPIED OUT OF a real TSUBAME job's environment
+    # (job 8492405, cpu_4, node r18n6). The unit tests that shipped first set
+    # NSLOTS by hand and were green while the memory rung was 65x wrong on that
+    # same machine, because nothing local exports SGE_HGR_m_mem_free and nothing
+    # local runs cgroup v1. A fixture invented from the documentation would have
+    # reproduced exactly that blindness, so these are transcribed, not imagined.
+    @testset "the UGE memory grant is read (measured on job 8492405)" begin
+        @test SpinorBEC._parse_suffixed_bytes("9.200G") == round(Int, 9.2 * 1024^3)
+        @test SpinorBEC._parse_suffixed_bytes("4096M") == 4096 * 1024^2
+        @test SpinorBEC._parse_suffixed_bytes("2g") == 2_000_000_000   # lowercase: decimal
+        @test SpinorBEC._parse_suffixed_bytes("512") == 512
+        @test SpinorBEC._parse_suffixed_bytes("lots") === nothing
+
+        withenv("SPINORBEC_HOST_MEMORY_BYTES" => nothing,
+            "SLURM_MEM_PER_NODE" => nothing, "SLURM_MEM_PER_CPU" => nothing,
+            "SGE_HGR_m_mem_free" => "9.200G", "NSLOTS" => "4") do
+            b = detect_host_budget()
+            @test b.memory_source === :uge
+            @test b.memory_bytes == round(Int, 9.2 * 1024^3)
+            @test b.cpu_threads == 4
+            # The defect this replaces: the ceiling was MemAvailable for the
+            # whole node. Whatever this host's MemAvailable is, the grant must
+            # win over it.
+            @test b.memory_bytes < something(SpinorBEC._meminfo_bytes("MemTotal"), typemax(Int))
+        end
+        # Set but unparseable is a refusal, not a fallthrough to the node total.
+        withenv("SGE_HGR_m_mem_free" => "nine gigs") do
+            @test_throws BlindBudget detect_host_budget()
+        end
+    end
+
+    @testset "cgroup v1 is read, not just v2" begin
+        # TSUBAME's compute nodes are v1: /proc/self/cgroup lines look like
+        # `13:memory:/AGE/8492405.1/master`, with no `0::` line at all. The
+        # v2-only reader found no limit there and said nothing about it.
+        @test hasmethod(SpinorBEC._cgroup_dirs, Tuple{String})
+        src = read(joinpath(_HB_ROOT, "src", "workflow", "io", "host_budget.jl"), String)
+        # v1 spellings must appear beside their v2 counterparts, or the file has
+        # silently regressed to one hierarchy.
+        for v1 in ("memory.limit_in_bytes", "cpu.cfs_quota_us", "cpu.cfs_period_us",
+            "memory.max_usage_in_bytes", "memory.usage_in_bytes")
+            @test occursin(v1, src)
+        end
+        # Whatever hierarchy this host runs, asking for a controller must not throw.
+        @test SpinorBEC._cgroup_dirs("memory") isa Vector{String}
+        @test SpinorBEC._cgroup_dirs("cpu") isa Vector{String}
     end
 
     @testset "MemoryHigh is never emitted" begin

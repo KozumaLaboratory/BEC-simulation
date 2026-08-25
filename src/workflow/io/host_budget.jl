@@ -14,8 +14,12 @@
 #   1. the batch allocation      — SLURM / UGE (TSUBAME) / PBS. When a scheduler
 #                                  has granted the job N cpus and M bytes, that
 #                                  IS the answer and the node's totals are a lie.
-#   2. the cgroup v2 limit       — containers, systemd slices, WSL2. What the
-#                                  kernel will actually enforce on us.
+#   2. the cgroup limit          — containers, systemd slices, WSL2, and UGE's
+#                                  per-job cgroups. What the kernel will actually
+#                                  enforce on us. BOTH hierarchies are read: v2
+#                                  on desktops, v1 on TSUBAME's compute nodes,
+#                                  and a reader that knows only one is silent
+#                                  rather than wrong on the other.
 #   3. what the OS lets us see   — the CPU AFFINITY MASK (not the machine's core
 #                                  count) and MemAvailable, which is the kernel's
 #                                  own estimate of "how much can be allocated
@@ -93,7 +97,7 @@ struct HostBudget
     cpu_source::Symbol              # :slurm :uge :pbs :cgroup :affinity :override
     cpu_origin::String              # the literal file or variable read
     memory_bytes::Int
-    memory_source::Symbol           # :slurm :cgroup :memavailable :override
+    memory_source::Symbol           # :slurm :uge :cgroup :memavailable :override
     memory_origin::String
     interactive::Bool
     interactive_reserve_bytes::Int
@@ -159,23 +163,47 @@ function _self_uid()
     return nothing
 end
 
-"Every cgroup v2 directory from this process's own cgroup up to the root."
-function _cgroup_chain()
+"""
+    _cgroup_dirs(controller) -> Vector{String}
+
+Directories that could carry a limit on `controller`, innermost first.
+
+BOTH hierarchies, because the hosts this has to be right on do not agree. cgroup
+v2 puts every controller in one tree (`0::/path` → `/sys/fs/cgroup/<path>`); v1
+gives each controller its own mount (`13:memory:/AGE/…` →
+`/sys/fs/cgroup/memory/AGE/…`).
+
+Measured on TSUBAME job 8492405: the compute nodes are **v1**, and a v2-only
+reader there is not so much wrong as SILENT — it finds no limit at all, the
+ladder falls through to the node's totals, and a job granted 9.2 GB is told it
+has 599 GiB. That is the failure this whole file is against, produced by the
+file itself, and no unit test could have found it because every unit test ran on
+a v2 host.
+"""
+function _cgroup_dirs(controller::AbstractString)
     isfile("/proc/self/cgroup") || return String[]
-    rel = nothing
-    for line in eachline("/proc/self/cgroup")
-        parts = split(line, ':'; limit=3)
-        length(parts) == 3 && parts[1] == "0" && (rel = parts[3])
-    end
-    rel === nothing && return String[]
     root = "/sys/fs/cgroup"
     isdir(root) || return String[]
+    bases = Tuple{String, String}[]
+    for line in eachline("/proc/self/cgroup")
+        parts = split(line, ':'; limit=3)
+        length(parts) == 3 || continue
+        hid, ctls, rel = parts
+        if hid == "0" && isempty(ctls)
+            push!(bases, (root, String(rel)))              # v2: one unified tree
+        elseif controller in split(ctls, ',')
+            push!(bases, (joinpath(root, controller), String(rel)))   # v1: own mount
+        end
+    end
     out = String[]
-    p = normpath(joinpath(root, lstrip(rel, '/')))
-    while startswith(p, root)
-        isdir(p) && push!(out, p)
-        p == root && break
-        p = dirname(p)
+    for (base, rel) in bases
+        isdir(base) || continue
+        p = normpath(joinpath(base, lstrip(rel, '/')))
+        while startswith(p, base)
+            isdir(p) && push!(out, p)
+            p == base && break
+            p = dirname(p)
+        end
     end
     out
 end
@@ -224,34 +252,91 @@ function _scheduler_memory()
         )
         return (n * 1024 * 1024 * c[1], :slurm, "SLURM_MEM_PER_CPU x $(c[3])")
     end
+    # UGE (TSUBAME). `SGE_HGR_<resource>` is the HARD GRANTED amount, and
+    # m_mem_free is the memory one. Measured on job 8492405 (cpu_4, node r18n6):
+    # SGE_HGR_m_mem_free=9.200G against a node holding 755 GiB across 384 cpus,
+    # whose 4-cpu proportional share is 7.9 GiB — i.e. the figure is the job's
+    # TOTAL, not a per-slot amount that would need multiplying by NSLOTS. Read
+    # as-is; were that reading wrong the error is toward granting the job LESS
+    # than it has, which is the safe direction and the opposite of the 65×
+    # over-estimate this rung was added to fix.
+    for var in ("SGE_HGR_m_mem_free", "SGE_HGR_TASK_m_mem_free")
+        v = get(ENV, var, "")
+        isempty(v) && continue
+        n = _parse_suffixed_bytes(v)
+        n === nothing && throw(
+            BlindBudget(:memory_bytes, var,
+                "is set to $(repr(v)), which is not a UGE memory specifier " *
+                "(a number, optionally suffixed K/M/G/T for binary or k/m/g/t " *
+                "for decimal)."),
+        )
+        return (n, :uge, var)
+    end
     return nothing
 end
 
-"Tightest finite `memory.max` anywhere in our own cgroup chain."
+"""
+    _parse_suffixed_bytes(s)
+
+UGE memory specifier → bytes. Uppercase suffixes are binary (K = 1024),
+lowercase decimal (k = 1000); that is UGE's convention, not a choice made here.
+"""
+function _parse_suffixed_bytes(s::AbstractString)
+    m = match(r"^\s*([0-9]*\.?[0-9]+)\s*([kKmMgGtT]?)\s*$", s)
+    m === nothing && return nothing
+    mult = Dict(
+        "" => 1.0,
+        "k" => 1e3, "K" => 1024.0,
+        "m" => 1e6, "M" => 1024.0^2,
+        "g" => 1e9, "G" => 1024.0^3,
+        "t" => 1e12, "T" => 1024.0^4,
+    )
+    round(Int, parse(Float64, m.captures[1]) * mult[m.captures[2]])
+end
+
+"Tightest real memory limit anywhere in our own cgroup chain, either hierarchy."
 function _cgroup_memory_max()
+    # v1 spells "no limit" as a number near typemax rather than the word `max`,
+    # and the exact sentinel has changed across kernels. Rather than match a
+    # constant, compare against physical RAM: a limit at or above what the
+    # machine has is not a limit on this job. Derived, so it cannot go stale.
+    total = _meminfo_bytes("MemTotal")
     best, origin = typemax(Int), ""
-    for dir in _cgroup_chain()
-        v = _read_int_file(joinpath(dir, "memory.max"))
-        (v === nothing || v == typemax(Int)) && continue
-        v < best && ((best, origin) = (v, joinpath(dir, "memory.max")))
+    for dir in _cgroup_dirs("memory")
+        for fname in ("memory.max", "memory.limit_in_bytes")
+            path = joinpath(dir, fname)
+            v = _read_int_file(path)
+            (v === nothing || v == typemax(Int)) && continue
+            (total !== nothing && v >= total) && continue
+            v < best && ((best, origin) = (v, path))
+        end
     end
     best == typemax(Int) ? nothing : (best, :cgroup, origin)
 end
 
-"Tightest finite `cpu.max` quota in our own cgroup chain, in whole CPUs."
+"Tightest finite CPU quota in our own cgroup chain, in whole CPUs, either hierarchy."
 function _cgroup_cpus()
     best, origin = typemax(Int), ""
-    for dir in _cgroup_chain()
-        path = joinpath(dir, "cpu.max")
-        isfile(path) || continue
-        parts = split(strip(read(path, String)))
-        length(parts) == 2 || continue
-        parts[1] == "max" && continue
-        quota = tryparse(Int, parts[1]);
-        period = tryparse(Int, parts[2])
-        (quota === nothing || period === nothing || period == 0) && continue
-        n = max(1, cld(quota, period))
-        n < best && ((best, origin) = (n, path))
+    for dir in _cgroup_dirs("cpu")
+        path = joinpath(dir, "cpu.max")                       # v2: "quota period"
+        if isfile(path)
+            parts = split(strip(read(path, String)))
+            if length(parts) == 2 && parts[1] != "max"
+                quota = tryparse(Int, parts[1])
+                period = tryparse(Int, parts[2])
+                if quota !== nothing && period !== nothing && period > 0
+                    n = max(1, cld(quota, period))
+                    n < best && ((best, origin) = (n, path))
+                end
+            end
+        end
+        qpath = joinpath(dir, "cpu.cfs_quota_us")              # v1: two files, -1 = none
+        quota = _read_int_file(qpath)
+        period = _read_int_file(joinpath(dir, "cpu.cfs_period_us"))
+        if quota !== nothing && period !== nothing && quota > 0 && period > 0
+            n = max(1, cld(quota, period))
+            n < best && ((best, origin) = (n, qpath))
+        end
     end
     best == typemax(Int) ? nothing : (best, :cgroup, origin)
 end
@@ -264,31 +349,48 @@ Memory the login session has historically needed BEYOND what it holds now.
 Zero when no login-session cgroup exists — that is a compute node, and there is
 no desktop to keep responsive. Throws when the session exists but its counters
 will not read, because that is a failure to measure and not a reserve of zero.
+
+Looks in both hierarchies: v2 pairs `memory.current` with `memory.peak`, v1
+pairs `memory.usage_in_bytes` with `memory.max_usage_in_bytes`. A v2-only reader
+on a v1 desktop would report "no login session" — the right words for the wrong
+reason, and it would hand the desktop's headroom to the job.
 """
 function _interactive_reserve()
     uid = _self_uid()
     uid === nothing && return (0, false, "no /proc/self/status")
-    base = "/sys/fs/cgroup/user.slice/user-$(uid).slice/user@$(uid).service"
-    isdir(base) || return (0, false, "no $(base) — no login session to protect")
+    rel = "user.slice/user-$(uid).slice/user@$(uid).service"
+    bases = [
+        joinpath("/sys/fs/cgroup", rel),                     # v2
+        joinpath("/sys/fs/cgroup", "memory", rel),           # v1
+    ]
+    base = nothing
+    for b in bases
+        isdir(b) && (base=b; break)
+    end
+    base === nothing &&
+        return (0, false, "no $(rel) in either hierarchy — no login session to protect")
     reserve, seen = 0, String[]
     for slice in ("app.slice", "session.slice")
         dir = joinpath(base, slice)
         isdir(dir) || continue
-        cur = _read_int_file(joinpath(dir, "memory.current"))
-        peak = _read_int_file(joinpath(dir, "memory.peak"))
+        cur = something(_read_int_file(joinpath(dir, "memory.current")),
+            _read_int_file(joinpath(dir, "memory.usage_in_bytes")), Some(nothing))
+        peak = something(_read_int_file(joinpath(dir, "memory.peak")),
+            _read_int_file(joinpath(dir, "memory.max_usage_in_bytes")), Some(nothing))
         if cur === nothing || peak === nothing
             throw(
                 BlindBudget(:interactive_reserve, dir,
-                    "the login session is present but memory.current/memory.peak " *
-                    "would not read (cgroup v1, or an older kernel without " *
-                    "memory.peak)."),
+                    "the login session is present but neither the v2 " *
+                    "(memory.current/memory.peak) nor the v1 " *
+                    "(memory.usage_in_bytes/memory.max_usage_in_bytes) counters " *
+                    "would read."),
             )
         end
         reserve += max(0, peak - cur)
         push!(seen, slice)
     end
     isempty(seen) && return (0, false, "$(base) has no app/session slice")
-    (reserve, true, "$(base)/{$(join(seen, ','))}: memory.peak - memory.current")
+    (reserve, true, "$(base)/{$(join(seen, ','))}: peak - current")
 end
 
 function _gpu_free_bytes(notes)

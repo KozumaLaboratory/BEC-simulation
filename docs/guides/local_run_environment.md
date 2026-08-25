@@ -96,12 +96,39 @@ Verified by execution on a WSL2 host, 2026-08-24:
 - the kill is scoped to the job — the system OOM killer never ran
 - runs land in `spinorbec.slice`, outside the measured slices
 
-**Not** verified by execution: the scheduler rungs. `SLURM_*`, `NSLOTS` and
-`PBS_*` are unit-tested in `test/test_host_budget.jl` by setting the variables,
-which proves the parsing and the precedence, and does **not** prove the values a
-real scheduler exports on a real node. Treat the first cluster run as the
-measurement. `scripts/run_local.sh` itself is not for cluster use: there the
-scheduler is the thing enforcing the budget.
+Verified by execution on TSUBAME, 2026-08-25, job 8492405 (`cpu_4`, node
+`r18n6`) — **0.001 points**, because the 300 s billing floor makes a two-second
+job cost the same as a five-minute one and the probe needs no GPU, no SpinorBEC
+and no precompile:
+
+- the UGE **cpu** rung is real: `NSLOTS=4` against a node reporting 384 cores,
+  and the budget returned `4 [uge] NSLOTS`. Reading the machine there is wrong
+  by 96×.
+- "no login session observed — compute node" fired correctly, so the interactive
+  reserve was zero **by observation** and not by a fallback.
+- the login node (free, no allocation) exercised rungs 2 and 3 on the same
+  hardware family: 96 cpus, no swap → "nothing to forbid", and a `nivdia-smi`
+  that exits non-zero became a *note* rather than a crash or a default.
+
+That job also **refuted** the memory rung as first shipped, which is why it was
+worth its 0.001 points:
+
+- TSUBAME's compute nodes run **cgroup v1**, and the reader understood only v2.
+  It therefore found no limit at all — silent, not wrong — and the ladder fell
+  through to `MemAvailable` for the entire node.
+- UGE's memory grant arrives as `SGE_HGR_m_mem_free`, which was not being read.
+- Net effect: a job granted **9.2 GiB** was told its ceiling was **598.9 GiB**,
+  a 65× over-estimate. Both holes are now closed and both hierarchies are read.
+
+**Still not verified by execution:** SLURM and PBS. Their variables are
+unit-tested by setting them, which proves parsing and precedence and — as the
+UGE memory rung just demonstrated — proves nothing about what a real scheduler
+exports or which cgroup hierarchy the node runs. Treat the first run on such a
+cluster as the measurement, and dump the raw inputs beside the derived answer
+the way `scripts/` did here.
+
+`scripts/run_local.sh` itself is not for cluster use: there the scheduler is the
+thing enforcing the budget.
 
 ## Related
 
