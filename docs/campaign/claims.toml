@@ -1085,6 +1085,34 @@ note = "Superseded the next day: there is no structure to explain. The mechanism
 # unmeetable and it would be deleted. Raise them as documents are poured; the gate
 # only forbids going backwards.
 
+[[claim]]
+id = "f6-uniform-gs-degenerates-the-whole-manifold"
+claim = "At uniform g_S the sigma_S sum rule degenerates the ENTIRE spinor manifold, not four phases: Sum_{S even} sigma_S(zeta) = 1 for any normalised zeta, so eps_MF = g/2 everywhere on CP^12. The degeneracy is continuous, which is what order-by-disorder requires."
+status = "live"
+type = "B"
+scope = "Any F, any normalised spinor, uniform g_S. An identity, so it has no grid, seed or duration. It is a statement about the UNIFORM-g_S reference point only — the physical Eu g_S are not uniform, and how far they sit from it is the six unmeasured channels."
+uncertainty = "Exact — the even-S two-body states span the symmetric subspace, so Sum_S sigma_S(zeta) = <zeta⊗zeta|zeta⊗zeta> = |<zeta|zeta>|^2 = 1 identically. Confirmed numerically: the four candidate spinors all return eps_MF = 1/2 at the scalar point in the 50x50 (g_10, g_12) scan, and `_f6_pd_sigma_S` reproduces the fingerprint for each."
+uncertainty_basis = "control"
+evidence = ["docs/research_notes/F6_phase_boundaries.md", "src/analysis/phases/F6_phase_diagram.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/research_notes/F6_phase_boundaries.md"
+section = "Result"
+pr = 0
+note = """Registered because the four-phase form was written in CAMPAIGN.md §11 and in memory and
+UNDERSTATES the result, in the one way that matters. Order-by-disorder needs a CONTINUOUS accidental
+degeneracy: four isolated points are selected between by an energy difference, and only a continuous
+manifold carries a would-be Goldstone mode for the selection to gap. So "four phases degenerate" would
+have made the pseudo-Goldstone programme (#455) look impossible on paper, while the identity makes it
+the same structure Turner-Barnett-Demler-Vishwanath (PRL 98, 190404) exploit for the spin-2 nematic
+manifold, at higher dimension.
+
+WHAT IT DOES NOT SAY. Uniform g_S is a reference point, not Eu. The physical g_S are not uniform and
+six of the seven even channels have never been measured, so the SIZE of any residual continuous
+degeneracy at the physical point is an a_S-dependent question (layer ii). What IS a_S-free is the
+stretched sector: the fully polarized cloud and its first magnon are pure S = 2F
+(`test/oracles/test_stretched_channel_invariance.jl`), which is why #455 is scoped to the FM branch."""
+
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 covered = 27

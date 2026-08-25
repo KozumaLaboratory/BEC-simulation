@@ -302,7 +302,20 @@ fixes only the long range ($C_6 = 3610$ a.u. ⇒ $R_6 = 178\,a_0$). ¹⁵³Eu's 
 carries the ¹⁵¹Eu value as an explicit placeholder. `K_3` has a ~2.6× systematic between
 direct and BEC-fit determinations.
 
-At uniform $g_S$ the σ_S sum rule makes polar / FM / cyclic / $I_h$ **exactly degenerate**
-($\varepsilon_{MF} = 1/2$), and Eu sits on the FM/cyclic/$I_h$ triple junction. Mean
-field cannot select the phase. That is the campaign's central physics opportunity, not a
+At uniform $g_S$ the σ_S sum rule degenerates **the whole spinor manifold**, not four
+phases. $\sum_{S\,\text{even}} \sigma_S(\zeta) = \langle \zeta\otimes\zeta | \zeta\otimes\zeta\rangle = 1$
+for **any** normalised $\zeta$ — the even-$S$ states span the symmetric two-body
+subspace, so the sum rule is an identity and not a coincidence of the four
+candidates. Hence $\varepsilon_{MF}(\zeta) = g/2$ everywhere on $\mathbb{CP}^{12}$,
+and Eu sits on the FM/cyclic/$I_h$ triple junction of the *physical* $g_S$. Mean field
+cannot select the phase. That is the campaign's central physics opportunity, not a
 problem.
+
+**The dimension is what makes it an opportunity rather than a curiosity.** Order-by-disorder
+needs a *continuous* accidental degeneracy: four isolated points would let fluctuations
+choose between them by an energy difference, but only a continuous manifold has a
+would-be Goldstone mode for the selection to gap. This is the same structure Turner *et
+al.* (PRL **98**, 190404) exploit for the spin-2 nematic manifold, at higher dimension.
+Ledger row: `f6-uniform-gs-degenerates-the-whole-manifold`. **Do not restate the four-phase
+form** — it was written here and in memory until 2026-08-25 and it understates the result
+in exactly the way that would have killed the pseudo-Goldstone programme on paper.
