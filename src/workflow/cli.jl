@@ -23,6 +23,7 @@ function _print_help(io::IO=stdout)
     println(
         io, "                                                   CAMPAIGN.md §4 guard 1, executed"
     )
+    println(io, "  host-budget [<yaml>]                             what this host grants a run")
     println(io, "  tsubame   {build-sysimage}                       cluster helper(s)")
     println(io, "  help                                            this message")
     println(io)
@@ -469,6 +470,34 @@ function _tsubame_build_sysimage()
     end
 end
 
+# ── host-budget ──────────────────────────────────────────────────────
+#
+# Reports what this host grants a run, and — given a config — whether the run
+# fits. ENFORCEMENT is not here and cannot be: the swap-proof cgroup has to wrap
+# the julia process, so it lives in `scripts/run_local.sh`, which this command
+# deliberately does not duplicate. Exit 3 on a run that demonstrably will not
+# fit, so a submit wrapper can gate on it.
+
+function _cmd_host_budget(args)
+    b = detect_host_budget()
+    budget_report(b)
+    isempty(args) && return 0
+    cfg = args[1]
+    if !isfile(cfg)
+        println(stderr, "cli.jl host-budget: no such config '$(cfg)'")
+        return 2
+    end
+    println()
+    try
+        assert_run_fits(cfg; budget=b)   # :undetermined is reported, not fatal
+        return 0
+    catch err
+        err isa ArgumentError || rethrow()
+        println(stderr, "\n", err.msg)
+        return 3
+    end
+end
+
 # ── main ─────────────────────────────────────────────────────────────
 
 """
@@ -491,6 +520,7 @@ function cli_main(args)
     sub == "gs-library" && return _cmd_gs_library(rest)
     sub == "validation-matrix" && return _cmd_validation_matrix(rest)
     sub == "campaign-gate" && return _cmd_campaign_gate(rest)
+    sub == "host-budget" && return _cmd_host_budget(rest)
     sub == "tsubame" && return _cmd_tsubame(rest)
     println(stderr, "cli.jl: unknown subcommand '$sub'")
     _print_help(stderr)

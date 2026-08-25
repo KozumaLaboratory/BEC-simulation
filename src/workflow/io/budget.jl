@@ -277,3 +277,96 @@ function recommend_backend_dtype(
         return (:cuda, Float64)
     end
 end
+
+# --- supply meets demand -------------------------------------------------------
+#
+# `estimate_run_budget` forecasts what a config will WANT; `detect_host_budget`
+# reads what this host will GIVE. Neither is useful alone at launch time, and
+# until this function existed nothing compared them: a 128³ config on a laptop
+# was discovered to be too large by being killed, several minutes in.
+#
+# Lives here rather than in host_budget.jl so that file stays Base-only in fact
+# as well as in intent — the launcher includes it without loading SpinorBEC.
+
+export check_run_fits, assert_run_fits
+
+"""
+    check_run_fits(yaml_path; budget=detect_host_budget(), io=devnull) -> NamedTuple
+
+Compare a config's forecast footprint against this host's derived budget.
+
+Returns `(; verdict, ram, vram, demand, budget)` where each of `ram` / `vram` is
+one of:
+
+  - `:fits`         — the forecast is within what the host grants
+  - `:exceeds`      — it is not
+  - `:undetermined` — the host could not tell us the limit (no `nvidia-smi`, so
+                      no VRAM figure). **This is deliberately not `:fits`.** An
+                      unmeasured headroom must not read as a sufficient one.
+
+`verdict` is `:exceeds` if anything exceeds, else `:undetermined` if anything is
+undetermined, else `:fits`.
+
+The forecast is not a tight upper bound (see `estimate_run_budget` — CUDA
+fragmentation and analyzer passes add 10-20 %), so `:fits` is a necessary and
+not a sufficient condition. It is still the cheap half of the question, and it
+is the half that was going unasked.
+"""
+function check_run_fits(yaml_path::AbstractString;
+    budget::HostBudget=detect_host_budget(), io::IO=devnull)
+    d = estimate_run_budget(yaml_path; io=io)
+    ram = d.host_ram_est <= budget.memory_bytes ? :fits : :exceeds
+    vram = if budget.gpu_free_bytes === nothing
+        :undetermined
+    else
+        d.vram_est <= budget.gpu_free_bytes ? :fits : :exceeds
+    end
+    verdict = if :exceeds in (ram, vram)
+        :exceeds
+    elseif :undetermined in (ram, vram)
+        :undetermined
+    else
+        :fits
+    end
+    (; verdict, ram, vram, demand=d, budget)
+end
+
+"""
+    assert_run_fits(yaml_path; budget=detect_host_budget(), io=stdout) -> NamedTuple
+
+`check_run_fits`, but throw when something demonstrably will not fit.
+
+Throws only on `:exceeds`. An `:undetermined` axis is PRINTED and allowed
+through: refusing it would block every host without `nvidia-smi` from starting a
+CPU run, which is a worse failure than the one being prevented. Saying which
+axis went unchecked is the honest middle — the caller can then decide, and
+cannot mistake silence for a clean bill.
+"""
+function assert_run_fits(yaml_path::AbstractString;
+    budget::HostBudget=detect_host_budget(), io::IO=stdout)
+    r = check_run_fits(yaml_path; budget=budget, io=devnull)
+    _gib(x) = round(x / 2^30; digits=2)
+    println(io, "run vs host budget: ", r.verdict)
+    println(io, "  host RAM   want ", _gib(r.demand.host_ram_est), " GiB",
+        "  have ", _gib(budget.memory_bytes), " GiB  -> ", r.ram)
+    println(io, "  device VRAM want ", _gib(r.demand.vram_est), " GiB",
+        "  have ",
+        budget.gpu_free_bytes === nothing ? "unknown" :
+        "$(_gib(budget.gpu_free_bytes)) GiB", "  -> ", r.vram)
+    if r.verdict === :exceeds
+        over = String[]
+        r.ram === :exceeds && push!(over, "host RAM")
+        r.vram === :exceeds && push!(over, "device VRAM")
+        throw(
+            ArgumentError(
+                "$(yaml_path) does not fit this host: " * join(over, " and ") *
+                " over budget. Shrink the grid or the snapshot count, or take it to " *
+                "TSUBAME where the budget is the scheduler's to grant. " *
+                "`scripts/run_local.sh --print` shows how the ceiling was derived."),
+        )
+    end
+    r.vram === :undetermined && println(io,
+        "  NOTE: the VRAM axis was NOT checked (no device figure available); " *
+        "this is not a statement that it fits.")
+    r
+end

@@ -1,11 +1,13 @@
-# The TSUBAME billing transcription, checked against itself.
+# The TSUBAME billing transcription, checked against the regulation and against
+# itself.
 #
 # `refs/tsubame4_points.toml` is a hand transcription of a PDF, so it is exactly
-# the kind of artifact this repository keeps discovering has rotted. It cannot be
-# checked against the regulation by a test — nothing here can read intent out of
-# 別表3 — but it CAN be held to internal consistency, and that is where the real
-# drift showed up: the worked example carried in memory for a year was 0.0271,
-# which is the charge ROUNDED, while 第4条 truncates and the charge is 0.0270.
+# the kind of artifact this repository keeps discovering has rotted. Two things
+# are checked, and they catch different faults: the numbers are cross-read out of
+# the regulation's own text (a retyped coefficient), and the worked examples are
+# recomputed from the stated rules (a rule applied backwards). The second is
+# where the real drift showed up: the example carried in memory for a year was
+# 0.0271, which is the charge ROUNDED, while 第4条 truncates and it is 0.0270.
 # Every empirical "match" against that number agreed to within one unit in the
 # last place, so nothing ever looked wrong, and the RULE inferred from it was
 # backwards.
@@ -16,11 +18,18 @@
 # than a single copy nobody re-derives. If a coefficient is retyped wrongly, or
 # an example is written with the wrong rounding, this goes red.
 #
-# What it does NOT check, said plainly so the gate is not read as more than it
-# is: whether the transcription matches the PDF. Re-extract and compare by eye —
-# the tables are in the text layer, so it takes about ten seconds:
-#   python3 -c "import pypdf; print(''.join(p.extract_text() for p in \
-#     pypdf.PdfReader('docs/refs/TSUBAME4_Terms_2024-02.pdf').pages))"
+# It DOES also check the transcription against the regulation, which the first
+# version of this file said was impossible. That was pessimism, not analysis: all
+# twelve resource types turn out to sit on the same line as their coefficient in
+# the PDF's text layer, so a retyped number is mechanically catchable. The text
+# layer is committed beside the PDF and pinned to its sha256 — the docs/STATE.md
+# pattern, a derived artifact plus a gate that it was really derived — so the
+# check needs no PDF library in the test environment.
+#
+# What remains genuinely uncheckable is INTENT: that 別表3 is the table this
+# repository should be reading at all, and that the regulation has not been
+# superseded by a new fiscal year's. `[source].effective_from` is the thing to
+# look at for that, and no test can look at it for you.
 
 using Test
 # The parallel-runner contract: every test file loads the package in the plain
@@ -29,6 +38,7 @@ using Test
 using SpinorBEC
 using TOML
 using Printf
+import SHA
 
 const _PTS_ROOT = dirname(@__DIR__)
 const _PTS_TOML = joinpath(_PTS_ROOT, "refs", "tsubame4_points.toml")
@@ -57,6 +67,60 @@ end
         pdf = joinpath(_PTS_ROOT, t["source"]["file"])
         @test isfile(pdf)
         @test filesize(pdf) > 100_000
+        # The committed text layer is DERIVED, so it must be pinned to the thing
+        # it was derived from. Without this, replacing the PDF with a new fiscal
+        # year's terms would leave the old text in place and every check below
+        # would keep passing against a regulation nobody is using any more.
+        @test bytes2hex(SHA.sha256(read(pdf))) == t["source"]["sha256"]
+        txt = joinpath(_PTS_ROOT, t["source"]["text"])
+        @test isfile(txt)
+        @test occursin(t["source"]["sha256"], read(txt, String))
+    end
+
+    @testset "every coefficient is co-located with its type IN the regulation" begin
+        # The check that makes this a transcription rather than a claim: for each
+        # row of 別表3, find a line of the regulation carrying BOTH the resource
+        # type's name and the coefficient this file assigns it.
+        lines = split(read(joinpath(_PTS_ROOT, t["source"]["text"]), String), '\n')
+        colocated(name, coef) =
+            any(
+                l -> occursin(name, l) && occursin(Printf.format(Printf.Format("%.3f"), coef), l),
+                lines,
+            )
+
+        # CALIBRATION. A scan that cannot fail is not evidence, and this one has
+        # two ways to be silently blind: the text file could be empty (nothing
+        # matches, and "0 mismatches" reads as success), or `occursin` on a short
+        # name could match anything. So: a row known to be right must be found,
+        # and the same row with a WRONG coefficient must not be.
+        @test colocated("node_f", 1.000)
+        @test !colocated("node_f", 0.999)
+        @test !colocated("node_zzz", 1.000)
+
+        for (name, coef) in t["resource_type"]
+            @test colocated(name, coef)
+        end
+    end
+
+    @testset "the rules quoted in prose are the rules in the regulation" begin
+        src = read(joinpath(_PTS_ROOT, t["source"]["text"]), String)
+        # 第4条, the clause that settles truncation-vs-round-up.
+        @test occursin("10,000 分の１ポイント", src)
+        @test occursin("端数は切り捨てて計算する", src)
+        @test !occursin("端数は切り上げて計算する", src)
+        # 別表2's on-demand formula. Specific fragments only: an earlier version
+        # of this line fell back to `occursin("300", src)`, which the document
+        # satisfies in half a dozen unrelated places — a check that cannot fail
+        # is not a check. The formula wraps mid-token in the text layer, so the
+        # floor is matched as two pieces rather than as one string.
+        @test occursin("max(実際", src)
+        @test occursin("，300)", src)
+        @test occursin("0.7×max", src)
+        @test occursin("0.1×指定した実行時間", src)
+        @test occursin("÷3600", src)
+        # ...and the negative control for the above: a weight the formula does
+        # NOT use must not be found in that position.
+        @test !occursin("0.9×max", src)
     end
 
     @testset "the rounding rule is truncation at 1/10000" begin

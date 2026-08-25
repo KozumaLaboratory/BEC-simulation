@@ -26,8 +26,12 @@ include("io/vtk_export.jl")
 include("io/measurement_provenance.jl")  # provenance stamp + refusal for measurement outputs
 include("io/run_summary.jl")
 include("io/html_report.jl")
-include("io/budget.jl")
+# host_budget BEFORE budget: `check_run_fits` in budget.jl annotates a kwarg with
+# `::HostBudget`, and a type annotation is resolved when the method is defined,
+# not when it is called. The reverse order loads and then dies on that line.
+# host_budget.jl depends on Base alone, so it can always go first.
 include("io/host_budget.jl")
+include("io/budget.jl")
 include("io/catalog.jl")
 include("io/catalog_index.jl")
 include("io/gs_library.jl")
