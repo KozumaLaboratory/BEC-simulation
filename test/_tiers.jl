@@ -41,6 +41,9 @@ const FAST_TESTS = [
     # the gate that keeps `Sys.CPU_THREADS` (the MACHINE's core count, wrong by
     # 24× inside a TSUBAME allotment) out of every site but its declaration.
     "test_host_budget.jl",
+    # The TSUBAME billing transcription, held to internal consistency. Cheap, and
+    # it already caught a worked example written with the wrong rounding rule.
+    "test_tsubame_point_cost.jl",
     # A job script may not report success for a stage that failed. `set +e` in
     # `tsubame_setup.sh` went unrestored for twelve days and covered two
     # failures with GREENs; the property is EXECUTED here, because grepping for
