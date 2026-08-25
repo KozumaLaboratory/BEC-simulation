@@ -1521,6 +1521,50 @@ stored under that name. The store is trustworthy for re-analysis and the committ
 not, which is the opposite of the intuition."""
 
 [[claim]]
+id = "node-hours-per-claim-is-forward-only"
+claim = "The metric #478 asked to be defined - node hours per claim advanced - is computable FORWARD and not backward. Denominator: 79 claims advanced over 2026-08-20..26, counted as ledger rows entering an evidence-bearing status, on first-parent history. Numerator: the writer works but nothing aggregates it and the store predates it - 11 of the 11 `_exit_summary.json` files on this host carry a numeric `runtime_seconds` (1.20 h total, all `completed = true`), spread over four roots, and NONE is under `runs/`, where 0 of 240 directories has one because every directory there carrying a live-status path predates `0d640402` (2026-05-28). The autopilot counter received none of it: `runs/budget.toml` reads `realized_total = 0.0`, `today = 2026-06-14`."
+status = "live"
+lifecycle = "registered"
+ladder = "exact: counts over the whole corpus in both halves, not a limit. Denominator control: the transition counter is checked against a planted history (a row appearing `open`, moving to `live`, then to `refuted`, then removed) and against an unchanged snapshot, before it is allowed to walk the real ledger. Numerator control: the 11 files that DO carry a value are the positive control that the writer fires and that the search could see one - the first pass scanned `runs/` only, found 0, and would have concluded that nothing records wall time; the control is what a host-wide search supplied."
+type = "A"
+scope = "Wall-time artifacts anywhere under /home/suzume/workspace on 2026-08-26 (four roots: tsubame_pull, BEC-simulation-campaign/runs, runs_archive, one worktree), the 240 run directories under the main checkout's `runs/`, and the 41 commits touching `docs/campaign/claims.toml` (19 on first-parent). About RECORDABILITY, not about efficiency: it says over which period the ratio can be computed, not that compute was well or badly spent. TSUBAME-side files not pulled back are outside it."
+uncertainty = "The denominator is exact given its own definition, and the definition is the soft edge: `advanced` = entering `live`/`scoped`/`refuted`/`superseded`/`closed` either new or from `open`/`suggested`, excluding restatements within the advanced set. The numerator is exact where it exists (11 of 11 files carry a value) and `unbounded: not recorded` for everything before 2026-05-28, which must not be read as small - it is absent. 1.20 h is a floor on this host, not a total: files never rsynced off the cluster are not counted, and `qacct` is authoritative for the UGE half and lives outside the tree."
+uncertainty_basis = "control"
+evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl", "src/workflow/autopilot/budget.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """THE MEASUREMENT TRAP ON THE DENOMINATOR, WHICH IS THE REASON THIS IS A ROW AND NOT A SENTENCE.
+Counting off `git log -- claims.toml` inflates it by 43 %: the full walk sees both sides of every
+merge, so a row appears on a branch, vanishes at the next mainline commit and returns. It reports 113
+advances, 33 removals and 3 regressions where the mainline has 79, 0 and 0 - and the 33 phantom
+removals are the tell, because a ledger nobody deleted from cannot lose 33 rows. `--first-parent` is
+the fix. The per-row `commit` field is not an alternative route: it is `"unknown"` on 28 of 85 rows.
+
+AND ONE ON THE NUMERATOR, WHICH THIS ROW MADE AND CAUGHT BEFORE MERGING. The first version said "no
+artifact in the tree records wall time" on the strength of 0 `_exit_summary.json` under `runs/`, and
+explained it with a mechanism - "written only on the autopilot path" - that is not what the code does:
+`run_yaml` passes `live_status_path` at run_registry.jl:663 and :923, so every `run_yaml` run should
+write one. The contradiction was visible in the same scan and was not looked at: 194 `_live_status.json`
+in `runs/` beside 0 exit summaries. A host-wide search found 11 exit summaries in four OTHER roots,
+all with numeric values. The real mechanism is vintage - `_write_exit_summary` landed in `0d640402`
+(2026-05-28) and the store's live-status files are all 2026-05-13..27 - so the store predates the
+writer and the runs that do carry it were never aggregated with anything. `store_census` scans `runs/`
+by design, so it cannot see this; the lesson is the one #482 already paid for, one root over instead of
+one corpus over: say which directory a count is a count of, and when the answer is "nowhere", check
+that "nowhere" was the search.
+
+WHAT THIS DOES NOT SAY. #478's decomposition found no recoverable cache waste, and an earlier reading
+took that to mean this metric has no subject. That inference is wrong - the subject is not duplicate
+submission. CLAUDE.md's own worked example (24 x 45-point GPU scans, every premise published and
+wrong) is roughly 3 h of node time against zero claims advanced, which is exactly what the ratio
+measures. The reason not to adopt it retrospectively is that there is nothing to divide over the
+period the store covers. Forward it is cheap, and the missing piece is not a stamp - the stamp exists -
+but an aggregator across roots and `refresh_budget!` actually being fed."""
+
+[[claim]]
 id = "seed-up-step-count-win-unmeasured-at-production-scale"
 quantity = "endpoint iteration-count ratio, seeded polish vs from-scratch"
 window = "the cells in which BOTH arms converged — tol 1e-5 and 1e-6 at c0 = 40/200/4000, two cold starts. Cells where either arm ended `floor_limited` are excluded and named, because a run chasing a tolerance below its own energy-comparison floor measures the floor and not the seed."
