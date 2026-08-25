@@ -46,7 +46,7 @@ export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
     CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, CLAIM_RETRACTION_PREMISE_ESCAPE,
     CLAIM_REDUCTION_NAMES, CLAIM_BOUNDARY_RULES,
-    CLAIM_LIFECYCLE_STATES, CLAIM_LADDER_EXACT_ESCAPE,
+    CLAIM_LIFECYCLE_STATES, CLAIM_LADDER_EXACT_ESCAPE, claim_anchor_source,
     claim_ledger_link_errors, claim_by_id,
     retraction_is_grounded, retraction_is_self_grounded,
     ledger_section_coverage,
@@ -166,6 +166,7 @@ struct LedgerClaim
     ladder::Union{Nothing, String}
     discriminators::Vector{String}
     blinding::Union{Nothing, String}
+    anchors::Vector{String}
 end
 
 """
@@ -220,6 +221,20 @@ sum rule, a closed form that IS the limit. Says "there is nothing to converge"
 rather than leaving the field blank, which would read as "nobody looked".
 """
 const CLAIM_LADDER_EXACT_ESCAPE = "exact:"
+
+"""
+    claim_anchor_source(anchor) -> Symbol
+
+The `refs/<source>.toml` an anchor names. `"matsui2025"` and
+`"matsui2025:dip_width_exp_scanwindow_nT"` both resolve to `:matsui2025`.
+
+ANCHORS POINT AT THE ARBITRATION LAYER, not at a bibliography. `src/model/ref.jl`
+re-measures a published target off a committed fixture with the same metric we
+apply to our own runs, and derives `arbitrates` rather than letting anyone set
+it. A citation that is only a `.bib` entry or a PDF in `docs/refs/` cannot decide
+a comparison, so it is not an anchor.
+"""
+claim_anchor_source(anchor::AbstractString) = Symbol(first(split(anchor, ':')))
 
 """
     CLAIM_BOUNDARY_RULES
@@ -453,6 +468,36 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                     "quote in a talk."),
             )
         end
+        # A TYPE-C CLAIM THAT MAY BE QUOTED MUST NAME WHAT ARBITRATES IT.
+        # `refs/<source>.toml` is the only layer in this tree that can decide a
+        # comparison: it re-measures the published target off a committed fixture
+        # with the metric we apply to our own runs, and DERIVES `arbitrates`
+        # instead of letting anyone assert it. A .bib entry or a PDF under
+        # `docs/refs/` cannot do that, so neither is an anchor.
+        anchors = _strvec(r, "anchors", id, path)
+        for a in anchors
+            src = claim_anchor_source(a)
+            # `ref_source_path` is the ONE definition of where a source lives
+            # (`src/model/ref.jl`). Recomputing it from the ledger's own path was
+            # the first attempt and it resolved relative to whatever file was being
+            # parsed, so a temp-file probe looked for `/tmp/refs/` — a second
+            # declaration of a path, wrong within the hour.
+            isfile(ref_source_path(src)) || throw(
+                ArgumentError(
+                    "$path claim `$id` anchors on `$a`, but `refs/$(src).toml` " *
+                    "does not exist. Register the source before leaning on it — " *
+                    "an unregistered paper cannot arbitrate anything."),
+            )
+        end
+        if typ == "C" && lifecycle in ("registered", "published") && isempty(anchors)
+            throw(
+                ArgumentError(
+                    "$path claim `$id` is a type-C claim at `$lifecycle` with no " *
+                    "`anchors`. Model fidelity is a comparison; name the " *
+                    "`refs/<source>.toml` it is compared against, or leave it " *
+                    "`candidate`."),
+            )
+        end
         if lifecycle == "published" && blinding === nothing
             throw(
                 ArgumentError(
@@ -502,7 +547,8 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                 _strvec(r, "replacement_literal", id, path),
                 _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note"),
                 retr_ev, _opt(r, "window"), _opt(r, "reduction"),
-                _opt(r, "boundary"), lifecycle, ladder, discriminators, blinding),
+                _opt(r, "boundary"), lifecycle, ladder, discriminators, blinding,
+                anchors),
         )
     end
     isempty(out) && throw(ArgumentError("$path declares no claims"))

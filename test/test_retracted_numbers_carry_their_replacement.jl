@@ -93,6 +93,83 @@ end
     end
 end
 
+@testset "type-C coverage: what arbitrates, and what nothing arbitrates" begin
+    # THE ARBITRATION LAYER IS `refs/<source>.toml`, and it is the only thing in
+    # this tree that can decide a comparison: `src/model/ref.jl` re-measures the
+    # published target off a committed fixture with the metric we apply to our own
+    # runs, and DERIVES `arbitrates` rather than letting anyone assert it. A .bib
+    # entry or a PDF under `docs/refs/` cannot do that.
+    #
+    # This arm reports the coverage rather than demanding it. A ratchet on a
+    # registry with two entries would be a gate on how much reading has been done,
+    # which is not a defect a test can fix — but an UNNAMED hole is, and the
+    # numbers below are printed so the hole cannot be invisible.
+    claims = claim_ledger()
+    refsdir = joinpath(_REPO, "refs")
+    registered = sort([splitext(f)[1] for f in readdir(refsdir) if endswith(f, ".toml")])
+    @test !isempty(registered)
+    println("  arbitration layer (refs/*.toml): ", join(registered, ", "))
+
+    tc = [c for c in claims if c.type == "C"]
+    @test !isempty(tc)
+    anchored = [c for c in tc if !isempty(c.anchors)]
+    println("  type-C claims: ", length(tc), ", anchored: ", length(anchored))
+    for c in tc
+        isempty(c.anchors) && println("    NO ANCHOR  ", c.id, "  [", c.status, "]")
+    end
+
+    # Every anchor that IS declared must resolve. The parser enforces this; the
+    # assertion here makes the count visible in the report.
+    for c in claims, a in c.anchors
+        @test isfile(joinpath(refsdir, String(claim_anchor_source(a)) * ".toml"))
+    end
+
+    mktempdir() do d
+        row(extra; ty="C", es="in_tree") = """
+        schema_version = 1
+        [[claim]]
+        id = "x"
+        claim = "c"
+        status = "live"
+        type = "$ty"
+        scope = "s"
+        uncertainty = "unbounded: probe"
+        uncertainty_basis = "none"
+        evidence = []
+        evidence_status = "$es"
+        commit = "unknown"
+        doc = "CLAUDE.md"
+        section = "1"
+        pr = 1
+        $extra
+        """
+        w(n, e; kw...) = (p=joinpath(d, n * ".toml"); write(p, row(e; kw...)); p)
+
+        # An anchor naming a source with no refs/ file is refused — leaning on an
+        # unregistered paper is the shape that cannot arbitrate anything.
+        @test_throws ArgumentError claim_ledger(
+            path=w("ghost", "anchors = [\"nosuchpaper2099\"]"))
+        # A registered one passes, and the quantity suffix is accepted.
+        @test length(
+            claim_ledger(path=w("ok",
+                "anchors = [\"matsui2025:dip_width_exp_scanwindow_nT\"]")),
+        ) == 1
+        # type-C may not be `registered` with nothing arbitrating it…
+        @test_throws ArgumentError claim_ledger(
+            path=w("tc_unanchored",
+                "lifecycle = \"registered\"\nladder = \"exact: probe\""),
+        )
+        # …and type-B at the same lifecycle is untouched, or the rule has become a
+        # tax on every claim rather than on the one kind that is a comparison.
+        @test length(
+            claim_ledger(
+                path=w("tb_ok",
+                    "lifecycle = \"registered\"\nladder = \"exact: probe\""; ty="B"),
+            ),
+        ) == 1
+    end
+end
+
 @testset "the lifecycle gates at the moment a claim becomes words, not before" begin
     # THE FIRST STATE IS UNGATED AND THAT IS THE DESIGN. Every other rule in this
     # file binds a row already in the ledger; none reaches the stage where a

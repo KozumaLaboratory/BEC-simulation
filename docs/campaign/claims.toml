@@ -1829,7 +1829,11 @@ note = "The deficiency is LOCATED, not merely asserted: the K₃ loss law itself
 id = "eu-evap-eta-start-is-2p07"
 claim = "The shipped euv3 defaults start evaporation at η = U/(k_BT₀) = 2.07, BELOW the η ≈ 4 floor at which evaporation can start, and re-anchoring T₀ does not lift it — both self-consistent epoch choices land at ≈ 2."
 status = "live"
-lifecycle = "registered"
+# lifecycle stays `candidate`: this is type C and `refs/miyazawa2021.toml` does not
+# exist, so nothing in this tree can arbitrate it. The promotion was caught by the
+# `anchors` rule within the hour that rule landed, which is the rule working. The
+# ladder below is kept because it is correct and is what the row needs on the day
+# the source is registered.
 ladder = """exact: eta = U/(k_B T_0) evaluated on the shipped euv3 defaults; a value read off a configuration, not a converged result. Control: both self-consistent epoch choices land at ~2, so the number does not depend on which one is taken."""
 type = "C"
 quantity = "eta_start on the shipped euv3 defaults"
