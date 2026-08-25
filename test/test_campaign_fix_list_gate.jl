@@ -112,6 +112,31 @@ const _NOT_A_CORRECTION = Dict(
         "the autopilot subsystem commit that introduced `_write_exit_summary` " *
         "(2026-05-28); cited as the vintage boundary of the wall-time stamp, " *
         "not as a correction -- runs predating it are fine, just untimed",
+    # docs/campaign/prior_art/order_by_disorder.md — branch tips, cited to say
+    # WHAT EACH BRANCH CARRIES so the disposition can be checked rather than
+    # taken on trust. A prior-art record's whole job is to name unmerged work;
+    # requiring main to descend from what it names would make the record
+    # unwritable. The one that mattered is `de816075` / `34db34b7`: a zero LHY
+    # gradient would have made the F=6 measurement an artefact, so the row states
+    # the SHAs and the row states that both fixes ARE in main under different
+    # SHAs. That check is the reason the tokens are there.
+    "bff0c3af" =>
+        "tip of origin/claude/spinor-lhy-correction-OXkxG; cited in the " *
+        "prior-art record to identify a stale branch, not as a fix",
+    "e2677a0b" =>
+        "the spinor-LHY commit that opens that same stale branch; landed in " *
+        "main long ago, named for provenance of the branch's content",
+    "de816075" =>
+        "'LBFGS gradient was exactly zero for every tabulated LHY' on " *
+        "origin/feat/lhy-block-wiring-spatial; named because the F=6 " *
+        "order-by-disorder measurement would be an artefact if it were NOT in " *
+        "main -- and it is, under a different SHA",
+    "34db34b7" =>
+        "'SpatialLHY gradient was missing its polarisation piece' on the same " *
+        "branch; same role, same answer",
+    "f8538695" =>
+        "tip of origin/test/gpu-bdg-instrument-parity-400, a GPU device gate; " *
+        "cited as prior art that becomes relevant only on a device",
 )
 
 @testset "campaign fix list — parses, and every ref is real" begin

@@ -414,6 +414,228 @@ const _HOLD_FRAMES = 11      # floor(5.5292 / (0.005 * 100))
         end
     end
 
+    @testset "hold_window_frames: one statement of a silent derivation" begin
+        # The three drivers each had a copy of `floor(hold / (dt * save_every))`.
+        # lt64_ens_*.yaml: duration 100.0, dt 0.005, save.every 1000.
+        @test hold_window_frames(100.0; dt=0.005, save_every=1000) == 20
+        # The 8 ms EdH arms: 5.5292 / (0.005 * 100) = 11.06 -> 11, the number
+        # §12.1 states independently.
+        @test hold_window_frames(5.5292; dt=0.005, save_every=100) == 11
+        # THE HISTORICAL WRONG CONSTANT, kept as a probe: `save_every = 100` on
+        # the lt64 suite asks for 200 frames of a 20-frame array. The derivation
+        # itself cannot know that — which is why the refusal lives in the window.
+        @test hold_window_frames(100.0; dt=0.005, save_every=100) == 200
+        @test_throws ArgumentError hold_window_frames(0.0; dt=0.005, save_every=1000)
+        @test_throws ArgumentError hold_window_frames(100.0; dt=0.0, save_every=1000)
+    end
+
+    @testset "an over-long :last window is refused per arm, not clamped" begin
+        # THE DEFECT `lt64_endpoint_verdict.jl` RECORDS HAVING SHIPPED. A hold
+        # window longer than the array used to clamp to the whole trajectory and
+        # report the pre-hold transient as the hold peak, silently. `:range` next
+        # to it refused; `:last` did not.
+        mktempdir() do root
+            full = joinpath(root, "arm_full")
+            short = joinpath(root, "arm_short")
+            adj = _padj_series()
+            _write_point(full, "point_001.jld2", adj)          # 42 frames
+            _write_point(short, "point_001.jld2", adj[1:8])    # a truncated arm
+            obs = ObservableDefinition("peak P_adj in hold"; window=:last,
+                window_frames=_HOLD_FRAMES, reduction=:max, boundary="accept")
+            ra = reanalyze(_padj_reader, [full, short]; observable=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+
+            @test ra.values["arm_full"] !== nothing
+            @test ra.values["arm_short"] === nothing
+            @test occursin("does not fit", ra.failures["arm_short"])
+            # POSITIVE CONTROL FOR THE REFUSAL. The clamped window would have
+            # returned a number, and a plausible one: the maximum of the 8 frames
+            # it does have. The point of the refusal is that this value is not
+            # the declared observable, so it must not appear.
+            @test maximum(adj[1:8]) > 0
+            @test !(maximum(adj[1:8]) in [v for v in values(ra.values) if v !== nothing])
+            # ...and one short arm must not silence the arm beside it, or the
+            # rule is the too-strict kind that gets switched off.
+            @test length(ra.sources) == 2
+            @test ra.vintage.n_points == 2
+        end
+    end
+
+    @testset "a read where NOTHING reduced throws instead of returning blanks" begin
+        mktempdir() do root
+            short = joinpath(root, "arm_short")
+            _write_point(short, "point_001.jld2", _padj_series()[1:8])
+            obs = ObservableDefinition("peak P_adj in hold"; window=:last,
+                window_frames=_HOLD_FRAMES, reduction=:max, boundary="accept")
+            @test_throws ArgumentError reanalyze(_padj_reader, [short];
+                observable=obs, declare=SpinorBEC.REANALYSIS_DECLARATION,
+                verbose=false)
+        end
+    end
+
+    @testset "an arm directory with no point file is named, not dropped" begin
+        mktempdir() do root
+            good = joinpath(root, "arm_good")
+            dead = joinpath(root, "arm_dead")
+            _write_point(good, "point_001.jld2", _padj_series())
+            mkpath(dead)
+            obs = ObservableDefinition("peak"; window=:all, reduction=:max,
+                boundary="accept")
+            ra = reanalyze(_padj_reader, [good, dead]; observable=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+            @test haskey(ra.values, "arm_dead")
+            @test ra.values["arm_dead"] === nothing
+            @test occursin("no stored point file", ra.failures["arm_dead"])
+            @test ra.vintage.n_points == 1          # it was not READ
+            @test ra.paths["arm_good"] == joinpath(good, "point_001.jld2")
+            @test !haskey(ra.paths, "arm_dead")
+        end
+    end
+
+    @testset "a String from the extractor is a named failure, not a value" begin
+        mktempdir() do root
+            good = joinpath(root, "arm_good")
+            bad = joinpath(root, "arm_bad")
+            _write_point(good, "point_001.jld2", _padj_series())
+            _write_point(bad, "point_001.jld2", _padj_series())
+            reader =
+                p -> if occursin("arm_bad", p)
+                    "cadence mismatch: 42 population rows vs 43 frames"
+                else
+                    _padj_reader(p)
+                end
+            obs = ObservableDefinition("peak"; window=:all, reduction=:max,
+                boundary="accept")
+            ra = reanalyze(reader, [good, bad]; observable=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+            @test ra.values["arm_bad"] === nothing
+            @test occursin("cadence mismatch", ra.failures["arm_bad"])
+            @test occursin("cadence mismatch",
+                reanalysis_record(ra)["failures"]["arm_bad"])
+        end
+    end
+
+    @testset "several observables come off ONE read of each file" begin
+        # The property that decides whether a driver taking nine numbers per pass
+        # can be migrated at all: the file is opened once, not once per number.
+        mktempdir() do root
+            a = joinpath(root, "arm_a")
+            b = joinpath(root, "arm_b")
+            _write_point(a, "point_001.jld2", _padj_series())
+            _write_point(b, "point_001.jld2", reverse(_padj_series()))
+            reads = Ref(0)
+            reader = function (p)
+                reads[] += 1
+                s = _padj_reader(p)
+                Dict("P_adj" => s, "P_sq" => s .^ 2)
+            end
+            obs = ObservableDefinition[
+                ObservableDefinition("peak P_adj in hold"; series="P_adj",
+                    window=:last, window_frames=_HOLD_FRAMES, reduction=:max,
+                    boundary="accept"),
+                ObservableDefinition("final P_adj"; series="P_adj", window=:all,
+                    reduction=:final, boundary="n/a"),
+                ObservableDefinition("mean P_adj squared"; series="P_sq",
+                    window=:all, reduction=:mean, boundary="n/a"),
+            ]
+            m = reanalyze(reader, [a, b]; observables=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+
+            @test reads[] == 2                   # 3 observables × 2 arms, 2 reads
+            @test length(m) == 3
+            @test keys(m) == [o.name for o in obs]
+            @test m.vintage.n_points == 2
+
+            # DIFFERENTIAL: identical to three separate single-observable calls.
+            # A grouped pass that quietly reduced something else would be the
+            # worst outcome here — plausible numbers nobody can tie back.
+            for o in obs
+                single = reanalyze(reader, [a, b]; observable=o,
+                    declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+                @test m[o.name].values == single.values
+                @test m[o.name].windows == single.windows
+                @test m[o.name].readings == single.readings
+            end
+
+            rec = reanalysis_record(m)
+            @test rec["observable_order"] == [o.name for o in obs]
+            @test rec["observables"]["peak P_adj in hold"]["reduction"] == "max"
+            @test rec["observables"]["mean P_adj squared"]["series"] == "P_sq"
+            @test rec["admissible"] === false
+            @test rec["sources_by_label"]["arm_a"] == joinpath("arm_a", "point_001.jld2")
+            @test JSON.parse(JSON.json(rec))["observables"]["final P_adj"]["boundary"] ==
+                "n/a"
+        end
+    end
+
+    @testset "a grouped pass must say which series each observable reduces" begin
+        mktempdir() do root
+            dir = joinpath(root, "arm")
+            _write_point(dir, "point_001.jld2", _padj_series())
+            reader = p -> Dict("P_adj" => _padj_reader(p))
+            named = ObservableDefinition("peak"; series="P_adj", window=:all,
+                reduction=:max, boundary="accept")
+            unnamed = ObservableDefinition("peak unnamed"; window=:all,
+                reduction=:max, boundary="accept")
+            typo = ObservableDefinition("peak typo"; series="Padj", window=:all,
+                reduction=:max, boundary="accept")
+            call(os) = reanalyze(reader, [dir]; observables=os,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+
+            @test call([named])[named.name].values["arm"] !== nothing
+            # No `series =` at all: which of the extracted series is this?
+            @test_throws ArgumentError call([named, unnamed])
+            # A key the extractor did not return must NOT read as a missing block.
+            @test_throws ArgumentError call([named, typo])
+            # Two observables under one name would collide in `results`.
+            @test_throws ArgumentError call([named, named])
+            # Exactly one of the two forms.
+            @test_throws ArgumentError reanalyze(reader, [dir];
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+            @test_throws ArgumentError reanalyze(reader, [dir]; observable=named,
+                observables=[named], declare=SpinorBEC.REANALYSIS_DECLARATION,
+                verbose=false)
+        end
+    end
+
+    @testset "one absent series is missing for that observable alone" begin
+        # `klaus_weff_cloud_size.jl`'s real case: snapshots saved, populations
+        # not. The cloud sizes must still come back.
+        mktempdir() do root
+            dir = joinpath(root, "arm")
+            _write_point(dir, "point_001.jld2", _padj_series())
+            reader = p -> Dict("r" => _padj_reader(p), "P_adj" => nothing)
+            obs = ObservableDefinition[
+                ObservableDefinition("r at end"; series="r", window=:all,
+                    reduction=:final, boundary="n/a"),
+                ObservableDefinition("peak P_adj"; series="P_adj", window=:all,
+                    reduction=:max, boundary="accept"),
+            ]
+            m = reanalyze(reader, [dir]; observables=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+            @test m["r at end"].values["arm"] !== nothing
+            @test m["peak P_adj"].values["arm"] === nothing
+            @test !haskey(m["peak P_adj"].failures, "arm")   # absent, not failed
+        end
+    end
+
+    @testset "an explicit stored FILE is a legal target" begin
+        # Not every stored artifact is a `point_*.jld2`: `klaus2022_reanalyse.jl`
+        # reads `*_frames.jld2`, and a reader restricted to one filename would
+        # have sent it back to opening the file itself.
+        mktempdir() do root
+            p = _write_point(root, "stripes_frames.jld2", _padj_series(); stamp=false)
+            obs = ObservableDefinition("peak"; window=:all, reduction=:max,
+                boundary="accept")
+            ra = reanalyze(_padj_reader, [p]; observable=obs,
+                declare=SpinorBEC.REANALYSIS_DECLARATION, verbose=false)
+            @test ra.values["stripes_frames.jld2"] == maximum(_padj_series())
+            # An unstamped file says so; it does not pass as clean.
+            @test ra.vintage.n_unstamped == 1
+            @test any(r -> occursin("unstamped", r), ra.inadmissible_because)
+        end
+    end
+
     @testset "the record is machine-readable and says it is not evidence" begin
         mktempdir() do root
             dir = joinpath(root, "arm")

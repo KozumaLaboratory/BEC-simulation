@@ -1143,7 +1143,7 @@ note = "Superseded the next day: there is no structure to explain. The mechanism
 
 [[claim]]
 id = "f6-uniform-gs-degenerates-the-whole-manifold"
-claim = "At uniform g_S the sigma_S sum rule degenerates the ENTIRE spinor manifold, not four phases: Sum_{S even} sigma_S(zeta) = 1 for any normalised zeta, so eps_MF = g/2 everywhere on CP^12. The degeneracy is continuous, which is what order-by-disorder requires."
+claim = "At uniform g_S the sigma_S sum rule degenerates the ENTIRE spinor manifold, not four phases: Sum_{S even} sigma_S(zeta) = 1 for any normalised zeta, so eps_MF = g/2 everywhere on CP^12. The degeneracy is continuous."
 status = "live"
 lifecycle = "registered"
 ladder = """exact: an algebraic identity in the symmetric two-body subspace — there is no cutoff axis to walk. Control: the 50x50 (g_10, g_12) scan returns eps_MF = 1/2 for all four candidate spinors at the scalar point, and `_f6_pd_sigma_S` reproduces each fingerprint."""
@@ -1169,7 +1169,54 @@ WHAT IT DOES NOT SAY. Uniform g_S is a reference point, not Eu. The physical g_S
 six of the seven even channels have never been measured, so the SIZE of any residual continuous
 degeneracy at the physical point is an a_S-dependent question (layer ii). What IS a_S-free is the
 stretched sector: the fully polarized cloud and its first magnon are pure S = 2F
-(`test/oracles/test_stretched_channel_invariance.jl`), which is why #455 is scoped to the FM branch."""
+(`test/oracles/test_stretched_channel_invariance.jl`), which is why #455 is scoped to the FM branch.
+
+AMENDED 2026-08-26. This claim ended `"The degeneracy is continuous, which is what order-by-disorder
+requires."` and that trailing clause has been REMOVED, not softened: the identity makes the
+interaction (g/2)(psi-dagger psi)^2, which is invariant under all of U(2F+1), so the manifold is a
+SYMMETRY ORBIT and fluctuations — respecting the same symmetry — cannot select within it. Measured,
+TSUBAME 8498064. The clause is superseded by `f6-uniform-gs-is-a-u2f1-orbit-so-nothing-selects`; the
+identity above is untouched and remains exact. Amended in place rather than filed as a `refuted` row
+because what was retired is a clause of prose, not a quotable number, so there is no literal for the
+retracted-number gates to hunt."""
+
+[[claim]]
+id = "f6-uniform-gs-is-a-u2f1-orbit-so-nothing-selects"
+claim = "The uniform-g_S degenerate manifold is a U(2F+1) SYMMETRY ORBIT, not an accidental degeneracy, so fluctuations cannot select within it and the would-be Goldstones acquire no gap. Sum_{S even} sigma_S = 1 makes the interaction (g/2)(psi-dagger psi)^2, which is invariant under any unitary rotation of the 2F+1 components; kinetic and trap are spin-blind. Measured at F=6: eps_LHY = 4.323347e-01 at polar, FM, cyclic, I_h and a random spinor alike (`:full_bdg`, one table per spinor), and dim(null) = 12 = the whole CP^12 tangent at every one of them, with LHY on and off."
+status = "live"
+lifecycle = "registered"
+ladder = """control: the constancy arm is worth exactly what its negative control is worth, so the same probe was run with a g_S spread (c1 = 0.1), where eps_LHY moves over 3.44 ... 19.6 across the same five spinors — a factor 5.7 against the 1e-7 relative spread of the uniform arm. Uniform box, exactly stationary by construction, no solver in the loop."""
+type = "B"
+scope = "Uniform g_S only, and that is the whole point: it is the REFERENCE point, not Eu. Says nothing about the physical (non-uniform) g_S, where a residual degeneracy would be accidental and is an a_S-dependent question (layer ii). Measured at F=6 and F=1 in a 1D periodic box at n0 = 1; the argument is algebraic and carries no grid, seed or duration."
+uncertainty = "eps_LHY across five spinors on the orbit: 4.323347e-01 to 4.323348e-01, i.e. 2e-7 relative, which is the LHY table's own numerics and not a physical spread. Against it the negative control moves by 5.7x. The symmetry statement itself is exact."
+uncertainty_basis = "control"
+evidence = ["test/oracles/test_trapped_bdg_frequencies.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/design/trapped_spinor_bdg_spectrum.md"
+section = "6"
+pr = 0
+note = """Supersedes the trailing clause of `f6-uniform-gs-degenerates-the-whole-manifold` (amended in
+place, see its note). The identity that row states is exact and untouched; what is wrong is reading a
+continuous degeneracy as sufficient for order-by-disorder. It is not — the degeneracy also has to be
+ACCIDENTAL, i.e. not related by a symmetry of the Hamiltonian, and Sum_S sigma_S = 1 is precisely the
+statement that at uniform g_S it IS a symmetry.
+
+WHAT THIS COSTS #455. Its observable — a pseudo-Goldstone gap opened by LHY on the uniform-g_S
+manifold — is exactly zero, and no amount of grid or nev reaches it. The programme has to move to the
+physical g_S, where the mean-field minimum set is generically isolated points and fluctuation
+selection appears as an ENERGY DIFFERENCE between them rather than as a gap. That is the binary
+verdict #455 was written to improve on, so this is a real subtraction, not a re-scoping.
+
+WHAT IT DOES NOT REFUTE. Turner-Barnett-Demler-Vishwanath (PRL 98, 190404) is untouched: the spin-2
+nematic manifold they treat is degenerate for a reason that is NOT a symmetry of their Hamiltonian.
+The error here was importing their structure through an identity that supplies the degeneracy and the
+symmetry together.
+
+A SECOND READING THAT WOULD ALSO BE WRONG: "then the excess over `bdg_expected_zero_modes` detects
+nothing". It detects flat directions beyond the LISTED generators, which is a real and useful thing;
+it simply cannot tell a symmetry outside the list from an accidental degeneracy. At F=6 uniform g_S
+the excess is 8-11 and every one of them is U(13)."""
 
 [[claim]]
 id = "ddi-cdd-f-squared-voids-pre-april-ddi"
@@ -1577,6 +1624,14 @@ does NOT reach them: only the EdH response number failed to reproduce."""
 doc = "docs/theory/lhy_scheme_selection_eu_f6.md"
 covered = 6
 note = "18 sections. The second document poured; the decision + the ambiguity + criteria B/C/D."
+
+[[coverage]]
+doc = "docs/design/trapped_spinor_bdg_spectrum.md"
+covered = 1
+note = """8 sections. Poured 2026-08-26 by `f6-uniform-gs-is-a-u2f1-orbit-so-nothing-selects`, which
+lands in §6 (KNOWN-LIMITs) alongside the aliasing limit from the same day. Pinned at the DERIVED
+number, not a guess: `ledger_section_coverage` reports 1/8 here. Uncovered: 1, 2, 3, 4, 4.1, 5, 7 —
+the design decisions and the acceptance table, none of which is a physics claim yet."""
 
 [[coverage]]
 doc = "docs/guides/eu_kappa_hysteresis_loop.md"

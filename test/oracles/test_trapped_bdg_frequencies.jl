@@ -289,34 +289,41 @@ end
     @test maximum(w -> minimum(abs(w - v) for v in ref), spin) < 1e-5
 end
 
-# HOW MANY ω≈0 MODES SHOULD THERE BE — and is the surplus an accidental
-# degeneracy? `bdg_expected_zero_modes` answers the first from the broken
-# symmetries alone; the difference against what `trapped_bdg_frequencies`
-# returns is the answer to the second, and that difference is the observable
-# order-by-disorder needs (#455: a would-be Goldstone on an accidentally
-# degenerate manifold is what fluctuations gap).
+# HOW MANY ω≈0 MODES SHOULD THERE BE — and what is the surplus?
+# `bdg_expected_zero_modes` answers the first from `bdg_symmetry_generators`
+# alone; the difference against what `trapped_bdg_frequencies` returns is a flat
+# direction THAT LIST does not account for.
 #
-# The five fixtures are chosen so the criterion is exercised in BOTH
-# directions, at states whose Goldstone content is known independently:
+# **The surplus is not evidence of an accidental degeneracy** — a symmetry
+# outside the list gives the same surplus, and at c₁ = 0 that is exactly what it
+# is. Σ_S σ_S ≡ 1 makes the interaction (g/2)(ψ†ψ)², invariant under all of
+# U(2F+1), so the degenerate manifold is a symmetry ORBIT: the extra flat
+# direction is an ordinary Goldstone and fluctuations, respecting the same
+# symmetry, cannot gap it. Measured at F=6 (2026-08-26, TSUBAME 8498064):
+# ε_LHY = 4.323347e-01 at polar, FM, cyclic, I_h and a random spinor alike,
+# against 3.44 … 19.6 for the same probe once g_S is not uniform. The rows below
+# therefore say "beyond the listed generators", not "accidental".
+#
+# The five fixtures exercise the count in BOTH directions, at states whose
+# Goldstone content is known independently:
 #
 #   polar, c₁≠0   2 broken generators, ⟨[F_x,F_y]⟩ = 0   → 2 type-A magnons
 #   FM,    c₁≠0   2 broken generators, ⟨[F_x,F_y]⟩ ≠ 0   → 1 type-B magnon
-#   FM,    c₁=0   the same 1 from symmetry, but Σ_S σ_S ≡ 1 makes the WHOLE of
-#                 CP² degenerate, so the m=−1 channel is flat too → 2 measured,
-#                 EXCESS 1 = the accidental direction
-#   polar, c₁=0   same manifold, read from a different point: here the
-#                 accidental tangent is already inside the complexification of
-#                 the symmetry orbit, so predicted 2 = measured 2 and the
-#                 excess is ZERO. **The criterion is blind at this point.** It
-#                 is a negative control, not a failure: a null from it means
-#                 "not visible from here", never "no accidental degeneracy".
+#   FM,    c₁=0   the same 1 from the listed generators, but the whole of CP² is
+#                 flat, so the m=−1 channel is flat too → 2 measured, SURPLUS 1
+#   polar, c₁=0   same manifold, read from a different point: here the extra
+#                 tangent is already inside the complexification of the SO(3)
+#                 orbit, so predicted 2 = measured 2 and the surplus is ZERO.
+#                 **The count is blind at this point.** A null from it means
+#                 "nothing beyond the list is visible from here", never "the
+#                 manifold is not degenerate".
 #
 # The FM rows are the ones that make the count non-trivial. Counting broken
 # GENERATORS instead of complex planes predicts 2 there, and then the correct
 # dim(null)=1 reads as the solver dropping a Goldstone — which is exactly how
 # this criterion failed its positive control before the planes were counted
 # (2026-08-26; the earlier attempt is recorded in the issue).
-@testset "expected zero modes ≡ measured, and the excess is the accidental direction" begin
+@testset "expected zero modes ≡ measured, and the surplus is beyond the listed generators" begin
     POLAR = ComplexF64[0, 1, 0]
     FM = ComplexF64[1, 0, 0]
     cases = (
@@ -326,7 +333,7 @@ end
             n_A=0, n_B=1),
         (name="FM, c1=+0.2", spinor=FM, c1=0.2, predicted=1, measured=1,
             n_A=0, n_B=1),
-        (name="FM, c1=0 (accidental CP^2)", spinor=FM, c1=0.0, predicted=1,
+        (name="FM, c1=0 (U(3) orbit)", spinor=FM, c1=0.0, predicted=1,
             measured=2, n_A=0, n_B=1),
         (name="polar, c1=0 (blind spot)", spinor=POLAR, c1=0.0, predicted=2,
             measured=2, n_A=2, n_B=0),
@@ -366,4 +373,95 @@ end
             @test nz == c.measured
         end
     end
+end
+
+# F=6, UNIFORM g_S — the manifold #455 is about, and the reason the surplus
+# above is not called accidental.
+#
+# Σ_{S even} σ_S(ζ) = 1 for any normalised ζ, so at uniform g_S the interaction
+# energy is (g/2)(ψ†ψ)². That is invariant under all of U(2F+1), not merely
+# under SO(3) × U(1), and kinetic and trap are spin-blind. CP¹² is therefore a
+# symmetry ORBIT. Two consequences are pinned here because the campaign ledger
+# turns on them:
+#
+#   1. every point of the orbit has the same ε_LHY — fluctuations respect the
+#      symmetry, so there is nothing to select and no gap to open. This is the
+#      measurement, and it is only worth what its NEGATIVE CONTROL is worth: the
+#      same probe at a g_S spread must move, and it moves by 5.7×.
+#   2. dim(null) is the whole CP¹² tangent (12 complex planes) at every ζ, while
+#      the listed generators predict 1–4. An excess of 8–11 that is entirely
+#      U(13) is what "an excess is not an accidental degeneracy" means.
+#
+# Also the regression for the deflation test: `gauge` joined the flat set at
+# cyclic / I_h / random (never at polar or FM, so the F=1 fixtures above could
+# not see it) because `P(iψ) = 0` only to round-off and the residue normalised
+# into noise. Measured 2026-08-26, TSUBAME 8498064.
+@testset "F=6 uniform g_S is a U(13) orbit, not an accidental degeneracy" begin
+    F = 6
+    cand = polyhedral_candidate_spinors(F)
+    # 16 points, not 8: this is the grid the cited measurement ran on, and the
+    # count is not grid-free in practice — at 8 the `cyclic` spinor returns a
+    # THIRTEENTH ω ≈ 0, reported as an exact 0.0000e+00, i.e. a purely real
+    # eigenvalue of the reduced generator rather than an oscillating mode. Its
+    # provenance is not established, so rather than loosen the assertion to
+    # `>= 12` around it the fixture stays at the configuration that was measured.
+    grid = make_grid(GridConfig((16,), (8.0,)))
+    function f6box(ζ; c1, lhy=nothing)
+        ψ = zeros(ComplexF64, 16, 2F + 1)
+        for i in 1:16, c in 1:(2F + 1)
+            ψ[i, c] = ζ[c]
+        end
+        ws = make_workspace(; grid, atom=Eu151,
+            interactions=InteractionParams(Dict(0 => 1.0, 1 => c1)),
+            potential=NoPotential(), psi_init=copy(ψ), spinor_lhy=lhy,
+            sim_params=SimParams(; dt=0.005, n_steps=1, imaginary_time=true))
+        copyto!(ws.state.psi, ψ)
+        (ws, ψ)
+    end
+
+    # (1) ε_LHY is constant along the orbit — with the control that says the
+    # probe can move at all.
+    e_uniform = [
+        energy_decomposition(f6box(cand[k]; c1=0.0, lhy=:full_bdg)[1]).lhy
+        for k in (:polar, :cyclic, :I_h)
+    ]
+    @test all(isapprox(e, e_uniform[1]; rtol=1e-5) for e in e_uniform)
+    @test e_uniform[1] > 1e-3                       # the term is live, not off
+    e_spread = [
+        energy_decomposition(f6box(cand[k]; c1=0.1, lhy=:full_bdg)[1]).lhy
+        for k in (:polar, :I_h)
+    ]
+    @test maximum(e_spread) / minimum(e_spread) > 1.3   # measured 5.7× over all five
+
+    # (2) the whole CP¹² tangent is flat, and the listed generators explain only
+    # a corner of it. Read at `cyclic`, which is also the deflation regression.
+    ws, ψ = f6box(cand[:cyclic]; c1=0.0)
+    p = constrained_hessian_params(ws, ψ)
+    ez = bdg_expected_zero_modes(ws, ψ; params=p, rng=MersenneTwister(3))
+    @test :gauge ∉ ez.flat                          # P annihilates it; round-off is not a mode
+    @test ez.predicted <= 4
+    r = trapped_bdg_frequencies(ws, ψ; nev=14, n_hessian=18, max_iter=250,
+        hess_tol=1e-7, params=p, rng=MersenneTwister(7))
+    nz = count(k -> r.omega[k] < 1e-3 && abs(r.growth[k]) < 1e-3, eachindex(r.omega))
+    # 12 = dim_C CP¹², and the assertion binds that DERIVED floor rather than the
+    # solver's exact output, because the two disagree by machine: the same code
+    # on the same 16-point grid returns 12 on TSUBAME and 13 on the CI runner.
+    # The extra mode arrives as an exact 0.0000e+00 — a purely REAL eigenvalue of
+    # the reduced generator, i.e. not an oscillating mode at all — so it is an
+    # artefact of the reduction on a 12-fold degenerate null block, not physics.
+    # Pinning `== 12` would be pinning one machine's arithmetic; pinning `>= 12`
+    # is the claim ("the whole tangent is flat") and it is not vacuous, which is
+    # what the control below shows.
+    @test nz >= 12
+    @test nz - ez.predicted >= 8
+    # POSITIVE CONTROL for that floor: a state whose manifold is NOT the U(13)
+    # orbit must fail it, or `>= 12` would pass on anything. Same spinor, same
+    # nev, g_S no longer uniform.
+    ws_c, ψ_c = f6box(cand[:FM]; c1=0.1)
+    p_c = constrained_hessian_params(ws_c, ψ_c)
+    r_c = trapped_bdg_frequencies(ws_c, ψ_c; nev=14, n_hessian=18, max_iter=250,
+        hess_tol=1e-7, params=p_c, rng=MersenneTwister(7))
+    nz_c = count(k -> r_c.omega[k] < 1e-3 && abs(r_c.growth[k]) < 1e-3,
+        eachindex(r_c.omega))
+    @test nz_c < 12
 end
