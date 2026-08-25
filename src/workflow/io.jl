@@ -13,6 +13,9 @@
 #   run_summary         — print_run_summary, compare_runs
 #   html_report         — generate_html_report (self-contained static HTML)
 #   budget              — estimate_run_budget (VRAM / RAM / disk forecast)
+#   host_budget         — the SUPPLY side of the same question: what this host
+#                         will give a run, derived per-term with provenance
+#                         (budget.jl forecasts DEMAND; the two meet at launch)
 #   catalog             — human-navigation layer (tags) over the CAS store
 
 include("io/io.jl")
@@ -24,6 +27,7 @@ include("io/measurement_provenance.jl")  # provenance stamp + refusal for measur
 include("io/run_summary.jl")
 include("io/html_report.jl")
 include("io/budget.jl")
+include("io/host_budget.jl")
 include("io/catalog.jl")
 include("io/catalog_index.jl")
 include("io/gs_library.jl")

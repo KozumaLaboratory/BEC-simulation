@@ -37,7 +37,13 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 #       loads SpinorBEC exactly once in a clean session. A shared-worker pool
 #       can reload the package mid-run (cache race), giving two copies of a type
 #       so `x isa CheckResult` flakes to false; separate processes cannot.
-#       `auto` = one worker per CPU thread.
+#       `auto` = one worker per CPU THIS JOB MAY USE — the affinity mask or the
+#       scheduler's grant, via host_budget.jl, NOT the machine's core count.
+#       The distinction is the whole point: `Sys.CPU_THREADS` on a TSUBAME node
+#       reports the node (384 on the cpu_16 hardware, per #407's own probe), so
+#       `auto` there used to start an entire node's worth of julia processes
+#       inside a 16-core allotment. Where the budget cannot be derived this
+#       falls back to SERIAL and says so — the safe extreme, not a guess.
 #       On-demand rather than pre-assigned: measured on CI, per-file times swing
 #       ±30 % run to run, so static bin-packing left the makespan 8-21 % above
 #       the perfect-balance floor no matter how well _COST was fitted.
@@ -57,8 +63,28 @@ include(joinpath(@__DIR__, "_tiers.jl"))
 get!(ENV, "SPINORBEC_FFT_ESTIMATE", "1")
 
 const _SKIP = Set(filter(!isempty, split(get(ENV, "SPINORBEC_TEST_SKIP", ""), ",")))
+
+# Wrapped in a module so the runner's namespace stays clean: every test file
+# does `using SpinorBEC`, which exports these same names.
+module _HostBudget
+include(joinpath(@__DIR__, "..", "src", "workflow", "io", "host_budget.jl"))
+end
+
 const _NWORKERS = let w = get(ENV, "SPINORBEC_TEST_WORKERS", "1")
-    w == "auto" ? max(1, Sys.CPU_THREADS) : parse(Int, w)
+    if w != "auto"
+        parse(Int, w)
+    else
+        try
+            _HostBudget.detect_host_budget().cpu_threads
+        catch err
+            err isa _HostBudget.BlindBudget || rethrow()
+            @warn(
+                "SPINORBEC_TEST_WORKERS=auto could not derive this job's CPU " *
+                    "allotment; running SERIAL rather than guessing a worker count.",
+                exception = err)
+            1
+        end
+    end
 end
 # Per-worker wall-clock cap (seconds) under parallelism; 0 disables. Generous by
 # default — catches a genuine hang, not a merely-slow file (cold F32 ≈ 600 s).
