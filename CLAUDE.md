@@ -349,7 +349,7 @@ NOT bugs — don't "fix".
 
 ## ¹⁵¹Eu
 
-F = 6, g_J = 1.9934, g_F ≈ 1.163, μ ≈ 6.977 μ_B, a_s ≈ 110 a₀. 7 unknown scattering channels (S = 0, 2, …, 12). Constraint: `c₀ + 36 c₁ = 4π(a_s / a_ho) N`.
+F = 6, g_J = 1.9934, g_F ≈ 1.163, μ ≈ 6.977 μ_B, a_s ≈ 110 a₀. **7 even scattering channels (S = 0, 2, …, 12), of which 6 are unmeasured** — `a_s` IS the stretched channel a₁₂ = 110(4) a₀, the one measured input, so it is not among the unknowns. (This line said "7 unknown" until 2026-08-25, one more than `CAMPAIGN.md`'s "the six unmeasured channels" and than `test/oracles/test_stretched_channel_invariance.jl`, which gates what the six cannot move.) Constraint: `c₀ + 36 c₁ = 4π(a_s / a_ho) N`.
 
 ## Constraints
 

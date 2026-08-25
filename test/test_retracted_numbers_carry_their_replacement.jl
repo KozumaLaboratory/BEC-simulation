@@ -93,6 +93,163 @@ end
     end
 end
 
+@testset "a retraction names the axis it moved, and both values" begin
+    # THE HOLE THE TWO ARMS AT THE BOTTOM OF THIS FILE LEAVE. They bind whether
+    # the killing row rests on ANYTHING — `in_tree` evidence and a real basis for
+    # a live successor, `note` + `pr` for a bare retirement. Neither can see the
+    # COMPARISON, and the comparison is where the eight bad retractions went
+    # wrong: #442 reversed at 0.05 sigma because one seed was compared against
+    # one seed, #436 replaced a window-dependent number with a different
+    # window-dependent number, #411 measured with `noise=false` and generalised.
+    #
+    # "The same convergence ladder" was the first draft of the rule and it is
+    # wrong. A refutation usually differs DELIBERATELY on one axis — 32³ → 64³,
+    # 8 ms → 16 ms, 1 seed → 3 — and requiring sameness would forbid the move
+    # that does the work. What is wanted is that the axis is NAMED and both sides
+    # are stated, so a reader can tell a refinement from a different experiment.
+    #
+    # The parser enforces presence fail-closed. This arm enforces that the text
+    # says something checkable, and that the `premise_dissolved:` escape is
+    # actually reachable rather than a phrase nobody uses.
+    claims = claim_ledger()
+    retired = [c for c in claims if c.status in ("superseded", "refuted")]
+    @test !isempty(retired)
+    @test all(c -> c.retraction_evidence !== nothing, retired)
+
+    # Either it names a comparison (which needs numbers) or it says the premise
+    # dissolved. A row that does neither is prose, which is the whole defect.
+    states_a_comparison(ev) =
+        occursin(CLAIM_RETRACTION_PREMISE_ESCAPE, ev) || occursin(r"\d", ev)
+
+    # Controls on the predicate BEFORE it is pointed at the ledger, both ways.
+    @test !states_a_comparison("later work disagreed with this")
+    @test states_a_comparison("grid, 32^3 -> 64^3: the ordering inverts")
+    @test states_a_comparison("premise_dissolved: there is no branch to explain")
+
+    bare = [c for c in retired if !states_a_comparison(c.retraction_evidence)]
+    isempty(bare) || println(
+        "  retractions that name no axis and no value:\n    ",
+        join([c.id for c in bare], "\n    "),
+        "\n  → say which axis the killing measurement moved and give both sides, ",
+        "or `", CLAIM_RETRACTION_PREMISE_ESCAPE, " <why>` if there was nothing ",
+        "to compare.")
+    @test bare == LedgerClaim[]
+
+    # Non-vacuity in both directions: the escape must be used somewhere, or it is
+    # an untested branch of the rule; and most rows must NOT use it, or the rule
+    # has been satisfied by declaring every retraction unmeasurable.
+    escaped = count(c -> occursin(CLAIM_RETRACTION_PREMISE_ESCAPE,
+            c.retraction_evidence), retired)
+    @test escaped >= 1
+    @test escaped < length(retired) ÷ 2
+
+    # RED MUST BE REACHABLE. The ledger is green above, so without this the arm
+    # is satisfied by a parser that never rejects anything.
+    mktempdir() do d
+        row(extra) = """
+        schema_version = 1
+        [[claim]]
+        id = "x"
+        claim = "c"
+        status = "refuted"
+        type = "A"
+        scope = "s"
+        uncertainty = "unbounded: probe"
+        uncertainty_basis = "none"
+        evidence = []
+        evidence_status = "absent"
+        commit = "unknown"
+        doc = "CLAUDE.md"
+        section = "1"
+        pr = 1
+        note = "probe"
+        retired_literal = "1.234"
+        $extra
+        """
+        missing_ev = joinpath(d, "missing.toml")
+        with_ev = joinpath(d, "with.toml")
+        write(missing_ev, row(""))
+        write(with_ev, row("retraction_evidence = \"grid, 32^3 -> 64^3\""))
+        @test_throws ArgumentError claim_ledger(path=missing_ev)
+        @test length(claim_ledger(path=with_ev)) == 1
+    end
+end
+
+@testset "a reduction carries the window it was reduced over" begin
+    # At B = 10.4 nT three readings of the same CACHED arms put the argmax at
+    # three different points, and 16 of 20 had theirs on the hold's first frame —
+    # the decaying pre-hold transient, ranked as if it were the cascade. The runs
+    # were fine. The window and the reduction were chosen after the campaign.
+    #
+    # The parser binds this fail-closed for any `quantity` naming a reduction.
+    # Here: that the detector is not vacuous, that `accept` and `unchecked` are
+    # both really used (they are the values that would be quietly replaced by
+    # `reject` if nobody could tell the difference), and that red is reachable.
+    claims = claim_ledger()
+    reducers = [
+        c for c in claims
+        if c.quantity !== nothing && any(
+            occursin(w, lowercase(c.quantity)) for w in CLAIM_REDUCTION_NAMES)
+    ]
+    @test !isempty(reducers)
+    @test all(c -> c.window !== nothing && c.reduction !== nothing, reducers)
+    @test all(c -> c.boundary in CLAIM_BOUNDARY_RULES, reducers)
+
+    # The detector must be a filter and not a pass-through: rows exist whose
+    # quantity is NOT a reduction, and they are correctly unbound. Otherwise
+    # "every reducer carries a window" is just "every row does".
+    quantified = [c for c in claims if c.quantity !== nothing]
+    @test length(reducers) < length(quantified)
+
+    # `accept` is the value that records the defect rather than the fix, and a
+    # ledger where nobody ever wrote it would mean the field is being used to
+    # describe intentions instead of measurements.
+    @test any(c -> c.boundary == "accept", reducers)
+
+    mktempdir() do d
+        row(extra) = """
+        schema_version = 1
+        [[claim]]
+        id = "x"
+        claim = "c"
+        status = "live"
+        type = "B"
+        scope = "s"
+        uncertainty = "unbounded: probe"
+        uncertainty_basis = "none"
+        evidence = []
+        evidence_status = "absent"
+        commit = "unknown"
+        doc = "CLAUDE.md"
+        section = "1"
+        pr = 1
+        quantity = "peak P_adj @ probe"
+        $extra
+        """
+        bare = joinpath(d, "bare.toml")
+        badbnd = joinpath(d, "badbnd.toml")
+        good = joinpath(d, "good.toml")
+        write(bare, row(""))
+        write(badbnd,
+            row("window = \"hold\"\nreduction = \"max\"\nboundary = \"whatever\""))
+        write(good,
+            row("window = \"hold\"\nreduction = \"max\"\nboundary = \"reject\""))
+        @test_throws ArgumentError claim_ledger(path=bare)
+        @test_throws ArgumentError claim_ledger(path=badbnd)
+        @test length(claim_ledger(path=good)) == 1
+
+        # And a non-reduction quantity must NOT be dragged in — the rule has to
+        # stay a filter or it becomes the too-strict kind that gets deleted.
+        notared = joinpath(d, "notared.toml")
+        write(notared,
+            replace(
+                row(""),
+                "quantity = \"peak P_adj @ probe\"" => "quantity = \"eta_start on the shipped defaults\"",
+            ))
+        @test length(claim_ledger(path=notared)) == 1
+    end
+end
+
 @testset "evidence declared `in_tree` actually resolves" begin
     # The column earns its keep here. Filling it for the 24 rows turned up a LIVE
     # document citing `klaus_quench_omp0p5_keeprot_mFplus.yaml`, a file `e8dafe8e`
@@ -323,9 +480,9 @@ end
     #
     # It does not check that the evidence SAYS what the row claims. It checks
     # that a replacement cannot be made out of nothing, which is what #295 was.
-    grounded(status, supersedes, evidence_status, uncertainty_basis) =
-        isempty(supersedes) || status in ("superseded", "refuted") ||
-        (evidence_status == "in_tree" && uncertainty_basis != "none")
+    # The rule itself lives in `claim_ledger.jl` and is called, not retyped —
+    # a second copy here would be the ledger's own defect one layer down.
+    grounded = retraction_is_grounded
 
     # Controls on the predicate, before it is pointed at the ledger. Both
     # failure modes of #295 must be visible, and an ordinary row must pass —
@@ -385,9 +542,7 @@ end
     # is deliberately not accepted as a substitute: 9 of the 13 retired rows
     # carry the literal string "unknown" there, so a rule keyed on it would be
     # satisfied by a value that names nothing.
-    self_grounded(status, superseded_by, note, pr) =
-        !(status in ("superseded", "refuted")) || superseded_by !== nothing ||
-        (note !== nothing && !isempty(strip(note)) && pr !== nothing)
+    self_grounded = retraction_is_self_grounded
 
     # Controls on the predicate, before it is pointed at the ledger.
     @test !self_grounded("refuted", nothing, "measured at 64³", nothing)  # no PR

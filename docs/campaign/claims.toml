@@ -54,6 +54,37 @@
 # Optional:
 #   supersedes / superseded_by   ids. Both directions are declared; the gate checks
 #                                they agree, so a half-migrated retraction is red.
+#   window / reduction / boundary REQUIRED when `quantity` names a reduction
+#                                (peak / argmax / optimum / endpoint). A peak is a
+#                                peak OF something OVER something, and at 10.4 nT
+#                                three readings of the SAME cached arms put the
+#                                argmax at three different points while 16 of 20
+#                                arms had theirs on the hold's first frame -- a
+#                                decaying pre-hold transient ranked as the cascade.
+#                                `boundary` says what was done when the argmax hit
+#                                the edge: reject / accept / unchecked / n/a.
+#                                `accept` records the defect rather than the fix and
+#                                is used where that is what happened. `unchecked` is
+#                                NOT `reject`.
+#                                The detector is a WORD LIST and unknown forms are
+#                                innocent: a quantity naming no reduction is not
+#                                required to carry a window, because a rule that
+#                                reddens `eta_start` gets deleted.
+#   retraction_evidence          REQUIRED on superseded/refuted rows. WHICH AXIS
+#                                the killing measurement moved, and both values.
+#                                NOT "the same convergence ladder" -- a refutation
+#                                usually differs deliberately on exactly one axis
+#                                (32^3 -> 64^3, 8 ms -> 16 ms, 1 seed -> 3), and
+#                                demanding sameness would forbid the move that does
+#                                the work. What is wanted is that a reader can tell
+#                                a refinement from a different experiment. Use
+#                                `premise_dissolved: <why>` when the claim never
+#                                rested on a measurement -- that is a real outcome
+#                                and must not look like a blank.
+#                                WHY: eight times in this repo a retraction was
+#                                itself wrong. The shape was never haste; it was
+#                                that the killed claim rested on a run and the
+#                                killing one was allowed to rest on prose.
 #   retired_literal              REQUIRED on superseded/refuted rows. String or
 #                                array — a retracted claim usually survives in
 #                                more than one wording, and the lab instruction
@@ -172,6 +203,7 @@ note = "This is why `0.468 ± 0.003` is not re-derivable AS POSED rather than me
 id = "edh-omega-window-0p468"
 claim = "|Ω|/ω_⊥ = 0.468 ± 0.003 at B = 2.6 nT, from a 7-point parabolic fit."
 status = "superseded"
+retraction_evidence = """preparation, ALIGNED -> ANTI-ALIGNED (the axis the original never varied), plus sampling 7 points -> 20 cells: 0.468 +- 0.003 -> 0.68 +- 0.04. Not a refinement. At the aligned preparation the response is flat and slightly negative (-0.45 %), so there was no optimum to fit and the third significant figure was never supportable."""
 superseded_by = "edh-omega-window-2p6nt"
 retired_literal = ["0.468 ± 0.003"]
 replacement_literal = ["0.68 ± 0.04", "0.68 +- 0.04"]
@@ -210,6 +242,7 @@ note = "Criteria C1-C4 were fixed before launch: interior maximum required, > 5 
 id = "edh-chirality-matched"
 claim = "The enhancement requires matched chirality: Ω·sign(m_init) < 0 lowers the mode energy by ΔE = -Ω·ℓ, so the trap must be rotated counter to the stretched-spin direction."
 status = "refuted"
+retraction_evidence = """knob parity, a one-sided Omega scan -> +-Omega at |Omega| in {0.1, 0.3, 0.5}: the response is EVEN to 0.071 / 0.113 / 0.124 % against a dt/2 reproducibility floor of 0.029 %. An effect even in Omega cannot come from -Omega*l, which is odd, so the mechanism is refuted by parity rather than by a better fit."""
 superseded_by = "edh-response-even-in-omega"
 retired_literal = ["chirality opposite", "Ω · sign(m_init)", "Ω·sign(m_init)"]
 # NOT the bare `sign(m_init)`: that also matches the KINEMATICS (`ℓ = − sign(m_init) · k`),
@@ -322,6 +355,7 @@ note = "Replaces the rotating-anisotropic-trap prescription and removes the 'sig
 id = "edh-window-1p3nt-0p3"
 claim = "|Ω|/ω_⊥ ≈ 0.3 at B = 1.3 nT."
 status = "refuted"
+retraction_evidence = """sampling, a 3-point Omega scan -> a static omega_eff scan over [0.65, 1.0] at the same field: 0.505 -> 0.514, +1.8 % and flat. The axis is the same one; only the density changed, and it shows there is no interior maximum for the number to relocate to."""
 retired_literal = ["≈ 0.3 at B = 1.3 nT"]
 type = "B"
 scope = "Was: the 1.3 nT row of the three-field prescription table."
@@ -339,6 +373,7 @@ note = "REFUTED WITH NO REPLACEMENT, and that is the finding rather than a gap. 
 id = "edh-window-5p2nt-0p5-0p6"
 claim = "|Ω|/ω_⊥ ∈ [0.5, 0.6] at B = 5.2 nT."
 status = "refuted"
+retraction_evidence = """sampling, 3 points -> 20 points in omega_eff at 5.2 nT. The old window [0.5, 0.6] maps to omega_eff [0.80, 0.87], which the 20-point scan resolves as a DECLINING shoulder (0.50070 -> 0.49290) lying below both maxima. At 7 points (#401) the honest verdict was still `neither confirmed nor replaced`; the status moved because the sampling changed, not because anyone re-read the prose."""
 superseded_by = "edh-two-branches-5p2nt"
 retired_literal = ["[0.5, 0.6]"]
 replacement_literal = ["hold duration", "hold-duration"]
@@ -357,8 +392,12 @@ note = "In ω_eff the old window is [0.80, 0.87], which the 20-point scan resolv
 [[claim]]
 id = "edh-two-branches-5p2nt"
 quantity = "peak_P_adj @ B=5.2nT, weff-ordering"
+window = "hold, 8 ms"
+reduction = "max"
+boundary = "accept"
 claim = "At B = 5.2 nT the ω_eff response has TWO branches: a global maximum at ω_eff ≈ 0.55 (+17.0 %), a secondary at ≈ 0.77, and a dip between them at ≈ 0.65."
 status = "refuted"
+retraction_evidence = """hold duration, 8 ms -> 16 ms at four matched omega_eff. 0.650 goes from 5.05 % BELOW 0.550 to 6.2 % ABOVE it. The grid axis WAS moved (32^3 -> 64^3, gate D4) and could not see it: at the 8 ms hold, omega_eff 0.42-0.62 all peak on the last streamed frame (42/42), so the reported structure compared boundary values against one resolved maximum (0.650, frame 38/42). A 20-arm re-run reproduced the published values to five digits and reproduced the same truncation with them."""
 supersedes = ["edh-window-5p2nt-0p5-0p6"]
 superseded_by = "edh-5p2nt-ordering-is-hold-dependent"
 retired_literal = ["TWO BRANCHES", "ω_eff ≈ 0.55"]
@@ -391,6 +430,9 @@ axes they covered; the axis nobody registered was hold duration."""
 [[claim]]
 id = "edh-5p2nt-ordering-is-hold-dependent"
 quantity = "peak_P_adj @ B=5.2nT, weff-ordering"
+window = "hold, 8 ms and 16 ms"
+reduction = "max"
+boundary = "accept"
 claim = "At B = 5.2 nT the ordering of peak P_adj across ω_eff INVERTS between an 8 ms and a 16 ms hold: ω_eff = 0.650 goes from 5.05 % below 0.550 to 6.2 % above it. No ω_eff optimum is quotable at 5.2 nT."
 status = "live"
 supersedes = ["edh-two-branches-5p2nt", "edh-5p2nt-second-branch-has-no-mechanism"]
@@ -414,8 +456,12 @@ argmax at the boundary is a statement that the run ended too early."""
 [[claim]]
 id = "edh-104nt-bump-at-0p65"
 quantity = "peak_P_adj @ B=10.4nT, weff-scan, 32cubed, hold=8ms"
+window = "whole_trajectory"
+reduction = "max"
+boundary = "accept"
 claim = "At B = 10.4 nT there is a resolved local maximum at ω_eff ≈ 0.65, +22.4 % over a flat baseline, and it peaks INSIDE the hold window."
 status = "superseded"
+retraction_evidence = """observable window, whole trajectory -> inside the hold, on the SAME cached arms and with no new run: baseline 0.27574 -> 0.20139, enhancement +22.4 % -> +49.5 %. 16 of 20 arms had their argmax on frame 32, the hold's first frame, where the decaying pre-hold transient still dominates. The correction was already in the tree when the row was written (section 12.1, 97ec124e)."""
 superseded_by = "edh-104nt-single-peak-in-hold"
 retired_literal = ["0.27574"]
 # NOT "+22.4 %": that percentage also names an unrelated quantity in the same
@@ -449,6 +495,7 @@ row for a new row to collide with. Hence `quantity` and the coverage ratchet."""
 id = "edh-5p2nt-dip-is-a-resonance"
 claim = "The 5.2 nT dip is a resonance entering the sampled window — plausibly between the Zeeman splitting and the radial mode spacing, both of which the field and ω_eff set."
 status = "refuted"
+retraction_evidence = """field, 5.2 -> 2.6 and 10.4 nT, which is the test registered before the measurement. It fails twice over: on the informative arm (2.6 nT) the predicted dip near omega_eff ~ 0.325 is absent, the curve rising monotonically 0.45976 / 0.46412 / 0.46681 / 0.47068 / 0.47682 over 0.250-0.375; and the structure the hypothesis explained is itself a hold-duration truncation, so there is no dip at 5.2 nT to move."""
 retired_literal = ["dip is a resonance", "resonance entering the sampled window"]
 type = "B"
 scope = "Hypothesis. The observation it explains is that 2.6 nT is a clean single peak and doubling the field introduces a dip."
@@ -480,6 +527,7 @@ categories that describe the analyst rather than the world."""
 id = "edh-grid-convergence-4-digit"
 claim = "32³ and 64³ agree to 4 digits on the klaus_quench observables."
 status = "refuted"
+retraction_evidence = """grid, 32^3 -> 64^3 with the residual quoted for the first time: peak P_adj moves +2.47 % and peak P_exc +2.05 %, one-signed, and one-signed again at 5.2 nT (+2.15 %, +2.54 %). That is 2-digit agreement, two orders of magnitude looser than the claimed 4 digits. The original quoted no residual at all, which is why the comparison had never been made."""
 superseded_by = "edh-grid-convergence-2-digit"
 retired_literal = ["4-digit match"]
 replacement_literal = ["2.47 %", "+2.47%"]
@@ -515,6 +563,7 @@ note = "One-signed means 32³ under-resolves the cascade rather than scattering 
 id = "edh-g6-pexc-rises-at-matsui-n"
 claim = "At N = 5×10⁴ the rotation raises P_exc by ~30 %."
 status = "refuted"
+retraction_evidence = """observable, P_exc -> P_adj at N = 5e4. P_exc measures 0.81531 against 0.81613, i.e. -0.10 %, resolved against the 0.029 % dt/2 floor and therefore a genuine null rather than an unresolved one, while P_adj rises +6.4 %. The cascade is already saturated at P_exc = 0.816 so that observable has no headroom: the gate was mis-posed, and it also failed against the criterion fixed before launch. Both facts are kept."""
 superseded_by = "edh-g6-omega-concentrates-not-creates"
 retired_literal = ["P_exc +30%"]
 replacement_literal = ["concentrates", "saturated"]
@@ -621,6 +670,7 @@ note = """CLOSED 2026-08-20, and it had been closed since 2026-08-19 without any
 id = "edh-longtime-static-sustains"
 claim = "At 145 ms the rotating arm peaks and collapses back below the baseline while the static weakened trap holds 2.25× it, so rotation gives a transient and the static trap a SUSTAINED transfer."
 status = "refuted"
+retraction_evidence = """grid, 32^3 -> 64^3 at a 100 omega_ref^-1 hold, three arms. BOTH orderings invert: static-vs-rotating goes -3.2 % -> +21.6 % at the peak and 2.25x -> 0.68x at the endpoint, and per-arm the endpoints move -42.6 % (static) and +91.3 % (rotating). The original stated its own key number (3.21 %) INSIDE the 2.5 % resolution systematic and said so, which is what made the 64^3 run the obvious next step."""
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, hold = 100 ω_ref⁻¹, three arms."
 retired_literal = ["2.25×", "2.25x", "sustained transfer", "a transient"]
@@ -754,6 +804,7 @@ note = """CORRECTS section 14.2, which attributed the missing energy to `run_reg
 id = "eu335-68p4-is-a-mean-field-spinodal"
 claim = "68.4 ± 0.15 µG is the flower branch's mean-field spinodal at κ = 1.8 — the branch stops existing there — so a rising B_z ramp must convert by then at ANY rate."
 status = "superseded"
+retraction_evidence = """not a value: the NUMBER is unchanged (68.4 +- 0.15 muG at 32^3, [68.0, 68.5] at 64^3, 0.2 % apart). What moved is what it is a number OF, and the measurement that moved it is #383's three-quantity test on the same cells: branch-tangent curvature linear in R^2 to rms 0.4 % with its zero at 78.2 muG, i.e. NOT vanishing at 68.4; escape direction <d,Ad> = +3.403, uphill; lowest omega flat to 1.4 %. A saddle-node takes all three to zero together and none softens."""
 type = "B"
 scope = "¹⁵¹Eu F = 6, κ = ω_z/ω_⊥ = 1.8, 32³ (64³ bracket [68.0, 68.5] µG), flower branch reached by warm-started L-BFGS continuation in B_z."
 retired_literal = [
@@ -823,6 +874,7 @@ note = """Three conditions, each shown necessary by removing it: MEASURE (ESTIMA
 id = "fftw-visible-cpu-count-hypothesis"
 claim = "The 36.9 GB at 48³ is caused by a library sizing per-thread scratch from the node's CPU count (`/proc/cpuinfo` = 384) rather than from the job's cgroup allocation (16)."
 status = "refuted"
+retraction_evidence = """visible CPU count, 384 (from /proc/cpuinfo) -> 16 under `taskset`, at three grid sizes. 48^3 still allocates 2.26 GB with the affinity mask at 16, so the blow-up survives the variable the hypothesis blamed. A refutation by counterexample on the named axis, not a re-measurement of a quantity."""
 type = "A"
 scope = "Same cells as `fftw-mixed-radix-planner-memory`. The taskset arm narrows the VISIBLE set without changing the allocation, which was already 16."
 retired_literal = [
@@ -1011,6 +1063,9 @@ now takes the window from `times`, printing both values with a marker when they 
 [[claim]]
 id = "edh-104nt-single-peak-in-hold"
 quantity = "peak_P_adj @ B=10.4nT, weff-scan, 32cubed, hold=8ms"
+window = "hold, frames 34-42"
+reduction = "max"
+boundary = "accept"
 claim = "At B = 10.4 nT, read inside the hold, the ω_eff response is a CLEAN SINGLE PEAK with its maximum at ω_eff = 0.650, +49.5 % over ω_eff = 1 — the largest relative enhancement of any field measured, on the smallest absolute transfer."
 status = "scoped"
 supersedes = ["edh-104nt-bump-at-0p65"]
@@ -1053,6 +1108,7 @@ name WHICH arm is informative at the time it is registered, or the cheap arm wil
 id = "edh-5p2nt-second-branch-has-no-mechanism"
 claim = "Whatever produced the second branch at 5.2 nT is unexplained: it is a measured structure without a mechanism, not a mechanism awaiting confirmation."
 status = "superseded"
+retraction_evidence = """premise_dissolved: there is no second branch to explain. The structure this row was a statement ABOUT is a hold-duration truncation (see `edh-5p2nt-ordering-is-hold-dependent`), so `no mechanism is known` stopped being a fact about the world and became a fact about an artifact. Nothing was measured against this row because there was nothing left for a measurement to address."""
 superseded_by = "edh-5p2nt-ordering-is-hold-dependent"
 retired_literal = ["measured structure without a mechanism"]
 replacement_literal = ["hold duration", "hold-duration"]
@@ -1084,6 +1140,34 @@ note = "Superseded the next day: there is no structure to explain. The mechanism
 # The numbers are low on purpose: pinning them at "everything" would make the gate
 # unmeetable and it would be deleted. Raise them as documents are poured; the gate
 # only forbids going backwards.
+
+[[claim]]
+id = "f6-uniform-gs-degenerates-the-whole-manifold"
+claim = "At uniform g_S the sigma_S sum rule degenerates the ENTIRE spinor manifold, not four phases: Sum_{S even} sigma_S(zeta) = 1 for any normalised zeta, so eps_MF = g/2 everywhere on CP^12. The degeneracy is continuous, which is what order-by-disorder requires."
+status = "live"
+type = "B"
+scope = "Any F, any normalised spinor, uniform g_S. An identity, so it has no grid, seed or duration. It is a statement about the UNIFORM-g_S reference point only — the physical Eu g_S are not uniform, and how far they sit from it is the six unmeasured channels."
+uncertainty = "Exact — the even-S two-body states span the symmetric subspace, so Sum_S sigma_S(zeta) = <zeta⊗zeta|zeta⊗zeta> = |<zeta|zeta>|^2 = 1 identically. Confirmed numerically: the four candidate spinors all return eps_MF = 1/2 at the scalar point in the 50x50 (g_10, g_12) scan, and `_f6_pd_sigma_S` reproduces the fingerprint for each."
+uncertainty_basis = "control"
+evidence = ["docs/research_notes/F6_phase_boundaries.md", "src/analysis/phases/F6_phase_diagram.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/research_notes/F6_phase_boundaries.md"
+section = "Result"
+pr = 0
+note = """Registered because the four-phase form was written in CAMPAIGN.md §11 and in memory and
+UNDERSTATES the result, in the one way that matters. Order-by-disorder needs a CONTINUOUS accidental
+degeneracy: four isolated points are selected between by an energy difference, and only a continuous
+manifold carries a would-be Goldstone mode for the selection to gap. So "four phases degenerate" would
+have made the pseudo-Goldstone programme (#455) look impossible on paper, while the identity makes it
+the same structure Turner-Barnett-Demler-Vishwanath (PRL 98, 190404) exploit for the spin-2 nematic
+manifold, at higher dimension.
+
+WHAT IT DOES NOT SAY. Uniform g_S is a reference point, not Eu. The physical g_S are not uniform and
+six of the seven even channels have never been measured, so the SIZE of any residual continuous
+degeneracy at the physical point is an a_S-dependent question (layer ii). What IS a_S-free is the
+stretched sector: the fully polarized cloud and its first magnon are pure S = 2F
+(`test/oracles/test_stretched_channel_invariance.jl`), which is why #455 is scoped to the FM branch."""
 
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1128,6 +1212,9 @@ id = "edh-104nt-observable-not-window-robust"
 claim = "At B = 10.4 nT `peak P_adj in the hold` does not measure the hold for 16 of 20 arms: their maximum falls on frame 32, the hold's FIRST frame, where the decaying pre-hold transient still dominates. It is not merely window-dependent — for 80 % of the scan it is reading a different physical quantity."
 status = "open"
 quantity = "peak_P_adj @ B=10.4nT, observable definition"
+window = "hold"
+reduction = "max"
+boundary = "reject"
 type = "A"
 scope = "B = 10.4 nT only. At 1.3 / 2.6 / 5.2 nT the whole-trajectory and in-hold peaks are identical on all 43 arms (§12.1), so the observable is well-posed there and every claim at those fields stands."
 uncertainty = "MEASURED, not argued. The hold boundary is frames 32-42: prep 13 + quench 13 + pre-delay 5 = 31 frames by construction, and the spread across 20 arms differing ONLY in the hold trap is exactly 0.000000 at frames 30-31 and 0.000213 at frame 32 — a zero-to-nonzero transition at the predicted boundary, which fixes the geometry independently. But 0.000213 across a 3× change in radial trap frequency means the trap has not yet acted at frame 32, so the maximum there is the transient's tail. Baseline: 0.27574 over 32-42, 0.20139 over 34-42."
@@ -1182,6 +1269,9 @@ id = "edh-optimum-not-quotable-at-either-field"
 claim = "Neither B = 5.2 nT nor B = 10.4 nT yields a quotable ω_eff optimum: three readings of the same cached arms place the argmax at three different points, and at 10.4 nT the mean-reading argmax sits on the scan boundary."
 status = "live"
 quantity = "weff optimum @ EdH quench, 5.2 and 10.4 nT"
+window = "hold"
+reduction = "max, mean and endpoint - three readings of the same cached arms"
+boundary = "reject"
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned. Readings: peak-in-hold, mean-over-hold, hold endpoint. All from cache, no recompute."
 uncertainty = "argmax by reading — 5.2 nT: 0.550 (peak at the 8 ms hold), 0.650 (peak over all arms), 0.750 (mean); 10.4 nT: 0.650 (peak, mean, final agree) against 0.350 for the mean over the 20-arm scan, which is the LOWER EDGE of the sampled range. A boundary argmax is not an optimum — it says the range does not contain one."
@@ -1232,6 +1322,9 @@ id = "edh-2p6nt-omega-scan-has-an-interior-maximum"
 claim = "At B = 2.6 nT the Ω scan has an interior maximum at |Ω| = 0.70 (peak P_adj 0.65905, +24.9 % over Ω = 0), falling to 0.441 at |Ω| = 1.00."
 status = "live"
 quantity = "peak_P_adj @ B=2.6nT, Omega-scan, 32cubed"
+window = "hold (identical to whole_trajectory at this field, measured on all 16 arms, section 12.1)"
+reduction = "max"
+boundary = "reject"
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, 20 Ω cells. Whole-trajectory and in-hold peaks are IDENTICAL at this field (§12.1, measured on all 16 arms), so the reading is not in question here as it is at 10.4 nT."
 uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = −2.70, fit rms 4.7e-3. Criteria C1-C4 fixed before launch: interior maximum required, > 5 % enhancement, ≥5-point fit with negative curvature and interior vertex, digits limited by the fit."
@@ -1266,6 +1359,9 @@ id = "edh-1p3nt-has-no-operating-window"
 claim = "At B = 1.3 nT there is no operating window: +1.8 % across a flat range in ω_eff ∈ [0.65, 1.0]. The absence is the finding, and `|Ω|/ω_⊥ ≈ 0.3 at 1.3 nT` has no replacement."
 status = "live"
 quantity = "weff optimum @ B=1.3nT"
+window = "hold (identical to whole_trajectory on all 7 arms, section 12.1)"
+reduction = "max"
+boundary = "reject"
 type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 7 arms. Whole-trajectory and in-hold peaks identical on all 7 (§12.1)."
 uncertainty = "+1.8 % over a flat range against a dt/2 floor of 0.029 % — resolved as a rise, but far below the 24.9 % at 2.6 nT. Bounded as an absence rather than a value: no fit was attempted because there is no interior maximum to fit."
@@ -1283,6 +1379,9 @@ id = "edh-observable-correction-touched-one-field-only"
 claim = "Re-extracting the peak inside the hold changed 10.4 nT and nothing else: 0.00 % on all 43 arms at 1.3, 2.6 and 5.2 nT, against 7 of 10 arms moving by up to −23 % at 10.4 nT."
 status = "live"
 quantity = "in-hold vs whole-trajectory peak, per field"
+window = "hold vs whole_trajectory - the comparison IS the claim"
+reduction = "max"
+boundary = "reject"
 type = "A"
 scope = "Every arm measured up to 2026-08-20, re-extracted from cache with no recompute."
 uncertainty = "Exact zeros, not small numbers: the two readings coincide arm-for-arm at the three lower fields. That is what makes the correction diagnostic rather than a global rescaling — it isolates the Zeeman-re-pinned field, where the hold suppresses the cascade and the transient wins."
@@ -1469,6 +1568,9 @@ claim = "The euv3 ramp allows a peak of N₀ = 4.41×10⁴ condensed atoms at t 
 status = "live"
 type = "C"
 quantity = "peak equilibrium N_0 on the euv3 evaporation trajectory"
+window = "the whole euv3 ramp"
+reduction = "max"
+boundary = "reject"
 supersedes = ["eu-evap-peak-18-point-sample"]
 scope = "The semiclassical Hartree-Fock constraint (Popov / Zaremba-Griffin-Nikuni) evaluated at EVERY point of one 0-D euv3 trajectory. Equilibrium, not dynamics — whether the field can follow is `eu-evap-cfield-does-not-collect-the-target`, and it cannot. N_total(t) is 0-D output and carries the K₃ systematic."
 uncertainty = "Trajectory-sampling error bounded at 10 % by the two scans themselves (18 points reads 4.01e4, every point reads 4.41e4). The K₃ systematic on N_total is NOT folded in: K₃ moves the total, not whether a condensate exists — see `eu-evap-k3-outside-universal-vdw-band`."
@@ -1485,6 +1587,7 @@ note = "The 0-D model's own final N₀ = 1789 (3.6 % of measured) is the value a
 id = "eu-evap-peak-18-point-sample"
 claim = "The peak equilibrium N₀ on the euv3 trajectory is 4.01×10⁴ at t = 1.726 s."
 status = "superseded"
+retraction_evidence = """sampling, 18 points -> a dense sweep of the SAME euv3 trajectory under the same constraint: 4.01e4 at t = 1.726 s -> 4.41e4 at t = 1.70 s, i.e. the 18-point value was 10 % low. Same physics and same trajectory; only the sampling density changed, which is why this is `superseded` and not `refuted`."""
 superseded_by = "eu-evap-thermodynamic-peak-4p41e4"
 type = "C"
 scope = "Same constraint, same trajectory — sampled at 18 points."
@@ -1506,6 +1609,9 @@ claim = "Halving the euv3 ramp raises the peak equilibrium N₀ by 36 %, 4.41×1
 status = "scoped"
 type = "B"
 quantity = "ramp-time scaling that maximises peak equilibrium N_0"
+window = "the whole ramp, at each time-axis scaling"
+reduction = "max"
+boundary = "unchecked"
 scope = "Stretching the `FortRamp` TIME AXIS at fixed beam powers — a numerical experiment, not a ramp design. Valid only at and above 0.3×: below that the trap depth outruns thermalisation (0.02-0.05 elastic collisions per e-folding against the conventional requirement of a few) and `condensate.jl`'s quasi-static assumption is void. The recommended 0.3-0.5× sits at 30.6 and 74.2 collisions per e-folding."
 uncertainty = "unbounded: a one-trajectory scan with no repeat. The DIRECTION is corroborated independently — a 3-parameter Bayesian search over the same ramp finds duration monotone with +42 % at ≈0.4×, and adding a finite-evaporation-rate penalty turns that knife-edge into an interior optimum at ≈0.6× worth +22 %. Three instruments, one direction, three different magnitudes."
 uncertainty_basis = "none"
@@ -1538,6 +1644,7 @@ note = "The positive control that this is not a broken solver: at the SAME end c
 id = "eu-evap-slowing-helps-by-7x"
 claim = "Slowing the ramp 3x improves the c-field condensate by 7x (2.9x on a second reading)."
 status = "refuted"
+retraction_evidence = """readout time, a single end-point marker -> six matched markers along the trajectory. The 3x run declines monotonically while the 1x run climbs to f0 = 0.255 and overtakes it from the third marker on, so a verdict taken at one end is the opposite of the verdict taken at the other. The axis the original never varied was WHERE along the trajectory it was read, not how many seeds it had."""
 type = "B"
 scope = "Read from the first TWO markers of a six-marker trajectory pair."
 uncertainty = "Not a bound — a sign error. Over six matched markers the 3x run declines monotonically while the 1x run climbs to f₀ = 0.255 and overtakes it from the third point on. A verdict taken at either end is the opposite of the one taken at the other."
@@ -1556,6 +1663,7 @@ note = "Killed by extending the same comparison from two matched markers to six,
 id = "eu-evap-halving-the-ramp-is-worse"
 claim = "Halving the ramp makes the c-field condensate worse: 27.8 against 39.7."
 status = "refuted"
+retraction_evidence = """seed count, 1 -> 3 per arm: 41.1 +- 14.3 at 0.5x against 41.6 +- 10.9 at 1.0x, a difference of 0.05 sigma. The reported 27.8 against 39.7 was one draw from a distribution whose seed-to-seed scatter is +-12, the same size as the claimed effect."""
 type = "B"
 scope = "One seed per arm."
 uncertainty = "The seed-to-seed scatter is ±12, the same size as the reported difference. Refuted by running two more seeds per arm."
@@ -1576,6 +1684,9 @@ claim = "No K₃ inside the universal van der Waals band reproduces the measured
 status = "live"
 type = "C"
 quantity = "K_3 required to reproduce the measured euv3 endpoint"
+window = "the measured euv3 endpoint, a fixed time"
+reduction = "none - a fixed-time value, not an argmax"
+boundary = "n/a"
 scope = "0-D two-component model with the exact all-η LRW rate and ⟨n²⟩ = 8/21 n₀², swept over K₃ ∈ [10⁻⁴²·³, 10⁻³⁹·³] at both loading anchors. The band top is the zero-range Efimov result; finite-range corrections move it by a few per cent, not by 2.5×."
 uncertainty = "The 2.5× exceedance is far outside the band's own width, which is the full [0, 67] oscillation in C and is already taken at its maximum. Independently re-evaluated 2026-08-22: 3 × 67.1 × ℏa⁴/m = 9.7×10⁻⁴¹ m⁶/s for ¹⁵¹Eu at a = 110 a₀."
 uncertainty_basis = "control"
@@ -1609,6 +1720,7 @@ note = "Found by running the very call the document tells the reader to make. Co
 id = "eu-evap-eta-window-4p5-to-11"
 claim = "η stays in a valid 4.5–11 range over the euv3 ramp."
 status = "superseded"
+retraction_evidence = """epoch anchoring, the guide's assumed T0 -> both self-consistent epoch choices, on the shipped euv3 defaults: eta_start = 2.07, not 4.5. More than a factor of two, and on the wrong side of the eta ~ 4 floor at which evaporation can start at all, which changes the KIND of statement rather than its precision. Re-anchoring T0 does not lift it - #356 corrects #333 and #348 on exactly that point."""
 superseded_by = "eu-evap-eta-start-is-2p07"
 type = "C"
 scope = "Asserted for the shipped euv3 defaults, in four places in the guide."
@@ -1661,6 +1773,7 @@ id = "saito-li-edh-response-1p75x"
 quantity = "EdH magnetisation response ratio vs Li-Saito Fig 4b @ 0.05 mG"
 claim = "RETRACTED: the 1.75x ratio between our EdH magnetisation response and Li-Saito Fig 4(b) at 0.05 mG rests on ours = 0.03750, and that value does not reproduce on current code AT ITS OWN RECORDED SETTINGS."
 status = "refuted"
+retraction_evidence = """reproduction at the claim's OWN recorded settings (box 8 / n 80 / dt 2e-4 / orient=rotate / t_end 10): 0.03750 -> 0.2778 +- 0.0185, a factor 7.4 against a per-sample scatter of 6.7 %. The diagnostic is the edge density, 1.546e-3 against the record's 6.08e-4, and edge density is a property of the evolved STATE rather than of the analysis window - so this is not the same trajectory read differently."""
 retired_literal = ["0.03750", "0.03722"]
 type = "C"
 scope = "runs/saito_li_torus, the EdH quench arm at B_z = 0.05 mG, 14.5 ms window, mean |f_z| over t > 3 ms. Binds README 'continued 6' and h16_digitise_fig4b.py's OURS dict."
