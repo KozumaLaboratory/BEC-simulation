@@ -1303,7 +1303,7 @@ lifecycle = "candidate"
 ladder = "exact: closed-form occupancy at fixed (T, mu, eps_cut) — no cutoff axis to walk. The SPREAD is the anisotropy, not a convergence residual: the TF formula as coded is isotropic (omega enters only eps_0), and a (1,1,kappa) trap carries an extra 1/kappa in the volume element, giving 1.886e4 with the factor and 3.272e4 without. Both ends are quoted."
 type = "A"
 scope = "The NUMBERS: the eu334 nucleation ramp: box 24, 64^3, kappa = 1.8, c0 = 0.046873 (norm-N form, n_atoms=1 preset), k_cut = min(sqrt(2(mu+T)), k_max = 8.378), evaluated at the ramp's TERMINAL mu. It is a statement about the STEADY STATE of the two dissipative schemes, not about which one is right for a growth problem."
-uncertainty = "The bracket 1.9e4-3.3e4 IS the uncertainty and it is a modelling spread (isotropic vs kappa-corrected TF, ideal-gas density of states), not a statistical one. The DIRECTION survives it: 2.9e3 is 6.5x below the lower end. Positive control, and it was not constructed for the purpose — the growth-only arm's measured steady state 2.96e4 falls INSIDE the independently computed range, so c0, omega and eps_cut are not mis-set; had that failed, nothing here would be readable."
+uncertainty = "The bracket 1.9e4-3.3e4 IS the uncertainty and it is a modelling spread (isotropic vs kappa-corrected TF, plus `coherent_population`'s validity condition - see the note), not a statistical one. The DIRECTION survives it: 2.9e3 is 6.5x below the lower end. Positive control, and it was not constructed for the purpose — the growth-only arm's measured steady state 2.96e4 falls INSIDE the independently computed range, so c0, omega and eps_cut are not mis-set; had that failed, nothing here would be readable."
 uncertainty_basis = "control"
 evidence = ["src/solvers/evaporation/spgpe_reservoir.jl", "src/solvers/spgpe.jl"]
 evidence_status = "in_tree"
@@ -1341,9 +1341,21 @@ ways these fixtures do not reproduce — T = 10 against 2, a RAMPING mu, 13 comp
 kappa = 1.8, and a SEED at 11530 rather than a field grown from zero. (b) Neither arm may
 have reached its stationary state: #418 read a plateau as arrival, and at production M the
 channel is slow enough that a plateau is weak evidence (400 steps move mu-tilde by 1e-4).
-(c) The equilibrium bracket in this row rests on Thomas-Fermi plus an ideal-gas density of
-states and could simply be wrong for that regime — in which case growth-only landing inside
-it was luck, and that possibility is now on the table rather than assumed away.
+(c) The equilibrium bracket in this row rests on Thomas-Fermi plus `coherent_population`,
+and that function has a VALIDITY CONDITION nothing in the tree gates.
+
+MEASURED THE SAME DAY, on (c). `coherent_population` is a BOSE sum over ideal harmonic levels
+that SKIPS every level below mu, on the stated grounds that "those are absorbed into the
+condensate that N_0(mu) already counts". Against numerical SPGPE equilibration at four
+(T, mu, c0, kappa) points with a LARGE c0 — where the TF condensate is 1-3 atoms and so
+absorbs nothing — it undercounts by 7.0x to 10.1x (53.8 against 427.8; 53.2 against 370.7;
+206.7 against 1492.7; 49.6 against 501.7), and the whole gap is in the thermal term.
+
+So the condition is "mu >> eps_0 AND the TF condensate genuinely holds the sub-mu levels",
+and eu334 satisfies it far better than those probes: c0 = 0.046873 there gives
+N_0^TF = 1.7-3.4e4 against a thermal term of 1.5e3, so the condensate dominates and does hold
+them. The bracket therefore STANDS — but on a NAMED condition that was previously unexamined
+rather than on an untested formula. Gating the function is its own issue.
 
 WHAT IT STILL OVERTURNS. #418 closed with "not a defect, two steady states, the full arm has
 ARRIVED". The arrival is what (b) doubts. And the threat to the flower nucleation result
