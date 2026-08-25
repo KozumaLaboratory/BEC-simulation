@@ -215,6 +215,26 @@ observable off ONE read and returns a `MultiReanalysis` with one shared vintage;
 `test_reanalysis_entrypoint.jl` counts the reads and differences the grouped pass
 against N separate single-observable calls.
 
+**And that was MEASURED before the API was widened, because #495 pre-registered
+the threshold** ("if re-reading costs less than 2× one pass, do not widen it —
+use several calls"). On one real snapshot-bearing arm — `klaus_long_om0p0_holdonly_t350`,
+613 MB, 89 streamed frames, the same `arm_series` path the ω_eff arms take:
+
+| | |
+|---|---|
+| one extraction, cold | 1.94 s |
+| one extraction, warm (page cache) | 0.49 s |
+| one reduction over the extracted series | 1.6 ms |
+| **one pass + 9 reductions** | **1.95 s** |
+| **9 separate calls, warm** | **5.87 s → 3.01×** |
+| 9 separate calls, cold | 17.5 s → 9.0× |
+
+3.01× against a 2× threshold, and that is the *favourable* figure: the warm
+number assumes every re-read hits the page cache, which a 94 GiB arm on a cluster
+filesystem will not. The re-read is not I/O alone — `radial_rms` per frame is
+recomputed every call and no cache helps it. The arm is a substitute (the ω_eff
+arms are not in this tree) and is named rather than implied.
+
 **`lt64_endpoint_verdict.jl` found a defect in `reanalyze` itself.** Its header
 records that the suite's first run used `save_every = 100` where the config saves
 every 1000, asked for a 200-frame hold window over a 20-frame array, and got the

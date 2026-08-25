@@ -18,6 +18,8 @@
 using Test
 using JLD2
 using JSON
+using Printf
+using Statistics
 using SpinorBEC
 
 const _RDM_REPO = normpath(joinpath(@__DIR__, "..", ".."))
@@ -126,11 +128,24 @@ end
         @test !occursin("REFERENCE DISAGREES", txt)
         @test occursin("ARMS THAT DID NOT LAND", txt)
         @test occursin("lt64_ens_baseline_short", txt)
-        # The pre-registered criterion still runs and still says which branch it
-        # took — the migration touched the extraction, not the verdict.
+        # THE PRE-REGISTERED CRITERION, RE-DERIVED HERE AND COMPARED. #495 asks
+        # the migration to show the verdict did not move; the 20 real arms are on
+        # the cluster, so what is executable is this: the criterion is restated
+        # from the README's formula — pooled sd across the two compared groups,
+        # SE_diff = sd·√(1/nb + 1/ns), threshold 2σ — and the number the driver
+        # prints must match it. Reading the diff and seeing the block unchanged
+        # is not the same as running it.
         @test occursin("VERDICT", txt)
-        @test occursin("ESTABLISHED", txt)
         @test occursin("ADMISSIBLE false", txt)
+        ends(pref, sc) = [_padj30(; scale=1.0 + 0.01 * i + sc)[end] for i in 1:7]
+        b, s = ends("baseline", 0.0), ends("static", 0.2)
+        nb = ns = 7
+        sd_pool = sqrt(((nb - 1) * var(b) + (ns - 1) * var(s)) / (nb + ns - 2))
+        se_diff = sd_pool * sqrt(1 / nb + 1 / ns)
+        nsig = abs(sum(s) / ns - sum(b) / nb) / se_diff
+        @test occursin(@sprintf("|diff| / SE    = %.2f sigma", nsig), txt)
+        @test occursin(nsig >= 2.0 ? "  ESTABLISHED:" : "  NOT ESTABLISHED", txt)
+        @test occursin(@sprintf("SE_diff        = %.5f", se_diff), txt)
 
         rec = JSON.parsefile(joinpath(root, "lt64_endpoint_verdict_reanalysis.json"))
         @test rec["admissible"] === false
