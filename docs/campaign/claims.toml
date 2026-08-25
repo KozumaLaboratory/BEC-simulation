@@ -1210,7 +1210,11 @@ is a fix the gate cannot see, which is the general lesson and the reason this ro
 [[claim]]
 id = "stored-runs-corpus-is-written-off"
 claim = "The 261 GB corpus under `runs/` is not a cache and cannot become one: 0 of 219 stored `summary.json` carry a producing commit, and 0 run directories use the current `compute_run_dir` naming. Re-deriving any of it means re-running it."
-status = "live"
+status = "superseded"
+superseded_by = "stored-runs-corpus-is-attributable-not-admissible"
+retired_literal = ["is not a cache and cannot become one", "Re-deriving any of it means re-running it"]
+replacement_literal = ["224 of 230", "attributable"]
+retraction_evidence = """artifact, `summary.json` -> `point_*.jld2` - the file the provenance gate actually opens (`_assert_point_provenance`, `run_registry.jl:243`). 0 of 219 summaries carry a stamp and 224 of 230 points do, with 23 distinct producing commits. The summary measurement was correct and was generalised to the wrong artifact: summaries are what documents cite, points are what the cache admits."""
 type = "A"
 scope = "The stored outputs as of 2026-08-25, in the main checkout (`/home/suzume/workspace/BEC-simulation/runs`; a git worktree does not share them). The committed YAML CONFIGS are a separate corpus and are fine — 566 of them, all parseable."
 uncertainty = "Exact counts, with the scan calibrated against the writer's own key format: `summary[\"_env_<k>\"]` (`src/workflow/experiments/analyzers/misc.jl:220`). Positive control - a synthetic dict carrying `_env_git_hash` is detected; negative control - a dict carrying a bare `git_hash` is not. The FIRST pass of this scan looked for `env.git_hash` and returned the same 0, which is why the control matters: a wrong extractor and an empty corpus print the same number."
@@ -1242,6 +1246,47 @@ of 566 committed configs only 9 groups are canonically identical, 7 of them byte
 files in total (3.2 %). One pair has materialised on disk as two run directories -
 `matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/`. So unifying on the
 `Experiment` (canonical-spec) path is a real but small win, and was NOT the dominant term."""
+
+[[claim]]
+id = "stored-runs-corpus-is-attributable-not-admissible"
+claim = "The stored corpus is ATTRIBUTABLE and RE-ANALYSABLE but not auto-reusable and not campaign-admissible: 224 of 230 `point_*.jld2` carry `env/git_hash` over 23 producing commits, yet all 224 also record `git_dirty = true`, and the three dominant vintages are 2026-05-21/23/26, before the June-July corrections."
+status = "live"
+supersedes = ["stored-runs-corpus-is-written-off"]
+type = "A"
+scope = "The stored outputs as of 2026-08-25 in the main checkout (a git worktree does not share them). Three different questions are separated here and must not be collapsed again: attributable / re-analysable / admissible."
+uncertainty = "Exact counts from a scan of every `point_*.jld2` (230 found, 0 unreadable), probing the group the gate reads (`env/git_hash`, written as `f[\"env/$k\"]`). CROSS-VALIDATED against the tree: `test_campaign_fix_list_gate.jl`'s `_NOT_A_CORRECTION` already names 15a9f1ee as the producing commit of 137 stored runs, 306ef71a of 32 and e8168dcb of 9 — the scan reproduces 137 / 32 / 9 exactly, which is a positive control nobody had to construct."
+uncertainty_basis = "control"
+evidence = ["src/workflow/experiments/pipeline/run_registry.jl", "test/test_campaign_fix_list_gate.jl"]
+evidence_status = "in_tree"
+commit = "dd50479f"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """THREE QUESTIONS, COLLAPSED INTO ONE BY THE ROW THIS REPLACES.
+
+ATTRIBUTABLE - yes. 224/230 points name their producing commit. What is unstamped is
+`summary.json`, which is what documents and figures cite; #290 added the stamp there on
+2026-08-02 and everything older lacks it. Both facts are true and they are about different files.
+
+RE-ANALYSABLE - yes, and there is precedent IN THE TREE. `97ec124e` corrected the EdH observable
+(the peak must be taken inside the hold) and "all affected numbers were re-extracted from cache
+with no recompute" - the entire 10.4 nT window correction was post-processing of stored psi. So
+the corpus already earns its disk space for any question that is a new READING of an old run.
+
+NOT AUTO-REUSABLE - `_assert_point_provenance` refuses on two independent grounds, and the second
+cannot be repaired retroactively by anything: the recorded hash differs from HEAD, AND all 224
+points record `git_dirty = true`, so "neither commit identifies the code" holds even at a matching
+hash. `SPINORBEC_ALLOW_STALE_POINTS=1` is the deliberate opt-out and is the right switch for
+re-analysis, where the code difference provably cannot reach the answer because no propagation is
+being redone.
+
+NOT CAMPAIGN-ADMISSIBLE - the three dominant vintages predate the June-July integrator, LHY and
+Zeeman corrections. That is physics, not bookkeeping, and no amount of provenance work changes it.
+This half of `stored_results_vintage_audit.md` stands.
+
+THE LESSON IS THE ONE THE LEDGER KEEPS RE-LEARNING. The measurement was right and the artifact was
+wrong: 0/219 was a real number about summaries, and it was reported as a conclusion about the cache.
+The gate opens a different file. Say which file a count is a count OF."""
 
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
