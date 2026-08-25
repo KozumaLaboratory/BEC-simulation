@@ -47,6 +47,7 @@ export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, CLAIM_RETRACTION_PREMISE_ESCAPE,
     CLAIM_REDUCTION_NAMES, CLAIM_BOUNDARY_RULES,
     claim_ledger_link_errors, claim_by_id,
+    retraction_is_grounded, retraction_is_self_grounded,
     ledger_section_coverage,
     retired_literals,
     unmarked_retired_literal_sites
@@ -422,6 +423,47 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
         throw(ArgumentError("$path has duplicate claim ids"))
     out
 end
+
+"""
+    retraction_is_grounded(c::LedgerClaim) -> Bool
+
+Whether a row that RETRACTS another rests on something the tree can resolve.
+
+Binds only rows that are currently believed: a `superseded`/`refuted` row that
+itself supersedes something is exempt, because a retraction later withdrawn is a
+real outcome the ledger exists to hold, and demanding live evidence of a dead row
+would push people to delete it.
+
+It does NOT check that the evidence says what the row claims. It checks that a
+replacement cannot be made out of nothing, which is what PR #295 was.
+"""
+retraction_is_grounded(status, supersedes, evidence_status, uncertainty_basis) =
+    isempty(supersedes) || status in ("superseded", "refuted") ||
+    (evidence_status == "in_tree" && uncertainty_basis != "none")
+
+retraction_is_grounded(c::LedgerClaim) = retraction_is_grounded(
+    c.status, c.supersedes, c.evidence_status, c.uncertainty_basis)
+
+"""
+    retraction_is_self_grounded(c::LedgerClaim) -> Bool
+
+Whether a retirement WITH NO REPLACEMENT carries its own grounds.
+
+`retraction_is_grounded` reaches only retractions that produced a successor, and
+that is the smaller half: when a replacement exists the successor row carries the
+measurement, and when there is none nothing else in the tree says why this died.
+
+`note` + `pr`, not `evidence_status`: a refuted row's `evidence` describes what
+the DEAD claim rested on. `commit` is deliberately not accepted — 9 of the 13
+retired rows carried the literal string "unknown" there, so a rule keyed on it
+would be satisfied by a value that names nothing.
+"""
+retraction_is_self_grounded(status, superseded_by, note, pr) =
+    !(status in ("superseded", "refuted")) || superseded_by !== nothing ||
+    (note !== nothing && !isempty(strip(note)) && pr !== nothing)
+
+retraction_is_self_grounded(c::LedgerClaim) = retraction_is_self_grounded(
+    c.status, c.superseded_by, c.note, c.pr)
 
 """
     claim_by_id(claims, id) -> Union{Claim, Nothing}

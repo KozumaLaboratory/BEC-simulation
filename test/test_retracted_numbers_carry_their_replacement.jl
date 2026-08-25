@@ -480,9 +480,9 @@ end
     #
     # It does not check that the evidence SAYS what the row claims. It checks
     # that a replacement cannot be made out of nothing, which is what #295 was.
-    grounded(status, supersedes, evidence_status, uncertainty_basis) =
-        isempty(supersedes) || status in ("superseded", "refuted") ||
-        (evidence_status == "in_tree" && uncertainty_basis != "none")
+    # The rule itself lives in `claim_ledger.jl` and is called, not retyped —
+    # a second copy here would be the ledger's own defect one layer down.
+    grounded = retraction_is_grounded
 
     # Controls on the predicate, before it is pointed at the ledger. Both
     # failure modes of #295 must be visible, and an ordinary row must pass —
@@ -542,9 +542,7 @@ end
     # is deliberately not accepted as a substitute: 9 of the 13 retired rows
     # carry the literal string "unknown" there, so a rule keyed on it would be
     # satisfied by a value that names nothing.
-    self_grounded(status, superseded_by, note, pr) =
-        !(status in ("superseded", "refuted")) || superseded_by !== nothing ||
-        (note !== nothing && !isempty(strip(note)) && pr !== nothing)
+    self_grounded = retraction_is_self_grounded
 
     # Controls on the predicate, before it is pointed at the ledger.
     @test !self_grounded("refuted", nothing, "measured at 64³", nothing)  # no PR
