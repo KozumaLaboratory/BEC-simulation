@@ -7,11 +7,13 @@
 #     課金等に関する取扱い」, 附則: 令和６年４月１日施行 (2024-04-01).
 #   Upstream: https://www.t4.cii.isct.ac.jp/sites/default/files/2024-02/TSUBAME4_Terms.pdf
 #
-# Every number below is transcribed from 別表2-5 of that PDF. Extract the text
-# yourself with `python3 -c "import pypdf; print(''.join(p.extract_text() for p
-# in pypdf.PdfReader('docs/refs/TSUBAME4_Terms_2024-02.pdf').pages))"` — the
-# tables ARE in the text layer, so this file is checkable in about ten seconds
-# and you should check it rather than trust it.
+# Every number below is transcribed from 別表2-5 of that PDF, and the
+# transcription is GATED against it: the PDF's text layer is committed beside it
+# (`[source].text`) and `test/test_tsubame_point_cost.jl` asserts that each
+# resource type sits on the same line as its coefficient in the regulation
+# itself. So a retyped coefficient is a red test, not a thing to notice by eye.
+# (This paragraph first said the check had to be done by eye. That was pessimism:
+# all twelve types turned out to be co-located in the text layer.)
 #
 # WHY A FILE AND NOT A PARAGRAPH. `observability/job_cost.sh` used to take the
 # coefficient as a command-line argument with a default of 0.200, so computing a
@@ -38,7 +40,13 @@
 
 [source]
 file = "docs/refs/TSUBAME4_Terms_2024-02.pdf"
-sha256_prefix = "801262f34a9334c1"
+sha256 = "801262f34a9334c1ed173855f146bd8598765fc7f92c162175bda6288b9657ae"
+# The PDF's text layer, extracted and committed so the transcription below can be
+# CHECKED rather than trusted. Derived artifact pinned to the sha256 above —
+# the docs/STATE.md pattern. Replacing the PDF with a new fiscal year's terms
+# without re-extracting turns the gate red instead of leaving it passing against
+# a regulation nobody uses.
+text = "docs/refs/TSUBAME4_Terms_2024-02.txt"
 pages = 5
 effective_from = "2024-04-01"          # 附則
 transcribed_on = "2026-08-25"

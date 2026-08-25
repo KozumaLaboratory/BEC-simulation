@@ -178,6 +178,67 @@ const _HB_ROOT = dirname(@__DIR__)
         end
     end
 
+    @testset "supply meets demand, and 'unknown' is not 'fits'" begin
+        # `estimate_run_budget` forecasts demand and `detect_host_budget` reads
+        # supply; nothing compared them until `check_run_fits`, so a config too
+        # large for the host was discovered by being killed several minutes in.
+        mktempdir() do dir
+            small = joinpath(dir, "small.yaml")
+            write(
+                small,
+                """
+   interactions: {omega_ref: 1.0, c0: 1.0, c1: -0.05}
+   pipeline:
+     - ground_state: {grid: {n: [16, 16, 16], box: 8.0}, steps: 10}
+     - dynamics: {duration: 0.1, dt: 0.01, save: {every: 5, psi: false}}
+   """,
+            )
+            big = joinpath(dir, "big.yaml")
+            write(
+                big,
+                """
+     interactions: {omega_ref: 1.0, c0: 1.0, c1: -0.05}
+     pipeline:
+       - ground_state: {grid: {n: [256, 256, 256], box: 8.0}, steps: 10}
+       - dynamics: {duration: 0.1, dt: 0.01, save: {every: 5, psi: false}}
+     """,
+            )
+            # A hand-built budget, so the test does not depend on the machine it
+            # runs on — CI has no GPU and a laptop has a small one.
+            # 16 GiB of VRAM: a real card, and specifically less than the ~26 GiB
+            # a 256³ D=13 run forecasts. The first version of this test gave it
+            # 40 GiB, so the "oversized" config fitted and three assertions were
+            # measuring nothing — the premise was wrong, not the code.
+            roomy = HostBudget(4, :override, "test", 64 * 2^30, :override, "test",
+                false, 0, true, 0, 16 * 2^30, :estimate, String[])
+            @test check_run_fits(small; budget=roomy).verdict === :fits
+            r = check_run_fits(big; budget=roomy)
+            @test r.vram === :exceeds        # 256³ at D=13 wants ~26 GiB of VRAM
+            @test r.ram === :fits            # ...and ONLY the VRAM axis trips
+            @test r.verdict === :exceeds
+            @test_throws ArgumentError assert_run_fits(big; budget=roomy, io=devnull)
+            # ...and the small one must not throw, or the guard is just "no".
+            @test assert_run_fits(small; budget=roomy, io=devnull).verdict === :fits
+
+            # The property worth gating: an axis the host could not report is
+            # `:undetermined`, NOT `:fits`. Spelling it `:fits` would turn every
+            # GPU-less host into a silent pass on the VRAM axis.
+            blind = HostBudget(4, :override, "test", 64 * 2^30, :override, "test",
+                false, 0, true, 0, nothing, :estimate, String[])
+            rb = check_run_fits(small; budget=blind)
+            @test rb.vram === :undetermined
+            @test rb.verdict === :undetermined
+            @test rb.ram === :fits
+            # An undetermined axis is reported, not fatal: refusing it would stop
+            # every CPU-only host from starting a CPU run.
+            @test assert_run_fits(small; budget=blind, io=devnull).verdict === :undetermined
+            # But a KNOWN overrun still throws even when another axis is blind.
+            tiny_ram = HostBudget(4, :override, "test", 1024, :override, "test",
+                false, 0, true, 0, nothing, :estimate, String[])
+            @test_throws ArgumentError assert_run_fits(small; budget=tiny_ram, io=devnull)
+        end
+    end
+
     # ── SSoT gate ────────────────────────────────────────────────────────
     #
     # `Sys.CPU_THREADS` reports the MACHINE. On a TSUBAME node allotted 16 cpus

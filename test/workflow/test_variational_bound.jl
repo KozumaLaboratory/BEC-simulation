@@ -12,6 +12,12 @@
 using Test
 using SpinorBEC
 using SpinorBEC: VariationalBound, variational_bound, exceeds, bound_report
+# `eigvals` / `Symmetric` below are LinearAlgebra's, not SpinorBEC's. Without
+# this the file passes or fails depending on which OTHER file the on-demand
+# queue happened to put in the same worker first — the exact order-dependence
+# the parallel-runner contract exists to remove. Observed as a live flake on
+# 2026-08-26: `UndefVarError: eigvals not defined in Main`.
+using LinearAlgebra
 
 # hbar = m = omega = 1. Trial psi ~ exp(-x^2 / (2 s^2)), parameterised by
 # u = log s so the search is unconstrained.

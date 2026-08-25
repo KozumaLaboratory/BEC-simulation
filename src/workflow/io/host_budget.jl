@@ -579,8 +579,21 @@ end
     budget_report(b; io=stdout)
 
 Print each term with the file or variable it was read from.
+
+A closed output pipe is not an error here: `run_local.sh --print | head` is a
+reasonable thing to type, and the bare behaviour is a page of stack trace from
+inside `println`. EPIPE is swallowed; every other write failure still throws.
 """
 function budget_report(b::HostBudget; io::IO=stdout)
+    try
+        _budget_report(b, io)
+    catch err
+        err isa Base.IOError && err.code == Base.UV_EPIPE && return io
+        rethrow()
+    end
+end
+
+function _budget_report(b::HostBudget, io::IO)
     println(io, "host budget")
     println(io, "  cpu threads        $(b.cpu_threads)  [$(b.cpu_source)] $(b.cpu_origin)")
     println(
