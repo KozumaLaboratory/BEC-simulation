@@ -448,6 +448,38 @@ falling half-life mean the institution works.
 **The retraction count is not a metric.** Minimising it selects for not making claims.
 The target is zero *external* retractions and *earlier* internal ones.
 
+### A third candidate — node hours per claim advanced. Defined here, not adopted
+
+#478 asked for the definition to be written and left adoption to after its
+decomposition. Written:
+
+**Denominator — a claim advanced** is a `claims.toml` row *entering* an
+evidence-bearing status (`live` / `scoped` / `refuted` / `superseded` / `closed`),
+either as a new row or from `open` / `suggested`. A restatement inside the advanced
+set does not count, and neither does a new `open` / `suggested` row — posing a
+question is not advancing one.
+
+**Compute it on `--first-parent`, or it is wrong by half.** `git log -- claims.toml`
+walks both sides of every merge, so a row appears on a branch, vanishes at the next
+mainline commit and returns: measured 2026-08-26 over 2026-08-20…26, the full walk
+reports **113** advances with 33 removals and 3 regressions where the mainline has
+**79, zero and zero**. The per-row `commit` field is not a substitute — it is
+`"unknown"` on 28 of 85 rows.
+
+**Numerator — node hours. Nothing in the tree records them**, so the ratio is
+`unbounded` rather than large or small. Three candidate sources, all empty; the
+counts are in ledger row `node-hours-per-claim-has-no-numerator`. The enabling
+condition is one line — `run_pipeline` already computes `runtime_seconds` and writes
+it only when handed a `live_status_path`, i.e. on the autopilot path.
+
+**Not adopted, and the reason is the numerator, not the subject.** #478's answer —
+no recoverable cache waste on disk — removes the *duplicate-submission* motive. It
+does not remove what this ratio measures: the day §"Before computing" is about (24
+× 45-point GPU scans, every premise published and wrong) is ~3 h of node time
+against zero claims advanced, and that is the shape this number is for. Stamp the
+numerator when something will read it. A metric whose numerator has to be
+reconstructed is one that gets quoted off the wrong walk.
+
 ---
 
 ## 14. When we disagree with a paper — attribution, in a fixed order

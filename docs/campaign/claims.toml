@@ -1474,6 +1474,42 @@ stored under that name. The store is trustworthy for re-analysis and the committ
 not, which is the opposite of the intuition."""
 
 [[claim]]
+id = "node-hours-per-claim-has-no-numerator"
+claim = "The metric #478 asked to be defined - node hours per claim advanced - has a measurable DENOMINATOR and no numerator. Denominator: 79 claims advanced over 2026-08-20..26, counted as ledger rows entering an evidence-bearing status, on first-parent history. Numerator: no artifact in the tree records wall time - `_exit_summary.json` `runtime_seconds` exists in 0 of 240 store directories, the autopilot's `runs/budget.toml` reads `realized_total = 0.0` with `today = 2026-06-14`, and the point-mtime span that `run_registry.jl` uses for ETA is defined in 2 of 240 directories (202 hold exactly one point)."
+status = "live"
+lifecycle = "registered"
+ladder = "exact: counts over the whole corpus in both halves, not a limit. Denominator control: the transition counter is checked against a planted history (a row appearing `open`, moving to `live`, then to `refuted`, then removed) and against an unchanged snapshot, before it is allowed to walk the real ledger. Numerator control: the three sources are counted over the SAME 240 directories `store_census` enumerates, and the 2 non-empty mtime spans are the positive control that the walk could see a span at all - a scan reporting 0 everywhere would be indistinguishable from one that could not look."
+type = "A"
+scope = "The 240 run directories under the main checkout's `runs/` and the 41 commits touching `docs/campaign/claims.toml` (19 on first-parent), as of 2026-08-26. About RECORDABILITY, not about efficiency: it says the ratio cannot be computed, not that compute was well or badly spent."
+uncertainty = "The denominator is exact given its own definition, and the definition is the soft edge: `advanced` = entering `live`/`scoped`/`refuted`/`superseded`/`closed` either new or from `open`/`suggested`, excluding restatements within the advanced set. The numerator is `unbounded: no artifact records wall time`, which must not be read as small - it is absent. TSUBAME `qacct` is authoritative and outside the tree, and covers UGE jobs only, so it cannot close the local half."
+uncertainty_basis = "control"
+evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl", "src/workflow/autopilot/budget.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """THE MEASUREMENT TRAP, WHICH IS THE REASON THIS IS A ROW AND NOT A SENTENCE. Counting the
+denominator off `git log -- claims.toml` inflates it by 43 %: the full walk sees both sides of every
+merge, so a row appears on a branch, vanishes at the next mainline commit and returns. It reports 113
+advances, 33 removals and 3 regressions where the mainline has 79, 0 and 0 - and the 33 phantom
+removals are the tell, because a ledger nobody deleted from cannot lose 33 rows. `--first-parent` is
+the fix. The per-row `commit` field is not an alternative route: it is `"unknown"` on 28 of 85 rows.
+
+WHY THE NUMERATOR IS ABSENT RATHER THAN SMALL. `run_pipeline` computes `runtime_seconds` and hands it
+to `_write_exit_summary`, which returns immediately when `live_status_path === nothing` - so the
+number exists during every run and is written only on the autopilot path. Nothing else records it.
+`refresh_budget!` is documented in `budget.jl` as the seam for a qacct poller that was never written,
+which is why `realized_total` is still 0.0 from 2026-06-14.
+
+WHAT THIS DOES NOT SAY. #478's decomposition found no recoverable cache waste, and an earlier reading
+took that to mean this metric has no subject. That inference is wrong - the subject is not duplicate
+submission. CLAUDE.md's own worked example (24 x 45-point GPU scans, every premise published and
+wrong) is roughly 3 h of node time against zero claims advanced, which is exactly what the ratio
+measures. The reason not to adopt it today is that the numerator would have to be reconstructed, and a
+reconstructed numerator gets quoted off the wrong walk - see the 113 above."""
+
+[[claim]]
 id = "seed-up-step-count-win-unmeasured-at-production-scale"
 quantity = "endpoint iteration-count ratio, seeded polish vs from-scratch"
 window = "the cells in which BOTH arms converged — tol 1e-5 and 1e-6 at c0 = 40/200/4000, two cold starts. Cells where either arm ended `floor_limited` are excluded and named, because a run chasing a tolerance below its own energy-comparison floor measures the floor and not the seed."
