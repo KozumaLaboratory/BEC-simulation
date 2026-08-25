@@ -1207,6 +1207,42 @@ PROVENANCE IS OUTSIDE THE REPO. Project chat conv 606ac7ca (2026-04-22) found it
 history, and drafted a ledger row that never landed. A fix whose only witness is a chat log
 is a fix the gate cannot see, which is the general lesson and the reason this row exists."""
 
+[[claim]]
+id = "stored-runs-corpus-is-written-off"
+claim = "The 261 GB corpus under `runs/` is not a cache and cannot become one: 0 of 219 stored `summary.json` carry a producing commit, and 0 run directories use the current `compute_run_dir` naming. Re-deriving any of it means re-running it."
+status = "live"
+type = "A"
+scope = "The stored outputs as of 2026-08-25, in the main checkout (`/home/suzume/workspace/BEC-simulation/runs`; a git worktree does not share them). The committed YAML CONFIGS are a separate corpus and are fine — 566 of them, all parseable."
+uncertainty = "Exact counts, with the scan calibrated against the writer's own key format: `summary[\"_env_<k>\"]` (`src/workflow/experiments/analyzers/misc.jl:220`). Positive control - a synthetic dict carrying `_env_git_hash` is detected; negative control - a dict carrying a bare `git_hash` is not. The FIRST pass of this scan looked for `env.git_hash` and returned the same 0, which is why the control matters: a wrong extractor and an empty corpus print the same number."
+uncertainty_basis = "control"
+evidence = ["docs/validation/stored_results_vintage_audit.md", "src/workflow/experiments/analyzers/misc.jl", "src/workflow/experiments/pipeline/run_registry.jl"]
+evidence_status = "in_tree"
+commit = "6571fc25"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """WHY THIS IS A ROW RATHER THAN A KNOWN INCONVENIENCE. Planning has been assuming a cache
+exists and asking which effect spoils its hit rate - near-duplicate configs, byte-keying,
+provenance mismatch. The measurement says the question is mis-posed for THIS corpus: there is
+nothing for `_assert_point_provenance` to compare, so no stored point is a reuse candidate at
+all. A canonical parameter grid is still worth having, but it is a policy for FUTURE runs and
+must not be sold as a way to recover what is on disk.
+
+TWO INDEPENDENT SIGNS, which is why this is not one scan's artifact. (1) No summary carries an
+`_env_*` stamp; #139 landed that stamping on 2026-07-29 and states that pre-#139 runs cannot be
+retro-dated, only re-run. (2) `compute_run_dir` keys on `sha256(bytes)[1:16]` and every directory
+on disk carries an 8-hex suffix, so the whole store also predates the current naming.
+
+WHAT IS NOT WRITTEN OFF: the 566 committed YAML configs, the figures already derived and cited
+with their own provenance, and the arms re-run under the campaign gate since. This row is about
+the stored OUTPUTS.
+
+MEASURED SIDE-RESULT, kept because it bounds a different question. Byte-keying exposure is small:
+of 566 committed configs only 9 groups are canonically identical, 7 of them byte-different, 18
+files in total (3.2 %). One pair has materialised on disk as two run directories -
+`matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/`. So unifying on the
+`Experiment` (canonical-spec) path is a real but small win, and was NOT the dominant term."""
+
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 covered = 27
