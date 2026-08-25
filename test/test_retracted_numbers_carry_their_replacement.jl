@@ -93,6 +93,187 @@ end
     end
 end
 
+@testset "type-C coverage: what arbitrates, and what nothing arbitrates" begin
+    # THE ARBITRATION LAYER IS `refs/<source>.toml`, and it is the only thing in
+    # this tree that can decide a comparison: `src/model/ref.jl` re-measures the
+    # published target off a committed fixture with the metric we apply to our own
+    # runs, and DERIVES `arbitrates` rather than letting anyone assert it. A .bib
+    # entry or a PDF under `docs/refs/` cannot do that.
+    #
+    # This arm reports the coverage rather than demanding it. A ratchet on a
+    # registry with two entries would be a gate on how much reading has been done,
+    # which is not a defect a test can fix — but an UNNAMED hole is, and the
+    # numbers below are printed so the hole cannot be invisible.
+    claims = claim_ledger()
+    refsdir = joinpath(_REPO, "refs")
+    registered = sort([splitext(f)[1] for f in readdir(refsdir) if endswith(f, ".toml")])
+    @test !isempty(registered)
+    println("  arbitration layer (refs/*.toml): ", join(registered, ", "))
+
+    tc = [c for c in claims if c.type == "C"]
+    @test !isempty(tc)
+    anchored = [c for c in tc if !isempty(c.anchors)]
+    println("  type-C claims: ", length(tc), ", anchored: ", length(anchored))
+    for c in tc
+        isempty(c.anchors) && println("    NO ANCHOR  ", c.id, "  [", c.status, "]")
+    end
+
+    # Every anchor that IS declared must resolve. The parser enforces this; the
+    # assertion here makes the count visible in the report.
+    for c in claims, a in c.anchors
+        @test isfile(joinpath(refsdir, String(claim_anchor_source(a)) * ".toml"))
+    end
+
+    mktempdir() do d
+        row(extra; ty="C", es="in_tree") = """
+        schema_version = 1
+        [[claim]]
+        id = "x"
+        claim = "c"
+        status = "live"
+        type = "$ty"
+        scope = "s"
+        uncertainty = "unbounded: probe"
+        uncertainty_basis = "none"
+        evidence = []
+        evidence_status = "$es"
+        commit = "unknown"
+        doc = "CLAUDE.md"
+        section = "1"
+        pr = 1
+        $extra
+        """
+        w(n, e; kw...) = (p=joinpath(d, n * ".toml"); write(p, row(e; kw...)); p)
+
+        # An anchor naming a source with no refs/ file is refused — leaning on an
+        # unregistered paper is the shape that cannot arbitrate anything.
+        @test_throws ArgumentError claim_ledger(
+            path=w("ghost", "anchors = [\"nosuchpaper2099\"]"))
+        # A registered one passes, and the quantity suffix is accepted.
+        @test length(
+            claim_ledger(path=w("ok",
+                "anchors = [\"matsui2025:dip_width_exp_scanwindow_nT\"]")),
+        ) == 1
+        # type-C may not be `registered` with nothing arbitrating it…
+        @test_throws ArgumentError claim_ledger(
+            path=w("tc_unanchored",
+                "lifecycle = \"registered\"\nladder = \"exact: probe\""),
+        )
+        # …and type-B at the same lifecycle is untouched, or the rule has become a
+        # tax on every claim rather than on the one kind that is a comparison.
+        @test length(
+            claim_ledger(
+                path=w("tb_ok",
+                    "lifecycle = \"registered\"\nladder = \"exact: probe\""; ty="B"),
+            ),
+        ) == 1
+    end
+end
+
+@testset "the lifecycle gates at the moment a claim becomes words, not before" begin
+    # THE FIRST STATE IS UNGATED AND THAT IS THE DESIGN. Every other rule in this
+    # file binds a row already in the ledger; none reaches the stage where a
+    # number is being found, and none should. The measured lesson is that a gate
+    # which reddens during correct work gets disabled, and a disabled gate
+    # protects nothing — so the ladder binds at `registered`, the first state
+    # whose contents may be spoken in prose, a talk, or to the lab.
+    claims = claim_ledger()
+    @test all(c -> c.lifecycle in CLAIM_LIFECYCLE_STATES, claims)
+
+    byl = Dict{String, Int}()
+    for c in claims
+        byl[c.lifecycle] = get(byl, c.lifecycle, 0) + 1
+    end
+    println("  lifecycle: ", sort(collect(byl), by=x -> -x[2]))
+
+    # Non-vacuity: promotion must have happened somewhere, or the gate below is a
+    # green over an empty set.
+    reg = [c for c in claims if c.lifecycle in ("registered", "published")]
+    @test !isempty(reg)
+    @test all(c -> c.ladder !== nothing, reg)
+    @test all(c -> c.evidence_status == "in_tree", reg)
+
+    # And most rows must NOT be registered, or the state has been handed out
+    # rather than earned. This is a ratchet on honesty, not on progress.
+    @test length(reg) < length(claims)
+
+    # A ladder says which axes were walked, or says there is nothing to walk.
+    walked(l) = occursin(CLAIM_LADDER_EXACT_ESCAPE, l) || count(isdigit, l) >= 2
+    @test !walked("we checked it carefully")
+    @test walked("grid 32^3 / 48^3 / 64^3, monotone")
+    @test walked("exact: an algebraic identity")
+    bare = [c for c in reg if !walked(c.ladder)]
+    isempty(bare) || println("  registered with a ladder that names no axis:\n    ",
+        join([c.id for c in bare], "\n    "))
+    @test bare == LedgerClaim[]
+
+    mktempdir() do d
+        row(extra; es="absent") = """
+        schema_version = 1
+        [[claim]]
+        id = "x"
+        claim = "c"
+        status = "live"
+        type = "B"
+        scope = "s"
+        uncertainty = "unbounded: probe"
+        uncertainty_basis = "none"
+        evidence = []
+        evidence_status = "$es"
+        commit = "unknown"
+        doc = "CLAUDE.md"
+        section = "1"
+        pr = 1
+        $extra
+        """
+        w(n, e; es="absent") =
+            (p=joinpath(d, n * ".toml"); write(p, row(e; es=es)); p)
+
+        # THE LOOSE SIDE, and it is the arm that matters most. An exploratory row
+        # with absent evidence, no basis, no ladder MUST parse. If this ever goes
+        # red the gate has crept into the exploration it was built to leave alone.
+        @test length(claim_ledger(path=w("explore", "lifecycle = \"exploratory\""))) == 1
+        # Default is `candidate`, since a row is in the file at all.
+        @test only(claim_ledger(path=w("default", ""))).lifecycle == "candidate"
+
+        # The strict side must be reachable.
+        @test_throws ArgumentError claim_ledger(path=w("bad", "lifecycle = \"draft\""))
+        @test_throws ArgumentError claim_ledger(
+            path=w("reg_no_ladder", "lifecycle = \"registered\""))
+        @test_throws ArgumentError claim_ledger(
+            path=w("reg_absent",
+                "lifecycle = \"registered\"\nladder = \"grid 24/48/64\""),
+        )
+        @test_throws ArgumentError claim_ledger(
+            path=w("pub_no_blind",
+                "lifecycle = \"published\"\nladder = \"exact: identity\"";
+                es="in_tree"),
+        )
+        # ...and the same row WITH a blinding record must pass, or the rule has
+        # quietly become "published is unreachable".
+        @test length(
+            claim_ledger(
+                path=w("pub_ok",
+                    "lifecycle = \"published\"\nladder = \"exact: identity\"\n" *
+                    "blinding = \"frozen on synthetic 2026-08-20, unblinded 2026-08-25\"";
+                    es="in_tree"),
+            ),
+        ) == 1
+
+        # ONE discriminator is the type-3 failure in miniature: a single test that
+        # agrees with the story is what the story predicts. Two is the shape that
+        # killed the Coriolis reading (parity + substitution).
+        @test_throws ArgumentError claim_ledger(
+            path=w("one_disc", "discriminators = [\"parity in Omega\"]"))
+        @test length(
+            claim_ledger(
+                path=w("two_disc",
+                    "discriminators = [\"parity in Omega\", \"static-trap substitution\"]"),
+            ),
+        ) == 1
+    end
+end
+
 @testset "a retraction names the axis it moved, and both values" begin
     # THE HOLE THE TWO ARMS AT THE BOTTOM OF THIS FILE LEAVE. They bind whether
     # the killing row rests on ANYTHING — `in_tree` evidence and a real basis for

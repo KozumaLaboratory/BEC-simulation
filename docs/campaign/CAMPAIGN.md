@@ -40,8 +40,8 @@ as campaign evidence.
 
 The machine-readable ref list is **`docs/campaign/fix_list.toml`** — the file guard 1
 reads, and the only place the SHAs are declared. The table below is the human-readable
-context and deliberately carries no SHAs, so the two cannot drift. It has 16 entries to
-this table's 13: the June integrator row expands into the four propagator paths that
+context and deliberately carries no SHAs, so the two cannot drift. It has 17 entries to
+this table's 14: the June integrator row expands into the four propagator paths that
 carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
 `test/test_campaign_fix_list_gate.jl` pins the two counts against each other
 and re-runs the ancestor check over every ref, so neither the drift nor a dead ref is
@@ -49,6 +49,7 @@ left to a reader.
 
 | merged | correction | effect |
 |---|---|---|
+| **2026-04-28** | **`c_dd` carried an unnecessary F² = 36 factor** | effective DDI 7,647 → 275,292. **Every DDI-dependent result before this ref is void.** Added to the machine-readable list on 2026-08-25: until then the only record in the tree was a code comment, so guard 1 could not see it — the #343 class, at the oldest correction in the campaign |
 | 2026-06-15 | ITP spin-rotation Stage-3 density bias (c₁ + DDI) | changes ground states |
 | 2026-06-22 | Strang/Yoshida order restored under DDI via midpoint mean-field | integrator was **1st order** with DDI |
 | 2026-06-22 | LBFGS driven to its true gradient floor | changes converged GS |
@@ -359,3 +360,90 @@ which is the same move the ledger made for claim status — and the same reason.
 Related: `docs/campaign/claims.toml` (`quantity`, `prediction_registered`), §10 above.
 The FLAG-style quality colouring used in lattice QCD is the natural external-facing
 presentation of the A/B/C split plus these tags, if the campaign ever publishes the table.
+
+---
+
+## 13. The claim lifecycle, and the ladder each type has to walk
+
+`status` says whether a claim is still believed. **`lifecycle` says what it has been
+through**, and the two are orthogonal.
+
+```
+exploratory → candidate → registered → published
+```
+
+| state | bound by | may be used for |
+|---|---|---|
+| **exploratory** | **nothing** | anything. This is the point |
+| **candidate** | everything the ledger parser already demands | internal argument |
+| **registered** | the ladder below | **prose, slides, the lab** |
+| **published** | registered + an unblinding record (§12) | outside |
+
+**The first state is ungated on purpose, and that is the load-bearing part.** Every
+other rule in this campaign binds a row that is already written down. None reaches the
+stage where a number is being *found*, and none should: the measured lesson here is that
+a gate which reddens during correct work gets disabled, and a disabled gate protects
+nothing. Gates bind **at the moment a claim becomes words**, not while it is being
+discovered.
+
+Absent means `candidate` — a row is in the ledger, so it is at least that.
+
+### The ladders, derived from what actually went wrong
+
+The 18 retirements in the ledger fall into five shapes. Each ladder is the counter to one.
+
+**Numeric claims** — against *the convergence illusion* (`32³/64³ agree to 4 digits`,
+which was +2.47 % one-signed) and *coefficient/scaling* errors (`c_dd` × F² = 36, the
+11× quadratic Zeeman):
+
+- **three points per cutoff axis, and check monotonicity.** dx, dt, hold length, box,
+  `nev`, `ε_cut`. **Two points are banned**: two values cannot separate agreement from a
+  shared offset, and that is exactly how the 4-digit claim survived.
+- **one analytic anchor** — a TF limit, a sum rule, or a closed form that IS the limit.
+- If nothing converges (an identity, a census, a re-extraction from cache), say
+  `exact: <why>` rather than leaving the field blank.
+
+If the canonical grid carries a resolution ladder, the promotion evidence is a
+**by-product** rather than an extra run.
+
+**Mechanism claims** — against *the story arriving before the discriminator* (Coriolis):
+
+- **two discriminators of different kinds**, declared before the measurement: a
+  **symmetry test** (parity, channel invariance) and an **ablation or substitution**
+  (turn the term off; reproduce it with a static trap at ω_eff).
+- **One is refused by the parser.** A single test that agrees with the story is what the
+  story predicts.
+- The rule generalises: *the test that killed the last mechanism becomes a required
+  item for the next one*. The Ω-parity scan was not luck, it was the template.
+
+**Phase and boundary claims** — against *branch confusion* (68.4 µG read as a spinodal;
+the Saito-Li cigar branch):
+
+- a single warm-started continuation is **not** sufficient. Use deflation or an
+  independent-initial-condition ensemble, and establish existence **and** absence.
+- **a boundary may only be registered as a band, never as a line.** The LHY scheme moves
+  the FM/polar boundary by +0.40 against +9.9 µG; a line is a retraction candidate the
+  moment it is drawn.
+
+**Type-C claims** — blind analysis, §12.
+
+### Designing claims that are hard to retract
+
+Order the work by robustness, not by interest. This changes no issue's *order* — it adds
+one line to each issue's exit criterion.
+
+| wave | what | why it survives |
+|---|---|---|
+| **0** | sum rules, gated invariances, closed-form-is-the-limit | structurally protected |
+| **1** | discrete observables — level counts, label transitions, signs, parities | "it was slightly off" cannot happen to an integer |
+| **2** | continuous quantities **as bands**, with scheme / resolution / statistical width shown separately | an interval absorbs what a point cannot |
+| **3** | mechanism | needs the discriminator pair, so it lands last by construction |
+
+### The two numbers worth tracking
+
+**Internal capture rate** (errors that died before `registered`, over all errors) and
+**claim half-life** (candidate → retraction, as a distribution). Rising capture and
+falling half-life mean the institution works.
+
+**The retraction count is not a metric.** Minimising it selects for not making claims.
+The target is zero *external* retractions and *earlier* internal ones.
