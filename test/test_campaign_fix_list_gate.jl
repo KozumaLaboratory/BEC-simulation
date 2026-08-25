@@ -101,6 +101,17 @@ const _NOT_A_CORRECTION = Dict(
         "the observable correction (peak inside the hold) plus long-time arms; " *
         "corrects the reading, not the runs -- all affected numbers were " *
         "re-extracted from cache",
+    # CAMPAIGN.md §13's node-hours definition cites this as the commit that
+    # introduced `_write_exit_summary`, i.e. the DATE BEFORE WHICH no run recorded
+    # its own wall time. That is the vintage boundary of an artifact, the same
+    # role 15a9f1ee/306ef71a/e8168dcb play for the stored corpus: an input to a
+    # verdict about what can be measured, not a physics fix. Nothing needs to
+    # descend from it -- a run older than it produced correct results and merely
+    # left no runtime stamp.
+    "0d640402" =>
+        "the autopilot subsystem commit that introduced `_write_exit_summary` " *
+        "(2026-05-28); cited as the vintage boundary of the wall-time stamp, " *
+        "not as a correction -- runs predating it are fine, just untimed",
 )
 
 @testset "campaign fix list — parses, and every ref is real" begin
