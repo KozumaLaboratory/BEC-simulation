@@ -443,6 +443,25 @@ end
     r = trapped_bdg_frequencies(ws, ψ; nev=14, n_hessian=18, max_iter=250,
         hess_tol=1e-7, params=p, rng=MersenneTwister(7))
     nz = count(k -> r.omega[k] < 1e-3 && abs(r.growth[k]) < 1e-3, eachindex(r.omega))
-    @test nz == 12                                  # dim_C CP^12 = 12
+    # 12 = dim_C CP¹², and the assertion binds that DERIVED floor rather than the
+    # solver's exact output, because the two disagree by machine: the same code
+    # on the same 16-point grid returns 12 on TSUBAME and 13 on the CI runner.
+    # The extra mode arrives as an exact 0.0000e+00 — a purely REAL eigenvalue of
+    # the reduced generator, i.e. not an oscillating mode at all — so it is an
+    # artefact of the reduction on a 12-fold degenerate null block, not physics.
+    # Pinning `== 12` would be pinning one machine's arithmetic; pinning `>= 12`
+    # is the claim ("the whole tangent is flat") and it is not vacuous, which is
+    # what the control below shows.
+    @test nz >= 12
     @test nz - ez.predicted >= 8
+    # POSITIVE CONTROL for that floor: a state whose manifold is NOT the U(13)
+    # orbit must fail it, or `>= 12` would pass on anything. Same spinor, same
+    # nev, g_S no longer uniform.
+    ws_c, ψ_c = f6box(cand[:FM]; c1=0.1)
+    p_c = constrained_hessian_params(ws_c, ψ_c)
+    r_c = trapped_bdg_frequencies(ws_c, ψ_c; nev=14, n_hessian=18, max_iter=250,
+        hess_tol=1e-7, params=p_c, rng=MersenneTwister(7))
+    nz_c = count(k -> r_c.omega[k] < 1e-3 && abs(r_c.growth[k]) < 1e-3,
+        eachindex(r_c.omega))
+    @test nz_c < 12
 end

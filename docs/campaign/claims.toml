@@ -1406,6 +1406,14 @@ covered = 6
 note = "18 sections. The second document poured; the decision + the ambiguity + criteria B/C/D."
 
 [[coverage]]
+doc = "docs/design/trapped_spinor_bdg_spectrum.md"
+covered = 1
+note = """8 sections. Poured 2026-08-26 by `f6-uniform-gs-is-a-u2f1-orbit-so-nothing-selects`, which
+lands in §6 (KNOWN-LIMITs) alongside the aliasing limit from the same day. Pinned at the DERIVED
+number, not a guess: `ledger_section_coverage` reports 1/8 here. Uncovered: 1, 2, 3, 4, 4.1, 5, 7 —
+the design decisions and the acceptance table, none of which is a physics claim yet."""
+
+[[coverage]]
 doc = "docs/guides/eu_kappa_hysteresis_loop.md"
 covered = 1
 note = "15 sections. Cited by one row from another session; not poured."
