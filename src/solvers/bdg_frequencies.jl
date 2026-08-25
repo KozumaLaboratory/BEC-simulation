@@ -142,14 +142,32 @@ function _real_span_rank(vs, ipR; tol::Float64=1e-8)
 end
 
 """
-    bdg_expected_zero_modes(ws, ψ; params, ε, order, flat_rel, rank_tol, rng)
-        → NamedTuple
+    bdg_expected_zero_modes(ws, ψ; params, ε, order, flat_rel, rank_tol,
+                            deflation_rel, rng) → NamedTuple
 
 How many `ω ≈ 0` modes `trapped_bdg_frequencies` SHOULD return at `ψ`, derived
-from the broken symmetries alone. Compare it with the number it DOES return:
-an EXCESS is a flat direction no symmetry accounts for — an accidental
-degeneracy, which is the thing order-by-disorder needs before fluctuations can
-select within it.
+from the generators in `bdg_symmetry_generators` alone. Compare it with the
+number it DOES return: an EXCESS is a flat direction THAT LIST does not account
+for.
+
+**An excess is not evidence of an ACCIDENTAL degeneracy, and this distinction
+cost a measurement.** A symmetry the list does not contain produces exactly the
+same excess. The worked example is the case this function was written for: at
+uniform `g_S` the σ_S sum rule makes the interaction `(g/2)(ψ†ψ)²`, which is
+invariant under all of `U(2F+1)` — kinetic and trap are spin-blind — so the
+degenerate manifold is a SYMMETRY ORBIT and its flat directions are ordinary
+Goldstones. Measured at F=6, uniform `g_S` (2026-08-26): `dim(null) = 12` at
+polar, FM, cyclic, I_h and a random spinor alike — the whole CP¹² tangent —
+against `predicted` of 1–4, i.e. an excess of 8–11 that is entirely `U(13)`.
+Fluctuations respect that symmetry too: ε_LHY (`:full_bdg`, one table per ζ)
+came back `4.323347e-01` at every one of those spinors, while the same probe
+with a `g_S` spread moved it from 3.44 to 19.6. Nothing selects, and nothing
+gaps.
+
+So read an excess as "flat directions beyond the listed generators", and then
+identify them. Order-by-disorder needs the leftover to be accidental — degenerate
+at mean field WITHOUT a symmetry relating the points — and that is a separate
+question this function does not answer.
 
 **The count is over COMPLEX planes, not over broken generators, and the
 difference is not bookkeeping.** The reduction complexifies its subspace
@@ -178,6 +196,14 @@ anyone having to remember that a trap breaks translation invariance. The
 threshold is relative to that control because the FD Hessian's own noise floor
 scales with the operator.
 
+A generator the tangent projection ANNIHILATES is not broken and is dropped
+before any of this. `deflation_rel` is that test and it is relative to the
+unprojected generator: `P(iψ) = 0` holds only to round-off, and an absolute
+floor leaves a residue that normalises into noise, which is not stiff and was
+therefore reported flat — measured at F=6 uniform `g_S`, `gauge` joined the flat
+set at the cyclic, I_h and random spinors (not at polar or FM, which is why the
+F=1 box fixtures missed it) and `predicted` came out 4 instead of 2.
+
 Returns `predicted`, `flat` (the generator names kept), `n_broken`
 (= `rank_R` of them, so a repeated direction cannot inflate the count), `n_A`,
 `n_B`, `consistent`, `residuals` (per generator `(name, ‖g‖, ‖Aĝ‖)` for every
@@ -189,7 +215,8 @@ construction is a statement about `∇E = 2μψ`. And `ψ` may not alias
 """
 function bdg_expected_zero_modes(
     ws, ψ; params=nothing, ε::Float64=1e-5, order::Int=2,
-    flat_rel::Float64=1e-4, rank_tol::Float64=1e-8, rng=Random.default_rng(),
+    flat_rel::Float64=1e-4, rank_tol::Float64=1e-8, deflation_rel::Float64=1e-8,
+    rng=Random.default_rng(),
 )
     p = params === nothing ? constrained_hessian_params(ws, ψ) : params
     ipR(a, b) = real(_ipC(a, b, p.dV))
@@ -208,10 +235,20 @@ function bdg_expected_zero_modes(
     for (name, graw) in bdg_symmetry_generators(ws, ψ)
         g = _tangent_project(graw, ψ, p.dV, p.n2)
         ng = sqrt(max(ipR(g, g), 0.0))
+        nraw = sqrt(max(ipR(graw, graw), 0.0))
         # A generator the projection annihilates (gauge) or that leaves the
         # state where it is (`F_z` on a polar state) is not a broken symmetry
         # and contributes no mode. Reported with ‖Aĝ‖ = 0 rather than dropped.
-        if ng <= UNDERFLOW_FLOOR
+        #
+        # The test is RELATIVE to the unprojected generator, and has to be:
+        # `P(iψ) = 0` holds to round-off, not exactly, so an absolute floor
+        # leaves a ~1e-16 residue that normalises into pure noise — and noise
+        # has no reason to be stiff, so it was then reported FLAT. Measured
+        # 2026-08-26 at F=6 uniform g_S: `gauge` appeared among the flat
+        # generators for the cyclic, I_h and random spinors (never for polar or
+        # FM, which is why the F=1 box fixtures did not catch it), inflating
+        # `predicted` from 2 to 4.
+        if ng <= deflation_rel * max(nraw, UNDERFLOW_FLOOR)
             push!(residuals, (name, ng, 0.0))
             continue
         end

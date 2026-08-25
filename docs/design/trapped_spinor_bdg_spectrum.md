@@ -248,7 +248,18 @@ Hamiltonian, not of the list — `bdg_expected_zero_modes` measures it (each
 projected generator through the constrained Hessian, against a random
 direction's) rather than asserting it, and turns the surviving ones into the
 number of `ω ≈ 0` modes to expect. Its docstring is the one statement of that
-count; the excess over it is the accidental-degeneracy observable #455 wants.
+count.
+
+**The excess over that count is NOT an accidental degeneracy**, and reading it
+as one is what #455 was about to spend F=6 compute on. A symmetry the generator
+list does not contain gives the same excess, and at uniform `g_S` that is
+exactly the case: `Σ_{S even} σ_S = 1` makes the interaction `(g/2)(ψ†ψ)²`,
+invariant under all of `U(2F+1)`, so CP¹² is a symmetry ORBIT. Measured at F=6
+(2026-08-26, TSUBAME 8498064): `dim(null) = 12` — the whole CP¹² tangent — at
+polar, FM, cyclic, I_h and a random spinor alike, against a predicted 1–4, and
+`ε_LHY` identical to 2e-7 relative across all five while the same probe at a
+`g_S` spread moves by 5.7×. Nothing selects, nothing gaps. Ledger:
+`f6-uniform-gs-is-a-u2f1-orbit-so-nothing-selects`.
 
 **`ψ` may not alias `ws.state.psi`, and the failure is silent.**
 `energy_gradient!` opens with `copyto!(ws.state.psi, psi)`, so an aliased `ψ` is
