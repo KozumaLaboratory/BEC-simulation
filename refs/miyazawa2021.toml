@@ -1,0 +1,186 @@
+# Miyazawa (2021) PhD thesis — the ¹⁵¹Eu BEC-preparation numbers this repository
+# leans on for evaporation.
+#
+# Read by `ref(:miyazawa2021, :<quantity>)` (`src/model/ref.jl`); gated by
+# `test/validation/test_miyazawa2021_ref.jl`.
+#
+# WHY THIS SOURCE, AND WHY NOW. Measured 2026-08-25: the claim ledger's six
+# type-C rows had ZERO anchors between them, and five of the six lean on THIS
+# thesis (the evaporation arc). The two sources already registered — Matsui 2025,
+# Klaus 2022 — arbitrate nothing in the ledger. So the cheapest thing that makes
+# a live claim checkable is not the most interesting unread paper; it is
+# registering the one five rows already depend on.
+#
+# EVERY ROW IS `read_off`, so NOTHING HERE ARBITRATES — `arbitrates` is derived as
+# `measured && isempty(disqualified_by)` (`ref.jl`), and a thesis ships no
+# re-measurable record. Same standing as `refs/klaus2022.toml`, for the same
+# reason and with the same benefit: the schema is closed on both sides, every
+# value carries the page it was read from, and the numbers live in one place a
+# gate reads instead of being retyped per campaign.
+#
+# THE SOURCE IS AN EXCERPT, AND THAT IS DELIBERATE. The full thesis is 27.56 MB;
+# `docs/refs/Miyazawa_2021_thesis_excerpt_ch6_ch7.pdf` is the nine pages every
+# `locus` below cites (52-54, 59-62, 65-66 of the original), 5.05 MB. A `read_off`
+# row owes "the line of the authors' published source", and the pages carrying
+# those lines discharge that at a fifth of the weight. The full PDF lives outside
+# the repository; if a future row needs another page, extend the excerpt rather
+# than retyping a number out of a file nobody else can open.
+#
+# TEXT EXTRACTS FINE, contrary to what the memory store recorded ("No Japanese
+# text extractable (CID fonts) — render pages with pypdfium2 and Read the PNG").
+# The body is in ENGLISH and `get_textpage().get_text_range()` returns it
+# verbatim, which is how every `locus` below is quoted rather than transcribed.
+# The note was true of the Japanese front matter and was generalised to the
+# thesis.
+#
+# ONE ROW IS DELIBERATELY ABSENT. There is no `a_s` row for production use. The
+# thesis's 135 a_B is registered below as `a_s_thesis` BECAUSE it is what the
+# thesis says, and the name carries the warning: production uses 110(4) a_B from
+# Matsui et al., a later published MEASUREMENT that supersedes an estimate. A row
+# called `a_s` would be one `ref` call away from re-entering the code as an input
+# authority and reversing a decision taken on 2026-07-27.
+
+format = 1
+
+[paper]
+citation = "Y. Miyazawa, Bose-Einstein condensation of europium (PhD thesis, Tokyo Institute of Technology, 2021), Ch. 6 (optical dipole trap) and Ch. 7 (Bose-Einstein condensate)"
+journal = "PhD thesis, Tokyo Institute of Technology (Kozuma group)"
+year = 2021
+
+# No datasets: a thesis ships no re-measurable record. Required by the file
+# schema and deliberately empty — which is what forces every row to be
+# `read_off`, and therefore non-arbitrating.
+[dataset]
+
+# ---------------------------------------------------------------------------
+# READ_OFF. `locus` quotes the sentence and names the page of the ORIGINAL
+# thesis; page N maps to the excerpt PDF in the order listed in its header.
+# ---------------------------------------------------------------------------
+
+[quantity.alpha_scalar_1550nm]
+provenance = "read_off"
+value = 189.0
+units = "atomic units (a.u.)"
+locus = "p. 53, Table 6.1: \"1550 nm | 189(5) a.u. | 0(3) a.u. | 0(5) a.u. | 0.43 s^-1\""
+note = """
+Scalar polarizability of ¹⁵¹Eu at 1550 nm, with a stated uncertainty of 5 a.u. \
+(2.6 %). Registered because it is the one atomic constant in the evaporation \
+model that does NOT move between apparatus epochs, so a disagreement here would \
+be a units or conversion error rather than a different machine.
+
+The same table gives the vector and tensor polarizabilities as 0(3) and 0(5) \
+a.u., i.e. consistent with zero: the 1550 nm trap is SCALAR and spin-independent, \
+which is why no tensor light shift enters the Eu evaporation model. That absence \
+is load-bearing and is easier to lose than a number.
+"""
+
+[quantity.velocity_ratio_parallel_perp]
+provenance = "read_off"
+value = 1.25
+units = "dimensionless (v_parallel / v_perpendicular)"
+locus = "p. 66, Sec. 7.x: \"we already got a experimental result on the ratio of the velocities of 1.25\""
+note = """
+The MEASURED quantity behind the thesis's scattering length. Griesmaier's method: \
+expand the condensate with the magnetic moment parallel and then perpendicular to \
+the imaging axis, and compare the asymptotic velocity ratio against a numerical \
+simulation of the expanding dipolar BEC.
+
+Registered separately from `eps_dd_thesis` because it is the datum and the other \
+is an inference from it through someone else's simulation. Conflating them is how \
+a fitted number acquires the standing of a measurement.
+"""
+
+[quantity.eps_dd_thesis]
+provenance = "read_off"
+value = 0.44
+units = "dimensionless (a_dd / a_s)"
+locus = "p. 66: \"By comparing the ratio to the numerical solution, we get a eps_dd = 0.44, which corresponds to a s-wave scattering length of as = 135 aB\""
+note = """
+Relative DDI strength, inferred from the 1.25 velocity ratio by comparison with a \
+numerical simulation — not measured directly.
+
+THE THESIS NAMES ITS OWN SYSTEMATIC IN THE SAME PARAGRAPH: \"Note that the \
+magnetic field direction is slightly tilted to the ODT trapping axis (~12 deg), \
+which I did not take into account to the calculation. More proper estimation is a \
+future task.\" A 12 deg tilt is not a rounding error on an anisotropy measurement, \
+and the authors say so.
+"""
+
+[quantity.a_s_thesis]
+provenance = "read_off"
+value = 135.0
+units = "a_0 (Bohr radii)"
+locus = "p. 66: \"which corresponds to a s-wave scattering length of as = 135 aB\""
+note = """
+NOT THE PRODUCTION VALUE, and the name says so. Production uses 110(4) a_0 from \
+Matsui et al. — a later published MEASUREMENT, which supersedes an estimate \
+inferred through a simulation and carrying an unmodelled 12 deg field tilt. \
+Decision taken 2026-07-27; the codebase is internally consistent on 110 (the \
+`c_extra` basis uses a_12 = 110, and eps_dd ~= 60/110 ~= 0.55 follows).
+
+REGISTERED ANYWAY, and this is the point of the file: every thesis-derived number \
+below was extracted USING 135, so quoting one of them against a production run \
+built on 110 is a comparison between two different atoms unless the dependency is \
+carried. `three_body_L` is the case that bites — see its note.
+
+There is deliberately no row called `a_s`. This one cannot be reached by \
+autocompleting the obvious name.
+"""
+
+[quantity.omega_bar_bec]
+provenance = "read_off"
+value = 204.0
+units = "Hz (mean trap frequency, omega_bar / 2*pi)"
+locus = "p. 62: \"By using as = 135 aB and omega_bar = 2*pi x 204 Hz, we extract L ~ 10^-29 cm^6/s\""
+note = """
+Geometric-mean trap frequency of the BEC-stage ODT, and one of the two inputs the \
+thesis's three-body coefficient is extracted with. Registered because L depends on \
+it: Eq. 7.7 carries (m*omega_bar/(hbar*sqrt(a_s)))^(6/5) inside a square, so \
+L ~ omega_bar^(-12/5). A 10 % error in omega_bar is a 27 % error in L.
+"""
+
+[quantity.tau_3body_initial]
+provenance = "read_off"
+value = 1.4
+units = "s (1/e lifetime of the initial three-body decay)"
+locus = "p. 62: \"A 1/e lifetime for the initial three-body loss is estimated to (gamma*N^(4/5))^-1 = 1.4 s\""
+note = """
+The fitted quantity. The thesis fits dN/dt = -gamma*N^(9/5) - alpha*N and reports \
+that \"The data was described by only three-body loss, and we couldn't estimate \
+one-body loss rate alpha\" — so alpha is unconstrained, not zero, and any one-body \
+channel is folded into gamma. That is the direction that makes the extracted \
+three-body coefficient an UPPER bound.
+
+THE EXPONENT IS AN INDEPENDENT CONFIRMATION of a claim this repository derived \
+separately. Eq. 7.5-7.6 give dN/dt = -gamma*N^(9/5) with solution N ~ t^(-5/4) at \
+long time, which is exactly the attractor in \
+`eu-evap-condensate-n2-moment-is-8-over-21` (n_0 ~ N_0^(2/5) gives \
+dN_0/dt = -gamma*N_0^(9/5), hence N_0 -> [(4/5)*gamma*t]^(-5/4), independent of the \
+initial atom number). Two derivations, five years apart, same power.
+"""
+
+[quantity.three_body_L]
+provenance = "read_off"
+value = 1.0e-41
+units = "m^6/s (converted from cm^6/s)"
+locus = "p. 62: \"we extract L ~ 10^-29 cm^6/s, which is the same order of that for rubidium atom in |F = 2, mF = 2>\""
+note = """
+Converted at 1 cm^6 = 1e-12 m^6, so 1e-29 cm^6/s = 1e-41 m^6/s. ONE SIGNIFICANT \
+FIGURE AT BEST — the thesis writes \"~\" and compares only the ORDER against \
+rubidium, so this is not a two-digit number and must not be quoted as one.
+
+IT CARRIES a_s AND omega_bar WITH IT. Eq. 7.7 is \
+L = gamma*(6/7)*[(15^(2/5)/(14*pi))*(m*omega_bar/(hbar*sqrt(a_s)))^(6/5)]^(-2), so \
+L ~ a_s^(6/5) * omega_bar^(-12/5). Re-extracting at the production a_s = 110 a_0 \
+instead of the thesis's 135 multiplies it by (110/135)^1.2 = 0.78, i.e. 22 % LOWER. \
+That is smaller than the one-digit precision of the number itself, which is the \
+useful conclusion: the a_s epoch difference does NOT explain a factor-2.6 spread.
+
+WHERE THIS SITS RELATIVE TO THE LIVE CLAIM. \
+`eu-evap-k3-outside-universal-vdw-band` needs K_3 ~ 2.45e-40 m^6/s to reproduce \
+the measured endpoint, against a universal van der Waals band top of 9.7e-41. This \
+thesis value, ~1e-41, is INSIDE the band and a factor ~25 below what the endpoint \
+demands. So the two numbers are not in competition and the claim's gap is not \
+closed by adopting the thesis figure — which is what a reader would otherwise \
+assume from "the thesis measured K_3".
+"""

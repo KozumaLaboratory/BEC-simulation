@@ -525,6 +525,12 @@ const CI_EXTRA = [
     # refusal that follows from it — a paper with no re-measurable record has
     # only `read_off` rows, none arbitrate, and a :C Claim against them throws.
     "validation/test_klaus2022_ref.jl",
+    # `refs/miyazawa2021.toml` + `ref`: the third source, and the first added
+    # because a LIVE CLAIM needed it rather than because the paper was
+    # interesting. Pins the a_s trap (135 thesis vs 110 production), that the
+    # thesis K_3 does NOT close `eu-evap-k3-outside-universal-vdw-band`, and that
+    # the thesis's own decay exponent agrees with our TF derivation.
+    "validation/test_miyazawa2021_ref.jl",
     # Klaus 2022 magnetostirring: the coefficient chain, the directional
     # magnetostriction oracle (coarse-grid ITP), and the pre-registered
     # thresholds re-applied to the stored production verdicts.
