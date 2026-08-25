@@ -447,3 +447,72 @@ falling half-life mean the institution works.
 
 **The retraction count is not a metric.** Minimising it selects for not making claims.
 The target is zero *external* retractions and *earlier* internal ones.
+
+---
+
+## 14. When we disagree with a paper — attribution, in a fixed order
+
+**A published number is not an oracle.** `refs/` exists because the alternative — a
+number typed out of a PDF — is one more place a value drifts from the paper it came
+from, and `src/model/ref.jl` therefore re-measures a published target off a committed
+fixture with the metric we apply to our own runs, and **derives** `arbitrates` rather
+than letting anyone assert it. Only what is registered there can decide a comparison; a
+`.bib` entry and a PDF in `docs/refs/` cannot.
+
+And a registered paper can still be wrong. Saito-Li's cigar branch is not the minimum of
+Saito-Li's own functional (#387). So the question "who is wrong" needs a procedure, not a
+disposition.
+
+### The four hypotheses, eliminated in this order
+
+**1. The two numbers are not the same quantity.** Window, reduction, boundary — the
+`quantity` fields from §13. This is the 10.4 nT shape: three readings of one cached scan
+put the argmax in three places, and 16 of 20 arms were reading a pre-hold transient.
+Before anything else, check that both sides reduce the same thing over the same interval.
+
+**2. The conventions differ.** `c_dd` with or without 4π; `F` versus `S`; the rotating
+frame's sign; ω̄ as geometric or arithmetic mean; per-atom versus norm-N couplings.
+**Keep a conversion table per source**, in that source's `refs/` file — not in prose,
+because the next reader will re-derive it and get a different answer half the time.
+
+**3. We are wrong.** Walk the numeric ladder (§13): three points per cutoff axis with
+monotonicity, plus an analytic anchor. Most of the time this is where it ends.
+
+**4. They are wrong.**
+
+**Claiming 4 requires 1–3 to have been eliminated in writing.** Not considered — written
+down, in the row or the report. This is the one step whose cost is asymmetric: a wrong
+claim of (3) costs a re-run, a wrong claim of (4) costs a correction to someone else's
+published work.
+
+### The weapon for step 4 is a one-sided test, not a better simulation
+
+Two integrators disagreeing is not evidence about which is right. **A variational or
+inequality argument is**, because it does not require trusting either one:
+
+- put **their** solution into **our** functional — if it is above our minimum, their
+  branch is not the minimum of the functional they claim to minimise;
+- bound **our** answer from one side with a trial function — a *weaker* bound that still
+  excludes their value is a *stronger* result, because it leans on less;
+- the virial theorem and sum rules are the same shape: an identity the answer must satisfy
+  regardless of how it was computed.
+
+`SpinorBEC.variational_bound` is this instrument, and `testing_strategy.md` already names
+`bound` as **the only grounding method that says which side of a disagreement is wrong**.
+#387 reached for it by accident and it settled the question at every field (+1.07 to
++1.48); the point of this section is that it should be reached for on purpose, as step 4's
+first move rather than its last.
+
+### What this changes about choosing what to reproduce
+
+Reproduction is **pulled by claims, not pushed by the literature.** A claim that wants
+`registered` declares the external results it leans on (`anchors`); if one is not
+registered, registering it is the gate. The weekly arXiv sweep becomes an act of filing,
+not a queue of work.
+
+Measured 2026-08-25, and it inverts the intuition about what to read next: the ledger's
+**six type-C claims have zero anchors between them**. The two registered sources arbitrate
+nothing in the ledger, and everything needing arbitration leans on a source that is not
+registered — five evaporation rows on Miyazawa 2021, one on Saito-Li 2024. So the cheapest
+next move is not the most interesting paper; it is **registering a source five live claims
+already depend on**.
