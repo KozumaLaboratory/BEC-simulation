@@ -283,6 +283,26 @@ function _k2022_frames(; n=30, tilt_until=26)
     ]
 end
 
+"A saved frames file: striped column densities on a 32² grid, one per time."
+function _write_k2022_frames(dir, arm; times)
+    nx = ny = 32
+    cols = [
+        [
+            1.0 + 0.2 * sin(2π * 3 * i / nx) *
+                  exp(-((i - nx / 2)^2 + (j - ny / 2)^2) / 200)
+            for i in 1:nx, j in 1:ny
+        ] for _ in times
+    ]
+    p = joinpath(dir, "$(arm)_frames.jld2")
+    JLD2.jldopen(p, "w") do f
+        f["times"] = collect(float.(times))
+        f["column_density"] = cols
+        f["dx"] = 0.25
+        f["dy"] = 0.25
+    end
+    p
+end
+
 @testset "klaus2022_reanalyse goes through reanalyze (#483)" begin
     fr = _k2022_frames()
     payload, aux = _K2022.frames_payload(fr)
@@ -340,25 +360,53 @@ end
     # `frame_metrics` still runs end to end on a saved frames file, and names its
     # own absence rather than throwing.
     mktempdir() do root
-        p = joinpath(root, "stripes_frames.jld2")
-        nx = ny = 32
-        cols = [
-            [
-                1.0 + 0.2 * sin(2π * 3 * i / nx) * exp(-((i - nx / 2)^2 + (j - ny / 2)^2) / 200)
-                for i in 1:nx, j in 1:ny
-            ] for _ in 1:3
-        ]
-        JLD2.jldopen(p, "w") do f
-            f["times"] = [0.0, 1.0, 2.0]
-            f["column_density"] = cols
-            f["dx"] = 0.25
-            f["dy"] = 0.25
-        end
+        p = _write_k2022_frames(root, "stripes"; times=[0.0, 1.0, 2.0])
         fr = _K2022.frame_metrics(p, "stripes", 0.5, 5.0)
         @test fr isa Vector && length(fr) == 3
         @test all(hasproperty(f, :axis_order) for f in fr)
         missing_msg = _K2022.frame_metrics(joinpath(root, "nope_frames.jld2"),
             "stripes", 0.5, 5.0)
         @test missing_msg isa String && occursin("no frames at", missing_msg)
+    end
+
+    # ...and `main` itself — read, reduce, difference, write — on a fixture. A
+    # gate that stops one call short of the thing that writes the numbers has not
+    # covered the driver.
+    mktempdir() do root
+        # Times spanning the control's θ ramp (0.6 → 0.7 s in internal units), so
+        # the pre-registered "last 20 %" window still contains a TILTED frame and
+        # the declared window does not. That difference is the driver's subject.
+        times = [0.0, 60.0, 120.0, 180.0, 200.0, 250.0]
+        for arm in ("stripes", "control")
+            _write_k2022_frames(root, arm; times=times)
+        end
+        results = joinpath(root, "klaus2022_results.json")
+        open(results, "w") do io
+            JSON.print(io,
+                Dict(
+                    arm => Dict("k_lo" => 0.5, "k_hi" => 5.0,
+                        "cloud_diameter_aho" => 12.0)
+                    for arm in ("stripes", "control")
+                ), 2)
+        end
+
+        txt = _capture(() -> _K2022.main(; results=results, frames=root))
+        @test occursin("=== control ===", txt)
+        @test occursin("ADMISSIBLE false", txt)
+
+        out = JSON.parsefile(results)
+        rec = out["reanalysis"]["control"]["reanalysis"]
+        @test rec["admissible"] === false
+        # The frames file carries no producing commit; the record says so instead
+        # of leaving the vintage to be assumed.
+        @test rec["n_unstamped"] == 1
+        @test any(r -> occursin("unstamped", r), rec["inadmissible_because"])
+        @test rec["observables"]["axis_order (declared)"]["reduction"] == "mean"
+        # Both windows are reported, and on the control they really are different
+        # windows.
+        pre = out["reanalysis"]["control"]["pre_registered_window"]
+        dec = out["reanalysis"]["control"]["declared_window"]
+        @test pre["n_frames"] > dec["n_frames"]
+        @test occursin("neither replaces the other", out["reanalysis"]["note"])
     end
 end

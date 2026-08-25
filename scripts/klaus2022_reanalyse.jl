@@ -191,14 +191,24 @@ function reference_disagreement(ref, got)
     nothing
 end
 
-function main()
-    res = JSON.parsefile(RESULTS)
+"""
+    main(; results = RESULTS, frames = FRAMES)
+
+Re-reduce every arm and write the report back into `results`.
+
+The two paths are arguments rather than constants so the whole path — read,
+reduce, difference against the reference, write — can be exercised on a fixture.
+A driver whose `main` cannot be run is a driver whose gate stops one call short
+of the thing that actually writes the numbers.
+"""
+function main(; results::AbstractString=RESULTS, frames::AbstractString=FRAMES)
+    res = JSON.parsefile(results)
     report = Dict{String, Any}()
     records = Dict{String, Any}()
 
     for arm in ("stripes", "control")
         haskey(res, arm) || continue
-        path = joinpath(FRAMES, "$(arm)_frames.jld2")
+        path = joinpath(frames, "$(arm)_frames.jld2")
         D = Float64(res[arm]["cloud_diameter_aho"])
         k_lo = Float64(res[arm]["k_lo"])
         k_hi = Float64(res[arm]["k_hi"])
@@ -275,10 +285,10 @@ function main()
         "`declared_window` restricts the θ→0 control to frames where θ has " *
         "reached 0; the pre-registered \"last 20 %\" window still contained 40 ms " *
         "at the full 35° tilt. Both are reported; neither replaces the other."
-    open(RESULTS, "w") do f
+    open(results, "w") do f
         JSON.print(f, res, 2)
     end
-    println("\nwritten to ", RESULTS)
+    println("\nwritten to ", results)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
