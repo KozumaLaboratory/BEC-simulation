@@ -63,6 +63,7 @@ using SpinorBEC
 using Test
 
 include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+include(joinpath(@__DIR__, "helpers", "scratch_git.jl"))
 
 const _REPO = normpath(joinpath(@__DIR__, ".."))
 const _SCRIPTS = joinpath(_REPO, "scripts")
@@ -416,10 +417,15 @@ function _drive_drift(script, generator_body)
             "else echo \"[stub] gh \$*\"; fi\n",
         )
         chmod(gh, 0o755)
-        for c in (`git init -q`, `git add -A`,
-            `git -c user.email=t@t -c user.name=t commit -qm base`)
-            run(pipeline(Cmd(c; dir=d); stdout=devnull, stderr=devnull))
-        end
+        # `scratch_git`, not a bare `Cmd(`git …`)`: the local `-c user.email` /
+        # `-c user.name` this used to carry are the two settings anyone remembers,
+        # and everything else in the developer's `~/.gitconfig` came in behind
+        # them — `commit.gpgsign = true` among it, which made this commit exit 128
+        # after a minute on the machine that signs its commits. See
+        # test/helpers/scratch_git.jl.
+        scratch_git("init", "-q"; dir=d)
+        scratch_git("add", "-A"; dir=d)
+        scratch_git("commit", "-qm", "base"; dir=d)
         write(joinpath(d, "script.sh"), script)
         out = IOBuffer()
         p = run(

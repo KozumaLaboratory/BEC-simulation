@@ -32,6 +32,7 @@ using SpinorBEC: marker_path, incomplete_marker_path, admit_payload,
     read_complete_marker, write_complete_marker, write_incomplete_marker,
     PayloadEntry, _has_result, _admitted_result_path, _result_path_or_nothing,
     _result_path, _reset_unmarked_warnings!
+include(joinpath(@__DIR__, "..", "helpers", "cacheable_tree.jl"))
 
 # No solver produces this. From the moment it is planted, reading it back means
 # "admission served this file"; not reading it back means "this point was
@@ -109,7 +110,14 @@ energy_of(p) = JLD2.load(p)["energy"]
     mktempdir() do dir
         y = joinpath(dir, "scan.yaml")
         write(y, scan_probe_yaml())
-        run_scan() = run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+        # `with_cacheable_tree`: a re-run that must HIT the cache. `_assert_point_provenance`
+        # refuses a reuse when the tree is dirty, i.e. in any working checkout — but the
+        # point was written by this process seconds earlier, so the code cannot differ,
+        # and the admission counting happens in `admit_payload`, before the check.
+        # See test/helpers/cacheable_tree.jl.
+        run_scan() = with_cacheable_tree() do
+            run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+        end
 
         rd = run_scan()
         p1 = joinpath(rd, "point_001.jld2")
@@ -263,7 +271,9 @@ end
     mktempdir() do dir
         y = joinpath(dir, "scan_dyn.yaml")
         write(y, scan_probe_yaml(; dynamics=true))
-        rd = run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+        rd = with_cacheable_tree() do
+            run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+        end
         p1 = joinpath(rd, "point_001.jld2")
         p2 = joinpath(rd, "point_002.jld2")
         res = joinpath(rd, "result.jld2")

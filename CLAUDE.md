@@ -433,6 +433,22 @@ Choose the probes from the failure being guarded against, never for
 convenience: a positive control that cannot fail proves nothing, which is the
 degenerate-knob trap in another costume.
 
+**And this applies to a committed gate, not only to a session's inline scan.**
+Measured 2026-08-26: the class gate inside
+`test_index_backed_gates_see_untracked.jl` — the file whose entire thesis is
+that *"an empty result and an unreachable corpus print the same two
+characters"* — had been blind since the day it was written. `tree_files(root/test)`
+returns paths relative to `root`; it joined them against `dirname(root)`, so all
+523 candidates resolved to files that do not exist, every one hit the `continue`,
+and `isempty(bare)` was asserted over a scan that had never opened anything. A
+green gate is not evidence that it looked. Two further things followed and both
+generalise: **the moment it could see, all three of its hits were prose** in
+docstrings, so the blindness had also hidden that the predicate was too wide —
+a blind scan conceals its own over-reach as well as its under-reach. And the
+repair is not a corrected line but a `calibrated_scan` plus an assertion that the
+corpus is non-empty and was fully opened, because those are what make a repeat
+red instead of silent. **A gate that walks a corpus asserts the corpus.**
+
 ## Before starting a topic — enumerate the open work, and disposition it
 
 Not a reminder. A file that must exist, in a state it may not be left in:

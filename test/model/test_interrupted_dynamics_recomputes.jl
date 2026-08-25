@@ -34,6 +34,7 @@ using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload, _has_result,
     _run_simulation_standard!, _run_simulation_leapfrog!, _reset_unmarked_warnings!
 include(joinpath(@__DIR__, "..", "helpers", "interrupt_harness.jl"))
+include(joinpath(@__DIR__, "..", "helpers", "cacheable_tree.jl"))
 
 # 1-D, 64 points, F=1, no DDI: the cheapest workspace that still exercises the
 # real V/K/V chain both loops run.
@@ -244,7 +245,14 @@ const DYN_DURATION = 100.0
         interrupted_t_end === nothing || @test interrupted_t_end < DYN_DURATION
 
         # (ii) the next run RECOMPUTES rather than serving the partial output.
-        run_yaml(cfg; verbose=false)
+        # `with_cacheable_tree`: a re-run that must HIT the cache. `_assert_point_provenance`
+        # refuses a reuse when the tree is dirty, i.e. in any working checkout — but the
+        # point was written by this process seconds earlier, so the code cannot differ,
+        # and the admission counting happens in `admit_payload`, before the check.
+        # See test/helpers/cacheable_tree.jl.
+        with_cacheable_tree() do
+            run_yaml(cfg; verbose=false)
+        end
         @test JLD2.load(psi_file)["energy"] == interrupted_gs_E   # GS phase unchanged
         @test isfile(res_file)
         @test JLD2.load(res_file)["dynamics/times"][end] ≈ DYN_DURATION rtol = 1.0e-6
@@ -257,7 +265,9 @@ const DYN_DURATION = 100.0
         # POSITIVE CONTROL for the recomputation: admission must still SERVE a
         # dynamics run that finished, or "it recomputed" would be consistent
         # with an admission that recomputes everything.
-        t_hit = @elapsed run_yaml(cfg; verbose=false)
+        t_hit = @elapsed with_cacheable_tree() do
+            run_yaml(cfg; verbose=false)
+        end
         @test JLD2.load(res_file)["dynamics/times"][end] ≈ DYN_DURATION rtol = 1.0e-6
         @test t_hit < 1.0     # a cache hit is milliseconds; the run is seconds
     end

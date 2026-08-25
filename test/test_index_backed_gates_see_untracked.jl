@@ -45,13 +45,17 @@ using Test
 using SpinorBEC
 
 include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+include(joinpath(@__DIR__, "helpers", "scratch_git.jl"))
 
 "Build a throwaway git repo with a known tracked/untracked/ignored layout."
 function _scratch_repo(f)
-    mktempdir() do dir
-        run(pipeline(Cmd(`git init -q`; dir), devnull))
-        run(pipeline(Cmd(`git config user.email t@t`; dir), devnull))
-        run(pipeline(Cmd(`git config user.name t`; dir), devnull))
+    # `scratch_git_repo`, not `mktempdir` + a bare `git init`: setting
+    # `user.email` and `user.name` locally is the half everyone remembers, and the
+    # rest of the developer's `~/.gitconfig` arrived behind it. `commit.gpgsign =
+    # true` made the commit below exit 128 on the machine that signs its commits,
+    # so this file was permanently red locally and green in CI. See
+    # test/helpers/scratch_git.jl.
+    scratch_git_repo() do dir
         mkpath(joinpath(dir, "scripts", "sub"))
         write(joinpath(dir, ".gitignore"), "scripts/ignored_clutter.sh\n")
 
@@ -59,12 +63,10 @@ function _scratch_repo(f)
         write(joinpath(dir, "scripts", "committed.sh"), "#!/bin/bash\n")
         # (b) staged but not committed
         write(joinpath(dir, "scripts", "staged.sh"), "#!/bin/bash\n")
-        run(
-            pipeline(Cmd(`git add .gitignore scripts/committed.sh scripts/staged.sh`;
-                    dir), devnull),
-        )
-        run(pipeline(Cmd(`git commit -q -m init -- .gitignore scripts/committed.sh`;
-                dir), devnull))
+        scratch_git("add", ".gitignore", "scripts/committed.sh",
+            "scripts/staged.sh"; dir)
+        scratch_git("commit", "-q", "-m", "init", "--",
+            ".gitignore", "scripts/committed.sh"; dir)
         # (c) untracked, NOT ignored — the file the old corpus dropped
         write(joinpath(dir, "scripts", "untracked_new.sh"), "#!/bin/bash\n")
         # (d) untracked AND ignored — must stay invisible
@@ -109,8 +111,8 @@ end
     # was fine, this is the counter-example, executed rather than described.
     _scratch_repo() do dir
         index_only = Set(
-            split(
-                read(Cmd(`git ls-files scripts`; dir), String), '\n'; keepempty=false),
+            split(scratch_git("ls-files", "scripts"; dir, capture=true),
+                '\n'; keepempty=false),
         )
         @test !("scripts/untracked_new.sh" in index_only)   # the blindness
         @test "scripts/committed.sh" in index_only          # ...and it looked fine
@@ -118,24 +120,66 @@ end
 end
 
 @testset "no gate in the tree builds a corpus from a bare `git ls-files`" begin
-    # The class gate. CLAUDE.md commitment 11: a new single source of truth
-    # ships with the gate that outlaws the old form, or the migration becomes
-    # permanent and the tree carries two live definitions of the same thing.
+    # The class gate. CLAUDE.md commitment 11: a new single source of truth ships
+    # with the gate that outlaws the old form, or the migration becomes permanent
+    # and the tree carries two live definitions of the same thing.
+    #
+    # THIS SCAN WAS BLIND FROM THE DAY IT WAS WRITTEN UNTIL 2026-08-26, and blind
+    # in the same direction as the defect the file is about. `tree_files(root/test)`
+    # returns paths relative to `root`; it joined them against `dirname(root)`, so
+    # all 523 candidates resolved to files that do not exist, every one hit the
+    # `continue`, and `isempty(bare)` was asserted over a scan that had never
+    # opened anything. No probe could have failed — the exact thesis of this file,
+    # one level up: an empty result and an unreachable corpus print the same two
+    # characters.
+    #
+    # The moment it could see, it found three hits and ALL THREE WERE PROSE
+    # ("never a bare `git ls-files`" in a docstring). So the predicate was also
+    # too wide, which the blindness had hidden. Both are fixed here and both are
+    # now held by controls, via `calibrated_scan` — which is what should have been
+    # used in the first place.
     root = normpath(joinpath(@__DIR__, ".."))
-    files = tree_files(joinpath(root, "test"))
-
-    # `--others` is what makes an `ls-files` call see the working tree; a call
-    # carrying it is fine however it is spelled.
-    bare = String[]
-    for rel in files
-        path = joinpath(dirname(rstrip(root, '/')), rel)
-        isfile(path) || continue
-        endswith(path, "test_index_backed_gates_see_untracked.jl") && continue
-        for m in eachmatch(r"git[^\n`]*ls-files[^\n`]*", read(path, String))
-            occursin("--others", m.match) || push!(bare, rel * ": " * strip(m.match))
-        end
+    rels = filter(tree_files(joinpath(root, "test"))) do rel
+        # This file states the old spelling in order to reproduce it (above).
+        !endswith(rel, "test_index_backed_gates_see_untracked.jl")
     end
+    corpus = [
+        (rel, read(joinpath(root, rel), String)) for rel in rels
+                                                     if isfile(joinpath(root, rel))
+    ]
 
-    @test isempty(bare)
-    isempty(bare) || @info "bare `git ls-files` corpora (use `git_corpus`)" bare
+    # A COMMAND, not a mention. Real call sites build the literal inside a `Cmd(`;
+    # prose quotes `git ls-files` in running text. `--others` is what makes the
+    # call see the working tree, so a call carrying it is fine however spelled.
+    call = r"Cmd\(`git\b[^`\n]*\bls-files\b[^`\n]*`"
+    offenders(text) = [strip(m.match) for m in eachmatch(call, text)
+                        if !occursin("--others", m.match)]
+
+    hits = calibrated_scan(corpus;
+        match=e -> !isempty(offenders(e[2])),
+        # POSITIVE control: the defect, spelled the way #425 found it.
+        present=("<probe>", "index = read(Cmd(`git ls-files scripts`; dir), String)"),
+        # NEGATIVE control: the prose that made the sighted scan report three
+        # false hits. Widening an exclusion list instead of narrowing the
+        # predicate would have been fixing the threshold, not the instrument.
+        absent=("<probe>", "Use this, never a bare `git ls-files`, whenever a gate's corpus is"),
+        describe=first)
+
+    @test isempty(hits)
+    isempty(hits) || @info "bare `git ls-files` corpora (use `git_corpus`)" [
+        e[1] * ": " * o for e in hits for o in offenders(e[2])]
+
+    # A correctly-spelled call must NOT be flagged — `calibrated_scan`'s negative
+    # probe covers prose, and this covers the other direction: the real helper.
+    @test isempty(
+        offenders(
+            "out = read(Cmd(`git ls-files --cached --others --exclude-standard \$args`; dir), String)"
+        ),
+    )
+
+    # CALIBRATION OF THE CORPUS ITSELF. Without these, `isempty(hits)` is
+    # satisfied by a scan that could not look — which is what it was.
+    @test length(corpus) == length(rels)     # every candidate was opened
+    @test length(corpus) > 100               # ...and there were candidates
+    @test any(e -> occursin("git_corpus(", e[2]), corpus)
 end

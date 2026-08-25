@@ -439,6 +439,13 @@ const FAST_TESTS = [
     # converges cheaply to the wrong branch and says nothing. Negative control:
     # the density-only trilinear helper on the same field returns winding 0.
     "workflow/test_upsample_spinor_fidelity.jl",
+    # A test's throwaway git repo must not read the developer's ~/.gitconfig. Two
+    # files were permanently red locally and green in CI because `commit.gpgsign`
+    # leaked in and `git commit` exited 128 — the worst shape a gate can have,
+    # since a gate that reddens on correct work is the one that gets switched off.
+    # Carries the positive control for the isolation itself, so it cannot pass
+    # vacuously on a machine with no signing configured.
+    "test_scratch_git_isolation.jl",
     "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",

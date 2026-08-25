@@ -24,6 +24,7 @@ using SpinorBEC: admit_payload, write_complete_marker, write_incomplete_marker,
     admission_counts, no_artifact_id_reasons, _reset_admission_counts!,
     _reset_unmarked_warnings!, _reset_no_artifact_id_warnings!,
     _warn_no_artifact_id_once, _write_exit_summary, _cache_stats_payload
+include(joinpath(@__DIR__, "..", "helpers", "cacheable_tree.jl"))
 
 sfixture(dir, name, nbytes=64) = begin
     p = joinpath(dir, name)
@@ -162,7 +163,14 @@ read_summary(path) = JSON.parsefile(path)
             _reset_admission_counts!()
             _reset_unmarked_warnings!()
 
-            run_dir = run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            # `with_cacheable_tree`: a re-run that must HIT the cache. `_assert_point_provenance`
+            # refuses a reuse when the tree is dirty, i.e. in any working checkout — but the
+            # point was written by this process seconds earlier, so the code cannot differ,
+            # and the admission counting happens in `admit_payload`, before the check.
+            # See test/helpers/cacheable_tree.jl.
+            run_dir = with_cacheable_tree() do
+                run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            end
             summary = joinpath(run_dir, "_exit_summary.json")
             @test isfile(summary)
             first_pass = read_summary(summary)["cache"]["admission"]
@@ -175,7 +183,9 @@ read_summary(path) = JSON.parsefile(path)
             # the numbers move with what actually happened rather than being a
             # constant that any implementation would emit.
             _reset_admission_counts!()
-            run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            with_cacheable_tree() do
+                run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            end
             second_pass = read_summary(summary)["cache"]["admission"]
             @test second_pass["marked"] >= 2
             @test second_pass["unmarked"] == 0
