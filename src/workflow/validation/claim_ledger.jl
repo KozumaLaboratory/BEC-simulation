@@ -44,7 +44,9 @@ using TOML
 
 export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
-    CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, claim_ledger_link_errors, claim_by_id,
+    CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, CLAIM_RETRACTION_PREMISE_ESCAPE,
+    CLAIM_REDUCTION_NAMES, CLAIM_BOUNDARY_RULES,
+    claim_ledger_link_errors, claim_by_id,
     ledger_section_coverage,
     retired_literals,
     unmarked_retired_literal_sites
@@ -154,7 +156,50 @@ struct LedgerClaim
     prediction_registered::Union{Nothing, String}
     prediction_outcome::Union{Nothing, String}
     note::Union{Nothing, String}
+    retraction_evidence::Union{Nothing, String}
+    window::Union{Nothing, String}
+    reduction::Union{Nothing, String}
+    boundary::Union{Nothing, String}
 end
+
+"""
+The escape hatch for `retraction_evidence`: a claim that never rested on a
+measurement cannot be killed on a comparable one, and saying so is information.
+Mirrors the `unbounded:` convention `uncertainty` already uses — the point of a
+keyword is that "there was nothing to compare" and "nobody wrote it down" stop
+looking the same.
+"""
+const CLAIM_RETRACTION_PREMISE_ESCAPE = "premise_dissolved:"
+
+"""
+    CLAIM_REDUCTION_NAMES
+
+Words in a `quantity` that mean the number is a REDUCTION over a trajectory or a
+scan, and therefore that the window it was taken in is part of the measurement.
+
+A named list rather than a rule, and unknown forms are innocent — a `quantity`
+that names none of these is not required to carry a window. The alternative,
+demanding the fields of every row, would redden correct writing (`eta_start`,
+a walltime ratio, an algebraic coefficient) and a gate that does that gets
+deleted.
+"""
+const CLAIM_REDUCTION_NAMES = ("peak", "argmax", "optimum", "endpoint")
+
+"""
+    CLAIM_BOUNDARY_RULES
+
+What was done when the reduction's argmax landed on the edge of its window.
+
+  `reject`    — a boundary argmax was treated as a truncation, not a peak
+  `accept`    — it was quoted as a peak. Often the defect, and it is written down
+                rather than inferred: `edh-two-branches-5p2nt` says `accept` and
+                is refuted for exactly that reason
+  `unchecked` — nobody looked. NOT the same as `reject`, and it must not be able
+                to read as it
+  `n/a`       — the quantity is not an argmax at all (the detector above is a
+                word list and will occasionally catch a fixed-time endpoint)
+"""
+const CLAIM_BOUNDARY_RULES = ("reject", "accept", "unchecked", "n/a")
 
 """
     claim_ledger_path(; repo=nothing) -> String
@@ -201,6 +246,11 @@ Parse the ledger. Throws on any row that cannot be checked:
     fabricated error bar
   - a non-`live` row with no `retired_literal`, which would be a retraction the
     gate cannot enforce anywhere
+  - a non-`live` row with no `retraction_evidence`, i.e. a retraction that does
+    not say on which axis the killing measurement differed from the killed one
+  - a `quantity` that names a reduction (`peak`, `argmax`, `optimum`,
+    `endpoint`) with no `window` / `reduction` / `boundary` — a peak with no
+    window is not an observable
 
 Link consistency between rows (`supersedes` ↔ `superseded_by`) is checked
 separately by [`claim_ledger_link_errors`](@ref), so a single bad edge names
@@ -264,6 +314,64 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                     "opened over."),
             )
         end
+        # THE RETRACTION IS A CLAIM TOO. Eight times in this repo's history a
+        # retraction was itself wrong and had to be withdrawn, and the shape was
+        # never haste: the killed claim rested on a run and the killing one was
+        # allowed to rest on prose. Two arms of
+        # `test_retracted_numbers_carry_their_replacement.jl` already bind the
+        # ROW DOING THE KILLING (a live `supersedes` row needs in_tree evidence
+        # and a real basis; a bare retirement needs `note` + `pr`). What neither
+        # could see is the COMPARISON: on which axis the killing measurement
+        # differs from the killed one, and what the two values were.
+        #
+        # "The same convergence ladder" is the wrong requirement and was the
+        # first draft of this field. A refutation usually differs deliberately on
+        # exactly one axis — 32³ → 64³, an 8 ms hold → 16 ms, two seeds → eight —
+        # and demanding sameness would forbid the move that does the work. What
+        # is wanted is that the axis is NAMED and both sides are stated, so a
+        # reader can tell a refinement from a different experiment.
+        retr_ev = _opt(r, "retraction_evidence")
+        if status in ("superseded", "refuted") && retr_ev === nothing
+            throw(
+                ArgumentError(
+                    "$path claim `$id` is `$status` but declares no " *
+                    "`retraction_evidence`. Name the axis the killing measurement " *
+                    "moved and give both values (\"grid 32³ → 64³; the ordering " *
+                    "inverts\"). If the claim never rested on a measurement, say " *
+                    "`$(CLAIM_RETRACTION_PREMISE_ESCAPE) <why>` — that is a real " *
+                    "outcome and must not look like a blank."),
+            )
+        end
+        # A REDUCTION WITHOUT ITS WINDOW IS NOT AN OBSERVABLE. At B = 10.4 nT
+        # three readings of the same cached arms put the argmax at three
+        # different points, and 16 of 20 arms had theirs on the hold's FIRST
+        # frame — a decaying pre-hold transient, ranked as if it were the
+        # cascade. Nothing was wrong with the runs. The window and the reduction
+        # were chosen after the campaign, which is what makes it not a
+        # measurement.
+        #
+        # `quantity` already collides two rows that describe the same number.
+        # These three fields make the number itself say what it is, so two
+        # readings of one trajectory collide instead of coexisting.
+        quant = _opt(r, "quantity")
+        if quant !== nothing &&
+            any(occursin(w, lowercase(quant)) for w in CLAIM_REDUCTION_NAMES)
+            for k in ("window", "reduction", "boundary")
+                _opt(r, k) === nothing && throw(
+                    ArgumentError(
+                        "$path claim `$id` has a `quantity` naming a reduction " *
+                        "($quant) but no `$k`. A peak is a peak OF something OVER " *
+                        "something; state the window, the reduction and what was " *
+                        "done when the argmax hit the edge."),
+                )
+            end
+            bnd = _opt(r, "boundary")
+            bnd in CLAIM_BOUNDARY_RULES || throw(
+                ArgumentError(
+                    "$path claim `$id` has boundary `$bnd`; must be one of " *
+                    join(CLAIM_BOUNDARY_RULES, ", ")),
+            )
+        end
         status == "closed" && _opt(r, "note") === nothing &&
             throw(
                 ArgumentError(
@@ -303,7 +411,9 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                 _strvec(r, "supersedes", id, path), _opt(r, "superseded_by"),
                 _opt(r, "quantity"), retired,
                 _strvec(r, "replacement_literal", id, path),
-                _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note")),
+                _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note"),
+                retr_ev, _opt(r, "window"), _opt(r, "reduction"),
+                _opt(r, "boundary")),
         )
     end
     isempty(out) && throw(ArgumentError("$path declares no claims"))
