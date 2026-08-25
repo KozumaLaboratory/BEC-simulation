@@ -73,6 +73,7 @@ docs/
 | Evaporative cooling to BEC (0-D truncated-Boltzmann model) | `research_notes/evaporation_bec_prep_model_2026-06-15.md` |
 | Superfluidity / dipolar supersolids — known vs unknown | `validation/superfluidity_knowledge_state.md` |
 | Whether a stored `runs/` result can still be quoted | `validation/stored_results_vintage_audit.md` |
+| Whether a stored run can be RE-READ instead of re-run, which duplicate directories are waste and which are parity arms, and what a re-analysis result may be used for | `validation/store_reuse_census.md` |
 | Whether a claim is campaign-eligible (ancestor gate, guards, lanes) | `campaign/CAMPAIGN.md` |
 | Whether a mistake you are about to make has a class, a count and a gate already | `campaign/pr_mistake_census_2026_08_22.md` (frozen; `scripts/pr_mistake_census.py` re-derives it) |
 | Which polarisation an EdH / rotation-assisted run must prepare, and why the m label alone is not the answer | `campaign/edh_quench_polarisation_decision.md` |

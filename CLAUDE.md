@@ -166,6 +166,8 @@ Four primitives:
 - `OperatorRHSSpec(; tol_hpsi=…, tol_per_term_E=…)` — Level-10 A/B operator-RHS diff via `RunComparison`; requires both runs to have saved `Hψ`.
 - `audit(exp; spec=ConservationSpec())` = `run!` + `check`.
 
+**Re-reading a stored run is a first-class arm, and it goes through `reanalyze`.** The cheapest progress this project has made was post-processing: `97ec124e` corrected the EdH observable (the peak must be taken *inside the hold*) and re-extracted every affected number from cache with **zero recompute** — a whole 10.4 nT window correction paid for in seconds. Measured 2026-08-25/26, that is available in general: 224 of 230 `point_*.jld2` name their producing commit, and **219 of 219 keyed run directories still hold the config that produced them** (the directory name *is* `sha256(config bytes)`, so this is an equality — `store_census(...).stale_key`). What is *not* available is auto-reuse (all 224 also record `git_dirty = true`, unrepairable) or campaign admissibility (the three dominant vintages predate the June–July corrections). So the tool was never the gap; the bookkeeping was. `reanalyze(series, dirs; observable, declare)` (`workflow/validation/reanalysis.jl`) refuses four ways: the observable must be **defined first** (`window` / `reduction` / `boundary` — *the ledger's own three fields*, validated against `CLAIM_BOUNDARY_RULES`, so a result transcribes into `claims.toml` without re-deciding them, and `boundary = "reject"` **withholds** an argmax that landed on a window edge); the **vintage** of the points actually read is carried in the result; `admissible` is `false` **as a field** with machine-readable reasons, and a clean single-vintage read still carries `not_ancestor_gated` on its own so the field cannot decay into a proxy for tree hygiene; and `SPINORBEC_ALLOW_STALE_POINTS` is **never set implicitly** — it is the right switch here (nothing recomputes, so the code difference cannot reach the answer) and *for that reason* must not be set on a caller's behalf, since a globally permissive process also reuses stale points on the paths that do recompute. An ambient setting is reported, not inherited. **Coverage, gated rather than implied:** one of the four stored-run readers is migrated (`klaus_weff_extract.jl`, which keeps `peak_padj` as the reference it is differenced against on every run), and `test_reanalysis_driver_coverage.jl` requires every other one to be **named with a reason** — so a fifth cannot appear unclassified. The list is a known cost, not a clean slate: `lt64_endpoint_verdict.jl` re-derives the in-hold window from its suite's own `dt`/`save_every` constants and its own header says getting them wrong is *silent*, which is a second live statement of the observable `97ec124e` fixed. Record: `docs/validation/store_reuse_census.md`.
+
 ## Subsystem catalog
 
 | Subsystem | Role | Discipline |
@@ -430,6 +432,22 @@ absence that was really a gap in its own reach.
 Choose the probes from the failure being guarded against, never for
 convenience: a positive control that cannot fail proves nothing, which is the
 degenerate-knob trap in another costume.
+
+**And this applies to a committed gate, not only to a session's inline scan.**
+Measured 2026-08-26: the class gate inside
+`test_index_backed_gates_see_untracked.jl` — the file whose entire thesis is
+that *"an empty result and an unreachable corpus print the same two
+characters"* — had been blind since the day it was written. `tree_files(root/test)`
+returns paths relative to `root`; it joined them against `dirname(root)`, so all
+523 candidates resolved to files that do not exist, every one hit the `continue`,
+and `isempty(bare)` was asserted over a scan that had never opened anything. A
+green gate is not evidence that it looked. Two further things followed and both
+generalise: **the moment it could see, all three of its hits were prose** in
+docstrings, so the blindness had also hidden that the predicate was too wide —
+a blind scan conceals its own over-reach as well as its under-reach. And the
+repair is not a corrected line but a `calibrated_scan` plus an assertion that the
+corpus is non-empty and was fully opened, because those are what make a repeat
+red instead of silent. **A gate that walks a corpus asserts the corpus.**
 
 ## Before starting a topic — enumerate the open work, and disposition it
 

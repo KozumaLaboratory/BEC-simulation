@@ -50,6 +50,7 @@ using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload,
     _reset_unmarked_warnings!
 include(joinpath(@__DIR__, "..", "helpers", "interrupt_harness.jl"))
+include(joinpath(@__DIR__, "..", "helpers", "cacheable_tree.jl"))
 
 # 1-D, 64 points, CPU. The step budget is large so that the interrupt lands far
 # from convergence; the recomputation still finishes in a few seconds.
@@ -125,7 +126,14 @@ interrupt_probe_config() = Dict{String, Any}(
         @test isfile(itp_ckpt)
 
         # (ii) the next run RECOMPUTES rather than serving the partial output.
-        run_yaml(cfg; verbose=false)
+        # `with_cacheable_tree`: a re-run that must HIT the cache. `_assert_point_provenance`
+        # refuses a reuse when the tree is dirty, i.e. in any working checkout — but the
+        # point was written by this process seconds earlier, so the code cannot differ,
+        # and the admission counting happens in `admit_payload`, before the check.
+        # See test/helpers/cacheable_tree.jl.
+        with_cacheable_tree() do
+            run_yaml(cfg; verbose=false)
+        end
         recomputed_E = JLD2.load(psi_file)["energy"]
         @test recomputed_E != interrupted_E
         # ITP decreases the energy monotonically, so "it really carried on" is a
@@ -140,7 +148,9 @@ interrupt_probe_config() = Dict{String, Any}(
         # SERVE a run that finished — otherwise "it recomputed" would be
         # consistent with an admission that recomputes everything, which is a
         # different bug wearing this gate as a disguise.
-        t_hit = @elapsed run_yaml(cfg; verbose=false)
+        t_hit = @elapsed with_cacheable_tree() do
+            run_yaml(cfg; verbose=false)
+        end
         @test JLD2.load(psi_file)["energy"] == recomputed_E
         @test t_hit < 1.0     # a cache hit is milliseconds; the solve is seconds
     end

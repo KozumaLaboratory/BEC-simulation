@@ -13,7 +13,9 @@
 #   julia --project=. scripts/validation/klaus_weff_extract.jl runs [--csv out.csv]
 
 using JLD2
+using JSON
 using Printf
+using SpinorBEC
 
 """
     peak_padj(dir) -> NamedTuple
@@ -89,27 +91,90 @@ function coords(name::AbstractString)
         field_nt=parse(Float64, replace(m.captures[2], "p" => ".")))
 end
 
+"""
+The per-frame `P_adj` series of one arm, for `reanalyze`. The window and the
+reduction are NOT here — that is the point of routing through the entry point:
+`peak_padj` above states them inline and is kept as the reference this is
+differenced against, and only one of the two may own them.
+"""
+function padj_series(path::AbstractString)
+    JLD2.jldopen(path, "r") do g
+        haskey(g, "dynamics") || return nothing
+        d = g["dynamics"]
+        haskey(d, "component_populations") || return nothing
+        cp = d["component_populations"]
+        P = cp isa AbstractMatrix ? cp : permutedims(reduce(hcat, cp))
+        [P[i, 2] + P[i, 3] for i in axes(P, 1)]
+    end
+end
+
+# The hold window in FRAMES, derivable from the config alone:
+# 5.5292 / (0.005 * 100) = 11.06 -> 11. See the note on `peak_padj`.
+hold_frames(hold_duration::Float64; dt=0.005, save_every=100) =
+    max(1, Int(floor(hold_duration / (dt * save_every))))
+
 function main(args)
     root = isempty(args) ? "runs" : args[1]
     csv = nothing
     i = findfirst(==("--csv"), args)
     i === nothing || (csv = args[i + 1])
 
-    rows = NamedTuple[]
+    # TWO HOLD SCALES ARE TWO OBSERVABLES. The `hold2p0x` arms are reduced over a
+    # window twice as long, so they are grouped and declared separately instead of
+    # sharing one column — mixing two window definitions under one heading is the
+    # defect §12.1 corrected, one level up.
+    arms = Dict{Float64, Vector{String}}()
     for d in sort(readdir(root; join=true))
         isdir(d) || continue
-        c = coords(basename(d))
-        c === nothing && continue
-        # hold_scale is in the directory name, and the window scales with it.
+        coords(basename(d)) === nothing && continue
         hd = occursin("hold2p0x", basename(d)) ? 2 * 5.5292 : 5.5292
-        p = peak_padj(d; hold_duration=hd)
-        if p === nothing
-            println("MISSING dynamics: ", basename(d))
-            continue
-        end
-        push!(rows, (; c..., p...))
+        push!(get!(arms, hd, String[]), d)
     end
-    isempty(rows) && (println("no arms found under $root"); return nothing)
+    isempty(arms) && (println("no arms found under $root"); return nothing)
+
+    rows = NamedTuple[]
+    records = Dict{String, Any}()
+    for hd in sort(collect(keys(arms)))
+        dirs = arms[hd]
+        obs = SpinorBEC.ObservableDefinition(
+            "peak P_adj in hold (hold_duration=$hd)";
+            window=:last, window_frames=hold_frames(hd),
+            # `accept`, not `reject`: at 10.4 nT the in-hold argmax DOES sit at
+            # the window's first frame and the number was still reported, with
+            # `mean` and `final` beside it. Withholding it here would delete the
+            # evidence the three-reading disagreement is read off. Declared, so
+            # nobody has to infer it.
+            reduction=:max, boundary="accept")
+        ra = SpinorBEC.reanalyze(padj_series, dirs;
+            observable=obs, declare=SpinorBEC.REANALYSIS_DECLARATION)
+        records["hold_$hd"] = SpinorBEC.reanalysis_record(ra)
+
+        for d in dirs
+            label = basename(d)
+            r = get(ra.readings, label, nothing)
+            if r === nothing
+                println("MISSING dynamics: ", label)
+                continue
+            end
+            # THE REFERENCE, KEPT. `peak_padj` states the window and the reduction
+            # itself; `reanalyze` states them in the ObservableDefinition. Two
+            # independent statements of one observable, differenced on every run
+            # — the same discipline the Hamiltonian terms are under, and the only
+            # thing that makes a routing change safe on arms nobody can re-run.
+            ref = peak_padj(d; hold_duration=hd)
+            got = ra.values[label]
+            if ref === nothing || got === nothing || ref.peak != got
+                println("!! REFERENCE DISAGREES on $label: " *
+                        "peak_padj=$(ref === nothing ? "nothing" : ref.peak) " *
+                        "reanalyze=$(got === nothing ? "withheld" : got)")
+                println("!! One of the two window definitions is wrong. Do not " *
+                        "quote either number until they agree.")
+                continue
+            end
+            push!(rows, (; coords(label)..., ref...))
+        end
+    end
+    isempty(rows) && (println("no arms produced a value under $root"); return nothing)
 
     for fld in sort(unique(r.field_nt for r in rows))
         sel = sort([r for r in rows if r.field_nt == fld]; by=r -> r.weff)
@@ -153,14 +218,26 @@ function main(args)
     end
 
     if csv !== nothing
-        open(csv, "w") do io
-            println(io, "field_nT,weff,peak_padj,frame,nframes")
+        # STAMPED, not `open(csv, "w")`. This wrote a bare CSV until 2026-08-26,
+        # which is exactly what `measurement_provenance.jl` exists to stop: a file
+        # that cannot say what produced it, aggregated later as if it could.
+        SpinorBEC.stamped_csv(csv,
+            ("scripts/validation/klaus_weff_extract.jl",);
+            header="field_nT,weff,peak_padj,frame,nframes") do io
             for r in sort(rows; by=r -> (r.field_nt, r.weff))
                 @printf(io, "%.1f,%.3f,%.6f,%d,%d\n",
                     r.field_nt, r.weff, r.peak, r.frame, r.nframes)
             end
         end
+        # The vintage of the arms these numbers came off, and the machine-readable
+        # statement that a re-read has not been through the ancestor gate. Beside
+        # the CSV, because that is the file a document will cite.
+        sidecar = replace(csv, r"\.csv$" => "") * "_reanalysis.json"
+        open(sidecar, "w") do io
+            JSON.print(io, records, 2)
+        end
         println("\nwrote $csv")
+        println("wrote $sidecar  (vintage + `admissible: false`)")
     end
 end
 

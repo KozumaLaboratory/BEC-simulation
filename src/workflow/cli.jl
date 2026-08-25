@@ -308,8 +308,17 @@ function _cmd_catalog(args)
         n_sum = count(r -> get(r, "has_summary", false), rows)
         println("catalog: $n runs · $n_sum with summary · $(n - n_sum) need reindex")
         return 0
+    elseif sub == "census"
+        # #478: which duplicate run directories are a cache miss and which are a
+        # parity arm. Takes a root because the store lives in the MAIN checkout
+        # and a git worktree does not share it.
+        root = length(args) > 1 ? args[2] : default_store().root
+        store_census_report(store_census(root))
+        return 0
     end
-    println(stderr, "cli.jl catalog: unknown subcommand '$sub' (index | reindex [--force])")
+    println(stderr,
+        "cli.jl catalog: unknown subcommand '$sub' " *
+        "(index | reindex [--force] | census [<runs_root>])")
     2
 end
 

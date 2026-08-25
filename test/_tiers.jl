@@ -421,6 +421,37 @@ const FAST_TESTS = [
     # under different code reuses cached points silently. This pins the gate that
     # stops it, and the widened 16-hex directory suffix.
     "workflow/test_run_dir_provenance_gate.jl",
+    # The other half of the same question. That gate refuses to REUSE a stored
+    # point; this one pins the path that deliberately reads one anyway — and that
+    # the result carries its vintage, refuses to pass as campaign evidence, and
+    # never sets SPINORBEC_ALLOW_STALE_POINTS on the caller's behalf. Its positive
+    # control differences `reanalyze` against the bespoke driver it replaces.
+    "workflow/test_reanalysis_entrypoint.jl",
+    # #478 asked which cache misses are recoverable. This gates the CLASSIFIER
+    # that decides it: `defaults.backend` differing is a GPU=CPU parity arm that
+    # is supposed to exist, `metadata.suite` differing is the same physics
+    # recomputed. Opposite buckets, and a classifier that collapsed them would
+    # reproduce the estimate it replaced and look like a measurement.
+    "workflow/test_store_census.jl",
+    # #55's wall-clock argument is "seed up from a converged coarse state"; its
+    # CORRECTNESS argument is that spectral prolongation preserves phase and
+    # winding, and only the norm half was gated. A seed with the winding dropped
+    # converges cheaply to the wrong branch and says nothing. Negative control:
+    # the density-only trilinear helper on the same field returns winding 0.
+    "workflow/test_upsample_spinor_fidelity.jl",
+    # A test's throwaway git repo must not read the developer's ~/.gitconfig. Two
+    # files were permanently red locally and green in CI because `commit.gpgsign`
+    # leaked in and `git commit` exited 128 — the worst shape a gate can have,
+    # since a gate that reddens on correct work is the one that gets switched off.
+    # Carries the positive control for the isolation itself, so it cannot pass
+    # vacuously on a machine with no signing configured.
+    "test_scratch_git_isolation.jl",
+    # #483 shipped `reanalyze` and migrated ONE of the four drivers that re-read a
+    # stored run. Commitment 11: a new SSoT ships with the gate outlawing the old
+    # form, or the migration becomes permanent. Stating the gap in a PR body is
+    # not a gate — this is. Every stored-run reader is migrated or named with a
+    # reason, so a FOURTH cannot appear unclassified.
+    "test_reanalysis_driver_coverage.jl",
     "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",

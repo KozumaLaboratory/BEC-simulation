@@ -9,7 +9,14 @@ function save_state(filename::String, ws::Workspace)
 
     jldsave(
         filename;
-        psi=ws.state.psi,
+        # `_to_host`, not `ws.state.psi`: on a CUDA workspace that field is a
+        # `CuArray`, and JLD2 serialises the device type — so the file carries a
+        # `CuArray` in its schema and every `load_state` of it warns about
+        # reconstructing a type the reader may not even have loaded. `_to_host` is
+        # the identity on an `Array`, so the CPU path is unchanged. This is #55's
+        # "save the HOST Array(psi) in the load_state schema"; the sibling
+        # `ground_state/checkpoint.jl` already did it and this writer did not.
+        psi=_to_host(ws.state.psi),
         t=ws.state.t,
         step=ws.state.step,
         grid_n_points=ws.grid.config.n_points,
