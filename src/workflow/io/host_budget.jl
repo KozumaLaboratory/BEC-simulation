@@ -210,6 +210,23 @@ end
 
 # --- the ladder, one rung per quantity ----------------------------------------
 
+"""
+    _batch_job() -> String | nothing
+
+The variable proving we are inside a batch job, or `nothing` for a plain host.
+
+Deliberately only asks IS THIS A JOB, not WHOSE scheduler — that question needs
+per-scheduler knowledge this file cannot verify without the cluster, whereas the
+consequence is the same for all of them: the node's free memory is not ours.
+Every scheduler exports a job id; that is the one thing they agree on.
+"""
+function _batch_job()
+    for var in ("SLURM_JOB_ID", "SLURM_JOBID", "PBS_JOBID", "JOB_ID", "LSB_JOBID")
+        isempty(get(ENV, var, "")) || return var
+    end
+    return nothing
+end
+
 function _scheduler_cpus()
     for (src, var) in ((:slurm, "SLURM_CPUS_PER_TASK"), (:slurm, "SLURM_JOB_CPUS_PER_NODE"),
         (:uge, "NSLOTS"), (:pbs, "PBS_NCPUS"), (:pbs, "PBS_NP"))
@@ -501,20 +518,56 @@ function detect_host_budget()
             # people's jobs and must not enter.
             sched
         else
-            avail = _meminfo_bytes("MemAvailable")
-            avail === nothing && throw(
-                BlindBudget(:memory_bytes, "/proc/meminfo",
-                    "MemAvailable is absent, so the kernel's own no-swap headroom " *
-                    "estimate cannot be read."),
-            )
-            best = avail - reserve
-            origin = "MemAvailable - interactive reserve ($(reserve_origin))"
             cg = _cgroup_memory_max()
-            src = :memavailable
-            if cg !== nothing && cg[1] < best
-                best, src, origin = cg[1], :cgroup, cg[3]
+            job = _batch_job()
+            if job !== nothing
+                # INSIDE A BATCH JOB, `MemAvailable` IS NOT OURS. It is the
+                # node's free memory, and on a shared node that is other
+                # people's. Reporting it is exactly the defect TSUBAME job
+                # 8492405 exposed: 9.2 GiB granted, 598.9 GiB reported, because
+                # the grant could not be read and this branch answered anyway.
+                #
+                # So on a batch host the supply is the grant (handled above) or
+                # the cgroup limit, and nothing else. It must not even enter as a
+                # `min` against MemAvailable — that was the first version of this
+                # guard, and a cgroup limit LOOSER than MemAvailable lost the
+                # comparison, so the ceiling came from the node again: the same
+                # hole, one size smaller. This file's own test caught it by
+                # failing under the parallel runner, where every worker runs in a
+                # cgroup that has a MemoryMax.
+                cg === nothing && throw(
+                    BlindBudget(:memory_bytes, job,
+                        "this is a batch job, but neither the scheduler's memory " *
+                        "grant nor a cgroup limit could be read, and MemAvailable " *
+                        "is the whole NODE's free memory — not this job's. " *
+                        "Refusing to report it as a budget. Export the grant " *
+                        "(SLURM_MEM_PER_NODE / SGE_HGR_m_mem_free / …) or state " *
+                        "the ceiling with SPINORBEC_HOST_MEMORY_BYTES."),
+                )
+                # The guard is scheduler-AGNOSTIC, which is what makes the
+                # per-scheduler parsers above best-effort rather than
+                # load-bearing: an unrecognised scheduler refuses here instead of
+                # over-reporting by the size of the node.
+                (cg[1], :cgroup,
+                    cg[3] * "  (batch job via $(job); MemAvailable not consulted)")
+            else
+                # An ordinary interactive host. Here MemAvailable IS the right
+                # quantity — the kernel's own no-swap headroom — and a cgroup
+                # limit, if any, applies on top of it.
+                avail = _meminfo_bytes("MemAvailable")
+                avail === nothing && throw(
+                    BlindBudget(:memory_bytes, "/proc/meminfo",
+                        "MemAvailable is absent, so the kernel's own no-swap " *
+                        "headroom estimate cannot be read."),
+                )
+                best = avail - reserve
+                origin = "MemAvailable - interactive reserve ($(reserve_origin))"
+                src = :memavailable
+                if cg !== nothing && cg[1] < best
+                    best, src, origin = cg[1], :cgroup, cg[3]
+                end
+                (best, src, origin)
             end
-            (best, src, origin)
         end
     end
 

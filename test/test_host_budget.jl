@@ -150,6 +150,97 @@ const _HB_ROOT = dirname(@__DIR__)
         @test SpinorBEC._cgroup_dirs("cpu") isa Vector{String}
     end
 
+    @testset "inside a batch job, MemAvailable is not a supply figure" begin
+        # The hole this closes, found by being asked "what is SLURM/PBS
+        # verification even for?": the per-scheduler memory parsers are
+        # best-effort, and when one does not fire the ladder fell through to
+        # MemAvailable — which on a shared compute node is the NODE's free
+        # memory, i.e. other people's. That is precisely the defect TSUBAME job
+        # 8492405 exposed (9.2 GiB granted, 598.9 GiB reported), so the guard is
+        # scheduler-AGNOSTIC and testable with no cluster at all: every scheduler
+        # exports a job id, and that is the only fact needed.
+        no_grant = ("SLURM_MEM_PER_NODE" => nothing, "SLURM_MEM_PER_CPU" => nothing,
+            "SGE_HGR_m_mem_free" => nothing, "SGE_HGR_TASK_m_mem_free" => nothing,
+            "SPINORBEC_HOST_MEMORY_BYTES" => nothing)
+
+        # THE INVARIANT, asserted the same way on every host: in a batch job the
+        # ceiling never comes from MemAvailable. Either a cgroup limit applies —
+        # and that one IS ours — or there is no supply figure and it refuses.
+        #
+        # Written this way because the first version asserted the refusal
+        # unconditionally and failed under the parallel runner: the suite is
+        # launched through scripts/run_local.sh, which puts every worker in a
+        # cgroup WITH a MemoryMax, so `cg === nothing` was false and the guard
+        # correctly did not fire. The test was environment-dependent, not the
+        # code. Both branches are checked, and which one ran is reported, so a
+        # host that exercises neither cannot look like a pass.
+        cg_limited = SpinorBEC._cgroup_memory_max() !== nothing
+        for jobvar in ("SLURM_JOB_ID", "SLURM_JOBID", "PBS_JOBID", "JOB_ID", "LSB_JOBID")
+            withenv(no_grant..., jobvar => "12345") do
+                if cg_limited
+                    b = detect_host_budget()
+                    @test b.memory_source === :cgroup
+                    @test b.memory_source !== :memavailable
+                else
+                    @test_throws BlindBudget detect_host_budget()
+                end
+            end
+        end
+        @info "batch-job memory guard: exercised the $(cg_limited ? "cgroup-limited" : "refusal") branch"
+
+        # `_batch_job` is the whole scheduler-agnostic part, so it is tested
+        # exhaustively and independently of the ambient cgroup.
+        withenv("SLURM_JOB_ID" => nothing, "SLURM_JOBID" => nothing,
+            "PBS_JOBID" => nothing, "JOB_ID" => nothing, "LSB_JOBID" => nothing) do
+            @test SpinorBEC._batch_job() === nothing
+            for v in ("SLURM_JOB_ID", "SLURM_JOBID", "PBS_JOBID", "JOB_ID", "LSB_JOBID")
+                withenv(v => "999") do
+                    @test SpinorBEC._batch_job() == v
+                end
+            end
+            # An empty value is not a job id — it must not count as one.
+            withenv("SLURM_JOB_ID" => "") do
+                @test SpinorBEC._batch_job() === nothing
+            end
+        end
+
+        # The refusal message must name the reason, or it is unactionable. Checked
+        # on the exception the guard actually constructs, so it holds whether or
+        # not this host can reach it end to end.
+        msg = sprint(showerror,
+            BlindBudget(:memory_bytes, "SLURM_JOB_ID",
+                "this is a batch job, but neither the scheduler's memory grant " *
+                "nor a cgroup limit could be read, and MemAvailable is the whole " *
+                "NODE's free memory — not this job's."))
+        @test occursin("whole NODE's free memory", msg)
+        @test occursin("Refusing to substitute a default", msg)
+
+        # NEGATIVE CONTROLS — the guard must not fire where it would be wrong.
+        # 1. A batch job that DOES export its grant still works. Without this the
+        #    guard would have broken every TSUBAME run.
+        withenv(no_grant..., "JOB_ID" => "8492405", "NSLOTS" => "4",
+            "SGE_HGR_m_mem_free" => "9.200G") do
+            b = detect_host_budget()
+            @test b.memory_source === :uge
+            @test b.memory_bytes == round(Int, 9.2 * 1024^3)
+        end
+        # 2. Not a batch job at all: MemAvailable is legitimate and must be used.
+        withenv(no_grant..., "SLURM_JOB_ID" => nothing, "SLURM_JOBID" => nothing,
+            "PBS_JOBID" => nothing, "JOB_ID" => nothing, "LSB_JOBID" => nothing) do
+            b = detect_host_budget()
+            @test b.memory_source in (:memavailable, :cgroup)
+            @test b.memory_bytes > 0
+        end
+        # 3. An explicit ceiling is still allowed inside a batch job — the guard
+        #    refuses to GUESS, not to be told.
+        withenv(no_grant..., "SLURM_JOB_ID" => "1",
+            "SPINORBEC_HOST_MEMORY_BYTES" => string(4 * 2^30)) do
+            b = detect_host_budget()
+            @test b.memory_source === :override
+            @test b.memory_bytes == 4 * 2^30
+        end
+    end
+
     @testset "MemoryHigh is never emitted" begin
         # Measured 2026-08-24: MemoryHigh below MemoryMax with swap forbidden
         # does not kill, it LIVELOCKS — memory.events read `high 2560, max 0,
