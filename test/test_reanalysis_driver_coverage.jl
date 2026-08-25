@@ -5,7 +5,7 @@
 # stored run a new way": the observable is defined first (window / reduction /
 # boundary), the vintage of the points read is carried in the result, and the
 # result says in machine-readable form that it has not been through the ancestor
-# gate. One driver was migrated with it.
+# gate.
 #
 # CLAUDE.md commitment 11 is that a new SSoT ships with the gate outlawing the old
 # form, or the migration becomes permanent and the tree carries two live
@@ -14,18 +14,33 @@
 # whether the old spelling stayed legal. Stating the coverage gap in a PR body is
 # not a gate. This is.
 #
-# THE DUPLICATION IS ALREADY REAL, which is why the list has to be named rather
-# than assumed empty. `lt64_endpoint_verdict.jl` re-derives the in-hold window
-# from the suite's own dt / save_every constants and says so in its own header:
+# ALL FOUR ARE NOW MIGRATED (2026-08-26). Three were deferred when the entry point
+# landed, and TWO OF THE THREE CARRIED THE SAME REASON — one pass over an
+# expensive file yields many numbers, and a one-observable-per-call API would have
+# meant re-reading streamed ψ snapshots once per number. A deferral whose reason
+# two callers share is a missing API, not a deferral; `observables = [...]` is
+# that API. The third, `lt64_endpoint_verdict.jl`, was the one that mattered: it
+# re-derived the in-hold window from the suite's own constants and said so in its
+# own header —
 #
 #     THE WINDOW CONSTANTS ARE THIS SUITE'S, AND GETTING THEM WRONG IS SILENT.
 #
-# That is a second independent statement of the observable `97ec124e` had to fix,
-# and it is exactly what `ObservableDefinition` exists to hold once.
+# — a second independent statement of the observable `97ec124e` had to fix. Both
+# halves of it are now single statements: `hold_window_frames` computes the frame
+# count, and `reanalyze` REFUSES a window longer than the array instead of
+# clamping it to the whole trajectory. The entry point itself had the clamp until
+# this migration, so migrating the driver is what found it.
 #
-# WHAT THIS GATE DOES NOT CLAIM. It does not say the un-migrated drivers are
-# wrong — two of them have good reasons, recorded below. It says a FOURTH one
-# cannot appear without someone deciding which bucket it is in.
+# WHAT THIS GATE CHECKS. Every script that reads a stored run artifact is in
+# exactly one bucket: migrated, or named as not-a-re-analysis with a reason. A
+# migrated driver must go through the entry point AND keep its old reduction as a
+# reference it is differenced against — these arms cannot be re-run, so "the
+# numbers still look right" is not available and the differential is the only
+# thing standing between a routing change and a silently different observable.
+#
+# WHAT IT DOES NOT CLAIM. It does not verify a driver against its real data; no
+# such data is in the tree. It says a FIFTH reader cannot appear without someone
+# deciding which bucket it is in.
 
 using Test
 using SpinorBEC
@@ -38,8 +53,23 @@ const _RDC_REPO = normpath(joinpath(@__DIR__, ".."))
 # marker of a re-analysis: the physics is not being re-run.
 const _READS_STORED = r"point_0\d|point_\*|_frames\.jld2|result\.jld2"
 
-# Already routed through the entry point.
-const _MIGRATED = ["validation/klaus_weff_extract.jl"]
+# Already routed through the entry point, each with the reference it is
+# differenced against. The value is not decoration: a migrated driver that stops
+# differencing its old reduction is a routing change nobody can check, and the
+# note is what says which reference the gate should find.
+const _MIGRATED = Dict(
+    "validation/klaus_weff_extract.jl" => "reference: `peak_padj` re-opens the point and re-states the window",
+    "validation/lt64_endpoint_verdict.jl" =>
+        "reference: `arm_values` re-opens the point and re-states the window, " *
+        "keeping its historical `max(1, …)` clamp so a short arm makes the two " *
+        "definitions disagree loudly instead of both widening",
+    "validation/klaus_weff_cloud_size.jl" =>
+        "reference: `reference_reduction` re-states the window and the nine " *
+        "reductions over the SAME arrays — it gates the reduction, not the read",
+    "klaus2022_reanalyse.jl" =>
+        "reference: `summarise` re-states the window and the seven reductions " *
+        "over the same extracted frames",
+)
 
 # Reads a stored artifact but is NOT a re-analysis, with the reason. A named list,
 # because a rule wide enough to excuse these would excuse a real driver too.
@@ -54,34 +84,11 @@ const _NOT_REANALYSIS = Dict(
 )
 
 # Re-analysis drivers NOT migrated, each with the reason, so a deferral is
-# distinguishable from an oversight. Every entry here is a known cost.
-const _UNMIGRATED = Dict(
-    "klaus2022_reanalyse.jl" =>
-        "reduces SEVEN quantities per pass (axis_order, null ratio, baseline " *
-        "ratio, prominence, misalignment, stripe count, frame count) over one " *
-        "read of the frames. `reanalyze` is one-observable-per-call, so this " *
-        "needs either seven passes over the same file or a multi-observable " *
-        "API. Two callers need one (see klaus_weff_cloud_size.jl), so the " *
-        "design question is live — but it is a change to an API two commits " *
-        "old and is not being bolted on here.",
-    "validation/klaus_weff_cloud_size.jl" =>
-        "CORRECTED 2026-08-26 after reading the whole file rather than its top " *
-        "half. `radial_rms` per frame IS a clean `series` — that part of the " *
-        "first reason held. What does not fit is the REDUCTION: one pass yields " *
-        "nine quantities (r at hold start, r at end, r_min, r_max, the " *
-        "expansion ratio, the in-hold P_adj peak, its frame, whether the " *
-        "whole-trajectory argmax lands in the hold, and the final P_adj) off " *
-        "TWO series read from the same file. So it is blocked on the same thing " *
-        "klaus2022_reanalyse.jl is — which is the finding: a multi-observable " *
-        "pass now has TWO callers, not one, and re-reading streamed psi " *
-        "snapshots once per observable is not a cheap alternative here.",
-    "validation/lt64_endpoint_verdict.jl" =>
-        "THE ONE THAT MATTERS. Re-derives the in-hold window from the suite's " *
-        "dt / save_every constants — a second independent statement of the " *
-        "observable 97ec124e fixed, and its own header says getting the " *
-        "constants wrong is SILENT. Migrating it means moving a pre-registered " *
-        "rejection criterion, which must not ride along in a refactor.",
-)
+# distinguishable from an oversight. EMPTY as of 2026-08-26 — the three entries
+# that stood here were migrated rather than re-justified, and the two that shared
+# a reason are what produced the multi-observable form of `reanalyze`. The Dict
+# stays, because the next deferral needs somewhere to be written down.
+const _UNMIGRATED = Dict{String, String}()
 
 "Every `.jl` under `scripts/` that reads a stored run artifact."
 function _artifact_reading_scripts()
@@ -118,7 +125,7 @@ end
 
     @testset "each reader is in exactly one bucket" begin
         classified = Set(
-            vcat(_MIGRATED, collect(keys(_NOT_REANALYSIS)),
+            vcat(collect(keys(_MIGRATED)), collect(keys(_NOT_REANALYSIS)),
                 collect(keys(_UNMIGRATED))),
         )
         unclassified = setdiff(Set(scripts), classified)
@@ -146,20 +153,44 @@ end
         end
     end
 
-    @testset "the migrated driver really goes through the entry point" begin
+    @testset "the migrated drivers really go through the entry point" begin
         # Membership in `_MIGRATED` is a claim about the file, so check the file.
-        for s in _MIGRATED
+        for (s, note) in _MIGRATED
             src = read(joinpath(_RDC_REPO, "scripts", s), String)
             @test occursin("reanalyze(", src)
             @test occursin("ObservableDefinition(", src)
             @test occursin("REANALYSIS_DECLARATION", src)
+            # AND KEEPS ITS REFERENCE. These arms cannot be re-run, so the old
+            # reduction differenced against the new path is the only check that a
+            # routing change did not quietly become a different observable. A
+            # driver that drops it must say so by editing its note here.
+            if startswith(note, "reference:")
+                @test occursin("REFERENCE DISAGREES", src)
+            end
+        end
+        # THE FRAME COUNT IS DERIVED, NOT RE-TYPED — for the window that is
+        # actually handed to `reanalyze`. The inline `floor(hold / (dt *
+        # save_every))` still appears in the REFERENCES, deliberately: a
+        # reference that delegates to the thing it is checking is not one. So the
+        # rule binds the declared window only.
+        with_frames = [
+            s for (s, _) in _MIGRATED
+            if occursin("window_frames",
+                read(joinpath(_RDC_REPO, "scripts", s), String))
+        ]
+        # ...and the corpus is asserted, because "no file declares a frame
+        # window" and "the check never ran" print the same nothing.
+        @test length(with_frames) >= 3
+        for s in with_frames
+            @test occursin("hold_window_frames",
+                read(joinpath(_RDC_REPO, "scripts", s), String))
         end
     end
 
     @testset "every deferral carries a reason" begin
         # An empty reason is the shape this whole ledger-and-gate discipline
         # exists to outlaw: absent must never read as benign.
-        for (k, v) in merge(_NOT_REANALYSIS, _UNMIGRATED)
+        for (k, v) in merge(_NOT_REANALYSIS, _UNMIGRATED, _MIGRATED)
             @test !isempty(strip(v))
             @test length(strip(v)) > 40      # a word is not a reason
         end

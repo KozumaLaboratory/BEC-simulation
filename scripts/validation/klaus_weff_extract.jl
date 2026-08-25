@@ -110,8 +110,14 @@ end
 
 # The hold window in FRAMES, derivable from the config alone:
 # 5.5292 / (0.005 * 100) = 11.06 -> 11. See the note on `peak_padj`.
+#
+# Delegated to `SpinorBEC.hold_window_frames` since 2026-08-26: three drivers had
+# a copy of this expression and the third one shipped it with the wrong
+# `save_every`, silently. `peak_padj` above keeps its own copy on purpose — it is
+# the reference this is differenced against, and a reference that delegates is
+# not one.
 hold_frames(hold_duration::Float64; dt=0.005, save_every=100) =
-    max(1, Int(floor(hold_duration / (dt * save_every))))
+    SpinorBEC.hold_window_frames(hold_duration; dt=dt, save_every=save_every)
 
 function main(args)
     root = isempty(args) ? "runs" : args[1]

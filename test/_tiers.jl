@@ -427,6 +427,13 @@ const FAST_TESTS = [
     # never sets SPINORBEC_ALLOW_STALE_POINTS on the caller's behalf. Its positive
     # control differences `reanalyze` against the bespoke driver it replaces.
     "workflow/test_reanalysis_entrypoint.jl",
+    # The other three stored-run drivers, routed through the same entry point.
+    # None of them can be RUN in CI — their arms are stored ψ on a cluster — so
+    # each keeps the reduction it used to perform inline and differences it, and
+    # this gates that the differential exists, is exact, and would notice a
+    # disagreement. Every fixture carries the control that the window MATTERS on
+    # it; otherwise a window that does nothing passes.
+    "workflow/test_reanalysis_driver_migration.jl",
     # #478 asked which cache misses are recoverable. This gates the CLASSIFIER
     # that decides it: `defaults.backend` differing is a GPU=CPU parity arm that
     # is supposed to exist, `metadata.suite` differing is the same physics

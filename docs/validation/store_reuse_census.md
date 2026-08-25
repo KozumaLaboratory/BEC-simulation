@@ -199,6 +199,59 @@ can re-run. Two further defects fell out of the migration:
 - its two hold scales (`hold2p0x`) were **two window definitions in one column**.
   Now two `ObservableDefinition`s, declared separately.
 
+### The other three drivers, and what migrating them found (2026-08-26)
+
+All four stored-run readers now route through the entry point. The three that
+were deferred are worth recording separately, because **two of them shared a
+reason and the third contained a live defect**.
+
+**The shared reason was a missing API, not a deferral.** `klaus2022_reanalyse.jl`
+reduces seven quantities per window and `klaus_weff_cloud_size.jl` nine off two
+series, both from one expensive read — FFT per frame in the first case, streamed
+ψ snapshots in the second. One observable per call would have multiplied that
+read by seven and by nine, which is exactly the pressure that keeps producing
+bespoke drivers. `reanalyze(...; observables = [...])` reduces every declared
+observable off ONE read and returns a `MultiReanalysis` with one shared vintage;
+`test_reanalysis_entrypoint.jl` counts the reads and differences the grouped pass
+against N separate single-observable calls.
+
+**`lt64_endpoint_verdict.jl` found a defect in `reanalyze` itself.** Its header
+records that the suite's first run used `save_every = 100` where the config saves
+every 1000, asked for a 200-frame hold window over a 20-frame array, and got the
+whole trajectory: `max(1, n - w + 1)` clamps, silently, and every "hold peak" it
+printed was the pre-hold transient. It was caught only because one of the three
+arm groups had a stored number to disagree with. **`_window_range` reproduced
+that clamp exactly**, while `:range` immediately below it refused to clip. Both
+halves are now single statements:
+
+- `hold_window_frames(hold; dt, save_every)` is the one definition of the frame
+  count — `dt` and `save_every` are required keywords, because a default is how a
+  caller inherits another suite's cadence without writing it down;
+- an over-long `:last` / `:first` window is **refused per arm and named**, not
+  clamped. Per arm rather than per call, so one short arm cannot silence nineteen
+  good ones — the too-strict version of this rule is the version that gets
+  switched off — and a read where *nothing* reduced throws rather than returning
+  a table of blanks.
+
+The pre-registered criterion in that driver (`K_SIGMA`, `N_MIN`, the pooled-sd
+sizing) **did not move**: the migration stops at the extraction, and `arm_values`
+is kept as the reference, differenced per arm, with its historical clamp left in
+place so a short arm makes the two definitions disagree loudly.
+
+**A third disagreement surfaced on the way.** `klaus_weff_cloud_size.jl` used a
+fixed 11-frame window for every arm including `hold2p0x`, whose hold is twice as
+long — the same "two hold scales in one column" defect that had already been
+corrected in `klaus_weff_extract.jl`, in a section whose purpose is comparing 1×
+against 2×. Two drivers read the same arms and disagreed about it. Both windows
+are now reported for the doubled arms (per-arm hold, and the fixed base window
+the earlier reading was taken off); neither replaces the other.
+
+None of the three can be executed in CI, so
+`test/workflow/test_reanalysis_driver_migration.jl` gates them on synthetic
+fixtures, and every fixture carries the control that **the window matters on it** —
+a differential over data where the whole trajectory and the hold agree is
+satisfied by a window that does nothing.
+
 ## What this does NOT settle
 
 - **Whether a canonical parameter grid is worth having.** It is a policy for
