@@ -1,0 +1,202 @@
+# TSUBAME 4.0 point charging — the regulation, transcribed so a cost can be
+# computed without asking anyone.
+#
+# PRIMARY SOURCE, committed beside this file:
+#   docs/refs/TSUBAME4_Terms_2024-02.pdf
+#   「東京工業大学学術国際情報センターTSUBAME4.0 スーパーコンピュータ利用料の
+#     課金等に関する取扱い」, 附則: 令和６年４月１日施行 (2024-04-01).
+#   Upstream: https://www.t4.cii.isct.ac.jp/sites/default/files/2024-02/TSUBAME4_Terms.pdf
+#
+# Every number below is transcribed from 別表2-5 of that PDF. Extract the text
+# yourself with `python3 -c "import pypdf; print(''.join(p.extract_text() for p
+# in pypdf.PdfReader('docs/refs/TSUBAME4_Terms_2024-02.pdf').pages))"` — the
+# tables ARE in the text layer, so this file is checkable in about ten seconds
+# and you should check it rather than trust it.
+#
+# WHY A FILE AND NOT A PARAGRAPH. `observability/job_cost.sh` used to take the
+# coefficient as a command-line argument with a default of 0.200, so computing a
+# cpu_4 job's cost required the operator to already know 0.015 and to type it
+# correctly. The number lived nowhere. It lives here now, and the script reads
+# it — see `[usage]` at the bottom.
+#
+# TWO RULES THAT ARE ROUTINELY MISREMEMBERED, both settled from the source:
+#
+#   * The rounding is a TRUNCATION, not a round-up, and the unit is 1/10000 pt
+#     rather than 0.01. 第4条 verbatim:
+#       「計算ノードの利用のために使用するポイントは，別表２に掲げる区分ごとに
+#         定める計算式により算出する使用ポイントとし，ポイントの使用ごとに
+#         10,000 分の１ポイントに満たない端数は切り捨てて計算する。」
+#   * There IS a round-up, and it is on the TIME axis: `max(actual, 300)`. A
+#     three-second job bills as five minutes. That is the one worth exploiting —
+#     pack several configurations into one sub-300 s job and the extra ones are
+#     free — and it is NOT a point-level round-up.
+#
+# `t4-user-info group point` prints two decimals and therefore cannot audit any
+# of this: one least-significant digit of its display spans 0.01 pt, which is
+# ten times a whole cpu_4 job. The formula is the authority; the balance delta
+# is not.
+
+[source]
+file = "docs/refs/TSUBAME4_Terms_2024-02.pdf"
+sha256_prefix = "801262f34a9334c1"
+pages = 5
+effective_from = "2024-04-01"          # 附則
+transcribed_on = "2026-08-25"
+# Terms are reissued per fiscal year. If the upstream PDF's date changes, this
+# file is stale — re-extract rather than patch, and bump `effective_from`.
+
+# --- 別表2（第４条関係）: the formulae -----------------------------------------
+#
+# Written as text, not as code, because a formula retyped into an evaluator is a
+# second declaration of it. `job_cost.sh` implements `on_demand` only; the other
+# three are here so that "which formula applies" is answerable from one file.
+
+[formula]
+on_demand = "(nodes * type_coef * prio_coef * (0.7 * max(actual_s, 300) + 0.1 * h_rt_s)) / 3600"
+interactive_queue = "(nodes * 0.100 * actual_s) / 3600"
+reservation = "nodes * reservation_coef * type_coef * reserved_hours"
+flat_rate_monthly = "nodes * 10.0 * 30 * 24"
+
+[formula.notes]
+actual_floor_s = 300
+# 別表2, インタラクティブジョブ専用キュー: no 300 s floor and no reserved term,
+# AND free for 利用細則第4条第1項第1号・第2号 users. Check eligibility before
+# assuming it is cheaper — it usually is, but it needs an interactive session.
+interactive_free_for = "利用細則第4条第1項第1号及び第2号"
+# 別表2, ノード予約: bills the FULL reserved hours at 1.25-10x. Never use AR for
+# a short job.
+reservation_bills_full_reserved_hours = true
+
+[rounding]
+mode = "truncate"                      # 切り捨て — NOT round-up, NOT round-half
+unit_points = 0.0001                   # 10,000 分の１ポイント
+per = "job"                            # 「ポイントの使用ごとに」
+clause = "第4条"
+
+# --- 別表3（第４条関係）: resource type coefficients ---------------------------
+#
+# One node = CPU 192 cores + GPU 4. MIG (fractional GPU) is only node_o and
+# gpu_h; gpu_1 is the cheapest FULL non-MIG H100 and profiles properly.
+
+[resource_type]
+node_f = 1.000
+node_h = 0.500
+node_q = 0.250
+node_o = 0.125
+gpu_1 = 0.200
+gpu_h = 0.100
+cpu_160 = 0.600
+cpu_80 = 0.300
+cpu_40 = 0.150
+cpu_16 = 0.060
+cpu_8 = 0.030
+cpu_4 = 0.015
+
+[resource_type_provides]
+node_f = "1 node (CPU 192 cores, GPU 4)"
+node_h = "1/2 node (CPU 96 cores, GPU 2)"
+node_q = "1/4 node (CPU 48 cores, GPU 1)"
+node_o = "1/8 node (CPU 24 cores, GPU 1/2 — MIG)"
+gpu_1 = "CPU 8 cores, GPU 1"
+gpu_h = "CPU 4 cores, GPU 1/2 — MIG"
+cpu_160 = "CPU 160 cores"
+cpu_80 = "CPU 80 cores"
+cpu_40 = "CPU 40 cores"
+cpu_16 = "CPU 16 cores"
+cpu_8 = "CPU 8 cores"
+cpu_4 = "CPU 4 cores"
+
+# --- 別表4（第４条関係）: priority ---------------------------------------------
+# Always submit at 0 unless something is genuinely urgent: 1 doubles the bill.
+
+[priority]
+"0" = 1.00
+"1" = 2.00
+"2" = 4.00
+
+# --- 別表5（第４条関係）: reservation timing ------------------------------------
+# Rows are lead time before the slot starts; columns are the season.
+
+[reservation.apr_sep]
+"14x24h_or_more_before" = 2.50
+"between_14x24h_and_24h_before" = 1.25
+"less_than_24h_before" = 5.00
+
+[reservation.oct_mar]
+"14x24h_or_more_before" = 5.00
+"between_14x24h_and_24h_before" = 2.50
+"less_than_24h_before" = 10.00
+
+# --- 別表1（第２条関係）: purchase price, for converting points to yen ----------
+# Needed to answer "what did that campaign cost in money", which the point
+# balance alone cannot.
+
+[purchase]
+"tier_1_2_3_6_per_1000yen" = 16      # 第4条第1項第1・2・3・6号
+"tier_4_5_per_1000yen" = 5           # 第4条第1項第4・5号
+"tier_7_8_per_100000yen_extax" = 400 # 第4条第1項第7・8号, 第4条第4項(成果公開)
+"tier_nonpublic_per_400000yen_extax" = 400 # 第4条第4項(成果非公開)
+
+# --- 第5条: group storage, monthly ---------------------------------------------
+
+[storage_monthly]
+hdd_points_per_tb = 0.5
+hdd_inodes_per_tb = 2_000_000
+ssd_points_per_100gb = 0.2
+ssd_inodes_per_100gb = 200_000
+
+# --- validity -------------------------------------------------------------------
+
+[expiry]
+rule = "ポイントは，購入した年度に限り有効"   # 第7条 — points die at fiscal year end
+
+# --- worked examples, each checked against a REAL job ----------------------------
+#
+# These exist so the file can be wrong loudly. Each row is reproducible with
+# `bash observability/job_cost.sh <jobid>`; the expected value is what the
+# formula above gives, and a mismatch means this transcription drifted.
+
+[[example]]
+job = 8492405
+what = "host_budget UGE probe"
+resource = "cpu_4"
+nodes = 1
+priority = 0
+actual_s = 2.516                       # qacct ru_wallclock
+h_rt_s = 300
+expected_points = 0.0010
+note = "actual floored to 300 s; 0.015*(0.7*300 + 0.1*300)/3600 = 0.001000"
+
+[[example]]
+job = 8492442
+what = "host_budget UGE probe, re-run after the cgroup-v1 fix"
+resource = "cpu_4"
+nodes = 1
+priority = 0
+actual_s = 2.623
+h_rt_s = 300
+expected_points = 0.0010
+
+[[example]]
+what = "the empirical node_q check recorded before this file existed"
+resource = "node_q"
+nodes = 1
+priority = 0
+actual_s = 142
+h_rt_s = 1800
+expected_points = 0.0270
+# 0.250*(0.7*300 + 0.1*1800)/3600 = 0.02708333..., and 第4条 TRUNCATES, so the
+# charge is 0.0270. This row is kept because the value carried in memory was
+# **0.0271** — the same number ROUNDED — recorded as an empirical match. That is
+# how the round-vs-truncate confusion propagated: at this size the two differ by
+# one unit in the last place and every check still "matched". Nothing downstream
+# was wrong by more than 1e-4 pt, but the RULE read backwards from it was.
+note = "kept as the case where truncation and rounding disagree"
+
+[usage]
+compute = "bash observability/job_cost.sh <jobid>"
+# The script reads [resource_type] here and reads the type, node count, h_rt and
+# ru_wallclock out of `qacct -j <jobid>`, so no coefficient is ever typed by
+# hand. It REFUSES rather than assuming a default when the type is not in the
+# job record — an unknown coefficient must not be spelled the same as gpu_1.
+check_balance = "ssh tsubame 't4-user-info group point -g tga-kozuma-kouhi'"
