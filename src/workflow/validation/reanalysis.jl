@@ -29,119 +29,28 @@
 # the ledger's own three fields, so a result can be pasted into `claims.toml`
 # without re-deciding them), and what it returns carries its vintage and its own
 # inadmissibility in machine-readable form.
+#
+# WHAT THE MIGRATION OF THE REMAINING DRIVERS ADDED (2026-08-26). Three of the
+# four stored-run readers were left un-migrated when this landed, and two carried
+# the SAME reason: one pass over an expensive file yields many quantities
+# (`klaus_weff_cloud_size.jl` nine off two series; `klaus2022_reanalyse.jl` seven
+# per window, each frame costing an FFT), and a one-observable-per-call entry
+# point would have meant re-reading streamed ψ snapshots once per number. That is
+# what `observables = [...]` is for: ONE read of each file, every declared
+# observable reduced off it, one shared vintage. A deferral whose reason two
+# callers share is a missing API, not a deferral.
+#
+# And migrating the third — `lt64_endpoint_verdict.jl` — turned up a defect in
+# THIS file. Its header records that the suite's first run used the wrong
+# `save_every`, computed a 200-frame hold window over a 20-frame array, silently
+# clamped it to the whole trajectory, and reported the pre-hold transient as the
+# hold peak; it was caught only because one group of three had a stored number to
+# check against. `_window_range` reproduced that clamp exactly (`max(1, n - w + 1)`)
+# while `:range` next to it refused to clip. An over-long `:last` / `:first`
+# window is now the same refusal, per point, named.
 
-export ObservableDefinition, RunVintage, Reanalysis
+export RunVintage, Reanalysis, MultiReanalysis
 export reanalyze, run_vintage, reanalysis_record
-
-"""
-    REANALYSIS_WINDOWS
-
-The windows a re-analysis may take a reduction over. A named set, because the
-window is part of the measurement and "the whole trajectory" is a CHOICE that
-has already been wrong once at production scale.
-
-  `:all`         — every frame. Legal, and the default nowhere: at 10.4 nT four
-                   arms differing only in the hold returned peak `P_adj` equal to
-                   five decimals, because the maximum sat in the pre-hold
-                   transient (argmax frame 29, hold from frame 32).
-  `:last`        — the last `n` frames, `n` from `window_frames`. What "inside the
-                   hold" means when the hold is the final step.
-  `:first`       — the first `n` frames.
-  `:range`       — an explicit `window_frames = lo:hi`.
-  `:predicate`   — frames where `window_predicate(i, aux)` holds. For a window
-                   defined by a physical condition rather than a frame count
-                   (`klaus2022_reanalyse.jl` needs "frames where θ has reached 0").
-"""
-const REANALYSIS_WINDOWS = (:all, :last, :first, :range, :predicate)
-
-"""
-    REANALYSIS_REDUCTIONS
-
-How a windowed series collapses to one number. `:max` / `:min` / `:mean` /
-`:final` / `:first` / `:argmax` / `:argmin` / `:sum`.
-
-`:max` and `:final` fail DIFFERENTLY — a peak is contaminated by a transient
-that a mean only dilutes and a final sample ignores — which is why
-`klaus_weff_extract.jl` keeps three readings and refuses an ordering they
-disagree on. `reanalyze` computes all of them (`readings`) and reports the one
-asked for, so that refusal is available without a second pass.
-"""
-const REANALYSIS_REDUCTIONS = (:max, :min, :mean, :final, :first, :argmax, :argmin, :sum)
-
-"""
-    ObservableDefinition(name; window, reduction, boundary, window_frames, window_predicate)
-
-What was measured, stated before the number exists.
-
-The three required fields are the ledger's (`window`, `reduction`, `boundary` in
-`docs/campaign/claims.toml`), spelled the same way and validated against the same
-sets, so a `Reanalysis` can be transcribed into a `[[claim]]` row without anyone
-re-deciding what the window was. `boundary` must be one of
-[`CLAIM_BOUNDARY_RULES`](@ref) — and `:unchecked` is a legal answer that reads as
-"nobody looked", which is the whole point of it being a field.
-
-`boundary = "reject"` is enforced, not recorded: an argmax landing on the edge of
-its window is returned as a `boundary_hit` with the value withheld, because a
-truncated maximum is not a peak.
-"""
-struct ObservableDefinition
-    name::String
-    window::Symbol
-    reduction::Symbol
-    boundary::String
-    window_frames::Union{Nothing, Int, UnitRange{Int}}
-    window_predicate::Union{Nothing, Function}
-
-    function ObservableDefinition(name::AbstractString;
-        window::Symbol,
-        reduction::Symbol,
-        boundary::AbstractString,
-        window_frames::Union{Nothing, Int, UnitRange{Int}}=nothing,
-        window_predicate::Union{Nothing, Function}=nothing,
-    )
-        isempty(strip(name)) && throw(
-            ArgumentError(
-                "ObservableDefinition: `name` is what the number will be called in a " *
-                "document; an unnamed observable cannot be quoted"),
-        )
-        window in REANALYSIS_WINDOWS || throw(
-            ArgumentError(
-                "ObservableDefinition: window `$window` not one of $REANALYSIS_WINDOWS"),
-        )
-        reduction in REANALYSIS_REDUCTIONS || throw(
-            ArgumentError(
-                "ObservableDefinition: reduction `$reduction` not one of $REANALYSIS_REDUCTIONS"
-            ),
-        )
-        boundary in CLAIM_BOUNDARY_RULES || throw(
-            ArgumentError(
-                "ObservableDefinition: boundary `$boundary` not one of " *
-                "$CLAIM_BOUNDARY_RULES. These are the ledger's own values " *
-                "(`CLAIM_BOUNDARY_RULES`); `unchecked` is legal and means nobody " *
-                "looked, which must not be able to read as `reject`"),
-        )
-        if window in (:last, :first)
-            window_frames isa Int && window_frames > 0 || throw(
-                ArgumentError(
-                    "ObservableDefinition: window `$window` needs `window_frames::Int > 0` " *
-                    "(got $(repr(window_frames)))"),
-            )
-        elseif window === :range
-            window_frames isa UnitRange{Int} && !isempty(window_frames) || throw(
-                ArgumentError(
-                    "ObservableDefinition: window `:range` needs a non-empty " *
-                    "`window_frames::UnitRange{Int}` (got $(repr(window_frames)))"),
-            )
-        elseif window === :predicate
-            window_predicate === nothing && throw(
-                ArgumentError(
-                    "ObservableDefinition: window `:predicate` needs `window_predicate`"),
-            )
-        end
-        new(String(name), window, reduction, String(boundary),
-            window_frames, window_predicate)
-    end
-end
 
 """
     RunVintage
@@ -176,14 +85,21 @@ distinguishable from a gated measurement.
 
 Fields:
 * `observable`     — the [`ObservableDefinition`](@ref) this was reduced under
-* `values`         — `Dict` point label → reduced value (`nothing` when withheld)
+* `values`         — `Dict` point label → reduced value (`nothing` when withheld
+                     or when the point could not supply the series)
 * `readings`       — `Dict` point label → NamedTuple of ALL reductions over the
                      same window, so "does the ordering survive the definition?"
                      is answerable without a second pass
+* `failures`       — `Dict` point label → why no number came off it. Distinct
+                     from a `nothing` value: "the block is absent" and "the
+                     declared window does not fit this arm" are different facts
 * `boundary_hits`  — labels whose argmax landed on a window edge
 * `windows`        — `Dict` point label → the frame range actually used
 * `vintage`        — [`RunVintage`](@ref) over the points read
 * `sources`        — the point files read, in order
+* `paths`          — `Dict` point label → the file it came off. A row in a table
+                     has to be able to name its own file; `sources` is the read
+                     order and answers a different question
 * `declared`       — the caller's re-analysis declaration string
 * `stale_env`      — whether `SPINORBEC_ALLOW_STALE_POINTS` was set in the
                      AMBIENT environment. `reanalyze` never sets it; recording
@@ -207,15 +123,55 @@ struct Reanalysis
     observable::ObservableDefinition
     values::Dict{String, Union{Nothing, Float64}}
     readings::Dict{String, NamedTuple}
+    failures::Dict{String, String}
     boundary_hits::Vector{String}
     windows::Dict{String, UnitRange{Int}}
     vintage::RunVintage
     sources::Vector{String}
+    paths::Dict{String, String}
     declared::String
     stale_env::Bool
     admissible::Bool
     inadmissible_because::Vector{String}
 end
+
+"""
+    MultiReanalysis
+
+Several observables reduced off ONE read of each stored file, sharing one
+vintage.
+
+`results` maps observable name → [`Reanalysis`](@ref); `order` keeps the
+declaration order, because the caller's table has columns in an order and a
+`Dict` does not. Index it by name: `ra["r at hold start"]`.
+
+The reason this exists rather than N calls: the expensive half of a re-analysis
+is the READ. `klaus_weff_cloud_size.jl` takes nine numbers off two series of
+streamed ψ snapshots, and `klaus2022_reanalyse.jl` pays an FFT per frame before
+any reduction happens. Reducing one observable per pass would multiply that by
+nine and by seven — which is exactly the pressure that keeps producing bespoke
+drivers with the window written inline.
+
+Every result carries the same `vintage`, `sources`, `declared`, `stale_env` and
+`inadmissible_because`, so a single observable lifted out of the group is still
+self-describing where it lands.
+"""
+struct MultiReanalysis
+    results::Dict{String, Reanalysis}
+    order::Vector{String}
+    vintage::RunVintage
+    sources::Vector{String}
+    paths::Dict{String, String}
+    declared::String
+    stale_env::Bool
+    admissible::Bool
+    inadmissible_because::Vector{String}
+end
+
+Base.getindex(m::MultiReanalysis, name::AbstractString) = m.results[String(name)]
+Base.haskey(m::MultiReanalysis, name::AbstractString) = haskey(m.results, String(name))
+Base.keys(m::MultiReanalysis) = m.order
+Base.length(m::MultiReanalysis) = length(m.order)
 
 """
     REANALYSIS_DECLARATION
@@ -230,7 +186,7 @@ which function was called.
 """
 const REANALYSIS_DECLARATION = "reanalysis: stored output re-read, no propagation redone"
 
-# Provenance for ONE point file. Reads only `env/*` — a 94 GiB point must not be
+# Provenance for ONE stored file. Reads only `env/*` — a 94 GiB point must not be
 # materialised to answer "which commit wrote this".
 function _point_provenance(path::AbstractString)
     JLD2.jldopen(path, "r") do d
@@ -245,7 +201,7 @@ end
 """
     run_vintage(paths) -> RunVintage
 
-Aggregate `env/git_hash` and `env/git_dirty` over the given point files.
+Aggregate `env/git_hash` and `env/git_dirty` over the given stored files.
 
 Unreadable and unstamped files are COUNTED, not skipped: "6 of 230 carry no
 provenance" is the kind of number that turns a census into a measurement, and a
@@ -286,151 +242,142 @@ function reanalysis_point_files(run_dir::AbstractString)
     ])
 end
 
-# (label, path) pairs. One directory labels by point file; a SCAN — many
-# directories, one arm each — labels by directory, because that is the coordinate
-# the caller sweeps and `point_001.jld2` repeated 24 times is not a table.
-_reanalysis_targets(run_dir::AbstractString) =
-    [(basename(p), p) for p in reanalysis_point_files(run_dir)]
+# (label, path) pairs, `path === nothing` for a target that holds no stored file.
+# One directory labels by point file; a SCAN — many directories, one arm each —
+# labels by directory, because that is the coordinate the caller sweeps and
+# `point_001.jld2` repeated 24 times is not a table. An explicit FILE is taken as
+# given: not every stored artifact is a `point_*.jld2` (`klaus2022_reanalyse.jl`
+# reads `*_frames.jld2`), and a reader restricted to one filename would have sent
+# that driver back to reading the file itself.
+function _reanalysis_targets(target::AbstractString)
+    isfile(target) && return Tuple{String, Union{Nothing, String}}[(basename(target), target)]
+    Tuple{String, Union{Nothing, String}}[(basename(p), p)
+                                          for p in reanalysis_point_files(target)]
+end
 
-function _reanalysis_targets(run_dirs::AbstractVector{<:AbstractString})
-    out = Tuple{String, String}[]
-    for d in run_dirs
-        ps = reanalysis_point_files(d)
+function _reanalysis_targets(targets::AbstractVector{<:AbstractString})
+    out = Tuple{String, Union{Nothing, String}}[]
+    for t in targets
+        if isfile(t)
+            push!(out, (basename(t), t))
+            continue
+        end
+        ps = reanalysis_point_files(t)
+        if isempty(ps)
+            # NAMED, NOT VANISHED. An arm whose directory exists but holds no
+            # point file is the shape of a job that died before its first save,
+            # and dropping it here is how a gap in the corpus becomes a structure
+            # in the scan.
+            push!(out, (basename(t), nothing))
+            continue
+        end
         n = length(ps)
         for p in ps
-            # A multi-point arm keeps the point in its label; a single-point arm
-            # is named by its directory alone.
-            push!(out, (n == 1 ? basename(d) :
-                        string(basename(d), "/", basename(p)), p))
+            push!(out, (n == 1 ? basename(t) :
+                        string(basename(t), "/", basename(p)), p))
         end
     end
     out
 end
 
-# The frame range a window selects out of a series of length `n`.
-function _window_range(obs::ObservableDefinition, n::Int, aux)
-    n > 0 || throw(ArgumentError("reanalyze: empty series for `$(obs.name)`"))
-    if obs.window === :all
-        return 1:n
-    elseif obs.window === :last
-        return max(1, n - obs.window_frames + 1):n
-    elseif obs.window === :first
-        return 1:min(n, obs.window_frames)
-    elseif obs.window === :range
-        lo, hi = first(obs.window_frames), last(obs.window_frames)
-        (lo >= 1 && hi <= n) || throw(
+# What one point supplied for one observable: a series, a declared absence, or a
+# named failure. The three are different facts and the caller's table has to be
+# able to print them differently.
+function _select_series(payload, obs::ObservableDefinition, multi::Bool)
+    key = obs.series_key
+    if multi || (key !== nothing && (payload isa AbstractDict || payload isa NamedTuple))
+        key === nothing && throw(
             ArgumentError(
-                "reanalyze: window $(obs.window_frames) does not fit a series of " *
-                "length $n. A window silently clipped to the data is how a reduction " *
-                "starts reporting a different observable than the one declared"),
+                "reanalyze: observable `$(obs.name)` has no `series = ` key. With " *
+                "several observables over one read, each must say which extracted " *
+                "series it reduces"),
         )
-        return lo:hi
-    else
-        keep = [i for i in 1:n if obs.window_predicate(i, aux) === true]
-        isempty(keep) && throw(
+        got = if payload isa AbstractDict
+            haskey(payload, key) ? payload[key] : :absent
+        elseif payload isa NamedTuple
+            hasproperty(payload, Symbol(key)) ? getproperty(payload, Symbol(key)) : :absent
+        else
+            throw(
+                ArgumentError(
+                    "reanalyze: with several observables the extractor must return a " *
+                    "Dict or NamedTuple of named series (got $(typeof(payload)))"),
+            )
+        end
+        got === :absent && throw(
             ArgumentError(
-                "reanalyze: window predicate selected no frames out of $n for " *
-                "`$(obs.name)`. An empty window is a failed selection, not a missing " *
-                "value — a NaN here would be quoted as a measurement"),
+                "reanalyze: observable `$(obs.name)` asks for series `$key`, which " *
+                "the extractor did not return. Available: " *
+                "$(payload isa AbstractDict ? collect(keys(payload)) : keys(payload))"),
         )
-        keep == collect(first(keep):last(keep)) || throw(
+        return got
+    end
+    payload
+end
+
+# One (label, path) against the whole observable list — ONE read, N reductions.
+function _reduce_point!(acc, label, payload, aux, observables, multi)
+    for obs in observables
+        a = acc[obs.name]
+        s = _select_series(payload, obs, multi)
+        if s === nothing
+            a.values[label] = nothing            # the block is absent: visible
+            continue
+        elseif s isa AbstractString
+            a.values[label] = nothing
+            a.failures[label] = String(s)        # named, not dropped
+            continue
+        end
+        s isa AbstractVector || throw(
             ArgumentError(
-                "reanalyze: window predicate selected a non-contiguous set of frames " *
-                "($(length(keep)) frames spanning $(first(keep)):$(last(keep))). " *
-                "A reduction over a gapped window is not the observable its name says"),
+                "reanalyze: `series` for $label / `$(obs.name)` returned $(typeof(s)); " *
+                "expected an AbstractVector of frame values, `nothing` for a missing " *
+                "block, or a String naming why it could not be read"),
         )
-        return first(keep):last(keep)
+        rng = try
+            _window_range(obs, length(s), aux)
+        catch err
+            err isa ArgumentError || rethrow()
+            # A window that does not fit THIS arm is a fact about the arm. It is
+            # recorded per point so one short arm cannot silence nineteen good
+            # ones — and if nothing at all reduced, `reanalyze` throws instead of
+            # handing back a table of blanks.
+            a.values[label] = nothing
+            a.failures[label] = sprint(showerror, err)
+            continue
+        end
+        r = _readings(s, rng)
+        a.readings[label] = r
+        a.windows[label] = rng
+        hit = _boundary_hit(obs, r, length(s))
+        hit && push!(a.boundary_hits, label)
+        # `reject` WITHHOLDS the value. A truncated maximum is not a peak, and
+        # returning it with a flag beside it is how `edh-two-branches-5p2nt` got
+        # published: the flag was in the ledger and the number was in the prose.
+        a.values[label] = if (hit && obs.boundary == "reject")
+            nothing
+        else
+            Float64(_pick(r, obs.reduction))
+        end
     end
+    nothing
 end
 
-# All reductions over one window, in one pass. Cheap, and having them all is what
-# makes "the ordering does not survive the definition" a checkable statement
-# instead of a suspicion.
-function _readings(series::AbstractVector{<:Real}, rng::UnitRange{Int})
-    w = @view series[rng]
-    imax = argmax(w)
-    imin = argmin(w)
-    (max=Float64(w[imax]), min=Float64(w[imin]),
-        mean=Float64(sum(w) / length(w)), sum=Float64(sum(w)),
-        final=Float64(w[end]), first=Float64(w[1]),
-        argmax=Float64(first(rng) - 1 + imax),
-        argmin=Float64(first(rng) - 1 + imin),
-        n=length(w), from=first(rng), to=last(rng))
-end
-
-_pick(r::NamedTuple, reduction::Symbol) = getproperty(r, reduction)
-
-# Did the argmax (or argmin) land on an edge of the window? Only meaningful for
-# the extremum reductions — a mean has no argmax to truncate.
-function _boundary_hit(obs::ObservableDefinition, r::NamedTuple, n_series::Int)
-    k = if obs.reduction in (:max, :argmax)
-        Int(r.argmax)
-    elseif obs.reduction in (:min, :argmin)
-        Int(r.argmin)
-    else
-        return false
-    end
-    # An edge of the WINDOW is only a truncation when there is data beyond it.
-    # The last frame of the whole run is the end of the experiment, not a cut —
-    # otherwise every `:final`-shaped peak would be flagged and the rule would be
-    # the too-strict kind that gets switched off.
-    (k == r.from && r.from > 1) || (k == r.to && r.to < n_series)
-end
-
-"""
-    reanalyze(series, run_dir; observable, declare, verbose=true) -> Reanalysis
-
-Read the stored points under `run_dir` a new way, and refuse to hand back a
-number that cannot say what produced it.
-
-`series(path) -> AbstractVector{<:Real}` (or `-> (series, aux)`) extracts the
-per-frame quantity from ONE point file. `observable` is an
-[`ObservableDefinition`](@ref) — the window, the reduction and the boundary rule,
-required, before any value exists. `declare` must equal
-[`REANALYSIS_DECLARATION`](@ref).
-
-A point whose `series` returns `nothing` is recorded as missing rather than
-skipped, and its label appears in `values` with a `nothing`: a run that did not
-save the block must be visibly absent.
-
-# What this does NOT do
-
-It does not set `SPINORBEC_ALLOW_STALE_POINTS`, and it does not go through
-`_assert_point_provenance` — nothing here recomputes, so there is no cached
-result to admit or refuse. It records whether the variable was set in the ambient
-environment (`Reanalysis.stale_env`), because a process that is globally
-permissive will also reuse stale points on the paths that DO recompute, and that
-is worth seeing in the output rather than in a shell history.
-
-# Example — the observable `97ec124e` had to fix
-
-```julia
-obs = ObservableDefinition("peak P_adj in hold";
-    window = :last, window_frames = 11,      # 5.5292 / (0.005 * 100)
-    reduction = :max, boundary = "reject")
-ra = reanalyze(dir; observable = obs, declare = REANALYSIS_DECLARATION) do path
-    JLD2.jldopen(path, "r") do g
-        haskey(g, "dynamics") || return nothing
-        P = g["dynamics"]["component_populations"]
-        [P[i, 2] + P[i, 3] for i in axes(P, 1)]
-    end
-end
-ra.vintage.commits          # which code produced the arms
-ra.admissible               # false, with reasons
-```
-"""
-function reanalyze(series::Function,
-    run_dir::Union{AbstractString, AbstractVector{<:AbstractString}};
-    observable::ObservableDefinition,
-    declare::AbstractString,
-    verbose::Bool=true,
-)
+function _reanalysis_core(series::Function, run_dir, observables, declare, multi)
     declare == REANALYSIS_DECLARATION || throw(
         ArgumentError(
             "reanalyze: `declare` must be `REANALYSIS_DECLARATION`, i.e.\n  " *
             "\"$REANALYSIS_DECLARATION\"\ngot $(repr(declare)). This is not " *
             "ceremony: the declaration is what lands in the output, so a number read " *
             "off stored ψ says so where it is USED instead of where it was produced."),
+    )
+    isempty(observables) && throw(
+        ArgumentError("reanalyze: no observable given; the definition comes first"))
+    names = [o.name for o in observables]
+    allunique(names) || throw(
+        ArgumentError(
+            "reanalyze: observable names must be unique — they are the keys of the " *
+            "result and the headings of the table. Repeated: " *
+            "$(unique([n for n in names if count(==(n), names) > 1]))"),
     )
 
     labelled = _reanalysis_targets(run_dir)
@@ -440,39 +387,59 @@ function reanalyze(series::Function,
             "fail rather than return an empty result that reads as a null."),
     )
 
-    values = Dict{String, Union{Nothing, Float64}}()
-    readings = Dict{String, NamedTuple}()
-    windows = Dict{String, UnitRange{Int}}()
-    hits = String[]
+    acc = Dict(
+        o.name => (
+            values=Dict{String, Union{Nothing, Float64}}(),
+            readings=Dict{String, NamedTuple}(),
+            failures=Dict{String, String}(),
+            windows=Dict{String, UnitRange{Int}}(),
+            boundary_hits=String[],
+        ) for o in observables
+    )
     read_paths = String[]
+    label_paths = Dict{String, String}()
 
     for (label, p) in labelled
-        raw = series(p)
-        if raw === nothing
-            values[label] = nothing
+        if p === nothing
+            for o in observables
+                acc[o.name].values[label] = nothing
+                acc[o.name].failures[label] = "no stored point file under this target"
+            end
             continue
         end
-        s, aux = raw isa Tuple ? raw : (raw, nothing)
-        s isa AbstractVector || throw(
-            ArgumentError(
-                "reanalyze: `series` for $label returned $(typeof(s)); expected an " *
-                "AbstractVector of frame values (or `nothing` for a missing block)"),
-        )
-        rng = _window_range(observable, length(s), aux)
-        r = _readings(s, rng)
-        readings[label] = r
-        windows[label] = rng
-        hit = _boundary_hit(observable, r, length(s))
-        hit && push!(hits, label)
-        # `reject` WITHHOLDS the value. A truncated maximum is not a peak, and
-        # returning it with a flag beside it is how `edh-two-branches-5p2nt` got
-        # published: the flag was in the ledger and the number was in the prose.
-        values[label] = if (hit && observable.boundary == "reject")
-            nothing
-        else
-            Float64(_pick(r, observable.reduction))
+        raw = series(p)
+        if raw === nothing
+            for o in observables
+                acc[o.name].values[label] = nothing
+            end
+            continue
+        elseif raw isa AbstractString
+            for o in observables
+                acc[o.name].values[label] = nothing
+                acc[o.name].failures[label] = String(raw)
+            end
+            continue
         end
+        payload, aux = raw isa Tuple ? raw : (raw, nothing)
+        _reduce_point!(acc, label, payload, aux, observables, multi)
         push!(read_paths, p)
+        label_paths[label] = p
+    end
+
+    # ALL FAILED IS NOT A NULL. A read where every point refused — an impossible
+    # window, an extractor that could not open anything — must not come back as a
+    # table of blanks that a caller prints as "no effect".
+    if isempty(read_paths) || all(o -> all(isnothing, values(acc[o.name].values)) &&
+                !isempty(acc[o.name].failures), observables)
+        reasons = unique(vcat([collect(values(acc[o.name].failures))
+                               for o in observables]...))
+        isempty(reasons) || throw(
+            ArgumentError(
+                "reanalyze: no point could be reduced under " *
+                "$(join(("`$n`" for n in names), ", ")). " *
+                "$(length(labelled)) target(s) read, every one refused:\n  " *
+                join(unique(reasons), "\n  ")),
+        )
     end
 
     vintage = run_vintage(read_paths)
@@ -493,46 +460,175 @@ function reanalyze(series::Function,
         "physics, so it inherits the vintage's correctness and has not passed " *
         "the campaign ancestor gate")
 
-    ra = Reanalysis(observable, values, readings, hits, windows, vintage,
-        read_paths, String(declare), stale_env, false, why)
-    verbose && _print_reanalysis(ra)
-    ra
+    results = Dict(
+        o.name => Reanalysis(o, acc[o.name].values, acc[o.name].readings,
+            acc[o.name].failures, acc[o.name].boundary_hits, acc[o.name].windows,
+            vintage, read_paths, label_paths, String(declare), stale_env, false, why)
+        for o in observables
+    )
+    (results=results, order=names, vintage=vintage, sources=read_paths,
+        paths=label_paths, stale_env=stale_env, why=why)
+end
+
+"""
+    reanalyze(series, run_dir; observable, declare, verbose=true) -> Reanalysis
+    reanalyze(series, run_dirs; observables, declare, verbose=true) -> MultiReanalysis
+
+Read the stored output under `run_dir` a new way, and refuse to hand back a
+number that cannot say what produced it.
+
+`series(path)` extracts the per-frame quantity from ONE stored file and may
+return:
+
+* an `AbstractVector` of frame values (the single-observable form),
+* a `Dict` / `NamedTuple` of named series (required with `observables`; each
+  observable names its own with `series = `),
+* `(payload, aux)`, where `aux` is whatever a `:predicate` window reads,
+* `nothing` — the block is absent, recorded as a missing value,
+* a `String` — why this arm could not be read, recorded in `failures`. An arm
+  that vanishes silently is how a gap in the corpus becomes a structure in a scan.
+
+`run_dir` may be a run directory (its `point_*.jld2` are read), an explicit
+stored FILE (`*_frames.jld2` is a stored artifact too), or a vector of either.
+
+`observable` / `observables` are [`ObservableDefinition`](@ref)s — the window, the
+reduction and the boundary rule, required, before any value exists. Several
+observables are reduced off ONE read of each file, which is what makes migrating
+a driver that takes nine numbers per pass cheaper than keeping it bespoke.
+`declare` must equal [`REANALYSIS_DECLARATION`](@ref).
+
+# What this does NOT do
+
+It does not set `SPINORBEC_ALLOW_STALE_POINTS`, and it does not go through
+`_assert_point_provenance` — nothing here recomputes, so there is no cached
+result to admit or refuse. It records whether the variable was set in the ambient
+environment (`Reanalysis.stale_env`), because a process that is globally
+permissive will also reuse stale points on the paths that DO recompute, and that
+is worth seeing in the output rather than in a shell history.
+
+# Example — the observable `97ec124e` had to fix
+
+```julia
+obs = ObservableDefinition("peak P_adj in hold";
+    window = :last,
+    window_frames = hold_window_frames(5.5292; dt = 0.005, save_every = 100),
+    reduction = :max, boundary = "reject")
+ra = reanalyze(dir; observable = obs, declare = REANALYSIS_DECLARATION) do path
+    JLD2.jldopen(path, "r") do g
+        haskey(g, "dynamics") || return nothing
+        P = g["dynamics"]["component_populations"]
+        [P[i, 2] + P[i, 3] for i in axes(P, 1)]
+    end
+end
+ra.vintage.commits          # which code produced the arms
+ra.admissible               # false, with reasons
+```
+"""
+function reanalyze(series::Function,
+    run_dir::Union{AbstractString, AbstractVector{<:AbstractString}};
+    observable::Union{Nothing, ObservableDefinition}=nothing,
+    observables::Union{Nothing, AbstractVector{ObservableDefinition}}=nothing,
+    declare::AbstractString,
+    verbose::Bool=true,
+)
+    # ONE method, not two: Julia dispatches on positional arguments only, so a
+    # second method differing solely in its keywords would silently REPLACE this
+    # one.
+    (observable === nothing) == (observables === nothing) && throw(
+        ArgumentError(
+            "reanalyze: give exactly one of `observable = ` (one definition, " *
+            "returns a Reanalysis) or `observables = [...]` (several off one read, " *
+            "returns a MultiReanalysis)"),
+    )
+    if observable !== nothing
+        c = _reanalysis_core(series, run_dir, (observable,), declare, false)
+        ra = c.results[observable.name]
+        verbose && _print_reanalysis(ra)
+        return ra
+    end
+    c = _reanalysis_core(series, run_dir, observables, declare, true)
+    m = MultiReanalysis(c.results, c.order, c.vintage, c.sources, c.paths,
+        String(declare), c.stale_env, false, c.why)
+    verbose && _print_multi_reanalysis(m)
+    m
 end
 
 reanalyze(run_dir::AbstractString; series::Function, kwargs...) =
     reanalyze(series, run_dir; kwargs...)
 
-function _print_reanalysis(ra::Reanalysis)
-    obs = ra.observable
-    println("reanalyze: $(obs.name)")
+function _print_observable_line(obs::ObservableDefinition)
     println(
         "  window    $(obs.window)" *
         (obs.window_frames === nothing ? "" : " $(obs.window_frames)") *
-        "   reduction $(obs.reduction)   boundary $(obs.boundary)",
+        "   reduction $(obs.reduction)   boundary $(obs.boundary)" *
+        (obs.series_key === nothing ? "" : "   series $(obs.series_key)"),
     )
-    v = ra.vintage
+end
+
+function _print_vintage(ra_vintage::RunVintage, stale_env::Bool, why::Vector{String})
+    v = ra_vintage
     println(
         "  vintage   $(v.n_points) points, $(length(v.commits)) producing " *
         "commit(s), $(v.n_dirty) dirty, $(v.n_unstamped) unstamped",
     )
     isempty(v.commits) || println("            " *
             join(("$c×$(v.counts[c])" for c in v.commits), "  "))
-    ra.stale_env && println(
+    stale_env && println(
         "  NOTE      SPINORBEC_ALLOW_STALE_POINTS=1 was already " *
         "set in the environment (not by reanalyze)",
     )
-    isempty(ra.boundary_hits) ||
-        println(
-            "  boundary  argmax on a window edge in $(length(ra.boundary_hits)) " *
-            "point(s): $(join(ra.boundary_hits, ", "))" *
-            (obs.boundary == "reject" ? "  [value withheld]" : ""),
-        )
-    println("  ADMISSIBLE false — " * join(ra.inadmissible_because, "; "))
+    println("  ADMISSIBLE false — " * join(why, "; "))
+end
+
+function _print_failures(ra::Reanalysis)
+    isempty(ra.failures) && return nothing
+    println("  UNREAD    $(length(ra.failures)) target(s) produced no value:")
+    for k in sort!(collect(keys(ra.failures)))
+        println("            $k : $(first(ra.failures[k], 120))")
+    end
+end
+
+function _print_boundary(ra::Reanalysis)
+    isempty(ra.boundary_hits) && return nothing
+    println(
+        "  boundary  argmax on a window edge in $(length(ra.boundary_hits)) " *
+        "point(s): $(join(ra.boundary_hits, ", "))" *
+        (ra.observable.boundary == "reject" ? "  [value withheld]" : ""),
+    )
+end
+
+function _print_reanalysis(ra::Reanalysis)
+    println("reanalyze: $(ra.observable.name)")
+    _print_observable_line(ra.observable)
+    _print_vintage(ra.vintage, ra.stale_env, ra.inadmissible_because)
+    _print_boundary(ra)
+    _print_failures(ra)
+    nothing
+end
+
+function _print_multi_reanalysis(m::MultiReanalysis)
+    println("reanalyze: $(length(m.order)) observables off one read")
+    for n in m.order
+        ra = m.results[n]
+        println("  * $n")
+        _print_observable_line(ra.observable)
+        _print_boundary(ra)
+    end
+    _print_vintage(m.vintage, m.stale_env, m.inadmissible_because)
+    # The failure list is the same for every observable only when the read
+    # failed; per-observable windows fail per-observable, so print each.
+    for n in m.order
+        ra = m.results[n]
+        isempty(ra.failures) && continue
+        println("  [$n]")
+        _print_failures(ra)
+    end
     nothing
 end
 
 """
     reanalysis_record(ra) -> Dict{String,Any}
+    reanalysis_record(m::MultiReanalysis) -> Dict{String,Any}
 
 The machine-readable record of a re-analysis: the observable's three fields, the
 vintage, the declaration, and `admissible = false` with its reasons.
@@ -541,8 +637,28 @@ Written as JSON beside a re-analysis output, or transcribed into a `[[claim]]`
 row — `window` / `reduction` / `boundary` come out under the ledger's own names,
 and `evidence_status` / `uncertainty_basis` are filled with what a re-read can
 honestly claim rather than left for the transcriber to guess.
+
+The `MultiReanalysis` form writes the shared vintage once and each observable's
+own three fields under `observables`, so a group of numbers taken off one read
+cannot be transcribed with the vintage of a different pass.
 """
 function reanalysis_record(ra::Reanalysis)
+    rec = _reanalysis_shared_record(ra.vintage, ra.sources, ra.paths, ra.declared,
+        ra.stale_env, ra.admissible, ra.inadmissible_because)
+    merge!(rec, _observable_record(ra))
+    rec
+end
+
+function reanalysis_record(m::MultiReanalysis)
+    rec = _reanalysis_shared_record(m.vintage, m.sources, m.paths, m.declared,
+        m.stale_env, m.admissible, m.inadmissible_because)
+    rec["observables"] = Dict{String, Any}(
+        n => _observable_record(m.results[n]) for n in m.order)
+    rec["observable_order"] = copy(m.order)
+    rec
+end
+
+function _observable_record(ra::Reanalysis)
     obs = ra.observable
     Dict{String, Any}(
         "observable" => obs.name,
@@ -551,21 +667,36 @@ function reanalysis_record(ra::Reanalysis)
             (obs.window_frames === nothing ? "" : " $(obs.window_frames)"),
         "reduction" => string(obs.reduction),
         "boundary" => obs.boundary,
-        "declared" => ra.declared,
-        "allow_stale_points_ambient" => ra.stale_env,
-        "vintage_commits" => ra.vintage.commits,
-        "vintage_counts" => ra.vintage.counts,
-        "n_points" => ra.vintage.n_points,
-        "n_dirty" => ra.vintage.n_dirty,
-        "n_unstamped" => ra.vintage.n_unstamped,
+        "series" => obs.series_key === nothing ? "" : obs.series_key,
         "boundary_hits" => ra.boundary_hits,
+        "values" => Dict{String, Any}(k => v for (k, v) in ra.values),
+        # A target that produced no number, with WHY. Absent must not read as
+        # benign, and "the window did not fit" must not read like "no data".
+        "failures" => Dict{String, Any}(k => v for (k, v) in ra.failures),
+    )
+end
+
+function _reanalysis_shared_record(vintage::RunVintage, sources, paths, declared,
+    stale_env, admissible, why)
+    Dict{String, Any}(
+        # Which file each ROW came off, so a value lifted out of the table keeps
+        # its provenance. `sources` below is the read order and answers a
+        # different question.
+        "sources_by_label" => Dict{String, Any}(
+            k => joinpath(basename(dirname(v)), basename(v)) for (k, v) in paths),
+        "declared" => declared,
+        "allow_stale_points_ambient" => stale_env,
+        "vintage_commits" => vintage.commits,
+        "vintage_counts" => vintage.counts,
+        "n_points" => vintage.n_points,
+        "n_dirty" => vintage.n_dirty,
+        "n_unstamped" => vintage.n_unstamped,
         # Arm directory AND point file. `basename` alone printed
         # "point_001.jld2" five times, which is a list of nothing: across a scan
         # the arm is the coordinate and the point name is a constant.
-        "sources" => [joinpath(basename(dirname(p)), basename(p)) for p in ra.sources],
-        "values" => Dict{String, Any}(k => v for (k, v) in ra.values),
-        "admissible" => ra.admissible,
-        "inadmissible_because" => ra.inadmissible_because,
+        "sources" => [joinpath(basename(dirname(p)), basename(p)) for p in sources],
+        "admissible" => admissible,
+        "inadmissible_because" => why,
         # What a transcriber would otherwise have to decide. `absent` because the
         # stored points are not in the tree, and `none` because a re-read has no
         # convergence axis of its own — the axis belongs to the run it read.
@@ -573,8 +704,7 @@ function reanalysis_record(ra::Reanalysis)
         "uncertainty_basis" => "none",
         "uncertainty" =>
             "unbounded: a re-read of stored output at vintage " *
-            (isempty(ra.vintage.commits) ? "<unstamped>" :
-             join(ra.vintage.commits, "/")) *
+            (isempty(vintage.commits) ? "<unstamped>" : join(vintage.commits, "/")) *
             "; the uncertainty is the run's, not this reduction's",
     )
 end
