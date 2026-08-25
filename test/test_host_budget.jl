@@ -162,21 +162,58 @@ const _HB_ROOT = dirname(@__DIR__)
         no_grant = ("SLURM_MEM_PER_NODE" => nothing, "SLURM_MEM_PER_CPU" => nothing,
             "SGE_HGR_m_mem_free" => nothing, "SGE_HGR_TASK_m_mem_free" => nothing,
             "SPINORBEC_HOST_MEMORY_BYTES" => nothing)
+
+        # THE INVARIANT, asserted the same way on every host: in a batch job the
+        # ceiling never comes from MemAvailable. Either a cgroup limit applies —
+        # and that one IS ours — or there is no supply figure and it refuses.
+        #
+        # Written this way because the first version asserted the refusal
+        # unconditionally and failed under the parallel runner: the suite is
+        # launched through scripts/run_local.sh, which puts every worker in a
+        # cgroup WITH a MemoryMax, so `cg === nothing` was false and the guard
+        # correctly did not fire. The test was environment-dependent, not the
+        # code. Both branches are checked, and which one ran is reported, so a
+        # host that exercises neither cannot look like a pass.
+        cg_limited = SpinorBEC._cgroup_memory_max() !== nothing
         for jobvar in ("SLURM_JOB_ID", "SLURM_JOBID", "PBS_JOBID", "JOB_ID", "LSB_JOBID")
             withenv(no_grant..., jobvar => "12345") do
-                @test_throws BlindBudget detect_host_budget()
+                if cg_limited
+                    b = detect_host_budget()
+                    @test b.memory_source === :cgroup
+                    @test b.memory_source !== :memavailable
+                else
+                    @test_throws BlindBudget detect_host_budget()
+                end
             end
         end
-        # The message must name the reason, or the refusal is unactionable.
-        err = try
-            withenv(no_grant..., "SLURM_JOB_ID" => "12345") do
-                detect_host_budget()
+        @info "batch-job memory guard: exercised the $(cg_limited ? "cgroup-limited" : "refusal") branch"
+
+        # `_batch_job` is the whole scheduler-agnostic part, so it is tested
+        # exhaustively and independently of the ambient cgroup.
+        withenv("SLURM_JOB_ID" => nothing, "SLURM_JOBID" => nothing,
+            "PBS_JOBID" => nothing, "JOB_ID" => nothing, "LSB_JOBID" => nothing) do
+            @test SpinorBEC._batch_job() === nothing
+            for v in ("SLURM_JOB_ID", "SLURM_JOBID", "PBS_JOBID", "JOB_ID", "LSB_JOBID")
+                withenv(v => "999") do
+                    @test SpinorBEC._batch_job() == v
+                end
             end
-        catch e
-            e
+            # An empty value is not a job id — it must not count as one.
+            withenv("SLURM_JOB_ID" => "") do
+                @test SpinorBEC._batch_job() === nothing
+            end
         end
-        @test err isa BlindBudget
-        @test occursin("whole NODE's free memory", sprint(showerror, err))
+
+        # The refusal message must name the reason, or it is unactionable. Checked
+        # on the exception the guard actually constructs, so it holds whether or
+        # not this host can reach it end to end.
+        msg = sprint(showerror,
+            BlindBudget(:memory_bytes, "SLURM_JOB_ID",
+                "this is a batch job, but neither the scheduler's memory grant " *
+                "nor a cgroup limit could be read, and MemAvailable is the whole " *
+                "NODE's free memory — not this job's."))
+        @test occursin("whole NODE's free memory", msg)
+        @test occursin("Refusing to substitute a default", msg)
 
         # NEGATIVE CONTROLS — the guard must not fire where it would be wrong.
         # 1. A batch job that DOES export its grant still works. Without this the
