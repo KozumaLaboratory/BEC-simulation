@@ -61,13 +61,20 @@ const _UNMIGRATED = Dict(
         "ratio, prominence, misalignment, stripe count, frame count) over one " *
         "read of the frames. `reanalyze` is one-observable-per-call, so this " *
         "needs either seven passes over the same file or a multi-observable " *
-        "API. Not extending the API speculatively for one caller.",
+        "API. Two callers need one (see klaus_weff_cloud_size.jl), so the " *
+        "design question is live — but it is a change to an API two commits " *
+        "old and is not being bolted on here.",
     "validation/klaus_weff_cloud_size.jl" =>
-        "reads `psi_snapshots_streamed` and reduces a SPATIAL quantity (radial " *
-        "RMS) per frame, not a saved per-frame scalar. It would fit the " *
-        "`series` contract, and it is the next migration — listed rather than " *
-        "done because it also carries the two-grid comparison this PR did not " *
-        "touch.",
+        "CORRECTED 2026-08-26 after reading the whole file rather than its top " *
+        "half. `radial_rms` per frame IS a clean `series` — that part of the " *
+        "first reason held. What does not fit is the REDUCTION: one pass yields " *
+        "nine quantities (r at hold start, r at end, r_min, r_max, the " *
+        "expansion ratio, the in-hold P_adj peak, its frame, whether the " *
+        "whole-trajectory argmax lands in the hold, and the final P_adj) off " *
+        "TWO series read from the same file. So it is blocked on the same thing " *
+        "klaus2022_reanalyse.jl is — which is the finding: a multi-observable " *
+        "pass now has TWO callers, not one, and re-reading streamed psi " *
+        "snapshots once per observable is not a cheap alternative here.",
     "validation/lt64_endpoint_verdict.jl" =>
         "THE ONE THAT MATTERS. Re-derives the in-hold window from the suite's " *
         "dt / save_every constants — a second independent statement of the " *

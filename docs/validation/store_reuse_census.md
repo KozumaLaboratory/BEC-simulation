@@ -213,10 +213,17 @@ can re-run. Two further defects fell out of the migration:
   Four `.jl` drivers under `scripts/` read a stored run artifact; one is
   migrated, and `test/test_reanalysis_driver_coverage.jl` requires each of the
   others to be **named with a reason**, so a fifth cannot appear unclassified.
-  What is deferred: `klaus2022_reanalyse.jl` reduces seven quantities per pass and
-  would need a multi-observable API (not extending it speculatively for one
-  caller); `klaus_weff_cloud_size.jl` fits the `series` contract and is the next
-  migration; **`lt64_endpoint_verdict.jl` is the one that matters** — it
+  What is deferred, and the shape of it is itself a finding: **two of the three
+  need a multi-observable pass, not a second driver rewrite.**
+  `klaus2022_reanalyse.jl` reduces seven quantities per pass;
+  `klaus_weff_cloud_size.jl` reduces nine off two series read from one file — its
+  `radial_rms` per frame IS a clean `series`, which is the half of the first
+  reading that held, but the reduction is not one observable. Re-reading streamed
+  ψ snapshots once per observable is not a cheap alternative there, so
+  "one `reanalyze` call per quantity" is not the answer either. A
+  multi-observable pass therefore has **two callers rather than one**, which is
+  what would justify extending an API two commits old — recorded rather than
+  built here. **`lt64_endpoint_verdict.jl` is the one that matters** — it
   re-derives the in-hold window from its suite's own `dt`/`save_every` constants,
   its own header says getting them wrong is SILENT, and that is a second live
   statement of the observable `97ec124e` fixed. Migrating it moves a
