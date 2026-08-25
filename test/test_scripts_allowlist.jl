@@ -43,6 +43,11 @@ const _SCRIPTS_ALLOWLIST = Set([
     "audit_memory.py",             # memory-store auditor (CLAUDE.md-gated)
     "preflight_invariants.jl",     # physics-invariant preflight battery
     "watch_until_done.sh",         # job watcher with a reachable RED
+    # Launcher for local runs: applies the budget src/workflow/io/host_budget.jl
+    # derives, in a swap-proof cgroup. Operational by nature — the cgroup has to
+    # wrap the julia process, so it cannot live inside it — and it holds no
+    # derivation of its own.
+    "run_local.sh",
     # ── build tooling (category 2) ──
     "build_sysimage.jl",
     "build_sysimage_full.jl",

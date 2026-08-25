@@ -5,7 +5,8 @@
 #     --shard k/n         every n-th class from k         (default: no sharding)
 #     --probe NAME|list   grounded_cheap | oracles | fast  (default: grounded_cheap)
 #                         or a comma-separated list of test files
-#     --workers N         parallel test processes          (default: CPU threads − 2)
+#     --workers N         parallel test processes          (default: this job's
+#                         own cpu allotment — affinity mask or scheduler grant)
 #     --out DIR           where the matrix + report go      (default: mutation_out/)
 #     --allow-dirty       run with uncommitted src changes  (default: refuse)
 #     --no-negative-control  skip the repeat-baseline pass     (default: run it)
@@ -31,7 +32,21 @@ _arg(flag, default) = (i=findfirst(==(flag), ARGS);
     i === nothing ? default : ARGS[i + 1])
 
 const OUT = abspath(_arg("--out", joinpath(_ROOT, "mutation_out")))
-const NWORKERS = parse(Int, _arg("--workers", string(max(1, Sys.CPU_THREADS - 2))))
+
+# The default worker count is this job's OWN cpu allotment — the affinity mask or
+# the scheduler's grant — not the machine's core count, which on a cluster node
+# describes hardware somebody else is using. The former `Sys.CPU_THREADS - 2`
+# got both halves wrong: it read the machine, and it kept the host responsive by
+# subtracting a constant. Responsiveness is the launcher's job now, and it does
+# it with a mechanism (CPUWeight) rather than a number — see scripts/run_local.sh.
+module _HostBudget
+include(joinpath(dirname(dirname(@__DIR__)), "src", "workflow", "io", "host_budget.jl"))
+end  # _ROOT is this same directory; spelled out here so the include is readable
+
+const NWORKERS = parse(
+    Int, _arg("--workers",
+        string(max(1, _HostBudget.detect_host_budget().cpu_threads)))
+)
 const ALLOW_DIRTY = "--allow-dirty" in ARGS
 # The negative control costs one probe pass and is what makes a catch mean
 # something, so it is on by default. The escape hatch exists for a re-probe of a

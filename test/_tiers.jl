@@ -37,6 +37,10 @@ const FAST_TESTS = [
     # The CONTRIBUTING.md scripts/ charter, gated: set equality between
     # scripts/ on disk and the in-test allowlist (306→76 cleanup, 2026-08-18).
     "test_scripts_allowlist.jl",
+    # Resource limits must be DERIVED per host, never chosen — and this is also
+    # the gate that keeps `Sys.CPU_THREADS` (the MACHINE's core count, wrong by
+    # 24× inside a TSUBAME allotment) out of every site but its declaration.
+    "test_host_budget.jl",
     # A job script may not report success for a stage that failed. `set +e` in
     # `tsubame_setup.sh` went unrestored for twelve days and covered two
     # failures with GREENs; the property is EXECUTED here, because grepping for
