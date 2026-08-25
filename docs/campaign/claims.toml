@@ -1294,6 +1294,47 @@ THE LESSON IS THE ONE THE LEDGER KEEPS RE-LEARNING. The measurement was right an
 wrong: 0/219 was a real number about summaries, and it was reported as a conclusion about the cache.
 The gate opens a different file. Say which file a count is a count OF."""
 
+[[claim]]
+id = "spgpe-full-steady-state-is-not-the-equilibrium"
+quantity = "N_C at the full-SPGPE steady state @ T=10, mu=11.724, kappa=1.8, 64cubed"
+claim = "The full-SPGPE (energy-damping-on) steady state N_C ~= 2.9e3 is NOT the grand-canonical equilibrium of its own reservoir: the C-region equilibrium at (T=10, mu=11.724, k_cut=6.59) is 1.9e4-3.3e4, which the growth-only steady state (2.96e4) lands inside and the full one sits 6.5x below."
+status = "live"
+lifecycle = "candidate"
+ladder = "exact: closed-form occupancy at fixed (T, mu, eps_cut) — no cutoff axis to walk. The SPREAD is the anisotropy, not a convergence residual: the TF formula as coded is isotropic (omega enters only eps_0), and a (1,1,kappa) trap carries an extra 1/kappa in the volume element, giving 1.886e4 with the factor and 3.272e4 without. Both ends are quoted."
+type = "A"
+scope = "The eu334 nucleation ramp: box 24, 64^3, kappa = 1.8, c0 = 0.046873 (norm-N form, n_atoms=1 preset), k_cut = min(sqrt(2(mu+T)), k_max = 8.378), evaluated at the ramp's TERMINAL mu. It is a statement about the STEADY STATE of the two dissipative schemes, not about which one is right for a growth problem."
+uncertainty = "The bracket 1.9e4-3.3e4 IS the uncertainty and it is a modelling spread (isotropic vs kappa-corrected TF, ideal-gas density of states), not a statistical one. The DIRECTION survives it: 2.9e3 is 6.5x below the lower end. Positive control, and it was not constructed for the purpose — the growth-only arm's measured steady state 2.96e4 falls INSIDE the independently computed range, so c0, omega and eps_cut are not mis-set; had that failed, nothing here would be readable."
+uncertainty_basis = "control"
+evidence = ["src/solvers/evaporation/spgpe_reservoir.jl", "src/solvers/spgpe.jl"]
+evidence_status = "in_tree"
+commit = "807260b4"
+doc = "docs/campaign/claims.toml"
+section = "spgpe"
+pr = 0
+window = "the ramp's terminal reservoir point"
+reduction = "steady-state value (the plateau), against a closed-form equilibrium at the same (T, mu, eps_cut)"
+boundary = "n/a"
+note = """WHY THIS IS TYPE A AND NOT B. The SPGPE's stationary distribution is the
+grand-canonical exp(-(H-mu N)/T) restricted to C. Energy damping is another dissipative
+channel satisfying fluctuation-dissipation with the SAME reservoir, so it must preserve the
+SAME stationary distribution. One scheme landing 6.5x off it is a defect in the
+implementation, not a physical difference between two theories. Tracked as its own issue.
+
+WHAT THIS OVERTURNS. #418 closed with "not a defect, two different steady states, the full arm
+has ARRIVED rather than failed". The arrival is confirmed; the destination is not the
+reservoir's equilibrium. So the threat this posed to the flower nucleation result dissolves:
+the equilibrium sits at 1.9-3.3e4, ABOVE the flower minimum atom number N0* ~= 1.5e4, and the
+growth-only arm lands there. "A more complete theory forbids flower" does not follow from an
+arm that is not at its own equilibrium.
+
+THE METHOD IN THE ISSUE WAS ALREADY REFUTED IN THE TREE, and this is the third instance of
+that pattern here. #454 proposed checking mu_psi against T. `field_chemical_potential`'s own
+docstring (PR #433) says a scalar mean cannot answer a mode-resolved question, reports the
+measurement on this very ramp — both arms carry mu-tilde ~ 16-20 against mu_res ~ 8.6 and
+growth-only grows anyway — and states that reading it as "the drive" produced a wrong
+conclusion its own control refuted. I wrote the issue without reading the docstring of the
+function it named. The instrument that DOES answer it is a different one two files away."""
+
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 covered = 27
