@@ -242,7 +242,25 @@ unchanged by this work.
 **Trap-broken symmetries.** `bdg_symmetry_generators` includes translations and
 rotation about z. For a uniform state the translation generator is identically
 zero (`∂ψ = 0`), so that column is 0 for a reason that has nothing to do with
-orthogonality. Do not read a zero overlap there as a measurement.
+orthogonality. Do not read a zero overlap there as a measurement. Which of the
+returned generators actually commute with THIS Hamiltonian is a property of the
+Hamiltonian, not of the list — `bdg_expected_zero_modes` measures it (each
+projected generator through the constrained Hessian, against a random
+direction's) rather than asserting it, and turns the surviving ones into the
+number of `ω ≈ 0` modes to expect. Its docstring is the one statement of that
+count; the excess over it is the accidental-degeneracy observable #455 wants.
+
+**`ψ` may not alias `ws.state.psi`, and the failure is silent.**
+`energy_gradient!` opens with `copyto!(ws.state.psi, psi)`, so an aliased `ψ` is
+moved by the first of the finite difference's two gradient evaluations: the step
+spans `ε` instead of `2ε` and the operator comes back at exactly HALF. That is
+not a scaled operator — the `−2μ` shift stops cancelling, so `Hg = 2μg` maps to
+`−μg` and every broken-symmetry direction stops being a null direction. Measured
+2026-08-26 on two jobs one `copy` apart: `‖(H−2μ)(iψ)‖/2μ` = 0.500 vs 1.1e-9,
+and a trapped F=1 polar state reported ZERO Goldstone modes where §4's own
+acceptance row asserts two. `hessian_converged` going false was the only hint,
+and a soft manifold produces that hint anyway. `hessian_vector_product` now
+refuses the aliased call.
 
 ## 7. What to predict, and where
 

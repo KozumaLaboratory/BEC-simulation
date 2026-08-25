@@ -164,3 +164,53 @@ end
         @test maximum(abs, Hc .- H1) / maximum(abs, H1) < 1e-9
     end
 end
+
+# ALIASING — the same defect class as the homogeneity bug above (the step is not
+# the step the caller thinks it is), and silent in the same way.
+#
+# `energy_gradient!` opens with `copyto!(ws.state.psi, psi)`. So when the caller
+# passes `ws.state.psi` ITSELF, the first of the two gradient evaluations moves
+# that array to `ψ+εd`; the second is then taken at `(ψ+εd)−εd = ψ`, the
+# difference spans `ε` rather than `2ε`, and the operator comes back at EXACTLY
+# half. Half an operator is NOT a scaled operator: the `−2μ` shift in
+# `constrained_hessian_action` no longer cancels, so `(H−2μ)` sends every
+# broken-symmetry direction `g` (which satisfies `Hg = 2μg`) to `−μg` instead of
+# to zero — the Goldstone modes stop existing.
+#
+# Measured 2026-08-26 on ¹⁵¹Eu's F=1 sibling, two TSUBAME jobs one `copy` apart
+# (8496696 aliased vs 8496708 not), same states and the same solver output:
+#
+#   ‖(H−2μ)(iψ)‖/2μ    0.500          vs 1.1e-09
+#   trapped F=1 polar  0 zero modes   vs 2   (the count this file's sibling
+#   trapped F=1 FM     0              vs 1    oracle already asserts)
+#
+# Nothing threw and nothing warned; `hessian_converged` going false was the only
+# hint, and it is the kind of hint a soft manifold produces anyway. Hence a
+# refusal at the primitive rather than a note in a docstring — every face
+# (`constrained_hessian_action`, the LOBPCG block, `trapped_bdg_frequencies`,
+# Newton-CG) reaches the operator through this one function.
+@testset "Hessian refuses a ψ that aliases ws.state.psi" begin
+    grid = make_grid(GridConfig((8, 8, 8), (4.0, 4.0, 4.0)))
+    ws = make_workspace(; grid, atom=Rb87,
+        interactions=InteractionParams(Dict(0 => 20.0, 1 => -0.4)),
+        potential=HarmonicTrap((1.0, 1.0, 1.0)),
+        sim_params=SimParams(; dt=0.01, n_steps=1, imaginary_time=true))
+    Random.seed!(12)
+    ψ0 = randn(ComplexF64, 8, 8, 8, 3)
+    ψ0 ./= sqrt(sum(abs2, ψ0) * cell_volume(grid))
+    copyto!(ws.state.psi, ψ0)
+    d = randn(ComplexF64, 8, 8, 8, 3)
+    d ./= sqrt(sum(abs2, d))
+
+    @test_throws ArgumentError hessian_vector_product(ws, ws.state.psi, d)
+    # The refusal must not be reachable the other way round: a copy is the
+    # supported call and has to keep working, or the guard would just be a
+    # tripwire on the whole instrument.
+    ψ = copy(ws.state.psi)
+    @test norm(hessian_vector_product(ws, ψ, d)) > 1e-6
+    # And the guard is at the primitive, so the faces inherit it — checked on
+    # the one every BdG consumer goes through rather than assumed.
+    p = constrained_hessian_params(ws, ψ)
+    @test_throws ArgumentError constrained_hessian_action(
+        ws, ws.state.psi, d; p.μ, p.dV, p.n2)
+end

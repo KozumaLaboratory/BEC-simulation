@@ -120,12 +120,27 @@ worth its 0.001 points:
 - Net effect: a job granted **9.2 GiB** was told its ceiling was **598.9 GiB**,
   a 65× over-estimate. Both holes are now closed and both hierarchies are read.
 
-**Still not verified by execution:** SLURM and PBS. Their variables are
-unit-tested by setting them, which proves parsing and precedence and — as the
-UGE memory rung just demonstrated — proves nothing about what a real scheduler
-exports or which cgroup hierarchy the node runs. Treat the first run on such a
-cluster as the measurement, and dump the raw inputs beside the derived answer
-the way `scripts/` did here.
+**SLURM and PBS are still not verified by execution**, and that now matters
+much less than it reads. Their variables are unit-tested by setting them, which
+proves parsing and precedence and proves nothing about what a real scheduler
+exports. What changed is the CONSEQUENCE of that being wrong.
+
+Asked what SLURM/PBS verification was even for, the answer turned out to be a
+hole rather than a chore: when a per-scheduler parser does not fire, the ladder
+fell through to `MemAvailable` — the whole **node's** free memory, which on a
+shared node is other people's. That is exactly the defect TSUBAME job 8492405
+exposed, reachable on any cluster whose spelling this file does not know.
+
+So the guard is scheduler-agnostic and needed no cluster to test: **inside a
+batch job, with neither a grant nor a cgroup limit readable, there is no supply
+figure and `detect_host_budget` refuses.** Every scheduler exports a job id;
+that is the only fact required. An unrecognised scheduler now fails loudly
+instead of silently over-reporting by the size of the node, which makes the
+per-scheduler parsers best-effort rather than load-bearing.
+
+Still treat the first run on a new cluster as the measurement — dump the raw
+inputs beside the derived answer the way the TSUBAME probe did — but a wrong
+guess there is now a refusal, not a number.
 
 `scripts/run_local.sh` itself is not for cluster use: there the scheduler is the
 thing enforcing the budget.
