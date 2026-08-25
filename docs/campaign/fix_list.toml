@@ -21,6 +21,37 @@
 schema_version = 1
 
 [[fix]]
+id = "ddi-cdd-f-squared"
+ref = "c6b1ed0b"
+merged = 2026-04-28
+summary = "c_dd carried an unnecessary F^2 = 36 factor"
+effect = "effective DDI 7,647 -> 275,292; every DDI-dependent result before this ref is void"
+note = """
+THE OLDEST ROW HERE AND THE LAST ONE ADDED, which is the finding. Until 2026-08-25 the \
+only record of this defect anywhere in the tree was a CODE COMMENT — \
+`src/hamiltonian/coefficients.jl:95`, "DO NOT MULTIPLY BY F^2 <- this docstring exists \
+because Bug-3 was an F^2/36x". The value-level SSoT held perfectly and nothing that the \
+gate reads said the fix existed, so guard 1 could not disqualify a single pre-2026-04-28 \
+DDI run. Same shape as eu-config-field-sign and eu-edh-corpus-anti-aligned-retarget: the \
+prose leant on a correction the machine-readable list had never been told about.
+
+Diagnosed twice wrong before it was found — the ITP energy oscillation was read as \
+Yoshida w0 < 0 back-diffusion, then as a failure of DDI self-consistency, and only then \
+as c_dd. That history is why the guard comment at the coefficient is phrased as an \
+imperative rather than a description.
+
+CATEGORY, stated because it has been miscategorised: this was caught by INTERNAL \
+diagnosis, not by comparison against a published result. It is a coefficient/scaling \
+defect (numbers ran before the analytic limit was checked) compounded by the same \
+physics living in more than one place and drifting. The second half is already digested \
+into the HamTerm protocol and day-0 gated redundancy; this row records the first.
+
+Provenance is OUTSIDE the repo — project chat conv 606ac7ca (2026-04-22) found it, conv \
+41595d89 (2026-06-11) audited it and drafted a ledger row that never landed. Recorded \
+here because a fix whose only witness is a chat log is a fix the gate cannot see.
+"""
+
+[[fix]]
 id = "itp-spin-rotation-stage3-density-bias"
 ref = "9925f41a"
 pr = 18

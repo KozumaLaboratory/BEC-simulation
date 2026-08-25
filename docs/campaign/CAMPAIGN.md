@@ -40,8 +40,8 @@ as campaign evidence.
 
 The machine-readable ref list is **`docs/campaign/fix_list.toml`** — the file guard 1
 reads, and the only place the SHAs are declared. The table below is the human-readable
-context and deliberately carries no SHAs, so the two cannot drift. It has 16 entries to
-this table's 13: the June integrator row expands into the four propagator paths that
+context and deliberately carries no SHAs, so the two cannot drift. It has 17 entries to
+this table's 14: the June integrator row expands into the four propagator paths that
 carried the same defect (#45 Strang, #46 Yoshida, #47 adaptive, #49 combined step).
 `test/test_campaign_fix_list_gate.jl` pins the two counts against each other
 and re-runs the ancestor check over every ref, so neither the drift nor a dead ref is
@@ -49,6 +49,7 @@ left to a reader.
 
 | merged | correction | effect |
 |---|---|---|
+| **2026-04-28** | **`c_dd` carried an unnecessary F² = 36 factor** | effective DDI 7,647 → 275,292. **Every DDI-dependent result before this ref is void.** Added to the machine-readable list on 2026-08-25: until then the only record in the tree was a code comment, so guard 1 could not see it — the #343 class, at the oldest correction in the campaign |
 | 2026-06-15 | ITP spin-rotation Stage-3 density bias (c₁ + DDI) | changes ground states |
 | 2026-06-22 | Strang/Yoshida order restored under DDI via midpoint mean-field | integrator was **1st order** with DDI |
 | 2026-06-22 | LBFGS driven to its true gradient floor | changes converged GS |

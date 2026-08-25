@@ -1169,6 +1169,44 @@ degeneracy at the physical point is an a_S-dependent question (layer ii). What I
 stretched sector: the fully polarized cloud and its first magnon are pure S = 2F
 (`test/oracles/test_stretched_channel_invariance.jl`), which is why #455 is scoped to the FM branch."""
 
+[[claim]]
+id = "ddi-cdd-f-squared-voids-pre-april-ddi"
+claim = "`c_dd` carried an unnecessary F^2 factor (36 at F=6) until `c6b1ed0b` (2026-04-28), so every DDI-dependent result produced before that ref is void — effective DDI 7,647 against a correct 275,292 is the wrong way round: the run used 275,292 where 7,647 was meant."
+status = "live"
+type = "A"
+scope = "Any run with DDI active whose producing commit does not descend from `c6b1ed0b`. Scalar (F=0) runs are unaffected: `c_dd = mu_0 mu^2` there and no spin operators enter H_dd."
+uncertainty = "Exact — F^2 = 36 at F = 6 is an algebraic factor, not a fitted one. `c_dd` carries `(g_F mu_B)^2`, NOT `(g_F F mu_B)^2`; the F^2 that maps eigenvalues is already in the spin operators, so multiplying again double-counts it. Control: the guard at `src/hamiltonian/coefficients.jl:95` and the F=6 constraint test that landed with the fix."
+uncertainty_basis = "control"
+evidence = ["docs/campaign/fix_list.toml", "src/hamiltonian/coefficients.jl"]
+evidence_status = "in_tree"
+commit = "c6b1ed0b"
+doc = "docs/campaign/fix_list.toml"
+section = "ddi-cdd-f-squared"
+pr = 0
+note = """UNTIL 2026-08-25 THE ONLY RECORD OF THIS ANYWHERE IN THE TREE WAS A CODE COMMENT.
+`src/hamiltonian/coefficients.jl:95` reads "DO NOT MULTIPLY BY F^2 <- this docstring exists
+because Bug-3 was an F^2/36x", and nothing the ancestor gate reads knew the fix existed. So
+guard 1 could not disqualify a single pre-2026-04-28 DDI run, which is the #343 class again
+and at the OLDEST correction in the campaign. The value-level SSoT was never the problem:
+one line computes c_dd and the comment defends it. What was missing was the statement, in
+the place that is executed.
+
+DIAGNOSED WRONG TWICE FIRST. The ITP energy oscillation was read as Yoshida w0 < 0
+back-diffusion, then as a failure of DDI self-consistency, and only then as c_dd. That is
+why the guard is phrased as an imperative rather than a description.
+
+CATEGORY, because it has been miscategorised in discussion: this was found by INTERNAL
+diagnosis (tracking the ITP oscillation), not by comparison against a published result, so
+it is not an example of the oracle problem. It is a coefficient/scaling defect - numbers ran
+before the analytic limit was checked - compounded by one piece of physics living in more
+than one place and drifting. The second half is already digested into the HamTerm protocol
+and day-0 gated redundancy; this row records the first half, which had no home.
+
+PROVENANCE IS OUTSIDE THE REPO. Project chat conv 606ac7ca (2026-04-22) found it; conv
+41595d89 (2026-06-11) audited it, called it the highest-impact numerical bug in the project's
+history, and drafted a ledger row that never landed. A fix whose only witness is a chat log
+is a fix the gate cannot see, which is the general lesson and the reason this row exists."""
+
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
 covered = 27
