@@ -1474,7 +1474,7 @@ stored under that name. The store is trustworthy for re-analysis and the committ
 not, which is the opposite of the intuition."""
 
 [[claim]]
-id = "node-hours-per-claim-has-no-numerator"
+id = "node-hours-per-claim-is-forward-only"
 claim = "The metric #478 asked to be defined - node hours per claim advanced - is computable FORWARD and not backward. Denominator: 79 claims advanced over 2026-08-20..26, counted as ledger rows entering an evidence-bearing status, on first-parent history. Numerator: the writer works but nothing aggregates it and the store predates it - 11 of the 11 `_exit_summary.json` files on this host carry a numeric `runtime_seconds` (1.20 h total, all `completed = true`), spread over four roots, and NONE is under `runs/`, where 0 of 240 directories has one because every directory there carrying a live-status path predates `0d640402` (2026-05-28). The autopilot counter received none of it: `runs/budget.toml` reads `realized_total = 0.0`, `today = 2026-06-14`."
 status = "live"
 lifecycle = "registered"

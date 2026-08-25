@@ -477,7 +477,7 @@ files are all 2026-05-13…27). Total wall time recorded anywhere on this host:
 **1.20 h.** The autopilot's counter received none of it — `runs/budget.toml` still
 reads `realized_total = 0.0`, `today = "2026-06-14"`, because the qacct poller behind
 `refresh_budget!` was never written. Counts and roots: ledger row
-`node-hours-per-claim-has-no-numerator`.
+`node-hours-per-claim-is-forward-only`.
 
 So the numerator is **absent retrospectively and available going forward**, and the
 enabling condition is not a new stamp — the stamp exists. It is an aggregator across
