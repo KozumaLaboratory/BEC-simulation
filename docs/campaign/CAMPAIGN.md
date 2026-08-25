@@ -319,3 +319,43 @@ al.* (PRL **98**, 190404) exploit for the spin-2 nematic manifold, at higher dim
 Ledger row: `f6-uniform-gs-degenerates-the-whole-manifold`. **Do not restate the four-phase
 form** — it was written here and in memory until 2026-08-25 and it understates the result
 in exactly the way that would have killed the pseudo-Goldstone programme on paper.
+---
+
+## 12. Blind analysis — the half the prediction field does not cover
+
+**Scope: type-C only.** Do not apply this to A or B; a bit-identity check has nothing
+to hide from.
+
+The ledger already protects the **hypothesis**: `prediction_registered = before | after`,
+and the gate refuses to count an `after` row as a prediction. Nothing protects the
+**analysis**. Between "the observable was fixed before launch" and "the number came out"
+there is a step where the window, the reduction, the fit range and the rejection rule get
+chosen, and at 10.4 nT three readings of the same cached arms put the argmax at three
+different points. That is not a measurement, and no registration field sees it.
+
+So, borrowing the standard from particle physics:
+
+1. **Freeze the analysis on synthetic data.** Observable definition (window / reduction /
+   boundary — the `quantity` fields), fit method, rejection criterion and error treatment
+   are fixed against the synthetic SG / TOF / tomography pipeline. Commit them.
+2. **Salt the real data.** Apply an offset the analyst does not know.
+3. **Run the frozen pipeline on the salted data.**
+4. **Unblind.** If the pipeline is changed after unblinding — sometimes it must be — the
+   change and the reason are recorded. The rule is not "never touch it"; the rule is that
+   touching it after seeing the answer is **visible**.
+
+**One analyst.** With a single person, salt-and-forget is not available, so use
+commit-and-reveal: draw the salt, commit `sha256(salt)` to the tree with the frozen
+pipeline, and disclose the salt at unblinding. The hash is what makes step 4 checkable by
+someone else later, which is the whole point.
+
+**Cost is a convention, not code.** The synthetic observable pipeline already exists; what
+is missing is the agreement about when it is allowed to be edited.
+
+**What this buys.** "Nothing in this repo has been fitted to an experiment" is currently
+a *claim about our own conduct*. Under this protocol it becomes a property of the record,
+which is the same move the ledger made for claim status — and the same reason.
+
+Related: `docs/campaign/claims.toml` (`quantity`, `prediction_registered`), §10 above.
+The FLAG-style quality colouring used in lattice QCD is the natural external-facing
+presentation of the A/B/C split plus these tags, if the campaign ever publishes the table.
