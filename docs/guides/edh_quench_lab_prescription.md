@@ -117,6 +117,39 @@ Read this before quoting any value above.
 not from component D. Hard-coding it to (D−1, D−2) is correct only for an m = −F
 seed and produced `P_adj = 0.00000` on the one arm built to test for a null.
 
+### 5.1 The definition, in the form that has to travel with the number
+
+**Write this down before taking data. It is half the measurement, and the half
+that has silently changed under us.**
+
+| field | value | why it is not obvious |
+|---|---|---|
+| `quantity` | `peak_P_adj` | population two rungs down **from the prepared state** |
+| `window` | **the hold**, cut at a stated frame range | not the whole trajectory |
+| `reduction` | `max` | not the endpoint, not the mean — those are different claims |
+| `boundary` | **`reject`** | an argmax on the edge of the window is a **truncation**, and must be reported as "the run ended too early", not quoted as a peak |
+
+The `boundary` row is the one that cost real work. At B = 10.4 nT, **16 of 20
+arms** had their in-hold argmax on the hold's *first* frame, where the decaying
+pre-hold transient still dominates — and those values rise monotonically with
+ω_eff, i.e. **opposite to the physical trend**. Ranking that scan by "peak" ranks
+the transient. At 5.2 nT the same shape appeared on the far side: ω_eff 0.42–0.62
+all peaked on the last streamed frame (42 of 42), so a published "two-branch"
+structure was comparing boundary values against one resolved maximum, and it
+inverted when the hold was doubled.
+
+Neither case is a bad run. In both, the window and the reduction were chosen
+after the data existed. These four fields are now required of any ledger row
+whose quantity names a reduction (`docs/campaign/claims.toml`, gated by
+`test_retracted_numbers_carry_their_replacement.jl`) — the same discipline is
+what this table asks of the lab.
+
+**At 1.3, 2.6 and 5.2 nT the choice does not matter**: whole-trajectory and
+in-hold peaks are identical on all 43 arms. It matters at 10.4 nT and it matters
+wherever the transient is comparable to the signal, which is exactly where the
+signal is small. So the definition travels with the number even when it is
+currently inert.
+
 At Matsui-scale N ≈ 5×10⁴ the cascade is already saturated (P_exc = 0.816), so
 **P_exc has no headroom** and the enhancement shows up on P_adj (+6.4 %). An
 older acceptance gate asking for "P_exc rises ~30 %" is refuted as posed: Ω does
@@ -141,3 +174,32 @@ None of these announces itself. Check each before trusting a repeat.
   record; its numbered protocol no longer issues instructions.
 - `docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md` — frozen; same.
 - `docs/archive/klaus_quench_protocol_pivot_2026-05-26.md` — archived.
+
+---
+
+## 7. Handover checklist — what is done, and the one thing that is not
+
+This page is the deliverable for issue #466. Before quoting it to the lab:
+
+| | state |
+|---|---|
+| The prescription itself (B = 2.6 nT, ω_⊥,eff/ω_⊥ = 0.71, no rotation, +24.9 %) | **done**, §2 |
+| The preparation stated as an orientation rather than an `m` label | **done**, §1 |
+| Why the other two fields give a different *kind* of answer | **done**, §3 |
+| The observable definition — window / reduction / boundary | **done**, §5.1 |
+| The four traps that print a clean, plausible number | **done**, §6 |
+| **A 64³ confirmation at the prescription point** | **NOT DONE** |
+
+**The open item, stated so it cannot be mistaken for done.** Every number in §2
+is 32³. The measured 32³ → 64³ shift is **+2.47 %, one-signed** — it does not
+move the optimum's *location*, and it does bound any absolute `P_adj` quoted
+with it. One arm at 64³ at ω_⊥,eff/ω_⊥ = 0.71, B = 2.6 nT settles whether the
+absolute figure is quotable; the *ratio* is already safe because a one-signed
+offset cancels in it.
+
+Cost, so nobody defers it for the wrong reason: **5.1×** a 32³ arm — 3026 s
+against ~590 s on the same core, not the 8× the cell count suggests, because the
+run is partly memory-bound at 3.0 GB RSS.
+
+Until that arm exists, quote **"+24.9 % relative, at 32³"** and not an absolute
+transfer.
