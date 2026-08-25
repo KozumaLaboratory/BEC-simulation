@@ -466,19 +466,37 @@ reports **113** advances with 33 removals and 3 regressions where the mainline h
 **79, zero and zero**. The per-row `commit` field is not a substitute — it is
 `"unknown"` on 28 of 85 rows.
 
-**Numerator — node hours. Nothing in the tree records them**, so the ratio is
-`unbounded` rather than large or small. Three candidate sources, all empty; the
-counts are in ledger row `node-hours-per-claim-has-no-numerator`. The enabling
-condition is one line — `run_pipeline` already computes `runtime_seconds` and writes
-it only when handed a `live_status_path`, i.e. on the autopilot path.
+**Numerator — node hours. The writer works; nothing aggregates it, and the store
+predates it.** `run_pipeline` stamps `runtime_seconds` into `_exit_summary.json` on
+both the success and the failure path, and where that writer existed it fired: **11
+of the 11 such files on this host carry a numeric value**, all `completed = true`.
+They sit in **four separate roots and not one of them is `runs/`** — 0 of its 240
+directories has one, because every `runs/` directory that carried a live-status path
+predates the writer (`0d640402`, 2026-05-28; the store's 194 `_live_status.json`
+files are all 2026-05-13…27). Total wall time recorded anywhere on this host:
+**1.20 h.** The autopilot's counter received none of it — `runs/budget.toml` still
+reads `realized_total = 0.0`, `today = "2026-06-14"`, because the qacct poller behind
+`refresh_budget!` was never written. Counts and roots: ledger row
+`node-hours-per-claim-has-no-numerator`.
+
+So the numerator is **absent retrospectively and available going forward**, and the
+enabling condition is not a new stamp — the stamp exists. It is an aggregator across
+roots, and `refresh_budget!` actually being fed.
 
 **Not adopted, and the reason is the numerator, not the subject.** #478's answer —
 no recoverable cache waste on disk — removes the *duplicate-submission* motive. It
 does not remove what this ratio measures: the day §"Before computing" is about (24
 × 45-point GPU scans, every premise published and wrong) is ~3 h of node time
-against zero claims advanced, and that is the shape this number is for. Stamp the
-numerator when something will read it. A metric whose numerator has to be
-reconstructed is one that gets quoted off the wrong walk.
+against zero claims advanced, and that is the shape this number is for. There is
+simply nothing to divide over the period the store covers. Adopt it forward, from
+the first period in which both halves are recorded — not backwards, because a
+reconstructed numerator is one that gets quoted off the wrong walk.
+
+**A `runs/`-only scan cannot see this**, which is the sharper lesson: the first pass
+here counted 0 exit summaries under `runs/` and was about to conclude that nothing
+records wall time. The artifact existed the whole time, one root over. Say which
+directory a count is a count of — and when the answer is "there is none anywhere",
+check that "anywhere" was the search.
 
 ---
 
