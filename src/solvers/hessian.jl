@@ -52,8 +52,26 @@ the same commit and problem.
 Normalising restores the property the exact Hessian action has and the fixed-ε
 form did not: homogeneity, `H·(cδ) = c·(H·δ)`. Gated by the homogeneity testset
 in `test/oracles/test_bdg_fd_hessian.jl`.
+
+**`ψ` may not BE `ws.state.psi`, and passing it is refused rather than
+answered.** `energy_gradient!` opens with `copyto!(ws.state.psi, psi)`, so an
+aliased `ψ` is moved to `ψ+εd` by the first of the two evaluations and the
+difference then spans `ε` instead of `2ε`: the operator comes back at EXACTLY
+half, with no error and no warning. Half an operator is not a scaled operator —
+the `−2μ` shift no longer cancels, so every broken-symmetry direction stops
+being a null direction (`‖(H−2μ)(iψ)‖/2μ` reads 0.500 against ~1e-9) and a
+trapped F=1 polar state reports ZERO Goldstone modes where it has two. Pass
+`copy(ws.state.psi)`.
 """
 function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
+    ψ === ws.state.psi && throw(
+        ArgumentError(
+            "hessian_vector_product: ψ aliases ws.state.psi. `energy_gradient!` " *
+            "does `copyto!(ws.state.psi, psi)`, so the finite-difference step " *
+            "ψ±εδ would be taken on an array the first evaluation already moved " *
+            "and the Hessian would come back at exactly half. Pass " *
+            "`copy(ws.state.psi)`."),
+    )
     nδ = sqrt(sum(abs2, δ))
     nδ == 0 && return zero(δ)
     d = δ ./ nδ

@@ -51,7 +51,7 @@
 # necessary-but-not-sufficient, exactly like `quartet_residual` on the dense
 # path. Say "residual", not "error bar", when quoting these.
 
-export trapped_bdg_frequencies, bdg_symmetry_generators
+export trapped_bdg_frequencies, bdg_symmetry_generators, bdg_expected_zero_modes
 
 # The complex inner product WITH the cell volume. Its real part is the
 # Hessian's ⟨,⟩_R and its imaginary part is the symplectic form ⟨a, Jb⟩_R —
@@ -128,6 +128,119 @@ function bdg_symmetry_generators(ws, ψ)
     end
     ndim >= 2 && push!(gens, :rotation_z => _lz_action(ψ, ws.grid, ndim, ws.backend))
     gens
+end
+
+# Real-linear rank of a set of complex fields under ⟨a,b⟩_R = Re∫ā b.
+function _real_span_rank(vs, ipR; tol::Float64=1e-8)
+    isempty(vs) && return 0
+    ns = [sqrt(max(ipR(v, v), 0.0)) for v in vs]
+    keep = findall(>(UNDERFLOW_FLOOR), ns)
+    isempty(keep) && return 0
+    us = [vs[i] ./ ns[i] for i in keep]
+    G = [ipR(us[i], us[j]) for i in eachindex(us), j in eachindex(us)]
+    count(>(tol), eigvals(Symmetric(G)))
+end
+
+"""
+    bdg_expected_zero_modes(ws, ψ; params, ε, order, flat_rel, rank_tol, rng)
+        → NamedTuple
+
+How many `ω ≈ 0` modes `trapped_bdg_frequencies` SHOULD return at `ψ`, derived
+from the broken symmetries alone. Compare it with the number it DOES return:
+an EXCESS is a flat direction no symmetry accounts for — an accidental
+degeneracy, which is the thing order-by-disorder needs before fluctuations can
+select within it.
+
+**The count is over COMPLEX planes, not over broken generators, and the
+difference is not bookkeeping.** The reduction complexifies its subspace
+(`span_R{X, iX}`) and emits one frequency per plane, so
+
+    predicted = dim_R span_R({g_a} ∪ {i g_a}) / 2
+
+For a magnetised state `i·(iF_xψ) = iF_yψ`: the two broken spin rotations are
+the SAME complex plane and give ONE zero mode — the quadratic (type-B) magnon.
+For polar `⟨F⟩ = 0`, the planes are independent and there are two linear
+(type-A) magnons. That is the Nambu–Goldstone count `n_A + n_B` with
+`n_broken = n_A + 2n_B`, written in this instrument's own coordinates, and both
+routes are returned so they can be compared rather than trusted: `n_B` is
+computed from the symplectic Gram `ρ_ab = Im⟨g_a, g_b⟩` — a different matrix —
+and `consistent` is `predicted == n_A + n_B`. Counting generators instead of
+planes reports 2 for every magnetised state and then reads the correct
+`dim(null) = 1` as the solver dropping a Goldstone.
+
+**Which generators are broken is MEASURED, not assumed.** `bdg_symmetry_generators`
+returns what a spinor condensate CAN break; which of those commute with this
+Hamiltonian is a property of the Hamiltonian. Rather than assert a list, each
+projected generator is pushed through the constrained Hessian and kept only if
+`‖A ĝ‖` is negligible against a random direction's — so a trapped cloud's
+translations come back stiff (measured 2.07 against a control of 57) without
+anyone having to remember that a trap breaks translation invariance. The
+threshold is relative to that control because the FD Hessian's own noise floor
+scales with the operator.
+
+Returns `predicted`, `flat` (the generator names kept), `n_broken`
+(= `rank_R` of them, so a repeated direction cannot inflate the count), `n_A`,
+`n_B`, `consistent`, `residuals` (per generator `(name, ‖g‖, ‖Aĝ‖)` for every
+generator, kept or not), and `control`.
+
+REQUIRES a stationary `ψ`, for the same reason the frequencies do: the whole
+construction is a statement about `∇E = 2μψ`. And `ψ` may not alias
+`ws.state.psi` — `hessian_vector_product` refuses that, see its docstring.
+"""
+function bdg_expected_zero_modes(
+    ws, ψ; params=nothing, ε::Float64=1e-5, order::Int=2,
+    flat_rel::Float64=1e-4, rank_tol::Float64=1e-8, rng=Random.default_rng(),
+)
+    p = params === nothing ? constrained_hessian_params(ws, ψ) : params
+    ipR(a, b) = real(_ipC(a, b, p.dV))
+    A(v) = constrained_hessian_action(ws, ψ, v; p.μ, p.dV, p.n2, ε, order)
+
+    vr = _tangent_project(
+        _to_device(ws.backend, randn(rng, ComplexF64, size(ψ))), ψ, p.dV, p.n2)
+    nr = sqrt(max(ipR(vr, vr), 0.0))
+    vr = vr ./ max(nr, UNDERFLOW_FLOOR)
+    Avr = A(vr)
+    control = sqrt(max(ipR(Avr, Avr), 0.0))
+
+    flat = Symbol[]
+    nulls = typeof(ψ)[]
+    residuals = Tuple{Symbol, Float64, Float64}[]
+    for (name, graw) in bdg_symmetry_generators(ws, ψ)
+        g = _tangent_project(graw, ψ, p.dV, p.n2)
+        ng = sqrt(max(ipR(g, g), 0.0))
+        # A generator the projection annihilates (gauge) or that leaves the
+        # state where it is (`F_z` on a polar state) is not a broken symmetry
+        # and contributes no mode. Reported with ‖Aĝ‖ = 0 rather than dropped.
+        if ng <= UNDERFLOW_FLOOR
+            push!(residuals, (name, ng, 0.0))
+            continue
+        end
+        ĝ = g ./ ng
+        Aĝ = A(ĝ)
+        an = sqrt(max(ipR(Aĝ, Aĝ), 0.0))
+        push!(residuals, (name, ng, an))
+        if an < flat_rel * max(control, UNDERFLOW_FLOOR)
+            push!(flat, name)
+            push!(nulls, ĝ)
+        end
+    end
+
+    predicted =
+        _real_span_rank(vcat(nulls, [im .* v for v in nulls]), ipR; tol=rank_tol) ÷ 2
+    n_broken = _real_span_rank(nulls, ipR; tol=rank_tol)
+    n_B = if isempty(nulls)
+        0
+    else
+        ρ = [imag(_ipC(nulls[i], nulls[j], p.dV))
+            for i in eachindex(nulls), j in eachindex(nulls)]
+        # ρ is real antisymmetric: iρ is Hermitian and its nonzero eigenvalues
+        # come in ± pairs, so rank(ρ)/2 counts the conjugate pairs.
+        count(>(rank_tol), abs.(eigvals(im .* ρ))) ÷ 2
+    end
+    n_A = n_broken - 2n_B
+
+    (; predicted, flat, n_broken, n_A, n_B, consistent=(predicted == n_A + n_B),
+        residuals, control, mu=p.μ)
 end
 
 # Overlap of a direction `g` with the subspace `vecs` spans: 0 = orthogonal,
