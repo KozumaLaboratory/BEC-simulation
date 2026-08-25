@@ -39,3 +39,4 @@ include("validation/scalar_summary.jl")          # run_scalar_summary + write_ru
 include("validation/campaign_gate.jl")          # CAMPAIGN.md §4 guard 1, executed rather than described
 include("validation/claim_ledger.jl")           # a claim's status as a FIELD, not as prose
 include("validation/variational_bound.jl")    # one-sided bound: which side of a disagreement is wrong
+include("validation/reanalysis.jl")           # re-read stored output; carries its vintage and its own inadmissibility

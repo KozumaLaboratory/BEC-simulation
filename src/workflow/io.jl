@@ -34,4 +34,8 @@ include("io/host_budget.jl")
 include("io/budget.jl")
 include("io/catalog.jl")
 include("io/catalog_index.jl")
+# What the store CONTAINS duplicate-wise, grouped by the knob that distinguishes
+# each set. Uses `diff_dicts` from the experiments layer, which loads later — the
+# reference is inside a function body, so it resolves at call time.
+include("io/store_census.jl")
 include("io/gs_library.jl")
