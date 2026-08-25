@@ -288,3 +288,82 @@ end
     @test !isempty(spin)
     @test maximum(w -> minimum(abs(w - v) for v in ref), spin) < 1e-5
 end
+
+# HOW MANY ω≈0 MODES SHOULD THERE BE — and is the surplus an accidental
+# degeneracy? `bdg_expected_zero_modes` answers the first from the broken
+# symmetries alone; the difference against what `trapped_bdg_frequencies`
+# returns is the answer to the second, and that difference is the observable
+# order-by-disorder needs (#455: a would-be Goldstone on an accidentally
+# degenerate manifold is what fluctuations gap).
+#
+# The five fixtures are chosen so the criterion is exercised in BOTH
+# directions, at states whose Goldstone content is known independently:
+#
+#   polar, c₁≠0   2 broken generators, ⟨[F_x,F_y]⟩ = 0   → 2 type-A magnons
+#   FM,    c₁≠0   2 broken generators, ⟨[F_x,F_y]⟩ ≠ 0   → 1 type-B magnon
+#   FM,    c₁=0   the same 1 from symmetry, but Σ_S σ_S ≡ 1 makes the WHOLE of
+#                 CP² degenerate, so the m=−1 channel is flat too → 2 measured,
+#                 EXCESS 1 = the accidental direction
+#   polar, c₁=0   same manifold, read from a different point: here the
+#                 accidental tangent is already inside the complexification of
+#                 the symmetry orbit, so predicted 2 = measured 2 and the
+#                 excess is ZERO. **The criterion is blind at this point.** It
+#                 is a negative control, not a failure: a null from it means
+#                 "not visible from here", never "no accidental degeneracy".
+#
+# The FM rows are the ones that make the count non-trivial. Counting broken
+# GENERATORS instead of complex planes predicts 2 there, and then the correct
+# dim(null)=1 reads as the solver dropping a Goldstone — which is exactly how
+# this criterion failed its positive control before the planes were counted
+# (2026-08-26; the earlier attempt is recorded in the issue).
+@testset "expected zero modes ≡ measured, and the excess is the accidental direction" begin
+    POLAR = ComplexF64[0, 1, 0]
+    FM = ComplexF64[1, 0, 0]
+    cases = (
+        (name="polar, c1=+0.2", spinor=POLAR, c1=0.2, predicted=2, measured=2,
+            n_A=2, n_B=0),
+        (name="FM, c1=-0.2", spinor=FM, c1=-0.2, predicted=1, measured=1,
+            n_A=0, n_B=1),
+        (name="FM, c1=+0.2", spinor=FM, c1=0.2, predicted=1, measured=1,
+            n_A=0, n_B=1),
+        (name="FM, c1=0 (accidental CP^2)", spinor=FM, c1=0.0, predicted=1,
+            measured=2, n_A=0, n_B=1),
+        (name="polar, c1=0 (blind spot)", spinor=POLAR, c1=0.0, predicted=2,
+            measured=2, n_A=2, n_B=0),
+    )
+    for c in cases
+        @testset "$(c.name)" begin
+            fx = _uniform_box(c.spinor; c1=c.c1)
+            p = constrained_hessian_params(fx.ws, fx.ψ)
+            ez = bdg_expected_zero_modes(fx.ws, fx.ψ; params=p,
+                rng=MersenneTwister(3))
+
+            # Which generators are broken is measured, not declared: only the
+            # two transverse spin rotations survive the flatness probe. `gauge`
+            # is deflated by P and `spin_z` acts as a phase (FM) or annihilates
+            # (polar), so neither can contribute a mode.
+            @test Set(ez.flat) == Set([:spin_x, :spin_y])
+            @test ez.n_broken == 2
+            # A uniform state's translation generator is identically zero
+            # (∂ψ = 0) — it is absent for that reason, not because it is stiff.
+            tr = only(r for r in ez.residuals if r[1] === :translation_1)
+            @test tr[2] < 1e-12
+
+            # The two routes to the same number: complex planes, and the
+            # symplectic Gram's rank. They are different matrices.
+            @test ez.consistent
+            @test (ez.n_A, ez.n_B) == (c.n_A, c.n_B)
+            @test ez.predicted == c.predicted
+
+            r = trapped_bdg_frequencies(fx.ws, fx.ψ; nev=6, n_hessian=10,
+                max_iter=200, hess_tol=1e-7, params=p, rng=MersenneTwister(7))
+            # A purely real eigenvalue of the reduced generator is reported with
+            # ω = 0 and its growth rate. It is a dynamical instability, not a
+            # zero mode, and counting on ω alone would credit an unstable state
+            # with Goldstones it does not have.
+            nz = count(k -> r.omega[k] < 1e-3 && abs(r.growth[k]) < 1e-3,
+                eachindex(r.omega))
+            @test nz == c.measured
+        end
+    end
+end
