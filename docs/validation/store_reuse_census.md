@@ -209,7 +209,15 @@ can re-run. Two further defects fell out of the migration:
   instrument that would see it.
 - **The 3.2 % over committed configs**, whose exposure to the same post-hoc-edit
   confound is unmeasurable from the tree.
-- **Coverage of re-analysis drivers.** One of the three known bespoke drivers is
-  migrated. `scripts/klaus2022_reanalyse.jl` is not — it reduces seven quantities
-  per call and does not fit a one-observable entry point without restructuring —
-  and **nothing gates a fourth driver appearing**. Named rather than implied.
+- **Coverage of re-analysis drivers — now gated, and the list is a known cost.**
+  Four `.jl` drivers under `scripts/` read a stored run artifact; one is
+  migrated, and `test/test_reanalysis_driver_coverage.jl` requires each of the
+  others to be **named with a reason**, so a fifth cannot appear unclassified.
+  What is deferred: `klaus2022_reanalyse.jl` reduces seven quantities per pass and
+  would need a multi-observable API (not extending it speculatively for one
+  caller); `klaus_weff_cloud_size.jl` fits the `series` contract and is the next
+  migration; **`lt64_endpoint_verdict.jl` is the one that matters** — it
+  re-derives the in-hold window from its suite's own `dt`/`save_every` constants,
+  its own header says getting them wrong is SILENT, and that is a second live
+  statement of the observable `97ec124e` fixed. Migrating it moves a
+  pre-registered rejection criterion, which must not ride along in a refactor.

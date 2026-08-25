@@ -446,6 +446,12 @@ const FAST_TESTS = [
     # Carries the positive control for the isolation itself, so it cannot pass
     # vacuously on a machine with no signing configured.
     "test_scratch_git_isolation.jl",
+    # #483 shipped `reanalyze` and migrated ONE of the four drivers that re-read a
+    # stored run. Commitment 11: a new SSoT ships with the gate outlawing the old
+    # form, or the migration becomes permanent. Stating the gap in a PR body is
+    # not a gate — this is. Every stored-run reader is migrated or named with a
+    # reason, so a FOURTH cannot appear unclassified.
+    "test_reanalysis_driver_coverage.jl",
     "workflow/test_recommend_backend_dtype.jl",
     "analysis/test_nematic_tensor.jl",
     "foundation/test_spherical_harmonics.jl",

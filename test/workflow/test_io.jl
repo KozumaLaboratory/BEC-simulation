@@ -32,7 +32,18 @@ using SpinorBEC
         @test data.grid_box_size == (10.0,)
         @test data.t == ws.state.t
         @test data.step == ws.state.step
-        @test data.psi ≈ ws.state.psi
+        # BIT-IDENTICAL, not `≈`. #55's first acceptance criterion is a
+        # bit-identical CPU round-trip, and `≈` would pass for a writer that
+        # silently narrowed to ComplexF32 — which is a real risk here, since the
+        # snapshot writers in this tree do exactly that on purpose.
+        @test data.psi == ws.state.psi
+        @test eltype(data.psi) === ComplexF64
+        # And the file carries a HOST array. On a CUDA workspace `ws.state.psi` is
+        # a `CuArray`; writing it puts the device type in the file's schema and
+        # every reader then warns about reconstructing it. `_to_host` in
+        # `save_state` is what stops that, and it cannot be checked on a GPU-less
+        # runner any other way than by pinning the type that comes back.
+        @test data.psi isa Array
 
         @test data.c0 == 100.0
         @test data.c1 == -0.5
