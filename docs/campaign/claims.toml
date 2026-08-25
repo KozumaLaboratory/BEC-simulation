@@ -1247,8 +1247,14 @@ the stored OUTPUTS.
 
 MEASURED SIDE-RESULT, kept because it bounds a different question. Byte-keying exposure is small:
 of 566 committed configs only 9 groups are canonically identical, 7 of them byte-different, 18
-files in total (3.2 %). One pair has materialised on disk as two run directories -
-`matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/`. So unifying on the
+files in total (3.2 %).
+REFUTED 2026-08-26, next sentence only - see `store-byte-only-duplicate-pair-on-disk`. The
+566-config count stands; the ON-DISK example does not, and the two are different corpora.
+One pair has materialised on disk as two run directories -
+`matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/`. Those two RAN different
+physics (`B.Bz` = -0.01 vs +0.01 Gauss in each directory's own config.yaml, each of which still
+hashes to its own directory name); the committed copies agree only because `bce2068f` edited one
+of them afterwards. So unifying on the
 `Experiment` (canonical-spec) path is a real but small win, and was NOT the dominant term."""
 
 [[claim]]
@@ -1377,6 +1383,133 @@ measurement on this very ramp — both arms carry mu-tilde ~ 16-20 against mu_re
 growth-only grows anyway — and states that reading it as "the drive" produced a wrong
 conclusion its own control refuted. I wrote the issue without reading the docstring of the
 function it named. The instrument that DOES answer it is a different one two files away."""
+
+[[claim]]
+id = "store-duplicates-hold-no-recoverable-cache-waste"
+claim = "Of the 34 run-directory basenames that appear more than once in the store (77 of 240 directories, 32.1 %), NONE is recoverable cache waste: 15 basenames over 32 directories differ only on an execution knob (GPU=CPU parity arms), 19 over 45 differ on a physics or resolution knob, and 0 are canonically identical or differ only in annotation."
+status = "live"
+lifecycle = "registered"
+ladder = "exact: a census of every run directory under the store, not a limit. Positive control: `defaults.backend` must classify as execution and `pipeline[1].ground_state.B.Bz` as physics, both asserted in test/workflow/test_store_census.jl; a classifier collapsing them would reproduce the estimate this replaces."
+type = "A"
+scope = "The 240 run directories under the main checkout's `runs/` as of 2026-08-26 (a git worktree does not share them). About DIRECTORIES on disk. The 566 committed YAML configs are a different corpus and the 3.2 % byte-only figure measured over THEM is untouched."
+uncertainty = "Exact counts. Each duplicate group is diffed by `diff_dicts` on the two directories' own config.yaml and reported as the SET OF DOTTED PATHS that differ, so the classification is auditable path by path rather than being a bucket total. The one soft edge is the knob taxonomy: an unrecognised key falls to `physics`, which can only OVERSTATE cause (a), and every path is printed."
+uncertainty_basis = "control"
+evidence = ["src/workflow/io/store_census.jl", "test/workflow/test_store_census.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """THIS IS THE QUESTION #478 PRE-REGISTERED AND #482 COULD NOT REACH. #482 said so: the store
+predates the current 16-hex naming, so a directory cannot be reverse-mapped to its source YAML,
+and it reported the CEILING (34 basenames / 77 dirs, 35 %) with an estimate that most of it was
+cause (a). The reverse map is not needed - every run directory carries its own config.yaml, so
+two directories sharing a basename can be diffed directly.
+
+A FOURTH CAUSE, which the pre-registration did not have and which is 42 % of the tail. The ten
+`0X_*` families and five `L4_*`/`barnett_*` families differ on `defaults.backend` and nothing
+else: they are the Level-0 GPU=CPU parity arms. They are the store working correctly. Reading the
+32 % as waste and deduplicating it would have DELETED a validation-ladder gate, which is the
+concrete cost of a count without a classifier.
+
+AND THE PRE-REGISTERED (b) IS ZERO ON DISK. Not small - zero. No duplicate group is canonically
+identical, and none differs only in annotation (`metadata.*`, which enters the byte key and
+reaches no physics - the door through which (b) would arrive). So there is nothing here for a
+canonical-grid or an `Experiment`-path migration to recover, and the case for either has to be
+made about FUTURE runs. That is a different argument and it should be made as one."""
+
+[[claim]]
+id = "store-byte-only-duplicate-pair-on-disk"
+quantity = "the on-disk example of a byte-only duplicate run directory"
+claim = "RETRACTED: `matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/` are NOT the same physics under two byte-different configs. They ran different fields."
+status = "refuted"
+retired_literal = ["One pair has materialised on disk as two run directories"]
+replacement_literal = ["-0.01 vs +0.01 Gauss", "bce2068f"]
+retraction_evidence = """artifact, committed config -> the config in the run directory. Each directory's own config.yaml still hashes to its own name (9ca973088b1743d9, 529e3a77181ea7ae), and those two files carry Bz = -0.01 Gauss and Bz = +0.01 Gauss - a sign flip on the field, i.e. cause (a). The committed copies agree because `bce2068f` ("211 Eu configs pinned m=-F under a field that prefers m=+F") edited one of them afterwards, and the edited copy now hashes to 89b5ed0b rather than 9ca97308. The original measurement grouped COMMITTED configs and the conclusion was stated about RUN DIRECTORIES."""
+type = "A"
+scope = "This one pair, and with it the inference from committed-config canonical identity to on-disk duplication. Binds the note of `stored-runs-corpus-is-written-off` and PR #482's reflection table. It does NOT bind the 3.2 % figure over the 566 committed configs, which is a statement about that corpus and stands."
+uncertainty = "The refutation is exact and reproducible in two lines: `diff` the two directories' config.yaml, and sha256 each against its own directory suffix. Both are shown by `store_census`'s `stale_key` field. What is NOT bounded is how much of the 3.2 % is manufactured the same way - a post-hoc edit can create canonical identity between configs that ran different physics, and only 2 of the store's 219 keyed directories have a committed config at all, so the question cannot be answered from the tree."
+uncertainty_basis = "control"
+evidence = ["src/workflow/io/store_census.jl", "test/workflow/test_store_census.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """THE MISTAKE IS THE ONE THE ROW ABOVE ALREADY NAMES, ONE CORPUS OVER. #482's own lesson was
+"say which file a count is a count OF" - it had generalised a measurement about summary.json into
+a conclusion about the cache. This is the same step: a canonical-identity grouping over the 566
+COMMITTED configs, reported as an instance of two RUN DIRECTORIES holding the same physics. The
+two corpora are not the same, and here they disagree about the very pair that was cited.
+
+WHAT MAKES IT CHECKABLE AT ALL is that the directory name IS sha256 of the config bytes, so
+"is this the config that ran?" is an equality and not a judgement. 219 of 219 keyed directories in
+the store pass it; the one committed copy that fails is the one this row is about."""
+
+[[claim]]
+id = "store-configs-still-hash-to-their-own-directories"
+claim = "Every keyed run directory in the store still holds the config that produced it: 219 of 219 config.yaml files hash to their own directory suffix, 0 mismatches."
+status = "live"
+lifecycle = "registered"
+ladder = "exact: an equality check on 219 files, not a limit. The check carries its own two-sided control in one pass - the 219 passes are the negative control and the one failing committed copy (matsui_edh_baseline_9ca97308 -> 89b5ed0b) is the positive control, so a scan that could not look is not able to report 0."
+type = "A"
+scope = "The 219 content-keyed directories under the main checkout's `runs/` as of 2026-08-26. 20 further directories are hand-named and carry no key to check. Says nothing about whether the stored RESULT is correct - only that the config beside it is the one that was run."
+uncertainty = "Exact. `compute_run_dir` keys on `sha256(raw bytes)[1:n]`, so re-hashing either reproduces the directory name or does not; there is no tolerance and no extractor to get wrong."
+uncertainty_basis = "control"
+evidence = ["src/workflow/io/store_census.jl", "test/workflow/test_store_census.jl"]
+evidence_status = "in_tree"
+commit = "unknown"
+doc = "docs/campaign/fix_list.toml"
+section = "stored-corpus"
+pr = 0
+note = """WHY THIS IS WORTH A ROW. `stored-runs-corpus-is-attributable-not-admissible` established
+that the points name their producing COMMIT. This is the other half and nobody had asked it: does
+each stored run still sit beside the CONFIG it was run from? For re-analysis that is the load-bearing
+one - a re-read takes its window, its component indices and its hold duration from the config, so a
+config edited after the run would silently re-reduce the wrong trajectory.
+
+The answer is yes, everywhere in the store. Where it is NO is in git: `bce2068f` edited a committed
+run directory's config in place, so the committed file describes different physics from the run
+stored under that name. The store is trustworthy for re-analysis and the committed copy of it is
+not, which is the opposite of the intuition."""
+
+[[claim]]
+id = "seed-up-step-count-win-unmeasured-at-production-scale"
+quantity = "endpoint iteration-count ratio, seeded polish vs from-scratch"
+window = "the cells in which BOTH arms converged — tol 1e-5 and 1e-6 at c0 = 40/200/4000, two cold starts. Cells where either arm ended `floor_limited` are excluded and named, because a run chasing a tolerance below its own energy-comparison floor measures the floor and not the seed."
+reduction = "per-cell ratio of `n_line_search_evals`, reported as a RANGE over cells and not aggregated. An average over seven cells whose sign disagrees would manufacture a direction the data does not have."
+boundary = "n/a"
+claim = "#55's acceptance criterion - a fine-grid polish from an upsampled coarse seed converging in much fewer steps than from scratch - is NOT established. At 16^3 -> 32^3, F=1, contact-only, the effect has no consistent sign: seven comparable cells span 1.5x worse to 1.5x better."
+status = "open"
+type = "A"
+scope = "L-BFGS, CPU, F=1, contact-only, harmonic trap, 16^3 -> 32^3 in a fixed box, tol 1e-5/1e-6, c0 in 40..4000. The regime #55 argues about - Eu F=6 with DDI, 32^3 -> 64^3, ~600 conditioning-limited iterations - is NOT measured."
+uncertainty = "unbounded in sign at the measured scale. Energy-evaluation penalties across the comparable cells: +15, +19, +11, +13, +11, +2, -20 against baselines of 32-61, i.e. the spread is the size of the effect. The comparison itself is VALID and that is checked rather than assumed - every pair agrees on the final energy to |dE|/|E| < 1e-13 (best 1.9e-16), so the two arms land on the same state, and the c0 knob is not degenerate (it moves the from-scratch count 43 -> 276). Cells where either arm ended `floor_limited` are excluded, because a run chasing a tolerance below its own energy-comparison floor measures the floor."
+uncertainty_basis = "control"
+evidence = ["test/workflow/test_upsample_spinor_fidelity.jl", "src/workflow/initialization/upsample.jl"]
+evidence_status = "partial"
+commit = "unknown"
+doc = "docs/design/eu_phase_diagram_adaptive_mapping.md"
+section = "seeding"
+pr = 0
+note = """WHAT IS ESTABLISHED, AND IT IS THE OTHER HALF. The prolongation is CORRECT: spectral
+zero-pad reproduces every coarse sample to 1e-10, carries component winding at l = 1 and 3, and
+holds the inter-component amplitude ratio and phase to 1e-8 - now gated, with the density-only
+trilinear helper as a negative control returning winding 0 on the same field. So a seeded solve
+starts from the same STATE. What is unmeasured is whether it finishes sooner.
+
+WHY THE SMALL-SCALE NULL DOES NOT SETTLE THE PRODUCTION CLAIM. The warm-start penalty is a
+start-up effect - a warm iterate begins with a small gradient and no curvature history, so the
+first line searches backtrack before the history is worth anything. Against 30-60 evaluations that
+is decisive and against ~600 it should be noise. The measurement cannot distinguish those two
+readings because it could not reach a large baseline: the one cell that did (276 evaluations, c0 =
+1000) had both arms end floor-limited and is not comparable.
+
+A STRUCTURAL POINT #55's OWN SCOPE IMPLIES AND SHOULD SAY. Its remedy for warm-restart regression
+is "L-BFGS history as an optional sidecar". That cannot help HERE: the history vectors are
+psi-shaped on the COARSE grid and there is no prolongation of a curvature history. The sidecar
+fixes resume at the same resolution; seed-up needs something else (a fresh scaling estimate, or a
+few steepest-descent steps before the history is trusted). Recording it so the next session does
+not build the sidecar and expect the seeding win to follow."""
 
 [[coverage]]
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
