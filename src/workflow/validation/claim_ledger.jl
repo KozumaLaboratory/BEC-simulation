@@ -46,6 +46,7 @@ export LedgerClaim, claim_ledger, claim_ledger_path,
     CLAIM_STATUSES, CLAIM_LEDGER_TYPES, CLAIM_UNCERTAINTY_BASES, CLAIM_EVIDENCE_STATUSES,
     CLAIM_PREDICTION_OUTCOMES, CLAIM_RETRACTION_MARKERS, CLAIM_RETRACTION_PREMISE_ESCAPE,
     CLAIM_REDUCTION_NAMES, CLAIM_BOUNDARY_RULES,
+    CLAIM_LIFECYCLE_STATES, CLAIM_LADDER_EXACT_ESCAPE,
     claim_ledger_link_errors, claim_by_id,
     retraction_is_grounded, retraction_is_self_grounded,
     ledger_section_coverage,
@@ -161,6 +162,10 @@ struct LedgerClaim
     window::Union{Nothing, String}
     reduction::Union{Nothing, String}
     boundary::Union{Nothing, String}
+    lifecycle::String
+    ladder::Union{Nothing, String}
+    discriminators::Vector{String}
+    blinding::Union{Nothing, String}
 end
 
 """
@@ -185,6 +190,36 @@ a walltime ratio, an algebraic coefficient) and a gate that does that gets
 deleted.
 """
 const CLAIM_REDUCTION_NAMES = ("peak", "argmax", "optimum", "endpoint")
+
+"""
+    CLAIM_LIFECYCLE_STATES
+
+How far a claim has been taken, ORTHOGONAL to `status`. `status` says whether the
+assertion is still believed; this says what it has been through.
+
+  `exploratory` — **ungated on purpose.** Anything may be written here and no rule
+                  binds it. This is the load-bearing state: a gate that reddens
+                  during exploration is the too-strict kind this project has
+                  measured getting deleted, and what is lost when one is disabled
+                  is more than a loose gate ever costs. Gates bind at the moment a
+                  claim becomes WORDS, not while it is being found.
+  `candidate`   — in the ledger. Everything the parser already demands applies.
+  `registered`  — walked its evidence ladder. **The first state that may be quoted
+                  in prose, in a talk, or to the lab.**
+  `published`   — registered plus an unblinding record.
+
+Absent means `candidate`: a row is in this file, so it is at least that.
+"""
+const CLAIM_LIFECYCLE_STATES = ("exploratory", "candidate", "registered", "published")
+
+"""
+    CLAIM_LADDER_EXACT_ESCAPE
+
+`ladder` escape for a claim with no convergence axis — an algebraic identity, a
+sum rule, a closed form that IS the limit. Says "there is nothing to converge"
+rather than leaving the field blank, which would read as "nobody looked".
+"""
+const CLAIM_LADDER_EXACT_ESCAPE = "exact:"
 
 """
     CLAIM_BOUNDARY_RULES
@@ -373,6 +408,59 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                     join(CLAIM_BOUNDARY_RULES, ", ")),
             )
         end
+        # THE LIFECYCLE, and the reason its first state has no rules.
+        #
+        # Every gate in this file binds a row that is already in the ledger. None
+        # of them reaches the stage where a number is being FOUND, and none
+        # should: the measured lesson here is that a gate which reddens during
+        # correct work gets disabled, and a disabled gate protects nothing. So
+        # `exploratory` is ungated by construction and the ladder binds only at
+        # `registered`, which is the first state whose contents may be spoken.
+        lifecycle = something(_opt(r, "lifecycle"), "candidate")
+        lifecycle in CLAIM_LIFECYCLE_STATES || throw(
+            ArgumentError(
+                "$path claim `$id` has lifecycle `$lifecycle`; must be one of " *
+                join(CLAIM_LIFECYCLE_STATES, ", ")),
+        )
+        ladder = _opt(r, "ladder")
+        discriminators = _strvec(r, "discriminators", id, path)
+        blinding = _opt(r, "blinding")
+        # A single discriminator is the type-3 failure in miniature: one test that
+        # agrees with the story is what a story predicts. Two, of different kinds,
+        # is the shape that killed the Coriolis reading.
+        if length(discriminators) == 1
+            throw(
+                ArgumentError(
+                    "$path claim `$id` declares ONE discriminator. A mechanism " *
+                    "needs two of different kinds — a symmetry test and an " *
+                    "ablation/substitution — because a single test that agrees " *
+                    "with the story is what the story predicts."),
+            )
+        end
+        if lifecycle in ("registered", "published")
+            ladder === nothing && throw(
+                ArgumentError(
+                    "$path claim `$id` is `$lifecycle` with no `ladder`. Name the " *
+                    "cutoff axes that were walked and how many points each — two " *
+                    "points cannot separate agreement from a shared offset, which " *
+                    "is how `32³/64³ agree to 4 digits` survived being +2.47 %. " *
+                    "If nothing converges, say `$(CLAIM_LADDER_EXACT_ESCAPE) <why>`."),
+            )
+            estatus == "in_tree" || throw(
+                ArgumentError(
+                    "$path claim `$id` is `$lifecycle` but its evidence is " *
+                    "`$estatus`. A claim nobody else can re-open is not one to " *
+                    "quote in a talk."),
+            )
+        end
+        if lifecycle == "published" && blinding === nothing
+            throw(
+                ArgumentError(
+                    "$path claim `$id` is `published` with no `blinding` record " *
+                    "(CAMPAIGN.md §12). Say which analysis was frozen and when it " *
+                    "was unblinded, or leave it `registered`."),
+            )
+        end
         status == "closed" && _opt(r, "note") === nothing &&
             throw(
                 ArgumentError(
@@ -414,7 +502,7 @@ function claim_ledger(; path::AbstractString=claim_ledger_path())
                 _strvec(r, "replacement_literal", id, path),
                 _opt(r, "prediction"), pred_reg, pred_out, _opt(r, "note"),
                 retr_ev, _opt(r, "window"), _opt(r, "reduction"),
-                _opt(r, "boundary")),
+                _opt(r, "boundary"), lifecycle, ladder, discriminators, blinding),
         )
     end
     isempty(out) && throw(ArgumentError("$path declares no claims"))
