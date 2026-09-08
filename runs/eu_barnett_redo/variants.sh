@@ -75,6 +75,35 @@ declare -A BR_PROD_VARIANTS=(
   # n = 320 = 2^6*5 rather than 336 = 2^4*3*7: the factor 7 is what made n = 112
   # ~66x slower per step than n = 80. box = 320 * 7/48 keeps dx at 7/48 exactly.
   [prod_box47]="320,320,120|46.6666666667,46.6666666667,18.0|0|1.0e-3|NaN"
+  # --- the cell this table never filled. Raised by anko: is 128 enough?
+  #
+  # The dx axis was only ever swept INSIDE box 28, and the box axis only ever at
+  # dx = 0.1458. So the crossing table is diagonal:
+  #
+  #     dx     | box 28  box 35  box 42  box 47
+  #   0.4375   |  n=64     --      --      --
+  #   0.2917   |  n=96     --      --      --
+  #   0.2188   |  n=128    --      --      --
+  #   0.1458   |   --    n=240   n=288   n=320
+  #
+  # "n=128 leaks 67.7% at production stir length" is therefore a BOX-28
+  # measurement, and the later finding was that the box dominates: at nearly
+  # fixed dx the leak fell 37x from box 28 (0.672) to box 35 (0.018) while dx
+  # moved only 1.5x. Reading that 67.7% as a resolution effect repeats the very
+  # mistake this table already recorded — "the dx-converged value was converged
+  # inside a contaminated box" — with the axes swapped.
+  #
+  # One variable against `minus_prod_box35`: same cell, same box, same dt, same
+  # protocol, n halved. If leak and conversion hold, the 6.6x cheaper cell makes
+  # a few-hundred-ms conversion phase affordable (0.93 vs 6.1 min per omega_ref^-1,
+  # so 300 ms is 7.4 h instead of 48 h) without checkpointing.
+  #
+  # n = 128 = 2^7 rather than 120: CLAUDE.md's FFTW trap is measured at 96^3 ->
+  # 6.73 GB against 128^3 -> 0.38 GB with threads and MEASURE, and 120 is not a
+  # power of two. The cost is that dx = 35/128 = 0.2734 is NOT a multiple of
+  # 7/48, so this row breaks the "dx held to the last digit" discipline the box
+  # series keeps. Deliberate: the box is what is being held fixed here.
+  [prod_box35_n128]="128,128,64|35.0,35.0,18.0|0|1.0e-3|NaN"
 )
 
 # Export geometry for a PRODUCTION variant. Exists because `qsub -v` splits on
@@ -83,11 +112,20 @@ declare -A BR_PROD_VARIANTS=(
 br_select_prod() {
   local tag=$1
   [[ -n "${BR_PROD_VARIANTS[$tag]:-}" ]] || { echo "unknown prod variant: $tag" >&2; return 1; }
-  IFS='|' read -r BR_N BR_BOX BR_PAD BR_DT BR_TRUNC <<<"${BR_PROD_VARIANTS[$tag]}"
+  IFS='|' read -r _v_N _v_BOX _v_PAD _v_DT _v_TRUNC <<<"${BR_PROD_VARIANTS[$tag]}"
   # BR_TAG names the OUTPUT file, so it must not be clobbered by the geometry.
   # A caller sweeping another axis (BR_OMEGA) passes its own tag; overwriting it
   # here pointed four concurrent jobs at one ledger, and they raced on the
   # tmp+rename and killed each other with ENOENT. Append instead of assign.
+  #
+  # BR_DT had the SAME bug and was not fixed with it (issue #498 §1): the table
+  # value overwrote a caller's, so the 30 mG dt-convergence pair came out
+  # BIT-IDENTICAL and the fast-Larmor check for that field never ran. A caller
+  # who names dt means it — the geometry supplies the DEFAULT, not the value.
+  # The others still take the table unconditionally, because they are geometry
+  # and a variant that half-applies is worse than one that applies.
+  BR_N="$_v_N"; BR_BOX="$_v_BOX"; BR_PAD="$_v_PAD"; BR_TRUNC="$_v_TRUNC"
+  BR_DT="${BR_DT:-$_v_DT}"
   export BR_N BR_BOX BR_PAD BR_DT BR_TRUNC
   export BR_TAG="${BR_TAG:-}_$tag"
 }
