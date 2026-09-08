@@ -28,28 +28,49 @@ fi
 #   30 mG / theta 35 / box35 240^3 / dt 1e-3 / stir 20 / quench 50
 # quench を 50 にするのは conv35 腕が t~70 で飽和しているため。20 では打ち切りに
 # なる（それが 30 mG 腕の t=51 で、F_z がまだ動いていた）。
-COMMON="BR_VARIANT=prod_box35,BR_B_GAUSS=0.03,BR_THETA=35,BR_T_STIR=20,BR_T_QUENCH=50,BR_T_ROT_BACK=3,BR_T_FIELD_DOWN=1,BR_B_FINAL_GAUSS=0.0,BR_FRAMES=8"
+# ★BR_PROTOCOL=adiabatic は**省略できない**。既定は "sudden" で、そちらは
+#   傾け段が無く、スピンを最初から傾いた向きに置く（seed polar 145 deg）。
+#   2026-09-08 に渡し忘れて 6 腕を投入し、45 分走らせて捨てた ── ログの段名が
+#   `tilt` ではなく `stir` から始まり、Fz が −4.91 に留まらず +0.48〜−3.02 で
+#   振動していたので気づいた。**バナーの seed polar が 180 deg でなければ違う実験。**
+COMMON="BR_PROTOCOL=adiabatic,BR_VARIANT=prod_box35,BR_B_GAUSS=0.03,BR_THETA=35,BR_T_STIR=20,BR_T_QUENCH=50,BR_T_ROT_BACK=3,BR_T_FIELD_DOWN=1,BR_B_FINAL_GAUSS=0.0,BR_FRAMES=8"
+
+# 投入前の検算。**省略できない env を名前で要求する** ── 既定値が別の実験に
+# なるものは、渡し忘れが静かに通ってはいけない。
+for req in BR_PROTOCOL BR_B_GAUSS BR_THETA BR_T_STIR BR_T_QUENCH; do
+  case ",$COMMON," in
+    *",$req="*) ;;
+    *) echo "COMMON に $req が無い。既定値が別の実験になる可能性があるので拒否する。" >&2
+       exit 3 ;;
+  esac
+done
 
 # 各腕: 名前 | 変える所
 #   ★Omega は CELL=zero では run_core が 0 に固定する（typo で壊せない設計）
+# 3 列目は h_rt。**腕ごとに分ける** ── dt を半分にすれば歩数は倍で、
+# 共通の h_rt にすると dt=5e-4 の腕だけが必ず時間切れになる（dry-run で気づいた）。
+# 見積りは probe の実測から: 傾いた段 0.220 s/step、quench 0.118 s/step (H100)。
+#   dt=1e-3 -> 3.71 h、dt=5e-4 -> 7.30 h。余裕 60 %。
 ARMS=(
-  "b8_om0   |BR_CELL=zero,BR_TAG=_b8_om0"
-  "b8_omp08 |BR_CELL=plus,BR_OMEGA=0.80,BR_TAG=_b8_omp08"
-  "b8_omp09 |BR_CELL=plus,BR_OMEGA=0.90,BR_TAG=_b8_omp09"
-  "b8_omm08 |BR_CELL=minus,BR_OMEGA=0.80,BR_TAG=_b8_omm08"
-  "b8_nodd  |BR_CELL=plus_nodd,BR_OMEGA=0.80,BR_TAG=_b8_nodd"
-  "b8_dt5e4 |BR_CELL=plus,BR_OMEGA=0.80,BR_DT=5.0e-4,BR_TAG=_b8_dt5e4"
+  "b8_om0   |BR_CELL=zero,BR_TAG=_b8_om0|$HRT"
+  "b8_omp08 |BR_CELL=plus,BR_OMEGA=0.80,BR_TAG=_b8_omp08|$HRT"
+  "b8_omp09 |BR_CELL=plus,BR_OMEGA=0.90,BR_TAG=_b8_omp09|$HRT"
+  "b8_omm08 |BR_CELL=minus,BR_OMEGA=0.80,BR_TAG=_b8_omm08|$HRT"
+  "b8_nodd  |BR_CELL=plus_nodd,BR_OMEGA=0.80,BR_TAG=_b8_nodd|$HRT"
+  "b8_dt5e4 |BR_CELL=plus,BR_OMEGA=0.80,BR_DT=5.0e-4,BR_TAG=_b8_dt5e4|${BR_HRT_LONG:-12:00:00}"
 )
 
 mkdir -p logs/tsubame
-echo "group=$GROUP  h_rt=$HRT  arms=${#ARMS[@]}"
+echo "group=$GROUP  h_rt=$HRT (dt5e4 は ${BR_HRT_LONG:-12:00:00})  arms=${#ARMS[@]}"
 echo "common: $COMMON"
 echo
 
 for spec in "${ARMS[@]}"; do
   name="${spec%%|*}"; name="${name// /}"
-  vars="${spec#*|}"
-  cmd=(qsub -g "$GROUP" -N "$name" -l gpu_1=1 -l "h_rt=$HRT"
+  rest="${spec#*|}"
+  vars="${rest%%|*}"
+  hrt="${rest#*|}"
+  cmd=(qsub -g "$GROUP" -N "$name" -l gpu_1=1 -l "h_rt=$hrt"
        -o "logs/tsubame/${name}.log" -j y
        -v "${COMMON},${vars}"
        runs/eu_barnett_redo/tsubame_core.sh)
