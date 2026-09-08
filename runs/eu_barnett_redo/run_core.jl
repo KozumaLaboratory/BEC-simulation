@@ -462,7 +462,44 @@ function run_gs()
     psi
 end
 
-# ---- stages 2-3: stir / quench ----------------------------------------------
+# ---- the shape of the field ramp-down ---------------------------------------
+# The adiabaticity condition on |B| is LOCAL: |dp/dt| < A p^2, because the gap
+# holding the spin-mixing channel shut is p itself. A ramp that is linear in p
+# therefore satisfies it at the start and violates it by three orders at the
+# end, and paying for that with a longer linear ramp is the wrong currency:
+# constant-A costs T = (1/|p_f| - 1/|p_i|) / A, while linear-at-the-same-final-A
+# costs (|p_i| - |p_f|) / (A p_f^2). At A = 0.1 that is 20.5 against 3.7e4 --
+# a factor 1800, and the whole reason "adiabatic is impossible here" was wrong
+# when I first said it on 2026-09-09.
+#
+# Constant A is harmonic interpolation in p: 1/p linear in t. Same endpoints,
+# same monotonicity, exponentially more time spent where the gap is small.
+const FIELD_DOWN_SHAPE = get(ENV, "BR_FIELD_DOWN_SHAPE", "linear")
+FIELD_DOWN_SHAPE in ("linear", "adiabatic") ||
+    error("BR_FIELD_DOWN_SHAPE must be linear or adiabatic, got $FIELD_DOWN_SHAPE")
+# B_FINAL = 0 has no adiabatic ramp AT ALL: 1/p_f diverges, and physically you
+# cannot follow a gap that closes to zero. Refuse rather than silently fall back
+# to linear, which would report an adiabatic run that was not one.
+if FIELD_DOWN_SHAPE == "adiabatic" && P_FINAL == 0
+    error("BR_FIELD_DOWN_SHAPE=adiabatic needs BR_B_FINAL_GAUSS > 0; " *
+          "a gap that closes to zero cannot be followed at any ramp rate")
+end
+
+_field_down_amp(t) =
+    if FIELD_DOWN_SHAPE == "linear"
+        P_ZEE + (P_FINAL - P_ZEE) * (t / T_FIELD_DOWN)
+    else
+        s = t / T_FIELD_DOWN
+        1 / ((1 - s) / P_ZEE + s / P_FINAL)
+    end
+
+# The achieved A, printed so the log states it rather than the submitter claiming it.
+field_down_A() = T_FIELD_DOWN <= 0 ? NaN :
+    FIELD_DOWN_SHAPE == "adiabatic" ?
+        abs(1 / P_FINAL - 1 / P_ZEE) / T_FIELD_DOWN :        # constant along the ramp
+        abs(P_FINAL - P_ZEE) / T_FIELD_DOWN / P_FINAL^2      # worst point (the end)
+
+# ---- stages 2-3: stir / hold ------------------------------------------------
 stage_duration(s) =
     s === :stir     ? T_STIR   :
     s === :tilt     ? T_TILT   :
@@ -555,12 +592,18 @@ function run_dynamics(psi0, stage_sym, t0, rows, frames; ledger_path=nothing,
         ramp_zee(t -> THETA * (1 - t / T_ROT_BACK),
                  t -> PHI_AFTER_SPINUP + OMEGA * (T_STIR + t), T_ROT_BACK)
     elseif stage_sym === :field_down
-        # |B| P_ZEE -> P_FINAL along +z. No direction change, so there is no
-        # adiabaticity condition to satisfy at all — that is the point of doing it
-        # second. This is where omega_L crosses mu and the conversion becomes
-        # possible.
-        ramp_zee(_ -> 0.0, _ -> 0.0, T_FIELD_DOWN;
-                 amp_of = t -> P_ZEE + (P_FINAL - P_ZEE) * (t / T_FIELD_DOWN))
+        # |B| P_ZEE -> P_FINAL along +z. This comment used to say "no direction
+        # change, so there is no adiabaticity condition to satisfy at all".
+        # That is true of the DIRECTION and false of the MAGNITUDE, and the
+        # magnitude is the whole point of the stage: lowering |B| closes the
+        # Zeeman gap that was holding the spin-mixing channel shut, so there is
+        # an adiabaticity condition and it is the hardest one in the schedule.
+        # Measured 2026-09-09: with the linear shape below, A = |dp/dt|/gap^2
+        # crosses 1 at p = 22.1 (1.36 mG) and reaches 2050 at the final 30 uG,
+        # i.e. the last 4.4 % of the ramp is crossed 62x faster than the
+        # spin-mixing time 1/(c_dd n) = 2.74. Omega = 0 oscillates for this
+        # reason and no other -- the DDI-off arm is flat to 1e-4.
+        ramp_zee(_ -> 0.0, _ -> 0.0, T_FIELD_DOWN; amp_of = _field_down_amp)
     else
         # The hold. P_FINAL = 0 (the default) reproduces the historical B = 0
         # quench exactly; a non-zero value leaves a weak axial field, which is
@@ -670,8 +713,74 @@ const SLICES = SLICE_EVERY > 0 ?
     Tuple{Float64, Array{ComplexF32, 3}}[] : nothing
 const LAST_SLICE = Ref(-Inf)
 
-psi_gs = run_gs()
-if PROTOCOL == "adiabatic"
+# ---- restart: pick up a saved psi instead of redoing the first 33 units -----
+# The first four stages (tilt, spin up, stir, rotate back) do not depend on what
+# field_down does afterwards, so an arm that only changes the ramp shape can
+# reuse them. frames_*.jld2 already holds psi at exactly t = 33.0 (frame 32 of
+# 48), which is the end of rotate_back, so the reuse is exact and not an
+# interpolation.
+#
+# The guards matter more than the saving: the whole point is comparing two ramp
+# shapes from the SAME state, so a restart that silently grabbed a different
+# time, a different grid, or another arm's cell would produce a comparison of
+# nothing. Each of those is checked and refused, not warned about.
+const RESTART_FRAMES = get(ENV, "BR_RESTART_FRAMES", "")
+const RESTART_T = parse(Float64, get(ENV, "BR_RESTART_T", "0"))
+
+function load_restart()
+    isfile(RESTART_FRAMES) || error("BR_RESTART_FRAMES not found: $RESTART_FRAMES")
+    # Restarting anywhere other than the end of rotate_back would skip a stage
+    # this driver would otherwise run, so the two runs would not share a history.
+    want = T_QUENCH_START + T_ROT_BACK
+    isapprox(RESTART_T, want; atol=1e-6) || error(
+        "BR_RESTART_T=$RESTART_T but this config ends rotate_back at $want. " *
+        "Restarting elsewhere silently changes the protocol.")
+    jldopen(RESTART_FRAMES, "r") do f
+        f["cell"] == CELL || error("frames cell=$(f["cell"]) but BR_CELL=$CELL")
+        f["omega"] == OMEGA || error("frames omega=$(f["omega"]) but BR_OMEGA=$OMEGA")
+        f["ddi"] == DDI_ON || error("frames ddi=$(f["ddi"]) but DDI_ON=$DDI_ON")
+        collect(f["n"]) == collect(NPTS) ||
+            error("frames grid $(f["n"]) != this run's $(NPTS)")
+        collect(f["box"]) ≈ collect(BOX) ||
+            error("frames box $(f["box"]) != this run's $(BOX)")
+        n = f["n_frames"]
+        ts = [f["frame_" * lpad(i, 3, '0') * "/t"] for i in 1:n]
+        k = argmin(abs.(ts .- RESTART_T))
+        # Exact, not nearest: a 0.3-unit slip is invisible in the ledger and
+        # would move the comparison's zero point.
+        isapprox(ts[k], RESTART_T; atol=1e-6) || error(
+            "no frame at t=$RESTART_T (nearest $(ts[k])). Frames: $(ts)")
+        psi = ComplexF64.(f["frame_" * lpad(k, 3, '0') * "/psi"])
+        # A file of right-sized zeros passes every structural check above; the
+        # 2026-07-28 incident is why this one exists.
+        pk = maximum(abs2, psi)
+        pk > 1e-8 || error("restart frame peak |psi|^2 = $pk — the file is garbage")
+        nrm = sum(abs2, psi) * prod(step.(GRID.x))
+        @printf("[redo] restart from %s frame_%s  t=%.3f  peak|psi|^2=%.4g  norm=%.6f\n",
+                basename(RESTART_FRAMES), lpad(k, 3, '0'), ts[k], pk, nrm); flush(stdout)
+        isapprox(nrm, 1.0; atol=1e-3) ||
+            error("restart frame norm $nrm != 1 — wrong grid weights or a bad file")
+        psi
+    end
+end
+
+if !isempty(RESTART_FRAMES)
+    PROTOCOL == "adiabatic" ||
+        error("restart is only defined for BR_PROTOCOL=adiabatic")
+    T_FIELD_DOWN > 0 || error("restart with T_FIELD_DOWN=0 would run only the hold")
+    psi_r = load_restart()
+    @printf("[redo] field_down shape=%s  T=%.3f  A=|dp/dt|/gap^2=%.4g\n",
+            FIELD_DOWN_SHAPE, T_FIELD_DOWN, field_down_A()); flush(stdout)
+    # No observe() here: run_dynamics records its own t0 row, and two rows at
+    # t = 33 would make every downstream index-by-time off by one.
+    psi_r = run_dynamics(psi_r, :field_down, RESTART_T, rows, frames;
+                         ledger_path=ledger, colframes=COLF, slices=SLICES,
+                         last_slice=LAST_SLICE)
+    run_dynamics(psi_r, :quench, RESTART_T + T_FIELD_DOWN, rows, frames;
+                 ledger_path=ledger, colframes=COLF, slices=SLICES,
+                 last_slice=LAST_SLICE)
+elseif PROTOCOL == "adiabatic"
+    psi_gs = run_gs()
     psi = run_dynamics(psi_gs, :tilt, 0.0, rows, frames;
                        ledger_path=ledger, colframes=COLF, slices=SLICES, last_slice=LAST_SLICE)
     psi = run_dynamics(psi, :spinup, T_TILT, rows, frames;
@@ -689,6 +798,7 @@ if PROTOCOL == "adiabatic"
     run_dynamics(psi, :quench, T_QUENCH_START + T_RAMPDOWN, rows, frames;
                  ledger_path=ledger, colframes=COLF, slices=SLICES, last_slice=LAST_SLICE)
 else
+    psi_gs = run_gs()
     psi_stir = run_dynamics(psi_gs, :stir, 0.0, rows, frames;
                             ledger_path=ledger, colframes=COLF, slices=SLICES, last_slice=LAST_SLICE)
     run_dynamics(psi_stir, :quench, T_QUENCH_START, rows, frames;
