@@ -74,6 +74,12 @@ nmax = max(float(fh[t]["n_col"][j].max()) for _n, t, _c, _w in ARMS
            for j in range(0, len(times), 60))
 print(f"共通の密度スケール 0 .. {nmax:.3g}")
 
+# 局所 m の色域は全域 (-6..+6)。**狭めない。**
+# 狭めれば構造は見やすくなる（測った: 上端 -1 で飽和 6.2 %、-2 で 17.3 %）が、
+# 頼まれていないうえ、飽和した画素と本当に端にいる画素が絵の上で同じになる。
+# 狭めるなら colorbar の extend 矢印と飽和率を必ず添えること。
+MLO, MHI = -6.0, 6.0
+
 # 表示範囲: 最終フレームで柱密度の 99.9 % を含む最小の対称窓
 last = fh[ARMS[0][1]]["n_col"][-1]
 ny, nx = last.shape
@@ -101,7 +107,7 @@ for j, (name, tag, _c, _w) in enumerate(ARMS):
     ims[(1, j)] = axes[1, j].imshow(fz, cmap="RdBu_r", vmin=-6 * nmax, vmax=6 * nmax,
                                     origin="lower")
     ims[(2, j)] = axes[2, j].imshow(np.where(nt > 1e-3 * nmax, fz / np.maximum(nt, 1e-30),
-                                             np.nan), cmap="RdBu_r", vmin=-6, vmax=6,
+                                             np.nan), cmap="RdBu_r", vmin=MLO, vmax=MHI,
                                     origin="lower")
     axes[0, j].set_title(name, fontsize=13)
     spread[j] = axes[2, j].text(0.5, 0.015, "", transform=axes[2, j].transAxes,
@@ -113,26 +119,39 @@ for i, lab in enumerate(["column density  $n$", "magnetisation  $f_z$",
 for ax in axes.ravel():
     ax.set_xticks([])
     ax.set_yticks([])
-fig.colorbar(ims[(2, 2)], ax=axes[2, :], fraction=0.028,
-             pad=0.012).set_label("local $m$   (−6 … +6)", fontsize=10)
+cb = fig.colorbar(ims[(2, 2)], ax=axes[2, :], fraction=0.028, pad=0.012,
+                  ticks=list(range(-6, 7, 2)))
+cb.set_label("local $m$", fontsize=10)
 
 for name, tag, col, _w in ARMS:
     axL.plot(led[tag]["t"], led[tag]["Fz"], "-", color=col, lw=2.0, label=name)
-axL.axhline(-6, color="#c00", lw=1.0, ls=":")
-axL.text(83.5, -5.85, "$m=-6$ edge", color="#c00", ha="right", va="bottom", fontsize=9)
-axL.axvspan(0, T_STIR_END, color="#eef3f8", zorder=0)
-axL.axvspan(T_STIR_END, T_LEDGER, color="#f6eef8", zorder=0)
-axL.text(T_STIR_END / 2, 5.2, "tilt · spin up · stir   (inject $L_z$)", ha="center",
-         fontsize=9.5, color="#41668c", va="top")
-axL.text((T_LEDGER + 84) / 2, 5.2, "hold at 30 µG   (spin ↔ orbital conversion)",
-         ha="center", fontsize=9.5, color="#666", va="top")
-cursor = axL.axvline(times[0], color="#111", lw=1.4)
+# ステージは **6 つある**。3 つをまとめて 1 つの名前で塗ると嘘になるので、
+# 境界を全部引いて全部名前を付ける。幅 1 の field_down も省かない。
+STAGES = [(0.0, 5.0, "tilt", "#f4f4f4"), (5.0, 10.0, "spin up", "#e8eef5"),
+          (10.0, 30.0, "stir", "#d4e3f0"), (30.0, 33.0, "rotate\nback", "#f0e4f4"),
+          (33.0, 34.0, "field\ndown", "#d7bfe4"), (34.0, 84.0, "hold at 30 µG", "#ffffff")]
+for a0, a1, lab, colr in STAGES:
+    axL.axvspan(a0, a1, color=colr, zorder=0)
+    axL.axvline(a0, color="#aaaaaa", lw=0.8, zorder=1)
+# 幅 3 と幅 1 のステージは水平に書くと必ず隣とぶつかる（"rotatefield backdown"
+# になった）。狭いものは band の中に縦書きで入れる。**省略はしない。**
+for a0, a1, lab, _c in STAGES:
+    if (a1 - a0) >= 8:
+        axL.text((a0 + a1) / 2, -2.06, lab.replace("\n", " "), ha="center", va="top",
+                 fontsize=9, color="#555")
+    else:
+        axL.text((a0 + a1) / 2, -5.92, lab.replace("\n", " "), ha="left", va="bottom",
+                 fontsize=7.5, color="#555", rotation=90)
+cursor = axL.axvline(times[0], color="#111", lw=1.4, zorder=6)
 axL.set_xlim(0, 84)
-axL.set_ylim(-6.6, 5.6)
+axL.set_ylim(-6.05, -2.0)
+axL.set_yticks([-6, -5, -4, -3, -2])
 axL.set_xlabel(r"$t\ \omega_{\rm ref}$")
 axL.set_ylabel(r"$\langle F_z\rangle$")
 axL.grid(alpha=0.25)
-axL.legend(loc="center left", fontsize=9.5, framealpha=0.95)
+# 凡例は曲線を隠さない場所へ。t>45 の y<-5.2 はどの腕も通らない帯。
+axL.legend(loc="lower right", ncol=3, fontsize=9, framealpha=0.95,
+           borderpad=0.35, columnspacing=1.2, handlelength=1.6)
 
 sup = fig.suptitle("", fontsize=13)
 fig.text(0.5, 0.008, f"protocol sl_* : θ = 35°, rotate_back, B_final = 30 µG, box 35 "
@@ -157,8 +176,8 @@ with tempfile.TemporaryDirectory() as tmp:
                 sd = np.sqrt((w * (m - bar) ** 2).sum() / w.sum())
                 spread[j].set_text(f"mean $m$ {bar:+.2f}   spread {sd:.2f}")
         cursor.set_xdata([t, t])
-        st = ("injecting $L_z$" if t < T_STIR_END else
-              "field back to axis" if t < T_LEDGER else "converting at 30 µG")
+        st = next(lab.replace("\n", " ") for a0, a1, lab, _c in STAGES
+                  if t < a1 or a1 >= 84)
         sup.set_text(f"$t\\ \\omega_{{\\rm ref}} = {t:5.1f}$    [{st}]")
         fig.savefig(tmp / f"f{i:04d}.png", dpi=88)
         if i % 50 == 0:

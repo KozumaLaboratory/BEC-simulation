@@ -2,7 +2,14 @@
 """残留磁場が変換をどれだけ殺すか、そしてそれが速さでなく行き先の問題であること。
 
 左: ΔF_z 対 B_final。3 つの Ω。
-右: クエンチ中の F_z(t)。**B=0 はまだ動き、30 µG は平らになっている** ──
+★語法: `BR_T_QUENCH = 50` は **保持**であって、クエンチではない。本当のクエンチは
+  `field_down` の 1 単位（p を 488.27 -> 0.488 に線形に落とす）。コードの変数名に
+  引きずられて 50 単位の窓を「クエンチ」と呼んでいたのを 2026-09-09 に訂正した。
+  そして field_down は **1.36 mG より下で断熱でなくなる**（A = |dp/dt|/gap² が
+  そこで 1 を超え、終端 30 µG では 2050）。避けられない ── A = 0.01 を要求すると
+  ランプに保持時間の 7300 倍かかる。**Ω に依らないので Ω = 0 でも振動する。**
+
+右: 保持中の F_z(t)。**B=0 はまだ動き、30 µG は平らになっている** ──
     「長く回せば追いつく」ではないことの直接の証拠。
 
 ★閾値は μ ではなく **c_dd n** と比べる。μ は c₀（スピンに依らない項）が支配する
@@ -82,7 +89,7 @@ ax1.set_title("Residual field suppresses the conversion\nthe experiment sits at 
 ax1.legend(loc="upper right", fontsize=10)
 ax1.annotate("experiment\n30 µG", (30, 0.55), ha="center", fontsize=10, color="#444")
 
-# ── 右: クエンチ中の F_z(t) ──────────────────────────────────────
+# ── 右: 保持中の F_z(t)（クエンチは field_down の 1 単位。上の注記） ──
 for om, (col, _mk, lab) in STY.items():
     for bf, ls, a in ((0, "-", 1.0), (30, "--", 0.85)):
         if (bf, om) not in d:
@@ -112,7 +119,7 @@ for om, (_c, _m, lab) in STY.items():
         n = len(ff) // 3
         txt.append(f"{lab.split('（')[0]} {bf:>3d}uG : {ff[2*n:].mean()-ff[n:2*n].mean():+.3f}")
 # ★等幅にしない（DejaVu Sans Mono に和文が無く豆腐になる）。凡例と重ならない位置へ。
-ax2.text(0.02, 0.97, "late third − middle third of the quench\n" + "\n".join(txt),
+ax2.text(0.02, 0.97, "late third − middle third of the hold\n" + "\n".join(txt),
          transform=ax2.transAxes, fontsize=8.5, va="top",
          bbox=dict(fc="white", ec="#bbb", alpha=0.93))
 
