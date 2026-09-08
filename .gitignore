@@ -205,6 +205,17 @@ __pycache__/
 *.toc
 # result CSVs are regenerable (extract from jld2); keep figures (png), not data
 runs/**/*.csv
+# ...except where the jld2 does not exist. The Barnett J_z ledgers are the ONLY
+# record of the runs behind runs/eu_barnett_redo/README.md: psi frames were never
+# kept off-cluster and are not on it either, so "regenerable" would mean re-running
+# a 320x320x120 GPU batch. They sat untracked on TSUBAME for a month while the
+# README quoted them; recovered 2026-08-25, see data/PROVENANCE.md.
+!runs/eu_barnett_redo/data/*.csv
+# ...and for LAB data, where "regenerable" is false by a different route: these are
+# measurements on the apparatus, not simulation output. There is no jld2 behind them
+# and re-running means booking the machine and getting a different day's systematics.
+# runs/eu_lab/data/ holds the sequence-program batches (see runs/eu_lab/CONTEXT.md).
+!runs/eu_lab/data/*.csv
 
 # figure data lives on TSUBAME (runs/eu_shape_optimization/data/); repo keeps figures+code
 docs/guides/figures/*.csv
