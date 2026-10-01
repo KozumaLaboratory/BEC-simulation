@@ -1530,7 +1530,9 @@ function warn_cost_drift(
     return stale
 end
 
-include(joinpath(@__DIR__, "_smoke.jl"))
+# The state generator evaluates this file in a dynamically constructed Module,
+# which has no module-local include function.
+Base.include(@__MODULE__, joinpath(@__DIR__, "_smoke.jl"))
 
 function select_tests(tier::String)
     haskey(SMOKE_TESTS, tier) && return SMOKE_TESTS[tier]
