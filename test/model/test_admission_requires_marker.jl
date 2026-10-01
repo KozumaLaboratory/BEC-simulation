@@ -33,6 +33,7 @@
 # (`_resolve_derived_params!`) before the id is built.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using JLD2
 using SpinorBEC
 using SpinorBEC: _gs_stage_dir, _run_step, GroundStateStep,
@@ -93,7 +94,7 @@ function plant_sentinel!(path, stage_ref; remark::Bool=true)
         # is rejected. A fixture standing for a PRE-cutover artifact therefore has
         # to be dated like one. 2023-11-14 as a literal so this file does not
         # depend on the constant's value.
-        run(pipeline(`touch -d @1700000000 $path`; stdout=devnull))
+        set_test_mtime!(path)
     end
     path
 end

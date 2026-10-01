@@ -376,7 +376,7 @@ using Random
 
         c0, c1 = 50.0, 5.0
 
-        g_base = SpinorBEC._c0c1_to_gS(F, c0, c1)
+        g_base = SpinorBEC.ku_c01_to_g_S(F, c0, c1)
         g_delta = SpinorBEC._dict_to_delta_gS(F, Dict(4 => 2.0))
         g_total = merge(+, g_base, g_delta)
         cache_total = SpinorBEC._make_tensor_cache_from_channels(F, g_total)

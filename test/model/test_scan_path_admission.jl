@@ -25,6 +25,7 @@
 # in `runs/eu151_edh_k3_compare`, a 3-point scan.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using JLD2
 using YAML
 using SpinorBEC
@@ -180,7 +181,7 @@ energy_of(p) = JLD2.load(p)["energy"]
                 # Written just now it is a post-cutover kill, which is rejected —
                 # that arm is `test_marker_cutoff.jl`'s. 2023-11-14 as a literal
                 # so this file does not depend on the constant's value.
-                run(pipeline(`touch -d @1700000000 $p1`; stdout=devnull))
+                set_test_mtime!(p1)
                 @test !isfile(marker_path(p1))
                 run_scan()
                 @test energy_of(p1) == SCAN_SENTINEL_E
@@ -210,7 +211,7 @@ end
             # unmarked payload written AFTER the cutover is rejected, which is a
             # different arm (`test_marker_cutoff.jl`). 2023-11-14 as a literal so
             # this file does not depend on the constant's value.
-            run(pipeline(`touch -d @1700000000 $res`; stdout=devnull))
+            set_test_mtime!(res)
             @test _has_result(dir)
             @test _result_path_or_nothing(exp) == res
         end

@@ -291,7 +291,7 @@ function summary_provenance(run_dir::AbstractString)
         extracted_at=nothing, stamped=false)
     isfile(path) || return absent
     d = try
-        JSON.parsefile(path)
+        JSON.parsefile(path; use_mmap=false)
     catch
         return absent
     end

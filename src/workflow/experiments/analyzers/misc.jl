@@ -67,7 +67,7 @@ function _analyze_hpsi_export(psi, grid, atom, params, ws_prev)
     # Default output path: under the run dir's analyze/ subtree so it
     # ends up next to other analyzer outputs. The user can override via
     # `path:` (absolute or relative to YAML dir).
-    yaml_dir = get(ENV, "SPINORBEC_YAML_DIR", pwd())
+    yaml_dir = get(ENV, "SPINORBEC_CONFIG_DIR", pwd())
     default_path = joinpath(yaml_dir, "operator_rhs.jld2")
     output_path = String(get(params, "path", default_path))
     isabspath(output_path) || (output_path = joinpath(yaml_dir, output_path))

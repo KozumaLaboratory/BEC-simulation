@@ -36,7 +36,8 @@ The output lands in `docs/build/`.
 
 ```@docs
 run_yaml
-run_config
+run_experiment
+run_pipeline
 load_config
 load_config_from_string
 print_run_summary

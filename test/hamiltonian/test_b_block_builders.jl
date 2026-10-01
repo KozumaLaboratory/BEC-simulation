@@ -1,4 +1,4 @@
-# YAML run_config blocks below trip the same JIT inference cascade
+# YAML run_pipeline blocks below trip the same JIT inference cascade
 # documented in CLAUDE.md ("Type stability boundaries") on Julia 1.11+.
 # Skip them by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in.
 using Test
@@ -172,7 +172,7 @@ pipeline:
       n_steps: 5
       tol: 1e-3
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test isfinite(result.ground_state_energy)
     end
 
@@ -200,7 +200,7 @@ pipeline:
         # which is what this testset asserted for as long as no tier ran it.
         theta: {from: 0.0, to: 0.611}
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
     end
 end

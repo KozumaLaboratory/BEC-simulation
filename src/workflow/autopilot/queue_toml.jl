@@ -114,7 +114,7 @@ function _entry_from_toml_dict(d::AbstractDict, run_dir::AbstractString)
     QueueEntry(
         get(prov, "content_id", basename(run_dir));
         run_dir=run_dir,
-        spec_path=get(spec, "path", joinpath(run_dir, "config.yaml")),
+        spec_path=get(spec, "path", _config_snapshot_path(run_dir)),
         status=Symbol(get(state, "status", "pending")),
         kill_reason=get(state, "kill_reason", ""),
         attempt=Int(get(state, "attempt", 1)),

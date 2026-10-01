@@ -21,8 +21,6 @@ resolves the backend per entry via `resolve_backend(config, entry)`, so
 a single tick loop can mix locally-run and remote-run jobs picked from
 one queue.
 
-Back-compat: passing `backend=<single AutopilotBackend>` to the kw
-constructor wraps it as `Dict(:local => backend)`.
 """
 struct AutopilotConfig
     backends::Dict{Symbol, AutopilotBackend}
@@ -36,8 +34,7 @@ struct AutopilotConfig
 end
 
 function AutopilotConfig(;
-    backends::Union{Nothing, Dict{Symbol, <:AutopilotBackend}}=nothing,
-    backend::Union{Nothing, AutopilotBackend}=nothing,
+    backends::Dict{Symbol, <:AutopilotBackend}=Dict{Symbol, AutopilotBackend}(),
     qr,
     inspect_before_dispatch::Bool=true,
     respect_budget::Bool=true,
@@ -46,18 +43,7 @@ function AutopilotConfig(;
     notify_slack_on_failure::Bool=false,
     dry_run::Bool=false,
 )
-    if backends !== nothing && backend !== nothing
-        throw(ArgumentError(
-            "AutopilotConfig: pass either backends= or backend=, not both"))
-    end
-    resolved = if backends !== nothing
-        Dict{Symbol, AutopilotBackend}(backends)
-    elseif backend !== nothing
-        Dict{Symbol, AutopilotBackend}(:local => backend)
-    else
-        Dict{Symbol, AutopilotBackend}()
-    end
-    AutopilotConfig(resolved, qr,
+    AutopilotConfig(Dict{Symbol, AutopilotBackend}(backends), qr,
         inspect_before_dispatch, respect_budget, max_dispatches_per_tick,
         on_complete_max_descendants, notify_slack_on_failure, dry_run)
 end

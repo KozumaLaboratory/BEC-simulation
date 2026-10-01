@@ -14,7 +14,7 @@
 using Test
 using LinearAlgebra
 using SpinorBEC
-using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
+using SpinorBEC: ku_c01_to_g_S, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
     _make_tensor_cache_from_channels, get_cn, bogoliubov_spectrum, c_to_g,
     has_higher_rank_couplings
 
@@ -23,7 +23,7 @@ using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
         for F in (1, 2, 3, 6, 8)
             c0 = 2.5
             c1 = 0.3
-            g = _c0c1_to_gS(F, c0, c1)
+            g = ku_c01_to_g_S(F, c0, c1)
             for S in 0:2:2F
                 expected = c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2
                 @test isapprox(g[S], expected; rtol=1e-14)
@@ -31,7 +31,7 @@ using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
         end
 
         # F=1 special: 2-param ansatz IS the full basis.
-        g = _c0c1_to_gS(1, 1.0, 0.5)
+        g = ku_c01_to_g_S(1, 1.0, 0.5)
         @test isapprox(g[0], 0.0; atol=1e-14)
         @test isapprox(g[2], 1.5; rtol=1e-14)
     end
@@ -186,7 +186,7 @@ using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
     end
 
     @testset "11. c_to_g: single unified entry point" begin
-        # Combines _c0c1_to_gS (KU closed-form for n=0,1) and
+        # Combines ku_c01_to_g_S (KU closed-form for n=0,1) and
         # _dict_to_delta_gS (6j for n≥2) into one Dict→Dict call.
         F = 2
         c0_val = 2.0
@@ -196,7 +196,7 @@ using SpinorBEC: _c0c1_to_gS, _dict_to_delta_gS, _cn_to_gS, _gS_to_cn,
         g_unified = c_to_g(F, ip)
 
         # Manual reconstruction.
-        g_manual = _c0c1_to_gS(F, c0_val, c1_val)
+        g_manual = ku_c01_to_g_S(F, c0_val, c1_val)
         g_delta = _dict_to_delta_gS(F, Dict(4 => c4_val))
         for (S, dg) in g_delta
             g_manual[S] = get(g_manual, S, 0.0) + dg

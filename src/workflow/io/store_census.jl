@@ -175,7 +175,7 @@ function store_census(root::AbstractString=default_run_root())
     for name in sort(readdir(root))
         d = joinpath(root, name)
         isdir(d) || continue
-        cfg = joinpath(d, "config.yaml")
+        cfg = _config_snapshot_path(d)
         if !isfile(cfg)
             # Not a run directory at all (`_stage/`, a scan parent) unless it
             # holds points, in which case it IS one and its config is missing.
@@ -187,14 +187,23 @@ function store_census(root::AbstractString=default_run_root())
         # Does the config still hash to the directory it lives in? `compute_run_dir`
         # keys on the raw bytes, so this is an equality and not a heuristic.
         m = match(_STORE_HASH_SUFFIX, name)
-        if m !== nothing
+        legacy_cfg = joinpath(d, "config.yaml")
+        if m !== nothing && isfile(legacy_cfg)
             n_keyed += 1
             want = m.match[2:end]           # drop the leading underscore
-            got = bytes2hex(sha256(read(cfg)))[1:length(want)]
+            got = bytes2hex(sha256(read(legacy_cfg)))[1:length(want)]
             got == want || (stale_key[name] = got)
+        elseif basename(cfg) == "config.json" && occursin(r"^[0-9a-f]{16}$", name)
+            n_keyed += 1
+            got = try
+                content_id(_load_config_data(cfg))
+            catch
+                nothing  # reported as unreadable by the parser below
+            end
+            got === nothing || got == name || (stale_key[name] = got)
         end
         parsed = try
-            YAML.load_file(cfg)
+            _load_config_data(cfg)
         catch
             push!(unreadable, name)
             continue

@@ -25,7 +25,7 @@
 using Test
 using YAML
 using SpinorBEC
-using SpinorBEC: _parse_gs_interactions, resolve_atom, _c0c1_to_gS,
+using SpinorBEC: _parse_gs_interactions, resolve_atom, ku_c01_to_g_S,
     epsilon_LHY_F6_Ih, lhy_energy_polar, lhy_energy_fm, build_fm_lhy_coefs,
     lhy_energy_fm_dipolar, compute_a_dd
 
@@ -116,9 +116,9 @@ end
     @testset "the domain guard is live (canary)" begin
         # If `epsilon_LHY_F6_Ih` stops rejecting c₁ < 0, every assertion below
         # passes for the wrong reason. Pin the guard itself.
-        g_bad = _c0c1_to_gS(6, 3270.05, -16.35)     # eu_k3_lhy's own numbers
+        g_bad = ku_c01_to_g_S(6, 3270.05, -16.35)     # eu_k3_lhy's own numbers
         @test isnan(epsilon_LHY_F6_Ih(1.0, g_bad))
-        g_ok = _c0c1_to_gS(6, 3270.05, +16.35)
+        g_ok = ku_c01_to_g_S(6, 3270.05, +16.35)
         @test isfinite(epsilon_LHY_F6_Ih(1.0, g_ok))
     end
 
@@ -131,7 +131,7 @@ end
                 @test F == F_req
                 continue
             end
-            g = _c0c1_to_gS(F, c0, c1)
+            g = ku_c01_to_g_S(F, c0, c1)
             # eps_dd's domain needs its own assertion: past the Petrov cut the
             # closed form still returns a finite value, so the NaN test below
             # would pass for an eps_dd it has no business at.
@@ -164,11 +164,11 @@ finite, so nothing else here would notice.""" path kind eps_dd
         # F=6: g_{2F} = c₀ + 36 c₁, so c₁/c₀ < −1/36 drives the FM stiffness
         # negative. Before the fix that returned 0.0 and sailed through
         # `isfinite` and `>= 0`; it now declines with NaN.
-        g_neg = _c0c1_to_gS(6, 10.0, -0.5)          # g_12 = −8.0
+        g_neg = ku_c01_to_g_S(6, 10.0, -0.5)          # g_12 = −8.0
         @test build_fm_lhy_coefs(6, g_neg).delta_F < 0
         @test isnan(lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g_neg)))
         # ...and the healthy side still answers.
-        g_ok = _c0c1_to_gS(6, 10.0, -0.05)          # g_12 = +8.2
+        g_ok = ku_c01_to_g_S(6, 10.0, -0.05)          # g_12 = +8.2
         @test lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g_ok)) > 0
     end
 end

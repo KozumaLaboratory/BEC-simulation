@@ -28,7 +28,7 @@
 # Usage:  julia --project=. bench/a4_lhy_closed_form_residual.jl [smoke|full]
 
 using SpinorBEC
-using SpinorBEC: _lhy_bdg_energy_density, _c0c1_to_gS,
+using SpinorBEC: _lhy_bdg_energy_density, ku_c01_to_g_S,
     lhy_energy_polar, lhy_energy_fm, build_polar_lhy_coefs, build_fm_lhy_coefs,
     epsilon_LHY_F6_Ih, ZETA_F6_IH, compute_c0_lambda_F6_Ih
 using Printf
@@ -50,14 +50,14 @@ function cases()
     out = Tuple{String, Int, Float64, Float64, Vector{ComplexF64}, Float64}[]
     # polar_contact — the ansatz is exact at F=1 and is the F≥2 polar path.
     for (F, c1) in ((1, 0.1), (1, 0.5), (2, 0.1), (2, 0.5), (6, 0.1))
-        g = _c0c1_to_gS(F, 10.0, c1)
+        g = ku_c01_to_g_S(F, 10.0, c1)
         all(>(0), values(g)) || continue
         push!(out, ("polar_contact F=$F c1=$c1", F, 10.0, c1, _polar_spinor(F),
             lhy_energy_polar(1.0, build_polar_lhy_coefs(F, g))))
     end
     # fm_contact — any F since 2026-07-27; c1 < 0 is the FM-stable side.
     for (F, c1) in ((1, -0.1), (2, -0.1), (6, -0.2), (6, -0.1), (6, -0.05))
-        g = _c0c1_to_gS(F, 10.0, c1)
+        g = ku_c01_to_g_S(F, 10.0, c1)
         all(>(0), values(g)) || continue
         push!(out, ("fm_contact F=$F c1=$c1", F, 10.0, c1, _fm_spinor(F),
             lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))))
@@ -68,7 +68,7 @@ function cases()
     # coerced. ζ_Ih is not a single-|m⟩ state, so unlike polar/FM its
     # stationarity is not free — the existing gate measured it at ≤1.5e-15.
     for c1 in (0.05, 0.1, 0.2)
-        g = _c0c1_to_gS(6, 10.0, c1)
+        g = ku_c01_to_g_S(6, 10.0, c1)
         all(>(0), values(g)) || continue
         c0_st, lam = compute_c0_lambda_F6_Ih(g)
         (c0_st > 0 && lam > 0) || continue

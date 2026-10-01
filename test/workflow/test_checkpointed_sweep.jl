@@ -55,12 +55,15 @@ using SpinorBEC:
             results2 = run_sweep!(sweep, cells; verbose=false)
             @test calls_log == [:a, :b]  # no additional calls
             @test results2[1].value == 1.0
+            run_sweep!(sweep, cells; force=true, verbose=false)
+            @test calls_log == [:a, :b, :a, :b]
         end
     end
 
     @testset "extend_unconverged! only touches gate=false cells" begin
         mktempdir() do dir
             extend_log = Symbol[]
+            gate_log = Symbol[]
             sweep = CheckpointedSweep(
                 cache_dir=dir,
                 cell_key=p -> "$(p.id)",
@@ -71,7 +74,10 @@ using SpinorBEC:
                     push!(extend_log, p.id)
                     (; id=p.id, value=prev.value + n_extend * 1.0)
                 end,
-                gate=r -> r.value > 1.0,
+                gate=r -> begin
+                    push!(gate_log, r.id)
+                    r.value > 1.0
+                end,
             )
             cells = [(id=:converged,), (id=:slow1,), (id=:slow2,)]
             run_sweep!(sweep, cells; verbose=false)
@@ -84,6 +90,7 @@ using SpinorBEC:
             @test results[1].value == 100.0  # converged, untouched
             @test results[2].value == 0.5    # extended (n_extend=0 + 0.5 = 0.5)
             @test results[3].value == 0.5
+            @test gate_log == [:converged, :slow1, :slow2]
 
             # Run again with adequate budget — should push past gate
             empty!(extend_log)

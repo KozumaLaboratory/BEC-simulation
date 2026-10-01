@@ -44,6 +44,7 @@ using SpinorBEC
 
         # Resume for 50 more steps (total 100)
         r2 = resume_ground_state(ckpt_dir;
+            checkpoint_dir=ckpt_dir,
             grid=make_grid(GridConfig((16,), (10.0,))),
             atom=Rb87,
             interactions=InteractionParams(Dict(0 => 10.0, 1 => -0.5)),
@@ -52,6 +53,7 @@ using SpinorBEC
             n_steps=100, tol=1e-20,
         )
         @test r2.last_step == 100
+        @test load_itp_checkpoint(ckpt_dir).step == 100
         # Energy should be lower after more steps
         @test r2.energy <= r1.energy + 1e-6
     end

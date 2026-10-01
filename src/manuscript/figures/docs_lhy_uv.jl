@@ -55,7 +55,7 @@ function build_docs_lhy_uv(io::IO, paper::AbstractString, fig::AbstractString)
     println(buf, "case,k_max,eps_prefix,eps_fixed,eps_closed")
     for c in _LHY_UV_CASES
         ip = InteractionParams(Dict(0 => c.c0, 1 => c.c1))
-        g = _c0c1_to_gS(c.F, c.c0, c.c1)
+        g = ku_c01_to_g_S(c.F, c.c0, c.c1)
         closed = if c.ansatz === :polar
             lhy_energy_polar(1.0, build_polar_lhy_coefs(c.F, g))
         else

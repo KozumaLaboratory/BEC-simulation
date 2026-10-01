@@ -199,7 +199,7 @@ end
 function _load_spec(entry)
     isfile(entry.spec_path) || return nothing
     try
-        return YAML.load_file(entry.spec_path)
+        return _load_config_data(entry.spec_path)
     catch err
         @warn "_load_spec failed" path=entry.spec_path exception=err
         return nothing
@@ -216,7 +216,7 @@ function _outcome_metric(entry, metric_path)
     p = joinpath(entry.run_dir, "summary.json")
     isfile(p) || return nothing
     d = try
-        JSON.parsefile(p)
+        JSON.parsefile(p; use_mmap=false)
     catch
         return nothing
     end

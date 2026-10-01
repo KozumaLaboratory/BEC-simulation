@@ -185,7 +185,7 @@ using LinearAlgebra: Diagonal
         # ground states give materially different LHY corrections. Pin
         # the ratio so a future "fix" that collapses one to the other
         # would be caught.
-        g_eu = SpinorBEC._c0c1_to_gS(6, 100.0, 5.0)
+        g_eu = SpinorBEC.ku_c01_to_g_S(6, 100.0, 5.0)
         pol = SpinorBEC.lhy_energy_polar(1.0, 6, g_eu)
         ico = SpinorBEC.epsilon_LHY_F6_Ih(1.0, g_eu)
         # I_h c_0 must be positive (else I_h not the GS, NaN returned).

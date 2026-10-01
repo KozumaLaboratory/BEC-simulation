@@ -21,7 +21,7 @@ using Printf
     CheckpointedSweep
 
 Parameter sweep that delegates per-cell caching to a `Checkpoint`.
-Three user-supplied callbacks drive the loop:
+Four user-supplied callbacks drive the loop:
 
   - `cell_key(params) → String` — the checkpoint key for one cell
   - `runner(params) → result::NamedTuple` — produce the cell result
@@ -108,18 +108,18 @@ function run_sweep!(
     results = Vector{Any}(undef, n_total)
     for (i, params) in enumerate(cells)
         key = sweep.cell_key(params)
-        if !force && has_checkpoint(sweep.checkpoint, key)
-            verbose && @printf("[%d/%d] %s  cached\n", i, n_total, key)
-            results[i] = load_checkpoint(sweep.checkpoint, key)
-            continue
-        end
-        verbose && @printf("[%d/%d] %s  running …\n", i, n_total, key)
-        t0 = time_ns()
-        results[i] = get_or_compute!(
-            sweep.checkpoint, key, () -> sweep.runner(params); force=force
-        )
-        verbose && @printf("[%d/%d] %s  done in %.1fs\n",
-            i, n_total, key, elapsed_s(t0))
+        computed = Ref(false)
+        results[i] = get_or_compute!(sweep.checkpoint, key,
+            () -> begin
+                computed[] = true
+                verbose && @printf("[%d/%d] %s  running …\n", i, n_total, key)
+                t0 = time_ns()
+                result = sweep.runner(params)
+                verbose && @printf("[%d/%d] %s  done in %.1fs\n",
+                    i, n_total, key, elapsed_s(t0))
+                result
+            end; force=force)
+        !computed[] && verbose && @printf("[%d/%d] %s  cached\n", i, n_total, key)
     end
     return results
 end
@@ -128,7 +128,7 @@ end
     extend_unconverged!(sweep, cells; n_extend=10_000, verbose=true) → Vector
 
 For each cell, if `gate(result) === false`, call
-`sweep.extender(params, prev; n_extend)` via `refine!` and overwrite
+`sweep.extender(params, prev; n_extend)` and overwrite
 the checkpoint. Cells without a cached result OR cells that pass the
 gate are skipped.
 
@@ -143,12 +143,12 @@ function extend_unconverged!(
     results = Vector{Any}(undef, n_total)
     for (i, params) in enumerate(cells)
         key = sweep.cell_key(params)
-        if !has_checkpoint(sweep.checkpoint, key)
+        prev = load_checkpoint(sweep.checkpoint, key)
+        if prev === nothing
             verbose && @printf("[%d/%d] %s  no cache → skipping\n", i, n_total, key)
             results[i] = nothing
             continue
         end
-        prev = load_checkpoint(sweep.checkpoint, key)
         if sweep.gate(prev)
             verbose && @printf("[%d/%d] %s  converged → skipping\n", i, n_total, key)
             results[i] = prev
@@ -157,15 +157,8 @@ function extend_unconverged!(
         verbose && @printf("[%d/%d] %s  extending (n=%d) …\n",
             i, n_total, key, n_extend)
         t0 = time_ns()
-        # In-place fork! (same source/target key) = advance the
-        # checkpoint. The predicate short-circuits already-converged
-        # cells (no transform call); we've already filtered above so
-        # it's belt-and-braces here.
-        results[i] = fork!(
-            sweep.checkpoint, key, key,
-            prev -> sweep.extender(params, prev; n_extend=n_extend);
-            predicate=sweep.gate,
-        )
+        results[i] = save_checkpoint!(sweep.checkpoint, key,
+            sweep.extender(params, prev; n_extend=n_extend))
         verbose && @printf("[%d/%d] %s  extended in %.1fs (gate=%s)\n",
             i, n_total, key, elapsed_s(t0), string(sweep.gate(results[i])))
     end

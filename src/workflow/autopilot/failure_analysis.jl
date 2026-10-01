@@ -59,7 +59,7 @@ function analyze_failure(entry::QueueEntry)
     exit_path = joinpath(entry.run_dir, "_exit_summary.json")
     if isfile(exit_path)
         d = try
-            JSON.parsefile(exit_path)
+            JSON.parsefile(exit_path; use_mmap=false)
         catch
             nothing
         end

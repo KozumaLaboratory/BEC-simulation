@@ -596,6 +596,31 @@ function _rebuild_workspace(ws::Workspace; kwargs...)
     Workspace(args...)
 end
 
+# Change the timestep and rebuild its dependent kinetic caches while sharing
+# the remaining workspace fields. Used by adaptive ITP and Richardson analysis.
+function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
+    sp = SimParams(
+        new_dt,
+        ws.sim_params.n_steps,
+        ws.sim_params.imaginary_time,
+        ws.sim_params.normalize_every,
+        ws.sim_params.save_every,
+        ws.sim_params.rotating_frame_omega,
+        ws.sim_params.spin_rotating_frame_omega,
+    )
+    kinetic_phase = _to_device(
+        ws.backend,
+        prepare_kinetic_phase(ws.grid, new_dt; imaginary_time=sp.imaginary_time),
+    )
+    batched_kinetic = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase, N, ws.backend)
+
+    _rebuild_workspace(ws;
+        sim_params=sp,
+        kinetic_phase=kinetic_phase,
+        batched_kinetic=batched_kinetic,
+    )
+end
+
 # Rotating-frame Zeeman absorbs the Barnett −Ω·F_z into an effective linear
 # coefficient. With Zeeman convention H_Zee = −p·F_z, the rotating-frame
 # Hamiltonian H_rot = H_lab − Ω(L_z + F_z) corresponds to

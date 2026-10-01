@@ -87,7 +87,7 @@ function resume_ground_state(checkpoint::ITPCheckpoint;
         psi_init=copy(checkpoint.psi),
         dt, n_steps, tol,
         _start_step=checkpoint.step,
-        _checkpoint_dir=checkpoint_dir,
+        checkpoint_dir=checkpoint_dir,
         kwargs...,
     )
 end

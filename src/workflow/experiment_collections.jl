@@ -17,7 +17,8 @@
 
 Recursively diff two YAML-shaped Dicts. Returns a vector of entries
 `(path::String, a, b)` for every leaf whose value differs (or is
-present on only one side).
+present on only one side). Absent values are represented by `missing`.
+Symbol and String dictionary keys are equivalent, as in `diff_dicts`.
 
 Used by:
 - `twin` verification (twin should differ on lhy + loss only)
@@ -25,38 +26,13 @@ Used by:
 - compare provenance / auto-labelling
 """
 function spec_diff(a::AbstractDict, b::AbstractDict)
-    out = Tuple{String, Any, Any}[]
-    _spec_diff!(out, a, b, String[])
-    [(path=p, a=va, b=vb) for (p, va, vb) in out]
+    [
+        (path=join(entry.path, "."), a=entry.before, b=entry.after)
+        for entry in flatten_diff(diff_dicts(a, b))
+    ]
 end
 
 spec_diff(a::Experiment, b::Experiment) = spec_diff(a.spec, b.spec)
-
-function _spec_diff!(out, a, b, prefix)
-    if a isa AbstractDict && b isa AbstractDict
-        ks = union(keys(a), keys(b))
-        for k in sort!(collect(ks); by=string)
-            ak = haskey(a, k) ? a[k] : _MISSING
-            bk = haskey(b, k) ? b[k] : _MISSING
-            _spec_diff!(out, ak, bk, vcat(prefix, string(k)))
-        end
-    elseif a isa AbstractVector && b isa AbstractVector
-        for i in 1:max(length(a), length(b))
-            ai = i ≤ length(a) ? a[i] : _MISSING
-            bi = i ≤ length(b) ? b[i] : _MISSING
-            _spec_diff!(out, ai, bi, vcat(prefix, string(i)))
-        end
-    else
-        if !_spec_equal(a, b)
-            push!(out, (join(prefix, "."), a, b))
-        end
-    end
-end
-
-const _MISSING = :__SPEC_DIFF_MISSING__
-
-_spec_equal(a, b) = a == b
-_spec_equal(::typeof(_MISSING), ::typeof(_MISSING)) = true
 
 # ===========================================================================
 # Sweep — returns Vector{Experiment} directly. No Batch type.

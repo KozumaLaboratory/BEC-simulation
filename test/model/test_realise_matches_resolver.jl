@@ -5,7 +5,7 @@ using SpinorBEC: Model, GSResolved, yaml_to_model, resolve_gs, gs_model,
     gs_physics_kwargs, model_physics_kwargs, realise_grid, realise_potential,
     realise_zeeman, realise_interactions, realise_ddi_kwargs, realise_lhy,
     make_workspace, evaluate_potential, parse_pipeline, GroundStateStep,
-    _run_yaml_prepare, restore_dealias_refs!, DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF,
+    _prepare_config_file, restore_dealias_refs!, DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF,
     LHYTableOpts, InteractionParams
 
 # `make_workspace(::Model)` must build the SAME workspace as the resolver path.
@@ -61,7 +61,7 @@ function _rmr_resolve(rel::String)
     path = joinpath(dirname(_RMR_ROOT), rel)
     was_en, was_kc = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     try
-        data = _run_yaml_prepare(path, false, false)
+        data = _prepare_config_file(path, false, false)
         cfg = parse_pipeline(Dict{Any, Any}(data))
         gs = first(s for s in cfg.steps if s isa GroundStateStep)
         r = resolve_gs(gs.params, nothing, nothing, nothing; verbose=false)::GSResolved

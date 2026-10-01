@@ -1,4 +1,5 @@
 style = "blue"
+normalize_line_endings = "unix"
 indent = 4
 margin = 100
 align_assignment = false

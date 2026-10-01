@@ -144,11 +144,15 @@ _uge_remote_run_dir(b::UGEBackend, entry::QueueEntry) =
     if (b.ssh_host === nothing || b.remote_runs_root === nothing)
         entry.run_dir
     else
-        joinpath(b.remote_runs_root, basename(entry.run_dir))
+        _ssh_remote_joinpath(b.remote_runs_root, basename(entry.run_dir))
     end
 
 _uge_remote_spec_path(b::UGEBackend, entry::QueueEntry) =
-    joinpath(_uge_remote_run_dir(b, entry), basename(entry.spec_path))
+    if b.ssh_host === nothing || b.remote_runs_root === nothing
+        joinpath(_uge_remote_run_dir(b, entry), basename(entry.spec_path))
+    else
+        _ssh_remote_joinpath(_uge_remote_run_dir(b, entry), basename(entry.spec_path))
+    end
 
 # UGE rejects job names that start with a digit ("not a valid object
 # name"). Content IDs are hex, so prefix unconditionally. Used by both
@@ -255,7 +259,7 @@ function render_uge_script(profile::AbstractString, config_path::AbstractString;
     # sysimage so first-output latency drops from ~30 s (cold JIT) to
     # ~2 s. Operator builds the sysimage once via the CLI helper —
     # rebuild only on Project.toml / Manifest.toml change.
-    "$(julia_path)" $(sysimage_arg) --project=. -e 'using SpinorBEC; SpinorBEC.run_yaml(ARGS[1])' "$(config_path)"
+    "$(julia_path)" $(sysimage_arg) --project=. -e 'using SpinorBEC; SpinorBEC.run_experiment(ARGS[1])' "$(config_path)"
     """
     return body
 end
@@ -277,8 +281,9 @@ _uge_rsync_config_cmd(b::UGEBackend, entry::QueueEntry,
 
 _uge_pull_live_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
-    _rsync_pull_missing_cmd(b.ssh_host, "$(remote_dir)/_live_status.json",
-        "$(entry.run_dir)/_live_status.json")
+    _rsync_pull_missing_cmd(b.ssh_host,
+        _ssh_remote_joinpath(remote_dir, "_live_status.json"),
+        joinpath(entry.run_dir, "_live_status.json"))
 
 _uge_collect_cmd(b::UGEBackend, entry::QueueEntry,
     remote_dir::AbstractString) =
@@ -290,10 +295,6 @@ _uge_rsync_script_cmd(b::UGEBackend, local_script::AbstractString,
 
 _uge_code_sync_cmd(b::UGEBackend) =
     _rsync_code_sync_cmd(b.ssh_host, _ssh_local_project_root(), b.project_root)
-
-# Tested directly (test_autopilot.jl) — keep as a thin alias over the
-# shared helper.
-_uge_local_manifest_hash() = _ssh_local_manifest_hash()
 
 """
     _uge_instantiate_if_needed(b::UGEBackend) -> Bool
@@ -421,7 +422,7 @@ function dispatch!(b::UGEBackend, entry::QueueEntry)
     remote_script = if b.ssh_host === nothing
         local_script_path
     else
-        rs = joinpath(_uge_remote_run_dir(b, entry), "submit.uge.sh")
+        rs = _ssh_remote_joinpath(_uge_remote_run_dir(b, entry), "submit.uge.sh")
         run(_uge_rsync_script_cmd(b, local_script_path, rs))
         rs
     end

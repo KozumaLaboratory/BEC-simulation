@@ -250,16 +250,6 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             mkpath(e_bad.run_dir);
             touch(e_bad.spec_path)
             @test_throws ErrorException resolve_backend(cfg, e_bad)
-
-            # Back-compat: passing a single backend wraps it as :local.
-            cfg_compat = AutopilotConfig(; backend=local_b, qr=qr)
-            @test cfg_compat.backends[:local] === local_b
-            @test resolve_backend(cfg_compat, e_local) === local_b
-
-            # Passing both forms is an explicit error.
-            @test_throws ArgumentError AutopilotConfig(;
-                backends=Dict{Symbol, AutopilotBackend}(:local => local_b),
-                backend=local_b, qr=qr)
         end
 
         @testset "default no-op contract on AutopilotBackend" begin
@@ -327,6 +317,9 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa"
             @test _uge_remote_spec_path(b, e) ==
                 "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa/config.yaml"
+            @test SpinorBEC._ssh_remote_manifest_hash_path("/project/") ==
+                "/project/.manifest_hash"
+            @test _uge_remote_spec_path(UGEBackend(), e) == e.spec_path
 
             # All ssh-prefixed commands inject ControlMaster opts so a
             # tick reaping N entries pays 1 TCP+SSH handshake instead
@@ -442,7 +435,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test occursin("module load cuda/12.8.0", script)
             @test occursin("cd \"/remote/proj\"", script)
             @test occursin("/remote/julia", script)
-            @test occursin("run_yaml(ARGS[1])", script)
+            @test occursin("run_experiment(ARGS[1])", script)
             @test occursin("/remote/cfg.yaml", script)
             # `-g <group>` MUST NOT appear as a script directive on
             # TSUBAME 4 (rejected with "invalid option argument").
@@ -461,7 +454,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             )
             # ...and it is exported before julia is invoked, not after.
             @test findfirst("JULIA_NUM_THREADS", script).start <
-                findfirst("run_yaml", script).start
+                findfirst("run_experiment", script).start
             # The premise: nothing reaches the job except through this script.
             let b_env = UGEBackend(ssh_host="tsubame")
                 argv = _uge_qsub_cmd(b_env, "/x").exec
@@ -676,7 +669,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             # call line by grepping for the run_yaml snippet.
             function _julia_line(script)
                 for ln in eachsplit(script, '\n')
-                    occursin("run_yaml(ARGS[1])", ln) && return String(ln)
+                    occursin("run_experiment(ARGS[1])", ln) && return String(ln)
                 end
                 return ""
             end
@@ -701,12 +694,12 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 findfirst("--project=.", jline).start
         end
 
-        @testset "_uge_local_manifest_hash: deterministic + content-sensitive" begin
+        @testset "_ssh_local_manifest_hash: deterministic + content-sensitive" begin
             # The hash is what _uge_instantiate_if_needed compares
             # local→remote on. Same Manifest.toml content must produce
             # the same hash across calls.
-            h1 = SpinorBEC._uge_local_manifest_hash()
-            h2 = SpinorBEC._uge_local_manifest_hash()
+            h1 = SpinorBEC._ssh_local_manifest_hash()
+            h2 = SpinorBEC._ssh_local_manifest_hash()
             @test h1 == h2
             # Hash is a sha256 hex string (or "" if no Manifest.toml).
             @test isempty(h1) || (length(h1) == 64 && all(c -> isdigit(c) || ('a' <= c <= 'f'), h1))
@@ -753,6 +746,10 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 a2 = SpinorBEC.analyze_failure(e2)
                 @test a2.category === :nan_cascade
                 @test occursin("2700", a2.summary)
+                # Metadata reads must release the file before the next writer
+                # or cleanup, without relying on a garbage collection cycle.
+                rm(joinpath(rd2, "_exit_summary.json"))
+                @test !isfile(joinpath(rd2, "_exit_summary.json"))
 
                 # 3. stderr.log tail with CUDA missing. `.autopilot/` is where
                 # `LocalBackend` writes it (`backends.jl:137`) and therefore

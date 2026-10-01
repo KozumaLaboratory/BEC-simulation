@@ -42,7 +42,7 @@ using LinearAlgebra: norm
 using StaticArrays: SVector
 using SpinorBEC
 using SpinorBEC: _lhy_V, _lhy_is_active, _lhy_energy, _grad_lhy!,
-    _diagonal_step_svec!, _c0c1_to_gS, total_density, delta_polar,
+    _diagonal_step_svec!, ku_c01_to_g_S, total_density, delta_polar,
     LHY_SCHEMA, _lhy_needs_spin
 
 const _FF = 6
@@ -50,8 +50,8 @@ const _DD = 13
 const _NMAX = 200.0
 const _NPTS = 400
 
-_g() = _c0c1_to_gS(_FF, 10.0, 0.1)          # c1 > 0 ⇒ polar-stable
-_gfm() = _c0c1_to_gS(_FF, 10.0, -0.02)      # c1 < 0 ⇒ FM-stable
+_g() = ku_c01_to_g_S(_FF, 10.0, 0.1)          # c1 > 0 ⇒ polar-stable
+_gfm() = ku_c01_to_g_S(_FF, 10.0, -0.02)      # c1 < 0 ⇒ FM-stable
 
 # A textured state, for the one mode that reads the local spinor.
 #

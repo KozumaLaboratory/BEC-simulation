@@ -15,7 +15,7 @@
 #
 # Reference: Kawaguchi-Ueda 2012 §3.2; CG factor X^{(S)} matches paper3 §III.
 
-export hf_matrix_generic, hf_matrix_generic!, ku_c01_to_g_S, ku_to_g_S
+export hf_matrix_generic, hf_matrix_generic!, ku_to_g_S
 
 """
     hf_matrix_generic!(h_hf, phi, rho, F, g_S) -> h_hf
@@ -126,35 +126,6 @@ function hf_matrix_generic(
     n_spatial = length(sz) - 1
     h_hf = zeros(ComplexF64, sz[1:n_spatial]..., D, D)
     return hf_matrix_generic!(h_hf, phi, rho, F, g_S)
-end
-
-"""
-    ku_c01_to_g_S(F, c0, c1) → Dict{Int, Float64}
-
-Convert Kawaguchi-Ueda (c_0, c_1) couplings to channel-decomposed
-couplings `g_S` for arbitrary F via the physical spin-spin scalar form
-
-    g_S = c_0 + c_1 · (S(S+1) − 2F(F+1)) / 2     for S ∈ 0:2:2F
-
-This is the same closed-form used by the GP / BdG splitter (see
-`_c0c1_to_gS` in `interactions.jl`); the public alias here is kept so
-TDHFB callers don't reach into the underscored helper.
-
-For F ≥ 2 the two parameters (c_0, c_1) constrain F+1 independent channels
-to a one-parameter family — appropriate when higher scattering lengths
-are unknown (e.g. Eu151 a_S for S ≥ 4). To inject independent g_S, layer
-in higher-rank c_n (n ≥ 4) via [`ku_to_g_S`](@ref) or build the tensor
-cache directly with `_make_tensor_cache_from_channels`.
-
-# Round-trip with `_gS_to_cn`
-`_gS_to_cn(F, ku_c01_to_g_S(F, c_0, c_1))` returns the rank-k tensor
-decomposition `{c₀, c₂, c₄, …}`; for F=1 this recovers
-`c₀ → c_0 − (4/3) c_1`, `c₂ → (2/3) c_1` (the rank-2 KU form, which is
-NOT the same as the `c_1` parameter — see KU 2012 §2 for the
-distinction).
-"""
-function ku_c01_to_g_S(F::Int, c0::Float64, c1::Float64)
-    _c0c1_to_gS(F, c0, c1)
 end
 
 """

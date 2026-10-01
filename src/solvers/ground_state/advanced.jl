@@ -4,7 +4,7 @@ export find_ground_state_multistart
 
 # `find_ground_state_multistart` (multiple initial states + energy minimum),
 # `_normalize_psi_constrained!` (Mz-constrained renormalisation),
-# `_rebuild_workspace_with_dt`, and `_find_ground_state_Jz` (rotating-frame
+# `_find_ground_state_Jz` (rotating-frame
 # bisection for target Jz).
 
 """
@@ -132,29 +132,6 @@ function _normalize_psi_constrained!(psi, grid, n_components, ndim, target_Mz, F
 
     _normalize_psi!(psi, grid, n_components, ndim)
     nothing
-end
-
-function _rebuild_workspace_with_dt(ws::Workspace{N}, new_dt::Float64) where {N}
-    sp = SimParams(
-        new_dt,
-        ws.sim_params.n_steps,
-        true,
-        ws.sim_params.normalize_every,
-        ws.sim_params.save_every,
-        ws.sim_params.rotating_frame_omega,
-        ws.sim_params.spin_rotating_frame_omega,
-    )
-    kinetic_phase = _to_device(
-        ws.backend,
-        prepare_kinetic_phase(ws.grid, new_dt; imaginary_time=true),
-    )
-    batched_kinetic = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase, N, ws.backend)
-
-    _rebuild_workspace(ws;
-        sim_params=sp,
-        kinetic_phase=kinetic_phase,
-        batched_kinetic=batched_kinetic,
-    )
 end
 
 # --- Constrained Jz ground state (bisection on rotating_frame_omega) ---

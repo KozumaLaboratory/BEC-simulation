@@ -142,6 +142,10 @@ Each dict has one entry per axis name (the swept coordinate values) and
 one per observable key (a scalar for kind ∈ (signed, positive, wide,
 categorical), a `Vector{Float64}` for kind=spectrum). Vector-of-Dict
 chosen over DataFrame to keep the analysis module dependency-free.
+
+For theoretical comparisons, `meta[:narrative]` may be a dictionary with
+`:hypothesis => Hypothesis(...)`. The hypothesis is a typed analysis value;
+prediction functions are not decoded from YAML or dictionary schemas.
 """
 struct SweepResult
     axes::Vector{SweepAxis}

@@ -2,8 +2,7 @@
 #
 # Single switch over 22 named initial states. Each branch sets one or more
 # spinor components from a Gaussian envelope. Helpers (_gaussian,
-# _set_component!, _extract_spinor, _default_spinor) live in
-# state_dispatch_helpers.jl.
+# _set_component!, _extract_spinor, _default_spinor) are defined below.
 
 export init_psi
 

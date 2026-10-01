@@ -92,7 +92,7 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
         # Resolve relative paths against the YAML file's directory when known
         # (ENV set by run_yaml / load_config). Otherwise treat as CWD.
         resolved = isabspath(path) ? path :
-                   joinpath(get(ENV, "SPINORBEC_YAML_DIR", pwd()), path)
+                   joinpath(get(ENV, "SPINORBEC_CONFIG_DIR", pwd()), path)
         isfile(resolved) || throw(ArgumentError(
             "csv waveform path not found: $resolved"))
         w = load_waveform_csv(

@@ -92,8 +92,11 @@ _ssh_local_manifest_hash() =
 # sha256 of the Manifest.toml last `Pkg.instantiate`d there. After code
 # sync we compare local → remote; differ → instantiate + write the new
 # hash; same → skip (instantiate is 10-60s, not free).
+_ssh_remote_joinpath(root::AbstractString, leaf::AbstractString) =
+    rstrip(root, '/') * "/" * leaf
+
 _ssh_remote_manifest_hash_path(project_root::AbstractString) =
-    joinpath(project_root, ".manifest_hash")
+    _ssh_remote_joinpath(project_root, ".manifest_hash")
 
 function _ssh_remote_manifest_hash(host::AbstractString, project_root::AbstractString)
     try

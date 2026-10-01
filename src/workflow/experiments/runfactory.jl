@@ -10,8 +10,6 @@
 # the schema constructor only. Batch persistence + sweep + run live on
 # top in `Batch` / `Experiment`.
 
-using YAML
-
 export config,
     ground_state, dynamics, analyze,
     B, ddi, lhy, loss, save, ramp, rate

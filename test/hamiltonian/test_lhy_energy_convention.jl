@@ -17,7 +17,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: _lhy_energy, _lhy_V, lhy_energy_polar, build_polar_lhy_coefs,
-    lhy_energy_fm, build_fm_lhy_coefs, _c0c1_to_gS
+    lhy_energy_fm, build_fm_lhy_coefs, ku_c01_to_g_S
 
 const _F = 6
 const _D = 13
@@ -30,11 +30,11 @@ _uniform_cloud(n0, m=4) = (p=zeros(ComplexF64, m, m, m, _D);
         # Independent truth: the analytic ε from paper #1 / #2, integrated by
         # hand over a constant-density cloud.
         cases = (
-            ("polar", _c0c1_to_gS(_F, 10.0, 0.1),
+            ("polar", ku_c01_to_g_S(_F, 10.0, 0.1),
                 g -> compute_spinor_lhy_polar_contact(; F=_F, g_dict=g, n_max=20.0,
                     n_points=4000),
                 (g, n) -> lhy_energy_polar(n, build_polar_lhy_coefs(_F, g))),
-            ("fm", _c0c1_to_gS(_F, 10.0, -0.02),
+            ("fm", ku_c01_to_g_S(_F, 10.0, -0.02),
                 g -> compute_spinor_lhy_fm_contact(; F=_F, g_dict=g, n_max=20.0,
                     n_points=4000),
                 (g, n) -> lhy_energy_fm(n, build_fm_lhy_coefs(_F, g))),
@@ -73,7 +73,7 @@ _uniform_cloud(n0, m=4) = (p=zeros(ComplexF64, m, m, m, _D);
     @testset "energy is the integral of the potential the propagator uses" begin
         # dE/dn must be V — otherwise the term the propagator applies and the
         # energy reported for it are different physics.
-        tbl = compute_spinor_lhy_polar_contact(; F=_F, g_dict=_c0c1_to_gS(_F, 10.0, 0.1),
+        tbl = compute_spinor_lhy_polar_contact(; F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, 0.1),
             n_max=20.0, n_points=4000)
         m = 4
         dV = 1.0
@@ -87,7 +87,7 @@ _uniform_cloud(n0, m=4) = (p=zeros(ComplexF64, m, m, m, _D);
     end
 
     @testset "an empty cloud costs nothing" begin
-        tbl = compute_spinor_lhy_polar_contact(; F=_F, g_dict=_c0c1_to_gS(_F, 10.0, 0.1),
+        tbl = compute_spinor_lhy_polar_contact(; F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, 0.1),
             n_max=20.0, n_points=200)
         @test _lhy_energy(zeros(ComplexF64, 4, 4, 4, _D), tbl, _D, 3, (4, 4, 4), 1.0) ==
             0.0

@@ -2,6 +2,29 @@ using Test
 using SpinorBEC
 using SpinorBEC: diff_dicts, path_string, DictDiff, DiffEntry, flatten_diff
 
+@testset "spec_diff reports state and structural changes" begin
+    @test spec_diff(Dict(:state => :polar), Dict("state" => :uniform)) ==
+        [(path="state", a=:polar, b=:uniform)]
+    @test isempty(spec_diff(Dict(:state => :polar), Dict("state" => :polar)))
+    added = only(spec_diff(Dict(), Dict("state" => :polar)))
+    @test added.path == "state"
+    @test ismissing(added.a)
+    @test added.b === :polar
+    removed = only(spec_diff(Dict("state" => :polar), Dict()))
+    @test removed.a === :polar
+    @test ismissing(removed.b)
+    @test isempty(spec_diff(Dict("value" => missing), Dict("value" => missing)))
+    @test isempty(spec_diff(Dict("value" => NaN), Dict("value" => NaN)))
+    a = Dict("pipeline" => [Dict("state" => :polar) for _ in 1:12])
+    b = deepcopy(a)
+    b["pipeline"][2]["state"] = :uniform
+    b["pipeline"][10]["state"] = :ferromagnetic
+    @test spec_diff(a, b) == [
+        (path="pipeline.2.state", a=:polar, b=:uniform),
+        (path="pipeline.10.state", a=:polar, b=:ferromagnetic),
+    ]
+end
+
 @testset "diff_dicts" begin
     @testset "identical dicts → no diff" begin
         a = Dict("x" => 1, "y" => Dict("z" => 2))

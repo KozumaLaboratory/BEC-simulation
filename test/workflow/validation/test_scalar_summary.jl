@@ -104,7 +104,7 @@ end
             end
             p = write_run_summary(dir, jld; source="finish_hook")
             @test isfile(p)
-            s = JSON.parsefile(p)
+            s = JSON.parsefile(p; use_mmap=false)
             @test s["_source"] == "finish_hook"
             @test s["_extractor_version"] == SpinorBEC.RUN_SUMMARY_EXTRACTOR_VERSION
             @test s["energy"] == -6.0
@@ -117,7 +117,7 @@ end
         mktempdir() do dir
             p = write_run_summary(dir, joinpath(dir, "nope.jld2"))
             @test isfile(p)   # partial summary still written
-            s = JSON.parsefile(p)
+            s = JSON.parsefile(p; use_mmap=false)
             @test any(startswith.(String.(s["extraction_error"]), "open_result"))
         end
     end
@@ -133,7 +133,7 @@ end
                 f["energy"] = -6.0
             end
             write_run_summary(dir, jld; source="finish_hook")
-            s = JSON.parsefile(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME))
+            s = JSON.parsefile(joinpath(dir, SpinorBEC.RUN_SUMMARY_FILENAME); use_mmap=false)
             # Assert the VALUE against an independently obtained HEAD, not just
             # that the key exists. `haskey` alone passed while the first version
             # of the stamp was recording an ANCESTOR repo's commit (git -C walks

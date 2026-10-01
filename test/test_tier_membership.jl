@@ -29,6 +29,7 @@
 using Test
 using SpinorBEC
 using TOML   # reads Project.toml for the import-availability gate below
+include(joinpath(@__DIR__, "helpers", "julia_imports.jl"))
 
 # The runner include()s `_tiers.jl` into global scope before this file, so under
 # `Pkg.test()` these are already bound. Pull them in when they are not, so the
@@ -186,9 +187,7 @@ end
     for (root, _, files) in walkdir(@__DIR__), f in files
         (startswith(f, "test_") && endswith(f, ".jl")) || continue
         rel = relpath(joinpath(root, f), @__DIR__)
-        for m in eachmatch(r"(?m)^\s*(?:using|import)\s+([A-Za-z_][A-Za-z0-9_]*)",
-            read(joinpath(root, f), String))
-            pkg = m.captures[1]
+        for pkg in julia_import_roots(read(joinpath(root, f), String))
             pkg in available && continue
             push!(get!(offenders, rel, String[]), pkg)
         end
@@ -201,21 +200,19 @@ end
         of `using Logging`).""" offenders
     @test isempty(offenders)
 
-    # Canary: the check must actually reject something. Without this, a typo in
-    # the regex leaves a gate that passes because it matches nothing.
+    # Canaries use the same parser as the corpus. Strings containing Python or
+    # Julia programs are data, while every comma-separated import is syntax.
     @test !("Logging" in available)
+    @test julia_import_roots("using SpinorBEC\nusing Base.CoreLogging: with_logger\n") ==
+        Set(["SpinorBEC", "Base"])
+    @test julia_import_roots("using Test, Logging\nimport Other.Tools: value\n") ==
+        Set(["Test", "Logging", "Other"])
     @test isempty(
-        collect(
-            eachmatch(r"(?m)^\s*(?:using|import)\s+Logging\b",
-                "using SpinorBEC\nusing Base.CoreLogging: with_logger\n"),
+        julia_import_roots(
+            "# using Logging\nprogram = raw\"\"\"\nimport sys\nusing Logging\n\"\"\"\n"
         ),
     )
-    @test !isempty(
-        collect(
-            eachmatch(r"(?m)^\s*(?:using|import)\s+([A-Za-z_][A-Za-z0-9_]*)",
-                "using Logging\n"),
-        ),
-    )
+    @test isempty(julia_import_roots("import .Local: value\n"))
 end
 
 # Test files share a worker process (SPINORBEC_TEST_WORKERS > 1) and which files

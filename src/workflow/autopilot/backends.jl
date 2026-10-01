@@ -67,7 +67,7 @@ prepare_status_snapshot(::AutopilotBackend) = nothing
 # byte-for-byte identical run artefacts under runs/<cid>/.
 const _LOCAL_RUN_SNIPPET = """
 using SpinorBEC
-SpinorBEC.run_yaml(ARGS[1])
+SpinorBEC.run_experiment(ARGS[1])
 """
 
 """

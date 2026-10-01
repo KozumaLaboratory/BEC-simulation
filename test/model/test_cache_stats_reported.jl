@@ -18,6 +18,7 @@
 # true and is not the defect.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using JSON
 using SpinorBEC
 using SpinorBEC: admit_payload, write_complete_marker, write_incomplete_marker,
@@ -33,9 +34,8 @@ sfixture(dir, name, nbytes=64) = begin
 end
 # 2023-11-14 — before the marker cutover, so an unmarked fixture is arm (b) and
 # not a W3 date rejection.
-predate!(p) = (run(pipeline(`touch -d @1700000000 $p`; stdout=devnull)); p)
 
-read_summary(path) = JSON.parsefile(path)
+read_summary(path) = JSON.parsefile(path; use_mmap=false)
 
 @testset "W4: the cache's counters survive into a file" begin
     @testset "A: every admission provenance is counted, on disk" begin
@@ -54,7 +54,8 @@ read_summary(path) = JSON.parsefile(path)
             end
             for i in 1:3
                 sub = mkpath(joinpath(dir, "store_$i"))
-                @test admit_payload(predate!(sfixture(sub, "old.jld2"))).provenance === :unmarked
+                @test admit_payload(set_test_mtime!(sfixture(sub, "old.jld2"))).provenance ===
+                    :unmarked
             end
             let p = sfixture(dir, "tombed.jld2")
                 write_incomplete_marker(p, [p]; kind="point", reason="killed")

@@ -167,7 +167,6 @@ function find_ground_state(;
     checkpoint::Union{Nothing, Checkpoint}=nothing,
     checkpoint_key::String="itp_state",
     _start_step::Int=0,        # internal: for resume
-    _checkpoint_dir::Union{Nothing, String}=nothing,  # internal alias
     light_shift::Union{Nothing, LightShift}=nothing,
     dtype::Union{Nothing, Type{<:AbstractFloat}}=nothing,
     spinor_lhy::Union{Nothing, Symbol}=nothing,
@@ -348,12 +347,10 @@ function find_ground_state(;
         )
     end
 
-    ckpt_dir = checkpoint_dir !== nothing ? checkpoint_dir : _checkpoint_dir
-
     _run_itp_loop!(ws, n_steps, tol, on_step, target_magnetization;
         tol_drho=tol_drho,
         start_step=_start_step,
-        checkpoint_dir=ckpt_dir,
+        checkpoint_dir=checkpoint_dir,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
         verbose=verbose,

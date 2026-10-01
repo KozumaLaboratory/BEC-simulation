@@ -219,3 +219,6 @@ runs/**/.*.lock
 
 # PR-census cache (scripts/pr_mistake_census.py --refresh rebuilds it)
 .pr_census_cache.json
+
+# Local build caches left by the retired web UI.
+/dashboard/

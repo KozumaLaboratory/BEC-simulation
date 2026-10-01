@@ -322,6 +322,11 @@ jobs:
             ok_test = format("test/"; verbose = false, overwrite = false)
             if !(ok_src && ok_test)
                 println("Formatting drift detected.")
+                for directory in ("src", "test"), (root, _, files) in walkdir(directory), file in files
+                    endswith(file, ".jl") || continue
+                    path = joinpath(root, file)
+                    format(path; verbose = false, overwrite = false) || println("Needs formatting: ", path)
+                end
                 println("Run `julia -e \"using JuliaFormatter; format(\\\"src/\\\")\"` locally.")
                 exit(1)
             end

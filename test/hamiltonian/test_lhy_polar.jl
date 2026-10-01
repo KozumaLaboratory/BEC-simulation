@@ -344,7 +344,7 @@ end
     # F=6-only restriction was never a physics limit.
     pref = 8 / (15 * π^2)
     for F in 1:8, c1 in (-0.02, -0.1)
-        g = SpinorBEC._c0c1_to_gS(F, 10.0, c1)
+        g = SpinorBEC.ku_c01_to_g_S(F, 10.0, c1)
         all(>(0), values(g)) || continue
         spinor = ComplexF64[c == 1 ? 1.0 : 0.0 for c in 1:(2F + 1)]   # m = +F
         closed = lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))
@@ -494,7 +494,7 @@ end
     @test c0_bad < 0                 # the premise, asserted rather than assumed
     err = try
         SpinorBEC.compute_spinor_lhy_polar_contact(;
-            F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_bad, r_bad * c0_bad),
+            F, g_dict=SpinorBEC.ku_c01_to_g_S(F, c0_bad, r_bad * c0_bad),
             n_max=2.0, n_points=8)
         nothing
     catch e
@@ -513,7 +513,7 @@ end
     c0_ok = c_total / (1 + F^2 * r_ok)
     @test c0_ok > 0 && r_ok * c0_ok < 0        # c₀ > 0 AND c₁ < 0
     tbl = SpinorBEC.compute_spinor_lhy_polar_contact(;
-        F, g_dict=SpinorBEC._c0c1_to_gS(F, c0_ok, r_ok * c0_ok),
+        F, g_dict=SpinorBEC.ku_c01_to_g_S(F, c0_ok, r_ok * c0_ok),
         n_max=2.0, n_points=8)
     @test tbl isa SpinorBEC.PolarContactLHY
     @test all(isfinite, tbl.potential_values)

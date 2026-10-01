@@ -29,9 +29,6 @@ function total_energy(ws::Workspace{N}) where {N}
     energy_decomposition(ws).total
 end
 
-# Per-term bodies (_trap_energy, _zeeman_energy, _magnetic_gradient_energy,
-# _density_interaction_energy, _lhy_energy multi-methods) now live with
-# their HamTerm subtypes in src/hamiltonian/terms/. `_energy_decomposition_cpu`
-# above calls each by its canonical name — Julia resolves to the terms/
-# definition. The trinity dispatch (`energy_contribution(::Term, psi, ws)`)
-# provides the same physics via the registry.
+# Per-term energies live with their HamTerm subtypes. CPU decomposition
+# invokes energy_contribution through the registry; GPU dispatch is in the
+# CUDA extension and uses the same operator faces where device-safe.

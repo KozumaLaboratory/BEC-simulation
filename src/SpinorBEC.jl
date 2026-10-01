@@ -30,7 +30,7 @@ const TIMER = TimerOutput()
 
 include("foundation.jl")    # types + math primitives + backends
 include("hamiltonian.jl")   # interactions + potentials + integrators
-include("model.jl")         # Model: resolved physics as ONE concrete value (additive; nothing uses it yet)
+include("model.jl")         # resolved physics specs + stages + artifact identity
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
@@ -43,7 +43,7 @@ include("workflow/monitoring.jl")      # Slack webhook notifications (notify_sla
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
 include("workflow/experiments/euv3_coils.jl")  # euv3 lab coil/field calibration
-include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
+include("workflow/validation.jl")      # RunResult + spec-driven checks + reanalysis
 include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
 include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
 include("analysis/coherence_length.jl")  # g1(r) + coherence length (KZ observable)
@@ -170,7 +170,6 @@ export animate_dynamics, plot_sweep
 include("precompile.jl")
 
 function __init__()
-    __init_templates__()
     # Fingerprint the source tree at LOAD, so a measurement written later stamps
     # what the process is running rather than what is on disk at write time.
     _capture_provenance!()

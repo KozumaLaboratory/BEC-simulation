@@ -4,7 +4,7 @@
 # named state-zoo builders, and noise injection.
 #
 #   atoms             — Li7 / Na23 / Eu151 / ... + ATOM_REGISTRY
-#   state_dispatch    — init_psi(state=:..., init_state_params=...)
+#   state_dispatch    — init_psi(state=:...) + state-specific parameters
 #   make_workspace    — Workspace factory + _rebuild_workspace
 #   thomas_fermi      — thomas_fermi_density + init_psi_thomas_fermi(_textured)
 #   state_zoo         — 22 init_psi_<name> wrappers

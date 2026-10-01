@@ -19,27 +19,7 @@ function estimate_splitting_error(ws::Workspace{N}) where {N}
     ws.state.t = t_save
     ws.state.step = step_save
 
-    dt_half = ws.sim_params.dt / 2
-    kinetic_phase_half = prepare_kinetic_phase(
-        ws.grid,
-        dt_half;
-        imaginary_time=ws.sim_params.imaginary_time,
-    )
-    bk_half = _make_batched_kinetic_cache(ws.state.psi, kinetic_phase_half, N)
-    sp_half = SimParams(
-        dt_half,
-        ws.sim_params.n_steps,
-        ws.sim_params.imaginary_time,
-        ws.sim_params.normalize_every,
-        ws.sim_params.save_every,
-        ws.sim_params.rotating_frame_omega,
-        ws.sim_params.spin_rotating_frame_omega,
-    )
-    ws_half = _rebuild_workspace(ws;
-        kinetic_phase=kinetic_phase_half,
-        sim_params=sp_half,
-        batched_kinetic=bk_half,
-    )
+    ws_half = _rebuild_workspace_with_dt(ws, ws.sim_params.dt / 2)
 
     split_step!(ws_half)
     split_step!(ws_half)

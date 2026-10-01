@@ -41,13 +41,13 @@ end
 n_beams(t::EvapTrap) = length(t.waists)
 
 """
-    EvapParams(; a_s, tau_bg, K3=0.0, kappa=1.0, eta_min=4.0)
+    EvapParams(; a_s, tau_bg, K3=0.0)
 
 Tunable physics knobs. `a_s` s-wave length [m], `tau_bg` 1-body vacuum lifetime
-[s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0), `kappa`
-DEPRECATED/unused — the excess-energy factor in dT/T is now the theoretical `κ̃(η)`
-from [`evap_volume_factor`](@ref), not a constant. `eta_min` a soft truncated-Boltzmann
-floor (the evaporation rate is the all-η Luiten incomplete-gamma form, valid below it too),
+[s], `K3` three-body loss coefficient [m⁶/s] (Eu unknown ⇒ default 0).
+The excess-energy factor in dT/T is the theoretical `κ̃(η)` from
+[`evap_volume_factor`](@ref). The evaporation rate uses the all-η Luiten
+incomplete-gamma form,
 `evap_scale` a dimensionless prefactor on the elastic collision rate whose
 **theoretical value is 1** — the rate `γ_el = n₀ σ v̄/√2` is fully determined
 (`σ = 8π a_s²`, `v̄ = √(8k_BT/πm)`, and the peak density `n₀` matches the measured
@@ -65,8 +65,6 @@ Base.@kwdef struct EvapParams
     a_s::Float64
     tau_bg::Float64
     K3::Float64 = 0.0
-    kappa::Float64 = 1.0
-    eta_min::Float64 = 4.0
     evap_scale::Float64 = 1.0
     heating_rate::Float64 = 0.0
     # Non-equilibrium (finite-evaporation-rate) penalty on fast ramps. When the trap

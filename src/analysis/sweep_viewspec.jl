@@ -104,72 +104,18 @@ function to_viewspec(result::SweepResult;
         "facet_grid"
     end
 
-    # Hypothesis (opt-in). The contract that carries the sweep's
-    # question + theoretical apparatus. Replaces the old `:expected`
-    # dict — see the [`Hypothesis`](@ref) docstring. Accepts both a
-    # `Hypothesis` struct and a Dict that decodes to one (for
-    # back-compat with YAML-defined narratives).
+    # Narrative metadata may carry one typed hypothesis. Prediction functions
+    # belong to the analysis contract, rather than a second dictionary schema.
     narrative = get(result.meta, :narrative, nothing)
     function _nget(d, sym, default=nothing)
         d isa AbstractDict || return default
         v = get(d, sym, get(d, String(sym), default))
         return v === nothing ? default : v
     end
-    raw_hyp = _nget(narrative, :hypothesis)
-    hypothesis = if raw_hyp isa Hypothesis
-        raw_hyp
-    elseif raw_hyp isa AbstractDict
-        # Decode a Dict-form hypothesis. Caller may pass nested Dicts /
-        # closures so we extract leniently.
-        rel = let k = _nget(raw_hyp, :relation, :asymptote)
-            k isa AbstractString ? Symbol(k) : k
-        end
-        pkey = let p = _nget(raw_hyp, :primary_obs)
-            p isa AbstractString ? Symbol(p) : p
-        end
-        raw_models = _nget(raw_hyp, :models, Dict{Symbol, Any}())
-        models = Dict{Symbol, ModelSpec}()
-        if raw_models isa AbstractDict
-            for (k, v) in raw_models
-                ksym = k isa AbstractString ? Symbol(k) : k
-                if v isa ModelSpec
-                    models[ksym] = v
-                elseif v isa AbstractDict
-                    fn = _nget(v, :fn)
-                    fn === nothing && continue
-                    models[ksym] = ModelSpec(;
-                        fn=fn,
-                        label=string(_nget(v, :label, "")),
-                        collapse_var_fn=_nget(v, :collapse_var_fn),
-                        collapse_var_label=let l = _nget(v, :collapse_var_label)
-                            l === nothing ? nothing : string(l)
-                        end,
-                    )
-                end
-            end
-        end
-        params = let p = _nget(raw_hyp, :params, Dict{Symbol, Any}())
-            if p isa AbstractDict
-                Dict{Symbol, Any}(
-                    (k isa AbstractString ? Symbol(k) : k) => v for (k, v) in p)
-            else
-                Dict{Symbol, Any}()
-            end
-        end
-        if pkey === nothing
-            nothing
-        else
-            Hypothesis(;
-                question=string(_nget(raw_hyp, :question, "")),
-                relation=rel,
-                primary_obs=pkey,
-                models=models,
-                params=params,
-            )
-        end
-    else
-        nothing
-    end
+    hypothesis = _nget(narrative, :hypothesis)
+    hypothesis === nothing || hypothesis isa Hypothesis ||
+        throw(ArgumentError(
+            "narrative hypothesis must be a Hypothesis, got $(typeof(hypothesis))"))
     primary_key = hypothesis === nothing ? nothing : hypothesis.primary_obs
     relation = hypothesis === nothing ? :auto : hypothesis.relation
 

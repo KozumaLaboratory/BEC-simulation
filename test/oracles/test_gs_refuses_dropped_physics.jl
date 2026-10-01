@@ -1,6 +1,6 @@
 using Test
 using SpinorBEC
-using SpinorBEC: GroundStateStep, parse_pipeline, _run_yaml_prepare, _run_step,
+using SpinorBEC: GroundStateStep, parse_pipeline, _prepare_config_file, _run_step,
     resolve_gs, GSResolved, restore_dealias_refs!, DEALIAS_2_3_ENABLED,
     DEALIAS_K_CUTOFF, linear_p, transverse_b
 
@@ -65,7 +65,7 @@ function _rdp_write(name, bblock)
     p
 end
 
-"Run `f` with the dealias globals restored — `_run_yaml_prepare` leaves them set."
+"Run `f` with the dealias globals restored — `_prepare_config_file` leaves them set."
 function _rdp_guarded(f)
     was_en, was_kc = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     try
@@ -76,7 +76,7 @@ function _rdp_guarded(f)
 end
 
 function _rdp_gs_step(path)
-    cfg = parse_pipeline(Dict{Any, Any}(_run_yaml_prepare(path, false, false)))
+    cfg = parse_pipeline(Dict{Any, Any}(_prepare_config_file(path, false, false)))
     first(s for s in cfg.steps if s isa GroundStateStep)
 end
 

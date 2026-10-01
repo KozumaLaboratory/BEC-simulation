@@ -11,6 +11,7 @@
 using Test
 using SpinorBEC
 using JLD2
+using JSON
 
 @testset "spinor ground_state from_jld2" begin
     dir = mktempdir()
@@ -99,8 +100,10 @@ using JLD2
             abs(sum(conj.(vec(a)) .* vec(b))) /
             (sqrt(sum(abs2, a)) * sqrt(sum(abs2, b)))
 
-        psi_seeded = run_config(load_config_from_string(
-            _cfg_yaml("path: $smooth, snap: last"))).psi
+        psi_seeded = run_pipeline(
+            load_config_from_string(
+                _cfg_yaml("path: $(JSON.json(smooth)), snap: last")),
+        ).psi
         control_yaml = """
         pipeline:
           - ground_state:
@@ -112,7 +115,7 @@ using JLD2
               initial_state: polar
               n_steps: 0
         """
-        psi_control = run_config(load_config_from_string(control_yaml)).psi
+        psi_control = run_pipeline(load_config_from_string(control_yaml)).psi
 
         @test size(psi_seeded) == (n, n, n, D)
         @test overlap(psi_seeded, psi_smooth) > 0.95
@@ -123,6 +126,6 @@ using JLD2
 
     @testset "missing path is an error, not a fallback" begin
         cfg_bad = load_config_from_string(_cfg_yaml("snap: last"))
-        @test_throws ArgumentError run_config(cfg_bad)
+        @test_throws ArgumentError run_pipeline(cfg_bad)
     end
 end

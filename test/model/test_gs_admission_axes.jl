@@ -679,7 +679,7 @@ end
         # this path, and so in `GS_KEYS_DROPPED_PHYSICS`. Chosen by MEASURING
         # which reasons are still live rather than by picking a plausible one:
         # `B_direction` was tried first and gives `why == nothing` here, because
-        # it is written by `apply_B_block_normalize!` during `_run_yaml_prepare`
+        # it is written by `apply_B_block_normalize!` during `_prepare_config_file`
         # and a hand-built step dict never goes through that.
         other = ax_base(;
             raman=Dict{String, Any}("Omega_R" => 0.3, "delta" => 0.0,

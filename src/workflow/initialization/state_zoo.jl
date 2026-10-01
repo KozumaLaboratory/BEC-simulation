@@ -11,10 +11,10 @@ export init_psi_chiral_spin_vortex, init_psi_magnetic_domain
 export init_psi_vortex_lattice, init_psi_skyrmion_lattice
 export init_psi_axial_spin_texture
 
-# Thin wrappers around `init_psi(grid, sys; state=:..., init_state_params=...)`
+# Thin wrappers around `init_psi(grid, sys; state=:...)`
 # so callers can write `init_psi_polar(grid, sys)` instead of remembering
 # the right symbol. Each wrapper accepts the relevant kwargs and forwards
-# them as `init_state_params`. This deliberately does NOT touch the
+# them to the corresponding `init_psi` keyword. This does NOT touch the
 # underlying `init_psi` dispatch — same physics, just nicer names.
 #
 # Coverage matches the state-type list in initialization.jl as of
@@ -45,6 +45,10 @@ const _TRIVIAL_ZOO_STATES = (
     (:cyclic,
         "Cyclic phase (F=2 / F=6 spinor) — three nonzero amplitudes " *
         "with relative phase 2π/3."),
+    (:biaxial_nematic,
+        "Canonical biaxial nematic representative (|+δ⟩+|−δ⟩)/√2."),
+    (:domain_wall,
+        "Two oppositely-magnetized regions joined by a wall along axis 1."),
     (:skyrmion,
         "Single-charge skyrmion texture."),
 )
@@ -76,8 +80,7 @@ init_psi_random(grid, sys; seed=nothing) =
 # `helix_k`, `seed`). The earlier `init_state_params=Dict(...)` route
 # pre-dates a 2026-05 refactor of `init_psi` to a flat-kwarg signature
 # and was silently broken (MethodError at call time) until the audit
-# turn caught it. Wrappers whose user-API kwarg has no `init_psi`
-# counterpart simply accept-and-drop it for backwards compatibility.
+# turn caught it.
 
 """
     init_psi_spin_coherent(grid, sys; theta=0.0, phi=0.0)
@@ -124,83 +127,51 @@ init_psi_spin_helix(grid::Grid{N}, sys; q_vector=ntuple(_ -> 0.0, N)) where {N} 
     helix_k=NTuple{N, Float64}(Float64(q_vector[d]) for d in 1:N))
 
 """
-    init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0))
-
-Biaxial nematic state. `init_psi` constructs the canonical
-(|+δ⟩+|−δ⟩)/√2 representative and ignores the angle pair — kept as
-a wrapper kwarg for API symmetry with other oriented states.
-"""
-init_psi_biaxial_nematic(grid, sys; angles=(0.0, 0.0)) = begin
-    angles isa Tuple && length(angles) == 2 ||
-        throw(ArgumentError("angles must be a 2-tuple (θ, φ)"))
-    init_psi(grid, sys; state=:biaxial_nematic)
-end
-
-"""
-    init_psi_polar_core_vortex(grid, sys; winding=1, axis=:z)
+    init_psi_polar_core_vortex(grid, sys; winding=1)
 
 Polar-core vortex — m=0 vortex core surrounded by m=±F density.
-(`axis` is currently hardcoded to z inside `init_psi`; accepted for
-forward compatibility.)
+The vortex axis is z.
 """
-init_psi_polar_core_vortex(grid, sys; winding::Int=1, axis::Symbol=:z) = begin
-    axis === :z || throw(ArgumentError(
-        ":polar_core_vortex currently only supports axis=:z (got $axis)"))
+init_psi_polar_core_vortex(grid, sys; winding::Int=1) =
     init_psi(grid, sys; state=:polar_core_vortex, init_vortex_charge=winding)
-end
 
 """
-    init_psi_bright_soliton(grid, sys; m_state=:max, width=1.0)
+    init_psi_bright_soliton(grid, sys)
 
-Bright soliton in the central m component. `width` is currently
-derived from the grid box size inside `init_psi`; the kwarg is
-accepted for API symmetry.
+Bright soliton in the central m component, with width derived from the grid box size.
 """
-init_psi_bright_soliton(grid, sys; m_state=:max, width::Real=1.0) = init_psi(
+init_psi_bright_soliton(grid, sys) = init_psi(
     grid, sys; state=:bright_soliton
 )
 
 """
-    init_psi_dark_soliton(grid, sys; m_state=:max, position=0.0)
+    init_psi_dark_soliton(grid, sys)
 
-Dark soliton kink in the central m component. `position` is fixed at
-0 inside `init_psi`; the kwarg is accepted for API symmetry.
+Dark soliton kink at position 0 in the central m component.
 """
-init_psi_dark_soliton(grid, sys; m_state=:max, position::Real=0.0) = init_psi(
+init_psi_dark_soliton(grid, sys) = init_psi(
     grid, sys; state=:dark_soliton
 )
 
 """
-    init_psi_gaussian_wavepacket(grid, sys; momentum=0.0, width=1.0, m_state=1)
+    init_psi_gaussian_wavepacket(grid, sys; momentum=0.0)
 
 Gaussian wavepacket with momentum kick along dim 1. `momentum` plumbs
 through `init_theta` (which `init_psi` uses as k₀ for this state).
 """
 init_psi_gaussian_wavepacket(grid, sys;
-    momentum::Real=0.0, width::Real=1.0, m_state::Int=1) = init_psi(
+    momentum::Real=0.0) = init_psi(
     grid, sys; state=:gaussian_wavepacket, init_theta=momentum
 )
 
 """
-    init_psi_domain_wall(grid, sys; axis=1)
-
-Two oppositely-magnetized regions joined by a wall along axis 1.
-(`axis` is currently hardcoded to 1 inside `init_psi`.)
-"""
-init_psi_domain_wall(grid, sys; axis::Int=1) = begin
-    axis == 1 || throw(ArgumentError(
-        ":domain_wall currently only supports axis=1 (got $axis)"))
-    init_psi(grid, sys; state=:domain_wall)
-end
-
-"""
-    init_psi_two_packets(grid, sys; separation=2.0, momentum_kick=1.0)
+    init_psi_two_packets(grid, sys; momentum_kick=1.0)
 
 Pair of Gaussian packets boosted toward each other. `momentum_kick`
-plumbs through `init_theta`; `separation` is fixed inside `init_psi`.
+plumbs through `init_theta`; packet separation is fixed inside `init_psi`.
 """
 init_psi_two_packets(grid, sys;
-    separation::Real=2.0, momentum_kick::Real=1.0) = init_psi(
+    momentum_kick::Real=1.0) = init_psi(
     grid, sys; state=:two_packets, init_theta=momentum_kick
 )
 
@@ -238,14 +209,13 @@ init_psi_magnetic_domain(grid, sys; pattern::Symbol=:stripe) = begin
 end
 
 """
-    init_psi_vortex_lattice(grid, sys; n_vortices=4, lattice=:triangular)
+    init_psi_vortex_lattice(grid, sys; n_vortices=4)
 
 Regular array of vortices. `n_vortices` plumbs through `init_vortex_charge`
-(used as lattice size). `lattice` is currently unused (only the default
-square pattern is implemented inside `init_psi`).
+(used as lattice size). The pattern is the square lattice implemented by `init_psi`.
 """
 init_psi_vortex_lattice(grid, sys;
-    n_vortices::Int=4, lattice::Symbol=:triangular) = init_psi(grid, sys; state=:vortex_lattice,
+    n_vortices::Int=4) = init_psi(grid, sys; state=:vortex_lattice,
     init_vortex_charge=n_vortices)
 
 """

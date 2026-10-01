@@ -101,7 +101,7 @@ function run_catalog_index(; runs_root::AbstractString=default_store().root)
         name = basename(d)
         startswith(name, ".") && continue
 
-        has_cfg = isfile(joinpath(d, "config.yaml"))
+        has_cfg = isfile(_config_snapshot_path(d))
         has_jld2 = _has_run_jld2(d)
         sp = joinpath(d, RUN_SUMMARY_FILENAME)
         has_summary = isfile(sp)
@@ -120,7 +120,7 @@ function run_catalog_index(; runs_root::AbstractString=default_store().root)
 
         if has_summary
             try
-                merge!(row, JSON.parsefile(sp))
+                merge!(row, JSON.parsefile(sp; use_mmap=false))
             catch e
                 row["has_summary"] = false
                 row["index_error"] = "summary parse: $(sprint(showerror, e))"

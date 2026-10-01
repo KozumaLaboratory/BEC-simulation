@@ -67,7 +67,7 @@ scan:
 
         code_rev = code_tree_hash()
 
-        @testset "single-point path (`_run_yaml_single`)" begin
+        @testset "single-point path (`_run_experiment_single`)" begin
             rd = run_probe(PROBE_PIPELINE, "single")
             p = joinpath(rd, "point_001.jld2")
             @test isfile(p)
@@ -97,7 +97,7 @@ scan:
             end
         end
 
-        @testset "scan path (`_run_yaml_scan`)" begin
+        @testset "scan path (`_run_experiment_scan`)" begin
             rd = run_probe(PROBE_SCAN, "scan")
             p1 = joinpath(rd, "point_001.jld2")
             p2 = joinpath(rd, "point_002.jld2")

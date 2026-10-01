@@ -109,7 +109,7 @@ using SpinorBEC
         # modes (m≥2) contribute. TwoChannel drops them → F-dependent
         # divergence.
         function compare_ratio(F::Int, c0::Float64, c1::Float64; n=1.0)
-            g_dict = SpinorBEC._c0c1_to_gS(F, c0, c1)
+            g_dict = SpinorBEC.ku_c01_to_g_S(F, c0, c1)
             tbl_2ch = compute_spinor_lhy_polar_two_channel(;
                 F=F, c0=c0, c1=c1, c_dd=0.0, n_max=2*n, n_points=400)
             tbl_pol = compute_spinor_lhy_polar_contact(;

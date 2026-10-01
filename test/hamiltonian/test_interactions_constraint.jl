@@ -146,18 +146,18 @@ using SpinorBEC
         @test ip[0] ≈ compute_c0(Eu151; N_atoms=1, dims=3)
     end
 
-    @testset "_c0c1_to_gS analytic F=1" begin
+    @testset "ku_c01_to_g_S analytic F=1" begin
         c0, c1 = 100.0, -5.0
-        g = SpinorBEC._c0c1_to_gS(1, c0, c1)
+        g = SpinorBEC.ku_c01_to_g_S(1, c0, c1)
         @test g[0] ≈ c0 - 2c1   # g_0 = c_0 + c_1(0 - 2)/2 = c_0 - c_1
         @test g[2] ≈ c0 + c1    # g_2 = c_0 + c_1(6 - 4)/2 = c_0 + c_1
     end
 
-    @testset "_c0c1_to_gS pair amplitude identity F=1,2,6" begin
+    @testset "ku_c01_to_g_S pair amplitude identity F=1,2,6" begin
         for F in [1, 2, 6]
             D = 2F + 1
             c0, c1 = 100.0, -3.0
-            g = SpinorBEC._c0c1_to_gS(F, c0, c1)
+            g = SpinorBEC.ku_c01_to_g_S(F, c0, c1)
             cg_table = precompute_cg_table(F)
             sm = spin_matrices(F)
 

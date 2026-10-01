@@ -114,6 +114,7 @@ const FAST_TESTS = [
     "analysis/test_larmor_adiabaticity.jl",
     "analysis/test_dipole_field.jl",
     "analysis/test_resonance_dip_nonuniform.jl",
+    "analysis/test_sweep_hypothesis_contract.jl",
     "workflow/test_phi_omega_convention.jl",
     "workflow/test_schema_validation_edge_cases.jl",
     "workflow/test_seed_from.jl",
@@ -164,6 +165,7 @@ const FAST_TESTS = [
     "workflow/test_absence_is_not_reported_as_health.jl",
     "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
+    "workflow/test_native_experiment.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
     "workflow/test_pipeline_name_and_precedence.jl",
@@ -539,7 +541,7 @@ const CI_EXTRA = [
     "dynamics/test_energy_damping_buffer_reuse.jl",
     "dynamics/test_mu_lda_constraint.jl",
     # (physics block × solver path) table: the term must be LIVE on the
-    # Workspace after a YAML run, on every path. Drives run_config, so `ci`
+    # Workspace after a YAML run, on every path. Drives run_pipeline, so `ci`
     # rather than `fast`. Replaces the per-incident plumbing files — a new path
     # is a row, not a new file.
     "workflow/test_yaml_physics_reaches_workspace.jl",
@@ -1245,6 +1247,7 @@ const _COST = Dict{String, Float64}(
     "oracles/test_hamiltonian_sign_oracles.jl" => 52.0,
     "oracles/test_lhy_full_bdg_closed_form_parity.jl" => 51.8,
     "workflow/test_autopilot.jl" => 49.1,
+    "workflow/test_native_experiment.jl" => 65.7,
     "test_level10_hpsi_self_consistency.jl" => 47.7,
     "test_quality.jl" => 45.7,
     "workflow/test_active_learning.jl" => 35.7,
@@ -1289,7 +1292,7 @@ const _COST = Dict{String, Float64}(
     # Two TOML parses (~5 MB total) plus one `walkdir` over the 429 configs
     # under `runs/` reading each first line-block. No SpinorBEC call at all.
     "validation/test_config_prose_harvest.jl" => 5.0,
-    # ~12 `_run_yaml_prepare` + resolve passes over throwaway configs, no solve.
+    # ~12 `_prepare_config_file` + resolve passes over throwaway configs, no solve.
     "model/test_yaml_to_model.jl" => 12.0,
     # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to
     # actually run, or arm C observes only one of the two consumers.

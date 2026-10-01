@@ -4,7 +4,7 @@
 
 A general-purpose solver for the spinor Gross–Pitaevskii equation: arbitrary
 spin $F$, 1D/2D/3D, contact + dipolar + LHY + Raman/Zeeman, on CPU or CUDA,
-driven entirely from YAML.
+with experiments defined directly in Julia.
 
 ## What it does well
 
@@ -25,31 +25,44 @@ driven entirely from YAML.
   pushed to absurd values. The `kind: rotating_basis` path co-rotates with
   $\hat B(t)$ and absorbs the Larmor phase analytically, so Klaus-et-al.-2022-style
   protocols just work.
-- **YAML in, results out.** A run is one YAML file: `pipeline:` (ground
-  state → dynamics → analysis), `scan:` for sweeps, optional
-  `calibration_history:` so lab-deck values (mV, mW) are written verbatim
-  and parsed into physical units. Re-running a YAML resumes from the last
-  completed point — and refuses to resume across a code change, because a
-  cached point carries the commit that produced it.
+- **Julia definitions, persistent results.** Build a `PipelineConfig` from
+  typed steps. Reuse Julia functions, loops, and comprehensions for protocols
+  and sweeps. `run_experiment` saves the input and resolved conditions as JSON,
+  writes checkpoints and progress, and refuses stale cached results. Existing
+  YAML configurations remain readable through `run_yaml`.
 - **GPU is not an afterthought.** Both kinetic and DDI paths are CUDA-native
   (CUFFT, in-place broadcasts), with a mixed-precision F32 path for large
   grids.
 
 ## Usage
 
-```bash
-julia --project=. -e 'using Pkg; Pkg.instantiate()'
+```julia
+using SpinorBEC
 
-# Run
-julia --project=. -e 'using CUDA, SpinorBEC; run_yaml("runs/eu151_edh/config.yaml")'
+experiment = PipelineConfig([
+    GroundStateStep(
+        atom=:Rb87,
+        grid=(n=[32], box=[12.0]),
+        interactions=(N_atoms=100, omega_ref=100.0, c0=1.0, c1=0.0),
+        potential=(type=:harmonic, omega=[1.0]),
+        initial_state=:polar, dt=0.001, n_steps=1000, tol=1e-6,
+    ),
+    DynamicsStep(duration=0.1, dt=0.001, save=(every=10,)),
+])
 
-# Or from the CLI: inspect / launch / figure / preflight / autopilot / tag / catalog
-julia --project=. scripts/cli.jl inspect runs/eu151_edh/config.yaml
+exp = Experiment(experiment)
+run!(exp)                       # no YAML serialization or parsing
+Fz_t(exp)                       # inspect saved results
+write_run!(exp)                 # config.json for local/cluster dispatch
 ```
 
-`inspect` type-checks a config against the schema and grades what it finds
-(block / error / warn / info) before anything is submitted — worth running on
-any config that is about to cost GPU hours.
+Run a saved snapshot with `run_experiment("runs/<id>/config.json")`.
+Inspect definitions before execution with `inspect_config(experiment)`.
+For a parameter sweep, construct a vector of experiments with a Julia
+comprehension and call `run!.(experiments)`.
+
+Existing YAML files use the same executor through `run_yaml(path)`; they
+are a compatibility input, rather than the required authoring format.
 
 WSL2 GPU users: prepend `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 

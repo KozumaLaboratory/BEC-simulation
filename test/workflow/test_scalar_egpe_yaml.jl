@@ -104,7 +104,7 @@ pipeline:
 
     @testset "end to end" begin
         cfg = load_config_from_string(_GS_YAML)
-        res = run_config(cfg; verbose=false)
+        res = run_pipeline(cfg; verbose=false)
         @test haskey(res, :scalar_gs)
         @test isfinite(res[:scalar_gs].mu)
         d = res[:scalar_egpe_dynamics]
