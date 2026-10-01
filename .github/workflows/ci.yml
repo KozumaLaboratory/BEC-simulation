@@ -35,6 +35,9 @@ concurrency:
 # don't carry deprecation warnings on every run.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # Hosted runners have different CPUs; native package images are not portable.
+  # https://docs.julialang.org/en/v1.12/devdocs/pkgimg/
+  JULIA_CPU_TARGET: generic
 
 # Target 2-3 minute development feedback with a warm depot. Required checks
 # run explicit smoke views; nightly.yml runs all tests, benchmarks and the
@@ -47,6 +50,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      julia: ${{ steps.runtime.outputs.version }}
       # Markdown is not inert here: `test/oracles/test_doc_run_citations_resolve.jl`
       # reads `docs/**.md` and fails on a document citing a `runs/` path that does
       # not exist. Treating .md as "no code changed" made that gate unreachable
@@ -58,6 +62,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - id: runtime
+        name: Select the Manifest Julia version
+        run: |
+          python3 - <<'PY'
+          import os, tomllib
+          with open("Manifest.toml", "rb") as manifest:
+              version = tomllib.load(manifest)["julia_version"]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"version={version}", file=output)
+          PY
       - id: filter
         run: |
           set -euo pipefail
@@ -115,11 +129,12 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
-          version: "1.12"
+          version: ${{ needs.changes.outputs.julia }}
       - uses: julia-actions/cache@v2
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
-          cache-name: julia-cache;workflow=${{ github.workflow }}
+          # Isolate normal-project images from nightly's Pkg.test compiler flags.
+          cache-name: smoke-depot;Julia=${{ needs.changes.outputs.julia }};cpu=generic
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - name: Run smoke tests
@@ -144,11 +159,12 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
-          version: "1.12"
+          version: ${{ needs.changes.outputs.julia }}
       - uses: julia-actions/cache@v2
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
         with:
-          cache-name: julia-cache;workflow=${{ github.workflow }}
+          # Isolate normal-project images from nightly's Pkg.test compiler flags.
+          cache-name: smoke-depot;Julia=${{ needs.changes.outputs.julia }};cpu=generic
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
       - name: Run smoke tests
@@ -173,11 +189,12 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         if: needs.changes.outputs.code == 'true'
         with:
-          version: "1.12"
+          version: ${{ needs.changes.outputs.julia }}
       - uses: julia-actions/cache@v2
         if: needs.changes.outputs.code == 'true'
         with:
-          cache-name: julia-cache;workflow=${{ github.workflow }}
+          # Isolate normal-project images from nightly's Pkg.test compiler flags.
+          cache-name: smoke-depot;Julia=${{ needs.changes.outputs.julia }};cpu=generic
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true'
       - name: Run smoke tests
@@ -195,7 +212,11 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         if: needs.changes.outputs.code == 'true'
         with:
-          version: "1.12"
+          version: ${{ needs.changes.outputs.julia }}
+      - uses: julia-actions/cache@v2
+        if: needs.changes.outputs.code == 'true'
+        with:
+          cache-name: formatter-2.5.0;Julia=${{ needs.changes.outputs.julia }};cpu=generic
       - name: Install JuliaFormatter
         if: needs.changes.outputs.code == 'true'
         # Pin the version so CI and the .githooks/pre-commit check agree.
