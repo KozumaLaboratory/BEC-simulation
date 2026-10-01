@@ -164,12 +164,8 @@ const FAST_TESTS = [
     "hamiltonian/test_two_spin_step_guards_agree.jl",
     "workflow/test_absence_is_not_reported_as_health.jl",
     "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
-    "workflow/test_plan_cache_is_keyed_on_the_box.jl",
     "workflow/test_failure_evidence_reaches_the_reader.jl",
-    "workflow/test_dashboard_does_not_invent_a_time_axis.jl",
-    "workflow/test_dashboard_json_responses.jl",
     "workflow/test_native_experiment.jl",
-    "workflow/test_precompile_resource_lifetime.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
     "workflow/test_pipeline_name_and_precedence.jl",
@@ -660,11 +656,6 @@ const CI_EXTRA = [
     # pending schema audit" since 2026-05-25; the schema was fine and the
     # `initial_state` was inverted (see the file header). Runs in ~68 s.
     "workflow/test_klaus_validation.jl",
-    # Dashboard HTTP round-trip. Was the last MANUAL entry ("spawns dashboard
-    # server on a TCP port"); it hung forever for two reasons, both fixed
-    # 2026-08-02 — a keep-alive read with no `Connection: close`, and a
-    # teardown by `Base.throwto` on a task parked in `accept`. 10 s.
-    "workflow/test_live_monitor.jl",
     # Spatial / B(r,t) Zeeman + TOF (#14): split_step / simulate_* (per-voxel
     # propagation, multi-frame TOF) — integration weight, not fast-tier units.
     "analysis/test_tof.jl",
@@ -1421,7 +1412,6 @@ const _COST = Dict{String, Float64}(
     # 68 s here; declared high because a runner estimate is what this model
     # needs and the nightly timing table will correct it downward if generous.
     "workflow/test_klaus_validation.jl" => 180.0,
-    "workflow/test_live_monitor.jl" => 30.0,   # 10 s here; a runner is slower
     "workflow/test_active_learning_yaml.jl" => 21.7,
     "hamiltonian/test_mixed_precision_kinetic_buffer.jl" => 9.7,
     # 4.8 s here against a warm depot; the CI runner pays a cold precompile

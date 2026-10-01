@@ -388,7 +388,7 @@ end
     for w in warnings
         # Suppress :info from stderr — keeps the audit chatter quiet
         # during sweep dispatches. Full findings remain in the
-        # ConfigInspection / dashboard panel.
+        # ConfigInspection result.
         if w.severity !== :info
             println(stderr, terse_warning_line(w))
         end
@@ -938,11 +938,8 @@ function _run_experiment_single(
             gs_artifact_id === nothing || (f["artifact_id"] = gs_artifact_id)
             code_rev = _code_rev_or_nothing()
             code_rev === nothing || (f["code_rev"] = code_rev)
-            # Embed grid geometry so dashboard endpoints (vector3d_bin,
-            # vorticity3d_bin, …) can reconstruct the spatial mesh without
-            # re-parsing config.yaml — the YAML fallback misses
-            # mixin-expanded configs because `_read_box_size` reads the raw
-            # YAML, not the expanded pipeline dict.
+            # Embed resolved grid geometry so post-processing can reconstruct
+            # the spatial mesh without re-parsing mixin-expanded configs.
             grid_obj = get(result, :grid, nothing)
             if grid_obj !== nothing
                 f["grid_box_size"] = collect(Float64, grid_obj.config.box_size)

@@ -4,7 +4,7 @@
 #
 #   notifications    — Slack webhook stub + notify_slack public API
 #
-# Live JSON status (for the dashboard) is built in the pipeline via
+# Live JSON status (for progress monitoring) is built in the pipeline via
 # `_build_live_callback` (see workflow/experiments/pipeline/pipeline_callbacks.jl) —
 # a plain SimulationCallbacks.on_step that atomically writes JSON. No
 # separate LiveMonitor type; direct Julia callers can write the same

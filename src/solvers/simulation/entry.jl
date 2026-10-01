@@ -21,7 +21,7 @@ Run time evolution simulation with optional event-driven monitoring.
 # Basic usage
 result = run_simulation!(ws)
 
-# Dashboard JSON push — plain on_step callback
+# Live JSON status — plain on_step callback
 callbacks = SimulationCallbacks(
     on_step = (ws, step, times, energies) -> begin
         step % 50 == 0 || return nothing

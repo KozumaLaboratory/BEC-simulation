@@ -3,7 +3,7 @@ using SpinorBEC
 using JSON
 using JLD2
 using YAML
-using SpinorBEC: Dashboard, _load_config_data, _config_snapshot_path, write_complete_marker,
+using SpinorBEC: _load_config_data, _config_snapshot_path, write_complete_marker,
     DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF
 
 native_probe(; n_steps=3) = PipelineConfig([
@@ -55,18 +55,6 @@ native_probe(; n_steps=3) = PipelineConfig([
             @test isfile(joinpath(exp.outdir, "_exit_summary.json"))
             @test basename(exp.outdir) in list_runs(root)
             @test run_status(exp.outdir).completed == 1
-            exported = Dashboard.generate_dashboard_data(exp.outdir)
-            @test JSON.parse(exported["config_text"]) == cfg.raw_data
-            inspected = Dashboard._route_effective_config(
-                "/api/effective_config/$(basename(exp.outdir))", root
-            )
-            @test inspected[1] == 200
-            @test JSON.parse(inspected[3])["raw"] == cfg.raw_data
-            preview = Dashboard._route_autopilot_enqueue(
-                JSON.json(Dict("spec" => cfg.raw_data, "preview" => true)), root)
-            @test preview[1] == 200
-            @test JSON.parse(preview[3])["content_id"] == content_id(cfg.raw_data)
-
             # Differential oracle: the compatibility reader must reach the
             # identical solver with identical inputs, without a second engine.
             legacy_dir = mkpath(joinpath(root, "legacy"))

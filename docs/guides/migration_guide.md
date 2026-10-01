@@ -43,7 +43,7 @@ with any of the three.
 
 **Old (legacy)**: `dynamics/psi_snapshots` as a single 5D array `(n_pts..., n_comp, n_snaps)` ComplexF64.
 
-**Current**: `dynamics/psi_snapshots_streamed/frame_NNNNN` (one entry per frame, ComplexF32 default; ComplexF64 with `save: {precision: "f64"}`). The dashboard reader and `column_density_movie` analyzer accept both.
+**Current**: `dynamics/psi_snapshots_streamed/frame_NNNNN` (one entry per frame, ComplexF32 default; ComplexF64 with `save: {precision: "f64"}`). The `column_density_movie` analyzer accepts both.
 
 ## Calibration auto-application
 
@@ -90,7 +90,7 @@ Migration: any post-processing script that walked `frames/*.png` should switch t
    end
    ```
 
-The dashboard renders frames client-side from the JLD2 archive.
+External plotting tools can render frames from the JLD2 archive.
 
 2. `plot_density` / `plot_spinor` / `plot_spin_texture` / `animate_dynamics` are now Makie-only. Load a Makie backend (`using GLMakie` or `using CairoMakie`) before calling them. The Plotly variants and `save_column_density_png` no longer exist.
 

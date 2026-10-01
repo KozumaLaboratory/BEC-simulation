@@ -197,7 +197,6 @@ limited で、F=6 + DDI + multi-stage pipeline には fit せず、専用 framew
 - **split-step Fourier** integrator (1D/2D/3D, F=1 to F=6+ generic)
 - **CPU + GPU backends** (CUDA extension)
 - **YAML pipeline runner** + experiment scheduler + checkpoint/resume
-- **dashboard** (Vite + React + WebGPU 3D visualization)
 - **mode-by-mode**: ITP (ground state), RTP (dynamics), TWA (ensemble), TDHFB (future)
 
 詳細: Chapter 2 で technical scaffold、Appendix B で API reference。

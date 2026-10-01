@@ -33,9 +33,6 @@ with experiments defined directly in Julia.
 - **GPU is not an afterthought.** Both kinetic and DDI paths are CUDA-native
   (CUFFT, in-place broadcasts), with a mixed-precision F32 path for large
   grids.
-- **A live dashboard.** `serve_dashboard` exposes runs in a React + WebGPU
-  UI: 3D volume raymarch, per-component column densities, scan heatmaps,
-  and a status panel for in-progress runs.
 
 ## Usage
 
@@ -120,7 +117,6 @@ src/    Solvers, Hamiltonian terms, workflow, analysis
 runs/   YAML configs (magnetostir, Einstein–de Haas, phase diagrams, …)
 docs/   guides/ reference/ conventions/ design/ validation/ theory/ … (see docs/index.md)
 test/   Tiered suite (fast / ci / oracles / integration / full / physics)
-dashboard/  React + WebGPU dashboard frontend
 ext/    CUDA, Makie, HTTP and VTK extensions
 scripts/    operational entry points (cli.jl, ops specs; allowlist-gated)
 bench/  Benchmarks

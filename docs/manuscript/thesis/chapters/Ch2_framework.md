@@ -313,7 +313,7 @@ $\langle O\rangle_{\rm TWA} = N_{\rm traj}^{-1} \sum_j O[\psi_j(t)]$。
 
 Sinatra criterion: $N_{\rm modes} D \ll N_{\rm atoms}$ で leading-order TWA controlled。
 
-実装 in `src/solvers/twa.jl` + dashboard 3D variance overlay。
+実装 in `src/solvers/twa.jl`。
 
 ### 2.7.2 TDHFB (D 論 candidate)
 

@@ -142,22 +142,6 @@ export bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
 export active_learn_phase_scan, active_learn_phase_scan_yaml
 export phase_entropy_uncertainty, default_phase_classifier_extractor
 
-# Dashboard subsystem (real submodule) — must be loaded after analysis +
-# workflow/experiments so that total_density / spin_density_vector /
-# list_runs / run_status are exported by SpinorBEC.
-include("workflow/io/dashboard.jl")  # `module Dashboard`
-
-# Re-export Dashboard's public surface at the umbrella level so existing
-# `using SpinorBEC; serve_dashboard(...)` call sites keep working.
-using .Dashboard:
-    serve_dashboard,
-    generate_dashboard_data,
-    export_dashboard,
-    RunMetadata,
-    load_run_metadata
-export serve_dashboard, generate_dashboard_data, export_dashboard
-export RunMetadata, load_run_metadata
-
 # All public symbols are now `export`ed at their definition sites under
 # src/foundation/, src/hamiltonian/, src/analysis/, src/solvers/, and
 # src/workflow/. The umbrella module here only declares cross-cutting

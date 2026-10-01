@@ -1,6 +1,6 @@
 # Golden per-cell table: materialise the resolved per-cell colours +
 # quality alpha for golden-gating, plus the VSUP-lite `compute_quality_alpha`
-# that both the golden table and the dashboard viewspec share.
+# that both the golden table and the resolved viewspec share.
 
 using JSON
 
@@ -29,7 +29,7 @@ observables) the dominant-m + decision-margin gap.
   * `spectrum_margin` — passed through to `dominant_m_with_margin`.
   * `quality_threshold` / `quality_dynamic_range_decades` — VSUP alpha
     fade parameters for the `role=:quality` observable. Match the
-    defaults used in `to_viewspec` so the dashboard and golden gate
+    defaults used in `to_viewspec` so the renderer and golden gate
     agree on opacity.
 
 Schema v1.1 emits `quality_alpha::Float64 ∈ [0, 1]` as a SEPARATE field

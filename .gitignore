@@ -43,8 +43,6 @@ runs/_loop/_local/
 # Simulation binary data (large, reproducible from config)
 *.jld2
 
-# Dashboard atlas cache (server-rebuildable from per-snap binaries)
-runs/_dashboard_cache/
 
 # Autopilot runtime sentinels (paused / dry_run / lock) — per-machine
 # operational state, never source-of-truth.
@@ -75,7 +73,7 @@ runs/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-
 # Auto-saved copies that show up under docs/validation/ (mirrored runs).
 docs/validation/**/*_[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]/
 
-# Generated dashboards (reproducible from data)
+# Generated HTML reports (reproducible from data)
 *.html
 
 # Legacy output directory
@@ -144,9 +142,6 @@ scripts/_*.txt
 # Generated paper LaTeX/PDF (use scripts/manuscript/build_paper_latex.sh to regenerate)
 docs/manuscript/papers/*/build/
 
-# Tailscale TLS certs (per-machine, never commit)
-dashboard/anko-wsl.*.crt
-dashboard/anko-wsl.*.key
 
 # Windows NTFS Alternate Data Streams ("Zone.Identifier") that get
 # attached when files are downloaded on Windows / WSL. Not real
@@ -224,3 +219,6 @@ runs/**/.*.lock
 
 # PR-census cache (scripts/pr_mistake_census.py --refresh rebuilds it)
 .pr_census_cache.json
+
+# Local build caches left by the retired web UI.
+/dashboard/

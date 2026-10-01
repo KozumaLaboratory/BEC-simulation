@@ -20,7 +20,7 @@
 #
 # ControlPath=/tmp/ssh-spinorbec-%C — %C is a hash of host:port:user, so
 # different SSH targets get different sockets; safe to share across
-# spinor-autopilot.service / spinor-dashboard.service (same user).
+# spinor-autopilot.service (same user).
 const _SSH_CM_OPTS = [
     "-o", "ControlMaster=auto",
     "-o", "ControlPath=/tmp/ssh-spinorbec-%C",
