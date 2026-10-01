@@ -31,7 +31,6 @@ makedocs(
             "Mixed precision" => "design/mixed_precision_design.md",
             "Multi-GPU" => "design/multi_gpu_design.md",
             "Two-component GP" => "design/two_component_gp_design.md",
-            "Live monitor" => "design/live_monitor_design.md",
             "Integrator modernization plan" => "design/integrator_modernization_plan.md",
             "Integrator Ch.3 plan" => "design/integrator_ch3_plan.md",
             "Integrator Phase -1 protocol" => "design/integrator_phase_minus_1_protocol.md",
@@ -42,8 +41,6 @@ makedocs(
             "TDHFB pilot" => "design/tdhfb_pilot_design.md",
             "D-thesis Year 1 roadmap" => "design/dthesis_year1_roadmap.md",
             "Scan group redesign" => "design/scan_group_redesign.md",
-            "Dashboard perf notes" => "design/dashboard_perf_notes.md",
-            "Dashboard ensemble panel" => "design/dashboard_ensemble_panel.md",
             "Tier 4 research extensions" => "design/tier4_research_extensions.md",
         ],
         "Theory" => [

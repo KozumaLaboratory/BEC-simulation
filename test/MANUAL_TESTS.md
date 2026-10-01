@@ -14,32 +14,10 @@ one was run, 2026-07-31 / 08-02:
 | `workflow/test_active_learning_yaml.jl` | "heavy YAML" | already carried `_SKIP_HEAVY_YAML_AL`: 0.0 s with the flag off, 21.7 s with it on | `CI_EXTRA` |
 | `workflow/test_multi_fidelity_yaml.jl` | "heavy YAML" | same shape; 0.0 s / **776 s on the runner** — see `_COST` | `CI_EXTRA` |
 | `workflow/test_klaus_validation.jl` | "pending schema audit" | the schema was fine. `initial_state: m_plus_F` was inverted against the field sign, so ITP underflowed every surviving component and the state normalised to NaN. 68 s at the real 1 Gauss field | `CI_EXTRA` |
-| `workflow/test_live_monitor.jl` | "spawns a server on a TCP port" | the port was never the problem. Two independent defects, the first hiding the second — see below. 10 s | `CI_EXTRA` |
+| `workflow/test_live_monitor.jl` | "spawns a server on a TCP port" | the port was never the problem. Two independent defects, the first hiding the second — fixed before removal. 10 s | Removed with the Web UI |
 
 **Three of the five needed no code change at all** — only for someone to run
 them.
-
-## What was wrong with `test_live_monitor.jl`
-
-1. The POST sent no `Connection: close`, and the test then did
-   `read(sock, String)`, which reads to EOF. HTTP/1.1 keeps the connection
-   alive by default, so the read never returned.
-2. Teardown was `Base.throwto(srv_task, InterruptException())` on a task parked
-   in `accept`. `throwto` switches to the target task and does not reliably
-   come back, so the server stayed up and the process hung until something
-   killed it (measured: SIGTERM at a 2400 s timeout, `Press Ctrl+C to stop` in
-   the log).
-
-`serve_dashboard` had no way to be stopped programmatically — it creates its
-listen socket internally and loops on `accept`, exiting only on an
-`InterruptException`. It now takes `server_ref::Ref`, so a caller that spawned
-it on a task can `close(ref[])`; `accept` throws, the `finally` runs, and
-`wait(srv_task)` is deterministic. That is useful beyond the test.
-
-Fixing the hang exposed a third defect that had never executed:
-`Base.Filesystem.touch(path; times=…)` is not a Julia method. The endpoint ages
-a run by its **mtime** (`routes/lab_live.jl`), so the back-dating is real and is
-now done with `touch -d @epoch`, with an assertion that it took.
 
 ## Keep this empty
 

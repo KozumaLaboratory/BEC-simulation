@@ -177,7 +177,7 @@ parallel channel arrays so the bytes do not depend on hash insertion order
 map, no per-term digest. Total by construction — there is nothing to be
 incomplete about, and no way to misfile a shared file. Priced, not assumed:
 `git rev-list HEAD -n 1931 -- src ext | wc -l` = **1018 of 1931 commits (52.7%)**
-move it. `docs/`, `test/`, `runs/`, `scripts/` and `dashboard/` do not.
+move it. `docs/`, `test/`, `runs/` and `scripts/` do not.
 
 This deletes `physics_id`, `method_id`, `input_digest`, `toolchain_id`,
 `probe_id`, `StageId`, `JobEnv`, `scope_digest` and its five hand-maintained

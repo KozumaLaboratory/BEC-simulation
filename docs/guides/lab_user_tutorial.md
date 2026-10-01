@@ -118,7 +118,6 @@ tail -f logs/today.log
 ls runs/today/frames/        # columns.jld2 + manifest.json after analyze step
 ```
 
-If you opened the dashboard (`serve_dashboard(8765)`), the run shows up under the active runs list and the 3D viewer streams snapshots.
 
 ## 7. Analyze offline
 

@@ -103,7 +103,7 @@ struct EnsembleResult
     rejected::Vector{Int}
     trajectory_results::Union{Nothing, Vector{SimulationResult}}
     # Last trajectory's full SimulationResult (with psi_snapshots). Always
-    # retained so the dashboard auto-save can stream dynamics frames even
+    # retained so the pipeline auto-save can stream dynamics frames even
     # when the user didn't request `store_trajectories=true`. Use
     # `last_trajectory.psi_snapshots[end]` for the post-evolution ψ when the
     # caller needs a representative state (the snapshot at the last step

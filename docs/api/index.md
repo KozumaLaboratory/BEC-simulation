@@ -29,7 +29,6 @@ The output lands in `docs/build/`.
 
 - [Mixed precision](../design/mixed_precision_design.md) — F32 / F64 path
 - [Two-component GP](../design/two_component_gp_design.md) — #51 plan
-- [Live monitor](../design/live_monitor_design.md) — #67 plan
 
 ## Module exports (selected)
 

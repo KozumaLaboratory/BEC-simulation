@@ -59,11 +59,9 @@ const _SCRIPTS_ALLOWLIST = Set([
     # ── declarative ops specs (category 3) ──
     "spinor-autopilot.service",
     "spinor-autopilot.timer",
-    "spinor-dashboard.service",
     "spinorbec.env",
     "spinorbec.def",
     "tsubame_setup.sh",
-    "deploy_dashboard_auth.sh",
     # ── cluster submit wrappers (UGE; declarative + qsub) ──
     "submit_test_tier.sh",
     "submit_mutation_sweep.sh",

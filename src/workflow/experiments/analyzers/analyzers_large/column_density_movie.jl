@@ -3,7 +3,7 @@ function _analyze_column_density_movie(psi, grid, atom, params, ws_prev,
     # Streams per-snapshot column densities into a single JLD2 archive
     # (`columns.jld2` with one Float32 2D array per frame, key
     # `frame_NNNNN`) and writes a JSON manifest with frame times + axis
-    # metadata. The dashboard / external notebooks render frames; we no
+    # metadata. External notebooks render frames; we no
     # longer ship PNGs (PlotlyJS dependency removed).
     #
     # Two snapshot sources supported, same as before:

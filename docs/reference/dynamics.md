@@ -1,6 +1,6 @@
 # `dynamics:` block reference
 
-Every key accepted under a YAML `dynamics:` step. Multiple knobs that return `on_step` callbacks compose freely (`_compose_callbacks` chains them). For `ground_state:` knobs see `../guides/pipeline_cookbook.md`; for hardware/dashboard plumbing see `architecture.md`.
+Every key accepted under a YAML `dynamics:` step. Multiple knobs that return `on_step` callbacks compose freely (`_compose_callbacks` chains them). For `ground_state:` knobs see `../guides/pipeline_cookbook.md`; for hardware and I/O plumbing see `architecture.md`.
 
 ## Required
 
