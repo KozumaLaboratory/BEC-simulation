@@ -122,10 +122,10 @@ jobs:
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
-      - uses: julia-actions/julia-runtest@v1
+      - name: Run smoke tests
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
-        with:
-          coverage: false
+        # Use the root project; skip resolving the full test-only dependency stack.
+        run: julia --startup-file=no --project=. test/runtests.jl
 
   oracles:
     # Preserve the required-check context; execute an explicit smoke view.
@@ -151,10 +151,10 @@ jobs:
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
-      - uses: julia-actions/julia-runtest@v1
+      - name: Run smoke tests
         if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
-        with:
-          coverage: false
+        # Use the root project; skip resolving the full test-only dependency stack.
+        run: julia --startup-file=no --project=. test/runtests.jl
 
   integration:
     # Preserve the required-check context; execute an explicit smoke view.
@@ -180,10 +180,10 @@ jobs:
           cache-name: julia-cache;workflow=${{ github.workflow }}
       - uses: julia-actions/julia-buildpkg@v1
         if: needs.changes.outputs.code == 'true'
-      - uses: julia-actions/julia-runtest@v1
+      - name: Run smoke tests
         if: needs.changes.outputs.code == 'true'
-        with:
-          coverage: false
+        # Use the root project; skip resolving the full test-only dependency stack.
+        run: julia --startup-file=no --project=. test/runtests.jl
 
   format:
     name: JuliaFormatter check
