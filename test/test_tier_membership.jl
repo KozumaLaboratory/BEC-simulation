@@ -31,6 +31,10 @@ using SpinorBEC
 using TOML   # reads Project.toml for the import-availability gate below
 include(joinpath(@__DIR__, "helpers", "julia_imports.jl"))
 
+module _TierWorkflowScan
+include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
+end
+
 # The runner include()s `_tiers.jl` into global scope before this file, so under
 # `Pkg.test()` these are already bound. Pull them in when they are not, so the
 # file that holds the "every test file is a dependency-free unit" contract
@@ -251,39 +255,44 @@ end
     @test isempty(collisions)
 end
 
-# The per-PR required checks must, between them, run the whole `ci` tier.
-#
-# `oracles` exists because the `ci` tier is nightly-only, so a PR could break an
-# oracle gate and merge green (5 gates sat RED for weeks, 2026-06-21). Cutting
-# that pseudo-tier fixed the oracle half and left the other half: CI_EXTRA's
-# non-oracle files — ground state, split-step, simulation, config/experiment
-# plumbing — were still gated only by the nightly run.
-#
-# Splitting `ci` across three jobs is only equivalent to running `ci` if the
-# three actually cover it, and if the workflow actually runs all three. Asserting
-# the set identity over the tier lists alone would not catch someone deleting the
-# job, so this reads the tiers back out of `.github/workflows/ci.yml` — delete a
-# job or rename a tier and this test goes red, rather than the coverage quietly
-# shrinking.
-@testset "Per-PR CI jobs cover the ci tier" begin
-    workflow = joinpath(@__DIR__, "..", ".github", "workflows", "ci.yml")
+# Development smoke coverage and exhaustive nightly coverage are separate
+# contracts. Shrinking smoke must be explicit; removing nightly must turn red.
+@testset "Development smoke and nightly coverage" begin
+    root = joinpath(@__DIR__, "..")
+    workflow = joinpath(root, ".github", "workflows", "ci.yml")
+    nightly = joinpath(root, ".github", "workflows", "nightly.yml")
     @test isfile(workflow)
+    @test isfile(nightly)
 
-    pr_tiers = Set{String}()
-    for line in eachline(workflow)
-        m = match(r"^\s*SPINORBEC_TEST_TIER:\s*([A-Za-z_]+)\s*$", line)
-        m === nothing || push!(pr_tiers, m.captures[1])
+    function workflow_tiers(path)
+        pattern = r"^\s*SPINORBEC_TEST_TIER:\s*([A-Za-z_]+)\s*$"
+        lines = readlines(path)
+        @test !isempty(lines)
+        hits = _TierWorkflowScan.calibrated_scan(
+            lines;
+            match=line -> match(pattern, line) !== nothing,
+            present="      SPINORBEC_TEST_TIER: smoke_integration",
+            absent="      # SPINORBEC_TEST_TIER: full",
+        )
+        return Set(match(pattern, line).captures[1] for line in hits)
     end
-    # Guard against the regex silently matching nothing after a formatting change.
-    @test !isempty(pr_tiers)
+    pr_tiers = workflow_tiers(workflow)
+    @test pr_tiers == Set(keys(SMOKE_TESTS))
+    @test "full" in workflow_tiers(nightly)
+    @test Set(select_tests("ci")) <= Set(select_tests("full"))
 
-    covered = union((Set(select_tests(t)) for t in pr_tiers)...)
-    ci_tier = Set(select_tests("ci"))
-    uncovered = sort(collect(setdiff(ci_tier, covered)))
-
-    isempty(uncovered) || @info string(
-        "ci-tier files no per-PR job runs (add them to a gated tier, or add a ",
-        "job for the tier they live in)",
-    ) uncovered
-    @test isempty(uncovered)
+    for (tier, files) in SMOKE_TESTS
+        @test !isempty(files)
+        @test length(files) == length(unique(files))
+        @test Set(files) <= Set(select_tests("ci"))
+        @test select_tests(tier) == files
+        @test all(f -> isfile(joinpath(@__DIR__, f)), files)
+    end
+    # Pin the checks whose inputs include documentation: docs-only changes
+    # must still reach them in the two workflows' code-or-docs jobs.
+    @test "test_tier_membership.jl" in SMOKE_TESTS["smoke_fast"]
+    @test "test_state_doc_is_current.jl" in SMOKE_TESTS["smoke_fast"]
+    @test "test_docs_live_set.jl" in SMOKE_TESTS["smoke_fast"]
+    @test "test_retracted_numbers_carry_their_replacement.jl" in SMOKE_TESTS["smoke_fast"]
+    @test "oracles/test_doc_run_citations_resolve.jl" in SMOKE_TESTS["smoke_oracles"]
 end
