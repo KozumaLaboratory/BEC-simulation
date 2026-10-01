@@ -3,9 +3,10 @@ using SpinorBEC
 
 # ── Test tier system ──────────────────────────────────────────────
 # SPINORBEC_TEST_TIER controls which tests run:
-#   fast     ~30s   lightweight unit tests only (no ITP/RTP)
-#   ci       ~3min  fast + core integration (split_step, simulation, ground_state)
-#   full     ~6min  everything (default)
+#   smoke_fast / smoke_oracles / smoke_integration: development checks
+#   fast: unit tier (historical name; no development latency guarantee)
+#   ci: fast + core integration + oracle gates
+#   full: everything (default; nightly)
 #   physics  validation-only subset (analytic + physics levels)
 #
 # Usage:
