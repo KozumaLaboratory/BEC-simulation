@@ -1,38 +1,7 @@
-# Loop infrastructure — SELECTIVE tracking (2026-05-21 reform pivot).
-#
-# The reform session moved load-bearing loop behavior INTO .claude/ (agent
-# prompts, helper scripts, slash command). Reproducibility — incident
-# archeology for the 2026-05-19 permission-gate event, Tier-3 audit replays,
-# prompt-bloat / Arbiter regressions — requires these to be tracked.
-# Per-machine state (logs, cache, settings.local) stays ignored.
-.claude/*
+# Legacy Claude tooling is retired; ignore any local remnants.
+/.claude/
 
-# Selectively un-ignore the load-bearing files
-!.claude/agents/
-!.claude/agents.references/
-!.claude/scripts/
-!.claude/commands/
-!.claude/templates/
-!.claude/workload_specs.yaml
-!.claude/settings.json
-!.claude/SYSTEM_DESIGN.md
-!.claude/REWRITE_SUMMARY.md
-!.claude/TODO_deferred.md
-
-# Inside the tracked dirs, re-ignore caches + transient
-.claude/scripts/__pycache__/
-.claude/scripts/tests/__pycache__/
-
-# Per-machine / ephemeral / huge — explicitly ignored
-.claude/projects/
-.claude/logs/
-.claude/cache/
-.claude/settings.local.json
-.claude/agents.v1.bak/
-
-# Loop's scientific record lives at runs/_loop/ and is tracked by default
-# (no entry needed — runs/ is not blanket-ignored, just specific subpaths).
-# Lock files and per-machine scratch under _local/ are ignored:
+# Per-machine scratch from the retired research loop.
 runs/_loop/_local/
 
 # Stray scratch notes occasionally dropped at repo root by tools / sessions.
@@ -198,9 +167,6 @@ __pycache__/
 *.out
 *.aux
 *.toc
-# result CSVs are regenerable (extract from jld2); keep figures (png), not data
-runs/**/*.csv
-
 # figure data lives on TSUBAME (runs/eu_shape_optimization/data/); repo keeps figures+code
 docs/guides/figures/*.csv
 docs/guides/figures/__pycache__/
