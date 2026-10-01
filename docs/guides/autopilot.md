@@ -12,7 +12,7 @@ tree: queue state is **per-run metadata** alongside the run's artefacts.
 ## Architecture in one diagram
 
 ```
- enqueue!(exp; …)        cli.jl autopilot tick    dashboard /api/queue
+ enqueue!(exp; …)        cli.jl autopilot tick    cli.jl autopilot status
         │                         │                       │
         ▼                         ▼                       │
  runs/<cid>/state.toml ──► autopilot_tick! ──► runs/<cid>/state.toml (mutated)
@@ -236,13 +236,6 @@ julia --project=. scripts/cli.jl autopilot drain     # block until running drain
 julia --project=. scripts/cli.jl autopilot why <content_id>  # lineage chain
 ```
 
-## Dashboard panel
-
-`/api/queue` returns the 5-state queue. The React `QueuePanel` renders
-the summary strip + per-state tables (cid / recipe / autonomy / profile
-/ attempt / walltime / gpu·h / job_id / parent / reason). Read-only —
-operate via the CLI.
-
 ## Where to run autopilot
 
 Three options:
@@ -255,10 +248,7 @@ Three options:
    cap login-node processes (15-min limit). Viable only if your cluster
    permits short cron jobs.
 
-The `_live_status.json` watcher works through any of these because the
-dashboard exposes `/api/live/<run>` — autopilot fetches live status via
-HTTP through the SSH tunnel rather than relying on shared filesystem
-visibility.
+Live progress is written to `_live_status.json` in the run directory.
 
 ## Operating the queue by hand
 
@@ -511,7 +501,6 @@ Unhealthy signals to chase before Day 8:
 
 - Warmup window before `is_divergent_status` fires (currently from t=0)
 - `cli.jl autopilot cancel <content_id>` for in-flight cancellation
-- Dashboard-side metrics tab (timeseries from `.autopilot.metrics.jsonl`)
 - More migrations in `_STATE_TOML_MIGRATIONS` once schema evolves
 
 ## See also

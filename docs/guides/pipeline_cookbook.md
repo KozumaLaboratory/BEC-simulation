@@ -103,7 +103,7 @@ pipeline:
 Output (PlotlyJS removed 2026-04-26):
 
 - `<output_dir>/columns.jld2` — one Float32 2D array per frame keyed `frame_NNNNN` (global frame counter across all phases).
-- `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`, `frame_keys`, `times` (with each phase's t offset added), `phase_indices`, `archive` (basename of the JLD2). The dashboard / external notebooks render PNGs on demand from this archive.
+- `<output_dir>/manifest.json` — `n_frames`, `n_phases`, `axis`, `frame_keys`, `times` (with each phase's t offset added), `phase_indices`, `archive` (basename of the JLD2). External notebooks render PNGs on demand from this archive.
 
 ## Calibration: lab-unit YAML
 

@@ -141,7 +141,7 @@ src/
 ├── rotating_basis/       # fast-Larmor regime path (B̂-rotated)
 └── workflow/
     ├── initialization/   # atoms, state zoo, make_workspace
-    ├── io/               # JLD2, dashboard, html_report
+    ├── io/               # JLD2, html_report
     ├── monitoring/       # logging, progress, resource monitor
     └── experiments/      # YAML pipeline + analyzers + optimization
 ```
@@ -259,19 +259,9 @@ These are not CI-tested; they're used for research / paper figure generation.
 
 ---
 
-## B.8 Dashboard + visualization
+## B.8 Visualization
 
-### B.8.1 Web dashboard
-
-```bash
-julia --project=. -e 'using SpinorBEC; serve_dashboard()'
-```
-
-Vite + React + WebGPU dashboard at `http://localhost:8765`. Loads `runs/*/result.jld2`
-and renders 3D density + spin observables. Requires `dashboard/dist/` (built once via
-`bun run build` in `dashboard/` directory).
-
-### B.8.2 Static plots
+### B.8.1 Static plots
 
 ```julia
 using Makie  # or Plots
@@ -281,7 +271,7 @@ animate_dynamics(snapshots; output = "anim.mp4")
 
 Defined in `ext/SpinorBECMakieExt/` (weak dependency on Makie).
 
-### B.8.3 VTK export
+### B.8.2 VTK export
 
 ```julia
 export_vtk(psi, grid; filename = "run.vtu")

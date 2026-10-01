@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "cac99f43cf6e0ff0369b292f63f7289a4952f9e5"
+project_hash = "764fea1f71fea1c05633ace251f190fc5db2a73b"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -623,7 +623,7 @@ version = "2.7.2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 
 [[deps.SpinorBEC]]
-deps = ["Base64", "BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "Test", "TimerOutputs", "Unitful", "YAML"]
+deps = ["BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "Test", "TimerOutputs", "Unitful", "YAML"]
 path = "."
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "1.0.0"

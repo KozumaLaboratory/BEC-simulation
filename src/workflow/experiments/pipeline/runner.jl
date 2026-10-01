@@ -286,7 +286,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
         runtime_seconds=elapsed_s(t_start),
         nan_encountered=false, oom_killed=false)
 
-    # Auto-save dynamics pipelines into the dashboard-canonical layout
+    # Auto-save dynamics pipelines into the canonical snapshot layout
     # whenever the caller supplied a `checkpoint_dir`. Fires for both
     # `kind: rotating_basis` (`:rotating_basis_history`) and `kind: spinor`
     # (`:dynamics_history`) so downstream launchers don't need to call

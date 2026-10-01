@@ -1,19 +1,12 @@
 using Test
 using SpinorBEC
 using SpinorBEC: scratch_get!, scratch_clear!, SCRATCH_REGISTRY
-using SpinorBEC.Dashboard: invalidate_path!
 
-# Four places where a thing that did not happen looked like a thing that was fine.
-#
-# This file gates the three that are checkable without a GPU or an HTTP server,
-# plus the scratch-registry eviction they all depend on. The VTK one is in
+# Scratch-registry eviction and reporting of unsupported VTK fields.
+# The VTK exporter is in
 # `ext/SpinorBECVTKExt` and needs WriteVTK, so it is asserted at source level
 # only — on CODE lines, because a comment explaining the fix is not the fix.
 
-const _QUEUE_ROUTE = normpath(
-    joinpath(@__DIR__, "..", "..", "src", "workflow",
-        "io", "dashboard", "routes", "autopilot_queue.jl"),
-)
 const _VTK = normpath(joinpath(@__DIR__, "..", "..", "ext", "SpinorBECVTKExt",
     "vtk_export.jl"))
 const _RUN_REGISTRY = normpath(
@@ -67,65 +60,6 @@ codelines(p) = [l for l in eachline(p) if !startswith(strip(l), "#")]
         @test g !== nothing && r !== nothing
         # ordering is the whole point: clearing after the GC frees nothing
         @test i < g < r
-    end
-
-    # ---- 2. a queue read failure is reported, not rendered as "no jobs" ----
-    @testset "the queue route reports an unreadable state" begin
-        code = codelines(_QUEUE_ROUTE)
-        # CALIBRATION: the route is being read and still has the catch we care
-        # about, or the assertions below pass on an empty file.
-        @test any(l -> occursin("list_queue(", l), code)
-        @test any(l -> occursin("QueueEntry[]", l), code)
-
-        # ANCHORED to the `list_queue` catch specifically. A first version took
-        # `findfirst(occursin("catch"))` and landed on an unrelated one three
-        # hundred lines earlier — a scan that finds *a* match rather than *the*
-        # match reports on the wrong code and says nothing about it.
-        li = findfirst(l -> occursin("list_queue(st", l), code)
-        @test li !== nothing
-        window = join(code[li:min(length(code), li + 4)], " ")
-        @test occursin("catch e", window)
-        @test occursin("push!(failed", window)
-        # the old shape: a bare `catch` that discards the exception
-        @test !occursin("catch\n", window)
-        # ...and the response must carry the failure out
-        @test any(l -> occursin("unreadable", l), code)
-    end
-
-    # ---- 3. invalidate_path! matches the keys it is given -------------------
-    #
-    # The `data_cache` loop asked whether the whole cache KEY is a substring of
-    # the path. Keys are `"<run_name>#<live_count>"`, so the `#3` suffix is
-    # never in a file path and the test could not match — the wrong-`occursin`-
-    # argument class. The run name IS a path component.
-    @testset "invalidate_path! drops the run it is asked about" begin
-        fpath = "/data/runs/eu151_klaus_barnett/point_003.jld2"
-        data = Dict{Any, Any}(
-            "eu151_klaus_barnett#3" => "cached json",
-            "eu151_klaus_barnett#7" => "cached json",
-            "some_other_run#3" => "keep me",
-        )
-        psi = Dict{Any, Any}(
-            "phase_bin:$(fpath)#snap=0#axis=z#slice=4" => [1.0],
-            "phase_bin:/data/runs/other/point_001.jld2#snap=0" => [2.0],
-        )
-
-        invalidate_path!(data, psi, fpath)
-
-        @test !haskey(data, "eu151_klaus_barnett#3")
-        @test !haskey(data, "eu151_klaus_barnett#7")   # every live_count, not one
-        @test haskey(data, "some_other_run#3")          # other runs preserved
-        @test !haskey(psi, "phase_bin:$(fpath)#snap=0#axis=z#slice=4")
-        @test haskey(psi, "phase_bin:/data/runs/other/point_001.jld2#snap=0")
-
-        # NEGATIVE CONTROL: a path belonging to no cached run must delete
-        # nothing, or the arm above would pass on an implementation that clears
-        # everything — which is `clear_all_caches!`, a different function.
-        data2 = Dict{Any, Any}("eu151_klaus_barnett#3" => "x")
-        psi2 = Dict{Any, Any}("phase_bin:/nowhere/p.jld2#snap=0" => [1.0])
-        invalidate_path!(data2, psi2, "/data/runs/unrelated_run/point_001.jld2")
-        @test length(data2) == 1
-        @test length(psi2) == 1
     end
 
     # ---- 4. the VTK series exporter says something about a name it cannot use

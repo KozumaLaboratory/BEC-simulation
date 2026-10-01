@@ -1,6 +1,6 @@
 # Sweep result contract: the tidy carrier + declared structure.
 #
-# `SweepResult{T}` is the single source of truth that both the dashboard
+# `SweepResult{T}` is the single source of truth that both the
 # `to_viewspec` pipeline and Makie `plot_sweep` consume. `SweepAxis` /
 # `SweepObservable` declare the sweep's structure; `ModelSpec` /
 # `Hypothesis` carry the theoretical apparatus.

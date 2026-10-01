@@ -1,10 +1,4 @@
 # --- I/O subsystem umbrella (top-level files only).
-#
-# The dashboard subsystem (`workflow/io/dashboard.jl` + `dashboard/`) is
-# wrapped in its own `module Dashboard` and loaded later in SpinorBEC.jl,
-# after the analysis subsystem is in scope (because Dashboard imports
-# total_density, spin_density_vector, ... from SpinorBEC). ---
-#
 #   io                  — save_state / load_state (JLD2 round-trip)
 #   unitful_support     — Unitful.jl helpers for YAML parsing
 #   save_rotating_result — rotating-basis history → result.jld2 writer

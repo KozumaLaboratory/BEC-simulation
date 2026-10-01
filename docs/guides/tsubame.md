@@ -208,22 +208,6 @@ singularity exec --nv \
 
 The `%post` block pre-warms a depot inside the image so first-time precompile of FFTW / CUDA / etc. is amortised at build time.
 
-## Live monitoring from your laptop
-
-Dashboard runs on the compute node; SSH-tunnel via the login node:
-
-```bash
-# laptop
-ssh -L 8765:cnode-h100-12:8765 tsubame
-
-# compute node (interactive via qrsh)
-julia --project=. -e 'using SpinorBEC; serve_dashboard(8765)' &
-
-# laptop browser → http://localhost:8765
-```
-
-Lab-image push uses the same tunnel: `curl --data-binary @absorption_shot.png http://localhost:8765/api/lab/image/today`.
-
 ## Checkpoint and resume
 
 `run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.

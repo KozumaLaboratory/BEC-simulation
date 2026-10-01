@@ -1,10 +1,3 @@
-# Makie sweep renderer: consumes the same `to_viewspec(::SweepResult)`
-# output that the React dashboard renders. Renderer paints, does not
-# decide — every per-cell fill / alpha / oracle line comes from the
-# resolved spec. Compare with `src/analysis/sweep.jl::to_viewspec` and
-# `dashboard/src/components/SweepView.tsx`. See
-# `docs/architecture/sweep_view.md`.
-
 using SpinorBEC: SweepResult, SweepAxis, SweepObservable,
     to_viewspec, _cell_edges, resolve_signed_cell_hex,
     resolve_positive_cell_hex, compute_quality_alpha
@@ -31,14 +24,12 @@ end
         quality_threshold=1e-5, quality_dynamic_range_decades=4.0,
         size=nothing) → Figure
 
-Render a `SweepResult` to a Makie `Figure` using the same dispatcher as
-the dashboard. The dispatcher resolves vmin/vmax, per-cell fill hex,
+Render a `SweepResult` to a Makie `Figure` using `to_viewspec`. The dispatcher resolves vmin/vmax, per-cell fill hex,
 and per-cell `quality_alpha`; this function paints them as Makie
 `poly!` rectangles. Out-of-the-box for 2D sweeps; 1D and ≥3D return a
 placeholder figure with a note.
 
-Keyword args mirror `to_viewspec` so the React and Makie renderings are
-pixel-decision identical:
+Keyword args mirror `to_viewspec`:
   * `signed_clip` — observable_key => (vmin, vmax). Default `(-F, +F)`.
   * `positive_clip` — observable_key => (vmin, vmax). Default auto via
     converged-only p05/p95.

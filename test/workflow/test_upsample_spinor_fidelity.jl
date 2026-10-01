@@ -13,10 +13,8 @@
 # solver a topologically different seed — which converges, cheaply, to the wrong
 # branch. That failure has no error message.
 #
-# The NEGATIVE control is the point of the file: `_trilinear_upsample`, the
-# density-only helper the issue warns against, is run on the same field and must
-# FAIL to be a valid prolongation. A fidelity test whose comparison method cannot
-# fail is the degenerate-knob trap.
+# The negative control discards phase after interpolation; it must fail to
+# preserve winding on the same field.
 
 using Test
 using SpinorBEC
@@ -96,22 +94,17 @@ end
         @test maximum(abs.(sub .- psi)) < 1e-10 * maximum(abs, psi)
     end
 
-    @testset "NEGATIVE CONTROL: trilinear on the same field is not a prolongation" begin
-        # `_trilinear_upsample` is real-valued and density-only, which is exactly
-        # why the issue says not to use it for ψ. Applied to |ψ| it cannot carry a
-        # phase at all — so a winding read off it is 0 where the spectral path
-        # returns 1, and the comparison in the testsets above is therefore capable
-        # of failing.
+    @testset "NEGATIVE CONTROL: discarding phase destroys winding" begin
+        # Magnitude alone cannot carry the vortex phase.
         psi, _ = _vortex_spinor(n, box, 1)
-        dens = Array{Float64, 3}(abs.(psi[:, :, :, 2]))
-        tri = SpinorBEC.Dashboard._trilinear_upsample(dens, M)
-        @test size(tri) == (M, M, M)
+        magnitude = abs.(upsample_spinor(psi, M)[:, :, :, 2])
+        @test size(magnitude) == (M, M, M)
         # A real field has no phase to preserve. Stated as an assertion so that if
         # someone ever routes ψ through this helper, this file says why not.
-        @test eltype(tri) <: Real
+        @test eltype(magnitude) <: Real
         gM = make_grid(GridConfig((M, M, M), (box, box, box)))
         as_spinor = zeros(ComplexF64, M, M, M, 3)
-        as_spinor[:, :, :, 2] .= tri
+        as_spinor[:, :, :, 2] .= magnitude
         w = component_phase_winding(as_spinor, gM, 2; radius=R)
         @test w.winding == 0            # the winding is gone
     end

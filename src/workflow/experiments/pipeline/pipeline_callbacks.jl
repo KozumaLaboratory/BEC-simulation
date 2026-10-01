@@ -60,7 +60,7 @@ end
     _build_live_callback(node, status_path) -> Union{Nothing,Function}
 
 Build an on_step callback that periodically writes a JSON status snapshot
-to `status_path` for the dashboard's `/api/live/*` endpoints. Accepts:
+to `status_path` for progress monitoring. Accepts:
 
     live_monitor: false | null   → off
     live_monitor: true           → defaults (every=50)

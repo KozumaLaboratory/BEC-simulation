@@ -163,7 +163,7 @@ end
 
 # Robust positive-observable clip [p05, p95] computed from converged-only
 # cells. Shared by the golden table and the viewspec builder so the
-# dashboard and the golden gate agree on the colour domain. Falls back to
+# renderer and the golden gate agree on the colour domain. Falls back to
 # (0, 1) when no finite converged values exist.
 function _positive_clip_range(result::SweepResult, obs_key::Symbol)
     conv_col = get(result.meta, :conv_column, nothing)

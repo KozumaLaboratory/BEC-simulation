@@ -222,7 +222,7 @@ dynamics:
 Welford-accumulated mean + variance per voxel per spinor component per snapshot,
 persistent JLD2 layout `dynamics/twa_<phase>/{mean, variance, n_traj}` per phase。
 
-Visualization: Round-3 Task 5 dashboard panel (3D variance overlay).
+Visualization data: saved ensemble variance fields.
 
 ### 5.3.3 5 GPU sweeps の overview
 

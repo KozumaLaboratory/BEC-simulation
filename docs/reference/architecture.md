@@ -186,23 +186,6 @@ Every parameter variation is a **dotted config-path override** (e.g. `pipeline.0
 
 For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points (`run_yaml`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`), see `dynamics.md` and `CLAUDE.md` "Entry points".
 
-### Dashboard (`workflow/io/dashboard.jl`)
-
-`serve_dashboard(port)` launches an HTTP server backed by `HTTP.jl` that serves the Vite-built React UI from `dashboard/dist/` plus the following JSON / binary endpoints:
-
-| endpoint                        | purpose                                       |
-|---------------------------------|-----------------------------------------------|
-| `/api/runs`                     | list of run directories                        |
-| `/api/data/<run>`               | dashboard JSON (energies, populations, …)     |
-| `/api/density_atlas?…`          | binary atlas for the WebGPU `HeatmapGrid`      |
-| `/api/snapshot/<run>/frame_N`   | per-frame ψ for the 3D raymarch                |
-| `/api/live/list`                | runs with a fresh `_live_status.json`         |
-| `/api/live/<run>`               | latest live status (step / t / energy / pops)  |
-| `/api/lab/list?run=…`           | lab images uploaded for `<run>`                |
-| `/api/lab/image` (POST)         | upload a `.png` lab image into a run dir       |
-
-Atlases are mtime-validated and cached under `runs/_dashboard_cache/atlas__<run>__<file>__axis<N>__bsz<true|false>.bin` (example). Optional bitshuffle + zstd-3 compression via `?bsz=1` (see `docs/design/dashboard_perf_notes.md`).
-
 ## I/O (`workflow/io/`)
 
 JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are described in `dynamics.md` "Output cadence" + `guides/tsubame.md` "Filesystem layout". `estimate_run_budget(yaml)` prints VRAM / host RAM / disk projections from a YAML.
@@ -216,15 +199,15 @@ JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are descri
 | LinearAlgebra | Eigendecomposition for matrix exponentials |
 | JLD2 | Binary state serialization (snapshot frames, scan points) |
 | YAML | Experiment configuration parsing |
-| JSON | Manifests, dashboard responses, `_live_status.json` |
-| HTTP / Sockets | `serve_dashboard` HTTP server |
-| CodecZlib / CodecZstd | Optional snapshot + atlas compression |
+| JSON | Manifests, `_live_status.json` |
+| HTTP | Optional Slack notifications |
+| CodecZlib / CodecZstd | Snapshot compression |
 | Unitful | Lab-unit YAML parsing (`"X Gauss"`, `"f Hz"`) |
 | WriteVTK | VTK export (3D paraview workflow) |
 | CUDA | GPU backend (weak extension `SpinorBECCUDAExt`) |
 | Makie | 2D/3D visualization (weak extension `SpinorBECMakieExt`) |
 
-No server-side plotting: dashboard renders 2D heatmaps via WebGPU (`HeatmapGrid`) and time series via SVG (`LineChartSVG`). PlotlyJS was removed 2026-04-26 — see `guides/migration_guide.md` for the user-facing changes.
+Visualization uses the optional Makie and VTK extensions. PlotlyJS was removed 2026-04-26 — see `guides/migration_guide.md` for the user-facing changes.
 
 ## Module dependency diagram
 
@@ -235,7 +218,7 @@ graph TD
     solvers["solvers/<br/>ground_state · simulation · sgpe · projected_gp · twa"]
     init["workflow/initialization/<br/>atoms · make_workspace · state_zoo"]
     experiments["workflow/experiments/<br/>pipeline_runner · pipeline_analyzers · run_registry · calibration · pulse_sequence"]
-    io["workflow/io/<br/>units · dashboard · run_summary · html_report · vtk_export"]
+    io["workflow/io/<br/>units · run_summary · html_report · vtk_export"]
     analysis["analysis/<br/>observables · topology · tomography · faraday · imaging · phases/"]
 
     foundation --> hamiltonian
