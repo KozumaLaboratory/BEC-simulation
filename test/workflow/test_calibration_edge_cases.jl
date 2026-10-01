@@ -8,6 +8,63 @@ using Dates
 using SpinorBEC
 using SpinorBEC: _calibration_from_dict, load_calibration_history,
     interpolate_calibration
+using YAML
+using JSON
+
+@testset "Calibrated conditions agree across entry paths" begin
+    mktempdir() do dir
+        spec = PipelineConfig([
+            GroundStateStep(
+                atom=:Rb87, grid=(n=[4, 4, 4], box=[8.0, 8.0, 8.0]),
+                interactions=(N_atoms=10, omega_ref=100.0, c0=1.0, c1=0.0),
+                potential=(type=:harmonic, fort_power_mw=[1.0, 4.0, 9.0]),
+                initial_state=:polar, dt=0.001, n_steps=1,
+            ),
+        ]).raw_data
+        spec["calibration"] = Dict("fort" => Dict(
+            "sqrt_coeffs_hz" => [100.0, 200.0, 300.0]))
+
+        for history in (false, true)
+            input = deepcopy(spec)
+            if history
+                delete!(input, "calibration")
+                input["calibration_history"] = [
+                    Dict(
+                        "date" => "2026-01-01",
+                        "fort" => Dict(
+                            "sqrt_coeffs_hz" => [50.0, 100.0, 150.0]),
+                    ),
+                    Dict(
+                        "date" => "2026-01-03",
+                        "fort" => Dict(
+                            "sqrt_coeffs_hz" => [150.0, 300.0, 450.0]),
+                    ),
+                ]
+                input["target_date"] = "2026-01-02"
+            end
+            original = deepcopy(input)
+            path = joinpath(dir, "calibrated.yaml")
+            YAML.write_file(path, input)
+            loaded = load_config(path)
+            literal = load_config_from_string(YAML.write(input))
+            inspected = inspect_config(input)
+            # Independent expected physical frequencies: coeff * sqrt(power).
+            expected = ["100.0 Hz", "400.0 Hz", "900.0 Hz"]
+            @test loaded.steps[1].params["potential"]["omega"] == expected
+            @test literal.steps[1].params["potential"]["omega"] == expected
+            @test inspected.normalised["pipeline"][1]["ground_state"]["potential"]["omega"] ==
+                expected
+            preview = redirect_stdout(devnull) do
+                run_experiment(input; dry_run=true, verbose=false, audit=false)
+            end
+            resolved = JSON.parse(preview)
+            @test resolved["pipeline"][1]["ground_state"]["potential"]["omega"] == expected
+            @test !haskey(resolved, history ? "calibration_history" : "calibration")
+            @test input == original
+            @test !any(w -> w.severity == :error, inspected.warnings)
+        end
+    end
+end
 
 @testset "Calibration edge cases" begin
     @testset "CalibrationHistory constructor invariants" begin

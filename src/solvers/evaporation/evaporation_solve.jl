@@ -78,8 +78,8 @@ _trap_at_time(trap::EvapTrap, ramp::FortRamp, t::Float64) =
     run_evaporation(trap, ramp, p; N0, T0, dt=ramp_duration/3000, save_every=10) -> EvapResult
 
 Integrate the (N, T) evaporation ODEs over the FORT ramp with fixed-step RK4.
-Stops at BEC onset (PSD ≥ ζ(3), interpolated) or when η < `p.eta_min` everywhere
-(evaporation stalled). `N0` initial atom number, `T0` initial temperature [K].
+Stops at BEC onset (PSD ≥ ζ(3), interpolated) or the end of the ramp.
+`N0` initial atom number, `T0` initial temperature [K].
 """
 function run_evaporation(
     trap::EvapTrap, ramp::FortRamp, p::EvapParams;
@@ -203,8 +203,7 @@ Condensed human-readable metrics of an `EvapResult`: BEC reached?, atom number
 (`NaN` when BEC is not reached — `r.N_BEC` is the final non-condensed `N` then),
 temperature [µK], onset time [s], efficiency `γ_eff = -dlnρ/dlnN`, the surviving
 fraction `N_BEC/N₀`, the peak phase-space density, the η at onset, the η at the
-*loaded start* (`eta_start` — if ≲ `eta_min` evaporation can't even begin: a shallow
-loaded trap, NOT a ramp problem), and whether the gas cooled at all (`cooled` — a deep
+*loaded start* (`eta_start`), and whether the gas cooled at all (`cooled` — a deep
 static trap with only background loss decays `N` but keeps `T`, so `cooled=false`).
 """
 function evaporation_summary(r::EvapResult)
@@ -238,8 +237,7 @@ experimentalist asks *before* trusting a ramp, independent of whether it happene
 reach BEC:
 
 - `eta_start` / `eta_min` — the truncation at the loaded start and its minimum over the
-  run. `eta_start ≲ eta_min(model) = 4` means the loaded trap is too shallow to evaporate
-  at all (raise the depth or lower `T₀`), NOT a ramp the optimizer can fix.
+  run. The minimum is an observed trajectory value, not an integration cutoff.
 - `collision_ratio_R = γ_el / (1/τ_bg + K₃⟨n²⟩)` at the start — the **good-to-bad
   collision ratio**. Runaway evaporation needs `R` large (≳ 10²–10³); `R ≲ 50` means
   background/3-body losses outrun elastic rethermalisation and evaporation stalls.

@@ -55,6 +55,16 @@ using SpinorBEC: _rebuild_workspace_with_dt
         @test ws2.sim_params.dt == 0.005
         @test ws2.sim_params.rotating_frame_omega == omega
         @test ws2.sim_params.spin_rotating_frame_omega == spin_omega
+        @test ws2.sim_params.imaginary_time
+        sp_real = SimParams(; dt=0.01, n_steps=10, imaginary_time=false,
+            rotating_frame_omega=omega, spin_rotating_frame_omega=spin_omega)
+        ws_real = make_workspace(; grid, atom=Rb87, interactions, sim_params=sp_real,
+            fft_flags=FFTW.ESTIMATE)
+        ws_half = _rebuild_workspace_with_dt(ws_real, 0.005)
+        @test !ws_half.sim_params.imaginary_time
+        @test all(z -> abs(z) ≈ 1.0, ws_half.kinetic_phase)
+        @test ws_half.sim_params.rotating_frame_omega == omega
+        @test ws_half.sim_params.spin_rotating_frame_omega == spin_omega
     end
 
     @testset "energy_decomposition includes -Ω⟨L_z⟩" begin

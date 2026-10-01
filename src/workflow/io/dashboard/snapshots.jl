@@ -17,8 +17,7 @@ function _load_psi_cached(
     if haskey(cache, key)
         return cache[key]
     end
-    # Evict oldest when at cap (Dicts iterate in insertion order in Julia,
-    # so popfirst!-style first-key removal gives us FIFO eviction).
+    # Evict an entry at capacity, preferring heavy wavefunction arrays.
     while length(cache) >= PSI_CACHE_MAX_ENTRIES
         _evict_one!(cache)
     end

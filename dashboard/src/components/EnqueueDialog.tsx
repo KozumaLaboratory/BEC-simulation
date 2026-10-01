@@ -10,7 +10,7 @@ import {
 
 // 2-step preview-confirm modal.
 //
-//   Step 1 (form)    — fill YAML + backend + priority + autonomy + recipe
+//   Step 1 (form)    — fill conditions + backend + priority + autonomy + recipe
 //                       + profile + walltime, click "Preview"
 //   Step 2 (preview) — inspector findings + budget impact + would-be cid,
 //                       click "Commit" (button labelled "Commit [DRY-RUN]"
@@ -23,9 +23,9 @@ import {
 interface Props {
   open: boolean
   onClose: () => void
-  /** Initial YAML — populated when "Fork" was clicked from a queue row,
+  /** Initial conditions — populated when "Fork" was clicked from a queue row,
    * empty when "+ Enqueue" was clicked from the header. */
-  initialYaml?: string
+  initialConfig?: string
   /** Whether the autopilot is currently in dry-run mode (from /api/queue). */
   dryRun: boolean
   /** Whether the autopilot is paused. We let commits through even when
@@ -52,29 +52,26 @@ const SESSION_ID = (() => {
   }
 })()
 
-const DEFAULT_YAML = `# Edit this YAML, then click Preview.
-pipeline:
-  - ground_state:
-      atom: Eu151
-      grid: {n: [32, 32, 32], box: [10.0, 10.0, 10.0]}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      interactions: {N_atoms: 10000, omega_ref: 691.1504}
-      B: {Bz: "0.01 Gauss"}
-      dt: 0.005
-      n_steps: 3000
-      tol: 1.0e-8
-`
+const DEFAULT_CONFIG = JSON.stringify({
+  pipeline: [{ ground_state: {
+    atom: 'Eu151',
+    grid: { n: [32, 32, 32], box: [10, 10, 10] },
+    potential: { type: 'harmonic', omega: [1, 1, 1] },
+    interactions: { N_atoms: 10000, omega_ref: 691.1504 },
+    B: { Bz: '0.01 Gauss' }, dt: 0.005, n_steps: 3000, tol: 1e-8,
+  } }],
+}, null, 2)
 
 export function EnqueueDialog({
   open,
   onClose,
-  initialYaml,
+  initialConfig,
   dryRun,
   paused,
   onCommitted,
 }: Props) {
   const [step, setStep] = useState<Step>('form')
-  const [yamlText, setYamlText] = useState<string>(initialYaml || DEFAULT_YAML)
+  const [configText, setConfigText] = useState<string>(initialConfig || DEFAULT_CONFIG)
   const [backend, setBackend] = useState<'local' | 'uge'>('local')
   const [priority, setPriority] = useState<number>(5)
   const [autonomy, setAutonomy] = useState<'suggest' | 'propose' | 'dispatch'>(
@@ -93,16 +90,16 @@ export function EnqueueDialog({
       setStep('form')
       setPreview(null)
       setError(null)
-      if (initialYaml !== undefined) {
-        setYamlText(initialYaml || DEFAULT_YAML)
+      if (initialConfig !== undefined) {
+        setConfigText(initialConfig || DEFAULT_CONFIG)
       }
     }
-  }, [open, initialYaml])
+  }, [open, initialConfig])
 
   const req: EnqueueRequest = useMemo(
     () => ({
       preview: true,
-      yaml: yamlText,
+      config_text: configText,
       backend,
       priority,
       autonomy_level: autonomy,
@@ -111,7 +108,7 @@ export function EnqueueDialog({
       estimated_walltime_hours: walltime,
       session_id: SESSION_ID,
     }),
-    [yamlText, backend, priority, autonomy, recipeName, profile, walltime],
+    [configText, backend, priority, autonomy, recipeName, profile, walltime],
   )
 
   async function handlePreview() {
@@ -194,8 +191,8 @@ export function EnqueueDialog({
           <div className="flex-1 min-h-0 overflow-auto p-5">
             {step === 'form' ? (
               <FormStep
-                yamlText={yamlText}
-                onYamlChange={setYamlText}
+                configText={configText}
+                onConfigChange={setConfigText}
                 backend={backend}
                 onBackendChange={setBackend}
                 priority={priority}
@@ -287,8 +284,8 @@ function DialogHeader({
 }
 
 function FormStep(props: {
-  yamlText: string
-  onYamlChange: (v: string) => void
+  configText: string
+  onConfigChange: (v: string) => void
   backend: 'local' | 'uge'
   onBackendChange: (v: 'local' | 'uge') => void
   priority: number
@@ -306,11 +303,11 @@ function FormStep(props: {
     <div className="space-y-4">
       <div>
         <label className="text-[10.5px] uppercase tracking-[0.10em] text-[var(--ink-faint)] font-mono">
-          spec YAML
+          spec conditions
         </label>
         <textarea
-          value={props.yamlText}
-          onChange={(e) => props.onYamlChange(e.target.value)}
+          value={props.configText}
+          onChange={(e) => props.onConfigChange(e.target.value)}
           rows={14}
           spellCheck={false}
           className="mt-1 w-full font-mono text-xs p-3 border border-[var(--ink-faint)] focus:border-[var(--ink)] outline-none bg-background"

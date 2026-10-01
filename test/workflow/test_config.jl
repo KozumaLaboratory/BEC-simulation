@@ -206,7 +206,7 @@ using SpinorBEC
         @test pf_auto == -1.0
     end
 
-    @testset "run_config - ground_state" begin
+    @testset "run_pipeline - ground_state" begin
         yaml = """
         pipeline:
           - ground_state:
@@ -227,14 +227,14 @@ using SpinorBEC
               potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
-        result = run_config(cfg; verbose=false)
+        result = run_pipeline(cfg; verbose=false)
         @test result.ground_state_energy isa Float64
         @test isfinite(result.ground_state_energy)
         @test result.ground_state_converged isa Bool
         @test result.psi isa AbstractArray
     end
 
-    @testset "run_config - dynamics" begin
+    @testset "run_pipeline - dynamics" begin
         yaml = """
         pipeline:
           - ground_state:
@@ -263,12 +263,12 @@ using SpinorBEC
               potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
-        result = run_config(cfg; verbose=false)
+        result = run_pipeline(cfg; verbose=false)
         @test result.ground_state_energy isa Float64
         @test result.dynamics_result !== nothing
     end
 
-    @testset "run_config - dynamics with perturbation" begin
+    @testset "run_pipeline - dynamics with perturbation" begin
         yaml = """
         pipeline:
           - ground_state:
@@ -299,7 +299,7 @@ using SpinorBEC
               potential: {type: harmonic, omega: [1.0]}
         """
         cfg = load_config_from_string(yaml)
-        result = run_config(cfg; verbose=false)
+        result = run_pipeline(cfg; verbose=false)
         @test result.dynamics_result !== nothing
     end
 

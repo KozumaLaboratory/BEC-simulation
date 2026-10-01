@@ -185,7 +185,7 @@ using SpinorBEC
         @test get(config.steps[3].params, "temperature_ratio", nothing) === nothing
     end
 
-    @testset "run_config integration" begin
+    @testset "run_pipeline integration" begin
         yaml_str = """
         pipeline:
           - ground_state:
@@ -217,7 +217,7 @@ using SpinorBEC
         """
 
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
 
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64
@@ -225,7 +225,7 @@ using SpinorBEC
         @test result.dynamics_result !== nothing
     end
 
-    @testset "run_config integration - phase temperature_ratio" begin
+    @testset "run_pipeline integration - phase temperature_ratio" begin
         yaml_str = """
         pipeline:
           - ground_state:
@@ -258,11 +258,11 @@ using SpinorBEC
 
         config = load_config_from_string(yaml_str)
         @test config.steps[2].params["temperature_ratio"] == 0.05
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
         @test result.dynamics_result !== nothing
     end
 
-    @testset "run_config integration - composite potential" begin
+    @testset "run_pipeline integration - composite potential" begin
         yaml_str = """
         pipeline:
           - ground_state:
@@ -289,7 +289,7 @@ using SpinorBEC
         """
 
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
         @test result.ground_state_energy !== nothing
         @test result.ground_state_energy isa Float64
     end

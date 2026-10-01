@@ -1,12 +1,12 @@
 # --- Dashboard subsystem (live HTTP/WS dashboard for SpinorBEC runs) ---
 #
-# 21 source files split by concern:
+# Source files split by concern:
 #
-#   encoding/cache/snapshots/route_helpers — shared infrastructure
+#   encoding/jld_handles/cache/snapshots/route_helpers — shared infrastructure
 #   compute/{helpers,density,phase,binary}  — number-crunch helpers
 #   routes/{density,phase,vortex,scan,
 #           snapshots,lab_live,misc}        — HTTP endpoint handlers
-#   server/{json,data_export,router,static} — HTTP/WS server core
+#   server/{data_export,router,static} — HTTP/WS server core
 #   pack3d, websocket                       — binary packers + WS frames
 #
 # Wrapped in `module Dashboard` so dashboard internals (cache structs,
@@ -40,7 +40,7 @@ using ..SpinorBEC: make_grid, make_fft_plans, spin_matrices
 using ..SpinorBEC: spin_density_vector
 using ..SpinorBEC: probability_current, superfluid_velocity, superfluid_vorticity
 using ..SpinorBEC: synthetic_dim_dispersion
-using ..SpinorBEC: list_runs, run_status
+using ..SpinorBEC: list_runs, run_status, _config_snapshot_path, _load_config_data
 # Dashboard internals (pack3d.jl + compute/phase.jl) call _component_slice
 # directly. It's a private helper from foundation/spinor_utils/slice_helpers.jl;
 # named import here makes the cross-module reference explicit.
@@ -49,15 +49,16 @@ using ..SpinorBEC: _component_slice
 # needed so configs whose GS step pulls `grid:` via `use: [some_mixin]`
 # (e.g. eu151_edh_k3_compare via eu151_edh_phys) still resolve. Imported
 # unexported.
-using ..SpinorBEC: apply_templates_and_mixins!
+using ..SpinorBEC: apply_mixins!
 using ..SpinorBEC: QueueEntry, autopilot_queue_root, list_queue,
     is_autopilot_dry_run, is_autopilot_paused,
     enqueue!, Experiment, content_id, default_store,
-    inspect_config_string, inspect_config, budget_gate, refresh_budget!,
+    inspect_config, budget_gate, refresh_budget!,
     UGE_PROFILE_DIRECTIVES
 
 include("dashboard/encoding.jl")          # bitshuffle + zstd
-include("dashboard/cache.jl")             # PSI_CACHE, JLD handle pool, atlas disk cache
+include("dashboard/jld_handles.jl")       # bounded read-handle pool + reader lifetime
+include("dashboard/cache.jl")             # PSI_CACHE, atlas disk cache + invalidation
 include("dashboard/snapshots.jl")         # _load_psi_cached + sibling result.jld2 redirect
 include("dashboard/route_helpers.jl")     # _parse_run_file / _q_int / _q_float / _q_flag / _q_sym
 include("dashboard/routes/density.jl")    # density2d/3d/_bin/_max/_atlas/_rotated handlers
@@ -67,8 +68,7 @@ include("dashboard/routes/scan.jl")       # scan_group/_status, physics_summary,
 include("dashboard/routes/snapshots.jl")  # snapshots, dynamics_series, ensemble
 include("dashboard/routes/lab_live.jl")   # lab_list, live_list, live
 include("dashboard/routes/misc.jl")       # data, coherence, vector3d_bin
-include("dashboard/server/json.jl")       # _write_json + _json_string
-include("dashboard/routes/inspect.jl")    # /api/effective_config — depends on _json_string
+include("dashboard/routes/inspect.jl")    # /api/effective_config — JSON responses
 include("dashboard/routes/autopilot_queue.jl")  # /api/queue — autopilot state
 include("dashboard/routes/autopilot_enqueue.jl") # /api/queue/enqueue — POST
 include("dashboard/routes/autopilot_action.jl")  # /api/queue/action — POST

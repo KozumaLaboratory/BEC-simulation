@@ -26,6 +26,7 @@ using SpinorBEC
 # (`scripts/prior_art.py`) is what makes enumerating cheap; this is what makes
 # leaving a row unread impossible to do quietly.
 @testset "prior-art records carry a disposition for every entry" begin
+    python = Sys.iswindows() ? "python" : "python3"
     root = normpath(joinpath(@__DIR__, ".."))
     dir = joinpath(root, "docs", "campaign", "prior_art")
     tool = joinpath(root, "scripts", "prior_art.py")
@@ -33,7 +34,7 @@ using SpinorBEC
 
     # `--check` is the same predicate the tool exposes to a human, so the gate and
     # the command someone runs by hand cannot drift apart.
-    ok = success(pipeline(`python3 $tool --check`; stdout=devnull, stderr=devnull))
+    ok = success(pipeline(`$python $tool --check`; stdout=devnull, stderr=devnull))
     if !ok
         @info "prior-art check failed; run `python3 scripts/prior_art.py --check`" *
             " to see which entries are unread" dir
@@ -67,7 +68,7 @@ using SpinorBEC
         refused =
             !success(
                 pipeline(
-                    `python3 $(joinpath(fake_root, "scripts", "prior_art.py")) --check`;
+                    `$python $(joinpath(fake_root, "scripts", "prior_art.py")) --check`;
                     stdout=devnull, stderr=devnull),
             )
         @test refused          # an `unread` row MUST fail
@@ -78,88 +79,136 @@ using SpinorBEC
         write(p, replace(read(p, String), "| unread |" => "| unrelated |"))
         @test success(
             pipeline(
-                `python3 $(joinpath(fake_root, "scripts", "prior_art.py")) --check`;
+                `$python $(joinpath(fake_root, "scripts", "prior_art.py")) --check`;
                 stdout=devnull, stderr=devnull),
         )
     end
 end
 
-# The two ways a record can be destroyed by the thing that maintains it. Both
-# were found by running the generator once, not by the gate above — which only
-# ever reads the file — so they get their own.
+@testset "prior-art UTF-8 rows preserve notes and invalid dispositions" begin
+    python = Sys.iswindows() ? "python" : "python3"
+    tool = joinpath(@__DIR__, "..", "scripts", "prior_art.py")
+    program = raw"""
+import importlib.util
+import pathlib
+import sys
+import tempfile
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("prior_art", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+with tempfile.TemporaryDirectory() as d:
+    mod.RECORD_DIR = pathlib.Path(d)
+    p = mod.RECORD_DIR / "topic.md"
+    p.write_text("| ref | disposition | what | note |\n"
+                 "|---|---|---|---|\n"
+                 "| #7 | read | pr: 日本語 | 調査理由 | 続き |\n"
+                 "| #8 | invalid | issue: 未処理 | 保持する |\n",
+                 encoding="utf-8")
+    assert list(mod.record_rows(p)) == [
+        ("#7", "read", "pr: 日本語", "調査理由 | 続き"),
+        ("#8", "invalid", "issue: 未処理", "保持する")]
+    assert mod.check() == 1
+    mod.write_record("topic", ["日本語"],
+                     [{"kind": "pr", "ref": "#7", "title": "日本語"}])
+    rows = list(mod.record_rows(p))
+    assert rows[0][3] == "調査理由 | 続き"
+    assert rows[1][1:] == ("invalid", "(no longer open)", "保持する")
+    assert mod.check() == 1
+    p.write_text(p.read_text(encoding="utf-8").replace("| invalid |", "| read |"),
+                 encoding="utf-8")
+    assert mod.check() == 0
+    p.write_text("| #9 | unread |\n", encoding="utf-8")
+    try:
+        mod.check()
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("truncated unread row silently disappeared")
+    for broken in ("| | read | pr: missing reference | |\n",
+                   "| #7 | read | pr: one | first note |\n"
+                   "| #7 | read | pr: two | second note |\n"):
+        p.write_text(broken, encoding="utf-8")
+        before = p.read_bytes()
+        try:
+            mod.write_record("topic", [], [])
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("ambiguous record was overwritten")
+        assert p.read_bytes() == before
+    p.unlink()
+    mod.write_record("topic", ["title"],
+                     [{"kind": "pr", "ref": "#7", "title": "left | right"}])
+    assert list(mod.record_rows(p)) == [
+        ("#7", "unread", "pr: left &#124; right", "")]
+    # Failure on a first enumeration must not manufacture an apparently complete
+    # empty record. Existing records must also survive partial results unchanged.
+    for topic in ("new_topic", "topic"):
+        target = mod.RECORD_DIR / (topic + ".md")
+        before = target.read_bytes() if target.exists() else None
+        with patch.object(sys, "argv", ["prior_art", "--topic", topic,
+                                        "--keywords", "title"]), \
+             patch.object(mod, "enumerate_topic", return_value=([], False)):
+            assert mod.main() == 2
+        assert (target.read_bytes() if target.exists() else None) == before
+"""
+    @test success(`$python -c $program $tool`)
+end
+
+# Provider failures and successful enumeration must have different outcomes.
+# Mock the subprocess boundary rather than installing a /bin/sh gh fixture:
+# the same cases must exercise the real enumeration and CLI on every OS.
 @testset "regenerating a prior-art record cannot destroy it" begin
-    root = normpath(joinpath(@__DIR__, ".."))
-    tool = joinpath(root, "scripts", "prior_art.py")
+    python = Sys.iswindows() ? "python" : "python3"
+    tool = joinpath(@__DIR__, "..", "scripts", "prior_art.py")
+    program = raw"""
+import importlib.util
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
 
-    setup = d -> begin
-        mkpath(joinpath(d, "scripts"))
-        mkpath(joinpath(d, "docs", "campaign", "prior_art"))
-        cp(tool, joinpath(d, "scripts", "prior_art.py"))
-        rec = joinpath(d, "docs", "campaign", "prior_art", "t.md")
-        write(
-            rec,
-            """
-# Prior art — t
+spec = importlib.util.spec_from_file_location("prior_art", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+with tempfile.TemporaryDirectory() as d:
+    mod.ROOT = pathlib.Path(d)
+    mod.RECORD_DIR = pathlib.Path(d)
+    rec = mod.RECORD_DIR / "t.md"
+    rec.write_text("| ref | disposition | what | note |\n"
+                   "|---|---|---|---|\n"
+                   "| #7 | read | pr: a thing | THE REASON |\n", encoding="utf-8")
+    before = rec.read_bytes()
+    argv = ["prior_art", "--topic", "t", "--keywords", "spgpe"]
+    with patch.object(sys, "argv", argv), \
+         patch.object(mod.subprocess, "run", side_effect=FileNotFoundError("missing provider")):
+        assert mod.main() == 2
+    assert rec.read_bytes() == before
 
-> **FROZEN 2026-01-01.**
-
-| ref | disposition | what | note |
-|---|---|---|---|
-| #7 | read | pr: a thing | THE REASON, which is the part worth keeping |
-""",
-        )
-        (joinpath(d, "scripts", "prior_art.py"), rec)
-    end
-
-    # 1. An INCOMPLETE enumeration must not overwrite. `gh` failing and `gh`
-    #    returning nothing are identical in the data and opposite in meaning; the
-    #    first version could not tell them apart, so an offline moment would have
-    #    replaced the record with "nothing open matched these keywords".
-    mktempdir() do d
-        (script, rec) = setup(d)
-        before = read(rec, String)
-        # No `gh` on PATH is the cheapest faithful stand-in for "the enumeration
-        # failed" — same code path as a network error or an expired token.
-        p = pipeline(
-            setenv(`python3 $script --topic t --keywords spgpe`, "PATH" => "/usr/bin:/bin");
-            stdout=devnull, stderr=devnull,
-        )
-        @test !success(p)             # must refuse…
-        @test read(rec, String) == before   # …and leave the file untouched
-    end
-
-    # 2. A COMPLETE regeneration must carry the notes forward. The first version
-    #    preserved only the disposition column, so regeneration silently blanked
-    #    every note while cheerfully reporting `0 unread`.
-    mktempdir() do d
-        (script, rec) = setup(d)
-        bin = joinpath(d, "bin")
-        mkpath(bin)
-        gh = joinpath(bin, "gh")
-        write(
-            gh,
-            """
-            #!/bin/sh
-            case "\$1" in
-              pr) echo '[{"number":7,"title":"a thing","headRefName":"f/spgpe"}]' ;;
-              *)  echo '[]' ;;
-            esac
-            """,
-        )
-        chmod(gh, 0o755)
-        # The tree must be a git repo or BRANCH enumeration fails, the run counts
-        # as incomplete, and the refusal above fires — which would make this case
-        # pass for the opposite of its reason. (It did, the first time.)
-        run(pipeline(`git -C $d init -q`; stdout=devnull, stderr=devnull))
-        @test success(
-            pipeline(
-                setenv(
-                    `python3 $script --topic t --keywords spgpe`,
-                    "PATH" => bin * ":/usr/bin:/bin",
-                );
-                stdout=devnull, stderr=devnull,
-            ),
-        )
-        @test occursin("THE REASON", read(rec, String))
-    end
+    calls = []
+    def provider(args, **kwargs):
+        calls.append(args)
+        assert kwargs["encoding"] == "utf-8"
+        if args[:3] == ["gh", "pr", "list"]:
+            out = json.dumps([{"number": 7, "title": "a thing 日本語",
+                               "headRefName": "f/spgpe"}], ensure_ascii=False)
+        elif args[:3] == ["gh", "issue", "list"]:
+            out = "[]"
+        elif args[0] == "git":
+            out = "origin/unrelated\n"
+        else:
+            raise AssertionError(args)
+        return subprocess.CompletedProcess(args, 0, stdout=out, stderr="")
+    with patch.object(sys, "argv", argv), \
+         patch.object(mod.subprocess, "run", side_effect=provider):
+        assert mod.main() == 0
+    assert len(calls) == 3
+    assert list(mod.record_rows(rec)) == [
+        ("#7", "read", "pr: a thing 日本語", "THE REASON")]
+"""
+    @test success(`$python -c $program $tool`)
 end

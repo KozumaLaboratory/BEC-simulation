@@ -7,7 +7,6 @@ export serve_dashboard
 const _REPO_ROOT = normpath(joinpath(@__DIR__, "..", "..", "..", "..", ".."))
 const _WEB_DIST_DIR = joinpath(_REPO_ROOT, "dashboard", "dist")
 const _WEB_DIST_INDEX = joinpath(_WEB_DIST_DIR, "index.html")
-const _LEGACY_DASHBOARD_HTML = joinpath(_REPO_ROOT, "runs", "tools", "dashboard.html")
 
 """
     serve_dashboard(port=8080; base_dir="runs")
@@ -15,15 +14,12 @@ const _LEGACY_DASHBOARD_HTML = joinpath(_REPO_ROOT, "runs", "tools", "dashboard.
 Start a local HTTP server for the React + WebGPU dashboard.
 Browse to http://localhost:\$port to view results.
 
-Requires `dashboard/dist/` (run `cd dashboard && bun run build`). The
-legacy Plotly dashboard remains reachable at `/legacy` as long as
-`runs/tools/dashboard.html` exists.
+Requires `dashboard/dist/` (run `cd dashboard && bun run build`).
 
 API:
 - `GET /`               → React dashboard (dashboard/dist/index.html)
 - `GET /assets/*`       → hashed static assets from dashboard/dist/assets/
 - `GET /favicon.svg`    → favicon from dashboard/dist/
-- `GET /legacy`         → legacy Plotly dashboard (if present)
 - `GET /api/runs`       → list of run directories
 - `GET /api/data/:name` → dashboard data JSON for a run
 - `GET /api/refresh`    → clear cache
@@ -45,19 +41,12 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs",
             ),
         )
     end
-    # Read index.html / legacy.html on each request, mtime-gated. Avoids
+    # Read index.html on each request, mtime-gated. Avoids
     # the previous footgun where a `bun run build` while the server was
     # alive would point the cached HTML at a stale asset hash and the
     # browser landed on a black screen until restart.
     html_cache = Ref{Tuple{Float64, String}}((0.0, ""))
-    legacy_cache = Ref{Tuple{Float64, String}}((0.0, ""))
     fetch_html() = _mtime_cached_read(html_cache, _WEB_DIST_INDEX)
-    fetch_legacy() =
-        if isfile(_LEGACY_DASHBOARD_HTML)
-            _mtime_cached_read(legacy_cache, _LEGACY_DASHBOARD_HTML)
-        else
-            ""
-        end
 
     data_cache = Dict{String, String}()
     psi_cache = Dict{String, Any}()  # path → (psi, n_comp, n_pts, F, pops)
@@ -88,7 +77,6 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs",
     println("Dashboard server running at http://$(bind_addr):$port")
     println("  Serving runs from: $(abspath(base_dir))")
     println("  React app:         $(_WEB_DIST_INDEX)")
-    !isempty(fetch_legacy()) && println("  Legacy dashboard:  /legacy")
     println("  Press Ctrl+C to stop")
     flush(stdout)
 
@@ -96,7 +84,7 @@ function serve_dashboard(port::Int=8080; base_dir::String="runs",
         while true
             sock = Sockets.accept(server)
             @async _handle_dashboard_connection(
-                sock, fetch_html, fetch_legacy, data_cache, psi_cache, base_dir
+                sock, fetch_html, data_cache, psi_cache, base_dir
             )
         end
     catch e
@@ -123,7 +111,7 @@ function _mtime_cached_read(slot::Ref{Tuple{Float64, String}}, path::AbstractStr
 end
 
 function _handle_dashboard_connection(
-    sock, fetch_html, fetch_legacy, data_cache, psi_cache, base_dir
+    sock, fetch_html, data_cache, psi_cache, base_dir
 )
     try
         # Keep-alive loop: a single TCP connection serves successive
@@ -233,7 +221,7 @@ function _handle_dashboard_connection(
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             else
                 status, content_type, body = _route_dashboard(
-                    path, fetch_html(), fetch_legacy(), data_cache, psi_cache, base_dir
+                    path, fetch_html(), data_cache, psi_cache, base_dir
                 )
                 _send_http_response(sock, status, content_type, body; keep_alive, accept_gzip)
             end
@@ -302,15 +290,9 @@ function _route_dashboard_post(path, body_bytes, base_dir;
     (404, "text/plain", "POST endpoint not found: $path")
 end
 
-function _route_dashboard(path, html_content, legacy_html, data_cache, psi_cache, base_dir)
+function _route_dashboard(path, html_content, data_cache, psi_cache, base_dir)
     if path == "/" || path == ""
         (200, "text/html; charset=utf-8", html_content)
-    elseif path == "/legacy"
-        if isempty(legacy_html)
-            (404, "text/plain", "Legacy dashboard not present")
-        else
-            (200, "text/html; charset=utf-8", legacy_html)
-        end
     elseif startswith(path, "/assets/") || path == "/favicon.svg"
         _serve_static_asset(path)
     elseif startswith(path, "/runs/") && occursin("/lab_images/", path)

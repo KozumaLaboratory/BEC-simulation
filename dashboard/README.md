@@ -1,7 +1,6 @@
 # SpinorBEC dashboard (React + WebGPU)
 
-Frontend for the Julia `serve_dashboard` backend. Replaces the previous
-Plotly.js dashboard (`runs/tools/dashboard.html`) with:
+Frontend for the Julia `serve_dashboard` backend, with:
 
 - shadcn/ui + Tailwind v4 shell
 - inline SVG line charts (`LineChartSVG`) for 2D series (energy / Mz /
@@ -98,8 +97,6 @@ bun run build
 
 Output goes to `dashboard/dist/`. `serve_dashboard` in Julia serves this
 directory — it refuses to start if `dashboard/dist/index.html` is missing.
-The legacy Plotly dashboard remains reachable at `/legacy` as long as
-`runs/tools/dashboard.html` is on disk.
 
 ## Browser support
 

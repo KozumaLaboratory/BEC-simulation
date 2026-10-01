@@ -61,7 +61,7 @@ function _route_data(path::String, base_dir::String, data_cache::Dict{String, St
     cache_key = "$name#$live_count"
     json = get!(data_cache, cache_key) do
         try
-            _json_string(generate_dashboard_data(run_dir))
+            JSON.json(generate_dashboard_data(run_dir))
         catch e
             "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
         end

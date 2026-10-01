@@ -141,7 +141,7 @@ function run_arm(steps)
     SpinorBEC._normalize_and_validate!(data; strict=true)
     cfg = SpinorBEC.parse_pipeline(data)
     t0 = time()
-    res = run_config(cfg; verbose=true)
+    res = run_pipeline(cfg; verbose=true)
     (res, time() - t0)
 end
 

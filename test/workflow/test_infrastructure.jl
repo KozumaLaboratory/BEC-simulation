@@ -1,4 +1,4 @@
-# YAML `run_config` integration tests trip the same JIT inference cascade
+# YAML `run_pipeline` integration tests trip the same JIT inference cascade
 # documented in CLAUDE.md ("Type stability boundaries") on Julia 1.11+.
 # Each ground_state YAML hangs for many minutes through `run_pipeline`'s
 # abstract dispatch over `PipelineStep`. The fix is the deferred
@@ -450,7 +450,7 @@ pipeline:
       n_steps: 50
       tol: 1e-4
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test isfinite(result.ground_state_energy)
     end
 
@@ -472,7 +472,7 @@ pipeline:
         c0: {from: 100.0, to: 200.0}
         c1: -0.5
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
     end
 
@@ -495,7 +495,7 @@ pipeline:
         axis: 1
         g_F: 1.0
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_workspace.magnetic_gradient !== nothing
         @test result.dynamics_workspace.magnetic_gradient isa MagneticGradient{1}
     end
@@ -519,7 +519,7 @@ pipeline:
         axis: 1
         g_F: 1.0
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_workspace.magnetic_gradient isa TimeDependentMagneticGradient{1}
     end
 
@@ -542,7 +542,7 @@ pipeline:
         q: 0.5
         bx: {sinusoidal: {amplitude: 1.0, frequency: 10.0}}
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
     end
 
@@ -710,7 +710,7 @@ pipeline:
         - {t: 0.0, apply: B, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
         - {t: 0.01, apply: B, duration: 0.01, p: 10.0, q: 0.5}
 """)
-        result = SpinorBEC.run_config(cfg)
+        result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
     end
 

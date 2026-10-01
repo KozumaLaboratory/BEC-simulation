@@ -74,7 +74,7 @@ function _live_status_for(entry::QueueEntry)
     p = joinpath(entry.run_dir, "_live_status.json")
     isfile(p) || return nothing
     try
-        return JSON.parsefile(p)
+        return JSON.parsefile(p; use_mmap=false)
     catch
         return nothing
     end

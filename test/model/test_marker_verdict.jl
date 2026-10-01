@@ -24,6 +24,7 @@
 # rejected everything.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using TOML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, write_complete_marker,
@@ -182,7 +183,7 @@ const V_FAILED = MarkerVerdict(false, "max_steps", false, 2.4e-3)
                 # arm (b) proper rather than a W3 date rejection. A literal and
                 # not `MARKER_CUTOVER_UNIX`: this file gates W2 and must stay
                 # green if W3 is reverted on its own.
-                run(pipeline(`touch -d @1700000000 $p`; stdout=devnull))
+                set_test_mtime!(p)
                 @test admit_payload(p).provenance === :unmarked   # control
                 r = admit_payload(p; require_converged=true)
                 @test !r.hit && r.provenance === :rejected

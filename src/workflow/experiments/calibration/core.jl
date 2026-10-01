@@ -19,7 +19,7 @@ export CalibrationHistory, load_calibration_history, load_calibration_csv,
 # Usage:
 #   calib = load_calibration("lab_calib_2026_04.yaml")
 #   apply_calibration!(raw_yaml_dict, calib)
-#   run_config(load_config_from_dict(raw_yaml_dict))
+#   run_pipeline(load_config_from_dict(raw_yaml_dict))
 #
 # Or the one-shot wrapper:
 #   run_yaml_calibrated("experiment.yaml"; calibration_path="lab_calib_2026_04.yaml")
@@ -344,7 +344,10 @@ function load_calibration_csv(path::AbstractString)
 end
 
 function load_calibration_history(path::AbstractString)
-    raw = YAML.load_file(String(path))
+    load_calibration_history(YAML.load_file(String(path)))
+end
+
+function load_calibration_history(raw::AbstractDict)
     root = haskey(raw, "calibration_history") ? raw["calibration_history"] : raw
     root isa AbstractVector ||
         throw(ArgumentError("calibration_history must be a list of dated entries"))

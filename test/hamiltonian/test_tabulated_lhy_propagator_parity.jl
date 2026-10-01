@@ -27,7 +27,7 @@ using LinearAlgebra
 using StaticArrays
 using SpinorBEC
 using SpinorBEC: _diagonal_step_svec!, _diagonal_step_with_ls!, _lhy_V, _lhy_is_active,
-    _lhy_potential_field, _c0c1_to_gS, compute_spatial_lhy
+    _lhy_potential_field, ku_c01_to_g_S, compute_spatial_lhy
 
 const _F = 6
 const _D = 13
@@ -47,8 +47,8 @@ function _textured_state(n::Int=6)
 end
 
 function _lhy_zoo()
-    g = _c0c1_to_gS(_F, 10.0, 0.1)
-    gfm = _c0c1_to_gS(_F, 10.0, -0.02)
+    g = ku_c01_to_g_S(_F, 10.0, 0.1)
+    gfm = ku_c01_to_g_S(_F, 10.0, -0.02)
     (
         "NoLHY" => NoLHY(),
         "ScalarLHY" => ScalarLHY(0.5),
@@ -136,7 +136,7 @@ end
         # "the paths agree" would both have passed had they agreed on zero.
         # Pin that the LHY is present at all.
         tbl = compute_spinor_lhy_polar_contact(;
-            F=_F, g_dict=_c0c1_to_gS(_F, 10.0, 0.1), n_max=200.0, n_points=200)
+            F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, 0.1), n_max=200.0, n_points=200)
         @test _lhy_V(1.0, tbl) > 1.0
         for path in (identity, x -> view(x, :, :, :, :))
             p_no, m_no = copy(psi0), copy(psi0)
@@ -175,7 +175,7 @@ end
 
     @testset "F32 grids stay F32" begin
         tbl = compute_spinor_lhy_polar_contact(;
-            F=_F, g_dict=_c0c1_to_gS(_F, 10.0, 0.1), n_max=200.0, n_points=200)
+            F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, 0.1), n_max=200.0, n_points=200)
         out = _lhy_potential_field(tbl, Float32[0.5, 2.0], Float32)
         @test eltype(out) == Float32
     end

@@ -32,12 +32,12 @@ function _route_effective_config(path::String, base_dir::String)
     p = _parse_run_only(path, "/api/effective_config/")
     run_dir = joinpath(base_dir, p.name)
     isdir(run_dir) || return (404, "text/plain", "Run not found: $(p.name)")
-    config_path = joinpath(run_dir, "config.yaml")
+    config_path = _config_snapshot_path(run_dir)
     isfile(config_path) ||
         return (404, "text/plain", "config.yaml not found for: $(p.name)")
     body = try
         ins = inspect_config(config_path)
-        _json_string(_jsonify(to_dict(ins)))
+        JSON.json(_jsonify(to_dict(ins)))
     catch e
         bt = sprint(showerror, e)
         return (500, "text/plain", "inspect_config failed: $bt")

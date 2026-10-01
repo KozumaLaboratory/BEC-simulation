@@ -24,7 +24,7 @@
 #
 #   3. ORDER INDEPENDENCE. `yaml_to_model(a)` does not depend on which configs
 #      were resolved before it in the same session. This is not hypothetical:
-#      `_run_yaml_prepare` is the prepare half of a prepare/execute pair and
+#      `_prepare_config_file` is the prepare half of a prepare/execute pair and
 #      leaves the dealias Refs set, so before the `finally` in `yaml_to_model`
 #      the `GridSpec` of every config resolved after a dealias-carrying one was
 #      silently rewritten.
@@ -40,7 +40,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: yaml_to_model, Model, model_from_toml, to_toml,
-    DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF, _DEALIAS_PENDING_SNAPSHOT,
+    DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF,
     restore_dealias_refs!, resolve_atom, n_terms
 using YAML
 
@@ -83,7 +83,7 @@ const CD_MU_0 = 1.25663706212e-6
 #                   by the rotating-basis runner, so the field silently runs
 #                   along +z; a model would describe physics the run drops.
 #   :schema_strict  `N_atoms` / `omega_ref` at STEP level instead of under
-#                   `interactions:`. Refused by `_run_yaml_prepare`, which is the
+#                   `interactions:`. Refused by `_prepare_config_file`, which is the
 #                   same function `run_yaml` calls (`run_registry.jl:205`) — so
 #                   these nine configs are unrunnable today, independently of
 #                   anything in the model layer.
@@ -320,12 +320,12 @@ const CORPUS_UNRESOLVED = [
     (
         "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/checks/expected_observables.yaml",
         :not_a_pipeline,
-        "must have a 'pipeline:' key",
+        "must have a 'pipeline' key",
     ),
     (
         "runs/verification_suite/checks/expected_observables.yaml",
         :not_a_pipeline,
-        "must have a 'pipeline:' key",
+        "must have a 'pipeline' key",
     ),
     # --- :yaml_unparseable (2) ---
     (
@@ -361,17 +361,16 @@ corpus_rel(p) = replace(relpath(p, REPO_ROOT), '\\' => '/')
 
 """
 The effective `ground_state:` block, read from the config's own YAML. Applies
-`_run_yaml_prepare` (units / templates / mixins / calibration / schema defaults
+`_prepare_config_file` (units / templates / mixins / calibration / schema defaults
 / B-block — preprocessing, no physics resolution) and the `defaults:` seeding,
 then hands back the RAW keys. Restores the dealias Refs, or the reader becomes
 the leak arm 3 is about.
 """
 function corpus_gs_block(path)
-    e0, k0, p0 = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[], _DEALIAS_PENDING_SNAPSHOT[]
+    e0, k0 = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     d = try
-        SpinorBEC._run_yaml_prepare(String(path), false, false)
+        SpinorBEC._prepare_config_file(String(path), false, false)
     finally
-        _DEALIAS_PENDING_SNAPSHOT[] = p0
         restore_dealias_refs!(e0, k0)
     end
     defaults = get(d, "defaults", nothing)
@@ -668,7 +667,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
     # Arm 3: order independence
     # ---------------------------------------------------------------
     @testset "resolution does not depend on what was resolved before it" begin
-        # `_run_yaml_prepare` applies a top-level `dealias:` block to module Refs
+        # `_prepare_config_file` applies a top-level `dealias:` block to module Refs
         # and leaves them set; `run_yaml` restores them in the execute half's
         # `finally`, which `yaml_to_model` never runs. Without its own restore,
         # the config below resolved to dealias=false alone and dealias=true after
@@ -692,11 +691,10 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
 
         # ... and the call leaves the globals exactly as it found them, for the
         # sake of every other test in the session.
-        e0, k0, p0 = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[], _DEALIAS_PENDING_SNAPSHOT[]
+        e0, k0 = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
         yaml_to_model(withd)
         @test DEALIAS_2_3_ENABLED[] == e0
         @test DEALIAS_K_CUTOFF[] == k0
-        @test _DEALIAS_PENDING_SNAPSHOT[] === p0
         # Even when it throws.
         try
             yaml_to_model(joinpath(REPO_ROOT, "runs/eu_k3_lhy/LHY_full_bdg.yaml"))
@@ -704,7 +702,6 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         end
         @test DEALIAS_2_3_ENABLED[] == e0
         @test DEALIAS_K_CUTOFF[] == k0
-        @test _DEALIAS_PENDING_SNAPSHOT[] === p0
     end
 
     # ---------------------------------------------------------------

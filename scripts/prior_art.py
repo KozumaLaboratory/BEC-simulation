@@ -47,6 +47,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 ROOT = Path(__file__).resolve().parent.parent
 RECORD_DIR = ROOT / "docs" / "campaign" / "prior_art"
@@ -70,10 +71,11 @@ def gh_json(args: list[str]) -> tuple[list[dict], bool]:
     two are indistinguishable in the data and opposite in meaning.
     """
     try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=60, check=True)
+        out = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
+                             timeout=60, check=True)
         return json.loads(out.stdout), True
     except Exception as e:  # noqa: BLE001 - any failure is the same story here
-        print(f"WARNING: {' '.join(args[:3])}… failed ({e}); enumeration is INCOMPLETE",
+        print(f"WARNING: {' '.join(args[:3])}... failed ({e}); enumeration is INCOMPLETE",
               file=sys.stderr)
         return [], False
 
@@ -107,7 +109,8 @@ def enumerate_topic(keywords: list[str]) -> tuple[list[dict], bool]:
             items.append({"kind": "issue", "ref": f"#{iss['number']}", "title": iss["title"]})
     try:
         br = subprocess.run(["git", "-C", str(ROOT), "branch", "-r", "--format=%(refname:short)"],
-                            capture_output=True, text=True, timeout=30, check=True)
+                            capture_output=True, text=True, encoding="utf-8",
+                            timeout=30, check=True)
         for b in br.stdout.split():
             if b.startswith("origin/") and matches(b, keywords) and not b.endswith("/HEAD"):
                 items.append({"kind": "branch", "ref": b, "title": ""})
@@ -115,6 +118,28 @@ def enumerate_topic(keywords: list[str]) -> tuple[list[dict], bool]:
         print(f"WARNING: branch enumeration failed ({e}); INCOMPLETE", file=sys.stderr)
         complete = False
     return items, complete
+
+
+def record_rows(path: Path) -> Iterator[tuple[str, str, str, str]]:
+    """Yield data rows, keeping pipes in the free-form note column intact."""
+    seen: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)\|\s*$", line)
+        if not m:
+            # Keep the checker's former reach: a truncated data row must not
+            # disappear just because the writer requires all four columns.
+            if re.match(r"^\|\s*[^|\s]+\s*\|\s*[^|\s]+\s*\|", line):
+                raise ValueError(f"{path.name}: malformed record row {line!r}")
+            continue
+        ref, disp, what, note = (cell.strip() for cell in m.groups())
+        if ref == "ref" or (ref and set(ref) <= {"-", ":"}):
+            continue
+        if not ref:
+            raise ValueError(f"{path.name}: record row has no reference")
+        if ref in seen:
+            raise ValueError(f"{path.name}: duplicate reference {ref!r}")
+        seen.add(ref)
+        yield ref, disp, what, note
 
 
 def write_record(topic: str, keywords: list[str], items: list[dict]) -> Path:
@@ -127,10 +152,8 @@ def write_record(topic: str, keywords: list[str], items: list[dict]) -> Path:
     # blanked every note while reporting `0 unread`.
     prev: dict[str, tuple[str, str]] = {}
     if path.exists():
-        for line in path.read_text().splitlines():
-            m = re.match(r"^\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)\|\s*$", line)
-            if m and m.group(2).strip() in DISPOSITIONS:
-                prev[m.group(1).strip()] = (m.group(2).strip(), m.group(4).strip())
+        for ref, disp, _, note in record_rows(path):
+            prev[ref] = (disp, note)
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out = [
@@ -157,7 +180,10 @@ def write_record(topic: str, keywords: list[str], items: list[dict]) -> Path:
     for it in sorted(items, key=lambda x: (x["kind"], x["ref"])):
         d, note = prev.get(it["ref"], ("unread", ""))
         seen.add(it["ref"])
-        out.append(f"| {it['ref']} | {d} | {it['kind']}: {it['title']} | {note} |")
+        # GitHub titles are free text; a pipe must not become a column separator
+        # and migrate part of the title into the preserved note on the next run.
+        title = it["title"].replace("|", "&#124;").replace("\n", " ").replace("\r", " ")
+        out.append(f"| {it['ref']} | {d} | {it['kind']}: {title} | {note} |")
     # A row that no longer matches has usually MERGED or CLOSED, which is exactly
     # when its note is most worth keeping. Dropping it would let a topic be
     # re-litigated the moment its prior art lands.
@@ -166,7 +192,7 @@ def write_record(topic: str, keywords: list[str], items: list[dict]) -> Path:
             out.append(f"| {ref} | {d} | (no longer open) | {note} |")
     if not out[-1].startswith("|") or out[-1].startswith("|---"):
         out.append("| — | read | nothing open matched these keywords | |")
-    path.write_text("\n".join(out) + "\n")
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
     return path
 
 
@@ -176,22 +202,16 @@ def check() -> int:
         print("no prior-art records yet")
         return 0
     bad = []
-    for p in sorted(RECORD_DIR.glob("*.md")):
-        for line in p.read_text().splitlines():
-            m = re.match(r"^\|\s*([^|\s]+)\s*\|\s*([^|\s]+)\s*\|", line)
-            # Skip the header and the markdown rule. Matching the rule as a row is
-            # how the first version reported a problem on a table that had none —
-            # a checker that cries wolf on its own format gets switched off.
-            if not m or m.group(1) == "ref" or set(m.group(1)) <= {"-", ":"}:
-                continue
-            ref, disp = m.group(1), m.group(2)
+    records = sorted(RECORD_DIR.glob("*.md"))
+    for p in records:
+        for ref, disp, _, _ in record_rows(p):
             if disp not in DISPOSITIONS:
                 bad.append(f"{p.name}: {ref} has unknown disposition {disp!r}")
             elif disp == "unread":
                 bad.append(f"{p.name}: {ref} is still UNREAD")
     for b in bad:
         print("  " + b)
-    print(f"prior-art records: {len(list(RECORD_DIR.glob('*.md')))}, problems: {len(bad)}")
+    print(f"prior-art records: {len(records)}, problems: {len(bad)}")
     return 1 if bad else 0
 
 
@@ -206,13 +226,13 @@ def main() -> int:
     if not a.topic or not a.keywords:
         ap.error("--topic and --keywords are required unless --check")
     items, complete = enumerate_topic(a.keywords)
-    if not complete and (RECORD_DIR / f"{a.topic}.md").exists():
-        print("REFUSING to overwrite an existing record from an INCOMPLETE "
-              "enumeration — fix `gh` / the network and re-run.", file=sys.stderr)
+    if not complete:
+        print("REFUSING to write a record from an INCOMPLETE "
+              "enumeration - fix `gh` / the network and re-run.", file=sys.stderr)
         return 2
     p = write_record(a.topic, a.keywords, items)
-    n_unread = sum(1 for line in p.read_text().splitlines() if "| unread |" in line)
-    print(f"wrote {p.relative_to(ROOT)} — {len(items)} matched, {n_unread} unread")
+    n_unread = sum(1 for _, disp, _, _ in record_rows(p) if disp == "unread")
+    print(f"wrote {p.relative_to(ROOT)} - {len(items)} matched, {n_unread} unread")
     if n_unread:
         print("Read each unread item and set its disposition before continuing.")
     return 0

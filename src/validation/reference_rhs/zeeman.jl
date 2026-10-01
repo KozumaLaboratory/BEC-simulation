@@ -48,7 +48,7 @@ end
 """
     reference_zeeman_diag_energy(psi, zeeman, sys, grid, t=0.0) → Float64
 
-Matches `_zeeman_energy`: `Σ_c (-p m_c + q m_c²) ∫ |ψ_c|² dV`.
+Diagonal-field limit: `Σ_c (-p m_c + q m_c²) ∫ |ψ_c|² dV`.
 """
 function reference_zeeman_diag_energy(
     psi::AbstractArray{<:Complex},

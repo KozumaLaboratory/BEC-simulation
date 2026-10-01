@@ -18,7 +18,8 @@ export interface PointMeta {
 
 export interface DashboardData {
   run: string
-  config_yaml: string
+  config_text: string
+  config_format: string
   F: number
   n_points: number
   scan_keys: string[]
@@ -200,7 +201,7 @@ export interface EnqueueErrorResponse {
 
 export interface EnqueueRequest {
   preview: boolean
-  yaml: string
+  config_text: string
   backend?: 'local' | 'uge'
   priority?: number
   autonomy_level?: 'suggest' | 'propose' | 'dispatch'

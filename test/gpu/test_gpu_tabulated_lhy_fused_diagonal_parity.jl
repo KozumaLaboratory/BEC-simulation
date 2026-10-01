@@ -30,7 +30,7 @@ using Test
 using Random
 import CUDA
 using SpinorBEC
-using SpinorBEC: _diagonal_step_svec!, compute_spinor_lhy_polar_contact, _c0c1_to_gS
+using SpinorBEC: _diagonal_step_svec!, compute_spinor_lhy_polar_contact, ku_c01_to_g_S
 
 if !CUDA.functional()
     @info "CUDA not functional — skipping fused tabulated-LHY diagonal parity"
@@ -42,7 +42,7 @@ else
         # A real table, not a synthetic one: the uniform-grid precondition and the
         # value range both have to be the ones production builds.
         lhy = compute_spinor_lhy_polar_contact(;
-            F, g_dict=_c0c1_to_gS(F, 10.0, 0.1), n_max=6.0, n_points=200)
+            F, g_dict=ku_c01_to_g_S(F, 10.0, 0.1), n_max=6.0, n_points=200)
 
         @testset "IT=$it" for it in (false, true)
             rng = MersenneTwister(20260730 + (it ? 1 : 0))

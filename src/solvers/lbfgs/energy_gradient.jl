@@ -155,13 +155,6 @@ function _energy_and_gradient_gpu! end
 # parent `energy_gradient!`). Helpers are gated on coupling magnitude so
 # they no-op when the term is inactive.
 
-# Per-term gradient bodies (_grad_trap!, _grad_zeeman!, _grad_c0_density!,
-# _grad_lhy!) now live with their HamTerm subtypes in src/hamiltonian/terms/.
-# `energy_gradient!` above calls each by its canonical name — Julia resolves
-# to the terms/ definition. The trinity dispatch
-# (`apply_operator!(out, ::Term, ws, psi)`) provides the same physics via
-# the registry.
-
 """
 Project gradient onto constraint tangent space:
   1. Remove ψ-component (particle number conservation)

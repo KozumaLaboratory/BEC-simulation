@@ -47,7 +47,7 @@ end
     cuda_preflight_check(; smoke_config=nothing, io=stdout) -> Bool
 
 Pre-flight check for a cluster session: reports CUDA state, optionally
-runs a single config through `run_config` as a smoke test. Returns
+runs a single config through `run_pipeline` as a smoke test. Returns
 `true` if all checks pass.
 
 `smoke_config` is the path to a tiny YAML (e.g. `runs/option_gamma_micro/config.yaml`);
@@ -81,7 +81,7 @@ function cuda_preflight_check(;
         println(io, "\n--- Smoke test: $smoke_config ---")
         config = load_config(String(smoke_config))
         try
-            @time run_config(config; verbose=false)
+            @time run_pipeline(config; verbose=false)
         catch err
             # A smoke test whose failure does not reach the caller is decoration.
             println(io, "\n❌ preflight FAILED: smoke config threw ",

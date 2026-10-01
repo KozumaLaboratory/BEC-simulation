@@ -197,8 +197,14 @@ not run the simulator. Safe to call before any expensive setup.
 `n_samples` controls how densely B(t) / q(t) / Raman are sampled across
 each dynamics step (default 256).
 """
+inspect_config(config::PipelineConfig; kwargs...) = inspect_config(config.raw_data; kwargs...)
+
+function inspect_config(spec::AbstractDict; n_samples::Int=256, strict::Bool=true)
+    _inspect_loaded(spec, "<Julia>"; n_samples, strict)
+end
+
 function inspect_config(path::AbstractString; n_samples::Int=256, strict::Bool=true)
-    raw = YAML.load_file(String(path))
+    raw = _load_config_data(String(path))
     raw isa AbstractDict || throw(ArgumentError(
         "inspect_config: $(path) did not parse to a mapping"))
     return _inspect_loaded(raw, String(path); n_samples, strict)

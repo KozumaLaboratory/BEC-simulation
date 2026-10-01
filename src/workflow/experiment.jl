@@ -16,7 +16,6 @@
 # via SHA-256 of canonical bytes. Users never name an outdir.
 
 using JLD2
-using YAML
 using SHA: sha256
 using Printf: @printf
 
@@ -125,13 +124,13 @@ content_id(spec; n::Int=_CONTENT_ID_HEX) = bytes2hex(sha256(_canonical_bytes(spe
 
 """
     Experiment(spec; store=default_store(), outdir=nothing) -> Experiment
-    Experiment(yaml_path; store=default_store()) -> Experiment
+    Experiment(config_path; store=default_store()) -> Experiment
 
 A single simulation cell. The triple `(spec, store, memo)` is enough
 to define what to run, where the result lives, and to cache derived
 quantities lazily.
 
-- `spec` is the YAML-shaped Dict built by the DSL (`config([...])`).
+- `spec` is a `PipelineConfig` or a serializable specification Dict.
 - `store` is the CAS root; the cell's outdir is
   `<store.root>/<content_id(spec)>/`.
 - `memo` is a lazy property cache used by `Fz_t`, `peaks`, … etc.
@@ -163,17 +162,19 @@ function Experiment(
     )
 end
 
+Experiment(config::PipelineConfig; kwargs...) = Experiment(config.raw_data; kwargs...)
+
 function Experiment(yaml_path::AbstractString; store::CASStore=default_store())
     isfile(yaml_path) ||
         throw(ArgumentError("Experiment: no such file: $yaml_path"))
-    spec = YAML.load_file(yaml_path)
+    spec = _load_config_data(yaml_path)
     spec_dict = Dict{Any, Any}(spec)
     cid = content_id(spec_dict)
     cas_dir = joinpath(store.root, cid)
     _has_result(cas_dir) && return Experiment(
         spec_dict, store, nothing, Dict{Symbol, Any}()
     )
-    if basename(yaml_path) == "config.yaml"
+    if basename(yaml_path) in ("config.yaml", "config.json")
         same_dir = dirname(abspath(yaml_path))
         _has_result(same_dir) && return Experiment(
             spec_dict, store, same_dir, Dict{Symbol, Any}()
@@ -270,16 +271,18 @@ end
 """
     write_run!(exp) -> String
 
-Write `exp.spec` to `<outdir(exp)>/config.yaml`. Internal: `run!`
-calls it automatically before launching the simulation. The only
+Write `exp.spec` to `<outdir(exp)>/config.json`. The `run!` executor
+also persists the snapshot when launching the simulation. The only
 external reason to call it directly is the cluster split-flow
 (write here, run on HPC).
 """
 function write_run!(exp::Experiment)
     mkpath(outdir(exp))
-    path = joinpath(outdir(exp), "config.yaml")
-    YAML.write_file(path, getfield(exp, :spec))
-    path
+    path = joinpath(outdir(exp), "config.json")
+    if isfile(path) && content_id(_load_config_data(path)) == content_id(exp.spec)
+        return path
+    end
+    _write_config_snapshot(path, getfield(exp, :spec))
 end
 
 """
@@ -287,24 +290,31 @@ end
 
 Idempotent: if a `result.jld2` / `point_001.jld2` exists in `outdir(exp)`,
 returns immediately. With `force=true`, clears the memo + reruns.
-Writes `config.yaml` if missing.
+Persists the input and resolved conditions in `config.json`.
 """
-function run!(exp::Experiment; force::Bool=false)
+function run!(exp::Experiment; force::Bool=false, verbose::Bool=true, audit::Bool=true,
+    source_dir::Union{Nothing, AbstractString}=nothing)
     if !force && _result_path_or_nothing(exp) !== nothing
         return exp
     end
     force && empty!(getfield(exp, :memo))
-    cfg_path = joinpath(outdir(exp), "config.yaml")
-    isfile(cfg_path) || write_run!(exp)
-    run_yaml(cfg_path)
+    snapshot = _config_snapshot_path(outdir(exp))
+    origin = if source_dir === nothing
+        (isfile(snapshot) ? _config_source_dir(snapshot) : pwd())
+    else
+        source_dir
+    end
+    run_experiment(
+        getfield(exp, :spec); run_dir=outdir(exp), source_dir=origin, verbose, audit, force
+    )
     exp
 end
 
 """
     status(exp) -> Symbol
 
-  `:cached`  result jld2 present and config.yaml mtime ≤ jld2 mtime
-  `:stale`   jld2 present but older than the YAML (rerun needed)
+  `:cached`  result jld2 present and configuration snapshot mtime ≤ jld2 mtime
+  `:stale`   jld2 present but older than the configuration snapshot (rerun needed)
   `:pending` outdir exists, no jld2 yet
   `:missing` outdir does not exist
 """
@@ -313,7 +323,7 @@ function status(exp::Experiment)
     isdir(dir) || return :missing
     jld = _result_path_or_nothing(exp)
     jld === nothing && return :pending
-    cfg = joinpath(dir, "config.yaml")
+    cfg = _config_snapshot_path(dir)
     isfile(cfg) && mtime(cfg) > mtime(jld) && return :stale
     :cached
 end

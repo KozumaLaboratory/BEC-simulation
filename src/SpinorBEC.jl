@@ -30,7 +30,7 @@ const TIMER = TimerOutput()
 
 include("foundation.jl")    # types + math primitives + backends
 include("hamiltonian.jl")   # interactions + potentials + integrators
-include("model.jl")         # Model: resolved physics as ONE concrete value (additive; nothing uses it yet)
+include("model.jl")         # resolved physics specs + stages + artifact identity
 
 # ========================================
 # WORKFLOW: Initialization, I/O, monitoring, experiments
@@ -38,12 +38,12 @@ include("model.jl")         # Model: resolved physics as ONE concrete value (add
 
 include("workflow/io/units.jl")        # Units module (needed by atoms.jl)
 include("workflow/initialization.jl")  # atoms + init_psi + Workspace factory + state zoo
-include("workflow/io.jl")              # save_state + dashboard + VTK + run summary + budget
+include("workflow/io.jl")              # save_state + VTK + run summary + budget
 include("workflow/monitoring.jl")      # Slack webhook notifications (notify_slack)
 
 include("workflow/experiments.jl")     # schema + runtime + pipeline + analyzers
 include("workflow/experiments/euv3_coils.jl")  # euv3 lab coil/field calibration
-include("workflow/validation.jl")      # RunResult + spec-driven validation (Phase 0: types only)
+include("workflow/validation.jl")      # RunResult + spec-driven checks + reanalysis
 include("workflow/checkpoint.jl")          # general keyed JLD2 store + refine + fork
 include("workflow/checkpointed_sweep.jl")  # thin sweep wrapper over Checkpoint
 include("analysis/coherence_length.jl")  # g1(r) + coherence length (KZ observable)
@@ -145,7 +145,7 @@ export phase_entropy_uncertainty, default_phase_classifier_extractor
 # Dashboard subsystem (real submodule) — must be loaded after analysis +
 # workflow/experiments so that total_density / spin_density_vector /
 # list_runs / run_status are exported by SpinorBEC.
-include("workflow/io/dashboard.jl")  # `module Dashboard` (21 source files)
+include("workflow/io/dashboard.jl")  # `module Dashboard`
 
 # Re-export Dashboard's public surface at the umbrella level so existing
 # `using SpinorBEC; serve_dashboard(...)` call sites keep working.
@@ -186,7 +186,6 @@ export animate_dynamics, plot_sweep
 include("precompile.jl")
 
 function __init__()
-    __init_templates__()
     # Fingerprint the source tree at LOAD, so a measurement written later stamps
     # what the process is running rather than what is on disk at write time.
     _capture_provenance!()

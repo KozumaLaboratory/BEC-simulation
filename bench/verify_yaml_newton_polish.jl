@@ -39,7 +39,7 @@ end
 # a Newton-CG pass (only emitted when the flag actually reaches the solver).
 for polish in (false, true)
     println("\n========== newton_polish=$polish ==========")
-    r = run_config(load_config(write_cfg(polish)))
+    r = run_pipeline(load_config(write_cfg(polish)))
     println("RESULT newton_polish=$polish  E=$(r.ground_state_energy)  converged=$(r.ground_state_converged)")
 end
 println("DONE")

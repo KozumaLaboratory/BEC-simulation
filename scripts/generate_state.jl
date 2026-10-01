@@ -58,7 +58,9 @@ const OUT = joinpath(ROOT, "docs", "STATE.md")
 
 # ---------------------------------------------------------------- helpers
 
-readsrc(rel) = read(joinpath(ROOT, rel), String)
+normalize_newlines(text::AbstractString) = replace(text, "\r\n" => "\n")
+readsrc(rel) = normalize_newlines(read(joinpath(ROOT, rel), String))
+repo_relpath(path) = replace(relpath(path, ROOT), '\\' => '/')
 
 "Line number of the first line matching `pat` in `rel`, or 0."
 function lineno(rel, pat)
@@ -121,7 +123,7 @@ function ham_terms()
     files = String[]
     for (root, _, fs) in walkdir(joinpath(ROOT, "src"))
         for f in fs
-            endswith(f, ".jl") && push!(files, relpath(joinpath(root, f), ROOT))
+            endswith(f, ".jl") && push!(files, repo_relpath(joinpath(root, f)))
         end
     end
     camel(sym) = join(uppercasefirst.(split(string(sym), "_")))
@@ -163,7 +165,7 @@ function sign_declaration()
             for (n, l) in enumerate(eachline(path))
                 occursin("BOHR_MAGNETON", l) && occursin(r"\bg_F\b", l) &&
                     !startswith(strip(l), "#") &&
-                    push!(hits, relpath(path, ROOT) * ":" * string(n))
+                    push!(hits, repo_relpath(path) * ":" * string(n))
             end
         end
     end
@@ -177,7 +179,7 @@ function bfield_converters()
         for f in files
             endswith(f, ".jl") || continue
             p = joinpath(root, f)
-            rel = relpath(p, ROOT)
+            rel = repo_relpath(p)
             for (n, l) in enumerate(eachline(p))
                 occursin("bfield_to_p", l) || continue
                 startswith(strip(l), "#") && continue
@@ -235,7 +237,10 @@ function tier_counts()
     Base.include(m, joinpath(ROOT, rel))
     names = (:FAST_TESTS, :CI_EXTRA, :FULL_EXTRA, :PHYSICS_TESTS,
         :ORACLE_TESTS, :INTEGRATION_TESTS)
-    (rel, [(string(n), length(getfield(m, n))) for n in names if isdefined(m, n)])
+    # include creates bindings in a newer world than this function's caller.
+    counts = Base.invokelatest(() ->
+        [(string(n), length(getfield(m, n))) for n in names if isdefined(m, n)])
+    (rel, counts)
 end
 
 """
@@ -263,7 +268,7 @@ function ladder()
     index = Dict{String, String}()
     for (root, _, files) in walkdir(joinpath(ROOT, "test"))
         for f in files
-            haskey(index, f) || (index[f] = relpath(joinpath(root, f), ROOT))
+            haskey(index, f) || (index[f] = repo_relpath(joinpath(root, f)))
         end
     end
     [(lvl, get(index, base, "**NOT FOUND anywhere under test/** ($base)")) for (lvl, base) in want]
@@ -280,7 +285,7 @@ function limit_markers()
             p = joinpath(root, f)
             n = count(l -> occursin("KNOWN-LIMIT", l) || occursin("NOT IMPLEMENTED", uppercase(l)),
                 readlines(p))
-            n > 0 && push!(rows, (relpath(p, ROOT), n))
+            n > 0 && push!(rows, (repo_relpath(p), n))
         end
     end
     sort(rows; by=r -> -r[2])
@@ -395,7 +400,7 @@ function admission_facts()
                     fm === nothing || (enclosing = fm.captures[1])
                     startswith(strip(l), "#") && continue
                     occursin(Regex("\\b" * fname * "\\("), l) || continue
-                    push!(out, relpath(path, ROOT) * ":" * enclosing)
+                    push!(out, repo_relpath(path) * ":" * enclosing)
                 end
             end
         end
@@ -531,7 +536,7 @@ function coverage(rendered)
             for f in fs
                 endswith(f, ".jl") || continue
                 total += 1
-                rel = relpath(joinpath(root, f), ROOT)
+                rel = repo_relpath(joinpath(root, f))
                 occursin(rel, rendered) && (cited += 1)
             end
         end
@@ -998,7 +1003,7 @@ function main()
             println("STALE: $OUT does not exist. Run: julia --project=. scripts/generate_state.jl")
             return 1
         end
-        cur = read(OUT, String)
+        cur = readsrc("docs/STATE.md")
         if cur == text
             println("docs/STATE.md is current")
             return 0

@@ -11,7 +11,7 @@
 include("experiments/schema/config_override.jl")
 include("experiments/schema/schema.jl")
 include("experiments/schema/units_block.jl")
-include("experiments/schema/templates_block.jl")
+include("experiments/schema/mixins_block.jl")
 include("experiments/schema/auto_defaults.jl")
 include("experiments/schema/B_block.jl")
 include("experiments/schema/noise_block.jl")
@@ -19,6 +19,7 @@ include("experiments/schema/schema_defaults.jl")
 include("experiments/schema/helpers_types.jl")
 
 include("experiments/runtime/runtime_misc.jl")
+include("experiments/runtime/config_artifacts.jl")
 include("experiments/runtime/runtime_io.jl")
 include("experiments/runtime/dealias_block.jl")
 

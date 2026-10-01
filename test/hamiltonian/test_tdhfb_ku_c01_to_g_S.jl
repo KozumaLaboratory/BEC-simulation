@@ -5,7 +5,7 @@
 #  - F=1 analytic inverse: c_0 = (g_0 + 2 g_2) / 3, c_1 = (g_2 − g_0) / 3
 #  - For arbitrary F, going g_S → tensor c_k (`_gS_to_cn`) → g_S
 #    (`_cn_to_gS`) is the identity (Wigner 6j orthogonality)
-#  - `ku_to_g_S(F, c_0, c_1, c_extra)` combines `_c0c1_to_gS` and
+#  - `ku_to_g_S(F, c_0, c_1, c_extra)` combines `ku_c01_to_g_S` and
 #    `_dict_to_delta_gS` consistently with the rest of `make_workspace`
 #
 # Regression coverage for the B-3 generalization (was F=1-only pre-2026-05-13).
@@ -14,7 +14,7 @@ using Test
 using SpinorBEC
 using SpinorBEC:
     ku_c01_to_g_S, ku_to_g_S,
-    _c0c1_to_gS, _dict_to_delta_gS, _gS_to_cn, _cn_to_gS
+    _dict_to_delta_gS, _gS_to_cn, _cn_to_gS
 
 @testset "ku_c01_to_g_S generalized to F = 1, 2, 3, 6" begin
     @testset "F=1 analytic round-trip" begin
@@ -29,15 +29,12 @@ using SpinorBEC:
         @test c1_back ≈ c1
     end
 
-    @testset "F = $F: g_S has 2F+1 even channels, matches _c0c1_to_gS" for F in (1, 2, 3, 6)
+    @testset "F = $F: g_S has F+1 even channels and satisfies the scalar-product formula" for F in (
+        1, 2, 3, 6
+    )
         c0, c1 = 100.0, 5.0
         g = ku_c01_to_g_S(F, c0, c1)
         @test sort(collect(keys(g))) == collect(0:2:2F)
-        # Public alias must agree with the internal `_c0c1_to_gS` it delegates to.
-        ref = _c0c1_to_gS(F, c0, c1)
-        for S in 0:2:2F
-            @test g[S] ≈ ref[S]
-        end
         # Each channel satisfies KU's scalar-product spin Hamiltonian closed form.
         for S in 0:2:2F
             expected = c0 + c1 * (S * (S + 1) - 2 * F * (F + 1)) / 2
@@ -76,7 +73,7 @@ using SpinorBEC:
         @test sort(collect(keys(g))) == collect(0:2:12)
 
         # Reconstruct via the two-step decomposition used by make_workspace
-        base = _c0c1_to_gS(F, c0, c1)
+        base = ku_c01_to_g_S(F, c0, c1)
         delta = _dict_to_delta_gS(F, c_extra)
         for S in 0:2:12
             expected = get(base, S, 0.0) + get(delta, S, 0.0)

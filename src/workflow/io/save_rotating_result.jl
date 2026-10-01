@@ -5,7 +5,7 @@ export save_rotating_basis_result!,
 """
     summarize_rotating_basis_result(io, result; label="")
 
-Print a short one-block summary of a `run_config` result containing a
+Print a short one-block summary of a `run_pipeline` result containing a
 rotating_basis dynamics phase. Reports Lz/Fz ranges over the final
 phase, m=+F initial/final populations, and integrator metadata
 (Larmor phase per step, dt). `label` is a free-form tag printed on
@@ -67,9 +67,9 @@ summarize_rotating_basis_result(result; kwargs...) = summarize_rotating_basis_re
 
 Per-run launcher convention. Resolves the YAML to
 `runs/<batch?>/<run_name>/config.yaml` (omits the `batch` segment when
-empty), runs `load_config |> run_config`, prints a rotating_basis
+empty), runs `load_config |> run_pipeline`, prints a rotating_basis
 summary, and persists the canonical dashboard layout via
-`save_rotating_basis_result!`. Returns the `run_config` result so
+`save_rotating_basis_result!`. Returns the `run_pipeline` result so
 callers can post-process.
 
 `save_rotating_basis_result!` is also called automatically by
@@ -91,8 +91,8 @@ function launch_experiment(
     label = isempty(batch) ? String(run_name) :
             "$(batch)/$(run_name)"
 
-    config = load_config(joinpath(run_dir, "config.yaml"))
-    result = @time run_config(config; verbose=verbose)
+    config = load_config(_config_snapshot_path(run_dir))
+    result = @time run_pipeline(config; verbose=verbose)
     summarize_rotating_basis_result(io, result; label=label)
     out_path = save_rotating_basis_result!(run_dir, result)
     println(io, "Saved (dashboard-canonical) -> $out_path")
@@ -271,7 +271,7 @@ The canonical layout:
     dynamics/integrator_meta/larmor_phase_per_step
 
 Use this from any per-run launcher that consumes the `:rotating_basis_dynamics`
-Dict produced by `run_config`. The compatibility
+Dict produced by `run_pipeline`. The compatibility
 `launch_thesis_run.jl` / `launch_phi_omega_run.jl` saved a Vector of
 4D arrays at the top level; that layout still works in the dashboard
 via the compatibility fallback, but new code should write canonical here.
@@ -282,7 +282,7 @@ function save_rotating_basis_result!(
     compress::Bool=true,
 )
     # Accepts either AbstractDict (e.g. `run_pipeline`'s internal results
-    # dict) or NamedTuple (`run_config(...)` return value). Both expose
+    # dict) or NamedTuple (`run_pipeline(...)` return value). Both expose
     # `haskey` and `getindex`, so we don't constrain the type.
     #
     # Two pipeline paths produce dashboard-saveable dynamics results:

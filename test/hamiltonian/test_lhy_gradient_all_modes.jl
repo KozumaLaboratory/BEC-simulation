@@ -17,7 +17,7 @@ using LinearAlgebra
 using Random
 using SpinorBEC
 using SpinorBEC: _grad_lhy!, _lhy_energy, _lhy_V, _lhy_is_active, total_density,
-    _c0c1_to_gS, _lhy_needs_spin, _lhy_de1_dp, _local_polarisation, fp_ladder_coeff
+    ku_c01_to_g_S, _lhy_needs_spin, _lhy_de1_dp, _local_polarisation, fp_ladder_coeff
 
 const _F = 6
 const _D = 13
@@ -42,12 +42,12 @@ function _fd_grad(psi, lhy, npts, dV; h=1e-6)
 end
 
 function _zoo()
-    g = _c0c1_to_gS(_F, 10.0, 0.1)
+    g = ku_c01_to_g_S(_F, 10.0, 0.1)
     (
         "PolarContactLHY" => compute_spinor_lhy_polar_contact(;
             F=_F, g_dict=g, n_max=50.0, n_points=2000),
         "FMContactLHY" => compute_spinor_lhy_fm_contact(;
-            F=_F, g_dict=_c0c1_to_gS(_F, 10.0, -0.02), n_max=50.0, n_points=2000),
+            F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, -0.02), n_max=50.0, n_points=2000),
         "IcosahedralLHY" => compute_spinor_lhy_icosahedral(;
             F=_F, g_dict=g, n_max=50.0, n_points=2000),
         "ScalarLHY" => ScalarLHY(0.7),
@@ -161,7 +161,7 @@ end
         # |grad| was exactly 0 for a table. If that returns, this is the line
         # that says so rather than a subtle tolerance drifting.
         tbl = compute_spinor_lhy_polar_contact(;
-            F=_F, g_dict=_c0c1_to_gS(_F, 10.0, 0.1), n_max=50.0, n_points=2000)
+            F=_F, g_dict=ku_c01_to_g_S(_F, 10.0, 0.1), n_max=50.0, n_points=2000)
         g = zeros(ComplexF64, size(psi))
         _grad_lhy!(g, psi, _ws(tbl), n, npts, _D, Val(3))
         @test norm(g) > 100.0

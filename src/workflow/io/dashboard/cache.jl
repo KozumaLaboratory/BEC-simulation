@@ -1,15 +1,14 @@
-# --- Dashboard cache layers: ψ + derived blobs + JLD2 handles + atlas disk ---
+# --- Dashboard data caches: ψ + derived blobs + atlas disk ---
 #
-# Six cache state pools live here (PSI_CACHE-keyed dict, _DERIVED_CACHE_PREFIXES,
-# _PREPACK_INFLIGHT, _OPEN_JLD_HANDLES + lock, _DASHBOARD_CACHE_DIRNAME). The
-# topology + the unified `clear_all_caches!` / `invalidate_path!` entry
-# points are documented inline.
+# Data-cache state and the unified invalidation entry points live here.
+# Persistent file handles and reader synchronization live in jld_handles.jl.
+# The topology across those layers is documented below.
 
 # Two flavours share the dict:
 #   - heavy ψ snapshots, keyed by "path" or "path#snap=K" (~14 MB each)
 #   - cheap derived binaries (density_bin/phase_bin/vortex_lines/…),
 #     keyed by a "<kind>:" prefix (~300 KB each, often <1 MB)
-# `_evict_one!` evicts the oldest *heavy* entry first so a long scrub
+# `_evict_one!` evicts a *heavy* entry first so a long scrub
 # session keeps every frame's pre-packed binary warm even after the ψ
 # cache has fully cycled. Worst-case RAM with all-heavy entries is
 # ~PSI_CACHE_MAX_ENTRIES × 14 MB; with all-derived it's ~PSI_CACHE_MAX_ENTRIES
@@ -38,7 +37,7 @@ function _evict_one!(cache::Dict)
             return nothing
         end
     end
-    # All entries are derived blobs — fall back to FIFO (insertion order).
+    # All entries are derived blobs — remove the first available entry.
     delete!(cache, first(keys(cache)))
 end
 
@@ -47,20 +46,6 @@ end
 # (the cache itself is per-call, so a stale entry just means "skip warming
 # until the in-flight task finishes" which is harmless).
 const _PREPACK_INFLIGHT = Set{String}()
-
-# Persistent JLD2 read handles keyed by absolute path. Each handle is
-# paired with a ReentrantLock — JLD2 maintains shared internal state
-# (jloffset Dict, read buffers) so concurrent readers on the same handle
-# must serialise. Reusing a handle across requests skips the
-# root-group + datatype-table reload cost (~30 ms cold) which dominated
-# the per-snap latency.
-#
-# Capacity is bounded so we don't exhaust file descriptors when many runs
-# get visited; LRU-ish eviction (FIFO via insertion order) closes the
-# oldest open handle when the cap is hit.
-const _OPEN_JLD_HANDLES = Dict{String, Tuple{JLD2.JLDFile, ReentrantLock}}()
-const _OPEN_JLD_LOCK = ReentrantLock()
-const _OPEN_JLD_MAX = 32
 
 # --- Cache topology -----------------------------------------------------
 #
@@ -76,12 +61,9 @@ const _OPEN_JLD_MAX = 32
 #   _PREPACK_INFLIGHT      in-flight prepack-warmer task IDs
 #   _DASHBOARD_CACHE_DIRNAME  on-disk atlas blobs (per run dir)
 #
-# Two helpers below are the invalidation entry points. `clear_all_caches!` is
-# the one in use — /api/refresh calls it. `invalidate_path!` has NO caller
-# today; this comment claimed it was "used when a single run regenerates", in
-# the present tense, and it never has been. It is kept because it is the right
-# primitive for a file watcher, and it is now correct — see its own docstring
-# for the matching bug that made it a no-op even if it had been called.
+# Two helpers below are the invalidation entry points. /api/refresh uses
+# `clear_all_caches!`; the precompile workload uses `invalidate_path!` to release
+# its temporary file without disturbing other runs.
 
 """Drop every cache layer at once. Used by /api/refresh."""
 function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
@@ -89,23 +71,15 @@ function clear_all_caches!(data_cache::Dict, psi_cache::Dict)
     empty!(psi_cache)
     empty!(_vector3d_plans_cache)
     empty!(_PREPACK_INFLIGHT)
-    lock(_OPEN_JLD_LOCK) do
-        for (_, (h, _)) in _OPEN_JLD_HANDLES
-            try
-                close(h)
-            catch
-            end
-        end
-        empty!(_OPEN_JLD_HANDLES)
-    end
+    _retire_jld_handles!()
     return nothing
 end
 
 """Drop every cache entry that references `fpath` so the next request
 reads it fresh. Other runs' caches are preserved.
 
-NO CALLER as of 2026-08-08 — see the comment above. It was also a no-op if
-called: the two loops below used opposite `occursin` argument orders, and the
+Before 2026-08-08 it was a no-op if called: the two loops below used opposite
+`occursin` argument orders, and the
 `data_cache` one asked whether the whole cache KEY is a substring of the path.
 Those keys are `"<run_name>#<live_count>"` (`routes/misc.jl`), so the `#3`
 suffix is never in a file path and the test could not match — the
@@ -123,47 +97,9 @@ function invalidate_path!(data_cache::Dict, psi_cache::Dict, fpath::String)
     for k in collect(keys(psi_cache))
         occursin(fpath, k) && delete!(psi_cache, k)
     end
-    lock(_OPEN_JLD_LOCK) do
-        if haskey(_OPEN_JLD_HANDLES, fpath)
-            (h, _) = _OPEN_JLD_HANDLES[fpath]
-            try
-                close(h)
-            catch
-            end
-            delete!(_OPEN_JLD_HANDLES, fpath)
-        end
-    end
+    _retire_jld_handles!(fpath)
     # Plans cache + prepack-inflight aren't path-keyed; leave alone.
     return nothing
-end
-
-function _get_or_open_jld_handle(fpath::String)
-    lock(_OPEN_JLD_LOCK) do
-        existing = get(_OPEN_JLD_HANDLES, fpath, nothing)
-        existing === nothing || return existing
-        while length(_OPEN_JLD_HANDLES) >= _OPEN_JLD_MAX
-            (k, (h, _)) = first(_OPEN_JLD_HANDLES)
-            try
-                close(h)
-            catch
-            end
-            delete!(_OPEN_JLD_HANDLES, k)
-        end
-        h = jldopen(fpath, "r")
-        l = ReentrantLock()
-        _OPEN_JLD_HANDLES[fpath] = (h, l)
-        (h, l)
-    end
-end
-
-"""Run `f(handle)` against the persistent JLD2 handle for `fpath`,
-holding the per-path lock for the duration. Use for short, sequential
-reads — long critical sections will starve concurrent fetchers."""
-function _with_jld_handle(f::Function, fpath::String)
-    h, l = _get_or_open_jld_handle(fpath)
-    lock(l) do
-        f(h)
-    end
 end
 
 # --- Atlas disk-cache: persist computed atlases between dashboard runs ---

@@ -1,8 +1,8 @@
-# --- Run Registry: resumable YAML-driven experiments ---
+# --- Run Registry: persistent execution shared by Julia definitions and imported configs ---
 
-export run_yaml, run_status, list_runs, compute_run_dir, run_provenance
+export run_experiment, run_yaml, run_status, list_runs, compute_run_dir, run_provenance
 
-# Directory-per-run design: 1 config.yaml ↔ 1 directory containing one
+# Directory-per-run design: 1 configuration snapshot ↔ 1 directory containing one
 # self-contained JLD2 per scan point. Re-running the same YAML skips files
 # that already exist; deleting a single jld2 forces that point to recompute.
 #
@@ -91,7 +91,7 @@ end
 
 _now_iso() = Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")
 
-function _run_yaml_status(verbose::Bool, msg::AbstractString; comment::Bool=false)
+function _experiment_status(verbose::Bool, msg::AbstractString; comment::Bool=false)
     verbose || return nothing
     prefix = comment ? "# [run_yaml] " : "[run_yaml] "
     println(prefix, msg)
@@ -286,29 +286,92 @@ each scan point × comparison run is executed independently via
 `run_pipeline` with the corresponding overrides applied to the raw dict.
 """
 function run_yaml(yaml_path::String; base_dir::String=default_run_root(), verbose::Bool=true,
-    dry_run::Bool=false, audit::Bool=true)
-    _run_yaml_status(verbose, "starting run_yaml: $yaml_path"; comment=dry_run)
-    return Base.invokelatest(_run_yaml_impl,
-        yaml_path, base_dir, verbose, dry_run, audit)
+    dry_run::Bool=false, audit::Bool=true, force::Bool=false)
+    isfile(yaml_path) || throw(ArgumentError("configuration not found: $yaml_path"))
+    run_dir = if basename(yaml_path) == "config.yaml"
+        dirname(yaml_path)
+    else
+        compute_run_dir(yaml_path; base_dir)
+    end
+    run_experiment(_load_config_data(yaml_path); run_dir,
+        source_dir=dirname(abspath(yaml_path)), verbose, dry_run, audit, force,
+        legacy_config_path=yaml_path)
 end
 
-@noinline function _run_yaml_impl(
-    yaml_path::String, base_dir::String, verbose::Bool, dry_run::Bool, audit::Bool
-)
-    data = Base.invokelatest(_run_yaml_prepare, yaml_path, verbose, dry_run)::Dict
+"""
+    run_experiment(config; base_dir=default_run_root(), run_dir=nothing,
+                   source_dir=pwd(), verbose=true, dry_run=false, audit=true)
+
+Execute or resume a Julia-defined `PipelineConfig`. Persists the input and
+resolved conditions in `config.json`, with the existing checkpoint, admission,
+progress, and exit-summary protocol. A saved JSON snapshot can also be run
+directly, including from a local or cluster worker.
+"""
+run_experiment(config::PipelineConfig; kwargs...) = run_experiment(config.raw_data; kwargs...)
+
+function run_experiment(path::AbstractString; run_dir=nothing, source_dir=nothing, kwargs...)
+    if lowercase(splitext(path)[2]) != ".json"
+        if run_dir === nothing && source_dir === nothing
+            return run_yaml(String(path); kwargs...)
+        end
+        return run_experiment(_load_config_data(path); run_dir,
+            source_dir=source_dir === nothing ? dirname(abspath(path)) : source_dir,
+            legacy_config_path=path, kwargs...)
+    end
+    run_experiment(_load_config_data(path);
+        run_dir=run_dir === nothing ? dirname(abspath(path)) : run_dir,
+        source_dir=source_dir === nothing ? _config_source_dir(path) : source_dir, kwargs...)
+end
+
+function run_experiment(spec::AbstractDict; base_dir::String=default_run_root(),
+    run_dir::Union{Nothing, AbstractString}=nothing, source_dir::AbstractString=pwd(),
+    verbose::Bool=true, dry_run::Bool=false, audit::Bool=true, force::Bool=false,
+    legacy_config_path::Union{Nothing, AbstractString}=nothing)
+    _experiment_status(verbose, "starting experiment"; comment=dry_run)
+    raw = deepcopy(_native_config_data(spec))
+    dir = run_dir === nothing ? joinpath(base_dir, content_id(raw)) : String(run_dir)
+    previous = get(ENV, "SPINORBEC_CONFIG_DIR", nothing)
+    ENV["SPINORBEC_CONFIG_DIR"] = abspath(source_dir)
+    # Preparation can fail after applying dealias settings, or audit can refuse
+    # a prepared run. Restore both settings on every exit, including dry runs.
+    snapshot = (DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[])
+    try
+        data = Base.invokelatest(_prepare_experiment_data, deepcopy(raw), verbose, dry_run)::Dict
+        return Base.invokelatest(_run_experiment_impl, data, raw, dir,
+            String(source_dir), verbose, dry_run, audit, legacy_config_path, force)
+    finally
+        if previous === nothing
+            delete!(ENV, "SPINORBEC_CONFIG_DIR")
+        else
+            (ENV["SPINORBEC_CONFIG_DIR"] = previous)
+        end
+        restore_dealias_refs!(snapshot...)
+    end
+end
+
+@noinline function _run_experiment_impl(data::Dict, raw::Dict, run_dir::String,
+    source_dir::String, verbose::Bool, dry_run::Bool, audit::Bool, legacy_config_path, force::Bool)
     # Audit hook: run inspector on normalised data; abort on :error severity
     # before any sim work hits the cluster. SPINORBEC_AUDIT=0 disables;
     # callers can also pass audit=false.
     if audit && lowercase(get(ENV, "SPINORBEC_AUDIT", "1")) ∉ ("0", "false", "off")
-        Base.invokelatest(_run_yaml_audit, data, verbose)
+        Base.invokelatest(_audit_experiment, data, verbose)
     end
     if dry_run
-        return Base.invokelatest(_run_yaml_dry_run_output, data, yaml_path, verbose)
+        if legacy_config_path !== nothing
+            return Base.invokelatest(
+                _legacy_dry_run_output, data, String(legacy_config_path), verbose
+            )
+        end
+        out = JSON.json(data, 2)
+        println(out)
+        return out
     end
-    return Base.invokelatest(_run_yaml_execute, data, yaml_path, base_dir, verbose)
+    return Base.invokelatest(_execute_experiment, data, raw, run_dir,
+        source_dir, verbose, legacy_config_path, force)
 end
 
-@noinline function _run_yaml_audit(data::Dict, verbose::Bool)
+@noinline function _audit_experiment(data::Dict, verbose::Bool)
     warnings = try
         audit_loaded_data(data)
     catch e
@@ -338,7 +401,7 @@ end
         e = first(blockers)
         throw(
             ArgumentError(
-                "audit blocked run_yaml: $(e.title)\n" *
+                "audit blocked run_experiment: $(e.title)\n" *
                 "  $(e.message)\n" *
                 "  → $(e.suggestion)\n" *
                 "  ($(length(blockers)) :block severity warning(s); " *
@@ -350,115 +413,42 @@ end
     return nothing
 end
 
-@noinline function _run_yaml_prepare(yaml_path::String, verbose::Bool, dry_run::Bool)
-    _run_yaml_status(verbose, "loading config: $yaml_path"; comment=dry_run)
-    data = YAML.load_file(yaml_path)
-    _run_yaml_status(verbose, "checking required top-level keys"; comment=dry_run)
-    haskey(data, "pipeline") || throw(ArgumentError(
-        "YAML must have a 'pipeline:' key. Got keys: $(collect(keys(data)))"))
+@noinline function _prepare_config_file(yaml_path::String, verbose::Bool, dry_run::Bool)
+    _experiment_status(verbose, "loading config: $yaml_path"; comment=dry_run)
+    _prepare_experiment_data(_load_config_data(yaml_path), verbose, dry_run)
+end
+
+@noinline function _prepare_experiment_data(data::Dict, verbose::Bool, dry_run::Bool)
+    _experiment_status(verbose, "checking required top-level keys"; comment=dry_run)
+    haskey(data, "pipeline") || throw(
+        ArgumentError(
+            "Experiment must have a 'pipeline' key. Got keys: $(collect(keys(data)))"),
+    )
 
     # Auto-apply Orszag 2/3 dealias settings. Pop the optional top-level
     # `dealias:` block so schema validation (strict=true) doesn't reject
-    # it as unknown; the prepare/execute pair stashes the previous Ref
-    # snapshot on the dict so execute can restore in a `finally`.
+    # it as unknown. The execution scope restores both numerical Refs
+    # on every exit, including preparation errors and dry runs.
     if haskey(data, "dealias")
-        _run_yaml_status(verbose, "applying dealias block"; comment=dry_run)
-        snapshot = apply_dealias_block!(data)
-        # Module-level Ref instead of `data["_dealias_snapshot"]` — strict
-        # schema validation rejects unknown top-level keys, so we cannot
-        # stash the snapshot inside the YAML dict.
-        _DEALIAS_PENDING_SNAPSHOT[] = snapshot
+        _experiment_status(verbose, "applying dealias block"; comment=dry_run)
+        apply_dealias_block!(data)
         if verbose && DEALIAS_2_3_ENABLED[]
             println("  dealias: enabled=$(DEALIAS_2_3_ENABLED[]), " *
                     "k_cut=$(DEALIAS_K_CUTOFF[])")
         end
     end
 
-    # Auto-apply lab-unit calibration. Three forms recognised:
-    #
-    #   1. `calibration:`         single CalibrationSet
-    #   2. `calibration_history:` + optional `target_date:` — interpolate
-    #      between dated snapshots so weekly drift is captured automatically
-    #      (Phase 5.5 / Scenario #68). Without target_date, defaults to
-    #      today's date.
-    #
-    # All calibration-related top-level keys are popped before schema
-    # validation so they don't trigger "unknown key" warnings.
-    if haskey(data, "calibration") && data["calibration"] isa Dict
-        _run_yaml_status(verbose, "applying calibration block"; comment=dry_run)
-        calib = _calibration_from_dict(pop!(data, "calibration"))
-        verbose && println("  applying calibration epoch=$(calib.epoch) date=$(calib.date)")
-        apply_calibration!(data, calib)
-    elseif haskey(data, "calibration_history")
-        _run_yaml_status(verbose, "applying calibration history"; comment=dry_run)
-        hist_raw = pop!(data, "calibration_history")
-        target = if haskey(data, "target_date")
-            Dates.Date(String(pop!(data, "target_date")))
-        else
-            Dates.today()
-        end
-        # Reuse the loader logic by stuffing into the expected wrapper
-        tmp = Dict{String, Any}("calibration_history" => hist_raw)
-        tmp_path = tempname() * ".yaml"
-        YAML.write_file(tmp_path, tmp)
-        try
-            hist = load_calibration_history(tmp_path)
-            calib = interpolate_calibration(hist, target)
-            verbose && println("  applying interpolated calibration → $(calib.epoch)")
-            apply_calibration!(data, calib)
-        finally
-            rm(tmp_path; force=true)
-        end
-    end
-
-    # Expand templates + mixins (named protocols, reusable parameter sets).
-    _run_yaml_status(verbose, "expanding templates and mixins"; comment=dry_run)
-    apply_templates_and_mixins!(data)
-
-    # Auto-inject schema-level block defaults (e.g. `ground_state.ddi: {}`
-    # so the parser auto-derives c_dd from atom + N_atoms + ω_ref). Must
-    # run after templates/mixins so the steps it walks are fully expanded;
-    # before unit/B/noise normalisation so those see consistent shape.
-    _run_yaml_status(verbose, "injecting schema defaults"; comment=dry_run)
-    apply_schema_defaults!(data)
-
-    # Apply opt-in `units:` block AFTER calibration + templates (template
-    # output may already be in Quantity strings; `units:` rewrite only
-    # touches bare Reals).
-    _run_yaml_status(verbose, "applying units block"; comment=dry_run)
-    apply_units_block!(data)
-
-    # Top-level `accuracy:` and `auto_grid:` shortcuts → physics-first
-    # defaults seeded into pipeline steps where missing.
-    _run_yaml_status(verbose, "applying accuracy and auto-grid defaults"; comment=dry_run)
-    apply_auto_defaults!(data)
-
-    # Unified `B:` block → split into internal magnitude + direction
-    # dicts for the runner. Validates Cartesian/spherical mutual exclusion.
-    _run_yaml_status(verbose, "normalizing B blocks"; comment=dry_run)
-    apply_B_block_normalize!(data)
-
-    # Unified `noise:` block → temperature_ratio / twa / sgpe / etc.
-    # Validates `initial.thermal` ⊕ `twa` mutex.
-    _run_yaml_status(verbose, "normalizing noise blocks"; comment=dry_run)
-    apply_noise_block_normalize!(data)
-
-    # Schema validation: catch typos and invalid values before starting.
-    # strict=true fails the run on unknown keys; this is the production
-    # default so silent-drop bugs (2026-04-27 `trap:` incident) cannot
-    # repeat.
-    _run_yaml_status(verbose, "validating schema"; comment=dry_run)
-    validate_pipeline!(data; strict=true)
-    _run_yaml_status(verbose, _pipeline_step_summary(data); comment=dry_run)
+    _normalize_and_validate!(data; strict=true, verbose, dry_run)
+    _experiment_status(verbose, _pipeline_step_summary(data); comment=dry_run)
     return data
 end
 
-@noinline function _run_yaml_dry_run_output(data::Dict, yaml_path::String, verbose::Bool)
+@noinline function _legacy_dry_run_output(data::Dict, yaml_path::String, verbose::Bool)
     # Dry-run: print the calibration-applied + units-applied + validated
     # YAML and exit without touching the GPU / building any workspace.
     # Useful for checking that lab-unit YAML expanded as expected before
     # committing to a long compute.
-    _run_yaml_status(verbose, "dry-run complete; printing normalized YAML"; comment=true)
+    _experiment_status(verbose, "dry-run complete; printing normalized YAML"; comment=true)
     buf = IOBuffer()
     println(buf, "# === run_yaml dry-run (post calibration + units + validation) ===")
     println(buf, "# original: $yaml_path")
@@ -482,61 +472,40 @@ end
     return out
 end
 
-@noinline function _run_yaml_execute(
-    data::Dict, yaml_path::String, base_dir::String, verbose::Bool
-)
-    # If the YAML is already runs/foo/config.yaml, use runs/foo/ as the run dir
-    # (user manages directory names). Otherwise compute a hash-based dir.
-    run_dir = if basename(yaml_path) == "config.yaml" && isdir(dirname(yaml_path))
-        dirname(yaml_path)
-    else
-        compute_run_dir(yaml_path; base_dir)
+@noinline function _execute_experiment(data::Dict, raw::Dict, run_dir::String,
+    source_dir::String, verbose::Bool, legacy_config_path, force::Bool)
+    recorded = joinpath(run_dir, "config.json")
+    if isfile(recorded) && content_id(_load_config_data(recorded)) != content_id(raw) &&
+        any(f -> startswith(f, "point_") && endswith(f, ".jld2"), readdir(run_dir))
+        throw(
+            ArgumentError(
+                "run directory contains results for different conditions: $run_dir. " *
+                "Choose a different directory; existing results and their recorded conditions are preserved.",
+            ),
+        )
     end
-    _run_yaml_status(verbose, "using run directory: $run_dir")
+    _experiment_status(verbose, "using run directory: $run_dir")
     mkpath(run_dir)
 
     config_snapshot = joinpath(run_dir, "config.yaml")
-    if abspath(yaml_path) != abspath(config_snapshot)
-        _run_yaml_status(verbose, "snapshotting config: $config_snapshot")
-        isfile(config_snapshot) || cp(yaml_path, config_snapshot)
+    if legacy_config_path !== nothing && abspath(legacy_config_path) != abspath(config_snapshot)
+        _experiment_status(verbose, "snapshotting config: $config_snapshot")
+        isfile(config_snapshot) || cp(legacy_config_path, config_snapshot)
     end
+    _write_config_snapshot(joinpath(run_dir, "config.json"), raw; source_dir, resolved=data)
 
-    _run_yaml_status(verbose, "collecting environment metadata")
+    _experiment_status(verbose, "collecting environment metadata")
     env = _env_metadata()
 
-    # Make relative paths inside the YAML (e.g. `csv: beams.csv`) resolve
-    # against the YAML's own directory, not the caller's cwd.
-    prev_yaml_dir = get(ENV, "SPINORBEC_YAML_DIR", nothing)
-    ENV["SPINORBEC_YAML_DIR"] = dirname(abspath(yaml_path))
-
-    # Snapshot the dealias Refs so they can be restored after the run —
-    # avoids state leakage when the same Julia session runs multiple
-    # YAMLs back-to-back with different dealias settings.
-    dealias_snapshot = _DEALIAS_PENDING_SNAPSHOT[]
-    _DEALIAS_PENDING_SNAPSHOT[] = nothing
-
-    try
-        # Expand scan points (if any)
-        scan_dict = get(data, "scan", nothing)
-        if scan_dict !== nothing
-            _run_yaml_status(verbose, "expanding scan points")
-            scan = _parse_override_scan(scan_dict)
-            _run_yaml_scan(data, scan, run_dir, env; verbose)
-        else
-            # Single-shot pipeline: one point
-            _run_yaml_status(verbose, "starting single pipeline run")
-            _run_yaml_single(data, run_dir, env, 1, ""; verbose)
-        end
-    finally
-        if prev_yaml_dir === nothing
-            delete!(ENV, "SPINORBEC_YAML_DIR")
-        else
-            (ENV["SPINORBEC_YAML_DIR"] = prev_yaml_dir)
-        end
-        if dealias_snapshot !== nothing
-            (was_enabled, was_k_cut) = dealias_snapshot
-            restore_dealias_refs!(was_enabled, was_k_cut)
-        end
+    # The caller owns the source-directory and numerical-setting scope.
+    scan_dict = get(data, "scan", nothing)
+    if scan_dict !== nothing
+        _experiment_status(verbose, "expanding scan points")
+        scan = _parse_override_scan(scan_dict)
+        _run_experiment_scan(data, scan, run_dir, env; verbose, force)
+    else
+        _experiment_status(verbose, "starting single pipeline run")
+        _run_experiment_single(data, run_dir, env, 1, ""; verbose, force)
     end
 
     # W4. `_exit_summary.json` is written by `run_pipeline`, and a run whose
@@ -557,7 +526,7 @@ end
 # `true` would be a claim this function cannot make.
 function _stamp_cache_stats(path::AbstractString)
     try
-        d = isfile(path) ? JSON.parsefile(path) : Dict{String, Any}()
+        d = isfile(path) ? JSON.parsefile(path; use_mmap=false) : Dict{String, Any}()
         d = Dict{String, Any}(String(k) => v for (k, v) in d)
         d["cache"] = _cache_stats_payload()
         d["cache_written_at"] = string(now())
@@ -569,10 +538,12 @@ function _stamp_cache_stats(path::AbstractString)
     nothing
 end
 
-function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=true)
+function _run_experiment_scan(
+    data::Dict, scan::OverrideScan, run_dir, env; verbose=true, force=false
+)
     has_comparison = !isempty(scan.comparison_runs)
     n_recipes = has_comparison ? length(scan.comparison_runs) : 1
-    _run_yaml_status(verbose,
+    _experiment_status(verbose,
         "scan: $(length(scan.points)) point(s), $n_recipes run recipe(s)")
     chain_state = Dict{String, Any}()  # run_name → (psi, mz_actual)
 
@@ -623,7 +594,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             # one is a design decision, not a merge resolution; left for a
             # follow-up rather than settled here by deleting one side.
             adm = admit_payload(psi_file)
-            if adm.hit
+            if adm.hit && !force
                 _assert_point_provenance(psi_file, env; verbose)
                 verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
                 if scan.continuation
@@ -640,7 +611,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
             verbose && println("  → $(basename(psi_file))")
 
             # Apply overrides to pipeline dict
-            _run_yaml_status(verbose, "applying overrides for $(basename(psi_file))")
+            _experiment_status(verbose, "applying overrides for $(basename(psi_file))")
             patched = apply_overrides(data, merged)
             # Strip scan block to prevent recursion
             delete!(patched, "scan")
@@ -657,11 +628,11 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 psi_prev = auto_rotate_psi(psi_prev, patched, prev_mz)
             end
 
-            _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
+            _experiment_status(verbose, "parsing pipeline for $(basename(psi_file))")
             config = parse_pipeline(patched)
             ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
             live_path = joinpath(run_dir, "_live_status.json")
-            _run_yaml_status(verbose, "running pipeline for $(basename(psi_file))")
+            _experiment_status(verbose, "running pipeline for $(basename(psi_file))")
             result = run_pipeline(config; verbose=verbose, psi_init=psi_prev,
                 checkpoint_dir=ckpt_dir, live_status_path=live_path)
 
@@ -705,7 +676,7 @@ function _run_yaml_scan(data::Dict, scan::OverrideScan, run_dir, env; verbose=tr
                 _light_points_enabled() && gs_ref !== nothing &&
                 isfile(joinpath(_gs_stage_dir(), gs_ref * ".jld2"))
             try
-                _run_yaml_status(verbose, "writing result: $(basename(psi_file))")
+                _experiment_status(verbose, "writing result: $(basename(psi_file))")
                 jldopen(tmp_file, "w"; jld_kwargs...) do f
                     if light_point
                         f["gs_ref"] = gs_ref
@@ -903,12 +874,14 @@ function _snapshot_compression_kwargs(result)
     return (;)
 end
 
-function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=true)
+function _run_experiment_single(
+    data::Dict, run_dir, env, index, run_name; verbose=true, force=false
+)
     psi_file = joinpath(run_dir, _point_filename(index, run_name))
 
     # Both questions — see the scan path above for why neither implies the other.
     adm = admit_payload(psi_file)
-    if adm.hit
+    if adm.hit && !force
         _assert_point_provenance(psi_file, env; verbose)
         verbose && println("  ✓ $(basename(psi_file)) (cached, $(adm.provenance))")
         return nothing
@@ -917,11 +890,11 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     started_at = _now_iso()
     t_start = time_ns()
 
-    _run_yaml_status(verbose, "parsing pipeline for $(basename(psi_file))")
+    _experiment_status(verbose, "parsing pipeline for $(basename(psi_file))")
     config = parse_pipeline(data)
     ckpt_dir = joinpath(run_dir, ".checkpoints", basename(psi_file))
     live_path = joinpath(run_dir, "_live_status.json")
-    _run_yaml_status(verbose, "running pipeline for $(basename(psi_file))")
+    _experiment_status(verbose, "running pipeline for $(basename(psi_file))")
     result = run_pipeline(config; verbose, checkpoint_dir=ckpt_dir,
         live_status_path=live_path)
 
@@ -949,7 +922,7 @@ function _run_yaml_single(data::Dict, run_dir, env, index, run_name; verbose=tru
     tmp_file = _scratch_tmp_path(psi_file)
     jld_kwargs = _snapshot_compression_kwargs(result)
     try
-        _run_yaml_status(verbose, "writing result: $(basename(psi_file))")
+        _experiment_status(verbose, "writing result: $(basename(psi_file))")
         jldopen(tmp_file, "w"; jld_kwargs...) do f
             f["psi"] = psi_host
             f["scan_index"] = index
@@ -1145,7 +1118,7 @@ function run_status(run_dir::String)
     files = filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
         readdir(run_dir))
     completed = length(files)
-    expected = _expected_scan_points(joinpath(run_dir, "config.yaml"))
+    expected = _expected_scan_points(_config_snapshot_path(run_dir))
     latest_mtime_s = NaN
     eta_s = NaN
     if !isempty(files)
@@ -1164,7 +1137,7 @@ end
 function _expected_scan_points(cfg_path::String)
     isfile(cfg_path) || return nothing
     data = try
-        YAML.load_file(cfg_path)
+        _load_config_data(cfg_path)
     catch
         return nothing
     end
@@ -1184,7 +1157,8 @@ end
 
 function list_runs(base_dir::String="runs")
     isdir(base_dir) || return String[]
-    dirs = filter(d -> isdir(joinpath(base_dir, d)) && isfile(joinpath(base_dir, d, "config.yaml")),
+    dirs = filter(
+        d -> isdir(joinpath(base_dir, d)) && isfile(_config_snapshot_path(joinpath(base_dir, d))),
         readdir(base_dir))
     sort(dirs)
 end

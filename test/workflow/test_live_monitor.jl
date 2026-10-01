@@ -2,6 +2,7 @@
 # Uses raw Sockets to avoid pulling HTTP.jl into the test deps.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using Sockets
 using SpinorBEC
 
@@ -87,13 +88,8 @@ end
         )
         # Back-date the file, because `/api/live/list` ages a run by its
         # mtime (`routes/lab_live.jl`), not by the `updated_ms` in the JSON.
-        # `touch(path; times=…)` is not a Julia method — this errored with
-        # `MethodError: no method matching touch(::String; times=…)` the first
-        # time anything ran the file, which was 2026-08-02, because the hang
-        # above had kept it from ever getting here. `Base.Filesystem.futime`
-        # is not usable either (checked). coreutils `touch -d @epoch` is.
         old_t = round(Int, time()) - 600  # 10 minutes ago
-        run(pipeline(`touch -d @$(old_t) $(stale_path)`; stdout=devnull, stderr=devnull))
+        set_test_mtime!(stale_path, old_t)
         @test time() - mtime(stale_path) > 500   # the back-dating really took
 
         port = 8900 + (getpid() % 100)

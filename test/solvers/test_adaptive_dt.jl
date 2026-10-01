@@ -303,7 +303,7 @@ using SpinorBEC
         @test ic["dt_max"] == 0.05
     end
 
-    @testset "run_config with adaptive_dt" begin
+    @testset "run_pipeline with adaptive_dt" begin
         yaml = """
         pipeline:
           - ground_state:
@@ -332,7 +332,7 @@ using SpinorBEC
               potential: {type: harmonic, omega: [1.0]}
         """
         config = load_config_from_string(yaml)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
         @test result.dynamics_result !== nothing
     end
 end

@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { stringify as yamlStringify } from 'yaml'
 import { Menu } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -84,10 +83,10 @@ export default function App() {
   // and let QueuePanel pop the dialog pre-filled (the YAML is too big for
   // the URL, so it rides in sessionStorage). enqueueRun fetches a run's
   // config first. The blank "new from scratch" path stays in the Queue.
-  const enqueueYaml = useCallback(
+  const enqueueConfig = useCallback(
     (yaml: string) => {
       try {
-        sessionStorage.setItem('spinorbec.enqueueYaml', yaml)
+        sessionStorage.setItem('spinorbec.enqueueConfig', yaml)
         // Remember where we came from so closing the dialog returns there
         // instead of stranding the user on tab=queue.
         sessionStorage.setItem('spinorbec.enqueueReturnTab', url.tab)
@@ -103,12 +102,12 @@ export default function App() {
       try {
         const d = await api.getEffectiveConfig(name)
         if (d === null) return  // no YAML source for this run
-        enqueueYaml(yamlStringify(d.raw, { indent: 2, lineWidth: 0 }))
+        enqueueConfig(JSON.stringify(d.raw, null, 2))
       } catch {
         /* config fetch failed — skip rather than enqueue a blank */
       }
     },
-    [enqueueYaml],
+    [enqueueConfig],
   )
   const [helpOpen, setHelpOpen] = useState(false)
   const isDark = useThemeMode()
@@ -341,8 +340,8 @@ export default function App() {
                     <Suspense fallback={<TabFallback />}>
                       <EffectiveConfigPanel
                         runName={selectedRun ?? undefined}
-                        yaml={data?.config_yaml || ''}
-                        onEnqueue={enqueueYaml}
+                        configText={data?.config_text || ''}
+                        onEnqueue={enqueueConfig}
                       />
                     </Suspense>
                   </TabBoundary>

@@ -14,7 +14,7 @@ using LinearAlgebra
 using StaticArrays
 import CUDA
 using SpinorBEC
-using SpinorBEC: _diagonal_step_svec!, _c0c1_to_gS
+using SpinorBEC: _diagonal_step_svec!, ku_c01_to_g_S
 
 if !CUDA.functional()
     @info "CUDA not functional — skipping GPU tabulated-LHY parity"
@@ -23,13 +23,13 @@ else
         F, D, n = 6, 13, 8
         psi0 = randn(ComplexF64, n, n, n, D)
         zd = SVector{D, Float64}(zeros(D))
-        g = _c0c1_to_gS(F, 10.0, 0.1)
+        g = ku_c01_to_g_S(F, 10.0, 0.1)
         zoo = (
             "ScalarLHY" => ScalarLHY(0.5),
             "PolarContactLHY" => compute_spinor_lhy_polar_contact(;
                 F, g_dict=g, n_max=200.0, n_points=200),
             "FMContactLHY" => compute_spinor_lhy_fm_contact(;
-                F, g_dict=_c0c1_to_gS(F, 10.0, -0.02), n_max=200.0, n_points=200),
+                F, g_dict=ku_c01_to_g_S(F, 10.0, -0.02), n_max=200.0, n_points=200),
             "IcosahedralLHY" => compute_spinor_lhy_icosahedral(;
                 F, g_dict=g, n_max=200.0, n_points=200),
             "PolarTwoChannelLHY" => compute_spinor_lhy_polar_two_channel(;

@@ -83,7 +83,7 @@ function _route_density_max(path::String, base_dir::String, psi_cache::Dict{Stri
                     gmax > 0 ? gmax : 1.0
                 elseif haskey(f, "psi")
                     # Static-psi file (e.g. ground-state-only run, or a
-                    # `_run_yaml_single` point_NNN.jld2 that only stores
+                    # `_run_experiment_single` point_NNN.jld2 that only stores
                     # the final ψ). Compute the spin-summed peak density
                     # directly so the volume renderer can normalise.
                     psi = f["psi"]
@@ -245,7 +245,7 @@ function _route_density2d(path::String, base_dir::String, psi_cache::Dict{String
     snap_idx = _q_int_opt(p.query, "snap")
     json = try
         cached = _load_psi_cached(fpath, psi_cache, snap_idx)
-        _json_string(_compute_column_densities_from_cache(cached..., axis, fpath))
+        JSON.json(_compute_column_densities_from_cache(cached..., axis, fpath))
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end
@@ -291,7 +291,7 @@ function _route_density3d(path::String, base_dir::String)
     fpath = joinpath(base_dir, p.name, p.file)
     isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
     json = try
-        _json_string(_compute_3d_densities(fpath))
+        JSON.json(_compute_3d_densities(fpath))
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end

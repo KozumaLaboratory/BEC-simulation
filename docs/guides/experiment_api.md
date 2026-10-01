@@ -246,7 +246,8 @@ spec_diff(exp_a, exp_b)                       # same, on Experiments
 
 `spec_diff` walks two specs recursively and returns the dotted paths
 whose leaves differ. Missing-on-one-side leaves are marked with the
-sentinel `:__SPEC_DIFF_MISSING__`.
+value `missing`. Symbol and String dictionary keys are treated as equivalent.
+The traversal uses the shared `diff_dicts` implementation.
 
 ---
 

@@ -124,7 +124,7 @@ using SpinorBEC
     end
 end
 
-# Direct _run_step test: bypasses run_config / _step_dispatch! abstract
+# Direct _run_step test: bypasses run_pipeline / _step_dispatch! abstract
 # dispatch (which triggers a multi-minute JIT cascade — see memory note
 # "pipeline_inference"). This exercises the helper bodies directly.
 @testset "Option γ pipeline _run_step direct" begin

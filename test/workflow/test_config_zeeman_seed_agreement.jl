@@ -33,7 +33,7 @@
 #     the ground state DIRECTLY (p > 0 ⇒ m=+F lowest) and therefore in the
 #     OPPOSITE direction to Bz. That inversion is the trap; encoding it here is
 #     the point.
-#   * mixins — expanded with the schema's own `apply_templates_and_mixins!`
+#   * mixins — expanded with the schema's own `apply_mixins!`
 #     rather than a second reading of the grammar.
 #
 # The sign itself is NOT restated here: Bz→p goes through `Units.bfield_to_p_gauss`,
@@ -63,7 +63,7 @@ silently read as "atom unresolvable".
 """
 function _expand(data)
     try
-        SpinorBEC.apply_templates_and_mixins!(Dict{Any, Any}(data))
+        SpinorBEC.apply_mixins!(Dict{Any, Any}(data))
     catch e
         e isa UndefVarError && rethrow()
         data

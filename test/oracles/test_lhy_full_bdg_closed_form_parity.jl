@@ -26,7 +26,7 @@ using SpinorBEC: _lhy_bdg_energy_density, _lhy_V, _lhy_quadrature,
     _bdg_branch_sum, _bdg_hessian_posdef, _lhy_n_dir, _lhy_bdg_stiffness, _bdg_contact_matrices,
     spin_matrices,
     lhy_energy_polar, lhy_energy_fm, build_polar_lhy_coefs, build_fm_lhy_coefs,
-    _c0c1_to_gS
+    ku_c01_to_g_S
 
 const _KMAX = 60.0
 const _NK = 300
@@ -45,7 +45,7 @@ end
         # c1 > 0 keeps the polar state mean-field stable; c1 magnitudes are
         # capped so every g_S stays positive at F = 6.
         for (F, c1) in ((1, 0.1), (1, 0.5), (1, 2.0), (2, 0.1), (2, 0.5), (6, 0.1))
-            g = _c0c1_to_gS(F, 10.0, c1)
+            g = ku_c01_to_g_S(F, 10.0, c1)
             @test all(>(0), values(g))
             closed = lhy_energy_polar(1.0, build_polar_lhy_coefs(F, g))
             @test _bdg_eps(_polar_spinor(F), F, 10.0, c1) ≈ closed rtol = _RTOL
@@ -58,7 +58,7 @@ end
         # selecting branches by |Re ω| instead of by symplectic norm gets
         # this wrong by 28% (c1 = 0.1) to 89% (c1 = 0.2).
         for c1 in (-0.2, -0.1, -0.05, 0.1, 0.2)
-            g = _c0c1_to_gS(6, 10.0, c1)
+            g = ku_c01_to_g_S(6, 10.0, c1)
             @test all(>(0), values(g))
             closed = lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g))
             @test _bdg_eps(_fm_spinor(6), 6, 10.0, c1) ≈ closed rtol = _RTOL
@@ -75,7 +75,7 @@ end
         # expands around — so the comparison is well posed and a mismatch is
         # about the implementations, not about the expansion point.
         for c1 in (0.05, 0.1, 0.2)
-            g = _c0c1_to_gS(6, 10.0, c1)
+            g = ku_c01_to_g_S(6, 10.0, c1)
             @test all(>(0), values(g))
             c0_st, lam = compute_c0_lambda_F6_Ih(g)
             @test c0_st > 0 && lam > 0
@@ -91,7 +91,7 @@ end
         # would not be an adequate control on its own — recorded because the
         # obvious choice of control here is the weak one.
         for c1 in (0.05, 0.1)
-            g = _c0c1_to_gS(6, 10.0, c1)
+            g = ku_c01_to_g_S(6, 10.0, c1)
             ih = epsilon_LHY_F6_Ih(1.0, g)
             fm = lhy_energy_fm(1.0, build_fm_lhy_coefs(6, g))
             @test abs(1 - fm / ih) > 0.4
@@ -110,7 +110,7 @@ end
         # configurations from a wrong number to an error. That is the point:
         # the parameter choice is visible at build time and the NaN was not.
         for c1 in (-0.05, -0.1, -0.2)
-            g = _c0c1_to_gS(6, 10.0, c1)
+            g = ku_c01_to_g_S(6, 10.0, c1)
             c0_st, lam = compute_c0_lambda_F6_Ih(g)
             @test c0_st > 0        # so the refusal is λ_spin's, not c_0's
             @test lam < 0
@@ -123,10 +123,10 @@ end
         # the build throws where the cause is readable instead of handing NaN
         # to the propagator. Same guard covers the pre-existing c_0 < 0 case.
         @test_throws ArgumentError compute_spinor_lhy_icosahedral(;
-            F=6, g_dict=_c0c1_to_gS(6, 10.0, -0.1), n_max=2.0, n_points=8)
+            F=6, g_dict=ku_c01_to_g_S(6, 10.0, -0.1), n_max=2.0, n_points=8)
         # ...and the stable side still builds.
         @test compute_spinor_lhy_icosahedral(;
-            F=6, g_dict=_c0c1_to_gS(6, 10.0, 0.1), n_max=2.0,
+            F=6, g_dict=ku_c01_to_g_S(6, 10.0, 0.1), n_max=2.0,
             n_points=8) isa IcosahedralLHY
     end
 
@@ -165,7 +165,7 @@ end
 
     @testset "tabulated V_LHY == d/dn of the closed form" begin
         F, c1 = 6, 0.1
-        g = _c0c1_to_gS(F, 10.0, c1)
+        g = ku_c01_to_g_S(F, 10.0, c1)
         eps_1 = lhy_energy_polar(1.0, build_polar_lhy_coefs(F, g))
         tbl = compute_spinor_lhy_table(;
             spinor=_polar_spinor(F), F,
@@ -189,7 +189,7 @@ end
             (2, _polar_spinor(2), 0.5, g -> lhy_energy_polar(1.0, build_polar_lhy_coefs(2, g))),
         )
             for c0 in (10.0, 100.0)
-                g = _c0c1_to_gS(F, c0, c1 * c0 / 10)
+                g = ku_c01_to_g_S(F, c0, c1 * c0 / 10)
                 all(>(0), values(g)) || continue
                 ip = InteractionParams(Dict(0 => c0, 1 => c1 * c0 / 10))
                 exact = closed(g)
@@ -277,7 +277,7 @@ end
         # anything. Independently, refining past a pinned large cutoff walks
         # into the round-off cliff.
         F, c1 = 6, -0.02
-        g = _c0c1_to_gS(F, 10.0, c1)
+        g = ku_c01_to_g_S(F, 10.0, c1)
         exact = lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))
         ip = InteractionParams(Dict(0 => 10.0, 1 => c1))
         v20 = _lhy_bdg_energy_density(_fm_spinor(F), 1.0, F, ip, ZeemanParams(),
@@ -332,7 +332,7 @@ end
         # answers wrong by factors of 4 to 120.
         F, c1 = 6, -0.02
         ip = InteractionParams(Dict(0 => 10.0, 1 => c1))
-        g = _c0c1_to_gS(F, 10.0, c1)
+        g = ku_c01_to_g_S(F, 10.0, c1)
         exact = lhy_energy_fm(1.0, build_fm_lhy_coefs(F, g))
         v = @test_logs (:warn, r"past what Float64 can deliver") match_mode = :any begin
             _lhy_bdg_energy_density(_fm_spinor(F), 1.0, F, ip, ZeemanParams(),

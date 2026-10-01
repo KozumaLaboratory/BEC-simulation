@@ -91,7 +91,7 @@ function run_gs(spec)
     SpinorBEC._normalize_and_validate!(data; strict=true)
     cfg = SpinorBEC.parse_pipeline(data)
     t0 = time()
-    res = run_config(cfg; verbose=false)
+    res = run_pipeline(cfg; verbose=false)
     # `:scalar_gs` is the key `scripts/klaus2022_reproduce.jl` reads; there is no
     # `:scalar_egpe_ground_state`.
     (res[:scalar_gs], time() - t0)

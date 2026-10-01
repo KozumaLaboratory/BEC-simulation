@@ -1,3 +1,5 @@
+export ku_c01_to_g_S
+
 export compute_interaction_params
 export compute_c0, compute_c_dd, compute_a_dd
 export interaction_params_from_constraint
@@ -130,7 +132,7 @@ function compute_a_dd(atom::AtomSpecies)
 end
 
 """
-    _c0c1_to_gS(F, c0, c1) → Dict{Int,Float64}
+    ku_c01_to_g_S(F, c0, c1) → Dict{Int,Float64}
 
 Convert physical density (c₀) and spin (c₁) couplings to channel couplings g_S:
   g_S = c₀ + c₁(S(S+1) − 2F(F+1))/2
@@ -145,7 +147,7 @@ unknown (e.g. Eu151). To specify independent g_S, provide higher-rank c_n
 couplings (n ≥ 4) via the InteractionParams Dict, or use
 `_make_tensor_cache_from_channels` directly.
 """
-function _c0c1_to_gS(F::Int, c0::Float64, c1::Float64)
+function ku_c01_to_g_S(F::Int, c0::Float64, c1::Float64)
     Dict{Int, Float64}(S => c0 + c1 * spin_pair_eigenvalue(S, F) for S in 0:2:2F)
 end
 
@@ -165,11 +167,11 @@ g_S Dict:
 
 The two conventions have different numerical normalisations (c_1
 specifically is in the Kawaguchi-Ueda "F̂·F̂" form, not the rank-1 6j
-form), so the n=0,1 entries route through the closed-form `_c0c1_to_gS`
+form), so the n=0,1 entries route through the closed-form `ku_c01_to_g_S`
 while n≥2 entries route through the 6j transform `_dict_to_delta_gS`.
 """
 function c_to_g(F::Int, ip::InteractionParams)
-    g = _c0c1_to_gS(F, ip[0], ip[1])
+    g = ku_c01_to_g_S(F, ip[0], ip[1])
     delta = _dict_to_delta_gS(F, ip.c)
     isempty(delta) && return g
     for (S, dg) in delta

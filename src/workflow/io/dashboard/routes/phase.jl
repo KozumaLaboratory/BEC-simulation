@@ -35,7 +35,7 @@ function _route_phase2d(path::String, base_dir::String, psi_cache::Dict{String, 
     snap_idx = _q_int_opt(p.query, "snap")
     json = try
         cached = _load_psi_cached(fpath, psi_cache, snap_idx)
-        _json_string(_compute_phase_slice_from_cache(cached..., axis, slice_idx, fpath))
+        JSON.json(_compute_phase_slice_from_cache(cached..., axis, slice_idx, fpath))
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end

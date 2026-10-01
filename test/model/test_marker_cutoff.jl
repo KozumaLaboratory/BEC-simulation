@@ -21,19 +21,16 @@
 # gates already shipped circular and both were caught only by canary.
 
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using Dates
 using SpinorBEC
 using SpinorBEC: admit_payload, write_complete_marker, write_incomplete_marker,
     MARKER_CUTOVER_UNIX, _reset_unmarked_warnings!
 
-# `touch(path)` can only set "now". Setting an explicit mtime needs the syscall,
-# and `touch -d @<epoch>` is the portable spelling of it here.
-set_mtime!(p, epoch) = (run(pipeline(`touch -d @$(Int(epoch)) $p`; stdout=devnull)); p)
-
 cfixture(dir, name, epoch; nbytes=64) = begin
     p = joinpath(dir, name)
     write(p, rand(UInt8, nbytes))
-    set_mtime!(p, epoch)
+    set_test_mtime!(p, epoch)
 end
 
 const BEFORE = MARKER_CUTOVER_UNIX - 86_400   # a day before marker writing existed
@@ -102,7 +99,7 @@ const AFTER = MARKER_CUTOVER_UNIX + 86_400    # a day after
             _reset_unmarked_warnings!()
             p = cfixture(dir, "good.jld2", AFTER)
             write_complete_marker(p, [p]; kind="point")
-            set_mtime!(p, AFTER)   # `write_complete_marker` does not touch it, but pin it
+            set_test_mtime!(p, AFTER)   # `write_complete_marker` does not touch it, but pin it
             a = admit_payload(p)
             @test a.hit
             @test a.provenance === :marked

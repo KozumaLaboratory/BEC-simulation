@@ -25,6 +25,14 @@ module StateGen
 include(normpath(joinpath(@__DIR__, "..", "scripts", "generate_state.jl")))
 end
 
+@testset "state derivation is independent of checkout formatting" begin
+    @test StateGen.normalize_newlines("one\r\ntwo\r\n") == "one\ntwo\n"
+    @test StateGen.normalize_newlines("one\ntwo\n") == "one\ntwo\n"
+    @test StateGen.repo_relpath(joinpath(StateGen.ROOT, "src", "SpinorBEC.jl")) ==
+        "src/SpinorBEC.jl"
+    @test StateGen.split_step_chain()[3] == string.(collect(SpinorBEC.OUTER_CHAIN))
+end
+
 @testset "docs/STATE.md is current" begin
     @testset "the generator and its output both exist" begin
         @test isfile(GEN)
@@ -89,7 +97,7 @@ end
         @test occursin(r"\| `src/\w+/` \| \d+ \| \d+ \|", derived)
     end
 
-    committed = read(STATE, String)
+    committed = StateGen.normalize_newlines(read(STATE, String))
     if committed != derived
         # Name WHAT moved. "run the generator" alone sends the next reader to a
         # 200-line diff; the first differing line is usually the whole answer.

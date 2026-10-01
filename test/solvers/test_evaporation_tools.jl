@@ -148,6 +148,16 @@ _euv3_ramp_t() = FortRamp(
 
     @testset "robust (worst-case ensemble) monotone optimizer" begin
         trap = _eu_trap_t()
+        active = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40,
+            evap_scale=0.8, heating_rate=0.025, noneq_scale=1.0)
+        members = param_uncertainty_ensemble(trap, active;
+            alpha_factors=(1.1,), K3_factors=(2.0,))
+        @test length(members) == 1
+        @test members[1][2].K3 == 2active.K3
+        for field in fieldnames(EvapParams)
+            field == :K3 && continue
+            @test getfield(members[1][2], field) == getfield(active, field)
+        end
         p = EvapParams(; a_s=_as_t, tau_bg=10.0, K3=1e-40)   # nonzero ⇒ K3 scaling differs
         base = _euv3_ramp_t()
         # ensemble over α and K3 uncertainty; nominal (1,1) omitted, added internally

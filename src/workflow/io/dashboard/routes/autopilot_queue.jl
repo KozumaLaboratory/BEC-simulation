@@ -117,7 +117,3 @@ function _entry_to_json(e::QueueEntry,
     ]
     "{" * join(fields, ",") * "}"
 end
-
-function _jsonesc(s::AbstractString)
-    replace(String(s), "\\" => "\\\\", "\"" => "\\\"")
-end

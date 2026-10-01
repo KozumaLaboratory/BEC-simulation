@@ -335,7 +335,7 @@ _is_trivial_direction(d) =
     resolve_gs(p, grid_prev, atom_prev, ws_prev; verbose=true) -> GSResolved
 
 Resolve one `ground_state:` step's params. `p` is the step dict as
-`parse_pipeline` produced it — i.e. AFTER `_run_yaml_prepare` (dealias pop,
+`parse_pipeline` produced it — i.e. AFTER `_prepare_config_file` (dealias pop,
 calibration, mixins, schema defaults, units, B-block) and AFTER the top-level
 `defaults:` seeding, which 414 of 416 committed configs rely on.
 
@@ -745,7 +745,7 @@ _accumulate_potential!(::_PotAcc, v::AbstractPotential, ::Float64) = throw(
 
 The resolved physics of a config's `ground_state:` step.
 
-Applies the preprocessing `run_yaml` applies — `_run_yaml_prepare` (dealias pop,
+Applies the preprocessing `run_yaml` applies — `_prepare_config_file` (dealias pop,
 calibration, templates + mixins, schema defaults, units, auto-defaults, B-block,
 noise-block, strict validation) followed by `parse_pipeline`'s `defaults:`
 seeding, which 414 of 416 committed configs depend on and which lives in neither
@@ -759,7 +759,7 @@ with several an explicit choice is required rather than guessed.
 Fails loudly and by name. There is no partially-filled `Model`: every slot a
 config cannot resolve throws, with the config path in the message.
 
-**Pure in the dealias globals.** `_run_yaml_prepare` is only the PREPARE half of
+**Pure in the dealias globals.** `_prepare_config_file` is only the PREPARE half of
 a prepare/execute pair: it applies a top-level `dealias:` block to
 `DEALIAS_2_3_ENABLED[]` / `DEALIAS_K_CUTOFF[]` and leaves them set, and it is
 `run_yaml`'s execute half that restores them in a `finally`
@@ -776,21 +776,17 @@ order-independence arm of `test/model/test_corpus_resolves.jl`.
 function yaml_to_model(path::AbstractString; index::Union{Nothing, Int}=nothing,
     verbose::Bool=false)
     isfile(path) || throw(ArgumentError("yaml_to_model: no such config: $path"))
-    # Restore BOTH the globals and the pending-snapshot slot, so the subsystem is
-    # left exactly as found. Clearing the slot outright would discard a restore
-    # point some earlier half-run `run_yaml` is still owed.
+    # Preserve the caller's numerical settings during read-only resolution.
     was_enabled, was_k_cut = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
-    was_pending = _DEALIAS_PENDING_SNAPSHOT[]
-    # `_run_yaml_prepare` is INSIDE the try: strict schema validation lives
+    # `_prepare_config_file` is INSIDE the try: strict schema validation lives
     # there, and a config that fails it is one `yaml_to_model` cannot resolve —
     # so it must be named the same way as every other refusal.
     try
-        yaml_to_model(_run_yaml_prepare(String(path), verbose, false); index, verbose)
+        yaml_to_model(_prepare_config_file(String(path), verbose, false); index, verbose)
     catch err
         err isa ArgumentError || rethrow()
         throw(ArgumentError("$path: $(err.msg)"))
     finally
-        _DEALIAS_PENDING_SNAPSHOT[] = was_pending
         restore_dealias_refs!(was_enabled, was_k_cut)
     end
 end

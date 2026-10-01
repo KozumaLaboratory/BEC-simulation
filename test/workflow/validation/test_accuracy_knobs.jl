@@ -82,7 +82,7 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
     #
     # Two independent causes, both measured. `:spin_taylor` is in no `Stage`
     # (see test/model/test_ambient_refs_vs_artifact_id.jl). `:dealias_2_3` IS in
-    # the id via `GridSpec`, but `_run_yaml_prepare` applies the config's own
+    # the id via `GridSpec`, but `_prepare_config_file` applies the config's own
     # top-level `dealias:` block AFTER the reference flip, overwriting it — and
     # 75 committed configs carry that block.
     #

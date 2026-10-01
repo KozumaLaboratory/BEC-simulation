@@ -9,7 +9,7 @@ Bayesian optimization wired through the YAML pipeline interface.
 of bounds. Each BO evaluation:
 
   1. Apply the candidate point as overrides to the YAML dict
-  2. Re-parse and run the pipeline via `run_config`
+  2. Re-parse and run the pipeline via `run_pipeline`
   3. Apply the user-supplied `objective_fn(result) → Float64` to score
   4. BO selects the next point to evaluate (Matérn 5/2 GP + EI acquisition)
 

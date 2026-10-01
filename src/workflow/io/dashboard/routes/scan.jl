@@ -90,7 +90,7 @@ function _route_scan_group(
             ),
             "runs" => runs_data,
         )
-        _json_string(out)
+        JSON.json(out)
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end
@@ -160,7 +160,7 @@ function _route_physics_summary(path::String, base_dir::String, psi_cache::Dict{
         nd = _norm_max_dev(d)
         nd === nothing || (out["norm_max_dev"] = nd)
 
-        _json_string(out)
+        JSON.json(out)
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end

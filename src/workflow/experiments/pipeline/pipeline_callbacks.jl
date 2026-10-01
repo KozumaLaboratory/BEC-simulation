@@ -67,7 +67,7 @@ to `status_path` for the dashboard's `/api/live/*` endpoints. Accepts:
     live_monitor: {every: 100}   → custom cadence
 
 If `status_path === nothing` we silently skip even when YAML asks for it
-(useful for ad-hoc `run_config` calls that have no run dir).
+(useful for ad-hoc `run_pipeline` calls that have no run dir).
 """
 function _build_live_callback(node, status_path::Union{Nothing, String})
     node === nothing && return nothing

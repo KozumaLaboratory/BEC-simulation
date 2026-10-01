@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { stringify as yamlStringify } from 'yaml'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   api,
@@ -250,7 +249,7 @@ export function QueuePanel() {
   const { snap, tagsByCid, error, refresh } = useAutopilotQueue()
   const [url, setUrl] = useDashboardURL()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [dialogInitialYaml, setDialogInitialYaml] = useState<string | undefined>()
+  const [dialogInitialConfig, setDialogInitialConfig] = useState<string | undefined>()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const [groupExpanded, setGroupExpanded] = useState<Set<string>>(() => new Set())
   const [flashCid, setFlashCid] = useState<string | null>(null)
@@ -321,7 +320,7 @@ export function QueuePanel() {
   }
 
   function openBlank() {
-    setDialogInitialYaml(undefined)
+    setDialogInitialConfig(undefined)
     setDialogOpen(true)
   }
 
@@ -348,17 +347,17 @@ export function QueuePanel() {
     () => {
       let y: string | null = null
       try {
-        y = sessionStorage.getItem('spinorbec.enqueueYaml')
+        y = sessionStorage.getItem('spinorbec.enqueueConfig')
       } catch {
         /* sessionStorage disabled — fall through to blank */
       }
       if (y) {
         try {
-          sessionStorage.removeItem('spinorbec.enqueueYaml')
+          sessionStorage.removeItem('spinorbec.enqueueConfig')
         } catch {
           /* ignore */
         }
-        setDialogInitialYaml(y)
+        setDialogInitialConfig(y)
         setDialogOpen(true)
       } else {
         openBlank()
@@ -372,15 +371,15 @@ export function QueuePanel() {
       .getEffectiveConfig(entry.content_id)
       .then((d) => {
         try {
-          const text = d === null ? undefined : yamlStringify(d.raw, { indent: 2, lineWidth: 0 })
-          setDialogInitialYaml(text)
+          const text = d === null ? undefined : JSON.stringify(d.raw, null, 2)
+          setDialogInitialConfig(text)
         } catch {
-          setDialogInitialYaml(undefined)
+          setDialogInitialConfig(undefined)
         }
         setDialogOpen(true)
       })
       .catch(() => {
-        setDialogInitialYaml(undefined)
+        setDialogInitialConfig(undefined)
         setDialogOpen(true)
       })
   }
@@ -513,7 +512,7 @@ export function QueuePanel() {
       <EnqueueDialog
         open={dialogOpen}
         onClose={closeEnqueue}
-        initialYaml={dialogInitialYaml}
+        initialConfig={dialogInitialConfig}
         dryRun={dryRun}
         paused={paused}
         onCommitted={(resp) => {

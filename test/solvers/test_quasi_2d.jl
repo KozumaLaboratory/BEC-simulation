@@ -35,7 +35,7 @@ using SpinorBEC
         @test p["ddi"]["l_z"] == 1.5
     end
 
-    @testset "end-to-end: run_config ground_state 2D" begin
+    @testset "end-to-end: run_pipeline ground_state 2D" begin
         yaml_str = """
         pipeline:
           - ground_state:
@@ -57,7 +57,7 @@ using SpinorBEC
         """
 
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
         @test result.ground_state_energy isa Float64
         @test result.ground_state_converged isa Bool
     end

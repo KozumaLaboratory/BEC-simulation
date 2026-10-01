@@ -8,7 +8,7 @@
 # statements of the same projection:
 #
 #   route A  KU closed form      g_S = c₀ + c₁·λ_S,  λ_S = ½(S(S+1) − 2F(F+1))
-#            (`_c0c1_to_gS`, interactions.jl:165)
+#            (`ku_c01_to_g_S`, interactions.jl:165)
 #   route B  Wigner-6j transform g_S = Σ_k (2k+1){F F k; F F S} c_k
 #            (`_cn_to_gS`, clebsch_gordan.jl:143)
 #   route C  CG-sum rank-4 kernel V = Σ_S g_S Σ_M |SM⟩⟨SM|
@@ -28,7 +28,7 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: _c0c1_to_gS, _cn_to_gS, channel_kernel, spin_matrices, wigner_6j
+using SpinorBEC: ku_c01_to_g_S, _cn_to_gS, channel_kernel, spin_matrices, wigner_6j
 using LinearAlgebra
 using Random
 
@@ -38,7 +38,7 @@ using Random
     # F=1 (Ho 1998 / Ohmi-Machida 1998): c₀ = (g₀ + 2g₂)/3, c₁ = (g₂ − g₀)/3.
     @testset "F=1 textbook inverse (Ho / Ohmi-Machida)" begin
         c0, c1 = 0.7, -0.13
-        g = _c0c1_to_gS(1, c0, c1)
+        g = ku_c01_to_g_S(1, c0, c1)
         @test isapprox((g[0] + 2g[2]) / 3, c0; rtol=1e-13)
         @test isapprox((g[2] - g[0]) / 3, c1; rtol=1e-13)
     end
@@ -46,7 +46,7 @@ using Random
     # F=2 (Kawaguchi-Ueda review): c₀ = (4g₂ + 3g₄)/7, c₁ = (g₄ − g₂)/7.
     @testset "F=2 textbook inverse (Kawaguchi-Ueda)" begin
         c0, c1 = 0.9, 0.21
-        g = _c0c1_to_gS(2, c0, c1)
+        g = ku_c01_to_g_S(2, c0, c1)
         @test isapprox((4g[2] + 3g[4]) / 7, c0; rtol=1e-13)
         @test isapprox((g[4] - g[2]) / 7, c1; rtol=1e-13)
     end
@@ -59,7 +59,7 @@ using Random
     # (Channels are even-S, so S-parity phases cannot fake constancy.)
     @testset "cross-route: KU λ_S ∝ 6j k=1 (F-swept)" begin
         for F in (1, 2, 3, 6)
-            g_ku = _c0c1_to_gS(F, 0.0, 1.0)      # pure c₁ ⇒ g_S = λ_S
+            g_ku = ku_c01_to_g_S(F, 0.0, 1.0)      # pure c₁ ⇒ g_S = λ_S
             g_6j = _cn_to_gS(F, Dict(1 => 1.0))  # rank-1 via 6j transform
             Ss = sort(collect(keys(g_ku)))
             ratios = [g_6j[S] / g_ku[S] for S in Ss if abs(g_ku[S]) > 1e-12]
@@ -87,7 +87,7 @@ using Random
         for F in (1, 2, 3, 6)
             D = 2F + 1
             c0, c1 = 0.8, -0.17
-            V = channel_kernel(F, _c0c1_to_gS(F, c0, c1))
+            V = channel_kernel(F, ku_c01_to_g_S(F, c0, c1))
             sm = spin_matrices(F)
             φ = randn(rng, ComplexF64, D)
 
@@ -117,7 +117,7 @@ using Random
     # kernel — pure operator spectrum. This anchors the c₁ channel
     # MAGNITUDE absolutely at every F including Eu F=6 (the homogeneous-
     # coefficient blind spot the file targets); a wrong factor in
-    # `_c0c1_to_gS`'s λ_S would diverge from the spectrum here even where
+    # `ku_c01_to_g_S`'s λ_S would diverge from the spectrum here even where
     # the cross-route ratio test (relative) stays green. Coefficient-
     # source class: a face reading c₁ with the wrong magnitude / channel
     # is sign-invisible, so this absolute spectrum anchor — not the
@@ -138,7 +138,7 @@ using Random
             @test length(ev) == D^2
             @test isapprox(sort(expected), ev; atol=1e-8)
             # the even-S eigenvalues are exactly the pure-c₁ g_S channels
-            g = _c0c1_to_gS(F, 0.0, 1.0)
+            g = ku_c01_to_g_S(F, 0.0, 1.0)
             for S in 0:2:(2F)
                 @test any(λ -> isapprox(λ, g[S]; atol=1e-8), ev)
             end

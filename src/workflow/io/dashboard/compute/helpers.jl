@@ -45,11 +45,15 @@ function _trilinear_upsample(data::Array{Float64, 3}, target_n::Int)
 end
 
 """
-Compute 3D density for each m-component.
-Uses trilinear interpolation to produce smooth output at `target_n` resolution.
-Top `max_components` by population are included, plus total.
-"""
+Resolve box_size for `jld2_path`. First tries the embedded
+`grid_box_size` dataset (written by `_run_experiment_single`), then falls
+back to parsing the sibling config.yaml's `pipeline[0].<step>.grid.box`.
+Returns nothing if neither path produces a usable vector.
 
+The JLD2-first lookup matters for configs that move `grid:` into a
+`mixins:` block: the YAML fallback reads the raw YAML, so it never
+sees the expanded grid.
+"""
 function _read_box_size(jld2_path::String)
     # Embedded dataset (preferred)
     try
@@ -67,11 +71,11 @@ function _read_box_size(jld2_path::String)
     # carry `use: [some_mixin]` and have no `grid:` key, even though
     # the mixin defines it. (Caught 2026-05-13 on eu151_edh_k3_compare
     # whose GS step pulls grid from `eu151_edh_phys` mixin.)
-    config_path = joinpath(dirname(jld2_path), "config.yaml")
+    config_path = _config_snapshot_path(dirname(jld2_path))
     isfile(config_path) || return nothing
     try
-        data = YAML.load_file(config_path)
-        apply_templates_and_mixins!(data)
+        data = _load_config_data(config_path)
+        apply_mixins!(data)
         pipe = get(data, "pipeline", [])
         isempty(pipe) && return nothing
         gs = first(values(pipe[1]))
@@ -151,10 +155,10 @@ function _read_run_physics(jld2_path::String)
         # fall through
     end
     # YAML fallback
-    config_path = joinpath(dirname(jld2_path), "config.yaml")
+    config_path = _config_snapshot_path(dirname(jld2_path))
     isfile(config_path) || return (nothing, nothing, nothing)
     try
-        data = YAML.load_file(config_path)
+        data = _load_config_data(config_path)
         pipe = get(data, "pipeline", [])
         isempty(pipe) && return (nothing, nothing, nothing)
         gs = first(values(pipe[1]))

@@ -8,7 +8,7 @@
 # Layout:
 #   runs/
 #     <content_id>/
-#       config.yaml        ← user spec
+#       config.json        ← experiment snapshot
 #       state.toml         ← queue entry (this file's responsibility)
 #       _exit_summary.json ← structured terminal status (written by run_pipeline)
 #       ... run artefacts (point_NNN.jld2, _live_status.json, ...)
@@ -79,7 +79,7 @@ function _read_exit_summary(entry)
     p = joinpath(entry.run_dir, EXIT_SUMMARY_FILENAME)
     isfile(p) || return nothing
     d = try
-        JSON.parsefile(p)
+        JSON.parsefile(p; use_mmap=false)
     catch
         return nothing
     end
@@ -174,7 +174,7 @@ mutable struct QueueEntry
 
     # filesystem
     run_dir::String                         # absolute path to runs/<cid>/
-    spec_path::String                       # config.yaml in run_dir
+    spec_path::String                       # experiment snapshot in run_dir
 
     # reproducibility (captured at enqueue! time, never mutated)
     code_sha::String                        # git rev-parse HEAD at enqueue
@@ -473,7 +473,7 @@ end
              backend_type=:local, qr=autopilot_queue_root()) -> QueueEntry
 
 Create / update the run dir's state.toml to `status=:pending`. Persists
-the spec to `<run_dir>/config.yaml` if it isn't already there. Idempotent
+the spec to `<run_dir>/config.json` if it isn't already there. Idempotent
 on re-enqueue (existing terminal status is overwritten by warning).
 """
 function enqueue!(exp::Experiment;
@@ -497,8 +497,7 @@ function enqueue!(exp::Experiment;
 )
     od = outdir(exp)
     isdir(od) || mkpath(od)
-    cfg_path = joinpath(od, "config.yaml")
-    isfile(cfg_path) || write_run!(exp)
+    cfg_path = write_run!(exp)
 
     existing = get_entry(od)
     if existing !== nothing && existing.status in (:running, :done)
@@ -623,7 +622,7 @@ end
 
 Run `inspect_config(spec_path)` and hash its serialized output. The
 hash answers "did the spec / templates / calibrations resolve to the
-same effective YAML at enqueue time as on this dispatch?" — i.e. it
+same effective conditions at enqueue time as on this dispatch?" — i.e. it
 detects silent semantic drift across enqueue and dispatch.
 """
 function _capture_inspector_snapshot_hash(spec_path::AbstractString)

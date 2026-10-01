@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { stringify as yamlStringify } from 'yaml'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   api,
@@ -13,25 +12,25 @@ import { CHART_COLORS } from '@/components/charts/chartColors'
 interface Props {
   /** Run name; used to fetch `/api/effective_config/<run>`. Empty → no fetch. */
   runName: string | undefined
-  /** Raw YAML text from `data.config_yaml` — shown alongside the resolved
+  /** Raw conditions text from `data.config_text` — shown alongside the resolved
    * view so the user can compare what they wrote vs what the simulator sees. */
-  yaml: string
-  /** Enqueue this config as a new run (pre-fills the dialog with `yaml`). */
-  onEnqueue?: (yaml: string) => void
+  configText: string
+  /** Enqueue this config as a new run (pre-fills the dialog with `configText`). */
+  onEnqueue?: (configText: string) => void
 }
 
 /**
- * Pre-run "what does this YAML actually solve?" panel.
+ * Pre-run "what does this conditions actually solve?" panel.
  *
  * Three sections, top to bottom:
  *   1. Warnings — sorted by severity (error → warn → info).
  *   2. Per-step list — resolved scalars + B(t)/q(t) line chart per step.
- *   3. Raw YAML — collapsible viewer for reference.
+ *   3. Raw conditions — collapsible viewer for reference.
  *
  * Backed by `/api/effective_config/<run>`, which runs the full
  * `_normalize_and_validate!` pipeline + per-step waveform sampling.
  */
-export function EffectiveConfigPanel({ runName, yaml, onEnqueue }: Props) {
+export function EffectiveConfigPanel({ runName, configText, onEnqueue }: Props) {
   const [ins, setIns] = useState<EffectiveConfig | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,11 +71,11 @@ export function EffectiveConfigPanel({ runName, yaml, onEnqueue }: Props) {
 
   return (
     <div className="space-y-5">
-      {onEnqueue && yaml && (
+      {onEnqueue && configText && (
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => onEnqueue(yaml)}
+            onClick={() => onEnqueue(configText)}
             className="font-mono text-[11px] uppercase tracking-[0.10em] px-3 py-1.5 border border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-background"
             style={{ borderRadius: 0 }}
             title="enqueue this config as a new run (pre-fills the dialog)"
@@ -97,13 +96,13 @@ export function EffectiveConfigPanel({ runName, yaml, onEnqueue }: Props) {
       {error && <ErrorBox message={error} />}
       {!loading && !error && !ins && (
         <div className="text-xs text-muted-foreground">
-          No effective config for this run (e.g. a scan export with no YAML
+          No effective config for this run (e.g. a scan export with no conditions
           source).
         </div>
       )}
       {ins && <WarningsSection warnings={ins.warnings} />}
       {ins && <StepsSection steps={ins.steps} />}
-      {ins && <RawVsResolvedSection ins={ins} rawYaml={yaml} />}
+      {ins && <RawVsResolvedSection ins={ins} rawConfig={configText} />}
     </div>
   )
 }
@@ -384,25 +383,25 @@ function fmt(v: number): string {
   return v.toPrecision(4)
 }
 
-// --- Raw vs Resolved YAML --------------------------------------------
+// --- Raw vs Resolved conditions --------------------------------------------
 //
 // Side-by-side viewer for what the user wrote vs what the simulator
 // will actually solve. Light line-based highlighting marks lines that
-// appear in only one column. Both panes are YAML-stringified from the
+// appear in only one column. Both panes are conditions-stringified from the
 // JSON dicts the backend returns.
 
 function RawVsResolvedSection({
   ins,
-  rawYaml,
+  rawConfig,
 }: {
   ins: EffectiveConfig
-  rawYaml: string
+  rawConfig: string
 }) {
   const [open, setOpen] = useState(false)
 
-  const resolvedYaml = useMemo(() => {
+  const resolvedConfig = useMemo(() => {
     try {
-      return yamlStringify(ins.normalised, { indent: 2, lineWidth: 0 })
+      return JSON.stringify(ins.normalised, null, 2)
     } catch (e) {
       return `# Failed to stringify resolved config: ${String(e)}`
     }
@@ -410,15 +409,15 @@ function RawVsResolvedSection({
 
   const diffSets = useMemo(() => {
     const rawLines = new Set(
-      (rawYaml || '').split('\n').map((l) => l.trim()).filter(Boolean),
+      (rawConfig || '').split('\n').map((l) => l.trim()).filter(Boolean),
     )
     const resolvedLines = new Set(
-      resolvedYaml.split('\n').map((l) => l.trim()).filter(Boolean),
+      resolvedConfig.split('\n').map((l) => l.trim()).filter(Boolean),
     )
     return { rawLines, resolvedLines }
-  }, [rawYaml, resolvedYaml])
+  }, [rawConfig, resolvedConfig])
 
-  if (!rawYaml && !resolvedYaml) return null
+  if (!rawConfig && !resolvedConfig) return null
   return (
     <Card>
       <CardContent className="p-0">
@@ -428,7 +427,7 @@ function RawVsResolvedSection({
           onClick={() => setOpen((v) => !v)}
         >
           <span>
-            {open ? '▾' : '▸'} Raw vs Resolved YAML
+            {open ? '▾' : '▸'} Raw vs Resolved conditions
           </span>
           <span className="text-[var(--ink-faint)] normal-case tracking-normal text-[10px]">
             what you wrote · what the simulator solves
@@ -436,15 +435,15 @@ function RawVsResolvedSection({
         </button>
         {open && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[var(--ink-faint)]">
-            <YamlPane
-              label="Raw (your YAML)"
-              text={rawYaml || ''}
+            <ConfigPane
+              label="Raw (your conditions)"
+              text={rawConfig || ''}
               foreignLines={diffSets.resolvedLines}
               addedColor="rgba(180, 80, 80, 0.18)"
             />
-            <YamlPane
+            <ConfigPane
               label="Resolved (effective config)"
-              text={resolvedYaml}
+              text={resolvedConfig}
               foreignLines={diffSets.rawLines}
               addedColor="rgba(80, 140, 80, 0.18)"
             />
@@ -455,7 +454,7 @@ function RawVsResolvedSection({
   )
 }
 
-function YamlPane({
+function ConfigPane({
   label,
   text,
   foreignLines,

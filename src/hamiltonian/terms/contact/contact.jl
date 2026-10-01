@@ -114,22 +114,6 @@ function _density_interaction_energy(psi, c0, n_comp, ndim, n_pts, dV)
     0.5 * c0 * s * dV
 end
 
-"""
-    _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, ::Val{N})
-
-Add c0·n·ψ contribution to `grad`. Body used by `energy_gradient!`,
-shares `n_density` scratch with sibling terms (LHY) for performance.
-"""
-function _grad_c0_density!(grad, psi, ws, n_density, n_pts, D, ::Val{N}) where {N}
-    c0 = ws.interactions[0]
-    is_active(c0) || return nothing
-    for c in 1:D
-        idx = _component_slice(N, n_pts, c)
-        view(grad, idx...) .+= c0 .* n_density .* view(psi, idx...)
-    end
-    nothing
-end
-
 sign_oracle(::Type{DensityC0Term}) = (
     name="DensityC0Term: +c0 ⇒ E_c0 > 0 (repulsive contact)",
     predicate=function (psi, ws)

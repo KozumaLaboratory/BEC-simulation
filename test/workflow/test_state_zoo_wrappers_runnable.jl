@@ -55,18 +55,13 @@ using SpinorBEC
     end
 
     @testset "init_psi_biaxial_nematic" begin
-        psi = init_psi_biaxial_nematic(grid2, sys; angles=(0.0, 0.0))
+        psi = init_psi_biaxial_nematic(grid2, sys)
         _check_psi(psi, 2; tag="biaxial_nematic")
-        # Non-tuple angles must throw.
-        @test_throws ArgumentError init_psi_biaxial_nematic(grid2, sys; angles=0.0)
     end
 
     @testset "init_psi_polar_core_vortex" begin
         psi = init_psi_polar_core_vortex(grid2, sys; winding=1)
         _check_psi(psi, 2; tag="polar_core_vortex")
-        # Non-:z axis must throw (not silently produce a z-axis state).
-        @test_throws ArgumentError init_psi_polar_core_vortex(
-            grid2, sys; winding=1, axis=:x)
     end
 
     @testset "init_psi_bright_soliton" begin
@@ -87,8 +82,6 @@ using SpinorBEC
     @testset "init_psi_domain_wall" begin
         psi = init_psi_domain_wall(grid2, sys)
         _check_psi(psi, 2; tag="domain_wall")
-        # Non-axis-1 must throw.
-        @test_throws ArgumentError init_psi_domain_wall(grid2, sys; axis=2)
     end
 
     @testset "init_psi_two_packets" begin

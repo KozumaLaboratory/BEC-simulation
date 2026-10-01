@@ -123,8 +123,8 @@ checking either.
 **4 sites admit a cached payload; 1 re-derives its verdict.**
 
 - admits: `src/workflow/experiment.jl:_admitted_result_path`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_yaml_scan`
-- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_yaml_single`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_experiment_scan`
+- admits: `src/workflow/experiments/pipeline/run_registry.jl:_run_experiment_single`
 - admits: `src/workflow/experiments/pipeline/run_step_ground_state.jl:_run_step`
 - **verifies**: `src/workflow/experiments/pipeline/run_step_ground_state.jl:_run_step`
 
@@ -279,7 +279,7 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
-| `src/workflow/` | 5 | 182 |
+| `src/workflow/` | 5 | 183 |
 | `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 

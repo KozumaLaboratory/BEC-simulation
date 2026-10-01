@@ -17,8 +17,8 @@ If `F` is not provided, it is inferred from the psi array shape.
 function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing)
     isdir(run_dir) || throw(ArgumentError("Not a directory: $run_dir"))
 
-    config_path = joinpath(run_dir, "config.yaml")
-    config_raw = isfile(config_path) ? read(config_path, String) : ""
+    config_path = _config_snapshot_path(run_dir)
+    config_raw = isfile(config_path) ? JSON.json(_load_config_data(config_path), 2) : ""
 
     jld2_files = sort(
         filter(f -> startswith(f, "point_") && endswith(f, ".jld2"),
@@ -32,7 +32,8 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
         return Dict{String, Any}(
             "points" => Dict{String, Any}[],
             "scan_keys" => String[],
-            "config_yaml" => config_raw,
+            "config_text" => config_raw,
+            "config_format" => "json",
             "in_progress" => true,
             "run_names" => String[],
         )
@@ -108,7 +109,8 @@ function generate_dashboard_data(run_dir::String; F::Union{Nothing, Int}=nothing
 
     Dict{String, Any}(
         "run" => basename(run_dir),
-        "config_yaml" => config_raw,
+        "config_text" => config_raw,
+        "config_format" => "json",
         "F" => F_out,
         "n_points" => length(points),
         "scan_keys" => scan_keys,
@@ -130,7 +132,7 @@ function export_dashboard(
     out_path = output !== nothing ? output : joinpath(run_dir, "dashboard_data.json")
 
     open(out_path, "w") do io
-        _write_json(io, data)
+        JSON.print(io, data)
     end
     println("Dashboard data written to $out_path ($(length(data["points"])) points)")
     out_path

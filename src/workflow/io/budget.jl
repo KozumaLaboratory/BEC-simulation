@@ -18,7 +18,7 @@ Not a tight upper bound — CUDA fragmentation, analyzer passes, and
 per-snapshot temporaries can add 10–20 %, so plan for headroom.
 """
 function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
-    data = YAML.load_file(String(yaml_path))
+    data = _load_config_data(String(yaml_path))
     pipeline = get(data, "pipeline", Any[])
     isempty(pipeline) &&
         throw(ArgumentError("No pipeline in $yaml_path"))
@@ -188,7 +188,7 @@ Count the scan points implied by a config YAML. Multiplies
 present. Returns 1 for non-scan configs. Used to size array jobs.
 """
 function scan_point_count(yaml_path::AbstractString)
-    data = YAML.load_file(String(yaml_path))
+    data = _load_config_data(String(yaml_path))
     haskey(data, "scan") || return 1
     scan = _parse_override_scan(data["scan"])
     n_pts = length(scan.points)

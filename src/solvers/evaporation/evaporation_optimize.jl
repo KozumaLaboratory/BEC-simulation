@@ -217,10 +217,9 @@ ensemble=...)`: the Cartesian product of `trap` with `alpha` scaled by each
 uncertainties most relevant to the BEC atom number). The nominal `(1.0, 1.0)` member
 is omitted — `optimize_ramp_monotone` adds the nominal `(trap, p)` itself.
 
-NOTE: pick `alpha_factors` so every member can still evaporate — if `α` is low enough
-that the loaded `η_start ≤ eta_min` the gas cannot evaporate for ANY ramp (a shallow
-*loaded trap*, not a ramp the optimizer can fix), and the worst case is then always
-failure. Check `evaporation_summary(...).eta_start` at the low-α member first.
+Check that the low-α members can reach BEC; a worst-case objective includes their
+failure as well as the nominal result. `evaporation_summary` reports each member's
+loaded-start truncation and whether the gas cooled.
 """
 function param_uncertainty_ensemble(
     trap::EvapTrap, p::EvapParams;
@@ -231,8 +230,8 @@ function param_uncertainty_ensemble(
         t = EvapTrap(; wavelength=trap.wavelength, alpha=trap.alpha * af,
             waists=trap.waists, directions=trap.directions, positions=trap.positions,
             mass=trap.mass, gravity_axis=trap.gravity_axis)
-        pp = EvapParams(; a_s=p.a_s, tau_bg=p.tau_bg, K3=p.K3 * kf,
-            kappa=p.kappa, eta_min=p.eta_min)
+        pp = EvapParams(; (name => getfield(p, name) for name in fieldnames(EvapParams))...,
+            K3=p.K3 * kf)
         push!(ens, (t, pp))
     end
     ens

@@ -1,7 +1,7 @@
 using Test
 using SpinorBEC
 using SpinorBEC: resolve_gs, gs_model, gs_physics_kwargs, model_physics_kwargs,
-    GSResolved, GroundStateStep, parse_pipeline, _run_yaml_prepare,
+    GSResolved, GroundStateStep, parse_pipeline, _prepare_config_file,
     restore_dealias_refs!, DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF, evaluate_potential,
     with, linear_p, quadratic_q, transverse_b
 
@@ -125,13 +125,13 @@ end
 
 """`(resolved, model)` for one config, or `nothing` if it does not get that far.
 
-Restores the dealias `Ref`s: `_run_yaml_prepare` leaves them set, and a reader
+Restores the dealias `Ref`s: `_prepare_config_file` leaves them set, and a reader
 that does not restore rewrites the `GridSpec` of every config resolved after it
 (arm 3 of `test_corpus_resolves.jl`)."""
 function _cwr_resolve(path::String)
     was_en, was_kc = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     try
-        data = _run_yaml_prepare(path, false, false)
+        data = _prepare_config_file(path, false, false)
         cfg = parse_pipeline(Dict{Any, Any}(data))
         gs = nothing
         for s in cfg.steps

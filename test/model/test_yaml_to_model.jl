@@ -61,7 +61,7 @@ function ytm_write(name::AbstractString, body::AbstractString)
     p
 end
 
-"Run `f` with the dealias globals saved and restored — `_run_yaml_prepare` sets them and leaves them set."
+"Run `f` with the dealias globals saved and restored — `_prepare_config_file` sets them and leaves them set."
 function with_dealias_restored(f)
     e, k = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     try

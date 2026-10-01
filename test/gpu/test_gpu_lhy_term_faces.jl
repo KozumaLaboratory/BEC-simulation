@@ -29,7 +29,7 @@ using Test
 using LinearAlgebra
 import CUDA
 using SpinorBEC
-using SpinorBEC: _grad_lhy!, _c0c1_to_gS, apply_step!, LHYTerm
+using SpinorBEC: _grad_lhy!, ku_c01_to_g_S, apply_step!, LHYTerm
 
 if !CUDA.functional()
     @info "CUDA not functional — skipping GPU LHY term-face gate"

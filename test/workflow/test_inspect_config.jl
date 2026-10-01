@@ -263,7 +263,7 @@ using SpinorBEC
 
     # --- run_yaml audit hook (:block aborts + opt-out) -------------------
     #
-    # The hook lives in `_run_yaml_impl`; we exercise it via run_yaml with
+    # The hook lives in `_run_experiment_impl`; we exercise it via run_yaml with
     # `dry_run=true` so no simulator work happens. Each test writes a YAML
     # to a tempdir, then asserts on whether run_yaml threw and on what.
     #

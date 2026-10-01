@@ -1,9 +1,11 @@
 # --- Pipeline step types ---
 
-export PipelineConfig
+export PipelineConfig, GroundStateStep, DynamicsStep, AnalyzeStep,
+    BinaryGroundStateStep, BinaryDynamicsStep, RotatingBasisGroundStateStep,
+    RotatingBasisDynamicsStep, ScalarEGPEGroundStateStep, ScalarEGPEDynamicsStep
 
 struct GroundStateStep
-    params::Dict{String, Any}    # raw YAML dict for this step
+    params::Dict{String, Any}    # parameters consumed by the physics resolver
 end
 
 struct DynamicsStep
@@ -63,5 +65,50 @@ const PipelineStep = Union{
 struct PipelineConfig
     steps::Vector{PipelineStep}
     scan::Union{Nothing, AbstractScanSpec}
-    raw_data::Dict                   # full YAML dict for override re-parse
+    raw_data::Dict                   # serializable specification for sweeps/provenance
+end
+
+for name in (:GroundStateStep, :DynamicsStep, :BinaryGroundStateStep, :BinaryDynamicsStep,
+    :RotatingBasisGroundStateStep, :RotatingBasisDynamicsStep,
+    :ScalarEGPEGroundStateStep, :ScalarEGPEDynamicsStep)
+    @eval $name(; kwargs...) = $name(_native_config_data((; kwargs...)))
+end
+
+AnalyzeStep(names::Symbol...) = AnalyzeStep(
+    Pair{Symbol, Dict{String, Any}}[name => Dict{String, Any}() for name in names])
+
+function _step_config_data(step::PipelineStep)
+    step isa AnalyzeStep && return Dict(
+        "analyze" =>
+            [Dict(string(name) => params) for (name, params) in step.analyzers],
+    )
+    kind, key = if step isa GroundStateStep || step isa DynamicsStep
+        nothing, step isa GroundStateStep ? "ground_state" : "dynamics"
+    elseif step isa BinaryGroundStateStep || step isa BinaryDynamicsStep
+        "binary", step isa BinaryGroundStateStep ? "ground_state" : "dynamics"
+    elseif step isa RotatingBasisGroundStateStep || step isa RotatingBasisDynamicsStep
+        "rotating_basis", step isa RotatingBasisGroundStateStep ? "ground_state" : "dynamics"
+    else
+        "scalar_egpe", step isa ScalarEGPEGroundStateStep ? "ground_state" : "dynamics"
+    end
+    params = deepcopy(step.params)
+    kind === nothing || (params["kind"] = kind)
+    Dict(key => params)
+end
+
+"""
+    PipelineConfig(steps; scan=nothing, dealias=nothing)
+
+Define an experiment in Julia using typed steps and nested NamedTuple parameters.
+Use Julia functions and loops to share definitions and construct sweeps.
+"""
+function PipelineConfig(steps::AbstractVector; scan=nothing, dealias=nothing)
+    all(s -> s isa PipelineStep, steps) || throw(ArgumentError(
+        "PipelineConfig requires typed pipeline steps"))
+    data = Dict{String, Any}("pipeline" => [_step_config_data(s) for s in steps])
+    scan === nothing || (data["scan"] = _native_config_data(scan))
+    dealias === nothing || (data["dealias"] = _native_config_data(dealias))
+    # Resolution happens at execution time, inside the run's source-directory
+    # and numerical-setting scope. Construction does not mutate global settings.
+    parse_pipeline(data)
 end

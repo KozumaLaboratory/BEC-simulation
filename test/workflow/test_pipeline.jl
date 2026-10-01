@@ -73,7 +73,7 @@ using Dates: Date
         @test p["ddi"]["c_dd"]["from"] == 0.0
         @test p["ddi"]["c_dd"]["to"] == 0.001
 
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
         @test result.ground_state_energy isa Float64
         @test isfinite(result.ground_state_energy)
     end
@@ -101,7 +101,7 @@ using Dates: Date
               B: {p: 0.0, q: 0.1}
         """
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
 
         @test result.dynamics_result !== nothing
         @test length(result.dynamics_result.energies) > 0
@@ -130,7 +130,7 @@ using Dates: Date
               - phase_classify: {}
         """
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
 
         @test haskey(result, :phase_classify)
         @test haskey(result.phase_classify, :spin_order)
@@ -154,7 +154,7 @@ using Dates: Date
               - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
         """
         config = load_config_from_string(yaml_str)
-        result = run_config(config; verbose=false)
+        result = run_pipeline(config; verbose=false)
 
         @test haskey(result, :bogoliubov)
         r = result.bogoliubov
@@ -216,7 +216,7 @@ using Dates: Date
                   loop_pts: [[6, 8], [10, 8], [10, 10], [6, 10], [6, 8]]
                   component: 1
         """
-        result_2d = run_config(load_config_from_string(yaml_str_2d); verbose=false)
+        result_2d = run_pipeline(load_config_from_string(yaml_str_2d); verbose=false)
         @test haskey(result_2d, :winding_field)
         @test haskey(result_2d.winding_field, :winding_field)
         @test haskey(result_2d.winding_field, :total_winding)
@@ -242,7 +242,7 @@ using Dates: Date
           - analyze:
               - monopole_charge: {smooth: false}
         """
-        result_3d = run_config(load_config_from_string(yaml_str_3d); verbose=false)
+        result_3d = run_pipeline(load_config_from_string(yaml_str_3d); verbose=false)
         @test haskey(result_3d, :monopole_charge)
         @test haskey(result_3d.monopole_charge, :total_charge)
         @test haskey(result_3d.monopole_charge, :monopole_charge_density)
@@ -300,7 +300,7 @@ using Dates: Date
           - analyze:
               - bogoliubov_mode: {k_max: 5.0, n_k: 60, directions: auto}
         """
-        result = run_config(load_config_from_string(yaml_str); verbose=false)
+        result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :bogoliubov_mode)
         bm = result.bogoliubov_mode
         @test haskey(bm, :u_mode);
@@ -350,7 +350,7 @@ using Dates: Date
               save: {every: 10}
               sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 11}
         """
-        result = run_config(load_config_from_string(yaml_str); verbose=false)
+        result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :dynamics_result)
         @test length(result.dynamics_result.energies) >= 2
         # SGPE noise injection means the norm grows from 1 — check it's finite
@@ -377,7 +377,7 @@ using Dates: Date
               projected_gp: {k_cut: 4.0, every: 1}
         """
         # Should run without error; high-k modes get truncated each step
-        result = run_config(load_config_from_string(yaml_str); verbose=false)
+        result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :dynamics_result)
     end
 
@@ -798,13 +798,13 @@ pipeline:
                   - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
             """
             cfg = load_config_from_string(yaml_str)
-            r1 = run_config(cfg; verbose=false)
+            r1 = run_pipeline(cfg; verbose=false)
             @test isfile(cache_file)
             @test haskey(r1, :bogoliubov)
 
             # Second run: cache is hit; analyzer must still receive ws_prev
             cfg2 = load_config_from_string(yaml_str)
-            r2 = run_config(cfg2; verbose=false)
+            r2 = run_pipeline(cfg2; verbose=false)
             @test haskey(r2, :bogoliubov)
             @test r2.bogoliubov.max_growth ≈ r1.bogoliubov.max_growth atol=1e-8
         end

@@ -213,7 +213,7 @@ using LinearAlgebra
             E_c1 = SpinorBEC._spin_interaction_energy(psi, sm, c1, 3, 1, (64,), dV)
             E_standard = E_c0 + E_c1
 
-            g_dict = SpinorBEC._c0c1_to_gS(1, c0, c1)
+            g_dict = SpinorBEC.ku_c01_to_g_S(1, c0, c1)
             cache = SpinorBEC._make_tensor_cache_from_channels(1, g_dict)
             E_tensor = SpinorBEC._tensor_interaction_energy(psi, cache, 1, (64,), dV)
 
@@ -229,7 +229,7 @@ using LinearAlgebra
                 apply_spin_mixing_step!(psi_sm, sm, c1, dt, 1)
             end
 
-            g_dict_c1 = SpinorBEC._c0c1_to_gS(1, 0.0, c1)
+            g_dict_c1 = SpinorBEC.ku_c01_to_g_S(1, 0.0, c1)
             cache_c1 = SpinorBEC._make_tensor_cache_from_channels(1, g_dict_c1)
             psi_tensor = copy(psi_base)
             for _ in 1:n_propagation_steps

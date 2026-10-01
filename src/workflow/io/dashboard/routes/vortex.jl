@@ -45,7 +45,7 @@ function _route_vortex_lines(path::String, base_dir::String, psi_cache::Dict{Str
                     )
                 end
             end
-            _json_string(
+            JSON.json(
                 Dict{String, Any}(
                     "lines" => out_lines,
                     "box" => collect(Float64.(box_size)),

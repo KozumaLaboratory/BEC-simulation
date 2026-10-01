@@ -114,14 +114,14 @@ _dyn_config(block_yaml::String) = string(
 @testset "YAML physics blocks reach the Workspace on every path" begin
     for (bname, byaml, pred) in _BLOCKS, (pname, pyaml) in _PATHS
         @testset "$bname via $pname" begin
-            result = run_config(load_config_from_string(_gs_config(byaml, pyaml));
+            result = run_pipeline(load_config_from_string(_gs_config(byaml, pyaml));
                 verbose=false)
             @test pred(result.workspace)
         end
     end
 
     @testset "$bname via dynamics" for (bname, byaml, pred) in _DYN_BLOCKS
-        result = run_config(load_config_from_string(_dyn_config(byaml)); verbose=false)
+        result = run_pipeline(load_config_from_string(_dyn_config(byaml)); verbose=false)
         @test pred(result.dynamics_workspace)
     end
 end

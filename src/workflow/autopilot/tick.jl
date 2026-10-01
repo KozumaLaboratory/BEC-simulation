@@ -48,18 +48,11 @@ end
 
 function default_autopilot_config(;
     backends::Union{Nothing, Dict{Symbol, <:AutopilotBackend}}=nothing,
-    backend::Union{Nothing, AutopilotBackend}=nothing,
     qr::QueueRoot=autopilot_queue_root(),
     kwargs...,
 )
-    if backends !== nothing && backend !== nothing
-        throw(ArgumentError(
-            "default_autopilot_config: pass backends= or backend=, not both"))
-    end
     resolved = if backends !== nothing
         Dict{Symbol, AutopilotBackend}(backends)
-    elseif backend !== nothing
-        Dict{Symbol, AutopilotBackend}(:local => backend)
     else
         # Always register :local. Auto-register :uge when env says so —
         # this is what lets the systemd timer / dashboard server pick up
@@ -406,14 +399,6 @@ function _dispatch_pending_pass!(config::AutopilotConfig,
 end
 
 # ── helpers ──────────────────────────────────────────────────────────
-
-function _inspect_blocks(entry::QueueEntry)::Union{Nothing, String}
-    # Backward-compat shim: returns the first :block finding or nothing.
-    # New call sites should use `_inspector_preflight` for the full
-    # severity breakdown.
-    p = _inspector_preflight(entry)
-    return p.blocked
-end
 
 """
     _inspector_preflight(entry) -> (blocked, error_kinds, warn_kinds, info_kinds)

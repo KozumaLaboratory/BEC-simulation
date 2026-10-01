@@ -37,9 +37,21 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
     req isa AbstractDict || return (400, "application/json",
         _enq_err("body must be a JSON object"))
 
-    yaml_src = String(get(req, "yaml", ""))
-    isempty(yaml_src) && return (400, "application/json",
-        _enq_err("yaml field is required"))
+    spec = try
+        if haskey(req, "spec")
+            req["spec"]
+        elseif haskey(req, "config_text")
+            JSON.parse(String(req["config_text"]))
+        elseif haskey(req, "yaml")
+            YAML.load(String(req["yaml"]))  # existing HTTP clients
+        else
+            nothing
+        end
+    catch e
+        return (400, "application/json", _enq_err("invalid experiment conditions: $(e)"))
+    end
+    spec isa AbstractDict || return (400, "application/json",
+        _enq_err("spec must be an object"))
 
     preview = Bool(get(req, "preview", true))
     backend_str = String(get(req, "backend", "local"))
@@ -79,7 +91,7 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
 
     # Inspector pre-flight on the YAML before doing anything else.
     ins = try
-        inspect_config_string(yaml_src)
+        inspect_config(spec)
     catch e
         return (400, "application/json",
             _enq_err("inspector threw: $(typeof(e).name.name): $(e)"))
@@ -91,9 +103,7 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
 
     # Compute the content_id by routing through Experiment construction.
     cid = ""
-    spec = nothing
     try
-        spec = YAML.load(yaml_src)
         cid = content_id(spec)
     catch e
         return (400, "application/json",
@@ -136,7 +146,6 @@ function _route_autopilot_enqueue(body_bytes, base_dir;
     # Build Experiment + enqueue!. Provenance tag carries session id.
     exp = try
         store = default_store()
-        spec = YAML.load(yaml_src)
         Experiment(spec; store=store)
     catch e
         return (500, "application/json",

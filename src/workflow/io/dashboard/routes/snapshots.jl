@@ -66,7 +66,7 @@ function _route_dynamics_series(path::String, base_dir::String)
                 end
             end
         end
-        _json_string(out)
+        JSON.json(out)
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end
@@ -101,7 +101,7 @@ function _route_snapshots(path::String, base_dir::String, psi_cache::Dict{String
             @async _warm_density_bin_all(fpath, Int(n_snaps), ax, psi_cache, base_dir)
         end
     end
-    (200, "application/json", _json_string(meta))
+    (200, "application/json", JSON.json(meta))
 end
 
 # /api/ensemble/:run/:file → TWA EnsembleResult summary (Round-2 Task 5).
@@ -123,7 +123,7 @@ function _route_ensemble(path::String, base_dir::String)
     fpath = joinpath(base_dir, p.name, p.file)
     isfile(fpath) || return (404, "text/plain", "File not found: $(p.name)/$(p.file)")
     json = try
-        _json_string(_compute_ensemble_summary(fpath))
+        JSON.json(_compute_ensemble_summary(fpath))
     catch e
         "{\"error\":\"$(replace(string(e), "\"" => "'"))\"}"
     end

@@ -131,3 +131,6 @@ function _per_m_top_fractions(d::AbstractDict)
     colT = sum(view(pm, :, T))
     (init=pm[1, 1] / max(col1, DENOM_FLOOR), final=pm[1, T] / max(colT, DENOM_FLOOR))
 end
+
+# Manual response builders need an escaped JSON string without its quotes.
+_jsonesc(s::AbstractString) = chop(JSON.json(s); head=1, tail=1)
