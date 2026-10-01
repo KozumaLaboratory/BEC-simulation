@@ -406,10 +406,10 @@ const MUTANTS = Mutant[
          dropped `ws.lhy` this way — and the reason the LBFGS arm could differ \
          from the ITP arm at all was that each transcribed the bundle by hand."),
     Mutant(:yaml_calibration_not_applied,
-        "src/workflow/experiments/pipeline/run_registry.jl",
-        # Exactly-8-space indentation pins the single-block arm; the
-        # `calibration_history` arm three lines down is indented 12.
-        r"\n        apply_calibration!\(data, calib\)\n",
+        "src/workflow/experiments/pipeline/pipeline_api.jl",
+        # The following elseif identifies the single-calibration arm in the
+        # normalization shared by definition, inspection, and execution.
+        r"\n        apply_calibration!\(data, calib\)\n(?=    elseif)",
         "\n        # mutant: calibration parsed, then discarded\n",
         :drop, :fatal,
         "synthetic — the lab-units surface has no term-level oracle at all",

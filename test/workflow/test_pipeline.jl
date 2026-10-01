@@ -647,7 +647,7 @@ pipeline:
                 end
             end
             log = read(logfile, String)
-            @test occursin("# [run_yaml] loading config:", log)
+            @test occursin("# [run_yaml] starting experiment", log)
             @test occursin("# [run_yaml] normalizing B blocks", log)
             @test occursin("# [run_yaml] dry-run complete", log)
             @test occursin("dry-run", out)
