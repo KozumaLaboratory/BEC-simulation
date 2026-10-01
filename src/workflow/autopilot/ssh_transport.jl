@@ -69,7 +69,7 @@ function _rsync_code_sync_cmd(host::AbstractString, local_root::AbstractString,
     # (raw `*` is unquoted-special). Interpolate via a String so the glob
     # reaches rsync verbatim.
     jld_excl = "--exclude=*.jld2"
-    `rsync -az --update -e $_RSYNC_SSH_CM --exclude=runs/ --exclude=.git/ --exclude=node_modules/ --exclude=dashboard/dist/ --exclude=dashboard/.vite/ --exclude=.venv/ $jld_excl $(local_root)/ $(host):$(project_root)/`
+    `rsync -az --update -e $_RSYNC_SSH_CM --exclude=runs/ --exclude=.git/ --exclude=node_modules/ --exclude=dashboard/ --exclude=.venv/ $jld_excl $(local_root)/ $(host):$(project_root)/`
 end
 
 # ── local project + Manifest-hash helpers (auto-instantiate) ──────────
