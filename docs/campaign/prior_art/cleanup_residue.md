@@ -11,4 +11,4 @@ Dispositions: `unread`, `read`, `unrelated`, `superseded`, `depends`
 
 | ref | disposition | what | note |
 |---|---|---|---|
-| — | read | nothing open matched these keywords | |
+| origin/chore/cleanup-retired-residue | read | branch: retired tooling and sync exclusions | Reviewed diff at 89d1c51e; owns .gitignore and dashboard sync residue. This change handles instructions, memory auditing, and issue scope; does not duplicate that branch. |

@@ -55,6 +55,7 @@ const FAST_TESTS = [
     # allocated that is a test nobody can run.
     "test_fft_planning_memory_risk.jl",
     "test_prior_art_dispositions.jl",
+    "test_memory_audit.jl",
     # 24 docs must be true; the other 143 must be dated. Nothing may be neither.
     "test_docs_live_set.jl",
     # CAMPAIGN.md §4 guard 1 executed rather than described: every fix_list ref

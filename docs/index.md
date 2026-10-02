@@ -4,7 +4,19 @@ Experiment authoring: [Julia experiment definitions](guides/julia_experiments.md
 
 Spin-F BEC simulator (split-step Fourier, 1D/2D/3D). Primary target: ¹⁵¹Eu (F=6, 13 components). Dimensionless units: ℏ=m=ω_ref=1.
 
-For build/install/test commands and conventions, see the repo root `README.md` and `CLAUDE.md`.
+For usage and test commands, see [README.md](../README.md). For agent work,
+start with [AGENTS.md](../AGENTS.md), then the shared rules and task map in
+[CLAUDE.md](../CLAUDE.md).
+
+## Current state and authority
+
+- [STATE.md](STATE.md) derives code facts and declares its coverage gaps.
+- [campaign/claims.toml](campaign/claims.toml) records claim status, uncertainty,
+  evidence, and retractions; [CAMPAIGN.md](campaign/CAMPAIGN.md) governs campaign work.
+- [testing_strategy.md](conventions/testing_strategy.md) defines what tests can establish.
+- [live_docs.jl](../test/helpers/live_docs.jl) declares maintained documents.
+  All others carry dated FROZEN headers. Check that status before treating a
+  guide, reference, or design note as a current instruction.
 
 ## Map
 
@@ -12,8 +24,8 @@ For build/install/test commands and conventions, see the repo root `README.md` a
 docs/
 ├── campaign/       active campaign charter (read first in a campaign session)
 ├── guides/         step-by-step how-tos
-├── reference/      API + YAML schema + architecture
-├── design/         active design notes (implemented or in-progress)
+├── reference/      API + parameter schema + architecture
+├── design/         design rationale and proposals (check LIVE/FROZEN status)
 ├── theory/         physics theory write-ups
 ├── research_notes/ scientific results
 ├── manuscript/     paper & thesis drafts
@@ -24,12 +36,33 @@ docs/
 
 ## Where to start
 
+### Active work and historical notes
+
+Use [open issues](https://github.com/KozumaLaboratory/BEC-simulation/issues?q=is%3Aissue%20is%3Aopen)
+for current task status; this map does not duplicate their checklists.
+
+- Evaporation: [#502](https://github.com/KozumaLaboratory/BEC-simulation/issues/502)
+  owns the fixed-endpoint experiment connection. [#75](https://github.com/KozumaLaboratory/BEC-simulation/issues/75)
+  retains older model-validation work; [#468](https://github.com/KozumaLaboratory/BEC-simulation/issues/468)
+  tracks calibration and loss-channel uncertainty. Old ramp gains are not predictions for the current endpoint.
+- Eu measurement comparison: [#503](https://github.com/KozumaLaboratory/BEC-simulation/issues/503)
+  owns experimental calibration and comparison. [#89](https://github.com/KozumaLaboratory/BEC-simulation/issues/89)
+  and [#97](https://github.com/KozumaLaboratory/BEC-simulation/issues/97) retain mode-identification
+  and excitation questions; their old branch results need provenance and validity checks.
+- Stored-run reanalysis: [#495](https://github.com/KozumaLaboratory/BEC-simulation/issues/495)
+  tracks the remaining real-data equivalence check, not a new driver migration.
+- Memory: use the available project-specific store and the
+  [auditor](../scripts/audit_memory.py) with an explicit `--memory-dir`.
+  [The 2026-08-04 ledger](audit/memory_ledger_2026-08-04.md) is a historical snapshot,
+  not evidence that those external memory files exist on the current host.
+
 ### Running an experiment
 
 | Task | Read |
 |---|---|
-| End-to-end walkthrough (calibration → YAML → run → analyze) | `guides/lab_user_tutorial.md` |
-| YAML pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
+| Define a new experiment in Julia and persist its inputs/results | [README usage](../README.md#usage), then [workflow rules](../CLAUDE.md#workflow-model-spec--cas--run--observe) |
+| End-to-end walkthrough (calibration → definition → run → analyze) | `guides/lab_user_tutorial.md` |
+| Experiment pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
 | Fast-Larmor regime (Eu / Dy production path) | `guides/fast_larmor_regime.md` |
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) — **its hysteresis reading is RETRACTED, see the next row** | `guides/eu_adiabatic_protocol.md` |
 | The κ-dependent transition, re-measured: the "loop" is a J_z slide; the deliverable is a Stern-Gerlach level count | `guides/eu_kappa_hysteresis_loop.md` |
@@ -47,7 +80,7 @@ docs/
 
 | Task | Read |
 |---|---|
-| Every YAML key | `reference/yaml_schema_reference.md` |
+| Parameter schema (legacy filename) | `reference/yaml_schema_reference.md` |
 | Every key in a `dynamics:` block | `reference/dynamics.md` |
 | Module structure + data flow | `reference/architecture.md` |
 | API docstrings | `api/index.md` |
@@ -62,7 +95,7 @@ docs/
 | TDHFB pilot | `design/tdhfb_pilot_design.md` |
 | What limits L-BFGS speed (per-iteration cost + why ~600 iterations) | `design/lbfgs_speed_limits.md` |
 | Mixed precision rollout | `design/mixed_precision_design.md` |
-| All other active design notes | `design/*.md` |
+| Other design notes (dated records unless declared LIVE) | `design/*.md` |
 
 ### Physics results
 
@@ -86,4 +119,10 @@ docs/
 
 ## Documentation philosophy
 
-**Reference** docs describe what *exists* in the code today. **Design** docs describe *intent* — implemented features keep their design doc as a permanent record of why; in-progress features track open questions there. **Research notes** are dated scientific snapshots — they reflect data captured on a specific day with a specific code state, and survive their results being reinterpreted (see the TWA Sinatra story for an example of a revised verdict that retained the original write-up). **Archive** is for dated artifacts (session handoffs, bug audits, measurement plans) and for designs that were superseded. See `archive/README.md` for an index of what's there and where the live equivalent lives now.
+Directory names describe purpose, not freshness. **Reference** docs explain APIs;
+**design** docs retain intent and rationale; **research notes** preserve dated
+scientific snapshots, including results later reinterpreted. **Archive** contains
+dated or superseded artifacts. A FROZEN reference may describe an older API, and a
+design proposal does not prove implementation. Use the maintained set and the code
+to establish current behavior. See [archive/README.md](archive/README.md) for
+historical records and their successors.

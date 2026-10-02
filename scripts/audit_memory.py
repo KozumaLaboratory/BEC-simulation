@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 """Audit the project's Claude memory tree for silent rot.
 
-    python3 scripts/audit_memory.py [--memory-dir DIR] [--limit 17100]
-    python3 scripts/audit_memory.py --fix-relocations   # repoint MOVED files
+    python3 scripts/audit_memory.py --memory-dir DIR [--limit 17100]
+    python3 scripts/audit_memory.py --memory-dir DIR --fix-relocations
 
-NOTE ON --limit. The load budget is asserted twice in this tree with values
-differing by 46 %: 17100 B here (in use since 2026-07-27) and 24.4 KB / 24986 B
-in CLAUDE.md, three memory files and docs/campaign/lessons_2026_08_04.md.
-Neither cites the mechanism that truncates. The default stays at the smaller
-one because the costs are asymmetric -- too small moves a few lines into a
-sub-index one hop away, too large means the tail silently never loads and the
-warning names the FILE, not the entries that fell off it. Do not raise it
-without a citation to the actual behaviour.
+NOTE ON --limit. 17100 bytes is a conservative maintenance budget inherited
+from the 2026-07-27 audit, not a verified client truncation limit. Historical
+notes also claimed 24986 bytes without citing a mechanism. Exceeding this
+budget asks for index maintenance; it does not prove client truncation.
 
 Three failure modes, all of which were live on 2026-07-27 and none of which
 announce themselves:
@@ -27,8 +23,8 @@ announce themselves:
    13 were broken, two of them malformed enough to have swallowed a
    paragraph of prose into a link target.
 
-3. **Index over budget.** `MEMORY.md` past the read limit gets truncated,
-   which silently drops whatever is at the bottom.
+3. **Index over budget.** Keep the entry point within the chosen maintenance
+   budget; actual loading limits depend on the client.
 
 Those three are gated (non-zero exit). A fourth is reported but NOT gated:
 
@@ -81,7 +77,6 @@ import subprocess
 import sys
 from collections import defaultdict
 
-DEFAULT_DIR = pathlib.Path.home() / ".claude/projects/-home-suzume-workspace-BEC-simulation/memory"
 # Index files are DISCOVERED in `index_stems`, not listed here -- the old
 # hardcoded pair named 2 of the 8 that exist and manufactured 24 false orphans.
 
@@ -382,7 +377,8 @@ def reachable(texts, roots):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--memory-dir", type=pathlib.Path, default=DEFAULT_DIR)
+    ap.add_argument("--memory-dir", type=pathlib.Path, required=True,
+        help="explicit project memory store; never guess another host's path")
     ap.add_argument("--limit", type=int, default=17100, help="MEMORY.md byte budget")
     ap.add_argument("--repo", type=pathlib.Path, default=pathlib.Path.cwd(),
         help="repo whose paths the memories cite")
@@ -391,15 +387,11 @@ def main():
     ap.add_argument("--fix-relocations", action="store_true",
         help="repoint dead paths whose basename resolves uniquely, then exit")
     ap.add_argument("--main-checkout", type=pathlib.Path,
-        default=pathlib.Path("/home/suzume/workspace/BEC-simulation"),
+        default=None,
         help="checkout to look in for untracked files (worktrees cannot see each other's)")
     args = ap.parse_args()
 
     memdir = args.memory_dir
-    if args.fix_links:
-        return 0 if fix_links(memdir) >= 0 else 1
-    if args.fix_relocations:
-        return 0 if fix_relocations(memdir, args.repo.resolve()) >= 0 else 1
     if not memdir.is_dir():
         print(f"no memory dir at {memdir}", file=sys.stderr)
         return 2
@@ -407,19 +399,16 @@ def main():
     if "MEMORY" not in texts:
         print("no MEMORY.md", file=sys.stderr)
         return 2
+    if args.fix_links:
+        return 0 if fix_links(memdir) >= 0 else 1
+    if args.fix_relocations:
+        return 0 if fix_relocations(memdir, args.repo.resolve()) >= 0 else 1
     indexes = index_stems(texts)
 
     # Calibrate before reporting. A scan whose extraction is broken reports a
     # clean tree in exactly the same words as a clean tree does -- an earlier
     # hand-rolled pass over this store reported 52 unreachable memories when
     # the true count was 0, because it recognised one link spelling.
-    probe_reach = reachable(texts, {"MEMORY"})
-    if "MEMORY" not in texts or len(probe_reach) < 2:
-        print("CALIBRATION FAILED: MEMORY.md reaches nothing; the link graph is "
-              "not being parsed and every count below would be fiction.",
-              file=sys.stderr)
-        return 2
-
     # Both link spellings must resolve, on a synthetic pair rather than on
     # whatever happens to be in the store. `link_targets` used to normalise
     # every hyphen to an underscore, so a file whose real name contains one
@@ -439,8 +428,10 @@ def main():
 
     index_text = "".join(prose(texts.get(i, "")) for i in indexes)
     linked = set(re.findall(r"\]\(([A-Za-z0-9_\-]+)\.md\)", index_text))
-    reach = reachable(texts, set(indexes))
-    orphans = sorted(set(texts) - reach - set(indexes) - archived)
+    # Sub-indexes are navigation, not independent entry points. Treating all
+    # indexes as roots hides both a disconnected index and every note under it.
+    reach = reachable(texts, {"MEMORY"})
+    orphans = sorted(set(texts) - reach - archived)
     broken_index = sorted(linked - set(texts))
 
     names = resolvable_names(texts)
@@ -458,13 +449,13 @@ def main():
           f"   (+{len(archived)} archived)")
     print(f"MEMORY.md size      : {size} / {args.limit} bytes")
     if size > args.limit:
-        fails.append(f"MEMORY.md is {size - args.limit} bytes over budget — it will be truncated")
+        fails.append(f"MEMORY.md is {size - args.limit} bytes over the maintenance budget")
 
     print(f"unreachable files   : {len(orphans)}")
     for o in orphans[:20]:
         print(f"    {o}")
     if orphans:
-        fails.append(f"{len(orphans)} memories are reachable from nothing and will never load")
+        fails.append(f"{len(orphans)} files cannot be reached from MEMORY.md")
 
     # A [[link]] to a memory that does not exist YET is legal by the memory
     # format's own rule -- it marks something worth writing. Gating on those
@@ -487,7 +478,7 @@ def main():
         fails.append(f"index links to {len(broken_index)} missing files")
 
     counts, untracked_only, absent, elsewhere = path_report(texts, index_text,
-        args.repo, args.main_checkout)
+        args.repo, args.main_checkout or args.repo.resolve())
     print("\npath references cited by memories:")
     for k in sorted(counts, key=lambda k: -counts[k]):
         print(f"    {counts[k]:4d}  {k}")

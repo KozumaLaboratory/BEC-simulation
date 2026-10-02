@@ -6,6 +6,8 @@ const SMOKE_TESTS = Dict(
     "smoke_fast" => [
         "test_tier_membership.jl",
         "test_prior_art_dispositions.jl",
+        "test_memory_audit.jl",
+        "test_claude_md_citations_resolve.jl",
         "test_docs_live_set.jl",
         "test_retracted_numbers_carry_their_replacement.jl",
         "test_state_doc_is_current.jl",

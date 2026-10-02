@@ -96,9 +96,9 @@ jobs:
           echo "$files"
           # Documentation is an input to a gate, not just prose — see the `docs`
           # output above. Reported separately from `code` so a markdown-only
-          # change pays for the documentation smoke checks. Consume all input:
-          # grep -q can SIGPIPE printf on large diffs and fail under pipefail.
-          if printf '%s\n' "$files" | grep '^docs/.*\.md$' >/dev/null; then
+          # Root instructions and README are documentation inputs too.
+          # Consume all input to avoid SIGPIPE under pipefail on large diffs.
+          if printf '%s\n' "$files" | grep -E '(^docs/.*\.md$|^(AGENTS|CLAUDE|README)\.md$)' >/dev/null; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
           else
             echo "docs=false" >> "$GITHUB_OUTPUT"

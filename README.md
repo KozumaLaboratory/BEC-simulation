@@ -140,8 +140,9 @@ kernel, and a master oracle compares the whole production stack against an
 independently written reference implementation. That reference deliberately
 restates physics the fast path already states — duplication is the point when
 it is gated, and the thing to avoid is duplication nothing compares.
-`docs/conventions/` documents the discipline, including the sign × path audit
-table and the checklist for adding a term.
+[CLAUDE.md](CLAUDE.md#sign-bug-proof-discipline-hamterm-protocol) contains the
+current checklist for adding a term; the sign × path audit under
+`docs/conventions/` is a dated historical record.
 
 `docs/reference/yaml_schema_reference.md` is the pipeline parameter reference.
 `docs/index.md` is the documentation map; subsystem design notes live under
