@@ -40,7 +40,7 @@ end
 """
     energy_gradient!(grad, psi, ws; k_squared_dev) → E
 
-Compute δE/δψ* = H_eff ψ and return total energy.
+Compute the real gradient `2δE/δψ* = 2H_eff ψ` and return total energy.
 
 Covered terms: kinetic, trap (incl. centrifugal modification when
 `rotating_frame_omega ≠ 0`), Zeeman (incl. Barnett shift when
@@ -109,14 +109,11 @@ end
 """
     gradient_only!(grad, psi, ws) → grad
 
-`δE/δψ*` at `psi` with the same Wirtinger scaling as `energy_gradient!`, but
+`2δE/δψ*` at `psi`, with the same real-gradient convention as `energy_gradient!`, but
 without evaluating the total energy.
 
-On the CPU that is a real saving: `energy_gradient!` runs the registry twice
-(`apply_operator_via_registry!` for the gradient, then `energy_decomposition`
-for the energy), so the whole FFT-heavy energy pass is skipped when the caller
-already knows `E` at this `psi`. On the GPU the energy comes out of the same
-fused pass for free, so this is `energy_gradient!` with the return dropped.
+Both backends traverse the operator registry without energy reductions. This
+is useful for Hessian-vector products and other callers that discard the energy.
 """
 function gradient_only!(
     grad::AbstractArray{<:Complex},
@@ -136,11 +133,7 @@ function gradient_only!(
             "gradient_only!: `grad` must be resident where the workspace is " *
             "($(typeof(grad)) vs $(typeof(ws.state.psi)))"),
     )
-    if _is_gpu(ws.state.psi)
-        _energy_and_gradient_gpu!(grad, ws)
-    else
-        apply_operator_via_registry!(grad, ws)
-    end
+    apply_operator_via_registry!(grad, ws)
     grad .*= 2
     return grad
 end

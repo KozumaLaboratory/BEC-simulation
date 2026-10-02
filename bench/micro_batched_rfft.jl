@@ -19,22 +19,66 @@
 using Printf
 import CUDA
 using CUDA.CUFFT
-using AbstractFFTs: plan_rfft, plan_brfft
+using FFTW: plan_rfft, plan_brfft
 using LinearAlgebra: mul!
 
 const PAD_N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 64
 const REPS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 50
 
-function tmin(f, reps)
-    best = Inf
-    for _ in 1:reps
-        CUDA.synchronize()
-        t0 = time_ns()
-        f()
-        CUDA.synchronize()
-        best = min(best, (time_ns() - t0) * 1e-9)
+function paired_times(separate, batched, prepare, reps)
+    samples = (Float64[], Float64[])
+    for repetition in 1:reps
+        # Alternate order to avoid systematically assigning clock/thermal drift
+        # to one arm. Restore inputs outside the timed region: C2R may destroy
+        # its input, and repeated unnormalised round trips overflow.
+        for arm in (isodd(repetition) ? (1, 2) : (2, 1))
+            prepare()
+            CUDA.synchronize()
+            t0 = time_ns()
+            (arm == 1 ? separate : batched)()
+            CUDA.synchronize()
+            push!(samples[arm], (time_ns() - t0) * 1e-9)
+        end
     end
-    best
+    map(samples) do values
+        sorted = sort(values)
+        (best=first(sorted), median=(sorted[(reps + 1) ÷ 2] + sorted[(reps + 2) ÷ 2]) / 2)
+    end
+end
+
+function max_relative_error(a, b)
+    maximum(abs, a .- b) / max(maximum(abs, a), eps(Float64))
+end
+
+function check_transforms!(Fs, Rs, Fb, Rb, fwd_sep, fwd_bat, bwd_sep, bwd_bat, shape)
+    fwd_sep()
+    fwd_bat()
+    forward_error = maximum(1:3) do c
+        max_relative_error(Rs[c], selectdim(Rb, 4, c))
+    end
+    bwd_sep()
+    bwd_bat()
+    backward_error = maximum(1:3) do c
+        max_relative_error(Fs[c], selectdim(Fb, 4, c))
+    end
+    @assert forward_error < 1e-12
+    @assert backward_error < 1e-12
+    @printf("  forward parity %.3e; inverse parity %.3e\n", forward_error, backward_error)
+    nothing
+end
+
+function restore_real!(Fs, Fb, seed)
+    copyto!(Fb, seed)
+    for c in 1:3
+        copyto!(Fs[c], selectdim(seed, 4, c))
+    end
+end
+
+function restore_spectrum!(Rs, Rb, spectrum)
+    copyto!(Rb, spectrum)
+    for c in 1:3
+        copyto!(Rs[c], selectdim(spectrum, 4, c))
+    end
 end
 
 function run(pad_n)
@@ -53,27 +97,36 @@ function run(pad_n)
     Rb = CUDA.zeros(ComplexF64, rk..., 3)
     p_bat = plan_rfft(Fb, 1:3)
     bp_bat = plan_brfft(Rb, pad_n, 1:3)
+    seed = copy(Fb)
 
-    fwd_sep() = for c in 1:3
-        mul!(Rs[c], p_sep, Fs[c])
-    end
+    fwd_sep() =
+        for c in 1:3
+            mul!(Rs[c], p_sep, Fs[c])
+        end
     fwd_bat() = mul!(Rb, p_bat, Fb)
-    bwd_sep() = for c in 1:3
-        mul!(Fs[c], bp_sep, Rs[c])
-    end
+    bwd_sep() =
+        for c in 1:3
+            mul!(Fs[c], bp_sep, Rs[c])
+        end
     bwd_bat() = mul!(Fb, bp_bat, Rb)
 
+    restore_real!(Fs, Fb, seed)
+    check_transforms!(Fs, Rs, Fb, Rb, fwd_sep, fwd_bat, bwd_sep, bwd_bat, shape)
+    restore_real!(Fs, Fb, seed)
+    fwd_bat()
+    spectrum = copy(Rb)
     for _ in 1:5
-        fwd_sep();
-        fwd_bat();
-        bwd_sep();
+        restore_real!(Fs, Fb, seed)
+        fwd_sep()
+        fwd_bat()
+        restore_spectrum!(Rs, Rb, spectrum)
+        bwd_sep()
         bwd_bat()
     end
 
-    t_fs = tmin(fwd_sep, REPS)
-    t_fb = tmin(fwd_bat, REPS)
-    t_bs = tmin(bwd_sep, REPS)
-    t_bb = tmin(bwd_bat, REPS)
+    fs, fb = paired_times(fwd_sep, fwd_bat, () -> restore_real!(Fs, Fb, seed), REPS)
+    bs, bb = paired_times(bwd_sep, bwd_bat, () -> restore_spectrum!(Rs, Rb, spectrum), REPS)
+    t_fs, t_fb, t_bs, t_bb = fs.best, fb.best, bs.best, bb.best
 
     bytes = 3 * (prod(shape) * 8 + prod(rk) * 16)
     @printf("\n  padded %d³ → rk %s   (3 fields move %.1f MB one way)\n",
@@ -85,6 +138,8 @@ function run(pad_n)
         t_bs * 1e6, t_bb * 1e6, t_bs / t_bb)
     @printf("  %-22s %9.1fµs %9.1fµs %8.3f\n", "both",
         (t_fs + t_bs) * 1e6, (t_fb + t_bb) * 1e6, (t_fs + t_bs) / (t_fb + t_bb))
+    @printf("  median fwd speedup %.3f; backward %.3f\n",
+        fs.median / fb.median, bs.median / bb.median)
     @printf("  bandwidth floor for both directions: %.1f µs at 3 TB/s\n",
         2 * bytes / 3e12 * 1e6)
 end
