@@ -775,7 +775,7 @@ function unmarked_retired_literal_sites(;
     # today. Requiring every line of a retired document to re-declare its own
     # retirement is the cost that would make the archive unwritable, and the
     # archive already carries a whole-file header saying it is history.
-    isarchive(f) = occursin(joinpath("docs", "archive"), String(f))
+    isarchive(f) = occursin(r"(?:^|/)docs/archive(?:/|$)", replace(String(f), '\\' => '/'))
     paths = if files !== nothing
         String[String(f) for f in files if endswith(String(f), ".md") && !isarchive(f)]
     else

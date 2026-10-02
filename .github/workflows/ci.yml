@@ -103,8 +103,9 @@ jobs:
           echo "$files"
           # Documentation is an input to a gate, not just prose — see the `docs`
           # output above. Reported separately from `code` so a markdown-only
-          # change pays for the oracle job (~5 min) and not the test tiers.
-          if printf '%s\n' "$files" | grep -q '^docs/.*\.md$'; then
+          # change runs the documentation-consuming fast/oracle checks. Root
+          # instructions and README are inputs too (citation and claim gates).
+          if printf '%s\n' "$files" | grep -Eq '(^docs/.*\.md$|^(AGENTS|CLAUDE|README)\.md$)'; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
           else
             echo "docs=false" >> "$GITHUB_OUTPUT"

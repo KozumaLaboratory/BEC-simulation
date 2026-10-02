@@ -593,6 +593,21 @@ end
     end
 end
 
+@testset "archive exclusion uses path components across platforms" begin
+    lit = first(claim_by_id(claim_ledger(), "edh-omega-window-0p468").retired_literal)
+    mktempdir() do d
+        archived = joinpath(d, "docs", "archive", "old.md")
+        live = joinpath(d, "docs", "archive_notes", "current.md")
+        for p in (archived, live)
+            mkpath(dirname(p))
+            write(p, "The value is $lit.\n")
+        end
+        @test isempty(unmarked_retired_literal_sites(files=[archived]))
+        @test isempty(unmarked_retired_literal_sites(files=[replace(archived, '\\' => '/')]))
+        @test length(unmarked_retired_literal_sites(files=[live])) == 1
+    end
+end
+
 @testset "the ledger's coverage of the documents it cites does not go backwards" begin
     # The gate the 2026-08-21 incident asked for. `quantity` can only make two ROWS
     # collide; it cannot see a section that was never poured, and the section that

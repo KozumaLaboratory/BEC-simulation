@@ -263,7 +263,7 @@ const _SCRIPTS_ALLOWLIST = Set([
         rel = relpath(dir, sdir)
         for f in files
             # editor droppings / venvs are not repo content; git status catches those
-            push!(on_disk, rel == "." ? f : joinpath(rel, f))
+            push!(on_disk, replace(rel == "." ? f : joinpath(rel, f), '\\' => '/'))
         end
     end
     # Ignore local-only clutter that git is told to ignore (e.g. mcp/.venv) —

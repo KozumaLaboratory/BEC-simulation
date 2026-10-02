@@ -1,12 +1,10 @@
 # Metric registry for the goal-driven perf/accuracy observability.
 #
-# Philosophy (do NOT add arbitrary numeric targets):
-#   - kind = "ratchet": optimise FOREVER. No finish line. Track best-so-far;
-#     the ONLY reference is a physical/hardware limit (`bound`), never a
-#     chosen target. headroom = gap(best_so_far, bound).
-#   - kind = "threshold": correctness. A physical floor exists (machine eps);
-#     over-optimising past it is noise, so it stays a pass/fail CI gate and is
-#     NOT ratcheted here. Listed for completeness only.
+# Metric semantics:
+#   - kind = "ratchet": track best-so-far against a physical/hardware bound.
+#   - kind = "threshold": correctness gate rather than an optimization score.
+# Scope, stopping criteria, and spending come from the current task; this
+# registry does not authorize perpetual optimization.
 #
 # `confidence`: deterministic > low_noise > noisy. A noisy metric only moves
 # the record when the change clears its stated noise band.

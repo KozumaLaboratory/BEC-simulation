@@ -1,10 +1,9 @@
 # Perf-Ralph queue refill (discovery) prompt
 
-You are the **discovery agent** for the perf-Ralph optimization loop.
-The kernel-level optimization queue at `bench/perf_targets.txt` has
-been exhausted (every active line is `# done` or `# skipped`). Your
-job: find the next bottleneck to attack, add it as a new target, and
-return so the main loop can pick it up.
+Use this prompt when assigned benchmark-target discovery. Read `CLAUDE.md`
+and `docs/STATE.md` first. Check `bench/perf_targets.txt` before assuming the
+queue is exhausted or a wrapper is running. Find a measured bottleneck,
+add an appropriate target, and report the evidence to the caller.
 
 ## Hard constraints
 
@@ -16,9 +15,9 @@ stability boundaries" — same as the per-iteration guardrails.
 2. **Do not change existing keys** in `bench/bench_regression.jl` —
    would invalidate the baseline ratchet. Add NEW `@benchmarkable`
    blocks only.
-3. **Do not propose targets marked as known-limitations** in
-   `CLAUDE.md` "Known limitations / open issues" — those are documented
-   design boundaries, not regressions.
+3. **Respect the intentional design boundaries** in `CLAUDE.md`.
+   Check `docs/STATE.md` for current known limits; a limitation marker alone
+   does not establish that an allocation is intentional or unoptimizable.
 4. **Do not touch `Workspace` type parameters** or any of the JIT
    cascade traps documented in CLAUDE.md.
 
@@ -31,8 +30,8 @@ stability boundaries" — same as the per-iteration guardrails.
      numbers.
    - Recent `git log --oneline -20` to see what's already been
      optimised in main.
-   - `CLAUDE.md` "Known limitations / open issues" — list of
-     intentionally-unfixed boundaries.
+   - `CLAUDE.md` "Design boundaries (intentional non-support)" and
+     `docs/STATE.md` — distinguish intended behavior from measured limitations.
 
 2. **Profile a representative workload**. Pick ONE of these
    (whichever is most relevant to recent commits):
@@ -75,20 +74,21 @@ stability boundaries" — same as the per-iteration guardrails.
      Place it under the latest `# === Round N ===` separator, or
      create `# === Round N+1 (discovery <date>) ===` if appropriate.
 
-5. **Re-pin baseline**. Run:
+5. **Measure and extend the baseline**. Run on the intended benchmark host:
    ```
-   LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. bench/bench_regression.jl
-   cp bench/results.json bench/baseline.json
+   julia --project=. bench/bench_regression.jl
    ```
-   This adds the new keys to baseline.json while keeping the existing
-   pinned numbers intact (BenchmarkTools.minimum() is monotone, so
-   the existing keys' numbers should be within ±5% of pinned values
-   — if they jumped >20%, something is broken; investigate before
-   continuing).
+   Merge only newly added benchmark keys from `bench/results.json` into
+   `bench/baseline.json`. Preserve every existing value exactly and verify
+   that equality before finishing. Replacing the whole baseline would reset
+   the regression reference. Separate runs can fluctuate; a sample minimum
+   does not guarantee monotonic improvement across runs or hosts. Investigate
+   large changes rather than silently re-pinning them.
 
 6. **Verify**: `git diff --stat` should show edits only to:
    `bench/bench_regression.jl`, `bench/perf_targets.txt`,
-   `bench/baseline.json`. If you touched anything else, revert it.
+   `bench/baseline.json`. Compare with the initial working-tree state; correct
+   only your own unintended edits and preserve other work.
 
 ## Bail conditions
 
@@ -97,12 +97,13 @@ edit any files when:
 
 - Profile shows no function ≥5% of time that isn't already in
   baseline.json (perf is exhausted — the loop should stop).
-- The next hot function is a known-limitations item from CLAUDE.md
-  (e.g. an allocation a measurement in CLAUDE.md declares intentional). **Do NOT bail on `_get_spinor` on that ground** — the 352-byte figure this line cited until 2026-08-06 was wrong; the `Val{D}` form allocates 0 in situ and the `n_comp::Int` overload costs ~1.6 kB/call at D=13, which is a real target.
+- A candidate would require violating a documented design boundary. For
+  `_get_spinor`, measure the actual overload and calling context rather than
+  treating an old allocation figure as an exemption.
 - You can't construct a meaningful @benchmarkable for the candidate
   (workspace setup is too tangled, requires GPU but bench infra is
   CPU-only, etc.).
-- 5 candidates ran but all were ≤5% or already-known-limitations.
+- All inspected candidates were below the threshold or lacked a valid target.
 
 ## What good output looks like
 
@@ -110,5 +111,5 @@ Last line of your reply must be one of:
 - `DISCOVERY_DONE: added N targets (<kernel1>, <kernel2>, ...)`
 - `BAIL: <reason>`
 
-Do NOT commit. The wrapper script will commit after verifying via
-`git diff --stat` that the changes are bench-only.
+Do not commit unless the caller assigned that step. Report the changed files and
+validation; do not assume that an external wrapper will review or commit them.

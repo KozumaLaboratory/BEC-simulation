@@ -242,7 +242,7 @@ end
     cited = Tuple{String, String}[]
     for d in docs, mt in eachmatch(r"`([0-9a-f]{7,40})`", read(d, String))
         tok = mt.captures[1]
-        _have(tok) && push!(cited, (relpath(d, _REPO), tok))
+        _have(tok) && push!(cited, (replace(relpath(d, _REPO), '\\' => '/'), tok))
     end
 
     fixrefs = Set(f.ref for f in campaign_fix_list(; path=_FIXLIST))

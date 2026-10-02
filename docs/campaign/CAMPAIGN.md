@@ -82,13 +82,15 @@ i.e. the gate could not see the fix the prose leant on.
 
 ---
 
-## 3. Stale documentation — four of the five overrides are now discharged
+## 3. Documentation drift — historical findings and prevention
 
 Measured 2026-07-30 by reading code against docs; **re-measured 2026-08-02 before
 this charter landed**. Four of the five rows had been fixed at the source in the
 meantime. They are kept as a record, struck, rather than deleted — a table that
 claims to override `CLAUDE.md` is exactly the thing that must not be allowed to
-go stale unnoticed.
+go stale unnoticed. This table is a dated audit, not a standing override of
+current instructions. As of 2026-10-01, the remaining roadmap row is a FROZEN
+planning record and no longer serves as a current work item.
 
 | Doc says | Reality | Status 2026-08-02 |
 |---|---|---|
@@ -96,7 +98,7 @@ go stale unnoticed.
 | ~~`ueda_status.md:32,80` — independent reference-RHS "(planned)"~~ | Exists, `src/validation/reference_rhs/` | **DISCHARGED** — both sites read "(implemented)" |
 | ~~`matsui_reproduction_status.md` Level 5 — "not started; needs imaging pipeline"~~ | The imaging chain is complete | **DISCHARGED** — the row now reads "the pipeline EXISTS … Blocker is the Fig-2C source data, not the code" |
 | ~~`README.md` CI badge points at `anko9801/BEC-simulation`~~ | — | **DISCHARGED** — no such URL in `README.md` |
-| `dthesis_year1_roadmap.md:41` — Q2 dated 2027-07 marked "CLOSED AHEAD OF SCHEDULE (2026-05-11)" | The document is internally inconsistent as a plan | **OPEN**, narrowed. The affiliation half of the original row was wrong: the doc says 上妻研, never 上妻研（東大）, so there is nothing to correct there |
+| `dthesis_year1_roadmap.md:41` — Q2 dated 2027-07 marked "CLOSED AHEAD OF SCHEDULE (2026-05-11)" | The document is internally inconsistent as a plan | **HISTORICAL (2026-10-01)** — the roadmap carries a FROZEN 2026-05-23 header. Preserve its dated plan and completion claim; derive current work from issues, not its dates. The earlier affiliation allegation was itself wrong |
 
 **Consequence for planning:** the tensor gradient is on the critical path for Lane C.
 It works. Use LBFGS, not ITP, for tensor-active ground states.
@@ -266,10 +268,11 @@ ordering is worth *more* when execution is cheap, not less.
 - If the session degrades or exceeds its turn estimate by ~2×: **write a handoff note to
   `docs/archive/` and stop.** Do not push through.
 - Respect `.githooks/pre-commit`, `.JuliaFormatter.toml`, and `CLAUDE.md`
-  "Conventions (do NOT fix)" and "Design boundaries (intentional non-support)" —
-  **except** where §3 above overrides.
-- **Do not touch performance** during a physics session. `gpu_busy_pct` has 3.1 % of
-  headroom left; marginal value is ~zero relative to validation.
+  "Conventions (do NOT fix)" and "Design boundaries (intentional non-support)".
+  Section 3 records historical drift; it does not override these authorities.
+- **Do not mix performance changes into a physics session.** If performance is
+  the assigned task, measure the current bottleneck and accuracy evidence;
+  a historical utilization value does not establish today's headroom.
 
 ## 10. Definition of done (campaign session)
 

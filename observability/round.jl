@@ -1,4 +1,4 @@
-# Deterministic round-verdict primitive for /goal + /loop driven optimisation.
+# Numerical comparison for a scoped performance investigation.
 #
 #   julia --project=. observability/round.jl <metric> [N] [dtype]
 #
@@ -7,13 +7,10 @@
 # the newest measurement beats best-so-far beyond the noise band and whether the
 # accuracy gates still hold. Writes observability/round_verdict.json.
 #
-# The /goal evaluator (a fast fuzzy model) must read ONLY `accepted` from that
-# file — never re-derive the numeric comparison. This is the sneaky-prover
-# discipline (don't trust a fuzzy judge with numbers) applied to /goal.
+# See README.md for evidence limitations: empty/stale gate records are not
+# rejected by this implementation. `accepted` is not a same-revision accuracy
+# certificate. On the first measurement, a baseline is recorded instead.
 #
-# accepted == true  => a REAL improvement, gates verified, best.json advanced.
-# On first-ever measurement of a metric: baseline recorded, accepted=false.
-
 using JSON, TOML
 
 const HERE = @__DIR__
@@ -124,9 +121,7 @@ verdict = Dict(
     "ts" => get(latest, "ts", ""),
 )
 
-# Monotonic progress counter — lets a CONSTANT, metric-agnostic /goal drive
-# many rounds: "accepted_count reaches N" is satisfied one win at a time,
-# whatever kernel each round targeted.
+# Count accepted comparisons for reporting within the current task.
 PROGRESS = joinpath(HERE, "progress.json")
 prog = isfile(PROGRESS) ? JSON.parsefile(PROGRESS) : Dict("accepted_count" => 0, "wins" => Any[])
 if accepted

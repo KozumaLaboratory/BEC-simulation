@@ -45,7 +45,7 @@ _frozen(path) = occursin(_FROZEN_MARK, first(read(joinpath(_REPO, path), String)
         undated = String[]
         for (root, _, files) in walkdir(joinpath(_REPO, "docs")), f in files
             endswith(f, ".md") || continue
-            rel = relpath(joinpath(root, f), _REPO)
+            rel = replace(relpath(joinpath(root, f), _REPO), '\\' => '/')
             rel in live && continue
             _frozen(rel) || push!(undated, rel)
         end

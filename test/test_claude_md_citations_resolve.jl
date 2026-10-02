@@ -1,5 +1,8 @@
 using Test
 using SpinorBEC
+using TOML
+
+include(joinpath(@__DIR__, "helpers", "calibrated_scan.jl"))
 
 # Every code path and every `file:line` that CLAUDE.md cites must resolve.
 #
@@ -35,6 +38,69 @@ function cited_paths(text)
         push!(hits, m.match[2:(end - 1)])   # strip backticks, keep any :line
     end
     unique(hits)
+end
+
+# Role prompts used to depend on a retired scheduler and copied physics limits
+# that the shared instructions had already retracted. Keep their contract small:
+# parseable roles, an explicit route to the authority, no retired runtime inputs.
+function _agent_role_problems(config, stem)
+    problems = String[]
+    for key in ("name", "description", "developer_instructions")
+        value = get(config, key, nothing)
+        value isa AbstractString && !isempty(strip(value)) ||
+            push!(problems, "missing or empty $key")
+    end
+    get(config, "name", nothing) == stem || push!(problems, "name differs from filename")
+    instructions = get(config, "developer_instructions", "")
+    if instructions isa AbstractString
+        occursin("CLAUDE.md", instructions) || push!(problems, "missing shared authority")
+        occursin(r"runs/_loop/|\.Codex/agents|loop\.sh|judge\.py|full_bdg_F6_polar_broken", instructions) &&
+            push!(problems, "retired loop or physics instruction")
+    end
+    problems
+end
+
+@testset "agent roles use current instructions" begin
+    role_dir = joinpath(REPO, ".codex", "agents")
+    files = filter(f -> endswith(f, ".toml"), readdir(role_dir; join=true))
+    stems = Set(first(splitext(basename(f))) for f in files)
+    @test Set(["director", "implementer", "theorist", "researcher", "critic", "critic_lite"]) ⊆ stems
+    roles = [(config=TOML.parsefile(f), stem=first(splitext(basename(f)))) for f in files]
+    @test length(roles) == length(files) >= 6
+
+    valid = Dict("name" => "probe", "description" => "Test role",
+        "developer_instructions" => "Read CLAUDE.md. Return evidence to the caller.")
+    old = merge(valid, Dict("developer_instructions" => "Read runs/_loop/state.json and CLAUDE.md."))
+    bad = calibrated_scan(roles;
+        match=x -> !isempty(_agent_role_problems(x.config, x.stem)),
+        present=(config=old, stem="probe"),
+        absent=(config=valid, stem="probe"))
+    @test isempty(bad)
+    for key in keys(valid)
+        missing = copy(valid)
+        delete!(missing, key)
+        @test !isempty(_agent_role_problems(missing, "probe"))
+    end
+    @test !isempty(_agent_role_problems(valid, "different_name"))
+    @test !isempty(_agent_role_problems(merge(valid,
+        Dict("developer_instructions" => "Use a private copy of conventions.")), "probe"))
+end
+
+@testset "CI detects root documentation inputs" begin
+    workflow = read(joinpath(REPO, ".github", "workflows", "ci.yml"), String)
+    # Read the actual filter rather than restating its pattern in this test.
+    filter_match = match(r"grep -Eq '([^']+)'", workflow)
+    @test filter_match !== nothing
+    if filter_match !== nothing
+        detector = Regex(filter_match.captures[1])
+        for file in ("AGENTS.md", "CLAUDE.md", "README.md", "docs/index.md",
+            "docs/conventions/testing_strategy.md")
+            @test occursin(detector, file)
+        end
+        for file in ("notes.md", "src/README.md", "docs/notes.txt", "CLAUDE.md.bak")
+            @test !occursin(detector, file)
+        end
+    end
 end
 
 "Every directory cited in backticks as `path/to/dir/`."
