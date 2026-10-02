@@ -179,7 +179,7 @@ const PIN_IDS = Set{String}(
         @test length(md["dump"]["key_counts"]) == PIN_MD_KEYS
         # Not 45. The cutover plan's estimate was low and the file says so.
         @test PIN_MD_KEYS != 45   # the cutover plan estimated 45; it was low then and lower now
-        dumped = Set(String(b["path"]) for b in blocks)
+        dumped = Set(replace(String(b["path"]), ".yaml" => ".experiment.jl") for b in blocks)
         @test length(dumped) == PIN_MD_BLOCKS       # one row per config, no dupes
         for b in blocks
             @test startswith(String(b["path"]), "runs/")
@@ -192,9 +192,9 @@ const PIN_IDS = Set{String}(
         still = String[]
         for (root, _, files) in walkdir(joinpath(_REPO, "runs"))
             for f in files
-                endswith(f, ".yaml") || endswith(f, ".yml") || continue
+                endswith(f, ".experiment.jl") || continue
                 p = joinpath(root, f)
-                any(startswith(l, "metadata:") for l in eachline(p)) || continue
+                haskey(SpinorBEC._load_config_data(p), "metadata") || continue
                 push!(still, relpath(p, _REPO))
             end
         end

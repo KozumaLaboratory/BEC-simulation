@@ -8,29 +8,54 @@ struct _FakeExp
 end
 
 const _BASE_YAML = """
-defaults: {kind: spinor, backend: cpu}
-pipeline:
-  - ground_state:
-      atom: Eu151
-      grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      interactions: {N_atoms: 1000, omega_ref: 691.1504}
-      B: {Bz: "0.01 Gauss"}
-      dt: 0.01
-      n_steps: 10
-      tol: 1.0e-6
-  - dynamics:
-      duration: 1.0
-      dt: 0.01
-      interactions: {N_atoms: 1000, omega_ref: 691.1504}
-      B: {Bz: "0.01 Gauss"}
-      rotating_frame_omega: 0.0
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "rotating_frame_omega" => 0.0,
+        ),
+    )],
+)
 """
 
 function _build_cells(rotating_omegas, dts)
     cells = _FakeExp[]
     for (rfo, dt) in zip(rotating_omegas, dts)
-        d = SpinorBEC.YAML.load(_BASE_YAML)
+        d = SpinorBEC._julia_config_string(_BASE_YAML)
         d["pipeline"][2]["dynamics"]["rotating_frame_omega"] = rfo
         d["pipeline"][2]["dynamics"]["dt"] = dt
         push!(cells, _FakeExp(Dict{Any, Any}(d)))

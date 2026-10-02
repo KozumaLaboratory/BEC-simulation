@@ -1,3 +1,8 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 # `store_census` — which duplicate run directories are recoverable waste (#478).
 #
 # The instrument answers a question #478 pre-registered and PR #482 could not
@@ -5,7 +10,7 @@
 # (cause a) and how many on nothing that reaches it (cause b)? #482 had to
 # estimate, because the store predates the current naming and a directory cannot
 # be reverse-mapped to its source YAML. It does not need to be: every directory
-# carries its own `config.yaml`.
+# carries its own `config.experiment.jl`.
 #
 # WHAT THIS FILE GATES, and it is the part that decides the answer: the CLASSIFIER.
 # A count of duplicates is not a verdict — `defaults.backend` differing is a
@@ -16,7 +21,6 @@
 # reproduce #482's estimate and look like it had measured something.
 
 using Test
-using YAML
 using SpinorBEC
 
 include(joinpath(@__DIR__, "..", "helpers", "calibrated_scan.jl"))
@@ -40,7 +44,7 @@ end
 function _mkrun(root, name, cfg; with_point=true)
     d = joinpath(root, name)
     mkpath(d)
-    YAML.write_file(joinpath(d, "config.yaml"), cfg)
+    SpinorBEC._write_config_snapshot(joinpath(d, "config.json"), cfg)
     with_point && write(joinpath(d, "point_001.jld2"), "not really a jld2")
     d
 end
@@ -158,25 +162,25 @@ end
         # same pass. Both are asserted here.
         mktempdir() do root
             cfg = _cfg(; bz="-0.01 Gauss")
-            body = YAML.yaml(cfg)
-            key = bytes2hex(SpinorBEC.sha256(codeunits(body)))[1:8]
-
-            honest = joinpath(root, "honest_$key")
+            key = content_id(cfg)
+            honest = joinpath(root, key)
             mkpath(honest)
-            write(joinpath(honest, "config.yaml"), body)
-
-            edited = joinpath(root, "edited_$key")
+            SpinorBEC._write_config_snapshot(joinpath(honest, "config.json"), cfg)
+            original = _cfg(; bz="-0.02 Gauss")
+            edited_key = content_id(original)
+            edited = joinpath(root, edited_key)
             mkpath(edited)
-            write(joinpath(edited, "config.yaml"),
-                replace(body, "-0.01 Gauss" => "0.01 Gauss"))
+            SpinorBEC._write_config_snapshot(
+                joinpath(edited, "config.json"), _cfg(; bz="0.01 Gauss")
+            )
 
             c = store_census(root)
             @test c.n_keyed == 2
-            @test collect(keys(c.stale_key)) == ["edited_$key"]      # positive
-            @test !haskey(c.stale_key, "honest_$key")                # negative
+            @test collect(keys(c.stale_key)) == [edited_key]      # positive
+            @test !haskey(c.stale_key, key)                # negative
             rep = store_census_report(c; io=devnull)
             @test rep["n_keyed"] == 2
-            @test haskey(rep["stale_key"], "edited_$key")
+            @test haskey(rep["stale_key"], edited_key)
         end
     end
 
@@ -185,7 +189,7 @@ end
             _mkrun(root, "ok_aaaaaaaa", _cfg())
             bad = joinpath(root, "bad_bbbbbbbb")
             mkpath(bad)
-            write(joinpath(bad, "config.yaml"), "pipeline: [\n  unclosed: {")
+            write(joinpath(bad, "config.json"), "pipeline: [\n  unclosed: {")
             c = store_census(root)
             @test "bad_bbbbbbbb" in c.unreadable
         end

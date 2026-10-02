@@ -2,7 +2,7 @@
 # Durable resume for the Eu GS phase-diagram campaign. Reads the committed ledger
 # runs/eu_gs_phase_c1_B_kappa/CAMPAIGN.tsv, checks per-config completion on TSUBAME,
 # and (with --submit) re-qsubs ONLY the missing task indices. Safe across session
-# breaks: run_yaml is content-addressed, so already-computed point_*.jld2 are
+# breaks: run_experiment is content-addressed, so already-computed point_*.jld2 are
 # skipped — nothing done is recomputed.
 #
 #   scripts/eu_campaign_resume.sh            # status only
@@ -48,7 +48,7 @@ printf "%-28s %-9s %-14s %-8s %s\n" CONFIG STATUS CELLS ACTIVE MISSING
 tail -n +1 "$LEDGER" | while IFS=$'\t' read -r cfg submit jobname ntasks nseeds hrt purpose; do
     [[ "$cfg" =~ ^#.*$ || -z "$cfg" ]] && continue
     [ -n "$FILTER" ] && [[ "$cfg" != *"$FILTER"* ]] && continue
-    base="${cfg%.yaml}"
+    base="${cfg%.experiment.jl}"
     out="$(remote_check "$base" "$jobname")"
     dirn=$(echo "$out" | awk '/^DIRN/{print $2}')
     active=$(echo "$out" | awk '/^ACTIVE/{print $2}')

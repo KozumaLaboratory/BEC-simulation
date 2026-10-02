@@ -5,7 +5,7 @@
 # Step 1a was PURELY ADDITIVE: nothing outside `src/model/` referenced `Model`,
 # so that increment could not change the behaviour of any existing run.
 #
-# Step 1b added the first consumer: `yaml_to_model`
+# Step 1b added the first consumer: `config_to_model`
 # (`workflow/experiments/pipeline/resolve_gs.jl`), which resolves a
 # `ground_state:` block to a `Model`. It shares ONE resolver with
 # `_run_step(::GroundStateStep, …)` rather than re-reading the YAML — a second

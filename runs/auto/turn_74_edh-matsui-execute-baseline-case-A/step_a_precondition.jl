@@ -1,6 +1,6 @@
-using YAML
-cfg_path = "runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml"
-cfg = YAML.load_file(cfg_path)
+using SpinorBEC
+cfg_path = "runs/eu151_matsui_edh/configs/matsui_edh_baseline.experiment.jl"
+cfg = SpinorBEC._load_config_data(cfg_path)
 
 @assert haskey(cfg, "defaults") "defaults block missing"
 @assert haskey(cfg, "pipeline") "pipeline block missing"

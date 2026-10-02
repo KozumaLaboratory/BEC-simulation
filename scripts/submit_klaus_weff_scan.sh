@@ -81,7 +81,7 @@ if [ -n "${WEFF_MANIFEST:-}" ]; then
     [ "$_missing" -eq 0 ] || exit 1
     echo "manifest: $WEFF_MANIFEST (${#CFGS[@]} arms, all resolve)"
 else
-    mapfile -t CFGS < <(ls "$CFG_DIR"/*.yaml | sort)
+    mapfile -t CFGS < <(ls "$CFG_DIR"/*.experiment.jl | sort)
 fi
 N=${#CFGS[@]}
 if [ "$N" -eq 0 ]; then
@@ -155,7 +155,7 @@ timeout --signal=INT --kill-after=120 "$BUDGET_S" \
         end
         error("pre-flight found $(length(blockers)) :error warning(s) — refusing to launch")
     end
-    run_yaml(cfg)
+    run_experiment(cfg)
 ' "$CFG"
 
 RC=$?

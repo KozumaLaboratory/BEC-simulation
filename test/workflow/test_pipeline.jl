@@ -47,25 +47,42 @@ using Dates: Date
 
     @testset "c_dd ramp in ground state" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [16]
-                box: [12.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              ddi:
-                enabled: true
-                c_dd: {from: 0.0, to: 0.001, scale: linear}
-              dt: 0.01
-              n_steps: 50
-              tol: 1.0e-4
-              initial_state: polar
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "c_dd" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "scale" => "linear",
+                    "to" => 0.001,
+                ),
+                "enabled" => true,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [12.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         @test config.steps[1] isa SpinorBEC.GroundStateStep
         p = config.steps[1].params
@@ -80,26 +97,45 @@ using Dates: Date
 
     @testset "dynamics inherits from ground state" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [16]
-                box: [12.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.01
-              n_steps: 50
-              tol: 1e-4
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 0.02
-              dt: 0.001
-              save: {every: 10}
-              B: {p: 0.0, q: 0.1}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [12.0],
+                "n" => [16],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.02,
+            "save" => Dict{String, Any}(
+                "every" => 10,
+            ),
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)
 
@@ -112,23 +148,37 @@ using Dates: Date
 
     @testset "analyzer dispatch" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [16]
-                box: [12.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.01
-              n_steps: 50
-              tol: 1e-4
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0]}
-          - analyze:
-              - phase_classify: {}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [12.0],
+                "n" => [16],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "phase_classify" => Dict{String, Any}(),
+        )],
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)
 
@@ -139,20 +189,42 @@ using Dates: Date
 
     @testset "bogoliubov analyzer" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [16, 16], box: [8.0, 8.0]}
-              interactions: {c0: 10.0, c1: -0.5}
-              dt: 0.01
-              n_steps: 50
-              tol: 1e-4
-              initial_state: m_plus_F
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-          - analyze:
-              - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0],
+                "n" => [16, 16],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "bogoliubov" => Dict{String, Any}(
+                "directions" => "auto",
+                "k_max" => 5.0,
+                "n_k" => 40,
+            ),
+        )],
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)
 
@@ -199,23 +271,46 @@ using Dates: Date
 
     @testset "topology analyzers (winding_field, monopole_charge, non_abelian_homotopy)" begin
         yaml_str_2d = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [16, 16], box: [8.0, 8.0]}
-              interactions: {c0: 10.0, c1: -0.5}
-              dt: 0.01
-              n_steps: 40
-              tol: 1e-4
-              initial_state: m_plus_F
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-          - analyze:
-              - winding_field: {component: 1, threshold: 1.0e-6}
-              - non_abelian_homotopy:
-                  loop_pts: [[6, 8], [10, 8], [10, 10], [6, 10], [6, 8]]
-                  component: 1
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0],
+                "n" => [16, 16],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 40,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "winding_field" => Dict{String, Any}(
+                "component" => 1,
+                "threshold" => 1.0e-6,
+            ),
+        ), Dict{String, Any}(
+            "non_abelian_homotopy" => Dict{String, Any}(
+                "component" => 1,
+                "loop_pts" => [[6, 8], [10, 8], [10, 10], [6, 10], [6, 8]],
+            ),
+        )],
+    )],
+)
+"""
         result_2d = run_pipeline(load_config_from_string(yaml_str_2d); verbose=false)
         @test haskey(result_2d, :winding_field)
         @test haskey(result_2d.winding_field, :winding_field)
@@ -228,20 +323,40 @@ using Dates: Date
         @test abs(result_2d.non_abelian_homotopy.holonomy) ≈ 1.0 atol=1e-8
 
         yaml_str_3d = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [10, 10, 10], box: [6.0, 6.0, 6.0]}
-              interactions: {c0: 10.0, c1: -0.5}
-              dt: 0.01
-              n_steps: 30
-              tol: 1e-4
-              initial_state: m_plus_F
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-          - analyze:
-              - monopole_charge: {smooth: false}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [6.0, 6.0, 6.0],
+                "n" => [10, 10, 10],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 30,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "monopole_charge" => Dict{String, Any}(
+                "smooth" => false,
+            ),
+        )],
+    )],
+)
+"""
         result_3d = run_pipeline(load_config_from_string(yaml_str_3d); verbose=false)
         @test haskey(result_3d, :monopole_charge)
         @test haskey(result_3d.monopole_charge, :total_charge)
@@ -286,20 +401,42 @@ using Dates: Date
         # Quick smoke: feed the analyzer a workspace from a tiny GS run
         # and check the output shape.
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [16, 16], box: [8.0, 8.0]}
-              interactions: {c0: 5.0, c1: -0.5}
-              dt: 0.01
-              n_steps: 60
-              tol: 1.0e-4
-              initial_state: m_plus_F
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-          - analyze:
-              - bogoliubov_mode: {k_max: 5.0, n_k: 60, directions: auto}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0],
+                "n" => [16, 16],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 60,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "bogoliubov_mode" => Dict{String, Any}(
+                "directions" => "auto",
+                "k_max" => 5.0,
+                "n_k" => 60,
+            ),
+        )],
+    )],
+)
+"""
         result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :bogoliubov_mode)
         bm = result.bogoliubov_mode
@@ -333,23 +470,49 @@ using Dates: Date
 
     @testset "SGPE YAML knob smoke" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [10, 10], box: [5.0, 5.0]}
-              interactions: {c0: 5.0, c1: 0.0}
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-              dt: 0.01
-              n_steps: 30
-              tol: 1.0e-4
-              initial_state: m_plus_F
-          - dynamics:
-              duration: 0.2
-              dt: 0.005
-              save: {every: 10}
-              sgpe: {gamma: 0.05, T: 0.05, mu: 0.0, every: 1, seed: 11}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [5.0, 5.0],
+                "n" => [10, 10],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 30,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.005,
+            "duration" => 0.2,
+            "save" => Dict{String, Any}(
+                "every" => 10,
+            ),
+            "sgpe" => Dict{String, Any}(
+                "T" => 0.05,
+                "every" => 1,
+                "gamma" => 0.05,
+                "mu" => 0.0,
+                "seed" => 11,
+            ),
+        ),
+    )],
+)
+"""
         result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :dynamics_result)
         @test length(result.dynamics_result.energies) >= 2
@@ -359,23 +522,46 @@ using Dates: Date
 
     @testset "Projected GP YAML knob smoke" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [12, 12], box: [6.0, 6.0]}
-              interactions: {c0: 5.0, c1: 0.0}
-              B: {p: 0.0, q: 0.1}
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-              dt: 0.01
-              n_steps: 30
-              tol: 1.0e-4
-              initial_state: m_plus_F
-          - dynamics:
-              duration: 0.2
-              dt: 0.005
-              save: {every: 100}
-              projected_gp: {k_cut: 4.0, every: 1}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [6.0, 6.0],
+                "n" => [12, 12],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 30,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.005,
+            "duration" => 0.2,
+            "projected_gp" => Dict{String, Any}(
+                "every" => 1,
+                "k_cut" => 4.0,
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 100,
+            ),
+        ),
+    )],
+)
+"""
         # Should run without error; high-k modes get truncated each step
         result = run_pipeline(load_config_from_string(yaml_str); verbose=false)
         @test haskey(result, :dynamics_result)
@@ -384,37 +570,66 @@ using Dates: Date
     @testset "column_density_movie multi-step concat" begin
         mktempdir() do tmp
             frame_dir = joinpath(tmp, "frames")
-            cfg_path = joinpath(tmp, "config.yaml")
+            cfg_path = joinpath(tmp, "config.experiment.jl")
             write(
                 cfg_path,
                 """
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [10, 10, 6], box: [5.0, 5.0, 4.0]}
-      interactions: {c0: 5.0, c1: 0.0}
-      B: {p: 0.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      dt: 0.01
-      n_steps: 20
-      tol: 1.0e-3
-      initial_state: m_plus_F
-  - dynamics:
-      duration: 0.1
-      dt: 0.01
-      save: {every: 5, psi: true}
-  - dynamics:
-      duration: 0.1
-      dt: 0.01
-      save: {every: 5, psi: true}
-  - analyze:
-      - column_density_movie:
-          axis: 3
-          output_dir: $frame_dir
-          multi_step: true
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [5.0, 5.0, 4.0],
+                "n" => [10, 10, 6],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 20,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.1,
+            "save" => Dict{String, Any}(
+                "every" => 5,
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.1,
+            "save" => Dict{String, Any}(
+                "every" => 5,
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "column_density_movie" => Dict{String, Any}(
+                "axis" => 3,
+                "multi_step" => true,
+                "output_dir" => $(repr(frame_dir)),
+            ),
+        )],
+    )],
+)
 """,
             )
-            run_yaml(cfg_path; base_dir=tmp, verbose=false)
+            run_experiment(cfg_path; base_dir=tmp, verbose=false)
             archive = joinpath(frame_dir, "columns.jld2")
             manifest = joinpath(frame_dir, "manifest.json")
             @test isfile(archive)
@@ -616,25 +831,46 @@ date,coil_strong_gauss_per_mv,coil_strong_gauss_offset,fort_x_hz,fort_y_hz,fort_
         end
     end
 
-    @testset "run_yaml dry-run prints calibration-applied YAML" begin
+    @testset "run_experiment dry-run prints calibration-applied conditions" begin
         mktempdir() do tmp
-            cfg_path = joinpath(tmp, "config.yaml")
+            cfg_path = joinpath(tmp, "config.experiment.jl")
             write(
                 cfg_path,
                 """
-calibration:
-  coil_strong: {gauss_per_mv: 0.4, gauss_offset: 0.05}
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [8, 8], box: [4.0, 4.0]}
-      interactions: {c0: 5.0, c1: 0.0}
-      B: {p_mv: 2.5, coil_mode: strong, q: 0.1}
-      potential: {type: harmonic, omega: [1.0, 1.0]}
-      dt: 0.01
-      n_steps: 5
-      tol: 1.0e-3
-      initial_state: m_plus_F
+Dict{String, Any}(
+    "calibration" => Dict{String, Any}(
+        "coil_strong" => Dict{String, Any}(
+            "gauss_offset" => 0.05,
+            "gauss_per_mv" => 0.4,
+        ),
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "coil_mode" => "strong",
+                "p_mv" => 2.5,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0],
+                "n" => [8, 8],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.001,
+        ),
+    )],
+)
 """,
             )
             # dry_run returns the expanded YAML string — must NOT touch GPU.
@@ -643,14 +879,14 @@ pipeline:
             logfile = joinpath(tmp, "stdout.log")
             out = open(logfile, "w") do io
                 redirect_stdout(io) do
-                    run_yaml(cfg_path; base_dir=tmp, verbose=true, dry_run=true)
+                    run_experiment(cfg_path; base_dir=tmp, verbose=true, dry_run=true)
                 end
             end
             log = read(logfile, String)
-            @test occursin("# [run_yaml] starting experiment", log)
-            @test occursin("# [run_yaml] normalizing B blocks", log)
-            @test occursin("# [run_yaml] dry-run complete", log)
-            @test occursin("dry-run", out)
+            @test occursin("# [run_experiment] starting experiment", log)
+            @test occursin("# [run_experiment] normalizing B blocks", log)
+            @test occursin("# [run_experiment] dry-run complete", log)
+            @test haskey(SpinorBEC.JSON.parse(out), "pipeline")
             @test occursin("Gauss", out)        # p_mv → "X Gauss" in expanded form
             @test !occursin("p_mv", out)        # lab key stripped
         end
@@ -712,32 +948,57 @@ pipeline:
         # writes per-frame column densities to columns.jld2 + manifest.json.
         mktempdir() do tmp
             frame_dir = joinpath(tmp, "frames")
-            cfg_path = joinpath(tmp, "config.yaml")
+            cfg_path = joinpath(tmp, "config.experiment.jl")
             write(
                 cfg_path,
                 """
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [12, 12, 6], box: [6.0, 6.0, 4.0]}
-      interactions: {c0: 5.0, c1: 0.0}
-      B: {p: 0.0, q: 0.0}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      dt: 0.01
-      n_steps: 30
-      tol: 1.0e-4
-      initial_state: m_plus_F
-  - dynamics:
-      duration: 0.2
-      dt: 0.01
-      save: {every: 5, psi: true, precision: "f32"}
-  - analyze:
-      - column_density_movie:
-          axis: 3
-          output_dir: $frame_dir
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [6.0, 6.0, 4.0],
+                "n" => [12, 12, 6],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 30,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.2,
+            "save" => Dict{String, Any}(
+                "every" => 5,
+                "precision" => "f32",
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "column_density_movie" => Dict{String, Any}(
+                "axis" => 3,
+                "output_dir" => $(repr(frame_dir)),
+            ),
+        )],
+    )],
+)
 """,
             )
-            run_yaml(cfg_path; base_dir=tmp, verbose=false)
+            run_experiment(cfg_path; base_dir=tmp, verbose=false)
             archive = joinpath(frame_dir, "columns.jld2")
             manifest = joinpath(frame_dir, "manifest.json")
             @test isfile(archive)
@@ -749,26 +1010,44 @@ pipeline:
 
     @testset "analyzer result persistence" begin
         mktempdir() do tmp
-            cfg_path = joinpath(tmp, "config.yaml")
+            cfg_path = joinpath(tmp, "config.experiment.jl")
             write(
                 cfg_path,
                 """
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [16], box: [8.0]}
-      interactions: {c0: 10.0, c1: -0.5}
-      dt: 0.01
-      n_steps: 30
-      tol: 1e-4
-      initial_state: m_plus_F
-      B: {p: 0.0, q: 0.1}
-      potential: {type: harmonic, omega: [1.0]}
-  - analyze:
-      - phase_classify: {}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 30,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "phase_classify" => Dict{String, Any}(),
+        )],
+    )],
+)
 """,
             )
-            run_dir = SpinorBEC.run_yaml(cfg_path; base_dir=tmp, verbose=false)
+            run_dir = SpinorBEC.run_experiment(cfg_path; base_dir=tmp, verbose=false)
             d = only(filter(p -> endswith(p, ".jld2"),
                 joinpath.(run_dir, readdir(run_dir))))
             loaded = JLD2.load(d)
@@ -782,21 +1061,43 @@ pipeline:
         mktempdir() do tmp
             cache_file = joinpath(tmp, "gs.jld2")
             yaml_str = """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid: {n: [16, 16], box: [8.0, 8.0]}
-                  interactions: {c0: 10.0, c1: -0.5}
-                  dt: 0.01
-                  n_steps: 50
-                  tol: 1e-4
-                  initial_state: m_plus_F
-                  B: {p: 0.0, q: 0.1}
-                  potential: {type: harmonic, omega: [1.0, 1.0]}
-                  cache: $cache_file
-              - analyze:
-                  - bogoliubov: {k_max: 5.0, n_k: 40, directions: auto}
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "cache" => $(repr(cache_file)),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0],
+                "n" => [16, 16],
+            ),
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "bogoliubov" => Dict{String, Any}(
+                "directions" => "auto",
+                "k_max" => 5.0,
+                "n_k" => 40,
+            ),
+        )],
+    )],
+)
+"""
             cfg = load_config_from_string(yaml_str)
             r1 = run_pipeline(cfg; verbose=false)
             @test isfile(cache_file)
@@ -843,30 +1144,49 @@ pipeline:
     end
 
     @testset "parse pipeline errors" begin
-        @test_throws ArgumentError load_config_from_string("pipeline: []")
+        @test_throws ArgumentError load_config_from_string("Dict(\"pipeline\" => [])")
         @test_throws ArgumentError load_config_from_string("""
-        pipeline:
-          - unknown_step:
-              foo: bar
-        """)
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "unknown_step" => Dict{String, Any}(
+            "foo" => "bar",
+        ),
+    )],
+)
+""")
     end
 
     @testset "scan parsing" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: 8, box: 6.0}
-              interactions: {c0: 10.0, c1: 0.0}
-              dt: 0.01
-              n_steps: 50
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        scan:
-          zip:
-            pipeline.0.interactions[1]: [-1.0, 0.0, 1.0]
-          continuation: true
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 6.0,
+                "n" => 8,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "continuation" => true,
+        "zip" => Dict{String, Any}(
+            "pipeline.0.interactions[1]" => [-1.0, 0.0, 1.0],
+        ),
+    ),
+)
+"""
         config = load_config_from_string(yaml_str)
         @test config.scan isa OverrideScan
         @test length(config.scan.points) == 3

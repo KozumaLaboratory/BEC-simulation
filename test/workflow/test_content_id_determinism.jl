@@ -68,11 +68,11 @@ const _REF_ID = "d6c4ff5a501e607d"
         @test content_id(rebuild_reversed(a)) == content_id(a)
     end
 
-    @testset "invariant under a YAML round-trip" begin
+    @testset "invariant under a Julia definition round-trip" begin
         a = _ref_spec()
         io = IOBuffer()
-        SpinorBEC.YAML.write(io, a)
-        b = SpinorBEC.YAML.load(String(take!(io)))
+        show(io, a)
+        b = SpinorBEC._julia_config_string(String(take!(io)))
         @test content_id(b) == content_id(a)
     end
 

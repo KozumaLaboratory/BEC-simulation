@@ -10,7 +10,7 @@
 # So there is one resolver with two consumers:
 #
 #   `_run_step(::GroundStateStep, …)`  →  the objects the solver takes
-#   `yaml_to_model(path)`              →  `gs_model(r)`, a pure function of the
+#   `config_to_model(path)`              →  `gs_model(r)`, a pure function of the
 #                                          SAME resolved objects
 #
 # `gs_model` never touches `p`. Everything it needs that the solver does not
@@ -23,13 +23,13 @@
 # extraction — it is the same code in the same order. Building a `Model` can
 # fail where a solve would not (a config with no `N_atoms`, a tabulated LHY with
 # no resolved `n_max`), so that failure lives in `gs_model`, which only
-# `yaml_to_model` calls. `_run_step`'s behaviour therefore does not change.
+# `config_to_model` calls. `_run_step`'s behaviour therefore does not change.
 #
 # NOT GENERALIZABLE: the `@noinline` + `::ConcreteType` boundary is load-bearing
 # here for the same reason it is in `run_step_ground_state.jl` — see that file's
 # header and CLAUDE.md §"Type stability boundaries".
 
-export resolve_gs, gs_model, yaml_to_model, GSResolved, gs_physics_kwargs
+export resolve_gs, gs_model, config_to_model, GSResolved, gs_physics_kwargs
 
 # ---------------------------------------------------------------------------
 # The per-slot resolvers (moved verbatim from run_step_ground_state.jl)
@@ -148,7 +148,7 @@ end
 #                     a direction, so this is provenance, not physics.
 #
 # The partition of GS_SCHEMA into {reaches a Model slot, reaches Stage/Initial,
-# dropped} is pinned in `test/model/test_yaml_to_model.jl`; adding a schema key
+# dropped} is pinned in `test/model/test_config_to_model.jl`; adding a schema key
 # without classifying it is red there.
 const GS_KEYS_DROPPED_PHYSICS = ("quasi_2d", "l_z", "raman", "B_direction",
     "a_s", "ddi_pad", "B_magnitude_gauss")
@@ -260,7 +260,7 @@ gs_physics_kwargs(r::GSResolved) = (
 # profile and the eigenvectors of the already-diagonalised operator — the two
 # coupling strengths and the polarization are gone by then. So the spec is read
 # off the same raw block, here, next to the call that consumes it: one site, two
-# products. `test/model/test_yaml_to_model.jl` gates the pair (a raw block that
+# products. `test/model/test_config_to_model.jl` gates the pair (a raw block that
 # yields a `LightShift` must yield an ACTIVE spec, and vice versa).
 function _light_shift_spec(raw)
     raw isa Dict || return LightShiftSpec()
@@ -463,7 +463,7 @@ number the config never gave would be a wrong answer wearing a content id, and
 the store is shared — so every gap throws, naming the slot and the reason.
 
 Slots a ground-state step cannot set take their inactive value, and which those
-are is pinned in `test/model/test_yaml_to_model.jl` against `GS_SCHEMA` rather
+are is pinned in `test/model/test_config_to_model.jl` against `GS_SCHEMA` rather
 than assumed here.
 """
 function gs_model(r::GSResolved)::Model
@@ -713,7 +713,7 @@ end
 # `BeamSpec` is `amplitude * exp(-rho^2)`, `rho = sqrt(2) r / waist` — equal iff
 # `waist = 2w`, i.e. `PlugBeam.waist` is HALF the 1/e^2 intensity radius. Both
 # forms are in the tree; the factor lives here, once, and
-# `test/model/test_yaml_to_model.jl` gates it against the evaluator numerically
+# `test/model/test_config_to_model.jl` gates it against the evaluator numerically
 # rather than against this comment.
 _accumulate_potential!(a::_PotAcc, v::PlugBeam, ::Float64) =
     push!(a.beam, BeamSpec(; amplitude=v.strength, waist=2 * v.waist, l_mode=0))
@@ -736,16 +736,16 @@ _accumulate_potential!(::_PotAcc, v::AbstractPotential, ::Float64) = throw(
 )
 
 # ---------------------------------------------------------------------------
-# yaml_to_model
+# config_to_model
 # ---------------------------------------------------------------------------
 
 """
-    yaml_to_model(path::AbstractString; index=nothing, verbose=false) -> Model
-    yaml_to_model(config::AbstractDict; index=nothing, verbose=false) -> Model
+    config_to_model(path::AbstractString; index=nothing, verbose=false) -> Model
+    config_to_model(config::AbstractDict; index=nothing, verbose=false) -> Model
 
 The resolved physics of a config's `ground_state:` step.
 
-Applies the preprocessing `run_yaml` applies — `_prepare_config_file` (dealias pop,
+Applies the preprocessing `run_experiment` applies — `_prepare_config_file` (dealias pop,
 calibration, templates + mixins, schema defaults, units, auto-defaults, B-block,
 noise-block, strict validation) followed by `parse_pipeline`'s `defaults:`
 seeding, which 414 of 416 committed configs depend on and which lives in neither
@@ -762,27 +762,27 @@ config cannot resolve throws, with the config path in the message.
 **Pure in the dealias globals.** `_prepare_config_file` is only the PREPARE half of
 a prepare/execute pair: it applies a top-level `dealias:` block to
 `DEALIAS_2_3_ENABLED[]` / `DEALIAS_K_CUTOFF[]` and leaves them set, and it is
-`run_yaml`'s execute half that restores them in a `finally`
-(`run_registry.jl:421-445`). `yaml_to_model` runs prepare alone, so it must do
+`run_experiment`'s execute half that restores them in a `finally`
+(`run_registry.jl:421-445`). `config_to_model` runs prepare alone, so it must do
 that restore itself — otherwise resolving a config that carries the block
 rewrites the `GridSpec` of every config resolved AFTER it in the same session,
-and `yaml_to_model(a) == yaml_to_model(a)` is false. That is fatal for a
+and `config_to_model(a) == config_to_model(a)` is false. That is fatal for a
 resolver whose output is a content id. Measured on the corpus rather than
-argued: `runs/validation_level10/L10_F1_smoke.yaml` resolved to
+argued: `runs/validation_level10/L10_F1_smoke.experiment.jl` resolved to
 `dealias_two_thirds=false, k_cut=0.0` alone and to `true, 10.0` after
-`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml`. Gated by the
+`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.experiment.jl`. Gated by the
 order-independence arm of `test/model/test_corpus_resolves.jl`.
 """
-function yaml_to_model(path::AbstractString; index::Union{Nothing, Int}=nothing,
+function config_to_model(path::AbstractString; index::Union{Nothing, Int}=nothing,
     verbose::Bool=false)
-    isfile(path) || throw(ArgumentError("yaml_to_model: no such config: $path"))
+    isfile(path) || throw(ArgumentError("config_to_model: no such config: $path"))
     # Preserve the caller's numerical settings during read-only resolution.
     was_enabled, was_k_cut = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
     # `_prepare_config_file` is INSIDE the try: strict schema validation lives
-    # there, and a config that fails it is one `yaml_to_model` cannot resolve —
+    # there, and a config that fails it is one `config_to_model` cannot resolve —
     # so it must be named the same way as every other refusal.
     try
-        yaml_to_model(_prepare_config_file(String(path), verbose, false); index, verbose)
+        config_to_model(_prepare_config_file(String(path), verbose, false); index, verbose)
     catch err
         err isa ArgumentError || rethrow()
         throw(ArgumentError("$path: $(err.msg)"))
@@ -791,7 +791,7 @@ function yaml_to_model(path::AbstractString; index::Union{Nothing, Int}=nothing,
     end
 end
 
-function yaml_to_model(config::AbstractDict; index::Union{Nothing, Int}=nothing,
+function config_to_model(config::AbstractDict; index::Union{Nothing, Int}=nothing,
     verbose::Bool=false)
     cfg = parse_pipeline(Dict{Any, Any}(config))
     gs = [s for s in cfg.steps if s isa GroundStateStep]

@@ -393,7 +393,7 @@ These doc questions inform per-paper supplementary material design.
   - SpinorBEC.jl version
   - Julia version
   - GPU configurations used (for paper #4)
-  - Configurations referenced (e.g., `runs/F6_phase_diagram/config.yaml`)
+  - Configurations referenced (e.g., `runs/F6_phase_diagram/config.experiment.jl`)
 
 これにより reviewer + future readers が exact reproducibility chain を traceable に
 保持。

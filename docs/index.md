@@ -1,5 +1,7 @@
 # SpinorBEC.jl documentation
 
+Experiment authoring: [Julia experiment definitions](guides/julia_experiments.md).
+
 Spin-F BEC simulator (split-step Fourier, 1D/2D/3D). Primary target: ¹⁵¹Eu (F=6, 13 components). Dimensionless units: ℏ=m=ω_ref=1.
 
 For build/install/test commands and conventions, see the repo root `README.md` and `CLAUDE.md`.

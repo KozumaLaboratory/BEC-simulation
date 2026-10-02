@@ -52,7 +52,7 @@ the operating model. Every claim below is anchored to a file:line.
 | "existing `Observable{T}` becomes the submit/results schema" | **No `Observable{T}` type.** Observables are plain functions on `Experiment` (`Fz_t`, `classify`, `peaks`…), memoized in `exp.memo`. |
 | "reuse the `Sweep` type" | **No `Sweep` type.** `sweep()` is a function → `Vector{Experiment}`. `SweepResult` / `SweepAxis` / `RunSweep` exist but are post-hoc analysis carriers, not a submission schema. |
 | "`tabulate` → vector / `spec_diff` → vector" | `tabulate` → **`NamedTuple`** (per-column Vectors); `spec_diff` → `Vector{(path,a,b)}` records. |
-| "`load_config \|> run_config`" | **Pattern does not exist.** Real forms: `config([...])` + `Experiment(spec)` + `run!`, or `run_yaml(path)`. |
+| "`load_config \|> run_config`" | **Pattern does not exist.** Real forms: `config([...])` + `Experiment(spec)` + `run!`, or `run_experiment(path)`. |
 | "dashboard … SSE" | **No SSE.** WebSocket (`/ws/scrub`) + `_live_status.json` polling. |
 | "Slack/Discord" | **Discord not implemented** (would need separate embed-JSON path). |
 | "suzume local/SLURM; add `SlurmExecutor`; reuse `SlurmBackend`" | **No `SlurmBackend` exists.** suzume bare is covered by `LocalBackend`. SLURM is greenfield **and likely unnecessary**. Note: `docs/guides/tsubame.md` itself says "ships with SlurmBackend only" — that line is **stale** (predates UGEBackend) and should be fixed. |

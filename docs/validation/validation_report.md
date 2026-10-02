@@ -39,7 +39,7 @@ Total automated assertions: 5722 pass, 0 fail, 0 broken.
 | 4 | ✅ PASS | Higher-rank c_extra builder (S=4,6,...) | `test/hamiltonian/test_tensor_interaction.jl` | 264 | 0 | 0 |  |
 | 5 | ✅ PASS | DDI kernel (spherical polarized E_DDI~0) | `test/hamiltonian/test_ddi.jl` | 4644 | 0 | 0 |  |
 | 5 | ✅ PASS | DDI padded convolution (FFT vs direct) | `test/hamiltonian/test_ddi_padded.jl` | 14 | 0 | 0 |  |
-| 6 | 👤 MANUAL | EdH F=3 toy benchmark (Jz conservation) | `MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` | 0 | 0 | 0 | runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml |
+| 6 | 👤 MANUAL | EdH F=3 toy benchmark (Jz conservation) | `MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl` | 0 | 0 | 0 | runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl |
 | 7 | ⏭ SKIP | K3 loss analytic n(t) = n0/sqrt(1+2K3 n0^2 t) | `test/workflow/test_losses.jl (full tier)` | 0 | 0 | 0 | skipped: full tier |
 | 7 | ✅ PASS | K3 / L3 routing + SI conversion edge cases | `test/workflow/test_loss_block_edge_cases.jl` | 20 | 0 | 0 |  |
 | 8 | ✅ PASS | Scalar LHY scaling + coefficient + spinor caveat | `test/hamiltonian/test_lhy_level8_unit.jl` | 25 | 0 | 0 |  |

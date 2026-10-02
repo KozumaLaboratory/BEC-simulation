@@ -4,7 +4,7 @@ using SpinorBEC
 # Measurement outputs must say what produced them, and the reader must refuse to
 # aggregate files that disagree.
 #
-# `_assert_point_provenance` already does this for `run_yaml`, and the figure
+# `_assert_point_provenance` already does this for `run_experiment`, and the figure
 # drivers bypassed it. The same bug class then appeared four times in one session:
 # six jobs overwrote one log because the swept rate was absent from its name; a
 # merge read CSVs stamped 10:49 as a 13:34 rerun's output and reported pre-fix

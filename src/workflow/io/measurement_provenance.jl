@@ -86,7 +86,7 @@ reads it back and refuses to aggregate files that disagree.
 
 # Why this exists
 
-`_assert_point_provenance` already refuses to reuse a `run_yaml` point whose
+`_assert_point_provenance` already refuses to reuse a `run_experiment` point whose
 recorded `env.git_hash` differs from the current one. Figure and measurement
 drivers under `docs/guides/figures/` bypass that entirely, and the same bug class
 came back four times in one session:

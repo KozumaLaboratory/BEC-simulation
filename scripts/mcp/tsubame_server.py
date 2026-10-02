@@ -313,7 +313,7 @@ async def tsubame_pull_results(params: PullInput) -> str:
         "--include=*/",
         "--include=*.jld2", "--include=_exit_summary.json",
         "--include=_exit_summary.json", "--include=_live_status.json",
-        "--include=config.yaml",
+        "--include=config.experiment.jl",
         "--exclude=*",
         "-e", "ssh -o BatchMode=yes",
     ]

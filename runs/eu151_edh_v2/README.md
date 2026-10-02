@@ -66,7 +66,7 @@ atom-number amplitude depends on K_3.
 
 ```bash
 LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-  julia --project=. -e 'import CUDA; using SpinorBEC; run_yaml("runs/eu151_edh_v2/config.yaml")'
+  julia --project=. -e 'import CUDA; using SpinorBEC; run_experiment("runs/eu151_edh_v2/config.experiment.jl")'
 ```
 
 The `comparison_runs` scan produces two run directories:
@@ -93,7 +93,7 @@ python3 runs/eu151_edh_v2/plot_trajectory.py
 
 ## Files in this directory
 
-- `config.yaml`               — the canonical Matsui EdH YAML
+- `config.experiment.jl`               — the canonical Matsui EdH YAML
 - `README.md`                 — this file
 - `extract_trajectory.jl`     — post-process result.jld2 → trajectory.json
 - `plot_trajectory.py`        — produce 2×2 figure from trajectory.json

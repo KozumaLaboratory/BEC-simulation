@@ -23,7 +23,7 @@ using JLD2
 points = trace.points
 
 # Use the R39 config to derive grid + atom + reference c_dd.
-config = SpinorBEC.load_config("runs/measurement_R3x_eu/r39_bdg_along_b1/config.yaml")
+config = SpinorBEC.load_config("runs/measurement_R3x_eu/r39_bdg_along_b1/config.experiment.jl")
 gs_step = config.pipeline[1]
 grid = SpinorBEC.make_grid_from_yaml(gs_step)
 atom = SpinorBEC.atom_from_yaml(gs_step.atom)

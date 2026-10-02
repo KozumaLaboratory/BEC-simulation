@@ -2,7 +2,7 @@
 # ============================================================
 #  UGE array — Eu F=6 texture B-scan, LHY-ON twin (full_bdg).
 #
-#  The A/B against config_texture_bscan.yaml (`lhy: {kind: none}`): same cells,
+#  The A/B against config_texture_bscan.experiment.jl (`lhy: {kind: none}`): same cells,
 #  same five seeds, `lhy.kind` the only difference. Its job is to decide whether
 #  "PCV wins at 50 µG, uniform axial from 60 µG" survives beyond mean field —
 #  the F=6 phases these seeds separate are mean-field DEGENERATE, so the
@@ -15,9 +15,9 @@
 #
 #    qsub -g tga-kozuma-kouhi -N eu_tex_lhy \
 #         runs/eu_gs_phase_c1_B_kappa/submit_texture_bscan_lhy.sh \
-#         runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml
+#         runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.experiment.jl
 #
-#  Smoke first (config_texture_bscan_lhy_smoke.yaml) — it renders every path
+#  Smoke first (config_texture_bscan_lhy_smoke.experiment.jl) — it renders every path
 #  this job takes, including the full_bdg table build on the GPU.
 # ============================================================
 #$ -cwd
@@ -30,7 +30,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
-CONFIG="${1:?usage: submit_texture_bscan_lhy.sh <config.yaml>}"
+CONFIG="${1:?usage: submit_texture_bscan_lhy.sh <config.experiment.jl>}"
 [ -f "$CONFIG" ] || CONFIG="$PROJECT_ROOT/$CONFIG"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
@@ -65,6 +65,6 @@ nvidia-smi -L || true
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task $SGE_TASK_ID] done"

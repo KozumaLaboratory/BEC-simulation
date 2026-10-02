@@ -93,54 +93,6 @@ function sweep(
     exps
 end
 
-"""
-    sweep(scan_yaml_path::AbstractString; store=default_store())
-        -> Vector{Experiment}
-
-Legacy scan.yaml reader. Loads template + parameter.values +
-override_path + extra_overrides and returns the Vector{Experiment}.
-"""
-function sweep(scan_yaml_path::AbstractString; store::CASStore=default_store())
-    scan = YAML.load_file(scan_yaml_path)
-    scan_dir = dirname(abspath(scan_yaml_path))
-    template_rel = scan["template"]
-    template_path =
-        isabspath(template_rel) ? template_rel :
-        normpath(joinpath(scan_dir, template_rel))
-    base = YAML.load_file(template_path)
-    override_path = _dotted_to_underscore(scan["override_path"])
-    extra_overrides = get(scan, "extra_overrides", Dict{Any, Any}())
-    values = scan["parameter"]["values"]
-    cells = Pair{Any, Dict{Any, Any}}[]
-    for (idx, v) in enumerate(values)
-        ovr = Dict{Any, Any}(Symbol(override_path) => v)
-        for (ep, ev) in extra_overrides
-            ovr[Symbol(_dotted_to_underscore(ep))] = _resolve_scan_placeholder(ev, v, idx)
-        end
-        push!(cells, v => ovr)
-    end
-    sweep(base, cells; store)
-end
-
-function _dotted_to_underscore(dotted::AbstractString)
-    parts = String[]
-    for p in split(dotted, '.')
-        idx = tryparse(Int, p)
-        push!(parts, idx === nothing ? p : string(idx + 1))
-    end
-    join(parts, "_")
-end
-
-function _resolve_scan_placeholder(literal, value, idx)
-    literal isa AbstractString || return literal
-    literal == "\${value}" && return value
-    literal == "\${idx}" && return idx
-    s = String(literal)
-    s = replace(s, "\${value}" => string(value))
-    s = replace(s, "\${idx}" => string(idx))
-    s
-end
-
 # --- run! / write_run! on a collection ---
 
 run!(exps::AbstractVector{Experiment}; force::Bool=false) =

@@ -1,8 +1,8 @@
 # Turn a runs/matsui_fig4b B-scan into the two numbers Fig. 4B is a test of:
 # the dip centre and its half-depth width in N_{m=-6} after the hold.
 #
-# `run_dir` is the CAS directory run_yaml wrote (contains point_NNN.jld2 and
-# config.yaml). Emits a per-field table, the dip metrics, and — critically —
+# `run_dir` is the CAS directory run_experiment wrote (contains point_NNN.jld2 and
+# config.experiment.jl). Emits a per-field table, the dip metrics, and — critically —
 # the SAME metric applied to the published curve restricted to the SAME field
 # window, because a half-depth width measured against a different baseline is
 # not the same number.
@@ -14,9 +14,9 @@ export matsui_fig4b_report
 _matsui_fixdir() = get(ENV, "MATSUI_FIXTURES",
     normpath(joinpath(@__DIR__, "..", "..", "test", "fixtures", "matsui2025")))
 
-"Field (nT) of each scan point, in the order run_yaml emitted them."
+"Field (nT) of each scan point, in the order run_experiment emitted them."
 function _matsui_scan_fields_nT(run_dir)
-    cfg = YAML.load_file(joinpath(run_dir, "config.yaml"))
+    cfg = _load_config_data(_config_snapshot_path(run_dir))
     axis = cfg["scan"]["zip"]["pipeline.1.B.Bz.to"]
     gauss = if axis isa AbstractVector
         Float64.(axis)
@@ -30,7 +30,7 @@ end
 Population fraction of every m component at the end of the hold, per scan point.
 
 Read from the last row of `dynamics/component_populations`, NOT from the saved
-top-level `psi`. In every multi-point scan run_yaml produced on 2026-07-30,
+top-level `psi`. In every multi-point scan run_experiment produced on 2026-07-30,
 `point_001`'s `psi` is the **ground state** rather than the evolved state —
 45/45, 19/19 and 6/6 point scans each had exactly that one file wrong, and a
 single-point run had none. Reading `psi` therefore hands you a first scan
@@ -99,7 +99,7 @@ window. Optionally writes the per-field population table to `out_csv`.
 """
 function matsui_fig4b_report(run_dir::AbstractString;
     out_csv::Union{Nothing, AbstractString}=nothing, io::IO=stdout)
-    cfg = YAML.load_file(joinpath(run_dir, "config.yaml"))
+    cfg = _load_config_data(_config_snapshot_path(run_dir))
     duration = Float64(cfg["pipeline"][2]["dynamics"]["duration"])
     B = _matsui_scan_fields_nT(run_dir)
     pops = _matsui_final_populations(run_dir; duration)

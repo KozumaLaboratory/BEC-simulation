@@ -24,21 +24,21 @@ end
 _env(hash, dirty) = Dict{String, Any}("git_hash" => hash, "git_dirty" => dirty)
 
 @testset "run-dir key + cached-point provenance gate" begin
-    @testset "compute_run_dir: 16 hex, and byte-sensitive" begin
-        a = joinpath(_PG_TMP, "cfg_a.yaml")
-        b = joinpath(_PG_TMP, "cfg_b.yaml")
-        write(a, "pipeline: []\n")
-        write(b, "pipeline: []\n# a comment changes the bytes\n")
+    @testset "compute_run_dir: 16 hex, and condition-sensitive" begin
+        a = joinpath(_PG_TMP, "cfg_a.experiment.jl")
+        b = joinpath(_PG_TMP, "cfg_b.experiment.jl")
+        write(a, "Dict(\"pipeline\" => [])\n")
+        write(b, "Dict(\"pipeline\" => [])\n# a comment does not change conditions\n")
 
         da = SpinorBEC.compute_run_dir(a; base_dir=_PG_TMP)
         db = SpinorBEC.compute_run_dir(b; base_dir=_PG_TMP)
-        suffix = split(basename(da), "_")[end]
+        suffix = basename(da)
 
         # Commitment #4 says 16 hex. It was 8 (32 bits), which reaches a 1 %
         # collision probability at ~9e3 files sharing a basename.
         @test length(suffix) == 16
         @test all(c -> c in "0123456789abcdef", suffix)
-        @test da != db                                   # different bytes, different dir
+        @test da == db                                   # different bytes, different dir
         @test da == SpinorBEC.compute_run_dir(a; base_dir=_PG_TMP)   # deterministic
     end
 

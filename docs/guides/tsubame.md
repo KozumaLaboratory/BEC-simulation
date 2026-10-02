@@ -83,10 +83,10 @@ Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN
 ## Edit-test-submit loop
 
 ```bash
-$EDITOR runs/eu151_edh_ext/config.yaml
+$EDITOR runs/eu151_edh_ext/config.experiment.jl
 
 # Dry-run check (calibration applied? schema OK?)
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"; dry_run=true)'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/eu151_edh_ext/config.experiment.jl"; dry_run=true)'
 
 # Save the per-job script shown below as spinor_run.sh, then submit:
 qsub -g tga-kozuma-kouhi spinor_run.sh
@@ -104,7 +104,7 @@ directive form).
 
 ```bash
 julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
-    runs/foo/config.yaml   # → 144
+    runs/foo/config.experiment.jl   # → 144
 ```
 
 For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the per-job
@@ -173,7 +173,7 @@ pipeline:
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 
-Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` reports VRAM, host RAM, disk per scan point + total disk.
+Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.experiment.jl")` reports VRAM, host RAM, disk per scan point + total disk.
 
 ## Singularity (alternative)
 
@@ -187,14 +187,14 @@ singularity build --fakeroot spinorbec.sif \
 singularity exec --nv \
     --bind /path/to/BEC-simulation:/work \
     spinorbec.sif julia --project=/work -e '
-        using SpinorBEC; run_yaml("/work/runs/eu151_edh_ext/config.yaml")'
+        using SpinorBEC; run_experiment("/work/runs/eu151_edh_ext/config.experiment.jl")'
 ```
 
 The `%post` block pre-warms a depot inside the image so first-time precompile of FFTW / CUDA / etc. is amortised at build time.
 
 ## Checkpoint and resume
 
-`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
+`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_experiment(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
 After a crash or walltime kill, inspect the job log and `_exit_summary.json`.
 Correct the resource request or failure cause, then re-submit the same
@@ -203,7 +203,7 @@ configuration. Completed scan points remain available for reuse.
 ## High-res scan inventory (target table for `runs/tsubame_scan/` (example))
 
 Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
-on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
+on `runs/klaus_eu151_v2_full/config.experiment.jl` (gone) as the template:
 
 ### Dy164 (3 configs)
 | name | grid | duration | est. wall (H100) |
@@ -244,7 +244,7 @@ rsync -av --include='*.jld2' --include='*/' --exclude='*' \
 julia --project=. -e '
     using SpinorBEC
     exps = [Experiment(p) for p in
-            sort(filter(endswith(".yaml"), readdir("runs/tsubame_scan"; join=true)))]
+            sort(filter(endswith(".experiment.jl"), readdir("runs/tsubame_scan"; join=true)))]
     tab = tabulate(exps, [norm_drift, Fz_t, per_m_t])
 '
 ```

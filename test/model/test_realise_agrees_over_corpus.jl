@@ -45,7 +45,7 @@ const _CWR_RUNS = joinpath(_CWR_ROOT, "runs")
 _cwr_files() = sort!(
     String[
         joinpath(r, f) for (r, _, fs) in walkdir(_CWR_RUNS)
-        for f in fs if endswith(f, ".yaml") || endswith(f, ".yml")
+        for f in fs if endswith(f, ".experiment.jl") || endswith(f, ".yml")
     ],
 )
 

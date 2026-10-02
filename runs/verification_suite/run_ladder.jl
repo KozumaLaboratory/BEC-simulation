@@ -30,7 +30,7 @@ end
 
 # Collect YAMLs
 all_files = sort(readdir(YAMLS_DIR; join=true))
-all_files = filter(f -> endswith(f, ".yaml"), all_files)
+all_files = filter(f -> endswith(f, ".experiment.jl"), all_files)
 
 # Filter by level
 function level_of(path::String)
@@ -68,7 +68,7 @@ for f in files
     println("\n=== $(name) ===")
     t0 = time()
     try
-        run_yaml(f)
+        run_experiment(f)
         dt = time() - t0
         results[name] = Dict(
             "status" => "OK",

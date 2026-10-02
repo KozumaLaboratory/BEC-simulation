@@ -13,7 +13,7 @@
 # `_resolve_gs_potential`) moved to `resolve_gs.jl` together with the light
 # shift / LHY / rotating-frame reads that used to sit ~170 lines below the cache
 # branch. There is now ONE resolution of a `ground_state:` block, and this method
-# is one of its two consumers; `yaml_to_model` is the other. A second reader of
+# is one of its two consumers; `config_to_model` is the other. A second reader of
 # `potential:` / `B:` / `lhy:` / `ddi:` anywhere is the failure that extraction
 # exists to prevent.
 
@@ -39,7 +39,7 @@ the wrong way round.
 MEASURED 2026-08-19, over the 455 ground-state steps that resolve: exactly TWO
 configs are affected, both by `B_direction`, and both are already wrong.
 
-`runs/klaus_hybrid/klaus_hybrid_{nostir_control,magnetostir_omega_m0p74}.yaml`
+`runs/klaus_hybrid/klaus_hybrid_{nostir_control,magnetostir_omega_m0p74}.experiment.jl`
 declare `B: {B_mag: "0.01 Gauss", theta: 3.14159}` — the field along −z — with
 `initial_state: m_minus_F`. That pairing is the ANTI-ALIGNED stretched state,
 which is the whole point of an EdH experiment. What runs is `p = -147.955`, the
@@ -191,7 +191,7 @@ _zeeman_pq(z) = (linear_p(z), quadratic_q(z))
 # ignores `pin`. That is deliberate: a method-gated parse would leave the id
 # blind to `pin` on any step whose method later learns to honour it, and blind is
 # the failure this step exists to end. Two committed configs pair `pin:` with
-# `method: itp` (`config_vortex_verify_{48,64}.yaml`) and both parse.
+# `method: itp` (`config_vortex_verify_{48,64}.experiment.jl`) and both parse.
 @noinline function _parse_pin_block(pin_block)
     pin_block === nothing && return (nothing, Float64[])
     pin_block isa AbstractDict ||
@@ -457,7 +457,7 @@ function _run_step(
     # re-introduce the JIT cascade.
 
     # THE shared resolution. Every slot below is read off `r`; nothing in this
-    # method parses a physics block. `yaml_to_model` consumes the same call.
+    # method parses a physics block. `config_to_model` consumes the same call.
     r = resolve_gs(p, grid_prev, atom_prev, ws_prev; verbose)::GSResolved
     _refuse_dropped_physics(r)
     method = r.method
@@ -480,7 +480,7 @@ function _run_step(
     # LHY mode and options, and the rotating frame — are the same fix, made
     # twice. origin/main hoisted them above the cache branch in place; cutover
     # step 1b moved the whole resolution into `resolve_gs` so `_run_step` and
-    # `yaml_to_model` cannot become two parsers of one physics. `r` above
+    # `config_to_model` cannot become two parsers of one physics. `r` above
     # already carries all four. Re-parsing here would be a second declaration of
     # the same thing, which is precisely what `test_resolve_gs_is_shared.jl` arm
     # B forbids, and it reddened on this merge.

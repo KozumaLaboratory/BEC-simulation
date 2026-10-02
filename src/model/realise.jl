@@ -94,7 +94,7 @@ other way round.
 Build the `Grid` the spec describes. The dealias globals are NOT touched here:
 `GridSpec` carries them because they change the physical meaning of a grid (the
 Orszag cutoff is dimensionful, `ddi_loss.jl:25`), but they live in `Ref`s that
-`run_yaml` owns and restores. `realise_sim_params` reports them instead so a
+`run_experiment` owns and restores. `realise_sim_params` reports them instead so a
 caller can apply them under its own `finally`.
 """
 function realise_grid(s::GridSpec)

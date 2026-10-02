@@ -1,4 +1,4 @@
-# Gate on `runs/saito_li_torus/config.yaml`: does the config the runner
+# Gate on `runs/saito_li_torus/config.experiment.jl`: does the config the runner
 # COMPILES carry the physics the header claims?
 #
 # Every check here failed on the config as committed before 2026-08-19, which
@@ -14,7 +14,7 @@ using SpinorBEC: load_config, compute_a_dd, effective_eps_dd,
 using Printf
 using LinearAlgebra: dot
 
-const CONFIG = joinpath(@__DIR__, "config.yaml")
+const CONFIG = joinpath(@__DIR__, "config.experiment.jl")
 const EPS_TARGET = 1.3
 const A_B = Units.BOHR_RADIUS
 
@@ -94,7 +94,7 @@ check(Bool(get(step["ddi"], "padded", true)), "DDI is zero-padded",
     "a self-bound object in a periodic box otherwise sees its own images")
 
 println("\n-- the trap is free space, or a cage small enough not to matter --")
-# `config.yaml` is free space (`potential: {type: none}`). An earlier revision
+# `config.experiment.jl` is free space (`potential: {type: none}`). An earlier revision
 # used a weak harmonic cage to hold the droplet on the origin; the field-axis
 # and EdH cells here still do, because a quenched droplet drifts. Either is
 # admissible, but the cage has to be shown irrelevant rather than assumed so.

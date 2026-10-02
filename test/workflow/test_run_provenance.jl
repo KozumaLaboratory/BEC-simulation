@@ -1,7 +1,7 @@
 using Test
 using SpinorBEC
 
-# Which code produced a file. `run_yaml` outputs carry this under `env/`; campaign
+# Which code produced a file. `run_experiment` outputs carry this under `env/`; campaign
 # scripts write their own JLD2 and carried NONE of it — measured 2026-08-21 on
 # scripts/eu334 output, which holds every physics parameter and the seed and not
 # one fact about the code that ran.

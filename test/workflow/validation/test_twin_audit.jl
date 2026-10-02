@@ -26,11 +26,17 @@ using SpinorBEC
         try
             mkpath(joinpath(root, "campaign_a"))
             write(
-                joinpath(root, "campaign_a", "loss_on.yaml"),
+                joinpath(root, "campaign_a", "loss_on.experiment.jl"),
                 """
-pipeline:
-  - dynamics:
-      loss: {gamma_dr: 0.02}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "loss" => Dict{String, Any}(
+                "gamma_dr" => 0.02,
+            ),
+        ),
+    )],
+)
 """,
             )
             r = audit_twin_controls(root)
@@ -49,18 +55,27 @@ pipeline:
             d = joinpath(root, "campaign_b")
             mkpath(d)
             write(
-                joinpath(d, "loss_on.yaml"),
+                joinpath(d, "loss_on.experiment.jl"),
                 """
-pipeline:
-  - dynamics:
-      loss: {gamma_dr: 0.02}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "loss" => Dict{String, Any}(
+                "gamma_dr" => 0.02,
+            ),
+        ),
+    )],
+)
 """,
             )
             write(
-                joinpath(d, "control.yaml"),
+                joinpath(d, "control.experiment.jl"),
                 """
-pipeline:
-  - dynamics: {}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(),
+    )],
+)
 """,
             )
             r = audit_twin_controls(root)
@@ -77,24 +92,36 @@ pipeline:
         try
             mkpath(joinpath(root, "x"))
             write(
-                joinpath(root, "x", "lhy_on.yaml"),
+                joinpath(root, "x", "lhy_on.experiment.jl"),
                 """
-pipeline:
-  - ground_state:
-      lhy: {kind: scalar}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "lhy" => Dict{String, Any}(
+                "kind" => "scalar",
+            ),
+        ),
+    )],
+)
 """,
             )
             write(
-                joinpath(root, "x", "lhy_none.yaml"),
+                joinpath(root, "x", "lhy_none.experiment.jl"),
                 """
-pipeline:
-  - ground_state:
-      lhy: {kind: none}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+        ),
+    )],
+)
 """,
             )
             r = audit_twin_controls(root)
             @test length(r.lhy_on) == 1                  # only kind!=none counted
-            @test r.pass == true                        # lhy_none.yaml IS the twin
+            @test r.pass == true                        # lhy_none.experiment.jl IS the twin
         finally
             rm(root; recursive=true)
         end
@@ -103,7 +130,7 @@ pipeline:
     @testset "Unparseable YAML reported, not pass-blocking" begin
         root = mktempdir()
         try
-            write(joinpath(root, "broken.yaml"), "this is: not [valid yaml:")
+            write(joinpath(root, "broken.experiment.jl"), "this is: not [valid yaml:")
             r = audit_twin_controls(root)
             @test length(r.unparseable) >= 0          # may be empty if YAML loader is forgiving
             # Brokenness doesn't generate orphans, so pass can still be true
@@ -113,20 +140,26 @@ pipeline:
         end
     end
 
-    @testset "config.yaml snapshots excluded" begin
+    @testset "config.experiment.jl snapshots excluded" begin
         root = mktempdir()
         try
             mkpath(joinpath(root, "myrun"))
             write(
-                joinpath(root, "myrun", "config.yaml"),
+                joinpath(root, "myrun", "config.experiment.jl"),
                 """
-pipeline:
-  - dynamics:
-      loss: {gamma_dr: 0.5}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "loss" => Dict{String, Any}(
+                "gamma_dr" => 0.5,
+            ),
+        ),
+    )],
+)
 """,
             )
             r = audit_twin_controls(root)
-            @test r.n_scanned == 0                    # config.yaml snapshots skipped
+            @test r.n_scanned == 0                    # config.experiment.jl snapshots skipped
         finally
             rm(root; recursive=true)
         end

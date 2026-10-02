@@ -6,10 +6,10 @@ println("Start time: ", Dates.now())
 t_start = time()
 
 try
-    run_yaml("runs/yan_li_saito_f1_torus_gs/config.yaml"; base_dir="runs", verbose=true)
-    println("run_yaml COMPLETED successfully")
+    run_experiment("runs/yan_li_saito_f1_torus_gs/config.experiment.jl"; base_dir="runs", verbose=true)
+    println("run_experiment COMPLETED successfully")
 catch e
-    println("run_yaml THREW EXCEPTION:")
+    println("run_experiment THREW EXCEPTION:")
     println(typeof(e))
     println(sprint(showerror, e))
     println("Backtrace:")

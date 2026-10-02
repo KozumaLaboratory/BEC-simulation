@@ -46,7 +46,7 @@ const VALIDATION_LEVELS = [
         "DDI kernel (spherical polarized E_DDI~0)"),
     (5, "test/hamiltonian/test_ddi_padded.jl",
         "DDI padded convolution (FFT vs direct)"),
-    (6, "MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml",
+    (6, "MANUAL: runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl",
         "EdH F=3 toy benchmark (Jz conservation)"),
     (7, "test/workflow/test_losses.jl (full tier)",
         "K3 loss analytic n(t) = n0/sqrt(1+2K3 n0^2 t)"),

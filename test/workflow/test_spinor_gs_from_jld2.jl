@@ -57,17 +57,31 @@ using JSON
     end
 
     _cfg_yaml(isp) = """
-    pipeline:
-      - ground_state:
-          atom: Rb87
-          F: 1
-          interactions: {N_atoms: 1000, omega_ref: 100.0, c1_ratio: 0.0}
-          grid: {n: [$n, $n, $n], box: [8.0, 8.0, 8.0]}
-          potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-          initial_state: from_jld2
-          init_state_params: {$isp}
-          n_steps: 0
-    """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "F" => 1,
+            "atom" => "Rb87",
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0, 8.0],
+                "n" => [$(repr(n)), $(repr(n)), $(repr(n))],
+            ),
+            "init_state_params" => $(repr(isp)),
+            "initial_state" => "from_jld2",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 100.0,
+            ),
+            "n_steps" => 0,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+        ),
+    )],
+)
+"""
 
     @testset "the spinor pipeline actually starts from the loaded ψ" begin
         # The seed here is SMOOTH — a Gaussian carrying an m-dependent phase
@@ -102,19 +116,33 @@ using JSON
 
         psi_seeded = run_pipeline(
             load_config_from_string(
-                _cfg_yaml("path: $(JSON.json(smooth)), snap: last")),
+                _cfg_yaml(Dict("path" => smooth, "snap" => "last"))),
         ).psi
         control_yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              F: 1
-              interactions: {N_atoms: 1000, omega_ref: 100.0, c1_ratio: 0.0}
-              grid: {n: [$n, $n, $n], box: [8.0, 8.0, 8.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              initial_state: polar
-              n_steps: 0
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "F" => 1,
+            "atom" => "Rb87",
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0, 8.0],
+                "n" => [$(repr(n)), $(repr(n)), $(repr(n))],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 100.0,
+            ),
+            "n_steps" => 0,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+        ),
+    )],
+)
+"""
         psi_control = run_pipeline(load_config_from_string(control_yaml)).psi
 
         @test size(psi_seeded) == (n, n, n, D)
@@ -125,7 +153,7 @@ using JSON
     end
 
     @testset "missing path is an error, not a fallback" begin
-        cfg_bad = load_config_from_string(_cfg_yaml("snap: last"))
+        cfg_bad = load_config_from_string(_cfg_yaml(Dict("snap" => "last")))
         @test_throws ArgumentError run_pipeline(cfg_bad)
     end
 end

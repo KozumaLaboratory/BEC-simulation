@@ -1,7 +1,7 @@
 using Test
 using FFTW
 using SpinorBEC
-using SpinorBEC: Model, GSResolved, yaml_to_model, resolve_gs, gs_model,
+using SpinorBEC: Model, GSResolved, config_to_model, resolve_gs, gs_model,
     gs_physics_kwargs, model_physics_kwargs, realise_grid, realise_potential,
     realise_zeeman, realise_interactions, realise_ddi_kwargs, realise_lhy,
     make_workspace, evaluate_potential, parse_pipeline, GroundStateStep,
@@ -44,17 +44,17 @@ already gated by `test_corpus_resolves.jl`. Chosen to span the axes that the
 realisation layer actually branches on — see each entry."
 const _RMR_CONFIGS = [
     # Eu F=6, DDI on + secular, tabulated LHY, lab-Gauss B. The production shape.
-    "runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml",
+    "runs/eu_ham_only_conservation/eu_ham_only_24_sec.experiment.jl",
     # Same but non-secular, so the DDI kernel branch differs.
-    "runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.yaml",
+    "runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.experiment.jl",
     # `lhy: {kind: none}` with DDI — the LHY-inactive arm.
-    "runs/matsui_fig4b/fig4b_unpadded_n35k_n32.yaml",
+    "runs/matsui_fig4b/fig4b_unpadded_n35k_n32.experiment.jl",
 ]
 
 _rmr_exists(rel) = isfile(joinpath(dirname(_RMR_ROOT), rel))
 
 """Resolve a config's ground_state step to BOTH representations, under the same
-dealias restore `yaml_to_model` uses (leaving those Refs set rewrites the
+dealias restore `config_to_model` uses (leaving those Refs set rewrites the
 GridSpec of every config resolved afterwards — the leak arm 3 of
 `test_corpus_resolves.jl` exists for)."""
 function _rmr_resolve(rel::String)

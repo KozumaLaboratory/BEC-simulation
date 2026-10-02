@@ -94,7 +94,7 @@ An entry belongs here only for something that sits BETWEEN the operators, or
 that changes the diagonal phase's form. How Φ itself is computed is neither: the
 zero-padded, open-boundary convolution gets a branch in the realization instead.
 That distinction is load-bearing rather than stylistic — `DDI_PADDED_DEFAULT` is
-`true` (9c117c05), so listing it here declined the fusion for every `run_yaml`
+`true` (9c117c05), so listing it here declined the fusion for every `run_experiment`
 RTP run, while `bench/profile_rtp.jl` went on measuring the fused path because
 it calls `make_workspace` directly, where `ddi_padding` defaults `false`.
 """

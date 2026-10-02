@@ -9,14 +9,14 @@ This is not a performance suite. Keep grids small, disable GPU-only assumptions,
 From the repository root:
 
 ```bash
-julia --project=. -e 'using SpinorBEC; run_yaml("path/to/yamls/00_scalar_free_uniform_stationary.yaml")'
+julia --project=. -e 'using SpinorBEC; run_experiment("path/to/yamls/00_scalar_free_uniform_stationary.experiment.jl")'
 ```
 
 For syntax-only expansion, use:
 
 ```julia
 using SpinorBEC
-run_yaml("path/to/file.yaml"; dry_run=true)
+run_experiment("path/to/file.experiment.jl"; dry_run=true)
 ```
 
 ## Recommended order
@@ -32,7 +32,7 @@ run_yaml("path/to/file.yaml"; dry_run=true)
 
 ## Acceptance targets
 
-See `checks/expected_observables.yaml`. The tolerances are intentionally loose enough for coarse grids, but tight enough to catch sign mistakes, missing half steps, FFT normalization errors, or wrong c1/c2/DDI conventions.
+See `checks/expected_observables.experiment.jl`. The tolerances are intentionally loose enough for coarse grids, but tight enough to catch sign mistakes, missing half steps, FFT normalization errors, or wrong c1/c2/DDI conventions.
 
 ## Notes
 

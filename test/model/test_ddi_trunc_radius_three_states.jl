@@ -15,7 +15,7 @@
 # Float64}` puts the auto arm OUTSIDE the numeric domain, where it cannot
 # collide.
 #
-# The corpus cannot gate any of this: `git grep trunc_radius -- '*.yaml'` returns
+# The corpus cannot gate any of this: `git grep trunc_radius -- '*.experiment.jl'` returns
 # ZERO files across 429 committed configs, so every one takes the ABSENT path and
 # a wrong auto↔off mapping would flip 100 % of production to the bare kernel with
 # every corpus-derived gate still green. The fixtures below are therefore
@@ -25,7 +25,7 @@ using Test
 using SpinorBEC
 using SpinorBEC: Model, Stage, stage, artifact_id, GridSpec, InteractionSpec, DDISpec,
     DDI_TRUNC_RADIUS_DEFAULT, ddi_trunc_radius_kwarg, ddi_trunc_radius_from_kwarg,
-    to_toml, model_from_toml, model_toml_dict, resolve_atom, with, _speceq, _enc,
+    model_data, model_from_data, resolve_atom, with, _speceq, _enc,
     _parse_ddi_trunc_radius, make_grid, GridConfig, make_ddi_params, OPTIONAL_FLOAT_NOTHING
 
 dtr_model(tr) = Model(;
@@ -87,32 +87,34 @@ dtr_stage(tr) = stage(:relax; model=dtr_model(tr), method=:itp,
     end
 
     @testset "the three are distinct SERIALISED forms, and all three round-trip" begin
-        sa, so, se = to_toml(dtr_model(nothing)), to_toml(dtr_model(0.0)), to_toml(dtr_model(4.0))
+        sa, so, se = model_data(dtr_model(nothing)),
+        model_data(dtr_model(0.0)),
+        model_data(dtr_model(4.0))
         @test sa != so && sa != se && so != se
         for (m, s) in ((dtr_model(nothing), sa), (dtr_model(0.0), so), (dtr_model(4.0), se))
-            back = model_from_toml(s)
+            back = model_from_data(s)
             @test back == m
             @test back.ddi.trunc_radius === m.ddi.trunc_radius
-            @test to_toml(back) == s
+            @test model_data(back) == s
         end
         # The auto arm is spelled outside the numeric domain, so it cannot
         # collide with a radius no matter which radius is chosen.
-        @test model_toml_dict(dtr_model(nothing))["ddi"]["trunc_radius"] ==
+        @test model_data(dtr_model(nothing))["ddi"]["trunc_radius"] ==
             OPTIONAL_FLOAT_NOTHING
-        @test model_toml_dict(dtr_model(0.0))["ddi"]["trunc_radius"] === 0.0
+        @test model_data(dtr_model(0.0))["ddi"]["trunc_radius"] === 0.0
         @test OPTIONAL_FLOAT_NOTHING isa AbstractString
     end
 
     @testset "the serialised vocabulary is closed" begin
-        d = model_toml_dict(dtr_model(nothing))
+        d = model_data(dtr_model(nothing))
         for bad in ("box_half", "none", "off", "", "AUTO")
             d2 = deepcopy(d)
             d2["ddi"]["trunc_radius"] = bad
-            @test_throws ArgumentError SpinorBEC.model_from_toml_dict(d2)
+            @test_throws ArgumentError SpinorBEC.model_from_data(d2)
         end
         d3 = deepcopy(d)
         d3["ddi"]["trunc_radius"] = Dict{String, Any}("times" => [0.0], "values" => [1.0])
-        @test_throws ArgumentError SpinorBEC.model_from_toml_dict(d3)
+        @test_throws ArgumentError SpinorBEC.model_from_data(d3)
         # And `_enc(nothing)` stays refused: `Nothing` is fieldless, so the
         # generic struct arm would launder it into `{}` and past
         # `_canonical_bytes!`, which is the enforcement invariant 1 rests on.

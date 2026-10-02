@@ -162,15 +162,28 @@ const _SKIP_HEAVY_YAML_ZEEMAN =
         # Real experimental values (e.g. Klaus et al. 2022, Bz=0.819G) give p≈3e4 which
         # requires matching small dt and physics-aware setup — not a plumbing test.
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Dy164
-      grid: {n: 16, box: 8.0}
-      interactions: {c0: 50.0, c1: -0.2, omega_ref: 314.159}
-      B: {Bz: 1.0e-4}
-      dt: 0.01
-      n_steps: 5
-      tol: 1e-3
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0001,
+            ),
+            "atom" => "Dy164",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => 16,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 50.0,
+                "c1" => -0.2,
+                "omega_ref" => 314.159,
+            ),
+            "n_steps" => 5,
+            "tol" => 0.001,
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test isfinite(result.ground_state_energy)
@@ -179,26 +192,43 @@ pipeline:
     @testset "YAML round-trip: Spherical dynamics (tilt ramp)" begin
         _SKIP_HEAVY_YAML_ZEEMAN && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Dy164
-      grid: {n: 16, box: 8.0}
-      interactions: {c0: 50.0, c1: -0.2, omega_ref: 314.159}
-      B: {Bz: 1.0e-4}
-      dt: 0.01
-      n_steps: 5
-      tol: 1e-3
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
-      interactions: {omega_ref: 314.159}
-      B:
-        B_mag: 1.0e-4
-        # `theta`, in RADIANS — 0.611 rad = 35°. `theta_deg` is the internal
-        # magnitude-dict spelling `_detect_b_coord` reads AFTER
-        # `_split_B_block!` has run; as a user-facing `B:` key it is rejected,
-        # which is what this testset asserted for as long as no tier ran it.
-        theta: {from: 0.0, to: 0.611}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0001,
+            ),
+            "atom" => "Dy164",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => 16,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 50.0,
+                "c1" => -0.2,
+                "omega_ref" => 314.159,
+            ),
+            "n_steps" => 5,
+            "tol" => 0.001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "B_mag" => 0.0001,
+                "theta" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "to" => 0.611,
+                ),
+            ),
+            "dt" => 0.001,
+            "duration" => 0.01,
+            "interactions" => Dict{String, Any}(
+                "omega_ref" => 314.159,
+            ),
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing

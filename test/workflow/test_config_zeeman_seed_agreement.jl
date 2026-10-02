@@ -22,7 +22,7 @@
 #
 # WIDENED 2026-08-19 (#343). The original gate read exactly two spellings —
 # `initial_state: m_{minus,plus}_F` and `B: {Bz: …}` — and the rotation-assisted EdH quench series
-# uses NEITHER: `runs/eu151_klaus_phi_phys/config.yaml` says `init_m_idx: 1`
+# uses NEITHER: `runs/eu151_klaus_phi_phys/config.experiment.jl` says `init_m_idx: 1`
 # with `B: {p: 26700.0}`, behind a `use:` mixin that hides the atom from a raw
 # YAML read. Three independent reasons for one config to be invisible to its own
 # convention gate. The widening covers all three:
@@ -47,7 +47,6 @@
 
 using SpinorBEC
 using Test
-using YAML
 
 const _STRETCHED = ("m_minus_F", "m_plus_F")
 
@@ -191,7 +190,7 @@ function _scan_configs(root)
     n_checked = 0
     for (dir, _, files) in walkdir(root)
         for f in files
-            endswith(f, ".yaml") || continue
+            endswith(f, ".experiment.jl") || continue
             path = joinpath(dir, f)
             raw = read(path, String)
             # A comment OR the key. The key is the better declaration — it is
@@ -199,7 +198,7 @@ function _scan_configs(root)
             # drift away from what the run does.
             anti_comment = occursin(_ANTIALIGNED, raw)
             data = try
-                YAML.load_file(path)
+                SpinorBEC._load_config_data(path)
             catch
                 continue          # templates / fragments that are not standalone
             end
@@ -272,9 +271,9 @@ end
     # so every `use:`-mixin config read as "atom unresolvable" — a silent
     # coverage hole dressed as a three-valued answer. Prove the expansion works
     # on the very config (#343 §2) that motivated the widening.
-    let p = joinpath(root, "eu151_klaus_phi_phys", "config.yaml")
+    let p = joinpath(root, "eu151_klaus_phi_phys", "config.experiment.jl")
         if isfile(p)
-            gs = _expand(YAML.load_file(p))["pipeline"][1]["ground_state"]
+            gs = _expand(SpinorBEC._load_config_data(p))["pipeline"][1]["ground_state"]
             @test haskey(gs, "atom")                        # came from the mixin
             atom = _atom_of(gs)
             @test atom !== nothing
@@ -313,18 +312,24 @@ end
     # silently swallows real drift.
     let tmp = mktempdir()
         body = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              initial_state: m_plus_F
-              B: {Bz: "0.01 Gauss"}
-        """
-        write(joinpath(tmp, "undeclared.yaml"), body)
-        write(joinpath(tmp, "declared.yaml"),
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "initial_state" => "m_plus_F",
+        ),
+    )],
+)
+"""
+        write(joinpath(tmp, "undeclared.experiment.jl"), body)
+        write(joinpath(tmp, "declared.experiment.jl"),
             "# anti-aligned-seed: EdH cascade needs the Zeeman-highest state\n" * body)
         s = _scan_configs(tmp)
-        @test length(s.disagree) == 1 && occursin("undeclared.yaml", only(s.disagree))
-        @test length(s.declared) == 1 && occursin("declared.yaml", only(s.declared))
+        @test length(s.disagree) == 1 && occursin("undeclared.experiment.jl", only(s.disagree))
+        @test length(s.declared) == 1 && occursin("declared.experiment.jl", only(s.declared))
     end
 
     # `m_minus_F` is unambiguous and is a hard gate: the config states the seed

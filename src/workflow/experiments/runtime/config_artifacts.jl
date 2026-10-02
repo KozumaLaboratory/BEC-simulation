@@ -1,23 +1,47 @@
 # Run specifications are data snapshots, independent of the authoring language.
 using JSON
-using YAML
 
 const _CONFIG_SNAPSHOT_FORMAT = "SpinorBEC.experiment.v1"
 
-function _config_snapshot_path(dir::AbstractString)
-    native = joinpath(dir, "config.json")
-    legacy = joinpath(dir, "config.yaml")
-    isfile(native) || !isfile(legacy) ? native : legacy
+_config_snapshot_path(dir::AbstractString) = joinpath(dir, "config.json")
+
+function _config_definition(value)
+    data = value isa PipelineConfig ? value.raw_data : value
+    data isa AbstractDict || throw(
+        ArgumentError(
+            "Julia experiment definitions must return a PipelineConfig or a dictionary"),
+    )
+    _native_config_data(data)
+end
+
+function _config_module()
+    context = Module(gensym(:ExperimentDefinition))
+    Core.eval(context, :(include(path) = Base.include(@__MODULE__, path)))
+    Core.eval(context, :(using SpinorBEC))
+    context
+end
+
+function _load_julia_config(path::AbstractString)
+    lowercase(splitext(path)[2]) == ".jl" || throw(ArgumentError(
+        "experiment definitions must be Julia (.jl): $path"))
+    _config_definition(Base.include(_config_module(), abspath(path)))
+end
+
+function _julia_config_string(source::AbstractString)
+    _config_definition(Base.include_string(_config_module(), source, "experiment.jl"))
 end
 
 function _load_config_data(path::AbstractString)
-    if lowercase(splitext(path)[2]) == ".json"
-        payload = JSON.parsefile(path; use_mmap=false)
-        get(payload, "format", nothing) == _CONFIG_SNAPSHOT_FORMAT ||
-            throw(ArgumentError("unsupported experiment snapshot format: $path"))
-        return payload["spec"]
-    end
-    YAML.load_file(String(path))
+    extension = lowercase(splitext(path)[2])
+    extension == ".jl" && return _load_julia_config(path)
+    extension == ".json" || throw(
+        ArgumentError(
+            "expected a Julia experiment (.jl) or a generated result snapshot (.json): $path"),
+    )
+    payload = JSON.parsefile(path; use_mmap=false)
+    get(payload, "format", nothing) == _CONFIG_SNAPSHOT_FORMAT ||
+        throw(ArgumentError("unsupported experiment snapshot format: $path"))
+    _native_config_data(payload["spec"])
 end
 
 function _config_source_dir(path::AbstractString)

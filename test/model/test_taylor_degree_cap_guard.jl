@@ -23,20 +23,42 @@ using SpinorBEC: SPIN_TAYLOR_DEGREE_CAP, SPIN_TAYLOR_RK_MAX,
     _assert_taylor_degree_cap_unclamped, load_config, run_pipeline
 
 const _CAP_PROBE = """
-defaults: {kind: spinor, backend: cpu}
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [16], box: [8.0]}
-      potential: {type: harmonic, omega: [1.0]}
-      interactions: {N_atoms: 100, omega_ref: 100.0, c0: 1.0, c1: 0.0}
-      ddi: {enabled: false}
-      lhy: {kind: none}
-      initial_state: polar
-      method: itp
-      n_steps: 5
-      dt: 1.0e-3
-      tol: 1.0e-6
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c0" => 1.0,
+                "c1" => 0.0,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
 """
 
 function _with_cap(f, k::Int)
@@ -80,7 +102,7 @@ end
 
     @testset "and it is wired into run_pipeline" begin
         mktempdir() do dir
-            path = joinpath(dir, "cap_probe.yaml")
+            path = joinpath(dir, "cap_probe.experiment.jl")
             write(path, _CAP_PROBE)
             cfg = load_config(path)
 

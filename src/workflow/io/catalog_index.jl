@@ -89,7 +89,7 @@ _has_run_jld2(dir::AbstractString) = _find_run_jld2(dir) !== nothing
     run_catalog_index(; runs_root=default_store().root) -> Vector{Dict{String,Any}}
 
 One flat, sparse row per run, most-recently-touched first. Reads
-summary.json (observables) + mtime only — no jld2. A dir is a "run" if it has config.yaml, a jld2, or
+summary.json (observables) + mtime only — no jld2. A dir is a "run" if it has config.json, a jld2, or
 a summary. Cheap enough to recompute per request.
 """
 function run_catalog_index(; runs_root::AbstractString=default_store().root)

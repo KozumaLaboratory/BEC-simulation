@@ -35,7 +35,7 @@ YAML. It reported the ceiling — 34 basenames spread over 77 directories — an
 estimated that most of it was (a).
 
 The reverse map is not needed. **Every run directory carries its own
-`config.yaml`**, so two directories sharing a basename can be diffed directly,
+`config.experiment.jl`**, so two directories sharing a basename can be diffed directly,
 and the answer is not a count but the *set of dotted paths on which they
 disagree*.
 
@@ -43,7 +43,7 @@ disagree*.
 
 ```
 240 run dirs · 196 basenames · 34 basenames with >1 dir covering 77 dirs (32.1 %)
-219 content-keyed dirs · 0 whose config.yaml no longer hashes to its own suffix
+219 content-keyed dirs · 0 whose config.experiment.jl no longer hashes to its own suffix
 
 (b) canonically identical (bytes only)           0 basenames /  0 dirs
 (b) annotation only — same physics, recomputed   0 basenames /  0 dirs
@@ -97,7 +97,7 @@ an annotation difference also has an execution or a physics one.
 > are **not** the same physics under two byte-different configs. Ledger row
 > `store-byte-only-duplicate-pair-on-disk`.
 
-Each directory's own `config.yaml` still hashes to its own name
+Each directory's own `config.experiment.jl` still hashes to its own name
 (`9ca973088b1743d9`, `529e3a77181ea7ae`) and they carry `Bz: "-0.01 Gauss"` and
 `Bz: "0.01 Gauss"` — a **sign flip on the field**, i.e. cause (a).
 

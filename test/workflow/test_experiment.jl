@@ -18,48 +18,77 @@ using SpinorBEC
 
     @testset "YAML parsing" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [64]
-                box: [20.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 100
-              tol: 1.0e-8
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              save: {every: 10}
-              B:
-                p:
-                  from: 0.0
-                  to: 0.5
-                q: 0.0
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 2.0
-              dt: 0.01
-              save: {every: 20}
-              B:
-                p: 0.5
-                q: 0.0
-          - dynamics:
-              duration: 0.5
-              dt: 0.005
-              save: {every: 10}
-              B:
-                p: 0.0
-                q: 0.0
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [20.0],
+                "n" => [64],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 100,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-8,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "to" => 0.5,
+                ),
+                "q" => 0.0,
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 10,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.5,
+                "q" => 0.0,
+            ),
+            "dt" => 0.01,
+            "duration" => 2.0,
+            "save" => Dict{String, Any}(
+                "every" => 20,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "dt" => 0.005,
+            "duration" => 0.5,
+            "save" => Dict{String, Any}(
+                "every" => 10,
+            ),
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
 
@@ -99,23 +128,33 @@ using SpinorBEC
 
     @testset "YAML parsing - DDI" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c0: 5.0
-                c1: 0.0
-              ddi:
-                enabled: true
-                c_dd: 1.5e-5
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "c_dd" => 1.5e-5,
+                "enabled" => true,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         p = config.steps[1].params
@@ -126,20 +165,29 @@ using SpinorBEC
 
     @testset "YAML parsing - minimal" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Na23
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.1
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Na23",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.1,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         @test config isa PipelineConfig
@@ -150,35 +198,53 @@ using SpinorBEC
 
     @testset "YAML parsing - phase temperature_ratio" begin
         yaml_with_noise = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              temperature_ratio: 0.1
-              noise_seed: 42
-              B:
-                p: 0.0
-                q: 0.0
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              B:
-                p: 0.0
-                q: 0.0
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "noise_seed" => 42,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "temperature_ratio" => 0.1,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_with_noise)
         @test config.steps[2].params["temperature_ratio"] == 0.1
         @test config.steps[2].params["noise_seed"] == 42
@@ -187,34 +253,53 @@ using SpinorBEC
 
     @testset "run_pipeline integration" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [20.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 200
-              tol: 1.0e-6
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 0.1
-              dt: 0.001
-              save: {every: 50}
-              B:
-                p:
-                  from: 0.0
-                  to: 0.1
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [20.0],
+                "n" => [32],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "to" => 0.1,
+                ),
+                "q" => 0.1,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.1,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 50,
+            ),
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)
@@ -227,34 +312,52 @@ using SpinorBEC
 
     @testset "run_pipeline integration - phase temperature_ratio" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [20.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 200
-              tol: 1.0e-6
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 0.1
-              dt: 0.001
-              save: {every: 50}
-              temperature_ratio: 0.05
-              noise_seed: 42
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [20.0],
+                "n" => [32],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.1,
+            "noise_seed" => 42,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 50,
+            ),
+            "temperature_ratio" => 0.05,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         @test config.steps[2].params["temperature_ratio"] == 0.05
@@ -264,29 +367,38 @@ using SpinorBEC
 
     @testset "run_pipeline integration - composite potential" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [20.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 200
-              tol: 1.0e-6
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.1
-              potential:
-                - type: harmonic
-                  omega: [1.0]
-                - type: gravity
-                  g: 0.1
-                  axis: 1
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [20.0],
+                "n" => [32],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 200,
+            "potential" => [Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ), Dict{String, Any}(
+                "axis" => 1,
+                "g" => 0.1,
+                "type" => "gravity",
+            )],
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)

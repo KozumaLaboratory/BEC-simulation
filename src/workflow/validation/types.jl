@@ -156,7 +156,7 @@ Fields:
 
 Examples (Phase-2 usage):
 ```julia
-sweep = sweep_runs("config.yaml"; vary = :grid => [24, 32, 48])
+sweep = sweep_runs("config.experiment.jl"; vary = :grid => [24, 32, 48])
 sweep.runs[2].grid.config.n_points   # (32, 32, 32)
 sweep.varying.first                  # :grid
 ```

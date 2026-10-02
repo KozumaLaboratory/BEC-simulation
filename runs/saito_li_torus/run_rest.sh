@@ -33,6 +33,6 @@ step "Fig.5 single-vortex control" jl "include(\"runs/saito_li_torus/h9_supersol
 step "EdH 30uG box 8.5 (edge test)" jl "include(\"runs/saito_li_torus/h6_edh.jl\"); main(String[\"Bz=0.030\",\"n=84\",\"box=8.5\",\"t_end=4.0\",\"dt=5.0e-4\",\"save_every=40\"])"
 
 # --- 4. main's missing 128^3 static cell ------------------------------------
-step "128^3 static cell" jl "using SpinorBEC; run_yaml(\"runs/saito_li_torus/config.yaml\")"
+step "128^3 static cell" jl "using SpinorBEC; run_experiment(\"runs/saito_li_torus/config.experiment.jl\")"
 
 echo ALL_DONE

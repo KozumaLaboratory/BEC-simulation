@@ -660,7 +660,7 @@ function _validate_ground_state_physics!(step_params::Dict, path::String,
             # `ferromagnetic` was retired from the `initial_state` enum in favour of
             # `m_plus_F` / `m_minus_F`, and this condition was never updated — so from
             # that day until 2026-08-06 the advisory was a FALSE NEGATIVE on exactly
-            # the configs it exists for: `runs/eu_lhy_longtime/LHY_full_bdg_*.yaml`
+            # the configs it exists for: `runs/eu_lhy_longtime/LHY_full_bdg_*.experiment.jl`
             # and friends paid the ~100x BdG cost with no hint that a closed form
             # agrees to ~1e-4. Gated by
             # `test/workflow/test_full_bdg_advisory_fires.jl`.

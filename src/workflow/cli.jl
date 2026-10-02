@@ -47,7 +47,7 @@ _kvi(args, key, default) =
 
 function _cmd_inspect(args)
     if isempty(args) || args[1] in ("-h", "--help")
-        println(stderr, "usage: cli.jl inspect <config.yaml> [--json]")
+        println(stderr, "usage: cli.jl inspect <config.experiment.jl> [--json]")
         return 2
     end
     path = args[1]

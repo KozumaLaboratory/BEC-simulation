@@ -1,6 +1,6 @@
 # Delivering an interrupt to a running solve, without a window.
 #
-# Four gates race a background `run_yaml` task: wait for it to reach a known
+# Four gates race a background `run_experiment` task: wait for it to reach a known
 # point, then interrupt it and assert the run is NOT served from cache. Each of
 # them used to ask `istaskdone` first and `schedule` second:
 #

@@ -226,7 +226,7 @@ Both are provable from the files, and both matter for a reproduction:
    zero-padding, against `time.f90`'s `sn = 2`.)
 
 So `Ntot` has to be **reconstructed**, not read off. `runs/matsui_fig4b/` does that.
-(`fig4b_gsvariant_n32.yaml` was written to price item 2 before item 2 was understood;
+(`fig4b_gsvariant_n32.experiment.jl` was written to price item 2 before item 2 was understood;
 it varies a knob the polarised ground state is degenerate in, and is retained only as
 the record of that.)
 
@@ -284,10 +284,10 @@ all 14 refs in `docs/campaign/fix_list.toml`, clean tree:
 
 | task | config | fields | grid | what it is for |
 |---|---|---|---|---|
-| 1 | `fig4b_scan_n32.yaml` | 45, −13 … +9 nT @ 0.5 | 32³, box 16 | the curve, hence the centre and width |
-| 2 | `fig4b_conv_n64.yaml` | 6 | 64³, box 16 | resolution error bar on task 1's centre |
-| 3 | `fig4b_gsvariant_n32.yaml` | 19, −8 … +1 nT | 32³ | prices the §0.3.5 ground-state ambiguity |
-| 4 | `fig2c_populations_n32.yaml` | 1 (2.6 nT), 40 ms | 32³ | `N_m(t)` against `dataset_fig2_theo` |
+| 1 | `fig4b_scan_n32.experiment.jl` | 45, −13 … +9 nT @ 0.5 | 32³, box 16 | the curve, hence the centre and width |
+| 2 | `fig4b_conv_n64.experiment.jl` | 6 | 64³, box 16 | resolution error bar on task 1's centre |
+| 3 | `fig4b_gsvariant_n32.experiment.jl` | 19, −8 … +1 nT | 32³ | prices the §0.3.5 ground-state ambiguity |
+| 4 | `fig2c_populations_n32.experiment.jl` | 1 (2.6 nT), 40 ms | 32³ | `N_m(t)` against `dataset_fig2_theo` |
 
 Read alongside the numbers, whenever they land:
 
@@ -419,7 +419,7 @@ converged spectral result. The width evidence still tilts toward the first.
 
 #### Resolution: measured on the full grid, not inferred
 
-`fig4b_scan_n64.yaml` re-runs the **same 45 fields** at `dx` 0.5 → 0.25 a_ho
+`fig4b_scan_n64.experiment.jl` re-runs the **same 45 fields** at `dx` 0.5 → 0.25 a_ho
 (UGE 8307358 task 8, exit 0, 1297 s):
 
 | | centre [nT] | width [nT] |
@@ -472,7 +472,7 @@ this document is the point-1-dropped number from here on.
 
 #### Their ramp shape is not the explanation
 
-`fig4b_theirramp_n32.yaml` replaces our 150 µs linear ramp with their
+`fig4b_theirramp_n32.experiment.jl` replaces our 150 µs linear ramp with their
 `B(t) = (B_ini − B_fin)exp(−t/τ) + B_fin`, τ = 50 µs, built as a constant plus a
 piecewise-linear exponential tail sampled at τ/6.
 
@@ -561,7 +561,7 @@ largely common to the numerator and the total. And since the brightest spot
 *up* at the dip — which is the direction that makes the measured dip shallower
 than truth, not deeper.
 
-`fig4b_loss_n32.yaml` crosses the 45 fields with three `K₃` values (UGE 8304841
+`fig4b_loss_n32.experiment.jl` crosses the 45 fields with three `K₃` values (UGE 8304841
 task 5, commit `0e78456e`, exit 0, 135 points):
 
 | `K₃` [cm⁶/s] | atom loss at 5 ms, over −12.5 … +9 nT | dip centre | width |

@@ -16,7 +16,7 @@ using SpinorBEC
 using JLD2
 
 # Load the Eu config and instantiate the grid + atom once.
-config = SpinorBEC.load_config("runs/measurement_R3x_eu/r35_b1_boundary_trace/config.yaml")
+config = SpinorBEC.load_config("runs/measurement_R3x_eu/r35_b1_boundary_trace/config.experiment.jl")
 gs_step = config.pipeline[1]                  # GroundStateStep
 grid = SpinorBEC.make_grid_from_yaml(gs_step)
 atom = SpinorBEC.atom_from_yaml(gs_step.atom)

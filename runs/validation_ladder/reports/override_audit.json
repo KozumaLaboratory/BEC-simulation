@@ -3,11 +3,11 @@
   "results": {
     "dry_k3_long": {
       "status": "NO_SCAN",
-      "path": "runs/eu151_edh_K3_long/config.yaml"
+      "path": "runs/eu151_edh_K3_long/config.experiment.jl"
     },
     "dry_eu151_edh_c1phys": {
       "status": "NO_SCAN",
-      "path": "runs/eu151_edh_c1phys/config.yaml"
+      "path": "runs/eu151_edh_c1phys/config.experiment.jl"
     },
     "eu151_edh_loss_factorial": {
       "comparison_runs": [
@@ -43,19 +43,19 @@
         }
       ],
       "status": "OK",
-      "path": "runs/eu151_edh_loss_factorial/config.yaml"
+      "path": "runs/eu151_edh_loss_factorial/config.experiment.jl"
     },
     "dry_eu151_edh": {
       "status": "NO_SCAN",
-      "path": "runs/eu151_edh/config.yaml"
+      "path": "runs/eu151_edh/config.experiment.jl"
     },
     "dry_matsui_baseline": {
       "status": "NO_SCAN",
-      "path": "runs/eu151_matsui_edh/configs/matsui_edh_baseline.yaml"
+      "path": "runs/eu151_matsui_edh/configs/matsui_edh_baseline.experiment.jl"
     },
     "eu151_edh_K3_long": {
       "status": "NO_SCAN",
-      "path": "runs/eu151_edh_K3_long/config.yaml"
+      "path": "runs/eu151_edh_K3_long/config.experiment.jl"
     },
     "dry_k3_compare": {
       "comparison_runs": [
@@ -75,7 +75,7 @@
         }
       ],
       "status": "OK",
-      "path": "runs/eu151_edh_k3_compare/config.yaml"
+      "path": "runs/eu151_edh_k3_compare/config.experiment.jl"
     },
     "dry_loss_factorial": {
       "comparison_runs": [
@@ -111,7 +111,7 @@
         }
       ],
       "status": "OK",
-      "path": "runs/eu151_edh_loss_factorial/config.yaml"
+      "path": "runs/eu151_edh_loss_factorial/config.experiment.jl"
     },
     "eu151_edh_k3_compare": {
       "comparison_runs": [
@@ -131,7 +131,7 @@
         }
       ],
       "status": "OK",
-      "path": "runs/eu151_edh_k3_compare/config.yaml"
+      "path": "runs/eu151_edh_k3_compare/config.experiment.jl"
     }
   }
 }

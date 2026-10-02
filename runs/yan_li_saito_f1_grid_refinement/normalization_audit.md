@@ -255,7 +255,7 @@ All instances are in per-experiment analysis scripts, not in SpinorBEC framework
 
 These five files cover all yan-li-saito reproduction turns (T33-T46). All prior sim results (T37, T40 P0-P4, T43, T44, T46) use the same consistent D0_factor=2990.1 with a_s=21 a₀. No run is affected by the wrong-a_s error because the T47 critic computed it independently — the framework's scripts were always correct.
 
-### Class-pattern proposal for patterns.yaml
+### Class-pattern proposal for patterns.experiment.jl
 
 ```yaml
 - name: paper-unit-system-wrong-param-in-spot-check
@@ -285,7 +285,7 @@ These five files cover all yan-li-saito reproduction turns (T33-T46). All prior 
 
 **T49 action**: `implementer_text` Document stage:
 1. Append a note to memory `yan_li_saito_2026_barnett_paper.md` clarifying that `a_s = 21 a₀` in the D₀ formula (not 110 a₀); add explicit computation: `D₀ = 3.24 μm⁻³`.
-2. Log the T47 critic's wrong-a_s error as a class-pattern entry in patterns.yaml (§6 proposal).
+2. Log the T47 critic's wrong-a_s error as a class-pattern entry in patterns.experiment.jl (§6 proposal).
 3. Update state.json tier: 0.60 → 0.40 (investigation closure path: gap is 6800× and the normalization audit confirms it is not a unit artifact).
 
 **Rationale for tier 0.60 → 0.40**: the normalization audit closes the last "revival possibility" flagged by T47. After audit:
@@ -297,7 +297,7 @@ These five files cover all yan-li-saito reproduction turns (T33-T46). All prior 
 
 The investigation is headed toward closure. Tier 0.40 signals "partial REFUTE — paper claim not reproducible in our framework at feasible grid sizes." Not 0.0 because (a) we have not tested the paper's actual dx=0.014 a_ho (290³ or finer), and (b) DDI energy is unknown due to BUG-9.
 
-**Success criterion for T49**: memory file updated with a_s=21 a₀ annotation + patterns.yaml entry added + state.json tier updated to 0.40. No GPU runs.
+**Success criterion for T49**: memory file updated with a_s=21 a₀ annotation + patterns.experiment.jl entry added + state.json tier updated to 0.40. No GPU runs.
 
 **Cost estimate**: T49 implementer_text ~20 min wall, ~500k effective.
 

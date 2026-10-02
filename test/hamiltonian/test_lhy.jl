@@ -156,23 +156,33 @@ using SpinorBEC
         # Post-2026-05-12: c_lhy moved from `interactions.c_lhy` to
         # `lhy.c_lhy` (single LHY block; see lhy_refactor_2026_05_12 memory).
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              lhy:
-                kind: scalar
-                c_lhy: 100.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "lhy" => Dict{String, Any}(
+                "c_lhy" => 100.0,
+                "kind" => "scalar",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
         p = cfg.steps[1].params
@@ -212,20 +222,29 @@ using SpinorBEC
 
     @testset "YAML without c_lhy defaults to 0" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         p = cfg.steps[1].params
         @test get(p["interactions"], "c_lhy", 0.0) == 0.0

@@ -59,7 +59,7 @@ Each `dynamics.{sgpe,projected_gp,photon_scattering,loss}` block adds ~5-15% wal
 ## Useful diagnostics
 
 ```julia
-estimate_run_budget("path/to/config.yaml")
+estimate_run_budget("path/to/config.experiment.jl")
 # Reports: VRAM, host RAM, disk per scan point, total disk
 ```
 

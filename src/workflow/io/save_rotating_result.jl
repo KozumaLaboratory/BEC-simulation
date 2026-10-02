@@ -66,7 +66,7 @@ summarize_rotating_basis_result(result; kwargs...) = summarize_rotating_basis_re
     launch_experiment(run_name; batch="", verbose=true, io=stdout) -> result
 
 Per-run launcher convention. Resolves the YAML to
-`runs/<batch?>/<run_name>/config.yaml` (omits the `batch` segment when
+`runs/<batch?>/<run_name>/config.experiment.jl` (omits the `batch` segment when
 empty), runs `load_config |> run_pipeline`, prints a rotating_basis
 summary, and persists the canonical dashboard layout via
 `save_rotating_basis_result!`. Returns the `run_pipeline` result so

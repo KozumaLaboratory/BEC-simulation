@@ -401,7 +401,7 @@ function _resolve_lhy_block!(p::Dict, inter::Dict, atom, c_dd_val::Float64,
     # actually in force. It read `atom.a_s / a_ho` until 2026-08-19, so a config
     # that overrode `interactions.c_total` got an LHY coefficient built from a
     # different scattering length than its own contact term — for
-    # `runs/saito_li_torus/config.yaml` (a_s 110 a₀ → 45.7 a₀ for ε_dd = 1.3)
+    # `runs/saito_li_torus/config.experiment.jl` (a_s 110 a₀ → 45.7 a₀ for ε_dd = 1.3)
     # that is 8.98× in `(a_s/a_ho)^{5/2}` alone, 3.52× after the Q₅ factor, on
     # the one term the droplet's existence depends on. The 6 other c_total-
     # overriding configs in `runs/` pin at the natural value (verified to

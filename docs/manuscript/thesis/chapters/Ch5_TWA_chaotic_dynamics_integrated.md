@@ -236,7 +236,7 @@ Visualization data: saved ensemble variance fields.
 | Sinatra check (32³ + 2×16³) | `runs/twa_sinatra/` (gone) | GS-resolution artifact (§5.7) |
 | Pinned 1/N at 16³×box=10 | `runs/twa_N_scan_pinned_16g/` | 1/√N fails (§5.5) |
 
-すべて `runs/*.config.yaml` + `result.jld2` で repository-tracked。
+すべて `runs/*.config.experiment.jl` + `result.jld2` で repository-tracked。
 
 ---
 
@@ -244,7 +244,7 @@ Visualization data: saved ensemble variance fields.
 
 ### 5.4.1 Configs
 
-`runs/twa_N_scan/N{1000, 10000, 100000}_<hash>/config.yaml`. Eu F=6 32³ box=20,
+`runs/twa_N_scan/N{1000, 10000, 100000}_<hash>/config.experiment.jl`. Eu F=6 32³ box=20,
 $N$-varied $\in \{10^3, 10^4, 10^5\}$ with all other physics fixed (DDI included).
 
 **重要 caveat**: これらの configs では `c_total ∝ N` (= Eu coupling が atom-number 自動

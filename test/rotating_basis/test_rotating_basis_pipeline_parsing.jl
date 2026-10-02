@@ -110,8 +110,8 @@ using SpinorBEC
         # absent. The legacy smoke YAML was curated out 2026-04-30
         # (commits d178b3a, 35245e7) but klaus_barnett carries the same
         # RotatingBasisGroundStateStep + RotatingBasisDynamicsStep layout.
-        candidates = ["runs/eu151_klaus_barnett/config.yaml",
-            "runs/option_gamma_smoke/config.yaml"]
+        candidates = ["runs/eu151_klaus_barnett/config.experiment.jl",
+            "runs/option_gamma_smoke/config.experiment.jl"]
         present = filter(isfile, candidates)
         if !isempty(present)
             config = SpinorBEC.load_config(first(present))

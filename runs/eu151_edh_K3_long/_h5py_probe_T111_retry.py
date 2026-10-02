@@ -122,7 +122,7 @@ probe['next_action_for_loop'] = (
     "Anko-consult fallback: anko runs `bash /home/suzume/workspace/BEC-simulation/"
     "runs/eu151_edh_K3_long/run_extract_ring_metrics.sh` from interactive shell. "
     "Loop resumes on the appearance of spatial_profiles.csv + ring_summary.json. "
-    "Loop directors MUST honor patterns.yaml entry sandbox-vs-scheduler-gate-mismatch-2026-05-19 "
+    "Loop directors MUST honor patterns.experiment.jl entry sandbox-vs-scheduler-gate-mismatch-2026-05-19 "
     "before any future implementer_julia_* dispatch."
 )
 

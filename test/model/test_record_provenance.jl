@@ -6,7 +6,7 @@
 # point (`run_registry.jl`). `test_admission_requires_marker.jl`
 # calls `_run_step(GroundStateStep(...))` directly, so it reaches the first and
 # only the first — deleting both `run_registry.jl` blocks left every model suite
-# green. Those two are the ones every `run_yaml` goes through, i.e. the ones a
+# green. Those two are the ones every `run_experiment` goes through, i.e. the ones a
 # production run's provenance actually depends on.
 #
 # `open_result`'s metadata whitelist is gated here for the same reason and in the
@@ -29,29 +29,54 @@ using SpinorBEC
 using SpinorBEC: code_tree_hash, open_result
 
 const PROBE_PIPELINE = """
-defaults: {kind: spinor, backend: cpu}
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [16], box: [8.0]}
-      potential: {type: harmonic, omega: [1.0]}
-      interactions: {N_atoms: 100, omega_ref: 100.0, c0: 1.0, c1: 0.0}
-      ddi: {enabled: false}
-      lhy: {kind: none}
-      initial_state: polar
-      method: itp
-      n_steps: 20
-      dt: 1.0e-3
-      tol: 1.0e-6
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c0" => 1.0,
+                "c1" => 0.0,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 20,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
 """
 
 # Two points, differing in an input `artifact_id` reads — so the two records
 # must carry two different `artifact_id`s and one shared `code_rev`.
 const PROBE_SCAN = """
-scan:
-  zip:
-    pipeline.0.tol: [1.0e-6, 1.0e-7]
-
+Dict{String, Any}(
+    "scan" => Dict{String, Any}(
+        "zip" => Dict{String, Any}(
+            "pipeline.0.tol" => [1.0e-6, 1.0e-7],
+        ),
+    ),
+)
 """ * PROBE_PIPELINE
 
 @testset "a run's record carries both ids (cutover step 1)" begin
@@ -60,9 +85,9 @@ scan:
         mkpath(stage_dir)
         run_probe(yaml_text, name) = withenv("SPINORBEC_STAGE_CACHE" => "1",
             "SPINORBEC_STAGE_DIR" => stage_dir) do
-            y = joinpath(dir, "$name.yaml")
+            y = joinpath(dir, "$name.experiment.jl")
             write(y, yaml_text)
-            run_yaml(y; base_dir=joinpath(dir, "out_$name"), verbose=false)
+            run_experiment(y; base_dir=joinpath(dir, "out_$name"), verbose=false)
         end
 
         code_rev = code_tree_hash()

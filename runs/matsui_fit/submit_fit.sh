@@ -31,48 +31,48 @@ export SPINORBEC_STAGE_CACHE=1
 # exactly that. This cost a 25-minute run of the wrong config.
 dup=$(grep -oE '^ *[0-9]+\)' "$0" | tr -d ' )' | sort -n | uniq -d)
 if [ -n "$dup" ]; then echo "duplicate task labels: $dup" >&2; exit 1; fi
-for c in $(grep -oE 'runs/matsui_fit/[A-Za-z0-9_.]+\.yaml' "$0"); do
+for c in $(grep -oE 'runs/matsui_fit/[A-Za-z0-9_.]+\.experiment.jl' "$0"); do
     [ -f "$c" ] || { echo "missing config: $c" >&2; exit 1; }
 done
 
-for f in runs/matsui_fit/*.yaml; do
+for f in runs/matsui_fit/*.experiment.jl; do
     grep -q "CONFIG=$f " "$0" || { echo "config not wired into any task: $f" >&2; exit 1; }
 done
 
 case "${SGE_TASK_ID:-1}" in
-    22) CONFIG=runs/matsui_fit/fit_paperN_r036.yaml ;;
-    23) CONFIG=runs/matsui_fit/fit_paperN_r018.yaml ;;
-    24) CONFIG=runs/matsui_fit/fit_paperN_r009.yaml ;;
-    25) CONFIG=runs/matsui_fit/fit_paperN_r020.yaml ;;
-    26) CONFIG=runs/matsui_fit/fit_paperN_r030.yaml ;;
-    27) CONFIG=runs/matsui_fit/fit_code_q_n35k.yaml ;;
-    28) CONFIG=runs/matsui_fit/fit_code_c1e2_n35k.yaml ;;
-    29) CONFIG=runs/matsui_fit/fit_code_qc1e2_n35k.yaml ;;
-    30) CONFIG=runs/matsui_fit/fit_code_q_n50k.yaml ;;
-    31) CONFIG=runs/matsui_fit/fit_code_c1e2_n50k.yaml ;;
-    32) CONFIG=runs/matsui_fit/fit_code_qc1e2_n50k.yaml ;;
-    33) CONFIG=runs/matsui_fit/rings_c0.yaml ;;
-    34) CONFIG=runs/matsui_fit/rings_c1e2.yaml ;;
-    35) CONFIG=runs/matsui_fit/rings_c036.yaml ;;
-    36) CONFIG=runs/matsui_fit/rings_c030.yaml ;;
-    37) CONFIG=runs/matsui_fit/res64_c036.yaml ;;
-    38) CONFIG=runs/matsui_fit/res64_c1e2.yaml ;;
-    39) CONFIG=runs/matsui_fit/res128_c036.yaml ;;
-    40) CONFIG=runs/matsui_fit/rc0p0139.yaml ;;
-    41) CONFIG=runs/matsui_fit/rc0p5.yaml ;;
-    42) CONFIG=runs/matsui_fit/rc1p0.yaml ;;
-    44) CONFIG=runs/matsui_fit/sdloss_1em40.yaml ;;
-    45) CONFIG=runs/matsui_fit/sdloss_5em40.yaml ;;
-    46) CONFIG=runs/matsui_fit/sdloss_2em39.yaml ;;
-    47) CONFIG=runs/matsui_fit/sdloss_dip.yaml ;;
-    48) CONFIG=runs/matsui_fit/fig2c_n35k.yaml ;;
-    49) CONFIG=runs/matsui_fit/fig2c_loss.yaml ;;
-    50) CONFIG=runs/matsui_fit/xfer_c1_low.yaml ;;
-    51) CONFIG=runs/matsui_fit/xfer_c1_high.yaml ;;
-    52) CONFIG=runs/matsui_fit/xfer_q_zero.yaml ;;
-    53) CONFIG=runs/matsui_fit/xfer_q_high.yaml ;;
-    54) CONFIG=runs/matsui_fit/xfer_q0_bm.yaml ;;
-    55) CONFIG=runs/matsui_fit/xfer_q0_bp.yaml ;;
+    22) CONFIG=runs/matsui_fit/fit_paperN_r036.experiment.jl ;;
+    23) CONFIG=runs/matsui_fit/fit_paperN_r018.experiment.jl ;;
+    24) CONFIG=runs/matsui_fit/fit_paperN_r009.experiment.jl ;;
+    25) CONFIG=runs/matsui_fit/fit_paperN_r020.experiment.jl ;;
+    26) CONFIG=runs/matsui_fit/fit_paperN_r030.experiment.jl ;;
+    27) CONFIG=runs/matsui_fit/fit_code_q_n35k.experiment.jl ;;
+    28) CONFIG=runs/matsui_fit/fit_code_c1e2_n35k.experiment.jl ;;
+    29) CONFIG=runs/matsui_fit/fit_code_qc1e2_n35k.experiment.jl ;;
+    30) CONFIG=runs/matsui_fit/fit_code_q_n50k.experiment.jl ;;
+    31) CONFIG=runs/matsui_fit/fit_code_c1e2_n50k.experiment.jl ;;
+    32) CONFIG=runs/matsui_fit/fit_code_qc1e2_n50k.experiment.jl ;;
+    33) CONFIG=runs/matsui_fit/rings_c0.experiment.jl ;;
+    34) CONFIG=runs/matsui_fit/rings_c1e2.experiment.jl ;;
+    35) CONFIG=runs/matsui_fit/rings_c036.experiment.jl ;;
+    36) CONFIG=runs/matsui_fit/rings_c030.experiment.jl ;;
+    37) CONFIG=runs/matsui_fit/res64_c036.experiment.jl ;;
+    38) CONFIG=runs/matsui_fit/res64_c1e2.experiment.jl ;;
+    39) CONFIG=runs/matsui_fit/res128_c036.experiment.jl ;;
+    40) CONFIG=runs/matsui_fit/rc0p0139.experiment.jl ;;
+    41) CONFIG=runs/matsui_fit/rc0p5.experiment.jl ;;
+    42) CONFIG=runs/matsui_fit/rc1p0.experiment.jl ;;
+    44) CONFIG=runs/matsui_fit/sdloss_1em40.experiment.jl ;;
+    45) CONFIG=runs/matsui_fit/sdloss_5em40.experiment.jl ;;
+    46) CONFIG=runs/matsui_fit/sdloss_2em39.experiment.jl ;;
+    47) CONFIG=runs/matsui_fit/sdloss_dip.experiment.jl ;;
+    48) CONFIG=runs/matsui_fit/fig2c_n35k.experiment.jl ;;
+    49) CONFIG=runs/matsui_fit/fig2c_loss.experiment.jl ;;
+    50) CONFIG=runs/matsui_fit/xfer_c1_low.experiment.jl ;;
+    51) CONFIG=runs/matsui_fit/xfer_c1_high.experiment.jl ;;
+    52) CONFIG=runs/matsui_fit/xfer_q_zero.experiment.jl ;;
+    53) CONFIG=runs/matsui_fit/xfer_q_high.experiment.jl ;;
+    54) CONFIG=runs/matsui_fit/xfer_q0_bm.experiment.jl ;;
+    55) CONFIG=runs/matsui_fit/xfer_q0_bp.experiment.jl ;;
     *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
 esac
 
@@ -84,6 +84,6 @@ nvidia-smi -L || true
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task ${SGE_TASK_ID}] done"

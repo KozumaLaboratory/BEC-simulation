@@ -23,7 +23,6 @@
 # domain failure rather than a source of one.
 
 using Test
-using YAML
 using SpinorBEC
 using SpinorBEC: _parse_gs_interactions, resolve_atom, ku_c01_to_g_S,
     epsilon_LHY_F6_Ih, lhy_energy_polar, lhy_energy_fm, build_fm_lhy_coefs,
@@ -58,12 +57,12 @@ function _lhy_cells()
     isdir(_RUNS) || return out
     for f in sort(
         collect(
-            Iterators.filter(p -> endswith(p, ".yaml") || endswith(p, ".yml"),
+            Iterators.filter(p -> endswith(p, ".experiment.jl") || endswith(p, ".yml"),
                 (root * "/" * n for (root, _, ns) in walkdir(_RUNS) for n in ns)),
         ),
     )
         cfg = try
-            YAML.load_file(f)
+            SpinorBEC._load_config_data(f)
         catch
             continue
         end

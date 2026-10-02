@@ -2,7 +2,7 @@
 #
 # #478 asked why a re-launch does not hit the cache, and pre-registered three
 # causes: (a) the values really differ, (b) same physics different BYTES (the
-# `run_yaml` directory key is `sha256(config bytes)`), (c) same config different
+# `run_experiment` directory key is `sha256(config bytes)`), (c) same config different
 # producing commit. PR #482 measured (b) at 3.2 % of committed configs and
 # dissolved (c) — the mismatch it would relax is not what the gate refuses; all
 # 224 stamped points record `git_dirty = true`, which no hash granularity fixes.
@@ -13,7 +13,7 @@
 # directories, 35 % of the store — and estimated that most of it was (a).
 #
 # That estimate is what this closes, and it does not need the reverse map: every
-# run directory carries its own `config.yaml`. Two directories sharing a basename
+# run directory carries its own `config.experiment.jl`. Two directories sharing a basename
 # can therefore be diffed DIRECTLY, and the answer is not a count but the SET OF
 # DOTTED PATHS on which they disagree — which separates the pre-registered causes
 # from a fourth the pre-registration did not have:
@@ -87,16 +87,16 @@ Duplicate structure of a run store, grouped by run-directory basename.
 
 Fields:
 * `root`          — the store scanned
-* `n_dirs`        — run directories seen (a directory holding `config.yaml`)
+* `n_dirs`        — run directories seen (a directory holding `config.experiment.jl`)
 * `n_basenames`   — distinct basenames
 * `groups`        — basename → `Vector{String}` of directory names, for the
                     basenames with more than one directory
 * `differing`     — basename → sorted dotted paths on which the group's configs
                     disagree. Empty vector = canonically identical (cause **b**)
-* `unreadable`    — directories whose `config.yaml` would not parse
-* `n_no_config`   — run directories with no `config.yaml` at all
+* `unreadable`    — directories whose `config.experiment.jl` would not parse
+* `n_no_config`   — run directories with no `config.experiment.jl` at all
 * `n_keyed`       — directories whose name carries a content-hash suffix
-* `stale_key`     — directories whose `config.yaml` no longer hashes to their own
+* `stale_key`     — directories whose `config.experiment.jl` no longer hashes to their own
                     suffix, i.e. the config was edited AFTER the run
 
 `differing` is the load-bearing field. A count of duplicates is not actionable;
@@ -108,7 +108,7 @@ not, and a scan that reported zero while unable to look is impossible here: the
 219 verifying directories ARE the negative control and any mismatch is the
 positive one. It is not a hypothetical — `bce2068f` ("211 Eu configs pinned m=-F
 under a field that prefers m=+F") edited a committed run directory's config in
-place, so the committed `matsui_edh_baseline_9ca97308/config.yaml` hashes to
+place, so the committed `matsui_edh_baseline_9ca97308/config.experiment.jl` hashes to
 `89b5ed0b` and describes DIFFERENT physics from the run stored under that name.
 """
 struct StoreCensus
@@ -158,7 +158,7 @@ end
 Group the run directories under `root` by basename and diff the configs within
 each group.
 
-Reads `config.yaml` only — no point file is opened, so this is seconds over a
+Reads `config.experiment.jl` only — no point file is opened, so this is seconds over a
 261 GB store. Directories with no config are COUNTED rather than skipped: the
 store predates several conventions and a silent skip would report a cleaner
 store than exists.
@@ -186,14 +186,7 @@ function store_census(root::AbstractString=default_run_root())
         n_dirs += 1
         # Does the config still hash to the directory it lives in? `compute_run_dir`
         # keys on the raw bytes, so this is an equality and not a heuristic.
-        m = match(_STORE_HASH_SUFFIX, name)
-        legacy_cfg = joinpath(d, "config.yaml")
-        if m !== nothing && isfile(legacy_cfg)
-            n_keyed += 1
-            want = m.match[2:end]           # drop the leading underscore
-            got = bytes2hex(sha256(read(legacy_cfg)))[1:length(want)]
-            got == want || (stale_key[name] = got)
-        elseif basename(cfg) == "config.json" && occursin(r"^[0-9a-f]{16}$", name)
+        if occursin(r"^[0-9a-f]{16}$", name)
             n_keyed += 1
             got = try
                 content_id(_load_config_data(cfg))
@@ -274,17 +267,17 @@ function store_census_report(c::StoreCensus; io::IO=stdout)
         "($(round(100 * n_dup_dirs / max(c.n_dirs, 1); digits=1)) %)",
     )
     c.n_no_config == 0 ||
-        println(io, "  $(c.n_no_config) dirs hold points but no config.yaml")
+        println(io, "  $(c.n_no_config) dirs hold points but no config.experiment.jl")
     isempty(c.unreadable) ||
         println(
             io,
-            "  $(length(c.unreadable)) unparseable config.yaml: " *
+            "  $(length(c.unreadable)) unparseable config.experiment.jl: " *
             join(first(c.unreadable, 5), ", "),
         )
     println(
         io,
         "  $(c.n_keyed) content-keyed dirs · " *
-        "$(length(c.stale_key)) whose config.yaml no longer hashes to " *
+        "$(length(c.stale_key)) whose config.experiment.jl no longer hashes to " *
         "its own suffix",
     )
     for (n, got) in sort!(collect(c.stale_key); by=first)

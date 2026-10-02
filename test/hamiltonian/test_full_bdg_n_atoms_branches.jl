@@ -12,7 +12,7 @@
 #     degenerate  (p=q=0)    ratio 1.0       <- ignored
 #     non-degen.  (p=0.5)    ratio 50000.0   <- honoured
 #
-# Downstream it showed up as E_LHY = 99.8 % of E_tot through `run_yaml` while
+# Downstream it showed up as E_LHY = 99.8 % of E_tot through `run_experiment` while
 # `polar_contact` on the same cell and state gave 1.34 %. The direct-call parity
 # oracle stayed green at 97/97 throughout, because it compares the two modes at
 # `n_atoms = 1` where the branches agree — which is why this needs its own gate

@@ -433,8 +433,8 @@ end
 
 @testset "evidence declared `in_tree` actually resolves" begin
     # The column earns its keep here. Filling it for the 24 rows turned up a LIVE
-    # document citing `klaus_quench_omp0p5_keeprot_mFplus.yaml`, a file `e8dafe8e`
-    # renamed to `*_mirror.yaml` when the corpus was retargeted — a reproduction
+    # document citing `klaus_quench_omp0p5_keeprot_mFplus.experiment.jl`, a file `e8dafe8e`
+    # renamed to `*_mirror.experiment.jl` when the corpus was retargeted — a reproduction
     # instruction that had stopped resolving and that nothing read.
     #
     # Only path-shaped entries are checked. An arm-set description ("34
@@ -446,7 +446,7 @@ end
 
     ispathlike(e) =
         occursin('/', e) && (
-            endswith(e, ".yaml") || endswith(e, ".yml") ||
+            endswith(e, ".experiment.jl") || endswith(e, ".yml") ||
             endswith(e, ".jl") || endswith(e, ".md") || endswith(e, ".toml")
         )
 

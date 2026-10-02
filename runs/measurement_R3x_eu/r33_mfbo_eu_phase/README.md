@@ -12,8 +12,8 @@ calls, identical best_y to 4 decimal places (logged in commit 9373461).
 ```julia
 using SpinorBEC
 
-res = multi_fidelity_optimize_yaml(
-    "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml",
+res = multi_fidelity_optimize_config(
+    "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.experiment.jl",
     ["pipeline.0.ground_state.interactions.c1_ratio",
      "pipeline.0.ground_state.ddi.c_dd_ratio"],
     [(-0.05, 0.05), (0.5, 1.5)];
@@ -37,8 +37,8 @@ res = multi_fidelity_optimize_yaml(
 **Reference** (single-fidelity baseline for comparison):
 
 ```julia
-ref = bayesian_optimize_yaml(
-    "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml",
+ref = bayesian_optimize_config(
+    "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.experiment.jl",
     ["pipeline.0.ground_state.interactions.c1_ratio",
      "pipeline.0.ground_state.ddi.c_dd_ratio"],
     [(-0.05, 0.05), (0.5, 1.5)];

@@ -18,90 +18,176 @@ using SpinorBEC: load_config_from_string
         # F=6: bound = -1/36 ≈ -0.0278
         for r in (-0.03, -0.05, -1.0)
             yaml = """
-            pipeline:
-              - ground_state:
-                  atom: Eu151
-                  grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-                  potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-                  interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: $r}
-                  ddi: {enabled: false}
-                  lhy: {kind: none}
-                  B: {Bz: 0.0, q: 0.0}
-                  initial_state: m_plus_F
-                  init_sigma: 1.0
-                  dt: 0.01
-                  n_steps: 10
-                  tol: 1.0e-6
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => $(repr(r)),
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
             @test_throws ArgumentError load_config_from_string(yaml; strict=true)
         end
 
         # F=1: bound = -1/1 = -1.0
         yaml_F1 = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [8], box: [4.0]}
-              potential: {type: harmonic, omega: [1.0]}
-              interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: -1.5}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0],
+                "n" => [8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => -1.5,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         @test_throws ArgumentError load_config_from_string(yaml_F1; strict=true)
 
         # Valid r just above bound passes
         yaml_ok = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: -0.02}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => -0.02,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml_ok; strict=true)
         @test cfg !== nothing
     end
 
     @testset "Unknown top-level key with strict=true throws" begin
         yaml = """
-        bogus_top_level_key: 42
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [8], box: [4.0]}
-              potential: {type: harmonic, omega: [1.0]}
-              interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: 0.0}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "bogus_top_level_key" => 42,
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0],
+                "n" => [8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         @test_throws ArgumentError load_config_from_string(yaml; strict=true)
     end
 
     @testset "Pipeline must have at least one step" begin
         # Empty pipeline / missing pipeline key
         yaml_empty = """
-        pipeline: []
-        """
+Dict{String, Any}(
+    "pipeline" => [],
+)
+"""
         # Empty pipeline is technically allowed by schema but run_pipeline
         # handles it as a no-op. The key check is that missing 'pipeline'
         # is an error.
@@ -111,8 +197,10 @@ using SpinorBEC: load_config_from_string
         # key" and the assertion went on passing while no longer exercising the
         # missing-`pipeline` path at all.
         yaml_missing = """
-        name: "no pipeline"
-        """
+Dict{String, Any}(
+    "name" => "no pipeline",
+)
+"""
         # load_config requires `pipeline` key — see pipeline_api.jl line 21
         @test_throws ArgumentError load_config_from_string(yaml_missing; strict=true)
     end
@@ -122,21 +210,42 @@ using SpinorBEC: load_config_from_string
         # buffers but the convolution is a no-op. Should not error
         # at config-load time.
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: 0.0}
-              ddi: {enabled: true}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml; strict=true)
         @test cfg !== nothing
     end

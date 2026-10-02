@@ -4,7 +4,7 @@
 #  One task = one c1_ratio point × all 9 comparison runs (seeds × LHY arms).
 #
 #    qsub -g tga-kozuma-kouhi -N eu337c1 runs/eu_lhy_boundary_337/submit_arms_c1.sh \
-#         runs/eu_lhy_boundary_337/config_arms_c1.yaml
+#         runs/eu_lhy_boundary_337/config_arms_c1.experiment.jl
 #
 #  The config path is the FIRST script argument (same convention as
 #  runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh, which this is copied from).
@@ -20,7 +20,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
-CONFIG="${1:?usage: submit_arms_c1.sh <config.yaml>}"
+CONFIG="${1:?usage: submit_arms_c1.sh <config.experiment.jl>}"
 [ -f "$CONFIG" ] || CONFIG="$PROJECT_ROOT/$CONFIG"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
@@ -40,6 +40,6 @@ echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"; nvidia-smi -L
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task $SGE_TASK_ID] done"

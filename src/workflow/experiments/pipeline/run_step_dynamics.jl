@@ -142,7 +142,7 @@ function _run_step(
     # `dynamics:` step declaring `ddi: {secular: true}` built a workspace 0.5
     # from the secular kernel (i.e. the non-secular one), while the
     # `ground_state:` step of the SAME config matched the secular kernel
-    # exactly. `runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml` is the
+    # exactly. `runs/eu_ham_only_conservation/eu_ham_only_24_sec.experiment.jl` is the
     # live casualty, and its stated purpose — "Compare against 24_nonsec to
     # isolate the impact of off-diagonal DDI terms" — is precisely what the drop
     # defeats: both arms ran the dynamics on the same kernel.

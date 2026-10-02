@@ -21,7 +21,7 @@ parameter set matching the published paper (Matsui et al., Science
 > convention diff. Three things below are now known to be wrong or missing.
 >
 > 1. **`ZeemanQ = 1.0 Hz` is a literal input in their code**, not derived from
->    |B|². The table below has no `q` row and none of `runs/matsui_baseline/*.yaml`
+>    |B|². The table below has no `q` row and none of `runs/matsui_baseline/*.experiment.jl`
 >    sets `q:`, so they auto-derive `q/h = 9.6×10⁻⁷ Hz` at 2.6 nT — six orders too
 >    small. At F=6 that is not decoration: `q/h = 1 Hz` moves the m=−6 → −5
 >    spacing by 11 Hz out of 42.3, i.e. **0.68 nT of resonance position**.
@@ -39,7 +39,7 @@ parameter set matching the published paper (Matsui et al., Science
 >
 > The "need Matsui Fig 2C digitised data to compare" caveat is **resolved**: the
 > published sheets are committed at `test/fixtures/matsui2025/` (see its README),
-> and `runs/matsui_fig4b/fig2c_populations_n32.yaml` is the clean-tree
+> and `runs/matsui_fig4b/fig2c_populations_n32.experiment.jl` is the clean-tree
 > reproduction against them.
 
 ## Parameter set (Matsui simulation reproduction target)
@@ -80,19 +80,19 @@ loss-off baseline.
 
 | Level | Target | Config | Status |
 |---|---|---|---|
-| 1 | Parameter consistency check | `matsui_baseline/*.yaml` parses + GS converges to m=−6 | (smoke running) |
+| 1 | Parameter consistency check | `matsui_baseline/*.experiment.jl` parses + GS converges to m=−6 | (smoke running) |
 | 2 | Early-time EdH selection rule | m=−6 decreasing, m=−5 growing first, m=−5 has `(z·e^{-iφ})` ring node | t < 5ms |
-| 3 | 5 ms morphology | m=−5 two-ring, m=−4 three-ring structure | `matsui_5ms_morphology_n{32,64}.yaml` |
-| 4 | 0–40 ms population dynamics | N_m(t) matches Fig 2C (loss-free) | `matsui_40ms_dynamics_n64.yaml` |
+| 3 | 5 ms morphology | m=−5 two-ring, m=−4 three-ring structure | `matsui_5ms_morphology_n{32,64}.experiment.jl` |
+| 4 | 0–40 ms population dynamics | N_m(t) matches Fig 2C (loss-free) | `matsui_40ms_dynamics_n64.experiment.jl` |
 | 5 | Imaging reproduction | TOF + Stern-Gerlach 42 mT/m + column density | not started; the pipeline EXISTS — `simulate_rf_sg_tof` / `simulate_tof_with_gradient` / `simulate_tof_scaling` (`analysis/tof{,_multiframe}.jl`) + PSF / saturation / shot noise / binning (`analysis/imaging.jl`). Blocker is the Fig-2C source data, not the code |
 
 ## Configs generated 2026-05-26
 
 ```
 runs/matsui_baseline/
-├── matsui_5ms_morphology_n32.yaml  ← smoke (~3 min GPU)
-├── matsui_5ms_morphology_n64.yaml  ← Level 3 production
-└── matsui_40ms_dynamics_n64.yaml   ← Level 4 production
+├── matsui_5ms_morphology_n32.experiment.jl  ← smoke (~3 min GPU)
+├── matsui_5ms_morphology_n64.experiment.jl  ← Level 3 production
+└── matsui_40ms_dynamics_n64.experiment.jl   ← Level 4 production
 ```
 
 Source: `scripts/validation/matsui_baseline_gen.jl`. Launch via
@@ -205,11 +205,11 @@ collapse-prone cigar stress regime, where the experiment doesn't live.
 
 ## Earlier YAMLs that did NOT match Matsui (now superseded)
 
-- `runs/eu_robust_factorial/*.yaml` (N=30k, c1_ratio=−0.005, isotropic)
+- `runs/eu_robust_factorial/*.experiment.jl` (N=30k, c1_ratio=−0.005, isotropic)
   — these are valid as L4-isotropic robustness factorial but should
   not be claimed as Matsui reproduction. The c1_ratio sign flip alone
   is decisive.
-- `runs/l4_k3_ladder/*.yaml` (N=30k, c1_ratio=−0.005, isotropic)
+- `runs/l4_k3_ladder/*.experiment.jl` (N=30k, c1_ratio=−0.005, isotropic)
   — same. These are the validation Level 9 cross-grid result; not
   Matsui reproduction.
 - `runs/eu_k3_*` (cigar N=30k geometry) — these are *stress test*

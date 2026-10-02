@@ -139,8 +139,8 @@ below is a fact about the observable rather than about the plumbing.
 
 Four arms of the real `klaus_quench` protocol, differing only in the sign of B_z
 (prep, ramp endpoints and hold together) and in Ω. **CPU**, 32³, `lhy: none`,
-DDI on, one seed, HEAD `b2d746cc`. Configs: `klaus_quench_om0p0.yaml` and
-`klaus_quench_omm0p5_keeprot.yaml`, unmodified except for those two knobs.
+DDI on, one seed, HEAD `b2d746cc`. Configs: `klaus_quench_om0p0.experiment.jl` and
+`klaus_quench_omm0p5_keeprot.experiment.jl`, unmodified except for those two knobs.
 
 ### 3.1 Three instrument corrections, each of which changed the answer
 
@@ -342,7 +342,7 @@ anti-alignment in the file so the next reader and the next gate both see it.
 
 ### 4.2 Scope check on the field-rotation branch
 
-`runs/eu151_klaus_phi_phys/config.yaml` — the config #343 §2 flagged as "the
+`runs/eu151_klaus_phi_phys/config.experiment.jl` — the config #343 §2 flagged as "the
 only Eu arc on the m=+F side" — specifies `B: {p: 26700.0}` with
 `init_m_idx: 1`. Since `H = −p·F_z`, **p > 0 puts m = +F at the BOTTOM** of the
 ladder. So that config is *aligned*, i.e. it is on the same side as everything
@@ -395,9 +395,9 @@ This was not in #343's list and is the sharpest thing here.
 
 > | (init m × Ω sign) reversal symmetry | 3-digit match in both branches  **PASS** |
 
-The two arms are `klaus_quench_omm0p5_keeprot.yaml` and
-`klaus_quench_omp0p5_keeprot_mFplus.yaml` — **renamed to
-`klaus_quench_omp0p5_keeprot_mirror.yaml` by `e8dafe8e`** when the corpus was
+The two arms are `klaus_quench_omm0p5_keeprot.experiment.jl` and
+`klaus_quench_omp0p5_keeprot_mFplus.experiment.jl` — **renamed to
+`klaus_quench_omp0p5_keeprot_mirror.experiment.jl` by `e8dafe8e`** when the corpus was
 retargeted, so the `mFplus` name below is the one valid at each commit discussed
 and is NOT what to look for in the tree today. Reading them at `bce2068f~1` — the
 tree the PASS was measured on — and at HEAD:
@@ -528,7 +528,7 @@ state**. Configs are the committed ones, unmodified.
 
 ### 9.1 R1 — the Ω operating window
 
-The 20 `*_holdonly_delay2ms_refine.yaml` cells — the same protocol, grid and
+The 20 `*_holdonly_delay2ms_refine.experiment.jl` cells — the same protocol, grid and
 delay the 0.468 came from, so this is a re-derivation of the same quantity.
 
 | Ω | peak P_adj | Ω | peak P_adj |
@@ -1363,7 +1363,7 @@ and never underflowing. This only bites at the fast-Larmor `p = 26700`.
 
 ### 16.4 What changed
 
-- `init_m_idx` reverted to `1` in `runs/eu151_klaus_phi_phys/config.yaml`, with
+- `init_m_idx` reverted to `1` in `runs/eu151_klaus_phi_phys/config.experiment.jl`, with
   the reason at the line. The config is **knowingly aligned**, i.e. on the wrong
   side for the EdH quench, and says so rather than claiming an anti-alignment it
   cannot have.
@@ -1557,14 +1557,14 @@ already decided elsewhere. Do not re-litigate:
 
 ## 8. Reproducing §2 and §3
 
-Everything here is `run_yaml` on the committed `runs/klaus_quench/*.yaml` with at
+Everything here is `run_experiment` on the committed `runs/klaus_quench/*.experiment.jl` with at
 most three fields changed, so there is no bespoke solver to trust:
 
 | arm set | template | changed |
 |---|---|---|
 | positive control (§2) | — | 16³, DDI off, `initial_state: spin_coherent`, `init_state_params: {init_theta: 1.5708}`, `Bz: ±0.01 Gauss` |
-| §3.2 (4 arms) | `klaus_quench_om0p0.yaml`, `klaus_quench_omm0p5_keeprot.yaml` | sign of every `Bz` incl. both ramp endpoints; `backend` |
-| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mirror.yaml` (called `*_mFplus.yaml` when §3.6 was run; renamed by `e8dafe8e`) | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
+| §3.2 (4 arms) | `klaus_quench_om0p0.experiment.jl`, `klaus_quench_omm0p5_keeprot.experiment.jl` | sign of every `Bz` incl. both ramp endpoints; `backend` |
+| §3.6 (3 arms) | `klaus_quench_om{m,p}0p5_keeprot_mirror.experiment.jl` (called `*_mFplus.experiment.jl` when §3.6 was run; renamed by `e8dafe8e`) | `initial_state`, `rotating_frame_omega`, sign of every `Bz` |
 
 Observables, all from the library (no local reimplementation):
 `spin_populations_trajectory` / `psi_snapshots` (`src/workflow/validation/run_observables.jl`)

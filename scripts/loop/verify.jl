@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
 #
-# scripts/loop/verify.jl <candidate.toml>
+# scripts/loop/verify.jl <candidate.jl>
 #
 # The ISOLATED, three-valued physics verifier for the Loop Engineering inner
 # gate (docs/design/loop_engineering_architecture.md). The loop agent invokes
@@ -11,7 +11,7 @@
 #   VERIFY: ACCEPT|REJECT|ABSTAIN <content_id> <verify_sha> — <reason>
 #   exit 0 (ACCEPT) · 2 (REJECT) · 3 (ABSTAIN) · 4 (malformed input)
 #
-# `content_id` = sha256 of the candidate TOML (the proposal's identity, CAS-
+# `content_id` = sha256 of the candidate Julia definition (the proposal's identity, CAS-
 # style). `verify_sha` = sha256 of THIS script (a version pin, so a token from
 # a tampered verifier is distinguishable — the Stop hook re-runs the frozen
 # good/bad suite to catch silent weakening).
@@ -22,18 +22,10 @@
 # :indeterminate→ABSTAIN (the loop escalates budget on ABSTAIN, never coerces
 # it to ACCEPT).
 #
-# The candidate is DATA (TOML), not code — the agent cannot inject Julia.
-# Schema:
-#   name = "..."                      # informational
-#   [physics]
-#   atom = "Rb87"                     # SpinorBEC atom const (Rb87 / Eu151 / ...)
-#   dims = [64]                       # grid points per spatial dim
-#   box  = [14.0]                     # box size per spatial dim
-#   c0 = 1.0 ; c1 = 0.1 ; q = 0.5     # contact c0/c1 + quadratic Zeeman
-#   [solve]
-#   n_steps = 600 ; tol = 1e-10
-#   [gate]
-#   niter = 60 ; eps_stat = 1e-4 ; bdg_dim_cap = 4000
+# The candidate is a Julia definition; execute only trusted experiment code.
+# Return a dictionary with "name", "physics", "solve", and "gate" entries.
+# Examples live in runs/directions/*.jl; physics contains atom/dims/box/c0/c1/q,
+# solve contains n_steps/tol, and gate contains niter/eps_stat/bdg_dim_cap.
 #
 # Mock mode (harness mechanism tests only): BEC_LOOP_MOCK ∈ {accept,reject,
 # abstain} short-circuits the physics (emits BEFORE loading SpinorBEC) so the
@@ -52,7 +44,7 @@ emit(status, cid, vsha, reason) = println("VERIFY: $status $cid $vsha — $reaso
 verify_sha = _short(bytes2hex(sha256(read(@__FILE__))))
 
 if isempty(ARGS)
-    emit("ABSTAIN", "-", verify_sha, "usage: verify.jl <candidate.toml>")
+    emit("ABSTAIN", "-", verify_sha, "usage: verify.jl <candidate.jl>")
     exit(MALFORMED_RC)
 end
 candidate = ARGS[1]
@@ -76,13 +68,12 @@ end
 
 # --- real physics path (heavy: a ground-state solve + the gate) -------------
 # Loaded only past the mock short-circuit so the mechanism test stays fast.
-using TOML: parsefile
 using SpinorBEC
 
 spec = try
-    parsefile(candidate)
+    SpinorBEC._load_julia_config(candidate)
 catch e
-    emit("ABSTAIN", content_id, verify_sha, "unparseable TOML: $(sprint(showerror, e))")
+    emit("ABSTAIN", content_id, verify_sha, "invalid Julia definition: $(sprint(showerror, e))")
     exit(MALFORMED_RC)
 end
 

@@ -87,7 +87,7 @@ their 2.619 nearer `N = 3.5×10⁴` (predicts 2.663) — which is the value ship
 
   The irony is the finding: that is exactly the initial-state/dynamics mismatch
   hypothesised for *their* code, reproduced by accident in ours because one knob
-  lives in three places. `fig4b_natoms_fixed_n32.yaml` moves all three in
+  lives in three places. `fig4b_natoms_fixed_n32.experiment.jl` moves all three in
   lockstep and drops `N_atoms` from `defaults` so nothing can be injected behind
   the scan.
 

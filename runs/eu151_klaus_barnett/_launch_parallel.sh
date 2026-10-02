@@ -3,7 +3,7 @@
 # batch-2 timing). Loss block makes per-step cost slightly higher than
 # klaus_phi (one extra apply_loss_step! per Y4 macro step).
 #
-# Generates sub-configs first via _gen_subconfigs.py, then xargs -P 2
+# Generates sub-configs first via _gen_subconfigs.jl, then xargs -P 2
 # fans out. Each worker streams its own log to logs/.
 #
 # Usage:
@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../.."
 
 mkdir -p logs
 
-python3 runs/eu151_klaus_barnett/_gen_subconfigs.py
+julia --project=. runs/eu151_klaus_barnett/_gen_subconfigs.jl
 
 PHI_LIST="+4.524 -4.524"
 
@@ -30,7 +30,7 @@ echo "$PHI_LIST" | tr ' ' '\n' | xargs -n 1 -P 2 -I {} bash -c '
     println(\"[\$(now())] phi=$PHI start\")
     flush(stdout)
     t0 = time()
-    run_yaml(\"runs/eu151_klaus_barnett/phi_$PHI/config.yaml\"; base_dir=\"runs\", verbose=true)
+    run_experiment(\"runs/eu151_klaus_barnett/phi_$PHI/config.experiment.jl\"; base_dir=\"runs\", verbose=true)
     println(\"[\$(now())] phi=$PHI done in \$(round((time()-t0)/60; digits=2)) min\")
   " > logs/eu151_klaus_barnett_phi_$PHI.log 2>&1
   echo "[$(date +%H:%M:%S)] finished phi=$PHI" >> logs/eu151_klaus_barnett_par.log

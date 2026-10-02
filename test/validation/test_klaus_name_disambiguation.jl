@@ -36,7 +36,7 @@ Files whose CONTENT this gate governs.
 Deliberately excluded, and the exclusions are the substance of the naming
 decision rather than convenience:
 
-  * `runs/**` — `run_yaml` keys its output directory on the RAW BYTES of the
+  * `runs/**` — `run_experiment` keys its output directory on the RAW BYTES of the
     YAML (`compute_run_dir`). Editing a comment there changes the content id and
     orphans cached `point_*.jld2` that cost GPU-hours. The retired labels stay.
   * `docs/validation/config_prose_harvest.toml` and `config_metadata_blocks.toml`

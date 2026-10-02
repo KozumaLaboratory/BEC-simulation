@@ -10,27 +10,57 @@ using Test
 using SpinorBEC
 
 const _GS_YAML = """
-pipeline:
-  - ground_state:
-      kind: scalar_egpe
-      atom: Dy162
-      a_s: 110
-      grid: {n: [24, 24, 12], box: [10.0, 10.0, 5.0]}
-      interactions: {N_atoms: 2000, omega_ref: 314.1592653589793}
-      ddi: {enabled: true}
-      lhy: {kind: scalar}
-      potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-      B_direction: {theta: 0.6108652}
-      B_magnitude_gauss: 5.333
-      dt: 0.005
-      n_steps: 200
-  - dynamics:
-      kind: scalar_egpe
-      duration: 0.5
-      dt: 0.005
-      B_direction: {theta: 0.6108652, omega: 0.75}
-      wigner_seed: {kT: 4.0, seed: 3}
-      save: {every: 5, column_density: true}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B_direction" => Dict{String, Any}(
+                "theta" => 0.6108652,
+            ),
+            "B_magnitude_gauss" => 5.333,
+            "a_s" => 110,
+            "atom" => "Dy162",
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+            ),
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0, 10.0, 5.0],
+                "n" => [24, 24, 12],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 2000,
+                "omega_ref" => 314.1592653589793,
+            ),
+            "kind" => "scalar_egpe",
+            "lhy" => Dict{String, Any}(
+                "kind" => "scalar",
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 2.6],
+                "type" => "harmonic",
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B_direction" => Dict{String, Any}(
+                "omega" => 0.75,
+                "theta" => 0.6108652,
+            ),
+            "dt" => 0.005,
+            "duration" => 0.5,
+            "kind" => "scalar_egpe",
+            "save" => Dict{String, Any}(
+                "column_density" => true,
+                "every" => 5,
+            ),
+            "wigner_seed" => Dict{String, Any}(
+                "kT" => 4.0,
+                "seed" => 3,
+            ),
+        ),
+    )],
+)
 """
 
 @testset "scalar_egpe YAML surface" begin
@@ -41,7 +71,13 @@ pipeline:
         # Calibration: the same YAML without `kind` must NOT produce these —
         # otherwise the assertion above is about the parser existing, not about
         # `kind` selecting anything.
-        plain = replace(_GS_YAML, "      kind: scalar_egpe\n" => "")
+        plain_data = SpinorBEC._julia_config_string(_GS_YAML)
+        for step in plain_data["pipeline"]
+            for parameters in values(step)
+                pop!(parameters, "kind", nothing)
+            end
+        end
+        plain = repr(plain_data)
         cfg2 = load_config_from_string(plain; strict=false)
         @test !(cfg2.steps[1] isa SpinorBEC.ScalarEGPEGroundStateStep)
     end
@@ -56,10 +92,10 @@ pipeline:
     end
 
     @testset "strict schema still applies to this path" begin
-        bad = replace(
-            _GS_YAML,
-            "      dt: 0.005\n      n_steps: 200" => "      dt: 0.005\n      n_stepss: 200",
-        )
+        bad_data = SpinorBEC._julia_config_string(_GS_YAML)
+        parameters = bad_data["pipeline"][1]["ground_state"]
+        parameters["n_stepss"] = pop!(parameters, "n_steps")
+        bad = repr(bad_data)
         @test_throws ArgumentError load_config_from_string(bad)
     end
 

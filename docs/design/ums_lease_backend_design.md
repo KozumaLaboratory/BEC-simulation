@@ -63,7 +63,7 @@ tick loop that already mixes `:local` + `:uge`. The contract
 | Contract method | UMS implementation |
 |---|---|
 | `stage_in` | identical to UGE (rsync config + optional code sync) — **reuse UGE rsync helpers** |
-| `dispatch!` | `ums-submit --job <lease> --name sb_<cid> --stdout-log … <julia run_yaml>` (requires active lease) |
+| `dispatch!` | `ums-submit --job <lease> --name sb_<cid> --stdout-log … <julia run_experiment>` (requires active lease) |
 | `prepare_status_snapshot` | `ums-list --job <lease>` once per tick → cached JSON |
 | `job_status(...; snapshot=)` | parse the snapshot JSON (see Problem A) |
 | `pull_live` / `collect!` | identical to UGE rsync |

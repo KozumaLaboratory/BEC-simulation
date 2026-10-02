@@ -204,7 +204,7 @@ question, not a change in the tree:
 2. **Directory names were matched whole**, so every CAS name lost to its
    `_<hash>` suffix. Matching the stem too recovered 104.
 3. **Only file *contents* were searched**, not tracked *filenames*. The factorial
-   arms live at `runs/eu_robust_factorial/K0_gdr0_LHY1.yaml` — the config is
+   arms live at `runs/eu_robust_factorial/K0_gdr0_LHY1.experiment.jl` — the config is
    committed, under a name no content grep would surface. That recovered 60.
 
 This is the same failure as the citation matcher two sections up, a fourth time

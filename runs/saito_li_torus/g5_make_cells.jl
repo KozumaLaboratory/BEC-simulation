@@ -1,9 +1,9 @@
-# Generate the convergence + bistability cells for issue #336 from config.yaml.
+# Generate the convergence + bistability cells for issue #336 from config.experiment.jl.
 #
-# One source of truth for the physics: every cell is config.yaml with exactly
+# One source of truth for the physics: every cell is config.experiment.jl with exactly
 # one axis changed, so a cell can never silently disagree with the production
 # config about c_total / c_dd / c_lhy. The cells are written to disk rather
-# than built in memory so each is inspectable and `run_yaml` content-addresses
+# than built in memory so each is inspectable and `run_experiment` content-addresses
 # it independently.
 #
 #   grid convergence : n = 64, 96, 128 at box 6      (dx halves)
@@ -15,13 +15,13 @@
 # both seeds from the same cell and comparing energies is what establishes
 # that here, rather than trusting whichever one ITP happened to find.
 
-using YAML
+using SpinorBEC
 
 const HERE = @__DIR__
 const CELLS = joinpath(HERE, "cells")
 mkpath(CELLS)
 
-base = YAML.load_file(joinpath(HERE, "config.yaml"))
+base = SpinorBEC._load_config_data(joinpath(HERE, "config.experiment.jl"))
 
 function cell(name; n=nothing, box=nothing, seed=nothing, n_steps=nothing)
     d = deepcopy(base)
@@ -35,8 +35,8 @@ function cell(name; n=nothing, box=nothing, seed=nothing, n_steps=nothing)
         step["initial_state"] = "m_plus_F"
         delete!(step, "init_state_params")
     end
-    path = joinpath(CELLS, "$(name).yaml")
-    YAML.write_file(path, d)
+    path = joinpath(CELLS, "$(name).experiment.jl")
+    open(io -> show(io, d), path, "w")
     println("wrote ", relpath(path, dirname(dirname(HERE))))
     path
 end
