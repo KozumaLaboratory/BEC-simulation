@@ -255,8 +255,8 @@ function residual_newton_refine(
 
     # Project out the gauge tangent (norm + phase Goldstone) AND any extra
     # supplied zero modes (vortex / translation Goldstone), orthogonalised.
-    function project(v, prm)
-        w = _tangent_project(v, ψ, prm.dV, prm.n2)
+    function project(v, prm, at=ψ)
+        w = _tangent_project(v, at, prm.dV, prm.n2)
         if extra_nullspace !== nothing
             for m in extra_nullspace
                 w = w .- m .* (ipR(m, w) / ipR(m, m))
@@ -272,8 +272,8 @@ function residual_newton_refine(
     t0 = time_ns()
 
     # ‖gp‖ at the current ψ, reusing the constrained_hessian_params gradient.
-    function residual_norm(prm)
-        gp = project(prm.g, prm)
+    function residual_norm(prm, at=ψ)
+        gp = project(prm.g, prm, at)
         (sqrt(ipR(gp, gp)), gp)
     end
 
@@ -299,7 +299,8 @@ function residual_newton_refine(
             ψt = ψ .+ t .* p
             ψt .*= sqrt(n2_init / ipR(ψt, ψt))
             prm_t = constrained_hessian_params(ws, ψt)
-            gnorm_t, _ = residual_norm(prm_t)
+            # The trial gradient lives in the tangent space at the trial state.
+            gnorm_t, _ = residual_norm(prm_t, ψt)
             if gnorm_t < gnorm
                 ψ = ψt
                 accepted = true

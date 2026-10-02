@@ -75,7 +75,7 @@ function hessian_vector_product(ws, ψ, δ; ε::Float64=1e-5, order::Int=2)
     nδ = sqrt(sum(abs2, δ))
     nδ == 0 && return zero(δ)
     d = δ ./ nδ
-    _g(s) = (out=similar(ψ); fill!(out, 0); energy_gradient!(out, ψ .+ s .* d, ws); out)
+    _g(s) = (out=similar(ψ); fill!(out, 0); gradient_only!(out, ψ .+ s .* d, ws); out)
     if order == 4
         # 5-point stencil: truncation O(ε⁴), so the finite-difference HvP
         # cancellation floor drops from eps^(2/3)≈2e-11 (3-point) to
@@ -111,7 +111,7 @@ function constrained_hessian_params(ws, ψ)
     n2 = real(sum(abs2, ψ)) * dV
     g0 = similar(ψ)
     fill!(g0, 0)
-    energy_gradient!(g0, ψ, ws)
+    gradient_only!(g0, ψ, ws)
     μ = (real(sum(conj.(ψ) .* g0)) * dV) / (2 * n2)
     (; μ, dV, n2, g=g0)
 end

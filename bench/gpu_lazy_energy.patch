@@ -1,0 +1,78 @@
+diff --git i/ext/SpinorBECCUDAExt/gpu_energy.jl w/ext/SpinorBECCUDAExt/gpu_energy.jl
+index eb4c2c42..90ba19bc 100644
+--- i/ext/SpinorBECCUDAExt/gpu_energy.jl
++++ w/ext/SpinorBECCUDAExt/gpu_energy.jl
+@@ -67,6 +67,13 @@ end
+ # The per-term `apply_operator!` (kinetic/DDI FFTs) is the expensive part —
+ # running it once for both energy and gradient (instead of once each in
+ # apply_operator_via_registry! + energy_decomposition) is the fusion win.
++# Reduce a lazy broadcast directly, retaining broadcasting axes (unlike a
++# multi-array mapreduce, which treats differently shaped arrays as iterators).
++# This avoids a full spatial/spinor temporary before the GPU reduction.
++_gpu_energy_sum(f, arrays...) = mapreduce(
++    identity, +, Base.Broadcast.instantiate(Base.Broadcast.broadcasted(f, arrays...))
++)
++
+ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {N}
+     psi = ws.state.psi
+     grid = ws.grid
+@@ -121,7 +128,7 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
+             idx = ntuple(_ -> Colon(), Val(N))
+             fftb .= view(psi, idx..., c)
+             ws.fft_plans.forward * fftb
+-            E_kin += 0.5 * invn * real(sum(ksq .* abs2.(fftb))) * dV
++            E_kin += 0.5 * invn * _gpu_energy_sum((k, p) -> k * abs2(p), ksq, fftb) * dV
+             if accumulate
+                 fftb .*= (0.5 .* ksq)
+                 ws.fft_plans.inverse * fftb
+@@ -133,7 +140,7 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
+     # gradient accumulated directly. Reads ψ+V but skips the out buffer/fill/dot.
+     accum_grad(trap_t)
+     V_bc = reshape(ws.potential_values, size(ws.potential_values)..., 1)
+-    E_trap = real(sum(V_bc .* abs2.(psi))) * dV
++    E_trap = _gpu_energy_sum((v, p) -> v * abs2(p), V_bc, psi) * dV
+     # Zeeman: diagonal (no transverse) has a direct energy Σ_c coef(m_c)·|ψ_c|²;
+     # transverse needs the D×D matrix expectation → keep out+dot.
+     E_zee = if SpinorBEC._has_transverse(zee_t)
+@@ -148,7 +155,7 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
+                 ntuple(_ -> 1, Val(N))..., n_comp,
+             ),
+         )
+-        real(sum(coefvec .* abs2.(psi))) * dV
++        _gpu_energy_sum((z, p) -> z * abs2(p), coefvec, psi) * dV
+     end
+     # Mean-field terms (c0, c1, DDI): DIRECT energy from the small intermediates
+     # (n², |F|², Φ·F) already held in ctx / ddi_bufs — reads ~36-216 MB instead
+@@ -165,7 +172,8 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
+         accum_grad(c1_t)   # (re)computes ctx.fx/fy/fz = spin density
+         E_c1 =
+             0.5 * ws.interactions[1] *
+-            (sum(abs2, ctx.fx) + sum(abs2, ctx.fy) + sum(abs2, ctx.fz)) * dV
++            _gpu_energy_sum((x, y, z) -> abs2(x) + abs2(y) + abs2(z),
++                ctx.fx, ctx.fy, ctx.fz) * dV
+     end
+     # DDI energy, from whichever buffers the ACTIVE path fills.
+     #
+@@ -205,14 +213,17 @@ function _gpu_energy_and_optional_grad(ws::SpinorBEC.Workspace{N}, grad) where {
+         end
+         E_ddi = if pad === nothing
+             b = ws.ddi_bufs
+-            0.5 * sum(b.Phi_x .* b.Fx_r .+ b.Phi_y .* b.Fy_r .+ b.Phi_z .* b.Fz_r) * dV
++            0.5 *
++            _gpu_energy_sum((px, fx, py, fy, pz, fz) -> px * fx + py * fy + pz * fz,
++                b.Phi_x, b.Fx_r, b.Phi_y, b.Fy_r, b.Phi_z, b.Fz_r) * dV
+         else
+             c = ntuple(d -> 1:n_pts[d], Val(N))
+             0.5 *
+-            sum(
+-                view(pad.Phi_x_pad, c...) .* view(pad.Fx_pad, c...) .+
+-                view(pad.Phi_y_pad, c...) .* view(pad.Fy_pad, c...) .+
+-                view(pad.Phi_z_pad, c...) .* view(pad.Fz_pad, c...),
++            _gpu_energy_sum(
++                (px, fx, py, fy, pz, fz) -> px * fx + py * fy + pz * fz,
++                view(pad.Phi_x_pad, c...), view(pad.Fx_pad, c...),
++                view(pad.Phi_y_pad, c...), view(pad.Fy_pad, c...),
++                view(pad.Phi_z_pad, c...), view(pad.Fz_pad, c...),
+             ) * dV
+         end
+     end

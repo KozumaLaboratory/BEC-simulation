@@ -299,6 +299,13 @@ function find_ground_state_lbfgs(;
     # means.
     n_line_search_failures = 0
     stalled = false
+    polish_attempted = false
+    polish_completed = false
+    polish_options = (;
+        tol=min(tol, 1.0e-13), max_outer=newton_max_outer,
+        max_cg=max(newton_max_cg, 120), ε=newton_eps,
+        hvp_order=residual_hvp_order, verbose,
+    )
     t_start = time_ns()
 
     # Initial gradient. `grad` is carried across iterations (the gradient at the
@@ -347,26 +354,30 @@ function find_ground_state_lbfgs(;
             is_sd = true
         end
 
+        # At this scale even the predicted unit-step decrease is lost to
+        # rounding. Try the requested residual solver once; accept the handoff
+        # only when the requested solve tolerance is met, otherwise resume this
+        # unchanged iterate. The polish itself keeps its tighter target; its
+        # roundoff floor need not be below that target on every grid.
+        if residual_polish && !newton_polish && target_magnetization === nothing &&
+            !polish_attempted && isfinite(E) && slope < 0 && E + slope == E
+            polish_attempted = true
+            rr = residual_newton_refine(ws, psi; polish_options...)
+            if rr.grad_norm < tol
+                copyto!(psi, rr.psi)
+                polish_completed = true
+                last_step = step
+                break
+            end
+            copyto!(ws.state.psi, psi)
+        end
+
         # Backtracking-Armijo line search from the natural L-BFGS step α=1.
         # `expand` lets the unscaled steepest-descent step auto-find its scale.
-        # Fuse the first trial with the gradient. `energy_gradient!` returns
-        # both for barely more than the gradient alone, so evaluating the α=1
-        # trial that way and reusing its gradient removes a whole
-        # `total_energy` on the ~85 % of iterations where α=1 is accepted
-        # (n_ls measured at 1.07-1.13).
-        #
-        # GPU: 1.383 ms against `gradient_only!`'s 1.382 — the same fused
-        # kernel, the energy falls out of the pass that forms H·ψ. Saves
-        # 1.306 of a 5.83 ms iteration.
-        #
-        # CPU: this was excluded until `operator_and_energy_via_registry!`
-        # landed, and that was a measurement, not caution — `energy_gradient!`
-        # used to traverse the registry TWICE, 14.2 ms against 6.6 + 7.7 for
-        # the two passes separately, so fusing cost 0.1 ms instead of saving.
-        # Reading each term's energy off the accumulation it already builds
-        # took it to 8.8 ms, and the arithmetic inverts:
-        #   separate  1.08 × 6.63 + 7.71 = 14.9 ms
-        #   fused     8.53 + 0.08 × 6.63 =  9.1 ms
+        # The first trial needs both energy and gradient; evaluating them
+        # together reuses the kinetic/DDI FFTs. Reuse that gradient when α=1
+        # is accepted, avoiding a second operator traversal. Gradient-only
+        # calls skip energy reductions when the energy is already known.
         fused_grad = grad_new
         α, E_trial, psi_accepted, n_ls, grad_ready = _line_search_energy_decrease(
             psi, direction, E, ws, grid, dV, target_magnetization, F;
@@ -501,13 +512,8 @@ function find_ground_state_lbfgs(;
     # steps, so it breaks the √eps·‖g‖ floor that both L-BFGS and Newton-CG hit
     # (see the note above). Opt-in; costs ~max_outer×max_cg HvPs. Use when the
     # grad_norm floor itself is the certificate (BdG / stability gates).
-    if residual_polish
-        rr = residual_newton_refine(
-            ws, psi;
-            tol=min(tol, 1.0e-13), max_outer=newton_max_outer,
-            max_cg=max(newton_max_cg, 120), ε=newton_eps,
-            hvp_order=residual_hvp_order, verbose,
-        )
+    if residual_polish && !polish_completed
+        rr = residual_newton_refine(ws, psi; polish_options...)
         copyto!(psi, rr.psi)
     end
 
@@ -523,11 +529,14 @@ function find_ground_state_lbfgs(;
         ws, psi, converged, last_step;
         k_squared_dev, target_magnetization, F, E_prev=Float64(E_prev),
     )
+    # Polish may change convergence after the L-BFGS loop has stopped.
+    converged = result.grad_norm < tol
+    result = merge(result, (; converged))
     # Expose the final L-BFGS curvature history so ε-continuation (or any warm
     # restart) can thread it into the next solve. Does not touch the atomic
     # {ws.state.psi, energy, grad_norm} spine.
     # `converged` keeps its meaning (grad_norm < tol). `stop_reason` says WHY the
-    # loop ended, which `converged=false` alone cannot distinguish: a solve that
+    # solve ended, which `converged=false` alone cannot distinguish: a solve that
     # ran out of steps while still descending and one that hit its gradient floor
     # at step 25 and then spent 1975 steps proving it both report `false`.
     stop_reason = converged ? :tol : (stalled ? :line_search_stalled : :max_steps)
@@ -560,7 +569,12 @@ function find_ground_state_lbfgs(;
         result,
         (; lbfgs_history=(s_hist, y_hist, rho_hist),
             n_line_search_evals, n_line_search_failures, stop_reason,
-            floor_limited),
+            floor_limited,
+            residual_polish_handoff=if polish_completed
+                :accepted
+            else
+                (polish_attempted ? :fallback : :not_attempted)
+            end),
     )
 end
 

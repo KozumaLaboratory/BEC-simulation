@@ -60,6 +60,14 @@ function _parity_check(builder; rtol_energy=1e-9, rtol_grad=1e-9,
              max(sqrt(sum(abs2, Hpsi_cpu)), 1e-30)
     @test rel_l2 < rtol_grad
     @test isapprox(E_cpu, E_gpu; rtol=rtol_total, atol=atol)
+    # The Hessian uses this traversal without energy reductions. Exercise the
+    # optional terms here too, so an operator that overwrites instead of adds
+    # cannot silently discard earlier terms in the gradient-only path.
+    SpinorBEC.gradient_only!(grad_gpu, ws_gpu.state.psi, ws_gpu)
+    gradient_only_error =
+        sqrt(sum(abs2, grad_cpu .- Array(grad_gpu))) /
+        max(sqrt(sum(abs2, grad_cpu)), 1e-30)
+    @test gradient_only_error < rtol_grad
     return (; ed_cpu, ed_gpu, rel_l2, E_cpu, E_gpu)
 end
 
