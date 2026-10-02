@@ -988,6 +988,9 @@ const FULL_EXTRA = [
     # the cache never loads from it, so only the SECOND GPU run of a given
     # ground state dies.
     "gpu/test_gpu_energy_gradient_host_psi.jl",
+    "gpu/test_gpu_energy_reduction_shapes.jl",
+    "gpu/test_gpu_hessian_gradient_only.jl",
+    "gpu/test_gpu_lbfgs_direction.jl",
     "gpu/test_gpu_spin_rotation_taylor_parity.jl",
     # The OTHER pair of realizations on the device: the warp-cooperative fused
     # Euler kernels vs the one-thread-per-voxel ones. Replaces

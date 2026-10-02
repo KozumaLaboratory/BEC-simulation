@@ -141,3 +141,76 @@ using SpinorBEC
         @test abs(r_poly.energy - 0.5) < 1e-10
     end
 end
+
+@testset "Residual refinement is invariant under a constant potential offset" begin
+    grid = make_grid(GridConfig(64, 16.0))
+    dV = cell_volume(grid)
+    psi = zeros(ComplexF64, 64, 3)
+    psi[:, 2] .= exp.(-grid.x[1] .^ 2 ./ 2) .* (1 .+ 0.01 .* grid.x[1])
+    psi ./= sqrt(sum(abs2, psi) * dV)
+    for offset in (0.0, 100.0)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            potential=HarmonicTrap(1.0), psi_init=psi,
+            sim_params=SimParams(; dt=1e-4, n_steps=1))
+        ws.potential_values .+= offset
+        result = residual_newton_refine(ws, psi; tol=1e-9, max_outer=8,
+            max_cg=80, ε=6e-4, hvp_order=4)
+        g = similar(psi)
+        energy = SpinorBEC.energy_gradient!(g, result.psi, ws)
+        norm2 = sum(abs2, result.psi) * dV
+        mu = real(sum(conj.(result.psi) .* g)) * dV / (2norm2)
+        residual = sqrt(sum(abs2, g .- 2mu .* result.psi) * dV)
+        # Exact oscillator energy and a fresh stationary-equation residual.
+        @test abs(energy - (0.5 + offset)) < 1e-10
+        @test residual < 1e-9
+        @test norm2 ≈ 1.0
+    end
+end
+
+@testset "Residual polish handoff retains its accuracy contract and fallback" begin
+    grid = make_grid(GridConfig(64, 16.0))
+    psi = zeros(ComplexF64, 64, 3)
+    psi[:, 2] .= exp.(-grid.x[1] .^ 2 ./ 2) .* (1 .+ 0.01 .* grid.x[1])
+    psi ./= sqrt(sum(abs2, psi) * cell_volume(grid))
+    function workspace(offset=100.0)
+        ws = make_workspace(; grid, atom=Rb87,
+            interactions=InteractionParams(Dict(0 => 0.0, 1 => 0.0)),
+            potential=HarmonicTrap(1.0), psi_init=psi,
+            sim_params=SimParams(; dt=1e-4, n_steps=1))
+        ws.potential_values .+= offset
+        ws
+    end
+    result = find_ground_state_lbfgs(; ws_init=workspace(), residual_polish=true,
+        tol=1e-10, n_steps=500, verbose=false)
+    @test result.residual_polish_handoff == :accepted
+    @test result.converged
+    @test result.stop_reason == :tol
+    @test result.grad_norm < 1e-10
+    @test abs(result.energy - 100.5) < 1e-10
+
+    # A starved residual solver cannot justify ending the L-BFGS loop.
+    base = find_ground_state_lbfgs(; ws_init=workspace(), tol=1e-10,
+        n_steps=500, verbose=false)
+    fallback = find_ground_state_lbfgs(; ws_init=workspace(), residual_polish=true,
+        newton_max_outer=0, tol=1e-10, n_steps=500, verbose=false)
+    @test fallback.residual_polish_handoff == :fallback
+    @test fallback.last_step == base.last_step
+    @test fallback.n_line_search_evals == base.n_line_search_evals
+    @test fallback.workspace.state.psi == base.workspace.state.psi
+    @test fallback.converged == (fallback.grad_norm < 1e-10)
+
+    # A constant energy offset leaves the exact oscillator state unchanged,
+    # but raises the residual evaluation floor above the internal 1e-13
+    # polish target. Meeting the requested tolerance must accept the handoff.
+    rounded = find_ground_state_lbfgs(; ws_init=workspace(1e4), residual_polish=true,
+        tol=1e-8, n_steps=500, verbose=false)
+    @test rounded.residual_polish_handoff == :accepted
+    @test rounded.converged
+    @test 1e-13 < rounded.grad_norm < 1e-8
+    @test abs(rounded.energy - 10000.5) < 1e-9
+    g = similar(rounded.workspace.state.psi)
+    SpinorBEC.energy_gradient!(g, rounded.workspace.state.psi, rounded.workspace)
+    SpinorBEC._project_constraints!(g, rounded.workspace.state.psi, grid, nothing, 1)
+    @test sqrt(sum(abs2, g) * cell_volume(grid)) < 1e-8
+end
