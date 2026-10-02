@@ -169,7 +169,7 @@ Runs real-time evolution for `n_steps` steps, recording observables (time, energ
 
 ## Experiment System (`workflow/experiments/`)
 
-The experiment system is YAML-driven. Top-level entry points live in `run_registry.jl`; per-step dispatch lives in `pipeline/runner.jl`.
+The experiment system evaluates Julia definitions and persists generated result snapshots. Top-level entry points live in `run_registry.jl`; per-step dispatch lives in `pipeline/runner.jl`.
 
 ### Pipeline shape
 
@@ -184,7 +184,7 @@ pipeline:
 
 Every parameter variation is a **dotted config-path override** (e.g. `pipeline.0.zeeman.p`) — see `CLAUDE.md` "YAML schema" for the full reference. The runner applies each scan point's overrides to the raw YAML dict, re-parses the experiment, and rebuilds a fresh workspace.
 
-For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points (`run_yaml`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`), see `dynamics.md` and `CLAUDE.md` "Entry points".
+For per-step dynamics knobs (sgpe, projected_gp, photon_scattering, loss, pulse_sequence, live_monitor, seed_amplitude/seed_k_cut) and entry points (`run_experiment`, `load_config`, `scan_continuation`, `scan_phase_diagram_2d`), see `dynamics.md` and `CLAUDE.md` "Entry points".
 
 ## I/O (`workflow/io/`)
 
@@ -198,7 +198,7 @@ JLD2 for state. Streaming snapshot format and `SPINORBEC_SCRATCH_DIR` are descri
 | StaticArrays | Stack-allocated spin matrices and spinors |
 | LinearAlgebra | Eigendecomposition for matrix exponentials |
 | JLD2 | Binary state serialization (snapshot frames, scan points) |
-| YAML | Experiment configuration parsing |
+| Julia | Experiment definitions and reusable parameter functions |
 | JSON | Manifests, `_live_status.json` |
 | HTTP | Optional Slack notifications |
 | CodecZlib / CodecZstd | Snapshot compression |
@@ -240,9 +240,9 @@ graph TD
 4. `src/hamiltonian/integrator/split_step.jl` — the inner Strang loop.
 5. `src/solvers/ground_state.jl` — ITP loop.
 6. `src/workflow/experiments/pipeline/runner.jl` — YAML → run dispatch.
-7. `src/workflow/experiments/pipeline/run_registry.jl` — `run_yaml` + scan loop.
+7. `src/workflow/experiments/pipeline/run_registry.jl` — `run_experiment` + scan loop.
 8. `CLAUDE.md` "Type stability boundaries" — recurring pitfall.
 
 ## Key design choices
 
-Don't reverse without careful thought. Listed in `CLAUDE.md` — "Conventions" (DDI normalisation, ITP Zeeman shift, scalar LHY warning, …) and "Constraints" (Workspace type params, all structs in `foundation/types/`, calibration is a YAML preprocessor, snapshots stream at F32, `run_yaml` is resumable). Optional deps live in `ext/` (HTTP, WriteVTK, Makie, CUDA) so the package loads without any of them.
+Don't reverse without careful thought. Listed in `CLAUDE.md` — "Conventions" (DDI normalisation, ITP Zeeman shift, scalar LHY warning, …) and "Constraints" (Workspace type params, all structs in `foundation/types/`, calibration is a YAML preprocessor, snapshots stream at F32, `run_experiment` is resumable). Optional deps live in `ext/` (HTTP, WriteVTK, Makie, CUDA) so the package loads without any of them.

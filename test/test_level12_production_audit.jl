@@ -13,31 +13,53 @@ using Test
 using SpinorBEC
 
 const _BASE_YAML = """
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      interactions: {N_atoms: 100, omega_ref: 1.0, c1_ratio: 0.0}
-      ddi: {enabled: false}
-      lhy: {kind: none}
-      B: {Bz: 0.0, q: 0.0}
-      initial_state: polar
-      init_sigma: 1.0
-      dt: 0.01
-      n_steps: 10
-      tol: 1.0e-6
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
 """
 
 function _yaml_with_lhy(kind)
-    replace(_BASE_YAML, "lhy: {kind: none}" => "lhy: {kind: $kind, c_lhy: 0.1}")
+    data = SpinorBEC._julia_config_string(_BASE_YAML)
+    data["pipeline"][1]["ground_state"]["lhy"] = Dict("kind" => kind, "c_lhy" => 0.1)
+    repr(data)
 end
 
 function _yaml_with_loss()
-    replace(
-        _BASE_YAML,
-        "ddi: {enabled: false}" => "ddi: {enabled: false}\n      loss: {gamma_dr: 0.05}",
-    )
+    data = SpinorBEC._julia_config_string(_BASE_YAML)
+    data["pipeline"][1]["ground_state"]["loss"] = Dict("gamma_dr" => 0.05)
+    repr(data)
 end
 
 function _write_yaml(path::AbstractString, body::AbstractString)
@@ -57,8 +79,8 @@ end
 
     @testset "Control-only tree (lhy=none, no loss) → PASS" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "ctrl.yaml"), _BASE_YAML)
-            _write_yaml(joinpath(tmp, "campaign", "another.yaml"), _BASE_YAML)
+            _write_yaml(joinpath(tmp, "campaign", "ctrl.experiment.jl"), _BASE_YAML)
+            _write_yaml(joinpath(tmp, "campaign", "another.experiment.jl"), _BASE_YAML)
             r = audit_twin_controls(tmp)
             @test r.pass == true
         end
@@ -66,7 +88,7 @@ end
 
     @testset "K3-on without twin → FAIL" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "k3_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "k3_on.experiment.jl"),
                 _yaml_with_loss())
             r = audit_twin_controls(tmp)
             @test r.pass == false
@@ -76,9 +98,9 @@ end
 
     @testset "K3-on with sibling control → PASS" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "k3_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "k3_on.experiment.jl"),
                 _yaml_with_loss())
-            _write_yaml(joinpath(tmp, "campaign", "k3_off.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "k3_off.experiment.jl"),
                 _BASE_YAML)
             r = audit_twin_controls(tmp)
             @test r.pass == true
@@ -87,7 +109,7 @@ end
 
     @testset "LHY-on without twin → FAIL" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "lhy_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "lhy_on.experiment.jl"),
                 _yaml_with_lhy("scalar"))
             r = audit_twin_controls(tmp)
             @test r.pass == false
@@ -97,9 +119,9 @@ end
 
     @testset "LHY-on with sibling control → PASS" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "lhy_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "lhy_on.experiment.jl"),
                 _yaml_with_lhy("scalar"))
-            _write_yaml(joinpath(tmp, "campaign", "lhy_off.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "lhy_off.experiment.jl"),
                 _BASE_YAML)
             r = audit_twin_controls(tmp)
             @test r.pass == true
@@ -108,11 +130,11 @@ end
 
     @testset "Mixed: K3-on + LHY-on + shared control twin → PASS" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign", "k3_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "k3_on.experiment.jl"),
                 _yaml_with_loss())
-            _write_yaml(joinpath(tmp, "campaign", "lhy_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "lhy_on.experiment.jl"),
                 _yaml_with_lhy("scalar"))
-            _write_yaml(joinpath(tmp, "campaign", "everything_off.yaml"),
+            _write_yaml(joinpath(tmp, "campaign", "everything_off.experiment.jl"),
                 _BASE_YAML)
             r = audit_twin_controls(tmp)
             @test r.pass == true
@@ -121,9 +143,9 @@ end
 
     @testset "Twin must be in same directory (not unrelated tree)" begin
         mktempdir() do tmp
-            _write_yaml(joinpath(tmp, "campaign_A", "k3_on.yaml"),
+            _write_yaml(joinpath(tmp, "campaign_A", "k3_on.experiment.jl"),
                 _yaml_with_loss())
-            _write_yaml(joinpath(tmp, "campaign_B", "k3_off.yaml"),
+            _write_yaml(joinpath(tmp, "campaign_B", "k3_off.experiment.jl"),
                 _BASE_YAML)
             r = audit_twin_controls(tmp)
             @test r.pass == false

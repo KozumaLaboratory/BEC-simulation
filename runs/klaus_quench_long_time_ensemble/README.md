@@ -91,7 +91,7 @@ rotating.
 
 **There is no `--smoke` flag and no `--only-point` flag.** Both were written into
 a first draft of the submit script from memory and neither exists: `cli.jl
-launch` takes `[<batch>] <run_name>`, and `run_yaml` has no point selection. To
+launch` takes `[<batch>] <run_name>`, and `run_experiment` has no point selection. To
 smoke one arm, submit `-t 1-1` with a short `h_rt` and expect it to be **killed**
 — that proves the config compiles, the 64³ grid allocates and the first
 snapshots land. It does **not** prove an arm finishes; the local 64³ arms ran

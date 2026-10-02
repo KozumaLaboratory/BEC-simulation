@@ -18,7 +18,7 @@
 #    1  5ms  morphology, n=64   (paper Fig 1 ring morphology)
 #    2  40ms dynamics,   n=64   (paper Fig 2C N_m(t) populations)
 #  Both LOSS-FREE, matching the paper's simulation. The loss-on variants
-#  (matsui_40ms_lossy_*.yaml) are the separate "experiment target" and are not
+#  (matsui_40ms_lossy_*.experiment.jl) are the separate "experiment target" and are not
 #  run here -- claims of "experiment reproduction" need those, claims of
 #  "simulation reproduction" need these. Do not conflate them.
 #
@@ -54,11 +54,11 @@ export SPINORBEC_STORE="${SPINORBEC_STORE:-/gs/bs/work/7/uk07267/runs}"
 mkdir -p "$SPINORBEC_STORE"
 
 if [ "${1:-}" = "SMOKE" ]; then
-    CONFIG=runs/matsui_baseline/matsui_5ms_morphology_n32.yaml
+    CONFIG=runs/matsui_baseline/matsui_5ms_morphology_n32.experiment.jl
 else
     case "${SGE_TASK_ID:-1}" in
-        1) CONFIG=runs/matsui_baseline/matsui_5ms_morphology_n64.yaml ;;
-        2) CONFIG=runs/matsui_baseline/matsui_40ms_dynamics_n64.yaml ;;
+        1) CONFIG=runs/matsui_baseline/matsui_5ms_morphology_n64.experiment.jl ;;
+        2) CONFIG=runs/matsui_baseline/matsui_40ms_dynamics_n64.experiment.jl ;;
         *) echo "no config for task ${SGE_TASK_ID}"; exit 1 ;;
     esac
 fi
@@ -75,6 +75,6 @@ nvidia-smi -L || true
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task ${SGE_TASK_ID:-smoke}] done"

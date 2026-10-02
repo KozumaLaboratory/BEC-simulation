@@ -1,7 +1,12 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 # Precompile workload for the Fig. 4B production path.
 #
 # A sysimage only removes JIT for the methods its workload actually exercises,
-# so this runs the REAL thing: `run_yaml` on the campaign's own config with the
+# so this runs the REAL thing: `run_experiment` on the campaign's own config with the
 # step counts cut to the bone. Same blocks — B ramp, padded DDI, the 3-step
 # pipeline, the analyzers, the JLD2 save — so the
 # specialisations PackageCompiler captures are the ones the campaign pays for.
@@ -23,11 +28,10 @@
 # which will still JIT at runtime. Measure the saving; do not assume it.
 
 using SpinorBEC
-using YAML
 
-const SRC = joinpath(@__DIR__, "..", "runs", "matsui_fig4b", "fig4b_scan_n35k_n32.yaml")
+const SRC = joinpath(@__DIR__, "..", "runs", "matsui_fig4b", "fig4b_scan_n35k_n32.experiment.jl")
 
-d = YAML.load_file(SRC)
+d = SpinorBEC._load_config_data(SRC)
 d["defaults"]["backend"] = "cpu"
 for st in d["pipeline"]
     for (_, blk) in st
@@ -64,12 +68,12 @@ for st in d["pipeline"]
 end
 
 dir = mktempdir()
-cfg = joinpath(dir, "sysimage_warmup.yaml")
-YAML.write_file(cfg, d)
+cfg = joinpath(dir, "sysimage_warmup.experiment.jl")
+_write_julia_fixture(cfg, d)
 
 withenv("SPINORBEC_STORE" => joinpath(dir, "store"),
     "SPINORBEC_STAGE_CACHE" => "1") do
-    run_yaml(cfg; verbose=false)
+    run_experiment(cfg; verbose=false)
 end
 
 @info "workload done (CPU backend; the CuArray specialisations are NOT in this image)"

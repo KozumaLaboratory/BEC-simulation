@@ -101,7 +101,7 @@ end
 #   :info   informational, e.g. unit conversion happened
 #   :warn   user almost certainly wants to know
 #   :error  config has a clear semantic error
-#   :block  WILL break at runtime — run_yaml aborts before sim
+#   :block  WILL break at runtime — run_experiment aborts before sim
 #
 # Add a new check with `register_check!(Check(:id, :sev, fn))`. The
 # registry is a Ref of Vector so test harnesses can swap it.
@@ -214,11 +214,11 @@ end
     inspect_config_string(yaml::AbstractString; n_samples=256, strict=true)
         -> ConfigInspection
 
-Same as `inspect_config` but takes a YAML literal. The `path` field of
+Same as `inspect_config` but evaluates a Julia definition. The `path` field of
 the returned struct is `"<string>"`.
 """
 function inspect_config_string(yaml::AbstractString; n_samples::Int=256, strict::Bool=true)
-    raw = YAML.load(String(yaml))
+    raw = _julia_config_string(yaml)
     raw isa AbstractDict || throw(ArgumentError(
         "inspect_config_string: input did not parse to a mapping"))
     return _inspect_loaded(raw, "<string>"; n_samples, strict)
@@ -285,7 +285,7 @@ end
 
 # Shared inspection over an *already-normalised* dict. Used by both
 # `inspect_config` (which normalises then calls this) and `audit_loaded_data`
-# (the run_yaml hot path, where the run pipeline has already normalised).
+# (the run_experiment hot path, where the run pipeline has already normalised).
 function _inspect_pipeline(normalised::AbstractDict;
     raw::AbstractDict=Dict{Any, Any}(),
     n_samples::Int, audit_only::Bool)
@@ -327,7 +327,7 @@ end
 """
     audit_loaded_data(normalised; raw=Dict()) -> Vector{ConfigWarning}
 
-Fast-path audit for `run_yaml` and similar entry points that have *already*
+Fast-path audit for `run_experiment` and similar entry points that have *already*
 finished `_normalize_and_validate!` (or its piecewise equivalents). Returns
 just the warnings — no trace sampling. Pass `raw` (pre-normalize snapshot)
 to enable input-vs-resolved drop detection; without it that check skips.
@@ -709,7 +709,7 @@ function _trace_dict(t::ResolvedTrace)
     )
 end
 
-# --- Terse one-line formatter (used by the run_yaml audit hook) ---------
+# --- Terse one-line formatter (used by the run_experiment audit hook) ---------
 
 """
     terse_warning_line(w::ConfigWarning) -> String

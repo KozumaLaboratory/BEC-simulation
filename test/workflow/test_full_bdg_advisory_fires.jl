@@ -12,7 +12,7 @@ using Base.CoreLogging: with_logger, SimpleLogger, Info
 # `init in ("polar", "ferromagnetic")`. `ferromagnetic` was retired from the
 # `initial_state` enum in favour of `m_plus_F` / `m_minus_F` and the condition
 # was never updated — so from that day the advisory was a FALSE NEGATIVE on
-# exactly the configs it exists for. `runs/eu_lhy_longtime/LHY_full_bdg_*.yaml`
+# exactly the configs it exists for. `runs/eu_lhy_longtime/LHY_full_bdg_*.experiment.jl`
 # and friends paid the full BdG cost with no hint that `fm_contact` /
 # `fm_dipolar` agree to ~1e-4 (gated by
 # `test/oracles/test_lhy_full_bdg_closed_form_parity.jl`).
@@ -54,7 +54,7 @@ is indistinguishable from the feature being broken.
 """
 function advises(spec)
     mktempdir() do d
-        p = joinpath(d, "probe.yaml")
+        p = joinpath(d, "probe.experiment.jl")
         open(io -> print(io, _to_yaml(spec)), p, "w")
         buf = IOBuffer()
         with_logger(SimpleLogger(buf, Info)) do

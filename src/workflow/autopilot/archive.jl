@@ -19,7 +19,7 @@ const _ARCHIVE_SUBDIR = "_archive"
 """
     ArchivePolicy
 
-Per-state retention windows (days) plus a flag to keep `.jld2` artefacts
+Per-state retention windows (days) plus a flag to keep `.experiment.jld2` artefacts
 or not. `keep_jld2_for_done` defaults to true (recent successful runs
 keep their data); killed_* defaults to false (only structured metadata
 preserved).
@@ -106,7 +106,7 @@ function _archive_one!(entry::QueueEntry, archive_root::String;
             src = joinpath(entry.run_dir, name)
             isfile(src) || continue
             # Keep only small structured files; drop *.jld2 / *.png / etc.
-            if endswith(name, ".toml") || endswith(name, ".yaml") ||
+            if endswith(name, ".toml") || endswith(name, ".experiment.jl") ||
                 endswith(name, ".json") || endswith(name, ".reason")
                 cp(src, joinpath(dst, name))
             end

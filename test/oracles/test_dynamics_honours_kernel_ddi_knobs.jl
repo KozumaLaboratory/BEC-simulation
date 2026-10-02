@@ -19,7 +19,7 @@ using SpinorBEC: make_workspace, InteractionParams, SimParams, ZeemanParams,
 # obligation is not the obligation being met, which is the whole shape of
 # CLAUDE.md commitment 11.
 #
-# Live casualty: `runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml`, whose
+# Live casualty: `runs/eu_ham_only_conservation/eu_ham_only_24_sec.experiment.jl`, whose
 # header states its purpose as "Compare against 24_nonsec to isolate the impact
 # of off-diagonal DDI terms". Both arms ran the dynamics on the SAME
 # (non-secular) kernel, so the comparison measured nothing in that phase. The

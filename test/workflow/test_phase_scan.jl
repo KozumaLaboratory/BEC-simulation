@@ -70,28 +70,40 @@ using FFTW
 
     @testset "YAML parsing - override scan with zip" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 8
-                box: 6.0
-              interactions:
-                c0: 100.0
-                c1: -5.0
-              dt: 0.01
-              n_steps: 100
-              tol: 1e-6
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.0
-              potential: {type: harmonic, omega: [1.0]}
-        scan:
-          zip:
-            pipeline.0.zeeman.p: [0.0, 0.5, 1.0]
-          continuation: true
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 6.0,
+                "n" => 8,
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -5.0,
+            ),
+            "n_steps" => 100,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "continuation" => true,
+        "zip" => Dict{String, Any}(
+            "pipeline.0.zeeman.p" => [0.0, 0.5, 1.0],
+        ),
+    ),
+)
+"""
         config = load_config_from_string(yaml)
         @test config.scan isa OverrideScan
         @test length(config.scan.points) == 3
@@ -102,30 +114,45 @@ using FFTW
 
     @testset "YAML parsing - comparison_runs" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 8
-                box: 6.0
-              interactions:
-                c0: 100.0
-                c1: -5.0
-              dt: 0.01
-              n_steps: 100
-              tol: 1e-6
-              potential: {type: harmonic, omega: [1.0]}
-        scan:
-          zip:
-            pipeline.0.interactions[1]: [-5.0, -1.0, 0.0]
-          comparison_runs:
-            - name: polar
-              override:
-                pipeline.0.initial_state: polar
-            - name: ferro
-              override:
-                pipeline.0.initial_state: m_plus_F
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 6.0,
+                "n" => 8,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -5.0,
+            ),
+            "n_steps" => 100,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "comparison_runs" => [Dict{String, Any}(
+            "name" => "polar",
+            "override" => Dict{String, Any}(
+                "pipeline.0.initial_state" => "polar",
+            ),
+        ), Dict{String, Any}(
+            "name" => "ferro",
+            "override" => Dict{String, Any}(
+                "pipeline.0.initial_state" => "m_plus_F",
+            ),
+        )],
+        "zip" => Dict{String, Any}(
+            "pipeline.0.interactions[1]" => [-5.0, -1.0, 0.0],
+        ),
+    ),
+)
+"""
         config = load_config_from_string(yaml)
         @test length(config.scan.comparison_runs) == 2
         @test config.scan.comparison_runs[1][1] == "polar"
@@ -134,26 +161,36 @@ using FFTW
 
     @testset "YAML parsing - constrained Jz scan" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [8, 8]
-                box: [6.0, 6.0]
-              interactions:
-                c0: 100.0
-                c1: -5.0
-              dt: 0.01
-              n_steps: 100
-              tol: 1e-6
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-        scan:
-          type: constrained_jz
-          target_values: [0.0, 1.0, 2.0]
-          tolerance: 0.1
-          max_iter: 5
-          omega_range: [-5.0, 5.0]
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [6.0, 6.0],
+                "n" => [8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -5.0,
+            ),
+            "n_steps" => 100,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "max_iter" => 5,
+        "omega_range" => [-5.0, 5.0],
+        "target_values" => [0.0, 1.0, 2.0],
+        "tolerance" => 0.1,
+        "type" => "constrained_jz",
+    ),
+)
+"""
         config = load_config_from_string(yaml)
         @test config.scan isa ConstrainedJzScan
         @test length(config.scan.target_values) == 3

@@ -5,7 +5,7 @@ using SpinorBEC
     @testset "clean rotation-assisted EdH quench config — no warnings" begin
         path = joinpath(@__DIR__, "..", "..", "runs",
             "klaus_quench_omm0p1_holdonly_delay2ms_refine_90bfb48f",
-            "config.yaml")
+            "config.experiment.jl")
         if isfile(path)
             ins = inspect_config(path)
             @test ins isa SpinorBEC.ConfigInspection
@@ -33,18 +33,38 @@ using SpinorBEC
 
     @testset "W1: B-direction theta dropped on split-step" begin
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {B_mag: "0.01 Gauss", theta: 3.14159, phi: 0.0}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "B_mag" => "0.01 Gauss",
+                "phi" => 0.0,
+                "theta" => 3.14159,
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         # Structural kind: input_resolved_drop covers the theta drop.
         warns = filter(w -> w.kind === :input_resolved_drop &&
@@ -61,18 +81,38 @@ using SpinorBEC
 
     @testset "W1 suppressed when direction is exactly zero" begin
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {B_mag: "0.01 Gauss", theta: 0.0, phi: 0.0}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "B_mag" => "0.01 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         @test !any(w -> w.kind === :input_resolved_drop &&
                         occursin("theta", w.title), ins.warnings)
@@ -80,23 +120,52 @@ using SpinorBEC
 
     @testset "W2: zero-duration ramp surfaced as quench" begin
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: {from: 0.01, to: 0.0001, duration: 0.0}}
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => Dict{String, Any}(
+                    "duration" => 0.0,
+                    "from" => 0.01,
+                    "to" => 0.0001,
+                ),
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         # Structural kind: boundary_value covers the zero-duration ramp.
         ws = filter(w -> w.kind === :boundary_value &&
@@ -107,23 +176,53 @@ using SpinorBEC
 
     @testset "W3: Hz string conversion surfaced" begin
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-          - dynamics:
-              duration: 0.1
-              dt: 0.001
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: {sinusoidal: {amplitude: 0.001, frequency: "226 Hz"}}}
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => Dict{String, Any}(
+                    "sinusoidal" => Dict{String, Any}(
+                        "amplitude" => 0.001,
+                        "frequency" => "226 Hz",
+                    ),
+                ),
+            ),
+            "dt" => 0.001,
+            "duration" => 0.1,
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         # Structural kind: unit_conversion covers Hz strings (and Gauss, etc.).
         @test any(w -> w.kind === :unit_conversion &&
@@ -132,25 +231,50 @@ using SpinorBEC
 
     @testset "W4: rotating_frame_omega + GPU on spinor" begin
         src = """
-        defaults: {kind: spinor, backend: gpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              backend: gpu
-              rotating_frame_omega: -0.2
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "gpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "backend" => "gpu",
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "rotating_frame_omega" => -0.2,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         # Structural kind: feature_incompat, :warn severity. This was a :block
         # until 2026-07-28. The underlying crash — `_apply_1d_shear_batch!`
@@ -167,18 +291,36 @@ using SpinorBEC
 
     @testset "to_dict round-trips for JSON" begin
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         d = SpinorBEC.to_dict(ins)
         @test d isa Dict
@@ -192,18 +334,33 @@ using SpinorBEC
     @testset "schema error surfaces as :normalize_failed" begin
         # Unknown step-level key under strict validation.
         src = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {Bz: "0.01 Gauss"}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-              definitely_unknown_key: 42
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "definitely_unknown_key" => 42,
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         @test any(w -> w.kind === :normalize_failed && w.severity === :error,
             ins.warnings)
@@ -217,19 +374,41 @@ using SpinorBEC
         # TSUBAME. A preflight that fails valid configs is worse than none:
         # this severity feeds the autopilot gate.
         src = """
-        units: {B: Gauss}
-        dealias: {enabled: true, k_cut: 5.0}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              lhy: {kind: full_bdg}
-              B: {Bz: "0.01 Gauss"}
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "dealias" => Dict{String, Any}(
+        "enabled" => true,
+        "k_cut" => 5.0,
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "full_bdg",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "units" => Dict{String, Any}(
+        "B" => "Gauss",
+    ),
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         @test !any(w -> w.kind === :normalize_failed, ins.warnings)
         @test !any(w -> w.kind === :input_resolved_drop &&
@@ -246,26 +425,42 @@ using SpinorBEC
     @testset "a malformed dealias block is still an error" begin
         # Popping it must not mean ignoring it — the runner throws on this.
         src = """
-        dealias: {enabled: true, no_such_key: 1}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "dealias" => Dict{String, Any}(
+        "enabled" => true,
+        "no_such_key" => 1,
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
         ins = SpinorBEC.inspect_config_string(src)
         @test any(w -> w.kind === :dealias_block_invalid && w.severity === :error,
             ins.warnings)
     end
 
-    # --- run_yaml audit hook (:block aborts + opt-out) -------------------
+    # --- run_experiment audit hook (:block aborts + opt-out) -------------------
     #
-    # The hook lives in `_run_experiment_impl`; we exercise it via run_yaml with
+    # The hook lives in `_run_experiment_impl`; we exercise it via run_experiment with
     # `dry_run=true` so no simulator work happens. Each test writes a YAML
-    # to a tempdir, then asserts on whether run_yaml threw and on what.
+    # to a tempdir, then asserts on whether run_experiment threw and on what.
     #
     # The abort path used to be driven by W4 (rotating_frame_omega + GPU),
     # which was downgraded to :warn on 2026-07-28 once the underlying GPU
@@ -274,47 +469,90 @@ using SpinorBEC
     # the abort coverage survives the downgrade. (`duration ≤ 0` would NOT
     # work: it is `:degenerate` and only emits a :warn.)
     _BLOCK_YAML = """
-    defaults: {kind: spinor, backend: cpu}
-    pipeline:
-      - ground_state:
-          atom: Eu151
-          grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-          potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-          interactions: {N_atoms: 1000, omega_ref: 691.1504}
-          B: {Bz: "0.01 Gauss"}
-          dt: 0.01
-          n_steps: 0
-          tol: 1.0e-6
-    """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 0,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
 
     _W4_YAML = """
-    defaults: {kind: spinor, backend: gpu}
-    pipeline:
-      - ground_state:
-          atom: Eu151
-          grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-          potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-          interactions: {N_atoms: 1000, omega_ref: 691.1504}
-          B: {Bz: "0.01 Gauss"}
-          dt: 0.01
-          n_steps: 10
-          tol: 1.0e-6
-      - dynamics:
-          duration: 1.0
-          dt: 0.01
-          backend: gpu
-          rotating_frame_omega: -0.2
-          interactions: {N_atoms: 1000, omega_ref: 691.1504}
-          B: {Bz: "0.01 Gauss"}
-    """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "gpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+            ),
+            "backend" => "gpu",
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "rotating_frame_omega" => -0.2,
+        ),
+    )],
+)
+"""
 
-    @testset "audit hook: a :block finding aborts run_yaml" begin
+    @testset "audit hook: a :block finding aborts run_experiment" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "block.yaml")
+            p = joinpath(tmp, "block.experiment.jl")
             write(p, _BLOCK_YAML)
             err = nothing
             try
-                run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
+                run_experiment(p; dry_run=true, verbose=false, base_dir=tmp)
             catch e
                 err = e
             end
@@ -326,10 +564,10 @@ using SpinorBEC
 
     @testset "audit hook: W4 is a warning and does NOT abort" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
+            p = joinpath(tmp, "w4.experiment.jl")
             write(p, _W4_YAML)
             ok = try
-                run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
+                run_experiment(p; dry_run=true, verbose=false, base_dir=tmp)
                 true
             catch
                 false
@@ -340,13 +578,13 @@ using SpinorBEC
 
     @testset "audit hook: audit=false bypasses" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
+            p = joinpath(tmp, "w4.experiment.jl")
             write(p, _W4_YAML)
             # No throw is the success criterion. dry_run reaches the dry-run
             # printer rather than the sim; we only care that the audit didn't
             # intercept.
             ok = try
-                run_yaml(p; dry_run=true, verbose=false, audit=false, base_dir=tmp)
+                run_experiment(p; dry_run=true, verbose=false, audit=false, base_dir=tmp)
                 true
             catch
                 false
@@ -357,12 +595,12 @@ using SpinorBEC
 
     @testset "audit hook: SPINORBEC_AUDIT=0 bypasses" begin
         mktempdir() do tmp
-            p = joinpath(tmp, "w4.yaml")
+            p = joinpath(tmp, "w4.experiment.jl")
             write(p, _W4_YAML)
             prev = get(ENV, "SPINORBEC_AUDIT", nothing)
             ENV["SPINORBEC_AUDIT"] = "0"
             ok = try
-                run_yaml(p; dry_run=true, verbose=false, base_dir=tmp)
+                run_experiment(p; dry_run=true, verbose=false, base_dir=tmp)
                 true
             catch
                 false
@@ -379,21 +617,41 @@ using SpinorBEC
 
     @testset "audit_loaded_data fast-path" begin
         # Inspector hot path: takes an already-normalised dict, returns
-        # warnings only, no traces. Used by the run_yaml hook.
+        # warnings only, no traces. Used by the run_experiment hook.
         src = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: {N_atoms: 1000, omega_ref: 691.1504}
-              B: {B_mag: "0.01 Gauss", theta: 3.14159, phi: 0.0}
-              dt: 0.01
-              n_steps: 10
-              tol: 1.0e-6
-        """
-        raw = SpinorBEC.YAML.load(src)
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "B_mag" => "0.01 Gauss",
+                "phi" => 0.0,
+                "theta" => 3.14159,
+            ),
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 691.1504,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
+        raw = SpinorBEC._julia_config_string(src)
         normalised = deepcopy(raw)
         SpinorBEC._normalize_and_validate!(normalised; strict=true)
         ws = audit_loaded_data(normalised; raw)

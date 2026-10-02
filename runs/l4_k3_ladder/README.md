@@ -20,7 +20,7 @@ Total: 12 cells. Configs auto-generated via
 ## Parameters
 
 Identical to L4 Matsui Hamiltonian-only baseline
-(`runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_64.yaml`)
+(`runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_64.experiment.jl`)
 except:
 
 - `t_evolution = 20.0` dimless (~32 ms physical, 3.2 × τ_EdH) — longer
@@ -45,9 +45,9 @@ julia --project=. scripts/validation/l4_k3_ladder_gen.jl --grid 64
 /tmp/run_l4_k3_64.sh           # or hand-loop, see below
 
 # Full ladder (overnight ~5 h GPU):
-for f in runs/l4_k3_ladder/*.yaml; do
+for f in runs/l4_k3_ladder/*.experiment.jl; do
   LD_LIBRARY_PATH=/usr/lib/wsl/lib \
-    julia --project=. -e "import CUDA; using SpinorBEC; run_yaml(\"$f\")"
+    julia --project=. -e "import CUDA; using SpinorBEC; run_experiment(\"$f\")"
 done
 
 # Summarise (handles partial sets):

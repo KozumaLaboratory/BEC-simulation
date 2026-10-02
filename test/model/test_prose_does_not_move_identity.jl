@@ -1,12 +1,12 @@
 using Test
 using SpinorBEC
-using YAML, TOML
+using TOML
 using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpec,
     PotentialSpec, HarmonicSpec, resolve_atom
 
 # Prose must not move the identity — and physics must.
 #
-# Measured 2026-08-03 on `runs/barnett_week1/scalar_rotation_om0p0.yaml`:
+# Measured 2026-08-03 on `runs/barnett_week1/scalar_rotation_om0p0.experiment.jl`:
 #
 #     content_id(with metadata:)    = be787f554832dd43
 #     content_id(without metadata:) = 2d33445c54b918d3
@@ -117,7 +117,10 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
         if !isfile(blocks) || !isdir(runs)
             @test_skip "harvest dump or runs/ not present"
         else
-            recorded = Set(String(b["path"]) for b in TOML.parsefile(blocks)["block"])
+            recorded = Set(
+                replace(String(b["path"]), ".yaml" => ".experiment.jl") for
+                b in TOML.parsefile(blocks)["block"]
+            )
             @test !isempty(recorded)
 
             # No config anywhere still carries the key the schema no longer
@@ -125,9 +128,9 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
             # directly rather than through a diff.
             still = String[]
             for (dir, _, files) in walkdir(runs), f in files
-                (endswith(f, ".yaml") || endswith(f, ".yml")) || continue
+                endswith(f, ".experiment.jl") || continue
                 path = joinpath(dir, f)
-                any(startswith(l, "metadata:") for l in eachline(path)) &&
+                haskey(SpinorBEC._load_config_data(path), "metadata") &&
                     push!(still, relpath(path, root))
             end
             @test isempty(still)
@@ -141,8 +144,8 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
             # These two were deleted on origin/main while this branch was only
             # stripping their `metadata:`; the deletion won the merge.
             const_deleted = Set([
-                "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.yaml",
-                "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.yaml",
+                "runs/config_texture_stir_movie_f5bf647e.pre_masscurrent/config.experiment.jl",
+                "runs/config_texture_stir_movie_f5bf647e.pre_strict/config.experiment.jl",
             ])
 
             # RENAMED is not DELETED, and filing one as the other would be a lie
@@ -154,8 +157,8 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
             # is tracked here. The new path must EXIST, so this cannot become a
             # dumping ground for genuine drift.
             const_renamed = Dict(
-                "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mFplus.yaml" => "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mirror.yaml",
-                "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mFplus.yaml" => "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml",
+                "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mFplus.experiment.jl" => "runs/klaus_quench/klaus_quench_omm0p5_keeprot_mirror.experiment.jl",
+                "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mFplus.experiment.jl" => "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.experiment.jl",
             )
             for (old, new) in const_renamed
                 @test isfile(joinpath(root, new))
@@ -167,9 +170,9 @@ using SpinorBEC: Model, Stage, artifact_id, content_id, GridSpec, InteractionSpe
             # POSITIVE CONTROL: the scan can actually see a `metadata:` block,
             # or `isempty(still)` above is satisfied by a broken reader.
             mktempdir() do d
-                probe = joinpath(d, "probe.yaml")
-                write(probe, "metadata:\n  note: x\npipeline: []\n")
-                @test any(startswith(l, "metadata:") for l in eachline(probe))
+                probe = joinpath(d, "probe.experiment.jl")
+                write(probe, repr(Dict("metadata" => Dict("note" => "x"), "pipeline" => [])))
+                @test haskey(SpinorBEC._load_config_data(probe), "metadata")
             end
         end
     end

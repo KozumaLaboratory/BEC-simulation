@@ -89,40 +89,58 @@ using SpinorBEC:
         @test idof(moved) != b
     end
 
-    # ── Integration: cross-analyze reuse via run_yaml (heavy; env-guarded) ──
+    # ── Integration: cross-analyze reuse via run_experiment (heavy; env-guarded) ──
     if lowercase(get(ENV, "SPINORBEC_RUN_HEAVY_YAML", "")) in ("1", "true", "on")
-        @testset "run_yaml reuses GS across differing analyze blocks" begin
+        @testset "run_experiment reuses GS across differing analyze blocks" begin
             mktempdir() do dir
                 stage = joinpath(dir, "stage")
                 base(an) = """
-                defaults: {kind: spinor, backend: cpu}
-                pipeline:
-                  - ground_state:
-                      atom: Eu151
-                      interactions: {N_atoms: 5000, omega_ref: 691.1504, c1_ratio: 0.03}
-                      grid: {n: [16, 16, 16], box: [8.0, 8.0, 8.0]}
-                      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-                      method: lbfgs
-                      n_steps: 60
-                      tol: 1.0e-7
-                  - analyze: [$an]
-                """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0, 8.0],
+                "n" => [16, 16, 16],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 5000,
+                "c1_ratio" => 0.03,
+                "omega_ref" => 691.1504,
+            ),
+            "method" => "lbfgs",
+            "n_steps" => 60,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-7,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [$(repr(an))],
+    )],
+)
+"""
                 # Two configs identical in physics, differing ONLY in the analyze
                 # block — the GS must be computed once and reused by the second.
                 # This is the whole purpose of a content-addressed stage store,
                 # and it is the property a too-inclusive id would destroy.
-                cfgA = joinpath(dir, "a.yaml");
+                cfgA = joinpath(dir, "a.experiment.jl");
                 write(cfgA, base("{energy_decomposition: {}}"))
-                cfgB = joinpath(dir, "b.yaml");
+                cfgB = joinpath(dir, "b.experiment.jl");
                 write(cfgB, base("{phase_classify_distance: {}}"))
                 withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_STAGE_DIR" => stage) do
                     # Isolated base_dir per config so the per-point cache (runs/<hash>)
                     # doesn't short-circuit the GS step on a re-run of the suite.
-                    run_yaml(cfgA; base_dir=joinpath(dir, "runsA"), verbose=false)
+                    run_experiment(cfgA; base_dir=joinpath(dir, "runsA"), verbose=false)
                     art(d) = filter(f -> endswith(f, ".jld2"), readdir(d))
                     n_after_A = length(art(stage))
                     @test n_after_A == 1                        # one GS artifact cached
-                    run_yaml(cfgB; base_dir=joinpath(dir, "runsB"), verbose=false)
+                    run_experiment(cfgB; base_dir=joinpath(dir, "runsB"), verbose=false)
                     @test length(art(stage)) == n_after_A       # different analyze → NO new GS
                 end
             end
@@ -133,28 +151,55 @@ using SpinorBEC:
         @testset "light points reference stage psi; open_result resolves them" begin
             mktempdir() do dir
                 stage = joinpath(dir, "stage")
-                cfg = joinpath(dir, "c.yaml")
+                cfg = joinpath(dir, "c.experiment.jl")
                 write(
                     cfg,
                     """
-         defaults: {kind: spinor, backend: cpu}
-         pipeline:
-           - ground_state:
-               atom: Eu151
-               interactions: {N_atoms: 5000, omega_ref: 691.1504, c1_ratio: 0.03}
-               grid: {n: [16, 16, 16], box: [8.0, 8.0, 8.0]}
-               potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-               method: lbfgs
-               n_steps: 50
-               tol: 1.0e-7
-           - analyze: [{energy_decomposition: {}}]
-         scan:
-           product: {pipeline.0.interactions.c1_ratio: {from: 0.030, to: 0.031, n: 2}}
-         """,
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "grid" => Dict{String, Any}(
+                "box" => [8.0, 8.0, 8.0],
+                "n" => [16, 16, 16],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 5000,
+                "c1_ratio" => 0.03,
+                "omega_ref" => 691.1504,
+            ),
+            "method" => "lbfgs",
+            "n_steps" => 50,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-7,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "energy_decomposition" => Dict{String, Any}(),
+        )],
+    )],
+    "scan" => Dict{String, Any}(
+        "product" => Dict{String, Any}(
+            "pipeline.0.interactions.c1_ratio" => Dict{String, Any}(
+                "from" => 0.03,
+                "n" => 2,
+                "to" => 0.031,
+            ),
+        ),
+    ),
+)
+""",
                 )
                 withenv("SPINORBEC_STAGE_CACHE" => "1", "SPINORBEC_LIGHT_POINTS" => "1",
                     "SPINORBEC_STAGE_DIR" => stage) do
-                    rd = run_yaml(cfg; base_dir=joinpath(dir, "runs"), verbose=false)
+                    rd = run_experiment(cfg; base_dir=joinpath(dir, "runs"), verbose=false)
                     is_point(f) = startswith(f, "point_") && endswith(f, ".jld2")
                     pts = sort(filter(is_point, readdir(rd)))
                     @test length(pts) == 2

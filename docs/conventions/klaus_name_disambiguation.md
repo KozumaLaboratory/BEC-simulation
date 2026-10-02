@@ -104,7 +104,7 @@ follow the rotating B̂. Record: `docs/manuscript/klaus_quench_protocol_spec_202
 `Klaus-I` / `Klaus-II` strings inside those YAML comments were left alone. This
 is deliberate, for two reasons, not an oversight:
 
-1. **`run_yaml` keys its output directory on the raw bytes of the YAML file**
+1. **`run_experiment` keys its output directory on the raw bytes of the YAML file**
    (`compute_run_dir`, CLAUDE.md architectural commitment 4). Editing a comment
    changes the content id, orphans every cached `point_*.jld2` under that
    directory and silently invalidates results that cost GPU-hours.

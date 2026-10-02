@@ -12,7 +12,7 @@ using SpinorBEC
 #     "LHY does not depend on B" looked like a property of the physics rather
 #     than a dropped argument.
 #   * Nothing errors. A B-scan just gets the same functional at every field —
-#     measured on config_texture_bscan_lhy_full_bdg.yaml, where the instability
+#     measured on config_texture_bscan_lhy_full_bdg.experiment.jl, where the instability
 #     diagnostic `max Im ω` was bit-identical across 50/60/70/80 µG.
 #
 # And it made the table's own warning unactionable: it says "pick a

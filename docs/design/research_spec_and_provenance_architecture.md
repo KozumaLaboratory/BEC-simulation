@@ -388,7 +388,7 @@ drops on purpose.
    are a per-instance `NamedTuple`: hashed and canonicalised, but not
    shape-checkable, because a `NamedTuple`'s field types are per-instance.
 10. **Concurrency.** Two processes computing one id race. The loser's compute is
-    wasted. No locking protocol is defined. `run_yaml` has this property today.
+    wasted. No locking protocol is defined. `run_experiment` has this property today.
 11. **TDHFB, Yoshida and Multistart are not day-1 methods.** `:itp`, `:lbfgs` and
     `:strang` are. CLAUDE.md forbids wiring TDHFB into the pipeline at all.
 
@@ -512,7 +512,7 @@ watching the suite stay green (canary pass, 2026-08-01):
    landed in the GS and rode the `|` accumulation in `_step_dispatch!` — so a
    dynamics-only run killed mid-evolution was still certified and served.
    `test_interrupted_dynamics_recomputes.jl` drives both loops directly and then
-   kills a `run_yaml` mid-dynamics, waiting on `_live_status.json` (written by
+   kills a `run_experiment` mid-dynamics, waiting on `_live_status.json` (written by
    the dynamics step and by nothing else) as the "the GS is done and the RTP is
    running" signal.
    A scheduler-delivered `InterruptException` can also land BETWEEN the pushes
@@ -530,7 +530,7 @@ watching the suite stay green (canary pass, 2026-08-01):
    alias is now published only into a name no point writer has claimed, and a
    rejection on a symlink says so instead of reporting truncation.
 
-**Step 1b — `yaml_to_model` (ADDED 2026-08-01, after step 3 was attempted and
+**Step 1b — `config_to_model` (ADDED 2026-08-01, after step 3 was attempted and
 refused).** The plan as first written went from step 1 to step 3 assuming a
 resolver from raw YAML to a `Model`, and there is none: `src/model.jl:8` itself
 says the rewiring "is Step 1b" while section 6 listed no such step. That is a
@@ -540,7 +540,7 @@ derived from.
 
 Measured before writing this, on the 407 committed configs that carry a
 `ground_state` step, attempting only 4 of the 14 slots (grid, atom,
-interactions, ddi) with the same preprocessing `run_yaml` applies:
+interactions, ddi) with the same preprocessing `run_experiment` applies:
 
 ```
 Model built:  42 / 407
@@ -574,7 +574,7 @@ mode-enum plus value (two fields that can disagree).
 
 Scope: resolve `ground_state` blocks only — that is what admission keys on.
 `Initial`, `InitialSpec` and the dynamics half stay out. The gate is that
-`yaml_to_model` round-trips all committed `ground_state` steps, with any config
+`config_to_model` round-trips all committed `ground_state` steps, with any config
 it cannot resolve listed by name and reason rather than skipped.
 
 **The architectural requirement, and the shape it forces.** Re-interpreting
@@ -600,17 +600,17 @@ Model-construction failures live in `gs_model`, not `resolve_gs`, so
 radius, no `B`, chained inheritance) diffing byte-identical on energies to 14
 digits, ψ samples and workspace digests.
 
-**`yaml_to_model` had to be made PURE in the dealias globals.** Found by the
-corpus gate, not by reading: `_run_yaml_prepare` is only the prepare half of a
+**`config_to_model` had to be made PURE in the dealias globals.** Found by the
+corpus gate, not by reading: `_run_experiment_prepare` is only the prepare half of a
 prepare/execute pair — it applies a top-level `dealias:` block to
 `DEALIAS_2_3_ENABLED[]` / `DEALIAS_K_CUTOFF[]` and leaves them set, and it is
-`run_yaml`'s execute half that restores them in a `finally`
-(`run_registry.jl:421-445`). `yaml_to_model` runs prepare alone, so until it did
+`run_experiment`'s execute half that restores them in a `finally`
+(`run_registry.jl:421-445`). `config_to_model` runs prepare alone, so until it did
 the same restore, resolving a config that carried the block **rewrote the
 `GridSpec` of every config resolved after it in the same session**:
-`runs/validation_level10/L10_F1_smoke.yaml` measured
+`runs/validation_level10/L10_F1_smoke.experiment.jl` measured
 `dealias_two_thirds=false, k_cut=0.0` alone and `true, 10.0` after
-`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml`, and the two models
+`runs/eu_gs_phase_c1_B_kappa/config_boundary_64.experiment.jl`, and the two models
 compared unequal. For a resolver whose output is a content id that is fatal, and
 it is invisible to any single-config test. Both the Refs and the pending-snapshot
 slot are now restored in a `finally`; the order-independence arm of
@@ -643,7 +643,7 @@ so the equality cannot pass vacuously.
 3. **The "364 / 407" measurement used 4 of the 14 slots**, so it saw only the
    `trunc_radius` defect. Over all 14, on the 429 config files under `runs/`
    — of which **407 carry a spinor `ground_state:` step** in the YAML, six of
-   those being refused by `_run_yaml_prepare` before any resolver runs, so 401
+   those being refused by `_run_experiment_prepare` before any resolver runs, so 401
    reach one:
 
    ```
@@ -667,15 +667,15 @@ so the equality cannot pass vacuously.
    c_dd, secular, LHY kind, trap ω, p, q) so that "constructs" and "carries the
    physics" are separate claims.
 
-   The nine `:schema_strict` refusals are `_run_yaml_prepare`'s, and that is the
-   same function `run_yaml` calls (`run_registry.jl:205`), so **those nine are
+   The nine `:schema_strict` refusals are `_run_experiment_prepare`'s, and that is the
+   same function `run_experiment` calls (`run_registry.jl:205`), so **those nine are
    unrunnable today** — independently of anything in this layer.
 
    One pre-existing defect the sweep surfaced and this step does NOT fix:
    `_parse_gs_interactions` (`parsing_blocks.jl:363-391`) tries `c_total`, then
    `N_atoms + omega_ref`, then explicit `c0`/`c1`, with **no warning when a
    later-priority key is present**. Two configs —
-   `runs/verification_suite/yamls/L7{,clean}_loss_only_uniform_K3.yaml`, whose
+   `runs/verification_suite/yamls/L7{,clean}_loss_only_uniform_K3.experiment.jl`, whose
    header says "no trap, no DDI, no contact, no LHY" — declare
    `{N_atoms: 100000, omega_ref: 628.3, c0: 0.0, c1: 0.0}` and therefore run
    with `c0 = 5338.9`, not 0. The model is faithful (both consumers share the
@@ -850,7 +850,7 @@ peak density" — measured, it is **10/7** (`c_0 + 36c_1` = 4687.266 against
 3281.086), and 34 % is `2^(-3/5)`, the figure for a factor 2. The factor 2 is
 the *separate* `cc0_eff` item, which §0.3.5 of the parameter contract **proves
 is degenerate** for a polarised `m = -F` state — so
-`runs/matsui_fig4b/fig4b_gsvariant_n32.yaml` prices a knob the observable cannot
+`runs/matsui_fig4b/fig4b_gsvariant_n32.experiment.jl` prices a knob the observable cannot
 see, and `matsui_reproduction_status.md:22-25` still asserts the retracted
 version. (b) `ZeemanQ = 1 Hz ⇒ 0.68 nT` **checks out** (11q against
 p/h = 16.275 Hz/nT ⇒ 0.6759 nT) and is now a gated arithmetic identity rather
@@ -885,7 +885,7 @@ same blocker two committed tests in `test/model/` already name. Offering the
 ground-state stage as evidence for a dip-width claim would restate a different
 observable, which is the failure the `control` field exists to name. What ships
 instead is the type-**A** claim the tree does support — that
-`fig4b_scan_n32.yaml` resolves to the parameters registered for the paper,
+`fig4b_scan_n32.experiment.jl` resolves to the parameters registered for the paper,
 checked against `ref` rather than against the config's own header prose — plus a
 tripwire that fires the day an `:evolve` producer appears. `Claim`'s constructor
 is the specified 8 lines and no more; the one hole they leave (`evidence =

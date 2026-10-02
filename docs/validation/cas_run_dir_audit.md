@@ -1,4 +1,4 @@
-# `run_yaml`'s run directory is not content-addressed in the CLAUDE.md sense
+# `run_experiment`'s run directory is not content-addressed in the CLAUDE.md sense
 
 > **FROZEN 2026-07-31.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
@@ -31,7 +31,7 @@ commitment #4 — `<sha256(canonical_bytes(spec))[1:16]>` — describes the
    matching basename. That is the safe direction: it wastes compute, it does not
    fabricate agreement.
 
-2. **It does not include the code version — and `run_yaml` skips existing point
+2. **It does not include the code version — and `run_experiment` skips existing point
    files.** Same YAML + a different commit ⇒ same directory ⇒ every point is
    skipped ⇒ **the run silently returns results computed by older code**. This
    is the live hazard, and it is precisely the class the campaign charter was
@@ -48,7 +48,7 @@ commitment #4 — `<sha256(canonical_bytes(spec))[1:16]>` — describes the
 - **18 run directories, 18 distinct `content_id` of their own snapshots.** No two
   runs shared a spec, so nothing could have been read across configs.
 - **No `skip` / `cached` / `exists` message in any run log.** Nothing was reused.
-- **No point file predates its directory's `config.yaml`.** Every point was
+- **No point file predates its directory's `config.experiment.jl`.** Every point was
   written by the job that wrote the snapshot beside it.
 - Every config edit during the campaign changed the file bytes, so every re-run
   got a fresh directory (`fig4b_scan_n32_a5400826` → `_d99c10a7` when
@@ -61,7 +61,7 @@ hashed from the file before it.
 
 ## `content_id` itself is sound
 
-Positive control on `fig4b_scan_n32.yaml`: every deep perturbation moves the id,
+Positive control on `fig4b_scan_n32.experiment.jl`: every deep perturbation moves the id,
 including `dt` by 1 part in 10⁷ and a box edge by 6 parts in 10⁵. It also moves
 on `metadata.target`, which is over-sensitivity again — safe direction.
 
@@ -78,7 +78,7 @@ on `metadata.target`, which is over-sensitivity again — safe direction.
 - **The suffix is 16 hex**, matching commitment #4. Every future directory is
   renamed, so runs cached under the old 8-hex name are recomputed once.
 - **CLAUDE.md commitment #4 now describes both mechanisms** instead of reading as
-  if `run_yaml` used `content_id`.
+  if `run_experiment` used `content_id`.
 - Gated by `test/workflow/test_run_dir_provenance_gate.jl` (tier `fast`), whose
   first assertion is the positive control — a matching clean provenance must be
   ALLOWED, or every other assertion would pass against a gate that rejects

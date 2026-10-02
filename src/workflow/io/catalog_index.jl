@@ -90,7 +90,7 @@ _has_run_jld2(dir::AbstractString) = _find_run_jld2(dir) !== nothing
 
 One flat, sparse row per run, most-recently-touched first. Reads
 summary.json (observables) + state.toml (autopilot status/provenance) +
-mtime only — no jld2. A dir is a "run" if it has config.yaml, a jld2, or
+mtime only — no jld2. A dir is a "run" if it has config.experiment.jl, a jld2, or
 a summary. Cheap enough to recompute per request.
 """
 function run_catalog_index(; runs_root::AbstractString=default_store().root)

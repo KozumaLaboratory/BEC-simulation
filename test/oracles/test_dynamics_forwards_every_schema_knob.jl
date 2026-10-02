@@ -11,7 +11,7 @@ using SpinorBEC:
 #
 # `ddi.secular` did not. The handler re-resolved `trunc_radius` and `padded` and
 # not `secular` / `quasi_2d` / `l_z`, so a step declaring the secular kernel got
-# the full one — and `runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml`,
+# the full one — and `runs/eu_ham_only_conservation/eu_ham_only_24_sec.experiment.jl`,
 # whose stated purpose is "Compare against 24_nonsec to isolate the impact of
 # off-diagonal DDI terms", ran both arms on the same kernel. Fixed 2026-08-19.
 #

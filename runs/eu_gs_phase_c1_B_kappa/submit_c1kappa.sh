@@ -6,9 +6,9 @@
 #
 #  The config path is the FIRST script argument, so one script serves all
 #  three B slices:
-#    qsub -g tga-kozuma-kouhi -N eu_c1k_b0  runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B0.yaml
-#    qsub -g tga-kozuma-kouhi -N eu_c1k_b10 runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B10.yaml
-#    qsub -g tga-kozuma-kouhi -N eu_c1k_b60 runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B60.yaml
+#    qsub -g tga-kozuma-kouhi -N eu_c1k_b0  runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B0.experiment.jl
+#    qsub -g tga-kozuma-kouhi -N eu_c1k_b10 runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B10.experiment.jl
+#    qsub -g tga-kozuma-kouhi -N eu_c1k_b60 runs/eu_gs_phase_c1_B_kappa/submit_c1kappa.sh runs/eu_gs_phase_c1_B_kappa/config_c1kappa_B60.experiment.jl
 # ============================================================
 #$ -cwd
 #$ -N eu_c1kappa
@@ -20,7 +20,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
-CONFIG="${1:?usage: submit_c1kappa.sh <config.yaml>}"
+CONFIG="${1:?usage: submit_c1kappa.sh <config.experiment.jl>}"
 [ -f "$CONFIG" ] || CONFIG="$PROJECT_ROOT/$CONFIG"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
@@ -47,6 +47,6 @@ echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname) cfg=$CONFIG"; nvidia-smi -L
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task $SGE_TASK_ID] done"

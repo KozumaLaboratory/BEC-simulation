@@ -17,7 +17,7 @@ using SpinorBEC
 
 # Step 1: AL scan over the 4-D space (same as R36 but lower n_iter
 # and tighter parameter ranges to keep wall time bounded).
-yaml_path = "runs/measurement_R3x_eu/r37_triple_point_hunt/config.yaml"
+yaml_path = "runs/measurement_R3x_eu/r37_triple_point_hunt/config.experiment.jl"
 
 # In-memory eval_fn that runs the YAML pipeline + extracts scores.
 override_paths = [
@@ -29,7 +29,7 @@ override_paths = [
 bounds = [(-0.05, 0.05), (0.5, 1.5), (0.0, 5.0), (-0.5, 0.5)]
 
 # Use the YAML wrapper so we get free heavy-gate compatibility.
-al = active_learn_phase_scan_yaml(
+al = active_learn_phase_scan_config(
     yaml_path, override_paths, bounds;
     n_init = 15, n_iter = 80,    # 95 evals
     temperature = 0.1, seed = 42, verbose = true,

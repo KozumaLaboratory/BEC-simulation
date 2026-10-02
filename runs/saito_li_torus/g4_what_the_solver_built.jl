@@ -9,7 +9,7 @@
 using SpinorBEC
 using Printf
 
-paths = isempty(ARGS) ? ["runs/saito_li_torus/config.yaml"] : ARGS
+paths = isempty(ARGS) ? ["runs/saito_li_torus/config.experiment.jl"] : ARGS
 
 for path in paths
     cfg = SpinorBEC.load_config(path)

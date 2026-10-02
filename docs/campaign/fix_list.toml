@@ -197,7 +197,7 @@ each config self-consistent by flipping the field, which moved the whole klaus_q
 family from the anti-aligned (Zeeman-highest) preparation the EdH cascade needs into \
 the aligned one, where the rotation enhancement measures -0.45 % against +16.5 %. \
 Every klaus_quench run predating this ref was launched at the preparation that has no \
-effect to measure. It also renamed the two mirror arms *_mFplus.yaml -> *_mirror.yaml, \
+effect to measure. It also renamed the two mirror arms *_mFplus.experiment.jl -> *_mirror.experiment.jl, \
 so a pre-retarget citation of those paths no longer resolves. \
 Added 2026-08-20: the decision document leant on this retarget throughout its section 6.4 \
 and section 9 WITHOUT naming the SHA, so the citation gate had nothing to catch — the \

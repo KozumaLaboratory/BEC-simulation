@@ -2,7 +2,7 @@
 # reversed rather than a different seed.
 #
 # The EdH quench starts from the stretched state at the TOP of the Zeeman ladder.
-# `runs/eu151_klaus_phi_phys/config.yaml` tried to get there with
+# `runs/eu151_klaus_phi_phys/config.experiment.jl` tried to get there with
 # `init_m_idx: 13` and the run COMPLETED, returning ψ with 0 of 212992 entries
 # non-zero and E = 0.0. Imaginary time is a projector onto the LOWEST state, so
 # the highest one picks up `exp(-(E_max-E_min)·dt)` per step — exp(-1602) at

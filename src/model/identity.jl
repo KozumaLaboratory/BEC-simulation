@@ -182,7 +182,7 @@ is why that arm now refuses fieldless types outright (`io.jl`).
 function artifact_id(s::Stage; n::Int=16)
     content_id(
         Dict{String, Any}(
-            "model" => model_toml_dict(s.model),
+            "model" => model_data(s.model),
             "kind" => String(s.kind),
             "method" => String(s.method),
             "backend" => String(s.backend),

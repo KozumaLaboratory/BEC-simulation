@@ -4,8 +4,8 @@
 > date. Re-run the generator when picking the topic up again; existing
 > dispositions are preserved.
 
-Keywords: run_config, run_yaml, native, pipeline. Regenerate with
-`python3 scripts/prior_art.py --topic julia_native_experiment_execution --keywords run_config run_yaml native pipeline`.
+Keywords: run_config, run_experiment, native, pipeline. Regenerate with
+`python3 scripts/prior_art.py --topic julia_native_experiment_execution --keywords run_config run_experiment native pipeline`.
 
 Dispositions: `unread`, `read`, `unrelated`, `superseded`, `depends`
 

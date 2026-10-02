@@ -29,7 +29,7 @@ with experiments defined directly in Julia.
   typed steps. Reuse Julia functions, loops, and comprehensions for protocols
   and sweeps. `run_experiment` saves the input and resolved conditions as JSON,
   writes checkpoints and progress, and refuses stale cached results. Existing
-  YAML configurations remain readable through `run_yaml`.
+  Experiment definitions are Julia code; YAML and TOML input are unsupported.
 - **GPU is not an afterthought.** Both kinetic and DDI paths are CUDA-native
   (CUFFT, in-place broadcasts), with a mixed-precision F32 path for large
   grids.
@@ -61,8 +61,11 @@ Inspect definitions before execution with `inspect_config(experiment)`.
 For a parameter sweep, construct a vector of experiments with a Julia
 comprehension and call `run!.(experiments)`.
 
-Existing YAML files use the same executor through `run_yaml(path)`; they
-are a compatibility input, rather than the required authoring format.
+See [Julia experiment definitions](docs/guides/julia_experiments.md).
+Save a Julia file that returns the `PipelineConfig` and run it with
+`run_experiment("experiment.jl")`. YAML and TOML experiment input is not supported.
+Generated JSON snapshots record conditions for resuming results; they are not an
+additional authoring format.
 
 WSL2 GPU users: prepend `LD_LIBRARY_PATH=/usr/lib/wsl/lib`.
 
@@ -114,7 +117,7 @@ Strang/Yoshida integrators.
 
 ```
 src/    Solvers, Hamiltonian terms, workflow, analysis
-runs/   YAML configs (magnetostir, Einstein–de Haas, phase diagrams, …)
+runs/   Julia experiment definitions (magnetostir, Einstein–de Haas, phase diagrams, …)
 docs/   guides/ reference/ conventions/ design/ validation/ theory/ … (see docs/index.md)
 test/   Tiered suite (fast / ci / oracles / integration / full / physics)
 ext/    CUDA, Makie, HTTP and VTK extensions
@@ -140,7 +143,7 @@ it is gated, and the thing to avoid is duplication nothing compares.
 `docs/conventions/` documents the discipline, including the sign × path audit
 table and the checklist for adding a term.
 
-`docs/reference/yaml_schema_reference.md` is the full YAML schema.
+`docs/reference/yaml_schema_reference.md` is the pipeline parameter reference.
 `docs/index.md` is the documentation map; subsystem design notes live under
 `docs/design/`, and `CLAUDE.md` records the internal conventions and
 architectural boundaries the code is held to.

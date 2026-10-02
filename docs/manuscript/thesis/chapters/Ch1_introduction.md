@@ -202,7 +202,7 @@ limited で、F=6 + DDI + multi-stage pipeline には fit せず、専用 framew
 詳細: Chapter 2 で technical scaffold、Appendix B で API reference。
 
 本研究の全ての mean-field + LHY + TWA + dynamics 結果は SpinorBEC.jl で再現可能、
-runs/ 配下に config.yaml + result.jld2 として repository-tracked。
+runs/ 配下に config.experiment.jl + result.jld2 として repository-tracked。
 
 ---
 

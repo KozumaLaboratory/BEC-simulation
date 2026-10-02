@@ -1,4 +1,4 @@
-# --- multi_fidelity_optimize_yaml end-to-end test (R34, 2026-05-02) ---
+# --- multi_fidelity_optimize_config end-to-end test (R34, 2026-05-02) ---
 #
 # Wires the R33 MFBO into the full YAML pipeline. Tests pin:
 #   1. Override propagation: low_overrides + high_overrides are applied
@@ -8,7 +8,7 @@
 #   3. budget_high cap respected.
 #
 # Each MFBO call runs the full YAML pipeline several times. CLAUDE.md
-# documents that a single `run_yaml` for a trivial config takes >4 min
+# documents that a single `run_experiment` for a trivial config takes >4 min
 # to first output, dominated by `make_workspace` + `find_ground_state`
 # specialisation for the freshly-emitted `Workspace{…23 type params…}`.
 # Skip by default — set SPINORBEC_RUN_HEAVY_YAML=true to opt in (mirrors
@@ -24,23 +24,41 @@ const _SKIP_HEAVY_YAML_MFBO =
 
 # Tiny 1D F=1 YAML — runs in seconds at low fidelity.
 const TINY_YAML = """
-defaults: {kind: spinor}
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [16], box: [10.0]}
-      potential: {type: harmonic, omega: [1.0]}
-      interactions: {c0: 5.0, c1: 0.0}
-      dt: 0.005
-      n_steps: 200
-      tol: 1.0e-5
-      initial_state: polar
-      B: {p: 0.0, q: 0.1}
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-5,
+        ),
+    )],
+)
 """
 
-@testset "multi_fidelity_optimize_yaml — end-to-end" begin
+@testset "multi_fidelity_optimize_config — end-to-end" begin
     # Write the tiny YAML to a temp file.
-    yaml_path = tempname() * ".yaml"
+    yaml_path = tempname() * ".experiment.jl"
     open(yaml_path, "w") do f
         write(f, TINY_YAML)
     end
@@ -64,8 +82,8 @@ pipeline:
     @testset "Function dispatches and respects budget_high" begin
         _SKIP_HEAVY_YAML_MFBO && (@test_skip false; return nothing)
         # Vary c0 in [1, 20] only — single-parameter scan
-        result = multi_fidelity_optimize_yaml(
-            yaml_path,
+        result = multi_fidelity_optimize_config(
+            load_config(yaml_path),
             ["pipeline.0.ground_state.interactions[0]"],
             [(1.0, 20.0)];
             objective_fn=objective_total_energy,

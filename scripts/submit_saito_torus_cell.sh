@@ -1,7 +1,7 @@
 #!/bin/bash
-# TSUBAME (UGE) submit for one `runs/saito_li_torus/cells/*.yaml` resolution cell.
+# TSUBAME (UGE) submit for one `runs/saito_li_torus/cells/*.experiment.jl` resolution cell.
 #
-# #376: `torus_n128_box6.yaml` was generated and never run — the local attempt
+# #376: `torus_n128_box6.experiment.jl` was generated and never run — the local attempt
 # was abandoned when a parallel session had half the GPU and it thrashed. It was
 # not "tried and passed", it is absent.
 #
@@ -24,7 +24,7 @@
 # one.
 #
 # Submit:
-#   qsub -g tga-kozuma-kouhi -v CELL=runs/saito_li_torus/cells/torus_n128_box6.yaml \
+#   qsub -g tga-kozuma-kouhi -v CELL=runs/saito_li_torus/cells/torus_n128_box6.experiment.jl \
 #        scripts/submit_saito_torus_cell.sh
 #
 #$ -cwd
@@ -48,7 +48,7 @@ source scripts/tsubame_setup.sh
 # file it sources.
 set -euo pipefail
 
-CELL="${CELL:?CELL=<path to a cells/*.yaml> is required}"
+CELL="${CELL:?CELL=<path to a cells/*.experiment.jl> is required}"
 [ -f "$CELL" ] || { echo "FATAL: cell not found: $CELL" >&2; exit 1; }
 echo "cell: $CELL"
 
@@ -80,7 +80,7 @@ timeout --signal=INT --kill-after=120 "$BUDGET_S" \
     println("GPU: ", CUDA.name(CUDA.device()),
         "  free/total GiB: ", round.(CUDA.available_memory() / 2^30; digits=2), "/",
         round(CUDA.total_memory() / 2^30; digits=2))
-    run_yaml(cfg)
+    run_experiment(cfg)
 ' "$CELL"
 
 RC=$?

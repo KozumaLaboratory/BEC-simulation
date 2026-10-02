@@ -1,3 +1,4 @@
+using SpinorBEC
 #!/usr/bin/env julia
 # Per-m diagnostic for an EdH-style 3D Eu151 result. Reports populations,
 # Mz drift, density envelope, and the |F→F-k| phase winding signature
@@ -7,18 +8,18 @@
 #   julia --project=. runs/tools/visualize_edh_components.jl <path.jld2> [box]
 #
 # `box` overrides the dimensionless box length per axis (defaults to
-# 20.0 — matches `runs/eu151_edh/config.yaml`). When the input lives
-# under runs/<run>/, the script also reads <run>/config.yaml's
+# 20.0 — matches `runs/eu151_edh/config.experiment.jl`). When the input lives
+# under runs/<run>/, the script also reads <run>/config.experiment.jl's
 # `grid.box` if present; the explicit CLI arg always wins.
 
-using JLD2, Statistics, Printf, YAML
+using JLD2, Statistics, Printf
 
 function _resolve_box(jld2_path::String; cli_box::Union{Nothing, Float64}=nothing)
     cli_box !== nothing && return cli_box
-    cfg_path = joinpath(dirname(jld2_path), "config.yaml")
+    cfg_path = joinpath(dirname(jld2_path), "config.experiment.jl")
     if isfile(cfg_path)
         try
-            data = YAML.load_file(cfg_path)
+            data = SpinorBEC._load_config_data(cfg_path)
             pipeline = get(data, "pipeline", nothing)
             if pipeline isa Vector && !isempty(pipeline)
                 gs = get(pipeline[1], "ground_state", nothing)

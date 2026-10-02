@@ -135,7 +135,7 @@ end
     # `extra_on_step::Union{Nothing, Function}`, so anything `_compose_callbacks`
     # can return must be `<: Function`. `ComposedCallbacks` was NOT, and the
     # defect stayed latent because two simultaneously-active callbacks needed
-    # `live_monitor` on (a `run_yaml` with a run directory) AND an `sgpe:` /
+    # `live_monitor` on (a `run_experiment` with a run directory) AND an `sgpe:` /
     # `projected_gp:` / `photon_scattering:` block. Default-on progress makes two
     # callbacks the ordinary case, so this is pinned rather than rediscovered.
     f = (ws, step, times, energies) -> nothing

@@ -171,20 +171,42 @@ scan(rules, docs) = [
     # rather than in someone's unrelated PR.
     @testset "catches the dead form, spares the live one" begin
         dead = """
-            pipeline:
-              - ground_state:
-                  interactions: {N_atoms: 5, c_lhy: 1135.0}
-                  loss: {K3_per_m: [0.1]}
-                  backend: cuda
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "backend" => "cuda",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 5,
+                "c_lhy" => 1135.0,
+            ),
+            "loss" => Dict{String, Any}(
+                "K3_per_m" => [0.1],
+            ),
+        ),
+    )],
+)
+"""
         live = """
-            pipeline:
-              - ground_state:
-                  interactions: {N_atoms: 5, c1_ratio: 0.0}
-                  lhy: {kind: scalar, c_lhy: 1135.0}
-                  loss: {K3_per_m_cubic: [0.1], K3_per_m_si: ["1e-30 m^6/s"]}
-                  backend: gpu
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "backend" => "gpu",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 5,
+                "c1_ratio" => 0.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "c_lhy" => 1135.0,
+                "kind" => "scalar",
+            ),
+            "loss" => Dict{String, Any}(
+                "K3_per_m_cubic" => [0.1],
+                "K3_per_m_si" => ["1e-30 m^6/s"],
+            ),
+        ),
+    )],
+)
+"""
         hits(body) = [r.label for r in rules if occursin(r.pattern, body)]
         @test "backend: cuda" in hits(dead)
         @test "interactions.c_lhy" in hits(dead)

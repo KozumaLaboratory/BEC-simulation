@@ -132,34 +132,55 @@ read_summary(path) = JSON.parsefile(path; use_mmap=false)
         end
     end
 
-    @testset "D: END TO END — a real `run_yaml` leaves the counts on disk" begin
+    @testset "D: END TO END — a real `run_experiment` leaves the counts on disk" begin
         # The arms above call `_write_exit_summary` directly, which proves the
         # payload and not the WIRING. This one runs a two-point scan twice: the
         # second pass must be served from cache, and the file must say so.
         mktempdir() do dir
-            y = joinpath(dir, "scan.yaml")
+            y = joinpath(dir, "scan.experiment.jl")
             write(
                 y,
                 """
-       scan:
-         zip:
-           pipeline.0.interactions.N_atoms: [100, 2000]
-
-       defaults: {kind: spinor, backend: cpu}
-       pipeline:
-         - ground_state:
-             atom: Rb87
-             grid: {n: [16], box: [8.0]}
-             potential: {type: harmonic, omega: [1.0]}
-             interactions: {N_atoms: 100, omega_ref: 100.0}
-             ddi: {enabled: false}
-             lhy: {kind: none}
-             initial_state: polar
-             method: itp
-             n_steps: 40
-             dt: 1.0e-3
-             tol: 1.0e-6
-       """,
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 40,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "zip" => Dict{String, Any}(
+            "pipeline.0.interactions.N_atoms" => [100, 2000],
+        ),
+    ),
+)
+""",
             )
             _reset_admission_counts!()
             _reset_unmarked_warnings!()
@@ -170,7 +191,7 @@ read_summary(path) = JSON.parsefile(path; use_mmap=false)
             # and the admission counting happens in `admit_payload`, before the check.
             # See test/helpers/cacheable_tree.jl.
             run_dir = with_cacheable_tree() do
-                run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+                run_experiment(y; base_dir=joinpath(dir, "out"), verbose=false)
             end
             summary = joinpath(run_dir, "_exit_summary.json")
             @test isfile(summary)
@@ -185,7 +206,7 @@ read_summary(path) = JSON.parsefile(path; use_mmap=false)
             # constant that any implementation would emit.
             _reset_admission_counts!()
             with_cacheable_tree() do
-                run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+                run_experiment(y; base_dir=joinpath(dir, "out"), verbose=false)
             end
             second_pass = read_summary(summary)["cache"]["admission"]
             @test second_pass["marked"] >= 2

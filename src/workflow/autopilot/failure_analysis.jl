@@ -54,7 +54,7 @@ function analyze_failure(entry::QueueEntry)
     # and step 2 below, which opens `_exit_summary.json` correctly, was doing
     # all the work already.
 
-    # `_exit_summary.json` — `run_yaml`'s atexit hook stamps this with
+    # `_exit_summary.json` — `run_experiment`'s atexit hook stamps this with
     #    exception_type / nan_encountered / oom_killed flags.
     exit_path = joinpath(entry.run_dir, "_exit_summary.json")
     if isfile(exit_path)

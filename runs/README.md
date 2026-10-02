@@ -1,6 +1,6 @@
 # `runs/` — YAML experiment configurations
 
-Each subdirectory holds one experiment: a `config.yaml` describing the
+Each subdirectory holds one experiment: a `config.experiment.jl` describing the
 pipeline (ground state → dynamics → analyzers), with results written
 in-place (`result_legacy.jld2`, `data.json`, `dashboard_data.json`,
 `figs/`, …).
@@ -8,7 +8,7 @@ in-place (`result_legacy.jld2`, `data.json`, `dashboard_data.json`,
 Run a single experiment:
 
 ```bash
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/<name>/config.yaml")'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/<name>/config.experiment.jl")'
 ```
 
 For GPU runs add `LD_LIBRARY_PATH=/usr/lib/wsl/lib` (WSL2). For long-
@@ -115,8 +115,8 @@ across the board. Superseded by `klaus_eu151_v2_*` (proper ramp protocol).
 ## Adding a new run
 
 1. Pick the closest existing config as a template (most thesis work descends
-   from `klaus_eu151_v2_full/config.yaml` or `klaus_eu151_spin_excitation/`).
-2. Copy to `runs/<your_name>/config.yaml`, override only what changes.
-3. Run via `run_yaml("runs/<your_name>/config.yaml")`.
+   from `klaus_eu151_v2_full/config.experiment.jl` or `klaus_eu151_spin_excitation/`).
+2. Copy to `runs/<your_name>/config.experiment.jl`, override only what changes.
+3. Run via `run_experiment("runs/<your_name>/config.experiment.jl")`.
 4. For batch jobs, follow the pattern in `scripts/generate_thesis_batch.jl`
    + `scripts/run_thesis_batch.sh`.

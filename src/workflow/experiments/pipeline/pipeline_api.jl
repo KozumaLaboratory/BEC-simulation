@@ -2,11 +2,11 @@
 
 export load_config, load_config_from_string
 
-"""Load a JSON experiment snapshot or legacy YAML file as a PipelineConfig.
+"""Load a Julia experiment definition or generated result snapshot as a PipelineConfig.
 
 Sets `ENV["SPINORBEC_CONFIG_DIR"]` to the source directory while parsing so
 that relative paths inside the config (e.g. `csv: beams.csv`) resolve
-against the YAML's location rather than the caller's pwd.
+against the definition's location rather than the caller's pwd.
 
 Schema validation runs in strict mode by default — unknown keys raise
 `ArgumentError` instead of `@warn` (silent-drop guard; see the 2026-04-27
@@ -29,11 +29,11 @@ function load_config(path::String; strict::Bool=true)
     end
 end
 
-"""Load a YAML string and return a PipelineConfig.
+"""Evaluate a Julia definition string and return a PipelineConfig.
 
 Schema validation runs in strict mode by default; see `load_config`."""
 function load_config_from_string(yaml_str::String; strict::Bool=true)
-    data = YAML.load(yaml_str)
+    data = _julia_config_string(yaml_str)
     _normalize_and_validate!(data; strict)
     parse_pipeline(data)
 end

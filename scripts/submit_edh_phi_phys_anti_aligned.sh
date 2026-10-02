@@ -12,15 +12,15 @@
 # land on the same energy. A discrepancy would mean the reversal is buggy.
 #
 # What has never run is the PIPELINE-SCALE version. `runs/eu151_klaus_phi_phys/
-# config.yaml` carries `prepare_anti_aligned: true` but was never re-run, so
+# config.experiment.jl` carries `prepare_anti_aligned: true` but was never re-run, so
 # every 151Eu number in
 # `docs/campaign/edh_quench_polarisation_decision.md` sections 3 and 4 is from
 # the ALIGNED preparation. Those are two different physical states, not an old
 # and a new value, so the anti-aligned numbers go BESIDE them.
 #
-# ONE JOB, NOT AN ARRAY, and that is forced rather than chosen: `run_yaml` has
+# ONE JOB, NOT AN ARRAY, and that is forced rather than chosen: `run_experiment` has
 # no point selection (there is no `--only-point`), so the 8-point `scan:` block
-# is indivisible from the outside. What makes that safe is that `run_yaml` IS
+# is indivisible from the outside. What makes that safe is that `run_experiment` IS
 # resumable — it skips any scan point whose `point_*.jld2` already exists — so a
 # task reaped at h_rt costs only the point it was inside. Requeue to continue.
 #
@@ -61,7 +61,7 @@ source scripts/tsubame_setup.sh
 # dependency is what let a failed arm print "done" for twelve days.
 set -euo pipefail
 
-CFG="${PHI_CFG:-runs/eu151_klaus_phi_phys/config.yaml}"
+CFG="${PHI_CFG:-runs/eu151_klaus_phi_phys/config.experiment.jl}"
 [ -f "$CFG" ] || { echo "FATAL: config not found: $CFG" >&2; exit 1; }
 
 # The config must actually carry the preparation this job exists to exercise.
@@ -108,7 +108,7 @@ timeout --signal=INT --kill-after=120 "$BUDGET_S" \
         end
         error("pre-flight found $(length(blockers)) :error warning(s) — refusing to launch")
     end
-    run_yaml(cfg)
+    run_experiment(cfg)
 ' "$CFG"
 
 RC=$?

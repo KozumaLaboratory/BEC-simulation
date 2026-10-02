@@ -165,20 +165,29 @@ using LinearAlgebra
     @testset "YAML parsing with higher-order c_n" begin
         @testset "no higher-rank couplings" begin
             yaml = """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid:
-                    n: 32
-                    box: 10.0
-                  interactions:
-                    c0: 100.0
-                    c1: -5.0
-                  dt: 0.01
-                  n_steps: 10
-                  tol: 1e-4
-                  potential: {type: harmonic, omega: [1.0]}
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -5.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
             config = load_config_from_string(yaml)
             p = config.steps[1].params
             @test p["interactions"]["c0"] == 100.0
@@ -191,22 +200,31 @@ using LinearAlgebra
             # represent KU pair-channel S-couplings (e.g. c₃ → S=2 channel), which
             # must be routed through scattering_lengths or tensor_cache.
             yaml = """
-            pipeline:
-              - ground_state:
-                  atom: Rb87
-                  grid:
-                    n: 32
-                    box: 10.0
-                  interactions:
-                    c0: 100.0
-                    c1: -5.0
-                    c2: 3.0
-                    c4: 1.5
-                  dt: 0.01
-                  n_steps: 10
-                  tol: 1e-4
-                  potential: {type: harmonic, omega: [1.0]}
-            """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -5.0,
+                "c2" => 3.0,
+                "c4" => 1.5,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
             config = load_config_from_string(yaml)
             p = config.steps[1].params
             @test p["interactions"]["c0"] == 100.0

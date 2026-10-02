@@ -152,53 +152,79 @@ using SpinorBEC
 
     @testset "YAML dealias persists across scan points" begin
         # A YAML scan runs multiple points through `run_pipeline` from
-        # one outer `run_yaml` call. Dealias settings come from the
+        # one outer `run_experiment` call. Dealias settings come from the
         # top-level block, so EVERY scan point should see them. This
         # test catches a regression where the snapshot restore (in
         # the per-point loop) could clobber the per-point Refs to the
-        # PRIOR run_yaml's defaults.
+        # PRIOR run_experiment's defaults.
         SpinorBEC.DEALIAS_2_3_ENABLED[] = false
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
 
         # A YAML with `scan:` (2 points sweeping a benign value), all
         # under one outer dealias block. The hook fires once per
-        # run_yaml invocation, so the snapshot pattern must survive
+        # run_experiment invocation, so the snapshot pattern must survive
         # multiple per-point run_pipeline calls inside.
         yaml_text = """
-        dealias:
-          enabled: true
-          k_cut: 8.0
-
-        defaults:
-          kind: spinor
-          backend: cpu
-          interactions: {N_atoms: 50, omega_ref: 1.0}
-
-        scan:
-          parameter_path: pipeline.0.interactions[1]_ratio
-          values: [0.0, 0.01]
-
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [10], box: [10.0]}
-              potential: {type: harmonic, omega: [1.0]}
-              interactions: {N_atoms: 50, omega_ref: 1.0, c1_ratio: 0.0}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0, theta: 0.0, phi: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.005
-              n_steps: 10
-              tol: 1.0e-6
-        """
+Dict{String, Any}(
+    "dealias" => Dict{String, Any}(
+        "enabled" => true,
+        "k_cut" => 8.0,
+    ),
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "interactions" => Dict{String, Any}(
+            "N_atoms" => 50,
+            "omega_ref" => 1.0,
+        ),
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "phi" => 0.0,
+                "q" => 0.0,
+                "theta" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [10],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 50,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "parameter_path" => "pipeline.0.interactions[1]_ratio",
+        "values" => [0.0, 0.01],
+    ),
+)
+"""
 
         yaml_path, io = mktemp()
         try
             write(io, yaml_text)
             close(io)
-            run_yaml(yaml_path; base_dir=mktempdir(), verbose=false)
+            run_experiment(yaml_path; base_dir=mktempdir(), verbose=false)
             # Final state must be restored cleanly even after a scan.
             @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false
             @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
@@ -207,43 +233,69 @@ using SpinorBEC
         end
     end
 
-    @testset "YAML dealias block end-to-end via run_yaml" begin
+    @testset "YAML dealias block end-to-end via run_experiment" begin
         # Smoke test: a minimal YAML config with `dealias:` block triggers
         # the apply_dealias_block! → set Refs → run pipeline → restore
         # Refs flow. Verifies state leakage is prevented across multiple
-        # run_yaml calls.
+        # run_experiment calls.
 
         # State before is reset.
         SpinorBEC.DEALIAS_2_3_ENABLED[] = false
         SpinorBEC.DEALIAS_K_CUTOFF[] = nothing
 
         yaml_text = """
-        dealias:
-          enabled: true
-          k_cut: 8.0
+Dict{String, Any}(
+    "dealias" => Dict{String, Any}(
+        "enabled" => true,
+        "k_cut" => 8.0,
+    ),
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "interactions" => Dict{String, Any}(
+            "N_atoms" => 50,
+            "omega_ref" => 1.0,
+        ),
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+                "phi" => 0.0,
+                "q" => 0.0,
+                "theta" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [12],
+            ),
+            "init_sigma" => 1.0,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 50,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 1.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 20,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
 
-        defaults:
-          kind: spinor
-          backend: cpu
-          interactions: {N_atoms: 50, omega_ref: 1.0}
-
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [12], box: [10.0]}
-              potential: {type: harmonic, omega: [1.0]}
-              interactions: {N_atoms: 50, omega_ref: 1.0, c1_ratio: 0.0}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              B: {Bz: 0.0, q: 0.0, theta: 0.0, phi: 0.0}
-              initial_state: m_plus_F
-              init_sigma: 1.0
-              dt: 0.005
-              n_steps: 20
-              tol: 1.0e-6
-        """
-
-        # Write to a temp file (run_yaml requires path-based input)
+        # Write to a temp file (run_experiment requires path-based input)
         yaml_path, io = mktemp()
         try
             write(io, yaml_text)
@@ -253,7 +305,7 @@ using SpinorBEC
             @test SpinorBEC.DEALIAS_K_CUTOFF[] === nothing
 
             # Run — should temporarily set Refs, then restore in finally.
-            run_yaml(yaml_path; base_dir=mktempdir(), verbose=false)
+            run_experiment(yaml_path; base_dir=mktempdir(), verbose=false)
 
             # Post-run: Refs restored to default.
             @test SpinorBEC.DEALIAS_2_3_ENABLED[] == false

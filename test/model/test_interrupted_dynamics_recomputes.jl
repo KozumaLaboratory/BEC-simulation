@@ -1,3 +1,8 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 # The DYNAMICS half of cutover step 2's interrupt fix. Sibling of
 # `test_interrupted_run_recomputes.jl`, which covers the ITP half.
 #
@@ -17,7 +22,7 @@
 #      step — no scheduler, no wall clock, no race. This is what names the
 #      corruption: forcing either `interrupted[] = false` turns exactly one of
 #      these two testsets red.
-#   2. THE RUN, end to end. `run_yaml` → GS → dynamics, interrupted mid-
+#   2. THE RUN, end to end. `run_experiment` → GS → dynamics, interrupted mid-
 #      evolution, asserting no marker, a tombstone, and a recomputation. Uses
 #      the harness `test_interrupted_run_recomputes.jl` proved functional
 #      (`@async` + `schedule(task, InterruptException(); error=true)`), with the
@@ -29,7 +34,6 @@
 using Test
 using JLD2
 using JSON
-using YAML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload, _has_result,
     _run_simulation_standard!, _run_simulation_leapfrog!, _reset_unmarked_warnings!
@@ -177,13 +181,13 @@ const DYN_DURATION = 100.0
     mktempdir() do dir
         run_dir = joinpath(dir, "run")
         mkpath(run_dir)
-        cfg = joinpath(run_dir, "config.yaml")
-        YAML.write_file(cfg, dyn_interrupt_config())
+        cfg = joinpath(run_dir, "config.experiment.jl")
+        _write_julia_fixture(cfg, dyn_interrupt_config())
         psi_file = joinpath(run_dir, "point_001.jld2")
         res_file = joinpath(run_dir, "result.jld2")
         live = joinpath(run_dir, "_live_status.json")
 
-        task = @async run_yaml(cfg; verbose=true)
+        task = @async run_experiment(cfg; run_dir=dirname(cfg), verbose=true)
         deadline = time() + 900
         while !isfile(live) && !istaskdone(task) && time() < deadline
             sleep(0.005)
@@ -212,7 +216,7 @@ const DYN_DURATION = 100.0
             false
         end
 
-        # THE defect, asserted directly: the interrupt was SWALLOWED, `run_yaml`
+        # THE defect, asserted directly: the interrupt was SWALLOWED, `run_experiment`
         # returned as if nothing had happened, and a full-looking payload is on
         # disk. If this goes false the interrupt escaped and the rest of the
         # testset would be measuring the harmless case.
@@ -251,7 +255,7 @@ const DYN_DURATION = 100.0
         # and the admission counting happens in `admit_payload`, before the check.
         # See test/helpers/cacheable_tree.jl.
         with_cacheable_tree() do
-            run_yaml(cfg; verbose=false)
+            run_experiment(cfg; run_dir=dirname(cfg), verbose=false)
         end
         @test JLD2.load(psi_file)["energy"] == interrupted_gs_E   # GS phase unchanged
         @test isfile(res_file)
@@ -266,7 +270,7 @@ const DYN_DURATION = 100.0
         # dynamics run that finished, or "it recomputed" would be consistent
         # with an admission that recomputes everything.
         t_hit = @elapsed with_cacheable_tree() do
-            run_yaml(cfg; verbose=false)
+            run_experiment(cfg; run_dir=dirname(cfg), verbose=false)
         end
         @test JLD2.load(res_file)["dynamics/times"][end] ≈ DYN_DURATION rtol = 1.0e-6
         @test t_hit < 1.0     # a cache hit is milliseconds; the run is seconds

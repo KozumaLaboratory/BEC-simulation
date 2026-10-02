@@ -268,7 +268,7 @@ This covers the global knobs ONLY. The `:per_run` entries live in the config and
 must be set there; `accuracy_report()` lists them with their reference values so
 the gap is visible rather than assumed away.
 
-**[KNOWN-GAP] Around `run_yaml`, this can produce the degeneracy it exists to
+**[KNOWN-GAP] Around `run_experiment`, this can produce the degeneracy it exists to
 detect.** Both remaining `:global` knobs fail to reach the artifact id, for two
 different reasons:
 

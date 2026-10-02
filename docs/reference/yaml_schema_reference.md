@@ -1,5 +1,9 @@
 # YAML schema — full parameter reference
 
+> Experiment authoring now uses [Julia definitions](../guides/julia_experiments.md).
+> YAML input has been removed. YAML-shaped snippets below describe historical
+> parameter structure, not executable input files.
+
 Authoritative source: `src/workflow/experiments/schema/schema.jl` (canonical
 `FieldSpec` declarations) + `src/workflow/experiments/schema/parsing_blocks.jl`
 + `src/workflow/experiments/schema/B_block.jl` (legacy-alias rejection +
@@ -8,7 +12,7 @@ unified `B:` resolution). Last regenerated 2026-05-23 alongside the
 
 Conventions:
 - A key marked **required** triggers an error if absent under strict
-  mode (default for `run_yaml`).
+  mode (default for `run_experiment`).
 - A key marked **rejected** is intercepted by
   `_reject_unknown_step_keys!` with an `ArgumentError` and a migration
   hint. There is no `[ALIAS]` rescue.

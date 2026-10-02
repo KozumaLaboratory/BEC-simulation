@@ -3,12 +3,12 @@
 YAML configs for the R32-R39 ROI measurement campaign described in
 `docs/archive/MEASUREMENT_CAMPAIGN_PHASE2.md`. Each sub-directory contains:
 
-- `config.yaml` — the canonical Eu thesis-grade input
+- `config.experiment.jl` — the canonical Eu thesis-grade input
 - a `README.md` with the matching `run` command (heavy-gate envvar) and
   the measurement target.
 
 These are designed to be directly drivable from a TSUBAME job script
-via `julia --project=. run_yaml(\"config.yaml\")`. The grids are
+via `julia --project=. run_experiment(\"config.experiment.jl\")`. The grids are
 deliberately conservative (24³ rather than 64³) so a single benchmark
 fits in a few hours; production-quality figures should re-run at 48³+
 with the same physics.
@@ -33,5 +33,5 @@ launching:
 
 ```sh
 export SPINORBEC_RUN_HEAVY_YAML=true
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml")'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.experiment.jl")'
 ```

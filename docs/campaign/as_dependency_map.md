@@ -49,7 +49,7 @@ channels via `interaction_params_from_constraint(; c_total, c1_ratio, F, c_extra
 **$r = 1/36$ is not a measurement.** It is Matsui's paper value, and their own
 shipped code used $1/3600$ (`docs/validation/matsui_campaign_report.md` §2). The
 production config comments `0.0277777778` as "physical Eu (1/36, AFM)"
-(`runs/eu_gs_phase_c1_B_kappa/config.yaml:42`); read that as an assumption.
+(`runs/eu_gs_phase_c1_B_kappa/config.experiment.jl:42`); read that as an assumption.
 
 **One empirical bound on $r$ already exists here, and it is discrete.** The 5 ms
 ring count in $m = -4$ against Matsui's Fig. 1E gives $0.0139 < r \le 0.0278$
@@ -236,7 +236,7 @@ choice. Invariance to $a_S$ is also only one axis of trust: a row marked **N**
 here can still be disqualified by the fix-list ancestry gate in CAMPAIGN §2.
 
 One consequence is worth stating in its own right, because it changes what a live
-config's outputs mean. `runs/eu_gs_phase_c1_B_kappa/config.yaml:72-75` scans
+config's outputs mean. `runs/eu_gs_phase_c1_B_kappa/config.experiment.jl:72-75` scans
 $r \in \{-0.015,\ 0,\ +0.0278\}$, and the ring-count bound in §1 excludes the
 first two for the physical atom. That is the right design for exploring an
 unknown — it is a sensitivity study over $r$, not a set of Eu predictions, and its

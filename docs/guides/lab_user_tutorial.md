@@ -20,7 +20,7 @@ Append a row each calibration day. SpinorBEC will linearly interpolate between r
 
 ## 2. Write the experiment YAML in lab units
 
-`runs/today/config.yaml` (example):
+`runs/today/config.experiment.jl` (example):
 
 ```yaml
 calibration_history:
@@ -76,7 +76,7 @@ Before kicking off a long compute, check the calibration expanded correctly:
 import CUDA
 using SpinorBEC
 
-run_yaml("runs/today/config.yaml"; dry_run = true)
+run_experiment("runs/today/config.experiment.jl"; dry_run = true)
 ```
 
 Output is the post-calibration YAML printed to stdout. Verify `zeeman.p` has become a `"X Gauss"` string and `potential.omega` is now a list of `"Y Hz"` strings.
@@ -84,7 +84,7 @@ Output is the post-calibration YAML printed to stdout. Verify `zeeman.p` has bec
 ## 4. Estimate the run budget
 
 ```julia
-estimate_run_budget("runs/today/config.yaml")
+estimate_run_budget("runs/today/config.experiment.jl")
 ```
 
 Prints VRAM / host RAM / disk estimates so you don't accidentally OOM the GPU.
@@ -94,7 +94,7 @@ Prints VRAM / host RAM / disk estimates so you don't accidentally OOM the GPU.
 Foreground (you wait):
 
 ```julia
-run_yaml("runs/today/config.yaml"; verbose = true)
+run_experiment("runs/today/config.experiment.jl"; verbose = true)
 ```
 
 Detached (overnight, survives Claude session close):
@@ -104,7 +104,7 @@ setsid nohup bash -c '
   LD_LIBRARY_PATH=/usr/lib/wsl/lib \\
   julia --project=. -e "
     import CUDA; using SpinorBEC;
-    run_yaml(\"runs/today/config.yaml\"; verbose=true)
+    run_experiment(\"runs/today/config.experiment.jl\"; verbose=true)
   "' > logs/today.log 2>&1 < /dev/null &
 disown
 ```
@@ -146,10 +146,10 @@ n_peak = d["analyze/droplet_profile/n_peak"]
 
 ## 8. Common patterns
 
-- **Parameter scan**: add a `scan: {product: {pipeline.0.zeeman.p: [...]}}` block; `run_yaml` writes one .jld2 per point and skips existing ones on re-run. See `docs/guides/pipeline_cookbook.md`.
-- **Resume**: just rerun `run_yaml`. Cached point files are skipped.
+- **Parameter scan**: add a `scan: {product: {pipeline.0.zeeman.p: [...]}}` block; `run_experiment` writes one .jld2 per point and skips existing ones on re-run. See `docs/guides/pipeline_cookbook.md`.
+- **Resume**: just rerun `run_experiment`. Cached point files are skipped.
 - **Single-point rerun**: `julia --project=. REPL: run!(Experiment(yaml); force=true) <run_name>` cleans the .checkpoints/ but preserves completed point_NNN.jld2.
-- **Resumable batch**: wrap a sequence of `run_yaml` calls in a `try/catch` so one failure doesn't kill the rest. Each call is already idempotent (cached point files are skipped).
+- **Resumable batch**: wrap a sequence of `run_experiment` calls in a `try/catch` so one failure doesn't kill the rest. Each call is already idempotent (cached point files are skipped).
 
 ## Troubleshooting
 

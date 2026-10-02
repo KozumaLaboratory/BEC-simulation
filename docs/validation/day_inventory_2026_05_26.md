@@ -280,8 +280,8 @@ transfer physics, NOT numerical drift.
 ```
 
 YAMLs already in place:
-- `runs/eu_lhy_longtime/LHY_full_bdg_200ms.yaml` (queued; was
-  `LHY_icosahedral_200ms.yaml` and `kind: icosahedral` until 2026-07-30 — the I_h
+- `runs/eu_lhy_longtime/LHY_full_bdg_200ms.experiment.jl` (queued; was
+  `LHY_icosahedral_200ms.experiment.jl` and `kind: icosahedral` until 2026-07-30 — the I_h
   closed form refuses this config's `c1_ratio < 0`, so both the mode and the file
   name changed)
 - Matsui loss-on YAMLs (Task #C, not yet generated)
@@ -295,10 +295,10 @@ Items 1-3 above dispatched same day, plus the manuscript / thesis
 ### New YAML configs
 
 ```
-runs/matsui_baseline/matsui_40ms_lossy_medium.yaml    K3 = 3e-40 m^6/s (factor 30, K3 sweep "delay"→"sacrificial")
-runs/matsui_baseline/matsui_40ms_lossy_strong.yaml    K3 = 1e-39 m^6/s (factor 100, brackets the medium probe)
-runs/barnett_eu_window/barnett_eu_omm0p3_n64_DDIon.yaml      backend: cpu (see GPU Coriolis gotcha below)
-runs/barnett_eu_window/barnett_eu_omm0p3_n64_N50k_DDIon.yaml backend: cpu
+runs/matsui_baseline/matsui_40ms_lossy_medium.experiment.jl    K3 = 3e-40 m^6/s (factor 30, K3 sweep "delay"→"sacrificial")
+runs/matsui_baseline/matsui_40ms_lossy_strong.experiment.jl    K3 = 1e-39 m^6/s (factor 100, brackets the medium probe)
+runs/barnett_eu_window/barnett_eu_omm0p3_n64_DDIon.experiment.jl      backend: cpu (see GPU Coriolis gotcha below)
+runs/barnett_eu_window/barnett_eu_omm0p3_n64_N50k_DDIon.experiment.jl backend: cpu
 ```
 
 ### Dispatch in progress

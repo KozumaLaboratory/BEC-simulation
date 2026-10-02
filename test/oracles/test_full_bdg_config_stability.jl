@@ -1,5 +1,4 @@
 using Test
-using YAML
 using SpinorBEC
 using SpinorBEC: _parse_gs_interactions, resolve_atom, _extract_spinor,
     _lhy_zeeman_params, _to_zeeman_field, lhy_mean_field_max_growth,
@@ -45,19 +44,19 @@ using SpinorBEC: _parse_gs_interactions, resolve_atom, _extract_spinor,
 
 # path (relative to runs/) => the reason it is allowed to be unstable.
 const _KNOWN_UNSTABLE = Dict(
-    "eu_k3_lhy/LHY_full_bdg.yaml" => "comparator for LHY_fm_dipolar.yaml (#218); instability is dipolar, eps_dd = 0.5402",
-    "eu_k3_lhy_control/LHY_full_bdg_K0.yaml" => "comparator for LHY_fm_dipolar_K0.yaml (#218)",
-    "eu_lhy_longtime/LHY_full_bdg_50ms.yaml" => "comparator for LHY_fm_dipolar_50ms.yaml (#218)",
-    "eu_lhy_longtime/LHY_full_bdg_100ms.yaml" => "comparator for LHY_fm_dipolar_100ms.yaml (#218)",
-    "eu_lhy_longtime/LHY_full_bdg_200ms.yaml" => "comparator for LHY_fm_dipolar_200ms.yaml (#218)",
+    "eu_k3_lhy/LHY_full_bdg.experiment.jl" => "comparator for LHY_fm_dipolar.experiment.jl (#218); instability is dipolar, eps_dd = 0.5402",
+    "eu_k3_lhy_control/LHY_full_bdg_K0.experiment.jl" => "comparator for LHY_fm_dipolar_K0.experiment.jl (#218)",
+    "eu_lhy_longtime/LHY_full_bdg_50ms.experiment.jl" => "comparator for LHY_fm_dipolar_50ms.experiment.jl (#218)",
+    "eu_lhy_longtime/LHY_full_bdg_100ms.experiment.jl" => "comparator for LHY_fm_dipolar_100ms.experiment.jl (#218)",
+    "eu_lhy_longtime/LHY_full_bdg_200ms.experiment.jl" => "comparator for LHY_fm_dipolar_200ms.experiment.jl (#218)",
 
     # The texture campaign. Already documented do-not-run-as-is; the gate reaching
     # the same verdict independently is the point of having it.
-    "eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml" =>
+    "eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.experiment.jl" =>
         "texture campaign: comparing five distinct textures needs one functional, " *
         "and full_bdg is the only one covering all five — see " *
         "docs/validation/full_bdg_scheme_dependence_eu_f6.md",
-    "eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_smoke.yaml" => "smoke twin of config_texture_bscan_lhy_full_bdg.yaml",
+    "eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_smoke.experiment.jl" => "smoke twin of config_texture_bscan_lhy_full_bdg.experiment.jl",
 
     # The movie configs (#164). Here the instability is not a defect to route
     # around: the observable is the EXCITATION — where vortices come from, how the
@@ -65,9 +64,9 @@ const _KNOWN_UNSTABLE = Dict(
     # unstable, so a uniform-mean-field BdG reference is the wrong reference for it
     # by construction (the framing is #214's). eps_LHY's scheme dependence remains
     # a caveat on any ENERGY these quote; it is not one on the vortex count.
-    "eu_gs_phase_c1_B_kappa/config_texture_quench_movie.yaml" => "movie config (#164): observable is the quench response, not eps_LHY",
-    "eu_gs_phase_c1_B_kappa/config_texture_quench_movie_smoke.yaml" => "smoke twin of config_texture_quench_movie.yaml",
-    "eu_gs_phase_c1_B_kappa/config_texture_stir_movie.yaml" =>
+    "eu_gs_phase_c1_B_kappa/config_texture_quench_movie.experiment.jl" => "movie config (#164): observable is the quench response, not eps_LHY",
+    "eu_gs_phase_c1_B_kappa/config_texture_quench_movie_smoke.experiment.jl" => "smoke twin of config_texture_quench_movie.experiment.jl",
+    "eu_gs_phase_c1_B_kappa/config_texture_stir_movie.experiment.jl" =>
         "movie config (#164): observable is vortex nucleation under a rotating " *
         "b_perp, not eps_LHY",
 
@@ -79,7 +78,7 @@ const _KNOWN_UNSTABLE = Dict(
     # other three (scalar / polar_contact / polar_dipolar, 0.956 / 0.951 / 0.951)
     # agree without it, so the conclusion does not hinge on this arm — but the arm
     # itself is not quotable alone. Noted in that suite's RESULTS.md.
-    "lhy_mode_ablation_reconstructed/LHY_full_bdg.yaml" =>
+    "lhy_mode_ablation_reconstructed/LHY_full_bdg.experiment.jl" =>
         "one of five compared arms (c58106a6); scheme-dependent at this ladder, " *
         "and the suite's conclusion is carried by the other three",
 )
@@ -97,11 +96,11 @@ function _full_bdg_configs()
     isdir(_RUNS) || return out
     files = sort([
         root * "/" * n for (root, _, ns) in walkdir(_RUNS) for n in ns
-        if endswith(n, ".yaml") || endswith(n, ".yml")
+        if endswith(n, ".experiment.jl") || endswith(n, ".yml")
     ])
     for f in files
         cfg = try
-            YAML.load_file(f)
+            SpinorBEC._load_config_data(f)
         catch
             continue
         end

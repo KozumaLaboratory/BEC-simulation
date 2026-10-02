@@ -12,20 +12,34 @@ using JSON
 @testset "Dynamics knobs — YAML wiring" begin
     @testset "schema accepts seed_k_cut + live_monitor" begin
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 16, box: 8.0}
-      interactions: {c0: 5.0, c1: 0.0}
-      dt: 0.005
-      n_steps: 5
-      tol: 1.0e-3
-  - dynamics:
-      duration: 0.05
-      dt: 0.01
-      seed_amplitude: 1.0e-6
-      seed_k_cut: 2.5
-      live_monitor: {every: 1}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => 16,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 5,
+            "tol" => 0.001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.05,
+            "live_monitor" => Dict{String, Any}(
+                "every" => 1,
+            ),
+            "seed_amplitude" => 1.0e-6,
+            "seed_k_cut" => 2.5,
+        ),
+    )],
+)
 """)
         @test length(cfg.steps) == 2
         dyn = cfg.steps[2]

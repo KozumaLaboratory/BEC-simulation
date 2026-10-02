@@ -52,7 +52,7 @@ Stacktrace:
  [1] top-level scope
 """,
             )
-            e = QueueEntry("probe"; run_dir=d, spec_path=joinpath(d, "c.yaml"),
+            e = QueueEntry("probe"; run_dir=d, spec_path=joinpath(d, "c.experiment.jl"),
                 status=:killed_bug)
             fa = analyze_failure(e)
             # it found the file at all — the whole defect was that it did not
@@ -66,7 +66,7 @@ Stacktrace:
     # no-evidence category.
     @testset "an empty run dir yields no evidence" begin
         mktempdir() do d
-            e = QueueEntry("empty"; run_dir=d, spec_path=joinpath(d, "c.yaml"),
+            e = QueueEntry("empty"; run_dir=d, spec_path=joinpath(d, "c.experiment.jl"),
                 status=:killed_bug)
             fa = analyze_failure(e)
             @test !occursin("OutOfGPUMemory", String(fa.details))

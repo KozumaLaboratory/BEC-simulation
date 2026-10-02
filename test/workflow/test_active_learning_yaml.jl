@@ -1,4 +1,4 @@
-# --- active_learn_phase_scan_yaml regression (R38, 2026-05-02) ---
+# --- active_learn_phase_scan_config regression (R38, 2026-05-02) ---
 #
 # YAML wrapper for R36 AL. Tests pin:
 #   1. `default_phase_classifier_extractor` correctly pulls `ranking`
@@ -8,7 +8,7 @@
 #
 # Heavy test gate matches `test_multi_fidelity_yaml.jl`: each AL call
 # runs the full YAML pipeline several times, and CLAUDE.md documents
-# that a single `run_yaml` for a trivial config takes >4 min to first
+# that a single `run_experiment` for a trivial config takes >4 min to first
 # output (Workspace specialisation). Skip by default; nightly CI sets
 # SPINORBEC_RUN_HEAVY_YAML=true.
 
@@ -54,33 +54,55 @@ const _SKIP_HEAVY_YAML_AL =
     end
 end
 
-@testset "active_learn_phase_scan_yaml — heavy YAML end-to-end" begin
+@testset "active_learn_phase_scan_config — heavy YAML end-to-end" begin
     _SKIP_HEAVY_YAML_AL && (@test_skip false; return nothing)
 
     # Tiny 1D F=1 YAML with phase_classify_distance analyzer at the end.
     yaml_str = """
-    defaults: {kind: spinor}
-    pipeline:
-      - ground_state:
-          atom: Rb87
-          grid: {n: [16], box: [10.0]}
-          potential: {type: harmonic, omega: [1.0]}
-          interactions: {c0: 5.0, c1: 0.0}
-          dt: 0.005
-          n_steps: 200
-          tol: 1.0e-5
-          initial_state: polar
-          B: {p: 0.0, q: 0.1}
-      - analyze:
-          - phase_classify_distance: {threshold: 0.5}
-    """
-    yaml_path = tempname() * ".yaml"
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 5.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-5,
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "phase_classify_distance" => Dict{String, Any}(
+                "threshold" => 0.5,
+            ),
+        )],
+    )],
+)
+"""
+    yaml_path = tempname() * ".experiment.jl"
     open(yaml_path, "w") do f
         write(f, yaml_str)
     end
 
-    result = active_learn_phase_scan_yaml(
-        yaml_path,
+    result = active_learn_phase_scan_config(
+        load_config(yaml_path),
         ["pipeline.0.ground_state.interactions[1]"],
         [(-1.0, 1.0)];
         n_init=3, n_iter=4,

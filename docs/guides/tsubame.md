@@ -75,25 +75,25 @@ Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN
 ## Edit-test-submit loop
 
 ```bash
-$EDITOR runs/eu151_edh_ext/config.yaml
+$EDITOR runs/eu151_edh_ext/config.experiment.jl
 
 # Dry-run check (calibration applied? schema OK?)
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"; dry_run=true)'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/eu151_edh_ext/config.experiment.jl"; dry_run=true)'
 
 # Preview the rendered qsub script (no submission):
 julia --project=. -e 'using SpinorBEC;
-    print(render_uge_script("default", "runs/eu151_edh_ext/config.yaml";
+    print(render_uge_script("default", "runs/eu151_edh_ext/config.experiment.jl";
         project_root=pwd(), log_dir="logs/tsubame"))'
 
 # Submit through the autopilot (renders the qsub script on the fly):
-julia --project=. scripts/cli.jl autopilot enqueue runs/eu151_edh_ext/config.yaml
+julia --project=. scripts/cli.jl autopilot enqueue runs/eu151_edh_ext/config.experiment.jl
 julia --project=. scripts/cli.jl autopilot tick    # dispatches via UGEBackend
 
 # Or submit a single config directly:
 julia --project=. -e '
     using SpinorBEC
     b = UGEBackend(; ssh_host="tsubame", project_root="...", remote_runs_root="...")
-    e = enqueue!(Experiment("runs/eu151_edh_ext/config.yaml"))
+    e = enqueue!(Experiment("runs/eu151_edh_ext/config.experiment.jl"))
     dispatch!(b, e)
 '
 
@@ -116,7 +116,7 @@ the directive form).
 
 ```bash
 julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
-    runs/foo/config.yaml   # → 144
+    runs/foo/config.experiment.jl   # → 144
 ```
 
 For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the rendered
@@ -124,7 +124,7 @@ script — extend `UGE_PROFILE_DIRECTIVES` with a new `"scan_array"`
 profile carrying the array directive, or pipe `render_uge_script`
 output through `sed`. Each task writes `runs/foo/point_NNN.jld2` (example);
 resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
-env var inside `_run_yaml_scan`).
+env var inside `_run_experiment_scan`).
 
 ### Manual per-job qsub script
 
@@ -189,7 +189,7 @@ pipeline:
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 
-Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` reports VRAM, host RAM, disk per scan point + total disk.
+Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.experiment.jl")` reports VRAM, host RAM, disk per scan point + total disk.
 
 ## Singularity (alternative)
 
@@ -203,24 +203,24 @@ singularity build --fakeroot spinorbec.sif \
 singularity exec --nv \
     --bind /path/to/BEC-simulation:/work \
     spinorbec.sif julia --project=/work -e '
-        using SpinorBEC; run_yaml("/work/runs/eu151_edh_ext/config.yaml")'
+        using SpinorBEC; run_experiment("/work/runs/eu151_edh_ext/config.experiment.jl")'
 ```
 
 The `%post` block pre-warms a depot inside the image so first-time precompile of FFTW / CUDA / etc. is amortised at build time.
 
 ## Checkpoint and resume
 
-`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
+`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_experiment(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
 For multi-attempt mixes of crashes + preemption: enqueue via
-`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` (example)
+`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.experiment.jl` (example)
 and let the autopilot's `retry_failed!` (called per-tick by the systemd
 timer) handle re-dispatch with profile escalation on OOM/TIMEOUT.
 
 ## High-res scan inventory (target table for `runs/tsubame_scan/` (example))
 
 Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
-on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
+on `runs/klaus_eu151_v2_full/config.experiment.jl` (gone) as the template:
 
 ### Dy164 (3 configs)
 | name | grid | duration | est. wall (H100) |
@@ -261,7 +261,7 @@ rsync -av --include='*.jld2' --include='*/' --exclude='*' \
 julia --project=. -e '
     using SpinorBEC
     exps = [Experiment(p) for p in
-            sort(filter(endswith(".yaml"), readdir("runs/tsubame_scan"; join=true)))]
+            sort(filter(endswith(".experiment.jl"), readdir("runs/tsubame_scan"; join=true)))]
     tab = tabulate(exps, [norm_drift, Fz_t, per_m_t])
 '
 ```

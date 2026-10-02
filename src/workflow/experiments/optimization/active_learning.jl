@@ -1,6 +1,6 @@
 # --- Active learning for phase-boundary scan (R36, 2026-05-02) ---
 
-export active_learn_phase_scan, active_learn_phase_scan_yaml
+export active_learn_phase_scan, active_learn_phase_scan_config
 export phase_entropy_uncertainty, default_phase_classifier_extractor
 
 # Reuses the existing `classify_phase_distance` output (a list of phase
@@ -149,7 +149,7 @@ function active_learn_phase_scan(
 end
 
 """
-    active_learn_phase_scan_yaml(yaml_path, override_paths, bounds;
+    active_learn_phase_scan_config(yaml_path, override_paths, bounds;
                                  phase_classifier_extractor=default_phase_classifier_extractor,
                                  n_init=5, n_iter=50, temperature=0.1,
                                  ℓ=nothing, n_grid=20, seed=42,
@@ -158,7 +158,7 @@ end
         → BO-result tuple
 
 YAML wrapper for [`active_learn_phase_scan`](@ref). Like
-`bayesian_optimize_yaml` and `multi_fidelity_optimize_yaml`, takes a
+`bayesian_optimize_config` and `multi_fidelity_optimize_config`, takes a
 base YAML config + override paths and runs the full pipeline at each
 candidate point. The pipeline must produce a phase classification (via
 an `analyze:` step running `phase_classify_distance`); this wrapper
@@ -180,8 +180,8 @@ heavy gate compatibility.
 
 See `active_learn_phase_scan` for the in-memory API.
 """
-function active_learn_phase_scan_yaml(
-    yaml_path::AbstractString,
+function active_learn_phase_scan_config(
+    config::Union{PipelineConfig, AbstractDict},
     override_paths::Vector{<:AbstractString},
     bounds::Vector{Tuple{Float64, Float64}};
     phase_classifier_extractor::Function=default_phase_classifier_extractor,
@@ -197,7 +197,7 @@ function active_learn_phase_scan_yaml(
     length(override_paths) == length(bounds) || throw(ArgumentError(
         "override_paths and bounds must have same length"))
 
-    base_dict = YAML.load_file(yaml_path; dicttype=Dict{String, Any})
+    base_dict = deepcopy(_native_config_data(config isa PipelineConfig ? config.raw_data : config))
 
     eval_count = Ref(0)
     function eval_fn(p::AbstractVector{<:Real})
@@ -229,7 +229,7 @@ function active_learn_phase_scan_yaml(
             y_history=res.y_history,
             override_paths=collect(override_paths),
             bounds=bounds,
-            yaml_path=yaml_path,
+            config=base_dict,
             n_init=n_init,
             n_iter=n_iter,
             temperature=temperature,
@@ -243,7 +243,7 @@ end
 """
     default_phase_classifier_extractor(result) → Vector{NamedTuple}
 
-Default extractor used by `active_learn_phase_scan_yaml`. Reads
+Default extractor used by `active_learn_phase_scan_config`. Reads
 `result[:phase_classify_distance].ranking` (the typical output shape
 when the pipeline ends with an `analyze: [phase_classify_distance: …]`
 step).

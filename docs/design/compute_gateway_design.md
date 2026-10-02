@@ -59,7 +59,7 @@ engine; the table below is the honest inventory (see the review for file:line).
 Build `submit`/`results` on `Experiment` / `Vector{Experiment}` + the existing
 *function* observables (`Fz_t`, `classify`, …) and `tabulate` (returns a
 `NamedTuple`). There is no `Observable{T}` and no `Sweep` type — do not create
-them. Use `config([...])` / `Experiment(spec)` / `run!` / `run_yaml`.
+them. Use `config([...])` / `Experiment(spec)` / `run!` / `run_experiment`.
 
 **Genuinely new — where the work goes:**
 

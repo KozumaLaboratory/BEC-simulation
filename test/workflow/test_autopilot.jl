@@ -26,7 +26,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
         @testset "queue entry round-trip via TOML" begin
             run_dir = joinpath(qr.path, "abc123def456")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("abc123def456";
                 run_dir=run_dir, spec_path=spec_path,
@@ -106,7 +106,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test haskey(on_complete_registry(), :test_cb)
             run_dir = joinpath(qr.path, "zzz_test")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("zzz_test"; run_dir=run_dir, spec_path=spec_path,
                 recipe_name=:test_cb)
@@ -228,15 +228,15 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             run_dir_u = joinpath(qr.path, "reg_uge_bbbbbb")
             mkpath(run_dir_l);
             mkpath(run_dir_u)
-            touch(joinpath(run_dir_l, "config.yaml"))
-            touch(joinpath(run_dir_u, "config.yaml"))
+            touch(joinpath(run_dir_l, "config.experiment.jl"))
+            touch(joinpath(run_dir_u, "config.experiment.jl"))
             e_local = QueueEntry("reg_local_aaaa";
                 run_dir=run_dir_l,
-                spec_path=joinpath(run_dir_l, "config.yaml"),
+                spec_path=joinpath(run_dir_l, "config.experiment.jl"),
                 backend_type=:local)
             e_uge = QueueEntry("reg_uge_bbbbbb";
                 run_dir=run_dir_u,
-                spec_path=joinpath(run_dir_u, "config.yaml"),
+                spec_path=joinpath(run_dir_u, "config.experiment.jl"),
                 backend_type=:uge)
             @test resolve_backend(cfg, e_local) === local_b
             @test resolve_backend(cfg, e_uge) === uge_b
@@ -245,7 +245,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             # mis-routing would be worse than a thrown error.
             e_bad = QueueEntry("reg_bad_cccccccc";
                 run_dir=joinpath(qr.path, "reg_bad_cccccccc"),
-                spec_path=joinpath(qr.path, "reg_bad_cccccccc", "config.yaml"),
+                spec_path=joinpath(qr.path, "reg_bad_cccccccc", "config.experiment.jl"),
                 backend_type=:nonexistent)
             mkpath(e_bad.run_dir);
             touch(e_bad.spec_path)
@@ -259,7 +259,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             local_b = LocalBackend()
             run_dir = joinpath(qr.path, "contract_noop_aaaa")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("contract_noop_aaaa";
                 run_dir=run_dir, spec_path=spec_path)
@@ -277,7 +277,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             b_local = UGEBackend()  # ssh_host=nothing by default
             run_dir = joinpath(qr.path, "uge_local_aaaaa")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("uge_local_aaaaa";
                 run_dir=run_dir, spec_path=spec_path,
@@ -306,7 +306,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 cuda_module="cuda/12.8.0")
             run_dir = joinpath(qr.path, "uge_cmd_aaaaaa")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("uge_cmd_aaaaaa";
                 run_dir=run_dir, spec_path=spec_path,
@@ -316,7 +316,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test remote_dir ==
                 "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa"
             @test _uge_remote_spec_path(b, e) ==
-                "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa/config.yaml"
+                "/gs/fs/tga-kozuma-kouhi/uk07267/runs/uge_cmd_aaaaaa/config.experiment.jl"
             @test SpinorBEC._ssh_remote_manifest_hash_path("/project/") ==
                 "/project/.manifest_hash"
             @test _uge_remote_spec_path(UGEBackend(), e) == e.spec_path
@@ -415,7 +415,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
         end
 
         @testset "UGE script rendering" begin
-            script = render_uge_script("default", "/remote/cfg.yaml";
+            script = render_uge_script("default", "/remote/cfg.experiment.jl";
                 project_root="/remote/proj",
                 log_dir="/remote/runs/cid_abcdef",
                 julia_path="/remote/julia",
@@ -436,7 +436,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             @test occursin("cd \"/remote/proj\"", script)
             @test occursin("/remote/julia", script)
             @test occursin("run_experiment(ARGS[1])", script)
-            @test occursin("/remote/cfg.yaml", script)
+            @test occursin("/remote/cfg.experiment.jl", script)
             # `-g <group>` MUST NOT appear as a script directive on
             # TSUBAME 4 (rejected with "invalid option argument").
             # The dispatch path passes it on the qsub command line instead.
@@ -463,7 +463,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             end
 
             # Without cuda_module the load line is omitted.
-            bare = render_uge_script("gpu_1", "/cfg.yaml";
+            bare = render_uge_script("gpu_1", "/cfg.experiment.jl";
                 project_root="/proj", log_dir="/runs/j", jobname="j")
             @test !occursin("module load", bare)
             @test occursin("#\$ -l gpu_1=1", bare)
@@ -557,7 +557,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 project_root="/p", remote_runs_root="/r")
             run_dir = joinpath(qr.path, "snap_test_aaaa")
             mkpath(run_dir)
-            spec = joinpath(run_dir, "config.yaml");
+            spec = joinpath(run_dir, "config.experiment.jl");
             touch(spec)
             mk(jobid, cid) = QueueEntry(cid; run_dir=joinpath(qr.path, cid),
                 spec_path=spec, backend_type=:uge, job_id=jobid)
@@ -653,7 +653,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
 
             run_dir = joinpath(qr.path, "local_shape_aaaa")
             mkpath(run_dir)
-            spec_path = joinpath(run_dir, "config.yaml")
+            spec_path = joinpath(run_dir, "config.experiment.jl")
             touch(spec_path)
             e = QueueEntry("local_shape_aaaa";
                 run_dir=run_dir, spec_path=spec_path)
@@ -666,7 +666,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
         @testset "render_uge_script: sysimage -J injection" begin
             # `-J <path>` should appear ONLY in the actual julia
             # invocation line, not in any comment. Pull out the julia
-            # call line by grepping for the run_yaml snippet.
+            # call line by grepping for the run_experiment snippet.
             function _julia_line(script)
                 for ln in eachsplit(script, '\n')
                     occursin("run_experiment(ARGS[1])", ln) && return String(ln)
@@ -674,7 +674,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 return ""
             end
             # Without sysimage_path: julia invocation has no -J.
-            bare = render_uge_script("default", "/cfg.yaml";
+            bare = render_uge_script("default", "/cfg.experiment.jl";
                 project_root="/proj",
                 log_dir="/runs/x",
                 jobname="sb_x")
@@ -682,7 +682,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
             # With sysimage_path: -J <abs path> precedes --project=.
             # in the julia invocation. Sysimage cuts first-output
             # from ~30 s cold JIT to ~2 s.
-            withimg = render_uge_script("default", "/cfg.yaml";
+            withimg = render_uge_script("default", "/cfg.experiment.jl";
                 project_root="/proj",
                 log_dir="/runs/x",
                 jobname="sb_x",
@@ -717,7 +717,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 function _mkentry(name, kind)
                     rd = joinpath(lq.path, name)
                     mkpath(rd)
-                    sp = joinpath(rd, "config.yaml")
+                    sp = joinpath(rd, "config.experiment.jl")
                     touch(sp)
                     e = QueueEntry(name;
                         run_dir=rd, spec_path=sp,
@@ -851,7 +851,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 function _done(cid, backend, profile, disp_s_ago, qw_s)
                     rd = joinpath(hqr.path, cid)
                     mkpath(rd)
-                    sp = joinpath(rd, "config.yaml")
+                    sp = joinpath(rd, "config.experiment.jl")
                     touch(sp)
                     d = now() - Second(disp_s_ago)
                     e = QueueEntry(cid;
@@ -930,7 +930,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 "recipe" => Dict("autonomy_level" => "dispatch"),
                 "backend" => Dict("type" => "local"),
                 "budget" => Dict(),
-                "spec" => Dict("path" => "/tmp/x.yaml"),
+                "spec" => Dict("path" => "/tmp/x.experiment.jl"),
                 "reproducibility" => Dict(),
             )
             mktempdir() do tmp
@@ -1011,7 +1011,7 @@ using SpinorBEC: QueueEntry, _entry_to_toml_dict, _entry_from_toml_dict,
                 function _legacy_entry(cid, parent)
                     rd = joinpath(local_qr.path, cid)
                     mkpath(rd)
-                    sp = joinpath(rd, "config.yaml")
+                    sp = joinpath(rd, "config.experiment.jl")
                     touch(sp)
                     e = QueueEntry(cid; run_dir=rd, spec_path=sp,
                         parent_id=parent, group_id="")  # empty → own cid

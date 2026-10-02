@@ -50,11 +50,11 @@ Pre-flight check for a cluster session: reports CUDA state, optionally
 runs a single config through `run_pipeline` as a smoke test. Returns
 `true` if all checks pass.
 
-`smoke_config` is the path to a tiny YAML (e.g. `runs/option_gamma_micro/config.yaml`);
+`smoke_config` is the path to a tiny YAML (e.g. `runs/option_gamma_micro/config.experiment.jl`);
 when `nothing`, the smoke step is skipped. The previous
 `scripts/tsubame/preflight.sh` inlined the equivalent of:
 
-    julia -e 'using SpinorBEC, CUDA; ... cuda_preflight_check(smoke_config="runs/option_gamma_micro/config.yaml")'
+    julia -e 'using SpinorBEC, CUDA; ... cuda_preflight_check(smoke_config="runs/option_gamma_micro/config.experiment.jl")'
 """
 function cuda_preflight_check(;
     smoke_config::Union{Nothing, AbstractString}=nothing,

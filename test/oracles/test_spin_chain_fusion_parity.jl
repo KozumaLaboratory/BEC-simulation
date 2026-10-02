@@ -132,7 +132,7 @@ else
     end
 
     # `DDI_PADDED_DEFAULT` is `true`, so this — not the bare kernel above — is the
-    # shape every `run_yaml` RTP run builds. It was unpinned while
+    # shape every `run_experiment` RTP run builds. It was unpinned while
     # `_spin_chain_reason` declined a padded DDI outright, which meant the arm
     # above was gating a path production had stopped taking.
     @testset "the fusion holds with a zero-padded DDI too" begin

@@ -274,25 +274,67 @@ const _HB_ROOT = dirname(@__DIR__)
         # supply; nothing compared them until `check_run_fits`, so a config too
         # large for the host was discovered by being killed several minutes in.
         mktempdir() do dir
-            small = joinpath(dir, "small.yaml")
+            small = joinpath(dir, "small.experiment.jl")
             write(
                 small,
                 """
-   interactions: {omega_ref: 1.0, c0: 1.0, c1: -0.05}
-   pipeline:
-     - ground_state: {grid: {n: [16, 16, 16], box: 8.0}, steps: 10}
-     - dynamics: {duration: 0.1, dt: 0.01, save: {every: 5, psi: false}}
-   """,
+Dict{String, Any}(
+    "interactions" => Dict{String, Any}(
+        "c0" => 1.0,
+        "c1" => -0.05,
+        "omega_ref" => 1.0,
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => [16, 16, 16],
+            ),
+            "steps" => 10,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.1,
+            "save" => Dict{String, Any}(
+                "every" => 5,
+                "psi" => false,
+            ),
+        ),
+    )],
+)
+""",
             )
-            big = joinpath(dir, "big.yaml")
+            big = joinpath(dir, "big.experiment.jl")
             write(
                 big,
                 """
-     interactions: {omega_ref: 1.0, c0: 1.0, c1: -0.05}
-     pipeline:
-       - ground_state: {grid: {n: [256, 256, 256], box: 8.0}, steps: 10}
-       - dynamics: {duration: 0.1, dt: 0.01, save: {every: 5, psi: false}}
-     """,
+Dict{String, Any}(
+    "interactions" => Dict{String, Any}(
+        "c0" => 1.0,
+        "c1" => -0.05,
+        "omega_ref" => 1.0,
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => [256, 256, 256],
+            ),
+            "steps" => 10,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 0.1,
+            "save" => Dict{String, Any}(
+                "every" => 5,
+                "psi" => false,
+            ),
+        ),
+    )],
+)
+""",
             )
             # A hand-built budget, so the test does not depend on the machine it
             # runs on — CI has no GPU and a laptop has a small one.

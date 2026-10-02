@@ -378,7 +378,7 @@ _is_inactive_value(s) = _speceq(s, typeof(s)())
 """
     slots(::Type{Model}) -> NTuple{14,Symbol}
 
-The slot names, in declaration order. `to_toml` and the shape gate both read
+The slot names, in declaration order. `model_data` and the shape gate both read
 this rather than restating the list.
 """
 slots(::Type{Model}) = fieldnames(Model)

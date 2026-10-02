@@ -148,7 +148,7 @@ Cost: small signals (≤ 1 on a ±6 scale) wash out. Override via the YAML
 defaults layer when contrast tuning is needed:
 
 ```yaml
-# config/sweep_view.yaml
+# config/sweep_view.experiment.jl
 per_run_overrides:
   "sprint5_M1_*":
     fz_total: {clip: [-4, 4], reason: "observed range ≤ |4.5|, headroom 4"}
@@ -209,7 +209,7 @@ Out-of-clip values saturate to the LUT endpoint (no extrapolation).
 distinct from the balance LUT centre.
 
 Future: cividis (color-blind-safe) as a `:positive` alternative,
-toggleable per project via `config/sweep_view.yaml`.
+toggleable per project via `config/sweep_view.experiment.jl`.
 
 ## Golden gate workflow
 
@@ -219,7 +219,7 @@ toggleable per project via `config/sweep_view.yaml`.
      → runs/sprint5_M1_*/golden/per_cell_table.json
 
 2. Implement to_viewspec (tomorrow):
-     viewspec = to_viewspec(SweepResult; defaults_path="config/sweep_view.yaml")
+     viewspec = to_viewspec(SweepResult; defaults_path="config/sweep_view.experiment.jl")
 
 3. Gate:
      for each cell:

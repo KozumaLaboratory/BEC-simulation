@@ -105,22 +105,37 @@ using SpinorBEC
     @testset "pause file mechanism" begin
         # Create a minimal run dir with config
         run_dir = mktempdir()
-        config_yaml = joinpath(run_dir, "config.yaml")
+        config_yaml = joinpath(run_dir, "config.experiment.jl")
         write(
             config_yaml,
             """
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 8, box: 6.0}
-      interactions: {c0: 10.0, c1: 0.0}
-      dt: 0.01
-      n_steps: 20
-      tol: 1e-4
-      potential: {type: harmonic, omega: [1.0]}
-scan:
-  zip:
-    pipeline.0.interactions[1]: [0.0, -0.5, -1.0]
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 6.0,
+                "n" => 8,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 20,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "zip" => Dict{String, Any}(
+            "pipeline.0.interactions[1]" => [0.0, -0.5, -1.0],
+        ),
+    ),
+)
 """,
         )
 
@@ -129,7 +144,7 @@ scan:
         # We can't easily test mid-run pause, but verify the mechanism exists
         # by touching .pause before running → should complete 0 points
         touch(joinpath(run_dir, ".pause"))
-        run_yaml(config_yaml; verbose=false)
+        run_experiment(config_yaml; run_dir=dirname(config_yaml), verbose=false)
 
         # No points should have been computed
         jld2_files = filter(f -> endswith(f, ".jld2"), readdir(run_dir))
@@ -137,7 +152,7 @@ scan:
 
         # Remove pause and run — should complete all
         rm(joinpath(run_dir, ".pause"))
-        run_yaml(config_yaml; verbose=false)
+        run_experiment(config_yaml; run_dir=dirname(config_yaml), verbose=false)
         jld2_files = filter(f -> endswith(f, ".jld2"), readdir(run_dir))
         @test length(jld2_files) == 3
     end

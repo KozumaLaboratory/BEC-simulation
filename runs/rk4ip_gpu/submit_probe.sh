@@ -37,7 +37,7 @@ case "${SGE_TASK_ID:-1}" in
     5) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 64 ;;
     6) "$JULIA" --project=. scripts/validation/step_cost_ablation_gpu.jl 32 ;;
     7) stdbuf -oL -eL "$JULIA" --project=. scripts/validation/scan_job_cost_breakdown.jl \
-           runs/matsui_fig4b/fig4b_scan_n35k_n32.yaml 3 ;;
+           runs/matsui_fig4b/fig4b_scan_n35k_n32.experiment.jl 3 ;;
     8) stdbuf -oL -eL "$JULIA" --project=. scripts/build_sysimage_matsui.jl \
            /gs/bs/work/7/uk07267/spinor_sysimage_matsui.so ;;
     *) echo "no task ${SGE_TASK_ID}"; exit 1 ;;

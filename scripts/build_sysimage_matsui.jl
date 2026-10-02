@@ -4,7 +4,7 @@
 #
 # Why a third one. `build_sysimage.jl` targets the rotating-basis F=1 API and
 # `build_sysimage_full.jl` the M0/M1/M2 F=6 LBFGS cascade; neither exercises the
-# split-step `run_yaml` path the Matsui campaign runs, and a sysimage only
+# split-step `run_experiment` path the Matsui campaign runs, and a sysimage only
 # removes JIT for methods its workload touched. Measured, that JIT is **277 s of
 # a 528 s job** (`docs/validation/where_the_campaign_time_goes.md`), so it is the
 # largest single item left — but the saving is an estimate until this is built
@@ -26,7 +26,7 @@ const WORKLOAD = joinpath(@__DIR__, "_sysimage_precompile_matsui.jl")
 isfile(WORKLOAD) || error("missing workload: $WORKLOAD")
 
 @info "Building the Fig. 4B sysimage" output = OUTPUT workload = WORKLOAD
-@info "Expect 30-60 minutes. The workload is a real 2-point run_yaml at 32^3."
+@info "Expect 30-60 minutes. The workload is a real 2-point run_experiment at 32^3."
 
 # `include_transitive_dependencies=false` is load-bearing, not tuning. CUDA is
 # declared in `[deps]` of Project.toml (while ALSO being the trigger for

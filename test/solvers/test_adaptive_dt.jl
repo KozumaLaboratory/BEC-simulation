@@ -156,33 +156,21 @@ using SpinorBEC
     # Adaptive stepping remains available and is exercised above, through the
     # Julia API it actually lives on.
     @testset "YAML `dynamics.adaptive_dt` is refused, not silently ignored" begin
-        _cfg(dyn_body) = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-        $dyn_body
-              B:
-                p: 0.0
-                q: 0.0
-        """
+        function _cfg(dyn_body)
+            gs = Dict("atom" => "Rb87", "grid" => Dict("n" => 32, "box" => 10.0),
+                "interactions" => Dict("c0" => 1.0, "c1" => 0.0),
+                "dt" => 0.01, "n_steps" => 10, "tol" => 1e-4,
+                "potential" => Dict("type" => "harmonic", "omega" => [1.0]))
+            dyn = merge(
+                Dict{String, Any}("duration" => 1.0, "dt" => 0.01,
+                    "B" => Dict("p" => 0.0, "q" => 0.0)), dyn_body)
+            repr(Dict("pipeline" => [Dict("ground_state" => gs), Dict("dynamics" => dyn)]))
+        end
 
         # THE PASS DIRECTION FIRST. A `dynamics:` block with no `adaptive_dt`
         # must still parse — this is the case that matters most, because a
         # guard that reddens on ordinary configs is a guard someone deletes.
-        ok = load_config_from_string(_cfg(""))
+        ok = load_config_from_string(_cfg(Dict()))
         @test ok isa PipelineConfig
         @test length(ok.steps) == 2
         @test !haskey(ok.steps[2].params, "adaptive_dt")
@@ -190,19 +178,12 @@ using SpinorBEC
         # Every shape the retired surface accepted is refused: fully specified,
         # partially specified, and empty. The empty-dict arm is the one a
         # `haskey`-based guard is most likely to miss.
-        fully = """
-              adaptive_dt:
-                dt_init: 0.005
-                dt_min: 0.0001
-                dt_max: 0.05
-                tol: 0.002
-        """
-        partial = """
-              adaptive_dt:
-                tol: 0.001
-                error_mode: richardson
-        """
-        empty = "      adaptive_dt: {}"
+        fully = Dict(
+            "adaptive_dt" => Dict("dt_init" => 0.005, "dt_min" => 0.0001,
+                "dt_max" => 0.05, "tol" => 0.002),
+        )
+        partial = Dict("adaptive_dt" => Dict("tol" => 0.001, "error_mode" => "richardson"))
+        empty = Dict("adaptive_dt" => Dict())
 
         for (label, body) in
             (("fully specified", fully), ("partial", partial), ("empty", empty))
@@ -237,32 +218,47 @@ using SpinorBEC
 
     @testset "YAML integrator string shorthand" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              integrator: strang
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              integrator: yoshida
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              integrator: adaptive
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "integrator" => "strang",
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "integrator" => "yoshida",
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "integrator" => "adaptive",
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
         @test cfg.steps[2].params["integrator"] == "strang"
@@ -272,28 +268,40 @@ using SpinorBEC
 
     @testset "YAML integrator dict form" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 32
-                box: 10.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              integrator:
-                method: adaptive
-                tol: 1.0e-4
-                dt_min: 1.0e-5
-                dt_max: 0.05
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "integrator" => Dict{String, Any}(
+                "dt_max" => 0.05,
+                "dt_min" => 1.0e-5,
+                "method" => "adaptive",
+                "tol" => 0.0001,
+            ),
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         ic = cfg.steps[2].params["integrator"]
         @test ic isa Dict
@@ -305,32 +313,50 @@ using SpinorBEC
 
     @testset "run_pipeline with adaptive_dt" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [20.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 200
-              tol: 1.0e-6
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 0.1
-              dt: 0.001
-              save: {every: 50}
-              B:
-                p: 0.0
-                q: 0.1
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [20.0],
+                "n" => [32],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 200,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.1,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.1,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 50,
+            ),
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml)
         result = run_pipeline(config; verbose=false)
         @test result.dynamics_result !== nothing

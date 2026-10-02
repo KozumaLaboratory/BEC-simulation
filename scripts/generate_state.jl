@@ -322,7 +322,7 @@ What `tol` actually bounds, and when it is even looked at.
 `docs/reference/yaml_schema_reference.md` labelled `tol` as
 "convergence threshold (`grad_norm`)" while the same table defaults `method` to
 `itp` — where `tol` bounds the relative ENERGY change and is evaluated only
-inside a `step % save_every == 0` guard. At the YAML default n_steps=100000 that
+inside a `step % save_every == 0` guard. At the pipeline default n_steps=100000 that
 is 1000 steps apart, so a run can sit converged for 999 steps without noticing,
 and a reader tuning `tol` against a gradient is tuning the wrong quantity.
 
@@ -436,7 +436,7 @@ The sharpest live trap this document carries: `m_lbfgs` is 20 in BOTH Julia
 entries — `ground_state.jl` even holds a `# keep in sync with
 find_ground_state_lbfgs default` comment — and 20 is the measured value (~9x
 lower grad_norm floor, ~30 % fewer line-search backtracks vs 10 on Eu F=6+DDI
-16^3). The YAML path defaults to **10**, so every production run that omits the
+16^3). The pipeline path defaults to **10**, so every production run that omits the
 key gets the worse value. The sync obligation was written for the two Julia
 entries and never extended to the path most runs take.
 """
@@ -735,7 +735,7 @@ function render()
     p()
     p("`dE` is `_relative_energy_change` — the relative **energy** change, not a")
     p("gradient norm. It is evaluated only inside `$guard` (`$erel:$guardn`), and")
-    p("the YAML path sets `save_every = max(1, n_steps ÷ 100)`, so at the default")
+    p("the pipeline path sets `save_every = max(1, n_steps ÷ 100)`, so at the default")
     p("`n_steps=100000` the criterion is tested **1000 steps apart**. A run can be")
     p("converged for 999 steps without noticing. `dpsi` appears in the diagnostics")
     p("and NOT in the condition above — that absence is derived here, not")
@@ -805,7 +805,7 @@ function render()
     p("EQUALITY in both directions — a missing key means a `Stage` input silently")
     p("left the identity, an extra one means something undeclared entered it. Set")
     p("equality proves no *field* is selected out; it does NOT prove content")
-    p("completeness (`model_toml_dict` deliberately omits non-required slots equal")
+    p("completeness (`model_data` deliberately omits non-required slots equal")
     p("to their own default), and that qualification is judgement, not derived.")
     p()
 
@@ -816,7 +816,7 @@ function render()
         "resolved $(length(knobs)) knobs; rows " * rowdesc)
     p("## Ground-state knob defaults, by entry path")
     p()
-    p("| knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |")
+    p("| knob | `find_ground_state` | `find_ground_state_lbfgs` | Pipeline fallback |")
     p("|---|---|---|---|")
     for (k, a, b, c) in knobs
         p("| `$k` | $a | $b | $c |")
@@ -825,7 +825,7 @@ function render()
     p("**`m_lbfgs` is the live trap.** Both Julia entries default to 20 and")
     p("`ground_state.jl` carries a `# keep in sync with find_ground_state_lbfgs")
     p("default` comment; 20 is the MEASURED value (~9× lower grad_norm floor, ~30 %")
-    p("fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The YAML path")
+    p("fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The pipeline path")
     p("defaults to 10, so every production run that omits the key gets the worse")
     p("one. The sync obligation was written for the two Julia entries and never")
     p("extended to the path most runs take. Whether to change it is a decision, so")
@@ -854,11 +854,11 @@ function render()
     p()
 
     top, steps = schema_surface()
-    assert_nondegenerate("YAML surface", length(top) >= 5 && length(steps) >= 2,
+    assert_nondegenerate("Experiment parameter surface", length(top) >= 5 && length(steps) >= 2,
         "$(length(top)) top-level keys and $(length(steps)) step kinds; " *
         "`pipeline` + `scan` + the lab-units block are always present, and " *
         "`ground_state` / `dynamics` both exist")
-    p("## YAML surface")
+    p("## Experiment parameter surface")
     p()
     p("**Top-level keys ($(length(top))):** " * join("`" .* top .* "`", ", "))
     p()

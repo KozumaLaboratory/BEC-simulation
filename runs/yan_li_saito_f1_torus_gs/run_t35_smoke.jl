@@ -2,7 +2,7 @@ import CUDA
 using SpinorBEC
 
 println("=== T35 Smoke test ===")
-cfg = load_config("/home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/config.yaml")
+cfg = load_config("/home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/config.experiment.jl")
 println("Config steps: ", length(cfg.steps))
 atom = SpinorBEC.resolve_atom(:Eu151_f1_effective)
 println("atom.F = ", atom.F)

@@ -16,8 +16,8 @@ using SpinorBEC: GroundStateStep, parse_pipeline, _prepare_config_file, _run_ste
 # THE LIVE CASE, measured 2026-08-19 over all 455 resolving ground-state steps:
 # exactly two configs, both `B_direction`, both already wrong.
 #
-#   runs/klaus_hybrid/klaus_hybrid_nostir_control.yaml
-#   runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_m0p74.yaml
+#   runs/klaus_hybrid/klaus_hybrid_nostir_control.experiment.jl
+#   runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_m0p74.experiment.jl
 #
 # Both declare `B: {B_mag: "0.01 Gauss", theta: 3.14159}` — the field along −z —
 # together with `initial_state: m_minus_F`. That pairing is the ANTI-ALIGNED
@@ -39,29 +39,47 @@ using SpinorBEC: GroundStateStep, parse_pipeline, _prepare_config_file, _run_ste
 const _RDP_DIR = mktempdir()
 
 const _RDP_BASE = """
-pipeline:
-  - ground_state:
-      atom: Eu151
-      grid: {n: [8, 8, 8], box: [6.0, 6.0, 6.0]}
-      interactions: {N_atoms: 1000, omega_ref: 691.15, c1_ratio: -0.01}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      B: {__BBLOCK__}
-      ddi: {enabled: false}
-      lhy: {kind: none}
-      method: itp
-      n_steps: 2
-      dt: 0.002
-      tol: 1.0e-6
-      backend: cpu
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "__BBLOCK__" => nothing,
+            ),
+            "atom" => "Eu151",
+            "backend" => "cpu",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.002,
+            "grid" => Dict{String, Any}(
+                "box" => [6.0, 6.0, 6.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "c1_ratio" => -0.01,
+                "omega_ref" => 691.15,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 2,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
 """
 
 function _rdp_write(name, bblock)
     p = joinpath(_RDP_DIR, name)
-    # `__BBLOCK__` rather than `{BBLOCK}`: the braces belong to the YAML flow
-    # mapping, and substituting a string containing them produced `B: {{...}}`,
-    # which YAML rejects with a parse error the test then mistook for a refusal.
-    body = replace(_RDP_BASE, "__BBLOCK__" => bblock)
-    write(p, body)
+    data = SpinorBEC._julia_config_string(_RDP_BASE)
+    data["pipeline"][1]["ground_state"]["B"] = bblock
+    write(p, repr(data))
     p
 end
 
@@ -99,8 +117,8 @@ end
         # is the assertion that says so rather than leaving a stale guard.
         ps = Float64[]
         for θ in ("0.0", "1.0", "1.5707963", "3.14159")
-            p = _rdp_write("theta_$(replace(θ, "." => "p")).yaml",
-                "B_mag: 0.01, theta: $θ, phi: 0.0")
+            p = _rdp_write("theta_$(replace(θ, "." => "p")).experiment.jl",
+                Dict("B_mag" => 0.01, "theta" => parse(Float64, θ), "phi" => 0.0))
             r = _rdp_guarded() do
                 resolve_gs(_rdp_gs_step(p).params, nothing, nothing, nothing;
                     verbose=false)::GSResolved
@@ -114,7 +132,9 @@ end
     end
 
     @testset "a declared-but-dropped direction is refused" begin
-        p = _rdp_write("tilted.yaml", "B_mag: 0.01, theta: 3.14159, phi: 0.0")
+        p = _rdp_write(
+            "tilted.experiment.jl", Dict("B_mag" => 0.01, "theta" => 3.14159, "phi" => 0.0)
+        )
         msg = _rdp_run(p)
         @test msg !== :ran
         @test occursin("does not read", msg)
@@ -125,17 +145,21 @@ end
         # The negative control. A refusal that fired on everything would pass the
         # arm above while breaking the corpus, and 453 of the 455 resolving
         # ground-state steps are this shape.
-        @test _rdp_run(_rdp_write("axial.yaml", "Bz: 0.01")) === :ran
+        @test _rdp_run(_rdp_write("axial.experiment.jl", Dict("Bz" => 0.01))) === :ran
         # …including the trivial `theta: 0` direction block, which
         # `apply_B_block_normalize!` leaves behind for a purely axial field and
         # which names nothing dropped.
-        @test _rdp_run(_rdp_write("theta0.yaml", "B_mag: 0.01, theta: 0.0, phi: 0.0")) === :ran
+        @test _rdp_run(
+            _rdp_write("theta0.experiment.jl", Dict("B_mag" => 0.01, "theta" => 0.0, "phi" => 0.0))
+        ) === :ran
     end
 
     @testset "the override runs, and says so" begin
         # An override that passed quietly would be a default. `@warn` is the
         # difference, and the same shape `SPINORBEC_ALLOW_STALE_POINTS` uses.
-        p = _rdp_write("tilted_override.yaml", "B_mag: 0.01, theta: 3.14159, phi: 0.0")
+        p = _rdp_write(
+            "tilted_override.experiment.jl", Dict("B_mag" => 0.01, "theta" => 3.14159, "phi" => 0.0)
+        )
         withenv("SPINORBEC_ALLOW_DROPPED_GS_PHYSICS" => "1") do
             @test_logs (:warn,) match_mode = :any begin
                 @test _rdp_run(p) === :ran

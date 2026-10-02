@@ -141,7 +141,7 @@ class EnqueueInput(BaseModel):
     config_path: str = Field(
         ...,
         description="Path to a run config YAML, relative to the project root "
-                    "(e.g. 'runs/eu151_edh_ext/config.yaml').",
+                    "(e.g. 'runs/eu151_edh_ext/config.experiment.jl').",
         min_length=1, max_length=400,
     )
     priority: Optional[int] = Field(
@@ -153,8 +153,8 @@ class EnqueueInput(BaseModel):
     def _no_escape(cls, v: str) -> str:
         if v.startswith("/") or ".." in v.split("/"):
             raise ValueError("config_path must be a project-relative path without '..'")
-        if not v.endswith((".yaml", ".yml")):
-            raise ValueError("config_path must point to a .yaml/.yml file")
+        if not v.endswith((".experiment.jl", ".yml")):
+            raise ValueError("config_path must point to a .experiment.jl/.yml file")
         return v
 
 
@@ -401,7 +401,7 @@ async def tsubame_pull_results(params: PullInput) -> str:
         "--include=*/",
         "--include=*.jld2", "--include=_exit_summary.json",
         "--include=_exit_summary.json", "--include=_live_status.json",
-        "--include=config.yaml",
+        "--include=config.experiment.jl",
         "--exclude=*",
         "-e", "ssh -o BatchMode=yes",
     ]
@@ -427,7 +427,7 @@ async def tsubame_enqueue(params: EnqueueInput) -> str:
     at the queue level. Slow on cold start (Julia JIT).
 
     Args:
-        params (EnqueueInput): config_path (project-relative .yaml),
+        params (EnqueueInput): config_path (project-relative .experiment.jl),
             priority (optional 0-100).
 
     Returns:

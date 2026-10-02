@@ -83,7 +83,7 @@ run_simulation!(ws; save_every = 50)
 ### B.2.3 YAML-driven runs (resumable)
 
 ```julia
-result = run_yaml("runs/eu151_klaus_lab_units/config.yaml")
+result = run_experiment("runs/eu151_klaus_lab_units/config.experiment.jl")
 ```
 
 Directory-per-config layout. Resume on re-run (existing `result.jld2` 検出 skipping)。
@@ -170,7 +170,7 @@ before `using SpinorBEC`. Then `backend = CUDABackend()` enables GPU kernels.
 
 | Path | Purpose | Backend |
 |---|---|---|
-| `runs/F6_phase_diagram/config.yaml` | Eu F=6 phase diagram (paper #2 primary) | CUDA, 32³ |
+| `runs/F6_phase_diagram/config.experiment.jl` | Eu F=6 phase diagram (paper #2 primary) | CUDA, 32³ |
 | `runs/Eu151_GS_64g/` (gone) | Eu ground state 64³ verification | CUDA |
 | `runs/samples/eu151_klaus_lab_units/` (example) | Klaus et al. 2022 magnetostir, lab units | CUDA |
 
@@ -315,7 +315,7 @@ julia --project=. test/manuscript/test_f12_icosahedral.jl
 julia --project=. test/manuscript/test_sign_pattern_6j.jl
 
 # Step 3: re-run any specific YAML config (~min-hours per config, GPU)
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/F6_phase_diagram/config.yaml")'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/F6_phase_diagram/config.experiment.jl")'
 
 # Step 4: regenerate figures (see Appendix C / figures.md)
 julia --project=. scripts/cli.jl figure

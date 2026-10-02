@@ -13,7 +13,7 @@ Zenodo 17303925 (CC-BY-4.0). Read them with a 14-column parser, **not**
 
 ## 1. We reproduce their simulation across the whole time series
 
-`runs/matsui_fit/fig2c_n35k.yaml`, N = 3.5e4, B = 2.6 nT, 40 ms, loss-free —
+`runs/matsui_fit/fig2c_n35k.experiment.jl`, N = 3.5e4, B = 2.6 nT, 40 ms, loss-free —
 their conditions. Against `dataset_fig2_theo.csv`, sampled every 0.5 ms:
 
 | component | mean | rms | max |
@@ -93,7 +93,7 @@ That is the paper's own statement, made quantitative:
 
 ## 5. The calibrated loss explains m = −4 and m = −2, and not m = −6
 
-`runs/matsui_fit/fig2c_loss.yaml` — the §1 run with `K3 = 2.6e-28 cm^6/s` on the
+`runs/matsui_fit/fig2c_loss.experiment.jl` — the §1 run with `K3 = 2.6e-28 cm^6/s` on the
 twelve m ≠ −6 components, calibrated to the paper's 26 %/40 ms. No free
 parameters. It delivers 20.0 % loss over 40 ms against that 26 % target (the
 calibration was taken at a single field under different conditions); the
@@ -137,7 +137,7 @@ the Fig. 4B residual.
 ## 6. The transfer rate: `c1_ratio` is excluded, `q` dominates
 
 Four arms, two points per parameter around their shipped values — a sensitivity
-table, not a scan (`runs/matsui_fit/xfer_*.yaml`, tasks 50–53). rms against the
+table, not a scan (`runs/matsui_fit/xfer_*.experiment.jl`, tasks 50–53). rms against the
 experiment in absolute number, 1–40 ms; the number to move is m = −6's 0.0926.
 
 | arm | c₀ / c₁ | m = −6 | m = −5 | m = −4 | m = −3 | m = −2 |

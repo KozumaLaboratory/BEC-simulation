@@ -1,7 +1,7 @@
-# The corpus gate for `yaml_to_model` — cutover step 1b's acceptance criterion.
+# The corpus gate for `config_to_model` — cutover step 1b's acceptance criterion.
 #
 # Step 3 flips admission from the legacy cache key to `artifact_id`, and it can
-# only do that for configs `yaml_to_model` resolves. So "which configs resolve"
+# only do that for configs `config_to_model` resolves. So "which configs resolve"
 # is not a statistic, it is the cutover's scope, and it has to be a fact the
 # suite maintains rather than a number in a report that rots. Every config under
 # `runs/` is resolved here, and every one that does NOT resolve is listed below
@@ -22,10 +22,10 @@
 #      that constructed but carried defaults passes arm 1 and fails this one.
 #      Five configs additionally carry LITERAL value pins (arm 4).
 #
-#   3. ORDER INDEPENDENCE. `yaml_to_model(a)` does not depend on which configs
+#   3. ORDER INDEPENDENCE. `config_to_model(a)` does not depend on which configs
 #      were resolved before it in the same session. This is not hypothetical:
 #      `_prepare_config_file` is the prepare half of a prepare/execute pair and
-#      leaves the dealias Refs set, so before the `finally` in `yaml_to_model`
+#      leaves the dealias Refs set, so before the `finally` in `config_to_model`
 #      the `GridSpec` of every config resolved after a dealias-carrying one was
 #      silently rewritten.
 #
@@ -39,10 +39,9 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: yaml_to_model, Model, model_from_toml, to_toml,
+using SpinorBEC: config_to_model, Model, model_from_data, model_data,
     DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF,
     restore_dealias_refs!, resolve_atom, n_terms
-using YAML
 
 const CORPUS_ROOT = normpath(joinpath(@__DIR__, "..", "..", "runs"))
 const REPO_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
@@ -54,7 +53,7 @@ const CD_MU_B = 9.2740100783e-24
 const CD_MU_0 = 1.25663706212e-6
 
 # ---------------------------------------------------------------------------
-# The configs `yaml_to_model` does NOT resolve, by name and reason.
+# The configs `config_to_model` does NOT resolve, by name and reason.
 #
 # Measured 2026-08-19 over 488 YAML files under `runs/`; 432 resolve.
 # (2026-08-02: 351 of 429. The 23 `:lhy_n_max` exclusions closed together when
@@ -74,23 +73,23 @@ const CD_MU_0 = 1.25663706212e-6
 #                   `index=1` DOES resolve all five (asserted below); the second
 #                   step is method-only (`method`/`n_steps`/`tol`/`m_lbfgs`/`pin`)
 #                   and inherits its physics from step 1's workspace, which
-#                   `yaml_to_model` does not build.
+#                   `config_to_model` does not build.
 #   :q_autoderive   87Rb with B != 0 and no explicit `q`. `q_geometry = 0` on
 #                   that entry, so the Breit-Rabi auto-derivation refuses. This
 #                   is `_build_zeeman_from_b_block` refusing, not the model
-#                   layer: `run_yaml` fails the same way.
+#                   layer: `run_experiment` fails the same way.
 #   :dropped_physics  A tilted `B` on the spinor path. `B_direction` is only read
 #                   by the rotating-basis runner, so the field silently runs
 #                   along +z; a model would describe physics the run drops.
 #   :schema_strict  `N_atoms` / `omega_ref` at STEP level instead of under
 #                   `interactions:`. Refused by `_prepare_config_file`, which is the
-#                   same function `run_yaml` calls (`run_registry.jl:205`) — so
+#                   same function `run_experiment` calls (`run_registry.jl:205`) — so
 #                   these nine configs are unrunnable today, independently of
 #                   anything in the model layer.
 #   :no_spinor_gs   Only a `rotating_basis` ground state. Out of scope by
 #                   construction: admission keys on the spinor GS step.
 #   :not_a_pipeline Not a run config at all (an expectations table).
-#   :yaml_unparseable  Not a run config at all (a suite manifest), and YAML.jl
+#   :not_pipeline  Not a run config at all (a suite manifest), and YAML.jl
 #                   rejects it outright: `id: 08` is read as octal.
 #
 # The reason strings are SUBSTRINGS of the thrown message. They are literal on
@@ -112,228 +111,276 @@ const CORPUS_UNRESOLVED = [
     # F=6 fm_dipolar at 16^3: n_max 0.4466 against 0.7471).
     # --- :no_N_atoms (16) — two copies of the same eight-config suite ---
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/00_scalar_free_uniform_stationary.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/00_scalar_free_uniform_stationary.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/01_scalar_harmonic_oscillator_ground.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/01_scalar_harmonic_oscillator_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/02_spin1_polar_contact_ground.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/02_spin1_polar_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/03_spin1_ferromagnetic_contact_ground.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/03_spin1_ferromagnetic_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/04_spin2_cyclic_contact_ground.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/04_spin2_cyclic_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/05_spin1_zeeman_phase_only.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/05_spin1_zeeman_phase_only.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/06_spin1_sma_spin_mixing.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/06_spin1_sma_spin_mixing.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/07_spin1_polar_bogoliubov_stable.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/yamls/07_spin1_polar_bogoliubov_stable.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/00_scalar_free_uniform_stationary.yaml",
+        "runs/verification_suite/yamls/00_scalar_free_uniform_stationary.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/01_scalar_harmonic_oscillator_ground.yaml",
+        "runs/verification_suite/yamls/01_scalar_harmonic_oscillator_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/02_spin1_polar_contact_ground.yaml",
+        "runs/verification_suite/yamls/02_spin1_polar_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/03_spin1_ferromagnetic_contact_ground.yaml",
+        "runs/verification_suite/yamls/03_spin1_ferromagnetic_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/04_spin2_cyclic_contact_ground.yaml",
+        "runs/verification_suite/yamls/04_spin2_cyclic_contact_ground.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     (
-        "runs/verification_suite/yamls/05_spin1_zeeman_phase_only.yaml",
+        "runs/verification_suite/yamls/05_spin1_zeeman_phase_only.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
-    ("runs/verification_suite/yamls/06_spin1_sma_spin_mixing.yaml", :no_N_atoms, "has no N_atoms"),
     (
-        "runs/verification_suite/yamls/07_spin1_polar_bogoliubov_stable.yaml",
+        "runs/verification_suite/yamls/06_spin1_sma_spin_mixing.experiment.jl",
+        :no_N_atoms,
+        "has no N_atoms",
+    ),
+    (
+        "runs/verification_suite/yamls/07_spin1_polar_bogoliubov_stable.experiment.jl",
         :no_N_atoms,
         "has no N_atoms",
     ),
     # --- :two_gs_steps (5) — `index=1` resolves all five, asserted below ---
-    ("runs/eu_gs_phase_c1_B_kappa/config_midfield_newton.yaml", :two_gs_steps, "pass index"),
-    ("runs/eu_gs_phase_c1_B_kappa/config_phase_repr.yaml", :two_gs_steps, "pass index"),
-    ("runs/eu_gs_phase_c1_B_kappa/config_softconv_diag.yaml", :two_gs_steps, "pass index"),
-    ("runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_48.yaml", :two_gs_steps, "pass index"),
-    ("runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_64.yaml", :two_gs_steps, "pass index"),
+    (
+        "runs/eu_gs_phase_c1_B_kappa/config_midfield_newton.experiment.jl",
+        :two_gs_steps,
+        "pass index",
+    ),
+    ("runs/eu_gs_phase_c1_B_kappa/config_phase_repr.experiment.jl", :two_gs_steps, "pass index"),
+    ("runs/eu_gs_phase_c1_B_kappa/config_softconv_diag.experiment.jl", :two_gs_steps, "pass index"),
+    (
+        "runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_48.experiment.jl",
+        :two_gs_steps,
+        "pass index",
+    ),
+    (
+        "runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_64.experiment.jl",
+        :two_gs_steps,
+        "pass index",
+    ),
     # --- :q_autoderive (5) ---
     (
-        "runs/barnett_week1/scalar_rotation_om0p0.yaml",
+        "runs/barnett_week1/scalar_rotation_om0p0.experiment.jl",
         :q_autoderive,
         "quadratic-Zeeman cannot be auto-derived",
     ),
     (
-        "runs/barnett_week1/scalar_rotation_om0p3.yaml",
+        "runs/barnett_week1/scalar_rotation_om0p3.experiment.jl",
         :q_autoderive,
         "quadratic-Zeeman cannot be auto-derived",
     ),
     (
-        "runs/barnett_week1/scalar_rotation_om0p5.yaml",
+        "runs/barnett_week1/scalar_rotation_om0p5.experiment.jl",
         :q_autoderive,
         "quadratic-Zeeman cannot be auto-derived",
     ),
     (
-        "runs/barnett_week1/scalar_rotation_om0p7.yaml",
+        "runs/barnett_week1/scalar_rotation_om0p7.experiment.jl",
         :q_autoderive,
         "quadratic-Zeeman cannot be auto-derived",
     ),
     (
-        "runs/barnett_week1/scalar_rotation_om0p9.yaml",
+        "runs/barnett_week1/scalar_rotation_om0p9.experiment.jl",
         :q_autoderive,
         "quadratic-Zeeman cannot be auto-derived",
     ),
     # --- :dropped_physics (2) ---
     (
-        "runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_m0p74.yaml",
+        "runs/klaus_hybrid/klaus_hybrid_magnetostir_omega_m0p74.experiment.jl",
         :dropped_physics,
         "does not read",
     ),
-    ("runs/klaus_hybrid/klaus_hybrid_nostir_control.yaml", :dropped_physics, "does not read"),
-    # --- :schema_strict (9) — unrunnable today, `run_yaml` refuses them too ---
     (
-        "runs/berry_crossover_scan/config.yaml",
+        "runs/klaus_hybrid/klaus_hybrid_nostir_control.experiment.jl",
+        :dropped_physics,
+        "does not read",
+    ),
+    # --- :schema_strict (9) — unrunnable today, `run_experiment` refuses them too ---
+    (
+        "runs/berry_crossover_scan/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/eu151_phase_diagram_lbfgs/config.yaml",
+        "runs/eu151_phase_diagram_lbfgs/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/klaus_baseline/config.yaml",
+        "runs/klaus_baseline/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.yaml",
+        "runs/measurement_R3x_eu/r33_mfbo_eu_phase/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/measurement_R3x_eu/r35_b1_boundary_trace/config.yaml",
+        "runs/measurement_R3x_eu/r35_b1_boundary_trace/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/measurement_R3x_eu/r36_4d_phase_al/config.yaml",
+        "runs/measurement_R3x_eu/r36_4d_phase_al/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/measurement_R3x_eu/r37_triple_point_hunt/config.yaml",
+        "runs/measurement_R3x_eu/r37_triple_point_hunt/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/measurement_R3x_eu/r39_bdg_along_b1/config.yaml",
+        "runs/measurement_R3x_eu/r39_bdg_along_b1/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     (
-        "runs/phi_omega_scan/config.yaml",
+        "runs/phi_omega_scan/config.experiment.jl",
         :schema_strict,
         "Unknown key 'pipeline.1.ground_state.omega_ref'",
     ),
     # --- :no_spinor_gs (15) ---
-    ("runs/eu151_klaus_barnett/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
+    ("runs/eu151_klaus_barnett/config.experiment.jl", :no_spinor_gs, "no spinor ground_state step"),
     (
-        "runs/eu151_klaus_barnett/phi_+4.524/config.yaml",
+        "runs/eu151_klaus_barnett/phi_+4.524/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
     (
-        "runs/eu151_klaus_barnett/phi_+4.524_1s/config.yaml",
+        "runs/eu151_klaus_barnett/phi_+4.524_1s/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
     (
-        "runs/eu151_klaus_barnett/phi_-4.524/config.yaml",
+        "runs/eu151_klaus_barnett/phi_-4.524/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
     (
-        "runs/eu151_klaus_barnett/phi_-4.524_1s/config.yaml",
-        :no_spinor_gs,
-        "no spinor ground_state step",
-    ),
-    ("runs/eu151_klaus_phi_phys/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
-    ("runs/eu151_klaus_phi_phys/phi_1.0/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
-    (
-        "runs/eu151_klaus_phi_phys/phi_12.0/config.yaml",
+        "runs/eu151_klaus_barnett/phi_-4.524_1s/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
     (
-        "runs/eu151_klaus_phi_phys/phi_18.0/config.yaml",
+        "runs/eu151_klaus_phi_phys/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
-    ("runs/eu151_klaus_phi_phys/phi_2.0/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
-    ("runs/eu151_klaus_phi_phys/phi_3.0/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
     (
-        "runs/eu151_klaus_phi_phys/phi_4.524/config.yaml",
+        "runs/eu151_klaus_phi_phys/phi_1.0/config.experiment.jl",
         :no_spinor_gs,
         "no spinor ground_state step",
     ),
-    ("runs/eu151_klaus_phi_phys/phi_6.0/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
-    ("runs/eu151_klaus_phi_phys/phi_8.0/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
-    ("runs/yan_li_saito_f1_torus_gs/config.yaml", :no_spinor_gs, "no spinor ground_state step"),
+    (
+        "runs/eu151_klaus_phi_phys/phi_12.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_18.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_2.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_3.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_4.524/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_6.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/eu151_klaus_phi_phys/phi_8.0/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
+    (
+        "runs/yan_li_saito_f1_torus_gs/config.experiment.jl",
+        :no_spinor_gs,
+        "no spinor ground_state step",
+    ),
     # --- :not_a_pipeline (2) ---
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/checks/expected_observables.yaml",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/checks/expected_observables.experiment.jl",
         :not_a_pipeline,
         "must have a 'pipeline' key",
     ),
     (
-        "runs/verification_suite/checks/expected_observables.yaml",
+        "runs/verification_suite/checks/expected_observables.experiment.jl",
         :not_a_pipeline,
         "must have a 'pipeline' key",
     ),
-    # --- :yaml_unparseable (2) ---
+    # --- :not_pipeline (2) ---
     (
-        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/verify_suite_manifest.yaml",
-        :yaml_unparseable,
-        "invalid base 8 digit",
+        "runs/spinorbec_verification_yamls/spinorbec_verification_yamls/verify_suite_manifest.experiment.jl",
+        :not_pipeline,
+        "pipeline",
     ),
-    ("runs/verification_suite/manifest.yaml", :yaml_unparseable, "invalid base 8 digit"),
+    ("runs/verification_suite/manifest.experiment.jl", :not_pipeline, "pipeline"),
 ]
 
 # A floor, not an equality: adding a config that resolves must not redden the
@@ -353,7 +400,7 @@ corpus_files() = sort!(
     String[
         joinpath(r, f)
         for (r, _, fs) in walkdir(CORPUS_ROOT) for f in fs
-        if endswith(f, ".yaml") || endswith(f, ".yml")
+        if endswith(f, ".experiment.jl") || endswith(f, ".yml")
     ],
 )
 
@@ -406,7 +453,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
     for f in files
         rel = corpus_rel(f)
         try
-            resolved[rel] = yaml_to_model(f)
+            resolved[rel] = config_to_model(f)
         catch err
             failed[rel] = err isa ArgumentError ? err.msg : sprint(showerror, err)
         end
@@ -462,13 +509,13 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         @test length(two) == 5
         for rel in two
             p = joinpath(REPO_ROOT, rel)
-            m = yaml_to_model(p; index=1)
+            m = config_to_model(p; index=1)
             @test m isa Model
             @test m.interactions.n_atoms > 0
             # The second step carries method knobs only and inherits its physics
-            # from step 1's workspace, which `yaml_to_model` does not build.
+            # from step 1's workspace, which `config_to_model` does not build.
             err = try
-                yaml_to_model(p; index=2)
+                config_to_model(p; index=2)
                 nothing
             catch e
                 e isa ArgumentError ? e.msg : sprint(showerror, e)
@@ -646,13 +693,13 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
     # ---------------------------------------------------------------
     # Arm 2b: every resolved model survives its own serialisation
     # ---------------------------------------------------------------
-    @testset "every resolved model round-trips through TOML" begin
+    @testset "every resolved model round-trips through provenance data" begin
         bad = String[]
         for (rel, m) in resolved
-            s = to_toml(m)
+            s = model_data(m)
             ok = try
-                back = model_from_toml(s)
-                back == m && to_toml(back) == s
+                back = model_from_data(s)
+                back == m && model_data(back) == s
             catch err
                 push!(bad, "$rel: $(sprint(showerror, err))")
                 false
@@ -668,19 +715,19 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
     # ---------------------------------------------------------------
     @testset "resolution does not depend on what was resolved before it" begin
         # `_prepare_config_file` applies a top-level `dealias:` block to module Refs
-        # and leaves them set; `run_yaml` restores them in the execute half's
-        # `finally`, which `yaml_to_model` never runs. Without its own restore,
+        # and leaves them set; `run_experiment` restores them in the execute half's
+        # `finally`, which `config_to_model` never runs. Without its own restore,
         # the config below resolved to dealias=false alone and dealias=true after
         # the one with the block.
-        plain = joinpath(REPO_ROOT, "runs/validation_level10/L10_F1_smoke.yaml")
-        withd = joinpath(REPO_ROOT, "runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml")
+        plain = joinpath(REPO_ROOT, "runs/validation_level10/L10_F1_smoke.experiment.jl")
+        withd = joinpath(REPO_ROOT, "runs/eu_gs_phase_c1_B_kappa/config_boundary_64.experiment.jl")
         @test isfile(plain) && isfile(withd)
 
-        before = yaml_to_model(plain)
-        other = yaml_to_model(withd)
-        after = yaml_to_model(plain)
+        before = config_to_model(plain)
+        other = config_to_model(withd)
+        after = config_to_model(plain)
         @test after == before
-        @test to_toml(after) == to_toml(before)
+        @test model_data(after) == model_data(before)
 
         # The pair must actually DISAGREE about dealias, or the equality above is
         # vacuous — this is the positive control for the arm.
@@ -692,12 +739,12 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         # ... and the call leaves the globals exactly as it found them, for the
         # sake of every other test in the session.
         e0, k0 = DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]
-        yaml_to_model(withd)
+        config_to_model(withd)
         @test DEALIAS_2_3_ENABLED[] == e0
         @test DEALIAS_K_CUTOFF[] == k0
         # Even when it throws.
         try
-            yaml_to_model(joinpath(REPO_ROOT, "runs/eu_k3_lhy/LHY_full_bdg.yaml"))
+            config_to_model(joinpath(REPO_ROOT, "runs/eu_k3_lhy/LHY_full_bdg.experiment.jl"))
         catch
         end
         @test DEALIAS_2_3_ENABLED[] == e0
@@ -710,7 +757,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
     # are not derived from anything the resolver can move.
     # ---------------------------------------------------------------
     @testset "six configs pinned by value" begin
-        m = resolved["runs/eu_k3_lhy/LHY_scalar.yaml"]
+        m = resolved["runs/eu_k3_lhy/LHY_scalar.experiment.jl"]
         @test m.atom.name == "151Eu" && m.atom.F == 6
         @test m.grid.n_points == (32, 32, 32) && m.grid.box == (12.0, 12.0, 12.0)
         @test m.interactions.n_atoms == 30000
@@ -728,7 +775,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         @test m.zeeman.q ≈ 0.0014215177337385363 atol = 1e-16
 
         # 87Rb, F=1, g_F < 0, DDI explicitly disabled, no dealias block.
-        r = resolved["runs/validation_level10/L10_F1_smoke.yaml"]
+        r = resolved["runs/validation_level10/L10_F1_smoke.experiment.jl"]
         @test r.atom.name == "87Rb" && r.atom.F == 1
         @test r.interactions.c0 ≈ 2.4567252413684244 atol = 1e-12
         @test r.interactions.c1 ≈ 0.024567252413684244 atol = 1e-14
@@ -738,7 +785,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
 
         # 52Cr, F=3 — the scattering-lengths atom (c1 = 0 by construction, the
         # tensor cache carries every channel) and a TRANSVERSE field.
-        c = resolved["runs/verification_suite/yamls/L2_ddi_axis_flip_Bx.yaml"]
+        c = resolved["runs/verification_suite/yamls/L2_ddi_axis_flip_Bx.experiment.jl"]
         @test c.atom.name == "52Cr" && c.atom.F == 3
         @test c.interactions.c0 ≈ 533.890403077037 atol = 1e-10
         @test c.interactions.c1 == 0.0
@@ -752,7 +799,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         # Asserted as a PROPERTY (equals the YAML literal, and differs from the
         # derived value) rather than as a bare pinned number, so it cannot pass
         # by coincidence if the derivation drifts onto the same value.
-        dy = resolved["runs/twa_eps_dd_scan/Dy_eps1.39.yaml"]
+        dy = resolved["runs/twa_eps_dd_scan/Dy_eps1.39.experiment.jl"]
         @test dy.ddi.c_dd == 106.6                       # the YAML literal
         @test dy.ddi.c_dd != compute_c_dd_dimless(       # ... not the atom's
             ATOM_REGISTRY[:Eu151]; N_atoms=10000, omega_ref=691.15)
@@ -768,7 +815,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
         #   * 972.56 is the schema's auto-derivation from the REGISTRY a_s and
         #     eps_dd=0.5402, neither of which this run uses.
         # The corrected cell reproduces the published profile to 1.3 %.
-        s = resolved["runs/saito_li_torus/config.yaml"]
+        s = resolved["runs/saito_li_torus/config.experiment.jl"]
         @test s.ddi.c_dd ≈ 63.306415527088 atol = 1e-10   # derived, NOT overridden
         @test s.grid.n_points == (128, 128, 128) && s.grid.box == (6.0, 6.0, 6.0)
         @test isempty(s.potential.harmonic)               # free space
@@ -780,7 +827,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
 
         # `secular: true`. Same c_dd / c0 / c1 / p as LHY_scalar above, which is
         # what makes the flag the only difference between the two models.
-        sec = resolved["runs/eu_ham_only_conservation/eu_ham_only_24_sec.yaml"]
+        sec = resolved["runs/eu_ham_only_conservation/eu_ham_only_24_sec.experiment.jl"]
         @test sec.ddi.secular == true
         @test sec.ddi.c_dd ≈ 120.7188510532178 atol = 1e-10
         @test sec.grid.n_points == (24, 24, 24)
@@ -789,7 +836,7 @@ corpus_is_hz(x) = x isa AbstractString && occursin("Hz", x)
 
         # A `dealias:` block that reaches the GridSpec, and 691.1504 rather than
         # 691.15 — the `units:` path, not a typo.
-        b = resolved["runs/eu_gs_phase_c1_B_kappa/config_boundary_64.yaml"]
+        b = resolved["runs/eu_gs_phase_c1_B_kappa/config_boundary_64.experiment.jl"]
         @test b.grid.dealias_two_thirds == true
         @test b.grid.dealias_k_cut == 10.0
         @test b.grid.n_points == (64, 64, 64)

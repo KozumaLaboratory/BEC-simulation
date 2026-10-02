@@ -53,7 +53,7 @@ not failures.
 using SpinorBEC
 
 # 1. Build experiments via the usual sweep / config DSL.
-base = SpinorBEC.load_config("runs/eu151_phi_omega/config.yaml")
+base = SpinorBEC.load_config("runs/eu151_phi_omega/config.experiment.jl")
 exps = sweep(base; over=:pipeline_2_dynamics_B_hat_phi_omega => [1.0, 2.0, 4.524])
 
 # 2. Enqueue → writes runs/<content_id>/state.toml with status=:pending.
@@ -228,7 +228,7 @@ julia --project=. scripts/cli.jl autopilot status
 #     gpu·h (total):    412.7
 
 julia --project=. scripts/cli.jl autopilot tick
-julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml --priority 3
+julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.experiment.jl --priority 3
 julia --project=. scripts/cli.jl autopilot retry 3
 julia --project=. scripts/cli.jl autopilot pause     # touch .autopilot.paused
 julia --project=. scripts/cli.jl autopilot resume    # rm .autopilot.paused
@@ -394,7 +394,7 @@ julia --project=. scripts/cli.jl autopilot dry-run on
 # → autopilot dry_run: ON
 
 # 4. Enqueue one harmless config to exercise the path
-julia --project=. scripts/cli.jl autopilot enqueue runs/option_gamma_micro/config.yaml
+julia --project=. scripts/cli.jl autopilot enqueue runs/option_gamma_micro/config.experiment.jl
 julia --project=. scripts/cli.jl autopilot status
 # states: pending 1, rest 0
 ```

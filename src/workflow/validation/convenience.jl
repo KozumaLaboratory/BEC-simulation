@@ -1,10 +1,10 @@
 # --- Top-level convenience layer ---
 #
-# 1-liner end-to-end flows that compose run_yaml + open_result + check
+# 1-liner end-to-end flows that compose run_experiment + open_result + check
 # + save_operator_rhs. These are the API anko hits from the REPL —
 # no script files needed.
 
-export audit, hand_off, diff_yamls
+export audit, hand_off, diff_experiments
 
 """
     audit(yaml::AbstractString; spec=ConservationSpec(), verbose=true) -> CheckResult
@@ -15,7 +15,7 @@ End-to-end: run the YAML, open the produced `point_001.jld2`, apply
 function call.
 
 ```julia
-res = audit("runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.yaml";
+res = audit("runs/eu_ham_only_conservation/eu_ham_only_24_nonsec.experiment.jl";
             spec=ConservationSpec(norm_drift=1e-12, Jz_drift=5e-2))
 passed(res)         # Bool (status === :pass)
 res.summary         # human-readable summary
@@ -26,11 +26,11 @@ function audit(
     spec=ConservationSpec(),
     verbose::Bool=true,
 )
-    run_dir = run_yaml(String(yaml); verbose)
+    run_dir = run_experiment(String(yaml); verbose)
     jld2 = joinpath(run_dir, "point_001.jld2")
     isfile(jld2) || throw(
         ArgumentError(
-            "audit: $jld2 not produced by run_yaml (pipeline error? cached?)"),
+            "audit: $jld2 not produced by run_experiment (pipeline error? cached?)"),
     )
     r = open_result(jld2)
     check(spec, r)
@@ -49,7 +49,7 @@ Returns the `save_operator_rhs` artefact NamedTuple
 `scripts/validation/export_operator_rhs.jl`.
 
 ```julia
-art = hand_off("docs/validation/step6_ueda_reference_state/reference_state.yaml")
+art = hand_off("docs/validation/step6_ueda_reference_state/reference_state.experiment.jl")
 art.jld2_path
 art.sha256
 ```
@@ -68,7 +68,7 @@ function hand_off(
     pre_existing = joinpath(yaml_dir, "operator_rhs.jld2")
     isfile(pre_existing) && rm(pre_existing)
 
-    run_yaml(yaml_str; verbose)
+    run_experiment(yaml_str; verbose)
 
     isfile(pre_existing) || throw(
         ArgumentError(
@@ -83,7 +83,7 @@ function hand_off(
 end
 
 """
-    diff_yamls(yaml_a::AbstractString, yaml_b::AbstractString;
+    diff_experiments(yaml_a::AbstractString, yaml_b::AbstractString;
                spec=OperatorRHSSpec(), label_a="A", label_b="B",
                verbose=true) -> CheckResult
 
@@ -95,15 +95,15 @@ compare drift bounds.
 Both YAMLs must include the `hpsi_export` analyzer for the default
 OperatorRHSSpec to apply.
 """
-function diff_yamls(
+function diff_experiments(
     yaml_a::AbstractString, yaml_b::AbstractString;
     spec=OperatorRHSSpec(),
     label_a::AbstractString="A",
     label_b::AbstractString="B",
     verbose::Bool=true,
 )
-    run_dir_a = run_yaml(String(yaml_a); verbose)
-    run_dir_b = run_yaml(String(yaml_b); verbose)
+    run_dir_a = run_experiment(String(yaml_a); verbose)
+    run_dir_b = run_experiment(String(yaml_b); verbose)
     pick_jld2(d) =
         let p = joinpath(d, "operator_rhs.jld2")
             isfile(p) ? p : joinpath(d, "point_001.jld2")

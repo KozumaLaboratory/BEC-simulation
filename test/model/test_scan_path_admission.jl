@@ -27,7 +27,6 @@
 using Test
 include(joinpath(@__DIR__, "..", "helpers", "file_timestamps.jl"))
 using JLD2
-using YAML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload,
     read_complete_marker, write_complete_marker, write_incomplete_marker,
@@ -50,24 +49,45 @@ const SCAN_SENTINEL_E = -98765.4321
 # came back with identical energies to the last digit. Same footgun as the
 # `c1_ratio`-in-a-ground_state-step arm that voided a Matsui comparison.
 scan_probe_yaml(; dynamics::Bool=false) = """
-scan:
-  zip:
-    pipeline.0.interactions.N_atoms: [100, 2000]
-
-defaults: {kind: spinor, backend: cpu}
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [16], box: [8.0]}
-      potential: {type: harmonic, omega: [1.0]}
-      interactions: {N_atoms: 100, omega_ref: 100.0}
-      ddi: {enabled: false}
-      lhy: {kind: none}
-      initial_state: polar
-      method: itp
-      n_steps: 40
-      dt: 1.0e-3
-      tol: 1.0e-6
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 40,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+    "scan" => Dict{String, Any}(
+        "zip" => Dict{String, Any}(
+            "pipeline.0.interactions.N_atoms" => [100, 2000],
+        ),
+    ),
+)
 """ * (dynamics ? """
   - dynamics:
       duration: 0.01
@@ -109,7 +129,7 @@ energy_of(p) = JLD2.load(p)["energy"]
 
 @testset "the SCAN path's admission and marker writer" begin
     mktempdir() do dir
-        y = joinpath(dir, "scan.yaml")
+        y = joinpath(dir, "scan.experiment.jl")
         write(y, scan_probe_yaml())
         # `with_cacheable_tree`: a re-run that must HIT the cache. `_assert_point_provenance`
         # refuses a reuse when the tree is dirty, i.e. in any working checkout — but the
@@ -117,7 +137,7 @@ energy_of(p) = JLD2.load(p)["energy"]
         # and the admission counting happens in `admit_payload`, before the check.
         # See test/helpers/cacheable_tree.jl.
         run_scan() = with_cacheable_tree() do
-            run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            run_experiment(y; base_dir=joinpath(dir, "out"), verbose=false)
         end
 
         rd = run_scan()
@@ -270,10 +290,10 @@ end
 
 @testset "G4: a scan's `point_001.jld2` holds POINT 1, not the last point" begin
     mktempdir() do dir
-        y = joinpath(dir, "scan_dyn.yaml")
+        y = joinpath(dir, "scan_dyn.experiment.jl")
         write(y, scan_probe_yaml(; dynamics=true))
         rd = with_cacheable_tree() do
-            run_yaml(y; base_dir=joinpath(dir, "out"), verbose=false)
+            run_experiment(y; base_dir=joinpath(dir, "out"), verbose=false)
         end
         p1 = joinpath(rd, "point_001.jld2")
         p2 = joinpath(rd, "point_002.jld2")

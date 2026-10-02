@@ -184,7 +184,7 @@ struct LightShiftSpec <: ModelValue
         norm_p > 0 || throw(ArgumentError("polarization must be a non-zero vector"))
         # Dividing a vector that is already unit to within a few ULP moves its
         # last bit, so the normalisation would not be a fixed point of itself and
-        # `model_from_toml(to_toml(m))` would take a second content id for the
+        # `model_from_data(model_data(m))` would take a second content id for the
         # same physics.
         pol = abs(norm_p - 1.0) <= 4eps(1.0) ? polarization : polarization ./ norm_p
         new(eta_vector, eta_tensor, pol, profile_source)

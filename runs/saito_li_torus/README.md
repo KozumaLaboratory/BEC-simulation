@@ -113,7 +113,7 @@ checks are the ones that do not depend on the solver: the flux-closure identity
 
 ### Bistability at B = 0 — the cigar seed falls into the torus
 
-`cells/cigar_n96_box6.yaml` seeds `m_plus_F`: spin uniformly along z, no
+`cells/cigar_n96_box6.experiment.jl` seeds `m_plus_F`: spin uniformly along z, no
 winding, the Fig. 3(a) branch. It descends from E = +53.07 through +0.68 and
 converges at **E = −1.5754125** — the torus energy, and all four energy terms
 agree with the torus cell to 6 digits.
@@ -204,25 +204,25 @@ places and right in the ratio those two places determine.
 
 Run-output directories are not tracked in this repo (no content-addressed run
 dir is), so the `runs/torus_n96_box6_<hash>/` names quoted above do not resolve
-from a fresh checkout. What IS tracked is `cells/`, and `run_yaml` keys the
+from a fresh checkout. What IS tracked is `cells/`, and `run_experiment` keys the
 output directory on the raw bytes of the config — so the same file reproduces
 the same directory name:
 
 ```bash
-julia --project=. runs/saito_li_torus/g5_make_cells.jl        # regenerate cells from config.yaml
-julia --project=. -e 'import CUDA; using SpinorBEC; run_yaml("runs/saito_li_torus/cells/torus_n96_box6.yaml")'
+julia --project=. runs/saito_li_torus/g5_make_cells.jl        # regenerate cells from config.experiment.jl
+julia --project=. -e 'import CUDA; using SpinorBEC; run_experiment("runs/saito_li_torus/cells/torus_n96_box6.experiment.jl")'
 julia --project=. runs/saito_li_torus/g6_measure.jl runs/torus_n96_box6_3014e1e20ffcd4d9
 ```
 
-Start with `smoke.yaml` (32³, ~1 min) before anything larger.
+Start with `smoke.experiment.jl` (32³, ~1 min) before anything larger.
 
 ## Files
 
 | file | what |
 |---|---|
-| `config.yaml` | the production cell, 128³ box 6 |
-| `smoke.yaml` | 32³, 25 iterations — every code path, ~1 min |
-| `cells/` | convergence + bistability cells, generated from `config.yaml` |
+| `config.experiment.jl` | the production cell, 128³ box 6 |
+| `smoke.experiment.jl` | 32³, 25 iterations — every code path, ~1 min |
+| `cells/` | convergence + bistability cells, generated from `config.experiment.jl` |
 | `g1_units_and_premises.jl` | gate 1: every asserted number recomputed |
 | `g2_resolved_coefficients.jl` | what the YAML resolves to, before/after |
 | `g3_digitise_fig2a.py` | Fig. 2(a) digitiser with its controls |

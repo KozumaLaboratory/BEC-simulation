@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # Read each result.jld2 from the verification suite runs, extract key
 # observables (norms, Fz, populations, energies), and compare against
-# the pass criteria in checks/expected_observables.yaml.
+# the pass criteria in checks/expected_observables.experiment.jl.
 #
 # Usage:
 #   julia --project=. runs/verification_suite/audit_observables.jl

@@ -1,3 +1,8 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 # THE gate cutover step 2 exists for. Do not delete it, do not weaken it.
 #
 # Before this step, admission was `isfile(payload)` and `_run_itp_loop!` swallowed
@@ -45,7 +50,6 @@
 
 using Test
 using JLD2
-using YAML
 using SpinorBEC
 using SpinorBEC: marker_path, incomplete_marker_path, admit_payload,
     _reset_unmarked_warnings!
@@ -71,12 +75,12 @@ interrupt_probe_config() = Dict{String, Any}(
     mktempdir() do dir
         run_dir = joinpath(dir, "run")
         mkpath(run_dir)
-        cfg = joinpath(run_dir, "config.yaml")
-        YAML.write_file(cfg, interrupt_probe_config())
+        cfg = joinpath(run_dir, "config.experiment.jl")
+        _write_julia_fixture(cfg, interrupt_probe_config())
         psi_file = joinpath(run_dir, "point_001.jld2")
         itp_ckpt = joinpath(run_dir, ".checkpoints", "point_001.jld2", "itp_checkpoint.jld2")
 
-        task = @async run_yaml(cfg; verbose=true)
+        task = @async run_experiment(cfg; run_dir=dirname(cfg), verbose=true)
         deadline = time() + 900
         while !isfile(itp_ckpt) && !istaskdone(task) && time() < deadline
             sleep(0.02)
@@ -98,7 +102,7 @@ interrupt_probe_config() = Dict{String, Any}(
             false
         end
 
-        # THE defect, asserted directly. The interrupt was SWALLOWED: `run_yaml`
+        # THE defect, asserted directly. The interrupt was SWALLOWED: `run_experiment`
         # returned as if nothing had happened and a complete-looking payload is
         # on disk. If this ever goes false the interrupt escaped instead of
         # being caught, and the rest of the testset would be measuring the
@@ -132,7 +136,7 @@ interrupt_probe_config() = Dict{String, Any}(
         # and the admission counting happens in `admit_payload`, before the check.
         # See test/helpers/cacheable_tree.jl.
         with_cacheable_tree() do
-            run_yaml(cfg; verbose=false)
+            run_experiment(cfg; run_dir=dirname(cfg), verbose=false)
         end
         recomputed_E = JLD2.load(psi_file)["energy"]
         @test recomputed_E != interrupted_E
@@ -149,7 +153,7 @@ interrupt_probe_config() = Dict{String, Any}(
         # consistent with an admission that recomputes everything, which is a
         # different bug wearing this gate as a disguise.
         t_hit = @elapsed with_cacheable_tree() do
-            run_yaml(cfg; verbose=false)
+            run_experiment(cfg; run_dir=dirname(cfg), verbose=false)
         end
         @test JLD2.load(psi_file)["energy"] == recomputed_E
         @test t_hit < 1.0     # a cache hit is milliseconds; the solve is seconds
@@ -164,7 +168,7 @@ end
     mktempdir() do dir
         run_dir = joinpath(dir, "run")
         mkpath(run_dir)
-        cfg = joinpath(run_dir, "config.yaml")
+        cfg = joinpath(run_dir, "config.experiment.jl")
         spec = interrupt_probe_config()
         # A dynamics step short enough to finish in milliseconds — the point is
         # that it finishes, and reports `:interrupted => false` while doing so.
@@ -176,11 +180,11 @@ end
                     "save" => Dict{String, Any}("every" => 1)),
             ),
         )
-        YAML.write_file(cfg, spec)
+        _write_julia_fixture(cfg, spec)
         psi_file = joinpath(run_dir, "point_001.jld2")
         itp_ckpt = joinpath(run_dir, ".checkpoints", "point_001.jld2", "itp_checkpoint.jld2")
 
-        task = @async run_yaml(cfg; verbose=true)
+        task = @async run_experiment(cfg; run_dir=dirname(cfg), verbose=true)
         deadline = time() + 900
         while !isfile(itp_ckpt) && !istaskdone(task) && time() < deadline
             sleep(0.02)

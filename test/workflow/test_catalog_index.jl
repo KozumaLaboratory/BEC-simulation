@@ -59,7 +59,7 @@ using JSON
             # Run A: has a summary.json (full row).
             a = joinpath(runs, "runA_aaaaaaaaaaaaaaaa")
             mkpath(a)
-            touch(joinpath(a, "config.yaml"))
+            touch(joinpath(a, "config.experiment.jl"))
             open(joinpath(a, RUN_SUMMARY_FILENAME), "w") do io
                 JSON.print(io, Dict("energy" => -6.0, "F" => 1,
                     "extraction_error" => String[]))

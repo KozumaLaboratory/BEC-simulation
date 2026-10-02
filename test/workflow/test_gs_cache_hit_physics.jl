@@ -34,24 +34,44 @@ using SpinorBEC: _run_step
 # `lhy:` block is silently ignored on every path — a separate defect from the
 # cache-hit one pinned here, and not fixed by this file.
 _gs_cache_yaml(cache_path) = """
-defaults:
-  kind: spinor
-  backend: cpu
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-      potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-      interactions: {N_atoms: 1000, omega_ref: 100.0}
-      ddi: {enabled: false}
-      lhy: {kind: polar_contact}
-      light_shift: {eta_tensor: 0.1}
-      rotating_frame_omega: 0.3
-      initial_state: polar
-      dt: 0.01
-      n_steps: 5
-      tol: 1.0e-6
-      cache: $(cache_path)
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "cache" => $(repr(cache_path)),
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "polar_contact",
+            ),
+            "light_shift" => Dict{String, Any}(
+                "eta_tensor" => 0.1,
+            ),
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "rotating_frame_omega" => 0.3,
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
 """
 
 @testset "GS cache hit rebuilds the full physics workspace" begin

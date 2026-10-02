@@ -1,6 +1,5 @@
 using Test
 using SpinorBEC
-using YAML
 
 # The budget must read the keys configs actually carry.
 #
@@ -8,7 +7,7 @@ using YAML
 # pre-2026 flat spellings — while the schema had folded them into `save:` and
 # now REJECTS them (`SAVE_SCHEMA`, `schema.jl:123-130`). So the `get(…, 1)`
 # default fired on every config that exists. Measured on
-# `runs/matsui_fig4b/fig4b_scan_n64.yaml`, which carries `save: {every: 108}`
+# `runs/matsui_fig4b/fig4b_scan_n64.experiment.jl`, which carries `save: {every: 108}`
 # over 3456 steps:
 #
 #     before   every = 1    ->  3456 snapshots
@@ -22,11 +21,11 @@ using YAML
     root = normpath(joinpath(@__DIR__, "..", ".."))
 
     @testset "a real config's cadence is honoured" begin
-        cfg = joinpath(root, "runs", "matsui_fig4b", "fig4b_scan_n64.yaml")
+        cfg = joinpath(root, "runs", "matsui_fig4b", "fig4b_scan_n64.experiment.jl")
         if !isfile(cfg)
             @test_skip "fixture config not present"
         else
-            d = YAML.load_file(cfg)
+            d = SpinorBEC._load_config_data(cfg)
             dyn = only(st["dynamics"] for st in d["pipeline"] if haskey(st, "dynamics"))
             every = Int(dyn["save"]["every"])
             n_steps = round(Int, Float64(dyn["duration"]) / Float64(dyn["dt"]))
@@ -41,27 +40,47 @@ using YAML
 
     @testset "n_snapshots is honoured too, and compression comes from save:" begin
         mktempdir() do dir
-            p = joinpath(dir, "c.yaml")
+            p = joinpath(dir, "c.experiment.jl")
             # `estimate_run_budget` needs a ground_state step to infer the
             # grid ("No ground_state step — can't infer grid"), so a bare
             # dynamics fixture cannot exercise it.
             write(
                 p,
                 """
-       pipeline:
-         - ground_state:
-             atom: Rb87
-             grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-             interactions: {N_atoms: 1000, omega_ref: 100.0, c1_ratio: -0.01}
-             potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-             method: itp
-             n_steps: 5
-             dt: 0.001
-         - dynamics:
-             duration: 10.0
-             dt: 0.01
-             save: {n_snapshots: 25, psi: true, compression: true}
-       """,
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "c1_ratio" => -0.01,
+                "omega_ref" => 100.0,
+            ),
+            "method" => "itp",
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 10.0,
+            "save" => Dict{String, Any}(
+                "compression" => true,
+                "n_snapshots" => 25,
+                "psi" => true,
+            ),
+        ),
+    )],
+)
+""",
             )
             b = estimate_run_budget(p; io=devnull)
             @test b.total_steps == 1000
@@ -77,29 +96,45 @@ using YAML
     @testset "positive control: the cadence changes the count" begin
         mk(body) = begin
             d = mktempdir()
-            p = joinpath(d, "c.yaml")
+            p = joinpath(d, "c.experiment.jl")
             write(
                 p,
                 """
-       pipeline:
-         - ground_state:
-             atom: Rb87
-             grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-             interactions: {N_atoms: 1000, omega_ref: 100.0, c1_ratio: -0.01}
-             potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-             method: itp
-             n_steps: 5
-             dt: 0.001
-         - dynamics:
-             duration: 10.0
-             dt: 0.01
-             save: $body
-       """,
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 1000,
+                "c1_ratio" => -0.01,
+                "omega_ref" => 100.0,
+            ),
+            "method" => "itp",
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 10.0,
+            "save" => $(repr(body)),
+        ),
+    )],
+)
+""",
             )
             estimate_run_budget(p; io=devnull)
         end
-        @test mk("{every: 10}").total_snapshots == 100
-        @test mk("{every: 100}").total_snapshots == 10
-        @test mk("{every: 10}").total_snapshots != mk("{every: 100}").total_snapshots
+        @test mk(Dict("every" => 10)).total_snapshots == 100
+        @test mk(Dict("every" => 100)).total_snapshots == 10
+        @test mk(Dict("every" => 10)).total_snapshots != mk(Dict("every" => 100)).total_snapshots
     end
 end

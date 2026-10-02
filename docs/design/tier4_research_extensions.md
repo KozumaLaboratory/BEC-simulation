@@ -13,7 +13,7 @@ The original 50-scenario plan flagged three items as "別ロードマップ" (se
 
 **Stack**:
 - `BayesianOptimization.jl` or `Surrogates.jl` for the GP-EI loop
-- An "evaluation" = `run_yaml` on a single-point config + extract a scalar objective from the result `.jld2` (e.g. `analyze/bogoliubov/max_growth`)
+- An "evaluation" = `run_experiment` on a single-point config + extract a scalar objective from the result `.jld2` (e.g. `analyze/bogoliubov/max_growth`)
 - Async dispatch so the GP doesn't block waiting for the 4-min eval
 
 **POC scaffold**: `scripts/research/bayesopt_skeleton.jl` (this commit). Hand-rolled placeholder, not a real BO loop — reads a known objective function and prints the next suggested point.

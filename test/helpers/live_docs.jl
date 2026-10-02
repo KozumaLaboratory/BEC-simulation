@@ -11,6 +11,7 @@
 #            gates to maintained documents only).
 
 const LIVE_DOCS = [
+    "docs/guides/julia_experiments.md",
     # GENERATED, and gated against the code by
     # `test_state_doc_is_current.jl` — the only LIVE doc whose
     # correctness is machine-checked rather than merely asserted.
@@ -64,7 +65,6 @@ const LIVE_DOCS = [
     # been executed on real hardware (UGE yes, SLURM/PBS no), which is exactly
     # the kind of line that must not silently outlive its measurement.
     "docs/guides/local_run_environment.md",
-    "docs/guides/pipeline_cookbook.md",
     "docs/guides/spgpe.md",
     "docs/guides/tsubame.md",
     "docs/index.md",
@@ -97,5 +97,5 @@ const LIVE_DOCS = [
     # reader is sent to, which is the LIVE test.
     "docs/validation/matsui_campaign_report.md",
     "docs/validation/parameter_contract_with_Ueda.md",
-    "docs/validation/step6_ueda_reference_state/reference_state.yaml",
+    "docs/validation/step6_ueda_reference_state/reference_state.experiment.jl",
     "docs/validation/ueda_status.md"]

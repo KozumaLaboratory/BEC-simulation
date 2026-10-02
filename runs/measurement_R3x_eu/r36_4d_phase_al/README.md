@@ -12,8 +12,8 @@ within 0.2 of the boundary vs 40 % random baseline.
 ```julia
 using SpinorBEC
 
-res = active_learn_phase_scan_yaml(
-    "runs/measurement_R3x_eu/r36_4d_phase_al/config.yaml",
+res = active_learn_phase_scan_config(
+    "runs/measurement_R3x_eu/r36_4d_phase_al/config.experiment.jl",
     [
         "pipeline.0.ground_state.interactions.c1_ratio",
         "pipeline.0.ground_state.ddi.c_dd_ratio",

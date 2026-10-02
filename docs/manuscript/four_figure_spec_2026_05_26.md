@@ -80,7 +80,7 @@ New: Barnett recommendation → Fig 4.
 
 **Optional extension (post-loss-on dispatch):**
 
-If the new `matsui_40ms_lossy_medium.yaml` / `matsui_40ms_lossy_strong.yaml`
+If the new `matsui_40ms_lossy_medium.experiment.jl` / `matsui_40ms_lossy_strong.experiment.jl`
 runs return a population decay that brackets the ~40% atom loss
 reported in Matsui's experiment, add a small inset to panel (c)
 showing total N(t)/N(0) for three rows: loss-free,
@@ -389,7 +389,7 @@ For each manuscript figure, the canonical data sources are:
 Fig 1 (a, b) :  runs/l4_k3_ladder/summary.json
 Fig 1 (c)    :  runs/matsui_baseline/summary.json (40ms_dynamics_n64 row)
 Fig 1 (d)    :  runs/matsui_baseline/matsui_5ms_n64_density_slice.json
-Fig 1 inset  :  runs/matsui_baseline/{matsui_40ms_lossy_medium,strong}.yaml
+Fig 1 inset  :  runs/matsui_baseline/{matsui_40ms_lossy_medium,strong}.experiment.jl
                   → analysis to extract N(t)/N(0) ratio for inset
 Fig 2 (a, b) :  runs/eu_k3_lhy_control/factorial_2x4.json
                   regen: scripts/eu_k3_lhy_factorial_regen.jl (8 cells, one revision)

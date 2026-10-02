@@ -35,7 +35,7 @@ The output lands in `docs/build/`.
 ### Pipeline
 
 ```@docs
-run_yaml
+run_experiment
 run_experiment
 run_pipeline
 load_config

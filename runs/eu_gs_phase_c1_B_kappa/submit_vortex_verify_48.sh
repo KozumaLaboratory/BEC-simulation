@@ -2,7 +2,7 @@
 # ============================================================
 #  UGE array — Eu F=6 GS phase diagram, 64³ full-map promotion (Stage B).
 #  Each task = one (c1,Bz,κ) point × 2 seeds, warm-started from its 32³
-#  recon winner via seed_from (config_vortex_verify_48.yaml). continuation is OFF
+#  recon winner via seed_from (config_vortex_verify_48.experiment.jl). continuation is OFF
 #  ⇒ cells are independent (no hysteresis), so array order is irrelevant.
 #
 #  Prereqs on the login node (once):
@@ -21,7 +21,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=/gs/fs/tga-kozuma-kouhi/uk07267/BEC-simulation
-CONFIG=$PROJECT_ROOT/runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_48.yaml
+CONFIG=$PROJECT_ROOT/runs/eu_gs_phase_c1_B_kappa/config_vortex_verify_48.experiment.jl
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
 cd "$PROJECT_ROOT"
@@ -41,6 +41,6 @@ echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] $(hostname)"; nvidia-smi -L || true
     import CUDA
     CUDA.functional() || (@error "CUDA not functional — refusing CPU fallback"; exit(1))
     using SpinorBEC
-    run_yaml(ARGS[1])' "$CONFIG"
+    run_experiment(ARGS[1])' "$CONFIG"
 
 echo "[task $SGE_TASK_ID] done"

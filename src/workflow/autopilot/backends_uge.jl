@@ -168,7 +168,7 @@ _uge_jobname(cid::AbstractString) = "sb_" * String(cid)
 
 Render the full UGE submission script. The body cd's into `project_root`,
 optionally `module load`s CUDA, sets `JULIA_NUM_THREADS` from the slot count
-the profile asked for, and invokes `julia run_yaml <config_path>` — same shape
+the profile asked for, and invokes `julia run_experiment <config_path>` — same shape
 as the LocalBackend subprocess invocation, for byte-for-byte run-artifact
 parity.
 

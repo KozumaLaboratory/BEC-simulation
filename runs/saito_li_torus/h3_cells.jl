@@ -5,7 +5,7 @@
 # so a difference between two cells is a difference in the physics.
 #
 # Units are the CONFIG's, not a rescaled set: omega_ref = 2 pi * 110 Hz,
-# a_ho = 0.78029 um, exactly as `config.yaml`. The variational sigma_r lands at
+# a_ho = 0.78029 um, exactly as `config.experiment.jl`. The variational sigma_r lands at
 # 0.588 a_ho, which is already a well-scaled internal length, so there is no
 # reason to rescale (contrast `runs/yls_barnett_f6/b_egpe_cells.jl`, where
 # a_ho = L0 would have forced dt ~ 1e-7).
