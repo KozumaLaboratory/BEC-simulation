@@ -41,7 +41,7 @@
 #
 # The sidecar name is load-bearing in one more way: `rsync` transfers
 # alphabetically and `point_001.jld2` sorts BEFORE `point_001.jld2.complete.toml`,
-# so an autopilot collect (`autopilot/ssh_transport.jl:52`) can never expose a
+# so a result transfer can never expose a
 # marker whose bytes have not landed yet. A bare `complete.toml` would sort
 # before every payload in the directory and open exactly that window.
 #
@@ -149,7 +149,7 @@ The failure direction is the safe one. An mtime that has been reset — `rsync`
 without `-t`, a `cp` that does not preserve times, a fresh `git checkout` — makes
 an old payload look new, and a payload that looks new is REJECTED, i.e.
 recomputed. Never the reverse. (The collect path is `rsync -av`, which does
-preserve mtimes: `autopilot/ssh_transport.jl:54`.)
+preserve mtimes.)
 
 Documented failure this closes: Snakemake issue 3808 — outputs of FAILED jobs
 stopped being marked incomplete, the metadata read `"incomplete": false`, and

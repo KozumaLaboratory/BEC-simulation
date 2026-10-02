@@ -372,7 +372,7 @@ Dict{String, Any}(
         # conversion. Inspect used to validate the raw dict, so it reported a
         # schema ERROR for ~20 configs that run fine, several already run on
         # TSUBAME. A preflight that fails valid configs is worse than none:
-        # this severity feeds the autopilot gate.
+        # this severity feeds the pre-flight verdict.
         src = """
 Dict{String, Any}(
     "dealias" => Dict{String, Any}(

@@ -85,10 +85,6 @@ native_probe(; n_steps=3) = PipelineConfig([
             run!(exp; force=true, verbose=false, audit=false)
             @test !haskey(JLD2.load(point), "force_canary")
 
-            qr = QueueRoot(joinpath(root, "queue"))
-            entry = enqueue!(exp; qr, kick_tick=false)
-            @test entry.spec_path == path
-            @test _load_config_data(entry.spec_path) == exp.spec
             @test isempty(store_census(root).stale_key)
             changed = JSON.parsefile(path; use_mmap=false)
             changed["spec"]["pipeline"][1]["ground_state"]["n_steps"] += 1

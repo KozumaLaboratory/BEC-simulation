@@ -20,7 +20,7 @@
 # WHAT THIS IS NOT
 #
 # It is not the liveness file. `_emit_live_status` writes `_live_status.json`
-# for the autopilot's divergence reaper, and #408 proposed riding on it because
+# for optional live diagnostics, and #408 proposed riding on it because
 # it already reaches all three dynamics paths. That is the right SHAPE and the
 # wrong COUPLING: the liveness callback is built from `live_monitor:`, whose own
 # documentation tells batch users to switch it OFF —

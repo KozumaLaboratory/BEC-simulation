@@ -57,9 +57,6 @@ const _SCRIPTS_ALLOWLIST = Set([
     "build_paper_latex.sh",
     "filter_bib.sh",
     # ── declarative ops specs (category 3) ──
-    "spinor-autopilot.service",
-    "spinor-autopilot.timer",
-    "spinorbec.env",
     "spinorbec.def",
     "tsubame_setup.sh",
     # ── cluster submit wrappers (UGE; declarative + qsub) ──
@@ -83,6 +80,7 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_saito_torus_cell.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
+    "tsubame/job_cost.sh",         # finished-job point charge from qacct + refs/tsubame4_points.toml
     "tsubame/submit_gpu_smoke.sh",
     "tsubame/submit_load_check.sh",
     "tsubame/submit_mutation.sh",

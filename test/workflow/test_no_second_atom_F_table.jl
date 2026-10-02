@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "..", "helpers", "calibrated_scan.jl"))
 #
 # Two were found on 2026-08-06, both feeding resource estimates:
 #
-#   autopilot/profile_recommend.jl   7 of 23 atoms, `Cs133` wrong in-table,
+#   retired scheduler recommender   7 of 23 atoms, `Cs133` wrong in-table,
 #                                    fallback F=1 → UNDER-sized up to 5.67x
 #                                    → OOM on TSUBAME → :killed_bug → retry
 #                                    escalates → the queue is paid for twice
@@ -92,9 +92,9 @@ end
         @test isempty(hits)
     end
 
-    # Both consumers, by name, so a revert is loud.
-    @testset "the two known consumers read the registry" begin
-        for f in ("workflow/autopilot/profile_recommend.jl", "workflow/io/budget.jl")
+    # The remaining budget consumer must read the registry.
+    @testset "the budget consumer reads the registry" begin
+        for f in ("workflow/io/budget.jl",)
             src = read(joinpath(_SRC, f), String)
             @test occursin("ATOM_REGISTRY", src)
         end

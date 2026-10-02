@@ -146,11 +146,6 @@ const FAST_TESTS = [
     "workflow/test_thermal_seed_amplitude.jl",
     # auto_grid, the spherical B angles and the error budget's positive-control
     # guard were each invisible to all 59 workflow files (mutation, 2026-07-31).
-    # Four autopilot invariants that 63 workflow files did not cover
-    # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
-    # OOM-is-permanent, and the on_complete lineage bound.
-    "workflow/test_autopilot_invariants.jl",
-    "workflow/test_profile_vram_uses_the_registry.jl",
     "workflow/test_docs_teach_real_analyzers.jl",
     "workflow/test_full_bdg_advisory_fires.jl",
     "workflow/test_no_second_atom_F_table.jl",
@@ -164,7 +159,6 @@ const FAST_TESTS = [
     "hamiltonian/test_two_spin_step_guards_agree.jl",
     "workflow/test_absence_is_not_reported_as_health.jl",
     "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
-    "workflow/test_failure_evidence_reaches_the_reader.jl",
     "workflow/test_native_experiment.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
@@ -192,12 +186,6 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
-    # Does what a run WRITES reach what the reaper READS? The autopilot suite
-    # drives `is_divergent_status` with dicts it builds itself, so it passed
-    # while the writer and the reader shared no keys at all.
-    "workflow/test_live_status_reaches_the_detector.jl",
-    # A name the autopilot reads must be a name something writes.
-    "workflow/test_terminal_record_has_a_producer.jl",
     # The budget read the pre-2026 flat save_* keys the schema now rejects.
     "workflow/test_budget_reads_the_save_block.jl",
     # A YAML key a maintained doc teaches must be one the schema accepts.
@@ -522,7 +510,6 @@ const FAST_TESTS = [
     "workflow/test_vortex_density_movie.jl",
     "workflow/test_diff_dicts.jl",
     "workflow/test_inspect_batch.jl",
-    "workflow/test_autopilot.jl",
     "workflow/test_catalog.jl",
     "workflow/test_catalog_index.jl",
     # Evaporation model + euv3 calibration units (pure 0-D kinetics / table
@@ -1246,7 +1233,6 @@ const _COST = Dict{String, Float64}(
     "test_reference_rhs.jl" => 59.4,
     "oracles/test_hamiltonian_sign_oracles.jl" => 52.0,
     "oracles/test_lhy_full_bdg_closed_form_parity.jl" => 51.8,
-    "workflow/test_autopilot.jl" => 49.1,
     "workflow/test_native_experiment.jl" => 65.7,
     "test_level10_hpsi_self_consistency.jl" => 47.7,
     "test_quality.jl" => 45.7,

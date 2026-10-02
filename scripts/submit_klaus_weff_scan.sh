@@ -147,7 +147,7 @@ timeout --signal=INT --kill-after=120 "$BUDGET_S" \
     # "block" against the printed struct, and every arm died on the q-auto-derive
     # INFO message, whose text is "Step 1 has no `q:` in its B BLOCK". A severity
     # is a field (`:error | :warn | :info`); `:block` is the registration
-    # level used by the autopilot pre-flight and is not a ConfigWarning value at all.
+    # level used by the retired scheduler pre-flight and is not a ConfigWarning value at all.
     blockers = filter(w -> w.severity === :error, r.warnings)
     if !isempty(blockers)
         for w in blockers

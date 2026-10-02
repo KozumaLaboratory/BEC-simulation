@@ -210,11 +210,7 @@ const _ROTATING_ACTUAL_INTEGRATOR = "strang"
     end
 
     dV = prod(grid.dx)
-    # Liveness for the autopilot's divergence kill. This path wrote no
-    # `_live_status.json` until 2026-08-07, so a diverging rotating_basis run ran
-    # to completion and billed for it — the reaper had nothing to read. Same
-    # writer as the standard path (`_emit_live_status`), so the keys cannot drift
-    # apart again.
+    # Emit live diagnostics independently of saved wavefunction snapshots.
     cb_live = _build_live_callback(get(p, "live_monitor", true), live_status_path)
     # Progress + ETA (#408). Separate from `live_monitor:` on purpose — see
     # `progress_reporter.jl`.
