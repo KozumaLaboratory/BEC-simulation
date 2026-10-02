@@ -200,7 +200,7 @@ Both runs are declared rejected-or-accepted by these, and by nothing decided
 afterwards. They live as the `ACCEPT` constants at the top of
 `scripts/klaus2022_reproduce.jl`, which is also what applies them and what
 writes the verdict — so the criterion cannot drift from the thing that enforces
-it. (An earlier draft of this section promised two `runs/*.yaml` files carrying
+it. (An earlier draft of this section promised two `runs/*.jl` files carrying
 `rejection_criterion:` blocks. Those were never written: a schema slot nothing
 reads is the failure mode `metadata:` was deleted for, and the criterion is
 only real where it is executed.)

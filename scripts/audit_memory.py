@@ -156,9 +156,9 @@ _RETIRED_FILES = frozenset((
 # lives on TSUBAME, the repo keeps figures and code). A memory naming a jld2 /
 # summary.json / per-point file under runs/ is recording what a run produced,
 # not asserting that the file is still there — so an absent one is expected,
-# not drift. Only `runs/**/*.yaml` is a config, i.e. real input worth checking.
+# not drift. Only `runs/**/*.experiment.jl` is a config, i.e. real input worth checking.
 def _is_run_output(path):
-    return path.startswith("runs/") and not path.endswith((".yaml", ".yml"))
+    return path.startswith("runs/") and not path.endswith((".experiment.jl", ".yml"))
 
 
 def _placeholder(path):

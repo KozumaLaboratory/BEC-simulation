@@ -5,7 +5,7 @@
 # is the lightweight Phase-2 surface — it composes opens with a
 # parametric label. A YAML-driven `sweep_runs(yaml; vary)` that
 # *runs* the pipeline N times is Phase-3 work (depends on
-# run_yaml + override machinery; deferred to keep this commit
+# run_experiment + override machinery; deferred to keep this commit
 # narrow).
 
 export sweep_runs, compare_runs

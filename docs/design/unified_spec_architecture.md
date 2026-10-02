@@ -701,8 +701,8 @@ this is what promotion looks like.
 
    The number inverts if the collapse is a BLIND SPOT rather than genuine
    sharing, so that was checked rather than assumed. Two members of the
-   59-config group (`klaus_quench_om0p0.yaml` and
-   `klaus_quench_omm0p2_holdonly_delay2ms_refine.yaml`) have `ground_state`
+   59-config group (`klaus_quench_om0p0.experiment.jl` and
+   `klaus_quench_omm0p2_holdonly_delay2ms_refine.experiment.jl`) have `ground_state`
    blocks with no key unique to either and no shared key holding a different
    value — byte-identical GS physics — while their `dynamics` blocks differ. The
    sharing is real: those 59 runs genuinely want one ground state, which is the

@@ -1,7 +1,7 @@
 name: Nightly heavy YAML
 
 # Runs the `full` tier with `SPINORBEC_RUN_HEAVY_YAML=true`, picking up
-# (a) every test the per-push `ci` tier defers — heavy pipeline /
+# (a) every test the per-push smoke views defer — heavy pipeline /
 # continuation / GPU / TWA / rotating-basis — and (b) the YAML pipeline
 # integration tests guarded by `_SKIP_HEAVY_YAML_INFRA` /
 # `_SKIP_HEAVY_YAML_ZEEMAN`. Each guarded block drives `run_pipeline`
@@ -235,9 +235,8 @@ jobs:
             "it by hand only hides the streak." \
             "" \
             "The nightly tier covers what per-PR checks cannot: the heavy YAML pipeline" \
-            "blocks behind \`SPINORBEC_RUN_HEAVY_YAML\`, which are SKIPPED in \`fast\` /" \
-            "\`oracles\` / \`integration\` even though the files containing them are" \
-            "gated. While this is red, that surface is unverified.")
+            "blocks behind \`SPINORBEC_RUN_HEAVY_YAML\`, plus tests deferred by smoke." \
+            "While this is red, the full test surface is unverified.")
 
           if [ -n "$existing" ]; then
             gh issue edit "$existing" --repo "$REPO" --body "$body"
@@ -247,3 +246,86 @@ jobs:
               --title "Nightly heavy YAML is failing" --body "$body"
             echo "opened a new status issue (streak $streak)"
           fi
+
+  # Maintenance outside the development feedback path.
+  bench:
+    name: Benchmark
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Run quick benchmark
+        run: julia --project=. bench/bench_quick.jl
+        timeout-minutes: 8
+
+  state-doc-drift:
+    name: STATE.md drift (nightly)
+    # Repairs main only; manual validation on a feature branch must not push.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }}
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Regenerate and report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: chore/state-doc-drift
+        run: |
+          set -euo pipefail
+          before=$(sha256sum docs/STATE.md | cut -d' ' -f1)
+          julia --project=. scripts/generate_state.jl
+          # POSITIVE CONTROL on the GENERATOR, not on the diff. One that errored,
+          # wrote nothing, or emitted a stub would leave "no drift" and "could
+          # not look" printing the same clean result — the class this repo keeps
+          # re-finding. Refuse to adjudicate on a file that is missing or
+          # implausibly small; the real one is ~13 kB.
+          test -f docs/STATE.md
+          size=$(wc -c < docs/STATE.md)
+          if [ "$size" -lt 4000 ]; then
+            echo "REFUSING to adjudicate: docs/STATE.md is $size bytes."
+            echo "The generator produced no document; that is not 'no drift'."
+            exit 1
+          fi
+          after=$(sha256sum docs/STATE.md | cut -d' ' -f1)
+          if [ "$before" = "$after" ]; then
+            echo "docs/STATE.md is current ($size bytes)."
+            exit 0
+          fi
+          echo "DRIFT: the committed docs/STATE.md does not match the generator."
+          git diff --stat -- docs/STATE.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add docs/STATE.md
+          git commit -m "chore(docs): regenerate STATE.md after a concurrent merge" -m "Two PRs each regenerated it against their own base; the text merge did not conflict and the result matches neither generator nor tree. Regenerated from ${GITHUB_SHA}."
+          git push -f origin "$BRANCH"
+          # A force-push updates an existing open PR, so only create one when
+          # there is none. `gh pr create` failing is NOT swallowed: if the org
+          # forbids Actions from opening PRs, this job says so rather than
+          # returning green over an unrepaired `main`.
+          open_pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')
+          if [ -z "$open_pr" ]; then
+            gh pr create --base main --head "$BRANCH" --title "chore(docs): regenerate STATE.md after a concurrent merge" --body "\`main\` is red at \`test_state_doc_is_current.jl\`. Opened by the \`state-doc-drift\` job; the repair is proposed as a PR because branch protection requires checks before merging."
+          else
+            echo "PR #$open_pr already open on $BRANCH; force-pushed the update"
+          fi
+          # Red on purpose: the repair is PROPOSED, not landed, and `main` is
+          # still carrying a document that does not describe it.
+          exit 1

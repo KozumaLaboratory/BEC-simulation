@@ -16,7 +16,7 @@
 # It needed three things at once to surface (`method: lbfgs` + a tabulated `lhy:`
 # kind + `backend: gpu`), and until #179 the L-BFGS path never built a table, so
 # no kernel was ever handed one. #179 exposed it, and
-# `runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml` needs both
+# `runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.experiment.jl` needs both
 # fixes before it runs at all.
 #
 # The assertion is deliberately GPU == CPU rather than merely "does not throw":

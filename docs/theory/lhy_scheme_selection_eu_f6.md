@@ -136,7 +136,7 @@ Three things make this a real route rather than an artefact:
 
 - **m = −F is the physical branch.** `p < 0` for a g_F > 0 atom on +Bz, so m = −F
   IS the Zeeman ground state; the `m_plus_F` seed measurably relaxes to
-  Mz = −5.89 in `config_smoke.yaml`.
+  Mz = −5.89 in `config_smoke.experiment.jl`.
 - **m = +F is the control and stays unstable** at 2.20–2.34 across the entire
   sweep. A probe that had simply gone blind would have zeroed both.
 - **The DDI is still what causes it.** With `c_dd = 0` every entry is exactly 0
@@ -300,9 +300,9 @@ the two conventions differ by a few percent regardless.
 
 Two campaigns, both at ¹⁵¹Eu, 32×32×64, box 12×12×24, κ = 1, LBFGS +
 `newton_polish`, `tol = 1e-9` — the campaign's own precision recipe from
-`config_c1_precise_B0k1.yaml`, differing from it only in the `lhy` block.
-`runs/eu_lhy_boundary_337/config_arms.yaml` scans Bz at `c1_ratio = 1/36`;
-`config_arms_c1.yaml` scans `c1_ratio` at B = 5 µG. Read by
+`config_c1_precise_B0k1.experiment.jl`, differing from it only in the `lhy` block.
+`runs/eu_lhy_boundary_337/config_arms.experiment.jl` scans Bz at `c1_ratio = 1/36`;
+`config_arms_c1.experiment.jl` scans `c1_ratio` at B = 5 µG. Read by
 `bench/lhy_boundary_report.jl`. Both were **re-run in full** after `7e6770c2`
 (jobs 8442771 and 8442773, both GREEN, 81 + 99 solves).
 
@@ -365,7 +365,7 @@ why the slope has to be measured rather than derived.
 
 **The Bz axis also fails its own pre-registered control threshold, so it is not
 the axis this document quotes.** The ×10 control's gap shift converts to
-−2.58 µG against the 5 µG written into `config_arms.yaml` before launch, and the
+−2.58 µG against the 5 µG written into `config_arms.experiment.jl` before launch, and the
 report REFUSES a verdict there. It is not that the instrument is blind — the
 physics arms move 9.2 and 12.2 µG, far more than the control — it is that the
 threshold was set from a pre-launch estimate that turned out optimistic, and
@@ -374,7 +374,7 @@ axis, whose control passes at 4× its threshold, is the measurement.
 
 ### 5.3 The c1 axis — where every arm has a boundary, and the answer
 
-`config_arms_c1.yaml`, 11 points of `c1_ratio` ∈ [0.022, 0.032] at B = 5 µG,
+`config_arms_c1.experiment.jl`, 11 points of `c1_ratio` ∈ [0.022, 0.032] at B = 5 µG,
 4000 LBFGS steps (job 8440274, GREEN, 11/11 tasks). B = 5 µG rather than 0
 because at exactly zero field the stretched branch sits on a degenerate spin
 manifold and the solver stalls — |∇E| = 5.7e-1 at B = 0 against 4.8e-6 at 5 µG,

@@ -1,5 +1,7 @@
 # SpinorBEC.jl documentation
 
+Experiment authoring: [Julia experiment definitions](guides/julia_experiments.md).
+
 Spin-F BEC simulator (split-step Fourier, 1D/2D/3D). Primary target: ¹⁵¹Eu (F=6, 13 components). Dimensionless units: ℏ=m=ω_ref=1.
 
 For usage and test commands, see [README.md](../README.md). For agent work,
@@ -22,7 +24,7 @@ start with [AGENTS.md](../AGENTS.md), then the shared rules and task map in
 docs/
 ├── campaign/       active campaign charter (read first in a campaign session)
 ├── guides/         step-by-step how-tos
-├── reference/      API + YAML schema + architecture
+├── reference/      API + parameter schema + architecture
 ├── design/         design rationale and proposals (check LIVE/FROZEN status)
 ├── theory/         physics theory write-ups
 ├── research_notes/ scientific results
@@ -59,8 +61,8 @@ for current task status; this map does not duplicate their checklists.
 | Task | Read |
 |---|---|
 | Define a new experiment in Julia and persist its inputs/results | [README usage](../README.md#usage), then [workflow rules](../CLAUDE.md#workflow-model-spec--cas--run--observe) |
-| End-to-end walkthrough (calibration → YAML → run → analyze) | `guides/lab_user_tutorial.md` |
-| YAML pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
+| End-to-end walkthrough (calibration → definition → run → analyze) | `guides/lab_user_tutorial.md` |
+| Experiment pattern recipes (scan, droplet, calibration, …) | `guides/pipeline_cookbook.md` |
 | Fast-Larmor regime (Eu / Dy production path) | `guides/fast_larmor_regime.md` |
 | Preparing the weak-field Eu chiral ground state (B ramp / κ ramp / z torque) — **its hysteresis reading is RETRACTED, see the next row** | `guides/eu_adiabatic_protocol.md` |
 | The κ-dependent transition, re-measured: the "loop" is a J_z slide; the deliverable is a Stern-Gerlach level count | `guides/eu_kappa_hysteresis_loop.md` |
@@ -78,7 +80,7 @@ for current task status; this map does not duplicate their checklists.
 
 | Task | Read |
 |---|---|
-| Every YAML key | `reference/yaml_schema_reference.md` |
+| Parameter schema (legacy filename) | `reference/yaml_schema_reference.md` |
 | Every key in a `dynamics:` block | `reference/dynamics.md` |
 | Module structure + data flow | `reference/architecture.md` |
 | API docstrings | `api/index.md` |

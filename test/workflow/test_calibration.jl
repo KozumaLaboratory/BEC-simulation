@@ -1,7 +1,6 @@
 using Test
 using SpinorBEC
 using SpinorBEC: _parse_bfield, Units
-using YAML
 
 @testset "Calibration layer (Phase 5.3)" begin
     @testset "unit conversions" begin
@@ -108,28 +107,36 @@ using YAML
 
     @testset "load_calibration from YAML" begin
         mktempdir() do tmp
-            path = joinpath(tmp, "calib.yaml")
+            path = joinpath(tmp, "calib.experiment.jl")
             write(
                 path,
                 """
-    calibration:
-      epoch: "lab_2026_04"
-      date: "2026-04-20"
-      coil_strong:
-        gauss_per_mv: 0.4
-        gauss_offset: 0.05
-        valid_range_mv:
-          min: -1000.0
-          max: 1000.0
-      coil_weak:
-        gauss_per_mv: 0.04
-        gauss_offset: 0.0
-      fort:
-        sqrt_coeffs_hz: [450.0, 450.0, 600.0]
-        offsets_hz: [0.0, 0.0, 0.0]
-      microwave:
-        rad_per_s_per_mw: 1.5e6
-    """,
+Dict{String, Any}(
+    "calibration" => Dict{String, Any}(
+        "coil_strong" => Dict{String, Any}(
+            "gauss_offset" => 0.05,
+            "gauss_per_mv" => 0.4,
+            "valid_range_mv" => Dict{String, Any}(
+                "max" => 1000.0,
+                "min" => -1000.0,
+            ),
+        ),
+        "coil_weak" => Dict{String, Any}(
+            "gauss_offset" => 0.0,
+            "gauss_per_mv" => 0.04,
+        ),
+        "date" => "2026-04-20",
+        "epoch" => "lab_2026_04",
+        "fort" => Dict{String, Any}(
+            "offsets_hz" => [0.0, 0.0, 0.0],
+            "sqrt_coeffs_hz" => [450.0, 450.0, 600.0],
+        ),
+        "microwave" => Dict{String, Any}(
+            "rad_per_s_per_mw" => 1.5e6,
+        ),
+    ),
+)
+""",
             )
             calib = load_calibration(path)
             @test calib.epoch == "lab_2026_04"

@@ -1,5 +1,9 @@
 # Compute Gateway — multi-target AI research infrastructure
 
+> **RETIRED 2026-10-02.** The Autopilot backend and queue described here were
+> removed. This document records the earlier design; use
+> [the TSUBAME guide](../guides/tsubame.md) for batch operations.
+
 > **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 
@@ -59,7 +63,7 @@ engine; the table below is the honest inventory (see the review for file:line).
 Build `submit`/`results` on `Experiment` / `Vector{Experiment}` + the existing
 *function* observables (`Fz_t`, `classify`, …) and `tabulate` (returns a
 `NamedTuple`). There is no `Observable{T}` and no `Sweep` type — do not create
-them. Use `config([...])` / `Experiment(spec)` / `run!` / `run_yaml`.
+them. Use `config([...])` / `Experiment(spec)` / `run!` / `run_experiment`.
 
 **Genuinely new — where the work goes:**
 

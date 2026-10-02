@@ -57,9 +57,6 @@ const _SCRIPTS_ALLOWLIST = Set([
     "build_paper_latex.sh",
     "filter_bib.sh",
     # ── declarative ops specs (category 3) ──
-    "spinor-autopilot.service",
-    "spinor-autopilot.timer",
-    "spinorbec.env",
     "spinorbec.def",
     "tsubame_setup.sh",
     # ── cluster submit wrappers (UGE; declarative + qsub) ──
@@ -72,17 +69,18 @@ const _SCRIPTS_ALLOWLIST = Set([
     "submit_klaus_weff_scan.sh",
     "submit_lt64_endpoint_ensemble.sh",
     # #423 — eu151_klaus_phi_phys at production scale with the anti-aligned
-    # preparation. One job, not an array: `run_yaml` has no point selection, so
+    # preparation. One job, not an array: `run_experiment` has no point selection, so
     # the 8-point scan is indivisible from outside; it IS resumable, so a
     # walltime kill costs only the point it was inside.
     "submit_edh_phi_phys_anti_aligned.sh",
-    # #376 — one runs/saito_li_torus/cells/*.yaml resolution cell. On TSUBAME
+    # #376 — one runs/saito_li_torus/cells/*.experiment.jl resolution cell. On TSUBAME
     # rather than the local card: 128³ x D=13 keeps 8.12 GiB of L-BFGS history
     # at the default m, and dropping m for one point of a four-point convergence
     # line would make that point answer a different question.
     "submit_saito_torus_cell.sh",
     "tsubame/_preamble.sh",
     "tsubame/preflight.sh",
+    "tsubame/job_cost.sh",         # finished-job point charge from qacct + refs/tsubame4_points.toml
     "tsubame/submit_gpu_smoke.sh",
     "tsubame/submit_load_check.sh",
     "tsubame/submit_mutation.sh",

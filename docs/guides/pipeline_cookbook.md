@@ -1,6 +1,12 @@
+> **FROZEN 2026-10-02.** — historical YAML recipes. Current authoring is documented in [Julia experiment definitions](julia_experiments.md).
+
 # Pipeline cookbook
 
-Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` (example) and `runs/eu151_*/config.yaml`.
+> Experiment authoring now uses [Julia definitions](../guides/julia_experiments.md).
+> YAML input has been removed. YAML-shaped snippets below describe historical
+> parameter structure, not executable input files.
+
+Common YAML patterns. Each block is a self-contained excerpt — combine them in your own configs. For complete runnable scenarios see `runs/samples/` (example) and `runs/eu151_*/config.experiment.jl`.
 
 ## Basic ground state
 
@@ -166,12 +172,12 @@ pipeline:
 
 ## Resumable scan
 
-`run_yaml` writes one `point_NNN.jld2` per scan point. Re-running the same YAML skips already-written points. Delete an individual file to force that point to recompute. Partial-failure resilience: each scan point's GS+dynamics is independent; one failure doesn't poison neighbours.
+`run_experiment` writes one `point_NNN.jld2` per scan point. Re-running the same YAML skips already-written points. Delete an individual file to force that point to recompute. Partial-failure resilience: each scan point's GS+dynamics is independent; one failure doesn't poison neighbours.
 
 ## Dry-run preview
 
 ```julia
-yaml_str = run_yaml("path/to/config.yaml"; dry_run = true)
+yaml_str = run_experiment("path/to/config.experiment.jl"; dry_run = true)
 ```
 
 Prints the post-calibration / post-validation YAML to stdout **and returns it as a String** without touching the GPU. Useful to capture the expanded YAML for diff'ing or to assert in tests.

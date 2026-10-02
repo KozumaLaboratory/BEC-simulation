@@ -14,7 +14,7 @@
 # `SinusoidalWaveform` is sin, so phase_x = -pi/2 puts B(0) = -x in EVERY cell,
 # aligned with the ground-state spin -- no nutation kick in either arm.
 #
-# The workspace is built directly rather than through run_yaml because the J_z
+# The workspace is built directly rather than through run_experiment because the J_z
 # ledger needs a dense observable time series: reconstructing it from saved psi
 # would cost ~25 GB per cell, against 21 GB free on the TSUBAME group volume.
 import CUDA

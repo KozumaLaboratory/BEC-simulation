@@ -31,7 +31,7 @@ include("validation/accuracy_knobs.jl")         # what trades accuracy, and what
 include("validation/accuracy_profiles.jl")      # :reference / :production / :fast, derived from the registry
 include("validation/ground_state_preflight.jl") # one gate before spending compute: the traps that actually cost time
 include("validation/save_operator_rhs.jl")      # Level-10 hand-off (operator_rhs.jld2 + MANIFEST)
-include("validation/convenience.jl")            # audit / hand_off / diff_yamls — top-level 1-liners
+include("validation/convenience.jl")            # audit / hand_off / diff_experiments — top-level 1-liners
 include("validation/show.jl")                   # Base.show pretty printing for REPL
 include("validation/twin_audit.jl")             # Level-12 production audit (twin control check)
 include("validation/run_observables.jl")        # snapshot trajectories + collapse classifier

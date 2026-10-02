@@ -96,7 +96,7 @@ if dE < tol && (tol_drho <= 0.0 || drho < tol_drho)
 
 `dE` is `_relative_energy_change` — the relative **energy** change, not a
 gradient norm. It is evaluated only inside `if step % sp.save_every == 0` (`src/solvers/ground_state/itp_loop.jl:247`), and
-the YAML path sets `save_every = max(1, n_steps ÷ 100)`, so at the default
+the pipeline path sets `save_every = max(1, n_steps ÷ 100)`, so at the default
 `n_steps=100000` the criterion is tested **1000 steps apart**. A run can be
 converged for 999 steps without noticing. `dpsi` appears in the diagnostics
 and NOT in the condition above — that absence is derived here, not
@@ -141,12 +141,12 @@ That set is exactly `fieldnames(Stage)` plus `code_rev`, asserted as an
 EQUALITY in both directions — a missing key means a `Stage` input silently
 left the identity, an extra one means something undeclared entered it. Set
 equality proves no *field* is selected out; it does NOT prove content
-completeness (`model_toml_dict` deliberately omits non-required slots equal
+completeness (`model_data` deliberately omits non-required slots equal
 to their own default), and that qualification is judgement, not derived.
 
 ## Ground-state knob defaults, by entry path
 
-| knob | `find_ground_state` | `find_ground_state_lbfgs` | YAML fallback |
+| knob | `find_ground_state` | `find_ground_state_lbfgs` | Pipeline fallback |
 |---|---|---|---|
 | `n_steps` | 10000 | 1000 | method === :lbfgs ? 500 : 100000 / 1000 / 100000 / 4000 / use_from_jld2 ? 0 : 200 (schema `100000`) |
 | `tol` | 1e-10 | 1e-8 | 1e-8 / 1e-6 / 1.0e-9 (schema `1.0e-8`) |
@@ -155,7 +155,7 @@ to their own default), and that qualification is judgement, not derived.
 **`m_lbfgs` is the live trap.** Both Julia entries default to 20 and
 `ground_state.jl` carries a `# keep in sync with find_ground_state_lbfgs
 default` comment; 20 is the MEASURED value (~9× lower grad_norm floor, ~30 %
-fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The YAML path
+fewer line-search backtracks against 10 on Eu F=6+DDI 16³). The pipeline path
 defaults to 10, so every production run that omits the key gets the worse
 one. The sync obligation was written for the two Julia entries and never
 extended to the path most runs take. Whether to change it is a decision, so
@@ -179,7 +179,7 @@ re-derived. **Do not restate these anywhere.**
 
 `LHY_KINDS`: `none`, `scalar`, `quasi_2d`, `polar_two_channel`, `full_bdg`, `polar_contact`, `polar_dipolar`, `fm_contact`, `fm_dipolar`, `icosahedral`, `spatial`
 
-## YAML surface
+## Experiment parameter surface
 
 **Top-level keys (10):** `accuracy`, `auto_grid`, `calibration`, `calibration_history`, `defaults`, `mixins`, `pipeline`, `scan`, `target_date`, `units`
 
@@ -279,7 +279,7 @@ as complete.
 | `src/validation/` | 1 | 10 |
 | `src/manuscript/` | 1 | 17 |
 | `src/solvers/` | 2 | 46 |
-| `src/workflow/` | 5 | 152 |
+| `src/workflow/` | 5 | 131 |
 | `src/foundation/` | 1 | 41 |
 | `src/analysis/` | 1 | 51 |
 

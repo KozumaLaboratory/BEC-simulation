@@ -14,7 +14,6 @@ function _print_help(io::IO=stdout)
     println(io, "  launch    [<batch>] <run_name>                  full per-run launcher")
     println(io, "  figure    --paper <p> --fig <n> | --list        manuscript figure builder")
     println(io, "  preflight [<smoke_config>]                      cluster CUDA + smoke")
-    println(io, "  autopilot <sub> [args]                          queue meta-loop ops")
     println(io, "  tag       {add <name> <cid>|remove <name>|list} catalog human pointers")
     println(io, "  catalog   {index | reindex [--force]}            navigable run index")
     println(io, "  gs-library {index <dir> | merge [src] [dest]}    converged-GS library ops")
@@ -27,16 +26,6 @@ function _print_help(io::IO=stdout)
     println(io, "  tsubame   {build-sysimage}                       cluster helper(s)")
     println(io, "  help                                            this message")
     println(io)
-    println(io, "autopilot subcommands:")
-    println(io, "  tick [--dry-run]                                one tick (cron / systemd)")
-    println(io, "  status                                          snapshot of all queues")
-    println(io, "  enqueue <yaml> [--priority N] [--enqueued-by T] add a run to pending")
-    println(io, "  retry [--max N]                                 reschedule killed_bug")
-    println(io, "  pause | resume                                  global dispatch gate")
-    println(io, "  drain [--timeout=N]                             wait for running to empty")
-    println(io, "  why <content_id>                                lineage chain")
-    println(io, "  budget [set --quarter=X --daily=Y]              GPU·h caps")
-    println(io, "  dry-run [on | off | status]                     toggle persisted flag")
 end
 
 # ── small kv-flag helpers (shared across subcommands) ────────────────
@@ -58,7 +47,7 @@ _kvi(args, key, default) =
 
 function _cmd_inspect(args)
     if isempty(args) || args[1] in ("-h", "--help")
-        println(stderr, "usage: cli.jl inspect <config.yaml> [--json]")
+        println(stderr, "usage: cli.jl inspect <config.experiment.jl> [--json]")
         return 2
     end
     path = args[1]
@@ -116,152 +105,6 @@ function _cmd_preflight(args)
     # `cli.jl preflight` exited green on a machine with no GPU — the caller threw
     # away the only signal the check produced.
     return cuda_preflight_check(; smoke_config=smoke) ? 0 : 1
-end
-
-# ── autopilot subcommand dispatcher ──────────────────────────────────
-
-function _cmd_autopilot(args)
-    if isempty(args)
-        println(
-            stderr,
-            "usage: cli.jl autopilot {tick|status|enqueue|retry|pause|resume|drain|why|budget|dry-run|backfill-groups}",
-        )
-        return 2
-    end
-    sub, rest = args[1], args[2:end]
-    sub == "tick" && return _ap_tick(rest)
-    sub == "status" && return _ap_status(rest)
-    sub == "enqueue" && return _ap_enqueue(rest)
-    sub == "retry" && return _ap_retry(rest)
-    sub == "pause" && return _ap_pause(rest)
-    sub == "resume" && return _ap_resume(rest)
-    sub == "drain" && return _ap_drain(rest)
-    sub == "why" && return _ap_why(rest)
-    sub == "budget" && return _ap_budget(rest)
-    sub == "dry-run" && return _ap_dryrun(rest)
-    sub == "backfill-groups" && return _ap_backfill_groups(rest)
-    println(stderr, "cli.jl autopilot: unknown subcommand '$sub'")
-    return 2
-end
-
-function _ap_tick(rest)
-    dry = "--dry-run" in rest
-    cfg = default_autopilot_config(; dry_run=dry)
-    stats = autopilot_tick!(; config=cfg)
-    println(dry ? "tick (DRY-RUN): " : "tick: ", stats)
-    0
-end
-
-function _ap_status(_)
-    print(stdout, autopilot_status())
-    0
-end
-
-function _ap_enqueue(rest)
-    isempty(rest) && (
-        println(stderr,
-            "usage: cli.jl autopilot enqueue <yaml> [--priority N] [--enqueued-by T]");
-        return 2
-    )
-    yaml_path = rest[1]
-    priority = _kvi(rest, "priority", 5)
-    tag = _kv(rest, "enqueued-by", "cli")
-    e = enqueue!(Experiment(yaml_path); priority=priority, enqueued_by=tag)
-    println("enqueued: $(e.run_dir)")
-    0
-end
-
-function _ap_retry(rest)
-    max_r = _kvi(rest, "max", 3)
-    # The config, so the backend is resolved per entry. Passing none meant every
-    # entry was interrogated as if it were local.
-    out = retry_failed!(; max_retries=max_r,
-        config=default_autopilot_config())
-    println("retry: ", out)
-    0
-end
-
-function _ap_backfill_groups(rest)
-    dry = "--dry-run" in rest
-    changes = backfill_group_ids!(; dry_run=dry)
-    if isempty(changes)
-        println("backfill-groups: nothing to do (all group_ids consistent)")
-    else
-        println(
-            if dry
-                "backfill-groups (DRY-RUN), would update $(length(changes)):"
-            else
-                "backfill-groups: updated $(length(changes)):"
-            end,
-        )
-        for (cid, gid) in changes
-            println("  $(cid[1:min(end, 16)]) → group_id $(gid[1:min(end, 16)])")
-        end
-    end
-    0
-end
-
-function _ap_pause(_)
-    autopilot_pause!()
-    println("autopilot paused (dispatch halted; running jobs continue)")
-    0
-end
-
-function _ap_resume(_)
-    autopilot_resume!()
-    println("autopilot resumed")
-    0
-end
-
-function _ap_drain(rest)
-    tmo = _kvf(rest, "timeout", 3600.0)
-    ok = autopilot_drain_wait(; timeout_s=tmo)
-    println(ok ? "drained" : "drain timed out")
-    ok ? 0 : 1
-end
-
-function _ap_why(rest)
-    isempty(rest) && (println(stderr, "usage: cli.jl autopilot why <content_id>"); return 2)
-    chain = autopilot_why(rest[1])
-    print_why(stdout, chain)
-    0
-end
-
-function _ap_budget(rest)
-    if !isempty(rest) && rest[1] == "set"
-        b = get_budget()
-        qcap = _kvf(rest, "quarter", b.quarter_cap_gpu_hours)
-        dcap = _kvf(rest, "daily", b.daily_cap_gpu_hours)
-        b.quarter_cap_gpu_hours = qcap
-        b.daily_cap_gpu_hours = dcap
-        set_budget!(b)
-        println("budget caps updated: quarter=$(qcap), daily=$(dcap)")
-        return 0
-    end
-    refresh_budget!()
-    d = budget_status()
-    for (k, v) in d
-        println("  ", rpad(string(k), 24), v)
-    end
-    0
-end
-
-function _ap_dryrun(rest)
-    if isempty(rest) || rest[1] in ("status", "show")
-        on = is_autopilot_dry_run()
-        println("autopilot dry_run: ", on ? "ON" : "OFF")
-        return 0
-    elseif rest[1] == "on"
-        autopilot_set_dry_run!(true)
-        println("autopilot dry_run: ON")
-        return 0
-    elseif rest[1] == "off"
-        autopilot_set_dry_run!(false)
-        println("autopilot dry_run: OFF")
-        return 0
-    end
-    println(stderr, "usage: cli.jl autopilot dry-run [on|off|status]")
-    2
 end
 
 # ── tag subcommand (catalog human pointers) ─────────────────────────
@@ -523,7 +366,6 @@ function cli_main(args)
     sub == "launch" && return _cmd_launch(rest)
     sub == "figure" && return _cmd_figure(rest)
     sub == "preflight" && return _cmd_preflight(rest)
-    sub == "autopilot" && return _cmd_autopilot(rest)
     sub == "tag" && return _cmd_tag(rest)
     sub == "catalog" && return _cmd_catalog(rest)
     sub == "gs-library" && return _cmd_gs_library(rest)

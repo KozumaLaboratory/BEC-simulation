@@ -16,9 +16,9 @@ else:
         "stages_at_turn": {
             "Observe": [50, "researcher 9-pattern sweep; 5 WHAT-comments + 126 1e-30 instances; 2 L3 proposals queued"],
             "Findings": [50, "folded into Observe; mechanical-fix-eligible vs investigation-eligible triage in director T51"],
-            "Triage": [51, "implementer applied mechanical topology.jl cleanup; patterns.yaml updated with proposed_classes"],
+            "Triage": [51, "implementer applied mechanical topology.jl cleanup; patterns.experiment.jl updated with proposed_classes"],
             "L3_critic_audit": [52, "critic produced LP-1 REJECT + LP-2 ACCEPT verdicts per F6 4-question audit"],
-            "Document": [54, "applied LP-1/LP-2 verdicts to patterns.yaml; audit_history row appended; investigation closed"]
+            "Document": [54, "applied LP-1/LP-2 verdicts to patterns.experiment.jl; audit_history row appended; investigation closed"]
         },
         "tier_current": 2,
         "tier_target": 2,

@@ -190,7 +190,7 @@ one `LaguerreGaussBeam` uses (`evaluate_potential.jl:117-131` computes
 `w` is HALF the 1/e² radius, and `BeamSpec.waist = 2 · PlugBeam.waist`. Two
 definitions of "waist" live in the current tree. The conversion belongs in the
 translator, once (`resolve_gs.jl`), and the spec carries the physical number;
-`test/model/test_yaml_to_model.jl` gates it against the evaluator numerically
+`test/model/test_config_to_model.jl` gates it against the evaluator numerically
 rather than against this paragraph, which said "twice" before it was measured.
 """
 struct BeamSpec <: ModelValue

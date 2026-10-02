@@ -13,7 +13,7 @@ owns the full simulation lifecycle: define → persist → run → observe.
 Users never name an outdir — the spec uniquely determines it
 (content-addressable storage, Nix-derivation style). `Batch` is a
 `Vector{Experiment}` paired with the sweep axis they vary over.
-Together they subsume the scattered `run_yaml + skip-if-cached loops +
+Together they subsume the scattered `run_experiment + skip-if-cached loops +
 RunResult + free observable functions` patterns that used to live
 across `scripts/`.
 
@@ -50,7 +50,7 @@ spec = config([
 exp = Experiment(spec)       # outdir auto-derived: runs/<16hex>/
 outdir(exp)                  # e.g. "runs/12174e883326ecac"
 
-write_run!(exp)              # writes config.yaml into outdir
+write_run!(exp)              # writes config.experiment.jl into outdir
 run!(exp)                    # runs (idempotent — no-op if result.jld2 exists)
 
 times(exp)                   # Vector{Float64}, snapshot time axis
@@ -116,15 +116,15 @@ Experiment(yaml_path::AbstractString; store=default_store())
 ## Lifecycle
 
 ```julia
-write_run!(exp)              # write config.yaml into outdir
+write_run!(exp)              # write config.experiment.jl into outdir
 run!(exp; force=false)       # idempotent run; force=true to rerun
 status(exp)                  # :cached | :stale | :pending | :missing
 ```
 
-`run!` is a thin wrapper over `run_yaml(cfg_path)`. When `force=true`
+`run!` is a thin wrapper over `run_experiment(cfg_path)`. When `force=true`
 the lazy observation cache is cleared first.
 
-`status` checks the relative mtime of `config.yaml` vs `result.jld2` —
+`status` checks the relative mtime of `config.experiment.jl` vs `result.jld2` —
 a YAML edit after the run flags `:stale`.
 
 ---
@@ -199,15 +199,15 @@ exps = sweep(base, cells)
 The cell label (`Pair.first`) is informational only — CAS handles
 naming.
 
-### Legacy scan.yaml reader
+### Legacy scan.experiment.jl reader
 
 ```julia
-exps = sweep("runs/eu151_klaus_phi_phys/scan.yaml")
+exps = sweep("runs/eu151_klaus_phi_phys/scan.experiment.jl")
 ```
 
-Reads the legacy `scan.yaml` schema (template + parameter.values +
+Reads the legacy `scan.experiment.jl` schema (template + parameter.values +
 override_path + extra_overrides + point_dir_pattern) and returns
-`Vector{Experiment}` directly. No `_manifest.yaml` is written.
+`Vector{Experiment}` directly. No `_manifest.experiment.jl` is written.
 
 ### Tabulate
 
@@ -280,7 +280,7 @@ run!.(exps)
 
 | Old pattern | Now |
 |---|---|
-| `run_yaml(path)` + manual skip-if-cached | `run!(exp)` |
+| `run_experiment(path)` + manual skip-if-cached | `run!(exp)` |
 | `open_result(jld2) + RunResult.Fz_t` | `Fz_t(exp)` |
 | `peak_density_trajectory(jld2)` | `peaks(exp)` |
 | `find_run_dir(yaml)` | inside `Experiment(yaml_path)` ctor |

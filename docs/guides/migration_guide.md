@@ -47,9 +47,9 @@ with any of the three.
 
 ## Calibration auto-application
 
-**Old**: lab-unit YAML required `run_yaml_calibrated(path; calibration_path=...)`.
+**Old**: lab-unit YAML required `run_experiment_calibrated(path; calibration_path=...)`.
 
-**Current**: `run_yaml(path)` auto-detects `calibration:` (single) or `calibration_history:` + optional `target_date:` (interpolated) at the YAML root. The wrapper still works for explicit external calibration files.
+**Current**: `run_experiment(path)` auto-detects `calibration:` (single) or `calibration_history:` + optional `target_date:` (interpolated) at the YAML root. The wrapper still works for explicit external calibration files.
 
 ## Snapshot reader path
 
@@ -96,4 +96,4 @@ External plotting tools can render frames from the JLD2 archive.
 
 ## `dry_run` returns the YAML string (2026-04-26)
 
-Old form silently called `redirect_stdout(IOBuffer())` and returned nothing useful. New form: `run_yaml(path; dry_run=true)` prints the post-calibration / post-validation YAML to stdout **and returns the same content as a `String`**. Tests that previously captured stdout with `redirect_stdout` should switch to inspecting the return value.
+Old form silently called `redirect_stdout(IOBuffer())` and returned nothing useful. New form: `run_experiment(path; dry_run=true)` prints the post-calibration / post-validation YAML to stdout **and returns the same content as a `String`**. Tests that previously captured stdout with `redirect_stdout` should switch to inspecting the return value.

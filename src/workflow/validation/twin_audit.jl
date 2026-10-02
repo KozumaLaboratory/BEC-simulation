@@ -14,8 +14,6 @@
 
 export audit_twin_controls, TwinAuditResult, walk_dicts!
 
-using YAML: load_file
-
 """
     TwinAuditResult
 
@@ -109,8 +107,8 @@ function _twin_find_yamls(root::AbstractString)
     out = String[]
     for (dir, _, files) in walkdir(root)
         for f in files
-            endswith(f, ".yaml") || continue
-            f == "config.yaml" && continue        # skip run-output snapshots
+            endswith(f, ".experiment.jl") || continue
+            f == "config.experiment.jl" && continue        # skip run-output snapshots
             occursin("Zone.Identifier", f) && continue
             push!(out, joinpath(dir, f))
         end
@@ -127,16 +125,15 @@ YAML structures.
 
 REPL pattern for writing LHY-off / loss-off twins of every orphan:
 ```julia
-using YAML
-for orig in audit_twin_controls("runs").loss_orphans
-    raw = YAML.load_file(orig)
-    walk_dicts!(raw) do d
-        haskey(d, "lhy") && d["lhy"] isa AbstractDict &&
-            (d["lhy"] = Dict("kind" => "none"))
-        delete!(d, "loss")
-    end
-    YAML.write_file(replace(orig, ".yaml" => "_TWIN_OFF.yaml"), raw)
+raw = SpinorBEC._load_julia_config(orig)
+# Build the control as another Julia experiment definition.
+control = deepcopy(raw)
+for step in control["pipeline"]
+    haskey(step, "ground_state") || continue
+    pop!(step["ground_state"], "loss", nothing)
+    pop!(step["ground_state"], "lhy", nothing)
 end
+run_experiment(control)
 ```
 """
 function walk_dicts!(f, node)
@@ -155,7 +152,7 @@ end
 
 function _twin_classify(yaml_path::AbstractString)
     raw = try
-        load_file(yaml_path)
+        _load_julia_config(yaml_path)
     catch
         return (loss=false, lhy=false, parseable=false)
     end

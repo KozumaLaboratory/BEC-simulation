@@ -72,7 +72,7 @@ The retired labels are **deleted** here rather than aliased, per the
 repo's naming convention. They survive verbatim only in
 `docs/validation/config_{prose_harvest,metadata_blocks}.toml`, which are
 records of what the configs said and must not be rewritten, and in
-`runs/**.yaml`, whose bytes key the content-addressed output directories.
+`runs/**.experiment.jl`, whose bytes key the content-addressed output directories.
 
 `docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md` — anko 2026-05-26
 evening pivot.

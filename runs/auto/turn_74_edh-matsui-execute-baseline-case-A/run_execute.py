@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-T74 Step B: run_yaml GPU execute via subprocess (with LD_LIBRARY_PATH for WSL2 GPU).
+T74 Step B: run_experiment GPU execute via subprocess (with LD_LIBRARY_PATH for WSL2 GPU).
 Timeout: 2700 seconds (45 min hard cap per director brief).
 """
 import subprocess, sys, time, os
@@ -16,7 +16,7 @@ env["LD_LIBRARY_PATH"] = "/usr/lib/wsl/lib"
 TIMEOUT_SEC = 2700
 
 t0 = time.time()
-print(f"Starting run_yaml at {time.strftime('%Y-%m-%dT%H:%M:%S')}", flush=True)
+print(f"Starting run_experiment at {time.strftime('%Y-%m-%dT%H:%M:%S')}", flush=True)
 
 timeout_triggered = False
 returncode = None
@@ -45,7 +45,7 @@ elapsed = time.time() - t0
 if timeout_triggered:
     print(f"TIMEOUT triggered after {elapsed:.1f}s (cap={TIMEOUT_SEC}s)", flush=True)
 else:
-    print(f"Julia run_yaml exited with code {returncode} in {elapsed:.1f}s", flush=True)
+    print(f"Julia run_experiment exited with code {returncode} in {elapsed:.1f}s", flush=True)
 
 # Print last 200 lines of the log
 with open(LOG_PATH) as f:

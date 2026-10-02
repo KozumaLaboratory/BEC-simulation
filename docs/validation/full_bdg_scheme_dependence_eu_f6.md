@@ -130,7 +130,7 @@ The warning names `(F, c₀, c₁, q)`. `F` is the atom. That leaves three.
 **Corrected 2026-08-19 (#337).** The table below was computed at 10⁻⁴ of the
 campaign's field. `linear_zeeman_p` takes **tesla**; the campaign YAML writes
 `Bz: "4.4e-5 Gauss"` = 4.4e-9 T, and `julia --project=. scripts/cli.jl inspect`
-on `config_texture_bscan.yaml` resolves `p = −0.651`, `q = +2.502e-08` there.
+on `config_texture_bscan.experiment.jl` resolves `p = −0.651`, `q = +2.502e-08` there.
 Every field label in the original was therefore 10⁴ too large — the row printed
 as "1 G" is in fact 100 µG, which is why its numbers are the only ones that
 survive unchanged. Corrected:

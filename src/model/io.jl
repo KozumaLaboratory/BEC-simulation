@@ -1,37 +1,15 @@
-# --- TOML round-trip for Model ---
+# Model data for result provenance and content identity. Experiments construct Model in Julia.
 #
-# TOML rather than JLD2/YAML/JSON: it is Julia stdlib (no dependency to break),
-# it is readable with `cat`, it will still parse in 2031, and — with
-# `sorted=true` — it is byte-deterministic, which is what a content-addressed
-# store needs. YAML is what this layer exists to stop being.
-#
-# Two properties the codec is built to have:
-#
-# 1. **Lossless.** `model_from_toml(to_toml(m)) == m` for every constructible
-#    `m`. `==` here is the structural comparison in `model.jl`, not object
-#    identity. Losslessness is what lets a `Record` carry the model verbatim
-#    instead of a summary that drifts from it.
-#
-# 2. **Closed.** A key that no field reads is an ERROR, not something quietly
-#    ignored. The 45-key `metadata:` block that nothing reads is the failure
-#    this whole layer removes; permitting unknown keys in the serialised form
-#    would re-open it one level down.
-#
-# A slot is omitted exactly when it already EQUALS its own inactive value
-# `T()` (invariant 3), because that is the condition under which the decoder's
-# `T()` reproduces it. The obvious-looking rule — omit when `active(s)` is false
-# — is not the same statement and is lossy: `active` asks whether the slot
-# contributes to the computation, and a `PotentialSpec` holding a zero-ω
-# harmonic term contributes nothing while still being a different value from
-# `PotentialSpec()`. See `_is_inactive_value` in `model.jl`.
+# The codec is lossless and closed: decoding rejects keys no field reads.
+# Omit a slot only when it equals its inactive value T(), not merely when
+# active(slot) is false. A zero-frequency harmonic trap is inactive but still
+# differs structurally from an absent trap. Losing that distinction changes
+# artifact identity. See _is_inactive_value in model.jl.
 
-using TOML
-
-export to_toml, model_from_toml, write_model_toml, read_model_toml
-export model_toml_dict, model_from_toml_dict, MODEL_TOML_FORMAT
+export model_data, model_from_data, MODEL_DATA_FORMAT
 
 "Serialised-model format version. Bump when the on-disk shape changes; readers dispatch on it."
-const MODEL_TOML_FORMAT = 1
+const MODEL_DATA_FORMAT = 1
 
 # ---------------------------------------------------------------------------
 # encode
@@ -163,40 +141,19 @@ const _ATOM_KEYS = Tuple(
 )
 
 """
-    model_toml_dict(m::Model) -> Dict{String,Any}
+    model_data(m::Model) -> Dict{String,Any}
 
-The TOML tree for `m`, before printing. Separated from `to_toml` so the identity
+The provenance data for `m`. Kept separate from file encoding so the identity
 layer can digest the tree without paying a round trip through a string.
 """
-function model_toml_dict(m::Model)
-    d = Dict{String, Any}("format" => MODEL_TOML_FORMAT)
+function model_data(m::Model)
+    d = Dict{String, Any}("format" => MODEL_DATA_FORMAT)
     for f in slots(Model)
         s = getfield(m, f)
         (f in REQUIRED_SLOTS || !_is_inactive_value(s)) || continue
         d[String(f)] = f === :atom ? _enc_atom(s) : _enc(s)
     end
     d
-end
-
-"""
-    to_toml(m::Model) -> String
-
-The resolved model, verbatim. Keys are sorted at every level, so the bytes are a
-function of the value alone — two processes serialising equal models produce
-identical text.
-"""
-function to_toml(m::Model)
-    io = IOBuffer()
-    TOML.print(io, model_toml_dict(m); sorted=true)
-    String(take!(io))
-end
-
-"""
-    write_model_toml(path, m::Model) -> path
-"""
-function write_model_toml(path::AbstractString, m::Model)
-    open(io -> write(io, to_toml(m)), path, "w")
-    path
 end
 
 # ---------------------------------------------------------------------------
@@ -284,16 +241,16 @@ function _dec_atom(v::AbstractDict)
 end
 
 """
-    model_from_toml_dict(d) -> Model
+    model_from_data(d) -> Model
 
-Rebuild a `Model` from a parsed TOML tree. An absent optional slot decodes to
+Rebuild a `Model` from recorded provenance data. An absent optional slot decodes to
 that slot's inactive value; an unknown key is an error.
 """
-function model_from_toml_dict(d::AbstractDict)
+function model_from_data(d::AbstractDict)
     fmt = get(d, "format", nothing)
-    fmt == MODEL_TOML_FORMAT || throw(
+    fmt == MODEL_DATA_FORMAT || throw(
         ArgumentError(
-            "model TOML format $(repr(fmt)) is not $MODEL_TOML_FORMAT; " *
+            "model data format $(repr(fmt)) is not $MODEL_DATA_FORMAT; " *
             "no migration path is registered for it"),
     )
     _closed(d, ("format", String.(slots(Model))...), "Model")
@@ -321,16 +278,6 @@ end
 # makes omission lossless.
 _slot(d::AbstractDict, f::Symbol, ::Type{T}) where {T} =
     haskey(d, String(f)) ? _dec(T, d[String(f)]) : T()
-
-"""
-    model_from_toml(s::AbstractString) -> Model
-"""
-model_from_toml(s::AbstractString) = model_from_toml_dict(TOML.parse(s))
-
-"""
-    read_model_toml(path) -> Model
-"""
-read_model_toml(path::AbstractString) = model_from_toml_dict(TOML.parsefile(path))
 
 # The struct decoder needs all-positional constructors, which every `*Spec` has
 # and which the three reused foundation types have too — except `AtomSpecies`,

@@ -53,7 +53,7 @@ that solution.
 | Norm | Hamiltonian-only dynamics | `test/test_level11_convergence_sweep.jl` + ITP loop assertions |
 | Energy | Hamiltonian-only dynamics (Strang 2nd-order) | `test/test_level2_strang_convergence.jl` |
 | M_z | Linear + quadratic Zeeman + diagonal contact | `test/test_level3_zeeman_only.jl`, scattered in spin-mixing tests |
-| J_z = L_z + F_z | DDI under rotational symmetry | EdH F=3 toy `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` |
+| J_z = L_z + F_z | DDI under rotational symmetry | EdH F=3 toy `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl` |
 
 ### Layer C — Independent reference RHS (post-pivot Level 10)
 
@@ -96,7 +96,7 @@ Coverage gaps (intentional, deferred):
 | DDI prolate vs oblate sign | `test/hamiltonian/test_ddi_convention_factorial.jl` | PASS (head-to-tail attractive; side-by-side repulsive) |
 | DDI axis-flip rotational invariance | `test/hamiltonian/test_ddi_convention_factorial.jl` | PASS (3% bound; FFT box anisotropy) |
 | Bogoliubov k=0 Goldstone | `test/analysis/test_bogoliubov.jl` | PASS (gap < 1e-6) |
-| EdH F=3 toy J_z conservation | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` | PASS (manual run) |
+| EdH F=3 toy J_z conservation | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl` | PASS (manual run) |
 | Scalar LHY n^{5/2} scaling | `test/hamiltonian/test_lhy_level8_unit.jl` | PASS (25/25) |
 
 ### Layer E — Grid / dt / box / seed convergence
@@ -171,7 +171,7 @@ Sanity checks (6/6 PASS):
 | 3 Zeeman / spin matrices | PASS | `test/test_level3_zeeman_only.jl` (12/12), `test/foundation/test_spin_matrices.jl` (422/422) |
 | 4 spinor contact | PASS | `test/test_level4_f1_phase_emergence.jl` (28/28), `test/test_level4_general_F_phase_emergence.jl` (93/93) |
 | 5 DDI kernel | PASS | `test/hamiltonian/test_ddi.jl` (4644/4644), `test/hamiltonian/test_ddi_convention_factorial.jl` (6/6) |
-| 6 EdH F=3 toy | PASS (manual) | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.yaml` |
+| 6 EdH F=3 toy | PASS (manual) | `runs/verification_suite/yamls/09_edh_toy_spin_orbit_transfer.experiment.jl` |
 | 7 K3 analytic | PASS | `test/workflow/test_loss_block_edge_cases.jl` (20/20); `reference_k3_uniform_analytic` (5/5) |
 | 8 LHY unit | PASS | `test/hamiltonian/test_lhy_level8_unit.jl` (25/25), `test/hamiltonian/test_lhy.jl` (37/37) |
 | 9 Eu Ham-only convergence | PASS (cross-grid) | L4 result: ΔF_z = 0.00886 at N=64/96/128 |
@@ -211,7 +211,7 @@ accidental `c_lhy`-fallback path was correct. The fix is therefore
 forward-looking; no L4 / Matsui retroactive re-runs are required.
 
 The fix unblocks the `lhy:` axis of the Eu robust factorial
-(`runs/eu_robust_factorial/K?_gdr?_LHY?.yaml`) for explicit and
+(`runs/eu_robust_factorial/K?_gdr?_LHY?.experiment.jl`) for explicit and
 auditable control.
 
 ## Known limitations (do not "fix")

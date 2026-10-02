@@ -1,5 +1,5 @@
 using SpinorBEC
-cfg = load_config("/home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/config.yaml")
+cfg = load_config("/home/suzume/workspace/BEC-simulation/runs/yan_li_saito_f1_torus_gs/config.experiment.jl")
 println("Config steps: ", length(cfg.steps))
 step1 = cfg.steps[1]
 println("Step 1 type: ", typeof(step1))

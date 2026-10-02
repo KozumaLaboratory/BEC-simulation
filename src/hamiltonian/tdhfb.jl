@@ -22,7 +22,7 @@
 #
 # Out of scope (deferred to future sessions per
 # docs/design/tdhfb_pilot_design.md Phase 4-6):
-#   - YAML pipeline integration (`dynamics.tdhfb` block, run_yaml dispatch)
+#   - YAML pipeline integration (`dynamics.tdhfb` block, run_experiment dispatch)
 #   - Non-local TDHFB (ρ(r, r'), κ(r, r'))
 #   - DDI / Zeeman / Raman terms in the TDHFB step
 #   - GPU port + Workspace integration

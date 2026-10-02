@@ -17,7 +17,7 @@ using SpinorBEC
 using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
     dominated_knobs,
     SPIN_TAYLOR_ENABLED, DEALIAS_2_3_ENABLED,
-    yaml_to_model, model_toml_dict, content_id
+    config_to_model, model_data, content_id
 
 @testset "accuracy knob registry" begin
     @test !isempty(ACCURACY_KNOBS)
@@ -76,7 +76,7 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
     # [KNOWN-GAP], pinned so that fixing it is a visible diff rather than a
     # silent improvement. `with_reference_accuracy` is the instrument for "re-run
     # this with every approximation at its most accurate setting", and around
-    # `run_yaml` it can produce exactly the degeneracy it exists to detect: the
+    # `run_experiment` it can produce exactly the degeneracy it exists to detect: the
     # reference run resolves to the SAME `artifact_id` as production and can be
     # served the production artifact.
     #
@@ -91,27 +91,51 @@ using SpinorBEC: ACCURACY_KNOBS, with_reference_accuracy, accuracy_report,
     # about a harness that never moves anything.
     @testset "[KNOWN-GAP] a config's dealias block clobbers the reference flip" begin
         base = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [16], box: [8.0]}
-              potential: {type: harmonic, omega: [1.0]}
-              interactions: {N_atoms: 100, omega_ref: 100.0, c0: 1.0, c1: 0.0}
-              ddi: {enabled: false}
-              lhy: {kind: none}
-              initial_state: polar
-              method: itp
-              n_steps: 5
-              dt: 1.0e-3
-              tol: 1.0e-6
-        """
-        mid(p) = content_id(model_toml_dict(yaml_to_model(p)); n=16)
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [8.0],
+                "n" => [16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 100,
+                "c0" => 1.0,
+                "c1" => 0.0,
+                "omega_ref" => 100.0,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "method" => "itp",
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-6,
+        ),
+    )],
+)
+"""
+        mid(p) = content_id(model_data(config_to_model(p)); n=16)
         mktempdir() do d
-            plain = joinpath(d, "plain.yaml")
-            blocked = joinpath(d, "blocked.yaml")
+            plain = joinpath(d, "plain.experiment.jl")
+            blocked = joinpath(d, "blocked.experiment.jl")
             write(plain, base)
-            write(blocked, "dealias: {enabled: false}\n" * base)
+            data = SpinorBEC._julia_config_string(base)
+            data["dealias"] = Dict("enabled" => false)
+            write(blocked, repr(data))
 
             # Control: with nothing clobbering it, the reference flip MOVES the id.
             @test mid(plain) != with_reference_accuracy(() -> mid(plain))

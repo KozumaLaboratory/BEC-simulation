@@ -259,24 +259,39 @@ using SpinorBEC
 
     @testset "YAML parsing of absorbing_boundary" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              absorbing_boundary: {strength: 10.0, width: 3.0, power: 2}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "absorbing_boundary" => Dict{String, Any}(
+                "power" => 2,
+                "strength" => 10.0,
+                "width" => 3.0,
+            ),
+            "dt" => 0.01,
+            "duration" => 1.0,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         p = cfg.steps[2].params
         @test p["absorbing_boundary"]["strength"] == 10.0

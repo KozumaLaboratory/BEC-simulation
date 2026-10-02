@@ -20,7 +20,7 @@
 # WHAT THIS IS NOT
 #
 # It is not the liveness file. `_emit_live_status` writes `_live_status.json`
-# for the autopilot's divergence reaper, and #408 proposed riding on it because
+# for optional live diagnostics, and #408 proposed riding on it because
 # it already reaches all three dynamics paths. That is the right SHAPE and the
 # wrong COUPLING: the liveness callback is built from `live_monitor:`, whose own
 # documentation tells batch users to switch it OFF —
@@ -202,7 +202,7 @@ _progress!(::Nothing, ::Integer, ::Real) = false
 # `extra_on_step::Union{Nothing, Function}`, so a plain callable struct is a
 # MethodError at that kwarg. `ComposedCallbacks` had the same defect latent —
 # it only ever reached that kwarg when two callbacks were active at once, which
-# needed `live_monitor` on (so, a `run_yaml` with a run directory) AND an
+# needed `live_monitor` on (so, a `run_experiment` with a run directory) AND an
 # `sgpe:` / `projected_gp:` / `photon_scattering:` block. Making progress
 # default-on would have made two callbacks the NORMAL case and turned a latent
 # defect into every standard dynamics run.

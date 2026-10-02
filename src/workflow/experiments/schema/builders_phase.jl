@@ -90,7 +90,7 @@ function _make_waveform(spec, duration::Float64; omega_ref::Float64=NaN)
             throw(ArgumentError("`csv` must be a filename or a {path, ...} dict"))
         end
         # Resolve relative paths against the YAML file's directory when known
-        # (ENV set by run_yaml / load_config). Otherwise treat as CWD.
+        # (ENV set by run_experiment / load_config). Otherwise treat as CWD.
         resolved = isabspath(path) ? path :
                    joinpath(get(ENV, "SPINORBEC_CONFIG_DIR", pwd()), path)
         isfile(resolved) || throw(ArgumentError(

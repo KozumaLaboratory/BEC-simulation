@@ -12,7 +12,7 @@ using JSON
 #     `_source`, all written by the backfill script, not by the run;
 #   * only 20 of the 226 had ANY file under version control. `runs/**/*.jld2`
 #     and `runs/**/summary.json` are gitignored by design, which is fine — but
-#     the `config.yaml` beside them is not ignored, and for 206 of them it was
+#     the `config.experiment.jl` beside them is not ignored, and for 206 of them it was
 #     simply never committed.
 #
 # So a cited number could be neither re-derived nor attributed: no input in

@@ -2,6 +2,14 @@
 
 Day-to-day workflow + scaling knobs for TSUBAME 4.0 (Altair Grid Engine / UGE + CUDA).
 
+## Finished-job point charge
+
+Run `bash scripts/tsubame/job_cost.sh <jobid>` on the login node, or locally
+with the `tsubame` SSH alias configured. It reads the job's `qacct` record and
+the billing transcription in `refs/tsubame4_points.toml`, and refuses to
+guess missing resource or priority fields. The transcription records the
+regulation's effective date; check that date before using it for budgeting.
+
 ## One-time setup
 
 ```bash
@@ -75,68 +83,45 @@ Lustre is bad at many small writes; `dynamics/psi_snapshots_streamed/frame_NNNNN
 ## Edit-test-submit loop
 
 ```bash
-$EDITOR runs/eu151_edh_ext/config.yaml
+$EDITOR runs/eu151_edh_ext/config.experiment.jl
 
 # Dry-run check (calibration applied? schema OK?)
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu151_edh_ext/config.yaml"; dry_run=true)'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/eu151_edh_ext/config.experiment.jl"; dry_run=true)'
 
-# Preview the rendered qsub script (no submission):
-julia --project=. -e 'using SpinorBEC;
-    print(render_uge_script("default", "runs/eu151_edh_ext/config.yaml";
-        project_root=pwd(), log_dir="logs/tsubame"))'
-
-# Submit through the autopilot (renders the qsub script on the fly):
-julia --project=. scripts/cli.jl autopilot enqueue runs/eu151_edh_ext/config.yaml
-julia --project=. scripts/cli.jl autopilot tick    # dispatches via UGEBackend
-
-# Or submit a single config directly:
-julia --project=. -e '
-    using SpinorBEC
-    b = UGEBackend(; ssh_host="tsubame", project_root="...", remote_runs_root="...")
-    e = enqueue!(Experiment("runs/eu151_edh_ext/config.yaml"))
-    dispatch!(b, e)
-'
+# Save the per-job script shown below as spinor_run.sh, then submit:
+qsub -g tga-kozuma-kouhi spinor_run.sh
 
 qstat -u $USER
 tail -f logs/spinorbec-*.out
 ```
 
-On TSUBAME the autopilot auto-registers a `UGEBackend` from the
-`SPINORBEC_TSUBAME_{HOST,PROJECT_ROOT,RUNS_ROOT,GROUP,JULIA,DEPOT,SYSIMAGE,CUDA_MODULE,SYNC_CODE}`
-env vars (the HOST/PROJECT_ROOT/RUNS_ROOT triple is required; the rest
-default). The qsub resource directives live in `UGE_PROFILE_DIRECTIVES`
-in `src/workflow/autopilot/backends_uge.jl` (`default` / `node_h` /
-`node_f` / `gpu_1` / `long_q`) — edit there to tune walltime / node
-class. Profiles escalate on OOM/TIMEOUT via the `next_profile` chain
-(see `docs/guides/autopilot.md`). Note: `-g <group>` is passed as a
-qsub CLI flag, not an `#$ -g` directive (the TSUBAME4 wrapper rejects
-the directive form).
+Resource requests are `#$ -l` directives in the submit script. Set the GPU
+class and walltime for the run before submission. Pass `-g <group>` as a
+qsub CLI flag, not an `#$ -g` directive (the TSUBAME wrapper rejects the
+directive form).
 
 ### Array jobs (multi-point scans)
 
 ```bash
 julia --project=. -e 'using SpinorBEC; println(scan_point_count(ARGS[1]))' \
-    runs/foo/config.yaml   # → 144
+    runs/foo/config.experiment.jl   # → 144
 ```
 
-For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the rendered
-script — extend `UGE_PROFILE_DIRECTIVES` with a new `"scan_array"`
-profile carrying the array directive, or pipe `render_uge_script`
-output through `sed`. Each task writes `runs/foo/point_NNN.jld2` (example);
-resumable — re-submitting skips cached files (`SPINORBEC_SCAN_ONLY_INDEX`
-env var inside `_run_yaml_scan`).
+For an array submission, add `#$ -t 1-N` + `#$ -tc K` to the per-job
+script and set `export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID` before the
+Julia invocation. Each task computes one scan point; re-submitting skips
+cached points in the persistent experiment executor.
 
 ### Manual per-job qsub script
 
-The autopilot's `UGEBackend` renders this shape automatically via
-`render_uge_script`. To submit by hand (`qsub` / `qstat` / `qdel`),
-use a per-job script of the form:
+Save a per-job script of this form as `spinor_run.sh`, replacing `<run_name>`
+with the experiment directory name before submission:
 
 ```bash
 #!/bin/bash
 #$ -cwd
 #$ -l h_rt=06:00:00
-#$ -l f_node=1
+#$ -l gpu_1=1
 #$ -N spinor_run
 #$ -o logs/tsubame/$JOB_NAME_$JOB_ID.log
 #$ -j y
@@ -169,10 +154,9 @@ Add `#$ -t 1-N` + `#$ -tc K` for array jobs; `mapfile -t CONFIGS < <(ls -d runs/
 then `RUN_NAME="${CONFIGS[$((SGE_TASK_ID - 1))]}"` to pick the per-task
 config.
 
-The autopilot ships two backends: `LocalBackend` (subprocess on the
-current host) and `UGEBackend` (TSUBAME / Altair Grid Engine over SSH).
-TSUBAME 4 dispatch goes through `UGEBackend`; the manual script above is
-only needed for ad-hoc one-offs outside the queue.
+Submit jobs with the UGE wrappers under `scripts/tsubame/` or the batch
+script above. Use `qstat` for scheduler status and `qacct -j <jobid>` for
+finished-job accounting.
 
 ## Recommended YAML knobs at scale
 
@@ -189,7 +173,7 @@ pipeline:
       save: {psi: true, precision: "f32"}  # streamed F32, ~8.4 GB at 128³
 ```
 
-Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.yaml")` reports VRAM, host RAM, disk per scan point + total disk.
+Pre-flight: `using SpinorBEC; estimate_run_budget("path/to/config.experiment.jl")` reports VRAM, host RAM, disk per scan point + total disk.
 
 ## Singularity (alternative)
 
@@ -203,24 +187,23 @@ singularity build --fakeroot spinorbec.sif \
 singularity exec --nv \
     --bind /path/to/BEC-simulation:/work \
     spinorbec.sif julia --project=/work -e '
-        using SpinorBEC; run_yaml("/work/runs/eu151_edh_ext/config.yaml")'
+        using SpinorBEC; run_experiment("/work/runs/eu151_edh_ext/config.experiment.jl")'
 ```
 
 The `%post` block pre-warms a depot inside the image so first-time precompile of FFTW / CUDA / etc. is amortised at build time.
 
 ## Checkpoint and resume
 
-`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_yaml(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
+`run_pipeline` writes periodic checkpoints to `$run_dir/.checkpoints/<filename>` during a dynamics step. Restart with the same `run_experiment(...)` call — the cache/resume logic picks up from the last checkpoint. Pair with a rerunnable job (`#$ -r y`) for automatic restart after preemption.
 
-For multi-attempt mixes of crashes + preemption: enqueue via
-`julia --project=. scripts/cli.jl autopilot enqueue runs/foo/config.yaml` (example)
-and let the autopilot's `retry_failed!` (called per-tick by the systemd
-timer) handle re-dispatch with profile escalation on OOM/TIMEOUT.
+After a crash or walltime kill, inspect the job log and `_exit_summary.json`.
+Correct the resource request or failure cause, then re-submit the same
+configuration. Completed scan points remain available for reuse.
 
 ## High-res scan inventory (target table for `runs/tsubame_scan/` (example))
 
 Generate the YAMLs via the sweep API (see `docs/guides/experiment_api.md`)
-on `runs/klaus_eu151_v2_full/config.yaml` (gone) as the template:
+on `runs/klaus_eu151_v2_full/config.experiment.jl` (gone) as the template:
 
 ### Dy164 (3 configs)
 | name | grid | duration | est. wall (H100) |
@@ -261,7 +244,7 @@ rsync -av --include='*.jld2' --include='*/' --exclude='*' \
 julia --project=. -e '
     using SpinorBEC
     exps = [Experiment(p) for p in
-            sort(filter(endswith(".yaml"), readdir("runs/tsubame_scan"; join=true)))]
+            sort(filter(endswith(".experiment.jl"), readdir("runs/tsubame_scan"; join=true)))]
     tab = tabulate(exps, [norm_drift, Fz_t, per_m_t])
 '
 ```

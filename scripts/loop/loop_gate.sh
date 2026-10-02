@@ -33,7 +33,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CAND="$BEC_LOOP_DIRECTION"
-NAME="$(basename "${CAND%.toml}")"
+NAME="$(basename "${CAND%.jl}")"
 CAP="${BEC_LOOP_MAX_TICKS:-12}"
 LDIR="$ROOT/.loop"
 mkdir -p "$LDIR"

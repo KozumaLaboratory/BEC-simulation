@@ -85,7 +85,7 @@ LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. \
 julia --project=. scripts/twa/twa_eps_dd_scan_analyze.jl
 ```
 
-The analyzer was updated 2026-05-08 to use a hash-suffix glob resolver (`runs/<label>_*/result.jld2`) matching the actual `run_yaml` output layout — same fix as the N-scan analyzer in `6b29e5c`.
+The analyzer was updated 2026-05-08 to use a hash-suffix glob resolver (`runs/<label>_*/result.jld2`) matching the actual `run_experiment` output layout — same fix as the N-scan analyzer in `6b29e5c`.
 
 ## See also
 

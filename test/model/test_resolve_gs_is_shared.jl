@@ -25,10 +25,10 @@
 
 using Test
 using SpinorBEC
-using SpinorBEC: resolve_gs, gs_model, yaml_to_model, GSResolved, GroundStateStep,
-    _run_step, linear_p, quadratic_q, Model, to_toml
+using SpinorBEC: resolve_gs, gs_model, config_to_model, GSResolved, GroundStateStep,
+    _run_step, linear_p, quadratic_q, Model, model_data
 
-# The step params. Identical physics to `test_yaml_to_model.jl`'s YAML fixture,
+# The step params. Identical physics to `test_config_to_model.jl`'s YAML fixture,
 # so the two files pin the same numbers from opposite ends of the layer.
 rgs_params(; extra...) = begin
     p = Dict{String, Any}(
@@ -263,7 +263,7 @@ end
     end
 
     @testset "C. both consumers produce the pinned physics" begin
-        # --- consumer 1: yaml_to_model, through gs_model ---
+        # --- consumer 1: config_to_model, through gs_model ---
         m = gs_model(resolve_gs(rgs_params(), nothing, nothing, nothing; verbose=false))
         @test m isa Model
         @test m.interactions.c0 ≈ RGS_C0 atol = 1e-10
@@ -305,7 +305,7 @@ end
         a = gs_model(resolve_gs(p, nothing, nothing, nothing; verbose=false))
         b = gs_model(resolve_gs(p, nothing, nothing, nothing; verbose=false))
         @test a == b
-        @test to_toml(a) == to_toml(b)
+        @test model_data(a) == model_data(b)
     end
 
     @testset "GSResolved carries every slot gs_model needs" begin

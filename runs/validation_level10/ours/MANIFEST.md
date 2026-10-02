@@ -4,7 +4,7 @@ Generated: 2026-05-25T07:39:30.942
 Wall-time: 109.12 s
 
 ## Inputs
-- YAML: `L10_F1_smoke.yaml`
+- YAML: `L10_F1_smoke.experiment.jl`
 - YAML sha256: 8fdcb77ba3bc88b5c0e507806177f0205f00c78ea6ddbd7e63bf6cf9882d56e8
 
 ## Outputs

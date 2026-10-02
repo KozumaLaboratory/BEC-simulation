@@ -14,8 +14,8 @@ by `test/solvers/test_polished_ground_state.jl`'s `t_itp > 0`).
     secs = elapsed_s(t0)
 
 This matters beyond cosmetics: `runtime_seconds` in the pipeline result is
-recorded to disk and the autopilot budget totals realized GPU-hours from it, so
-a stepped clock corrupts accounting, not just a progress line.
+recorded to disk and used for cost analysis, so a stepped clock corrupts
+accounting, not just a progress line.
 
 Wall-clock DEADLINES are a different thing and legitimately use `time()` — the
 question there is "what time is it", not "how long has this taken".

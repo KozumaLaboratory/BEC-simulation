@@ -15,7 +15,7 @@ claim. See `docs/validation/self_contained_validation_report.md`
 | γ_dr (dipolar relaxation) | no loss block | `loss.gamma_dr = 0.02` |
 | Scalar LHY | `lhy.kind: none` | `lhy.kind: scalar` |
 
-Naming: `K{0,1}_gdr{0,1}_LHY{0,1}.yaml`. `K0_gdr0_LHY0.yaml` is the
+Naming: `K{0,1}_gdr{0,1}_LHY{0,1}.experiment.jl`. `K0_gdr0_LHY0.experiment.jl` is the
 canonical L4 Hamiltonian-only baseline (DDI on, every other model axis
 off).
 
@@ -64,11 +64,11 @@ conditions" without enumerating which.
 julia --project=. scripts/validation/eu_robust_factorial_gen.jl
 
 # Run one cell:
-julia --project=. -e 'using SpinorBEC; run_yaml("runs/eu_robust_factorial/K0_gdr0_LHY0.yaml")'
+julia --project=. -e 'using SpinorBEC; run_experiment("runs/eu_robust_factorial/K0_gdr0_LHY0.experiment.jl")'
 
 # Run all 8 (sequential, ~30 min on GPU):
-for f in runs/eu_robust_factorial/K*.yaml; do
-  julia --project=. -e "using SpinorBEC; run_yaml(\"$f\")"
+for f in runs/eu_robust_factorial/K*.experiment.jl; do
+  julia --project=. -e "using SpinorBEC; run_experiment(\"$f\")"
 done
 
 # Summarise:
@@ -87,7 +87,7 @@ heavy (≥ 30 min wall time) and is not run on every commit.
 - `docs/validation/self_contained_validation_report.md` — full
   validation chain
 - `docs/validation/ueda_status.md` — external comparison status
-- `runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_32.yaml`
+- `runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_32.experiment.jl`
   — Hamiltonian-only baseline this factorial extends
 - `memory:validation_ladder_2026_05_22` — Level 12 production criteria
 - `memory:gotcha_bz_ramp_duration_ignored` — inner `duration: 0.0`

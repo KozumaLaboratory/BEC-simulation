@@ -13,7 +13,7 @@
 #  Outputs:
 #    /gs/bs/work/6/ue06186/bec-runs/projectA_ground_state/
 #       survey_B_secular_false_pm120_v3/
-#         ├── config.yaml          (snapshot of v3, written by first task)
+#         ├── config.experiment.jl          (snapshot of v3, written by first task)
 #         ├── point_001.jld2 … point_047.jld2
 #         └── logs/task_<JOBID>.<TASKID>.out|err
 # ============================================================
@@ -30,7 +30,7 @@ set -euo pipefail
 
 # ── Paths ──────────────────────────────────────────────────────────────
 PROJECT_ROOT=$HOME/bec-simulation
-CONFIG_SRC=$PROJECT_ROOT/runs/eu151_B_sweep_pm120/config_scan_B_pm120_v3.yaml
+CONFIG_SRC=$PROJECT_ROOT/runs/eu151_B_sweep_pm120/config_scan_B_pm120_v3.experiment.jl
 
 OUTPUT_ROOT=/gs/bs/work/6/ue06186/bec-runs/projectA_ground_state/survey_B_secular_false_pm120_v3
 mkdir -p "$OUTPUT_ROOT/logs"
@@ -58,9 +58,9 @@ export JULIA_DEPOT_PATH="$JULIA_DEPOT_PATH:$HOME_DEPOT"
 JULIA=/gs/fs/tga-kozuma-kouhi/shared/.juliaup/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia
 
 # ── Stage config into the output dir (idempotent) ──────────────────────
-# Naming as config.yaml means run_yaml treats $OUTPUT_ROOT itself as the
+# Naming as config.experiment.jl means run_experiment treats $OUTPUT_ROOT itself as the
 # run directory and writes point_*.jld2 alongside.
-CONFIG_DST=$OUTPUT_ROOT/config.yaml
+CONFIG_DST=$OUTPUT_ROOT/config.experiment.jl
 if [ ! -f "$CONFIG_DST" ]; then
     cp "$CONFIG_SRC" "$CONFIG_DST"
 fi
@@ -71,6 +71,6 @@ export SPINORBEC_SCAN_ONLY_INDEX=$SGE_TASK_ID
 echo "[task $SGE_TASK_ID/$SGE_TASK_LAST] running point $SGE_TASK_ID on $(hostname)"
 nvidia-smi -L || true
 
-"$JULIA" --project=. -e "import CUDA; using SpinorBEC; run_yaml(\"$CONFIG_DST\")"
+"$JULIA" --project=. -e "import CUDA; using SpinorBEC; run_experiment(\"$CONFIG_DST\")"
 
 echo "[task $SGE_TASK_ID] done"

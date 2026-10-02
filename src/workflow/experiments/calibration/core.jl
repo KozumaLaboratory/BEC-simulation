@@ -1,7 +1,7 @@
 # --- Lab calibration layer (Phase 5.3 / Scenario #66) ---
 
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
-export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
+export DEFAULT_CALIBRATION, load_calibration, apply_calibration!
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
 export CalibrationHistory, load_calibration_history, load_calibration_csv,
     interpolate_calibration
@@ -17,14 +17,13 @@ export CalibrationHistory, load_calibration_history, load_calibration_csv,
 # here.
 #
 # Usage:
-#   calib = load_calibration("lab_calib_2026_04.yaml")
+#   calib = load_calibration("lab_calib_2026_04.experiment.jl")
 #   apply_calibration!(raw_yaml_dict, calib)
 #   run_pipeline(load_config_from_dict(raw_yaml_dict))
 #
 # Or the one-shot wrapper:
-#   run_yaml_calibrated("experiment.yaml"; calibration_path="lab_calib_2026_04.yaml")
 
-using YAML: YAML
+using ..SpinorBEC: _load_julia_config
 using Dates: Date
 
 # --- Calibration struct (one per hardware epoch) ---
@@ -95,7 +94,7 @@ rabi_mw_to_rad_s(mw::Real, calib::RabiCalibration) =
 # --- YAML loader ---
 
 function load_calibration(path::AbstractString)
-    raw = YAML.load_file(String(path))
+    raw = _load_julia_config(path)
     root = haskey(raw, "calibration") ? raw["calibration"] : raw
     _calibration_from_dict(root)
 end
@@ -344,7 +343,7 @@ function load_calibration_csv(path::AbstractString)
 end
 
 function load_calibration_history(path::AbstractString)
-    load_calibration_history(YAML.load_file(String(path)))
+    load_calibration_history(_load_julia_config(path))
 end
 
 function load_calibration_history(raw::AbstractDict)
@@ -419,37 +418,4 @@ function _interp_fort(a_f::FORTCalibration, b_f::FORTCalibration, a::Float64)
         ntuple(i -> (1 - a) * a_f.sqrt_coeffs_hz[i] + a * b_f.sqrt_coeffs_hz[i], 3),
         ntuple(i -> (1 - a) * a_f.offsets_hz[i] + a * b_f.offsets_hz[i], 3),
     )
-end
-
-"""
-    run_yaml_calibrated(path; calibration_path=nothing, base_dir=pwd(), kwargs...)
-
-Load a YAML config file, apply calibration, and delegate to `run_yaml`.
-
-Calibration source precedence:
-1. explicit `calibration_path` argument
-2. top-level `calibration:` key embedded in `path`'s YAML
-3. `DEFAULT_CALIBRATION` (placeholder — warns).
-"""
-function run_yaml_calibrated(path::AbstractString;
-    calibration_path::Union{Nothing, AbstractString}=nothing,
-    base_dir::AbstractString=pwd(),
-    kwargs...)
-    raw = YAML.load_file(String(path))
-    calib = if calibration_path !== nothing
-        load_calibration(String(calibration_path))
-    elseif haskey(raw, "calibration") && raw["calibration"] isa Dict
-        _calibration_from_dict(pop!(raw, "calibration"))
-    else
-        @warn "run_yaml_calibrated: no calibration provided — using DEFAULT_CALIBRATION placeholder"
-        DEFAULT_CALIBRATION
-    end
-    apply_calibration!(raw, calib)
-    tmpfile = tempname() * ".yaml"
-    YAML.write_file(tmpfile, raw)
-    try
-        run_yaml(tmpfile; base_dir=base_dir, kwargs...)
-    finally
-        rm(tmpfile; force=true)
-    end
 end

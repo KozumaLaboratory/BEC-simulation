@@ -28,30 +28,70 @@ using SpinorBEC
     #     m_plus_F  / 1.0 Gauss    → NaN at step 1
     #     m_minus_F / 1.0 Gauss    → E = -277668.36
     yaml_str = """
-    pipeline:
-      - ground_state:
-          atom: Dy164
-          grid: {n: [16, 16, 8], box: [10.0, 10.0, 5.0]}
-          interactions: {omega_ref: 314.159, N_atoms: 5000}
-          ddi: {enabled: true}
-          potential: {type: harmonic, omega: [1.0, 1.0, 2.6]}
-          B: {Bz: "1.0 Gauss"}
-          dt: 0.001
-          n_steps: 500
-          tol: 1.0e-5
-          initial_state: m_minus_F
-      - dynamics:
-          duration: 0.5
-          dt: 0.002
-          save: {every: 50}
-          interactions: {omega_ref: 314.159}
-          B:
-            Bz: "0.819 Gauss"
-            Bx: {sinusoidal: {amplitude: 0.574, frequency: 4.52}}
-            By: {sinusoidal: {amplitude: 0.574, frequency: 4.52, phase: -1.5708}}
-      - analyze:
-          - vortex_detect: {component: 1, threshold: 0.1}
-    """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "1.0 Gauss",
+            ),
+            "atom" => "Dy164",
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+            ),
+            "dt" => 0.001,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0, 10.0, 5.0],
+                "n" => [16, 16, 8],
+            ),
+            "initial_state" => "m_minus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 5000,
+                "omega_ref" => 314.159,
+            ),
+            "n_steps" => 500,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 2.6],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-5,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bx" => Dict{String, Any}(
+                    "sinusoidal" => Dict{String, Any}(
+                        "amplitude" => 0.574,
+                        "frequency" => 4.52,
+                    ),
+                ),
+                "By" => Dict{String, Any}(
+                    "sinusoidal" => Dict{String, Any}(
+                        "amplitude" => 0.574,
+                        "frequency" => 4.52,
+                        "phase" => -1.5708,
+                    ),
+                ),
+                "Bz" => "0.819 Gauss",
+            ),
+            "dt" => 0.002,
+            "duration" => 0.5,
+            "interactions" => Dict{String, Any}(
+                "omega_ref" => 314.159,
+            ),
+            "save" => Dict{String, Any}(
+                "every" => 50,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "vortex_detect" => Dict{String, Any}(
+                "component" => 1,
+                "threshold" => 0.1,
+            ),
+        )],
+    )],
+)
+"""
     cfg = load_config_from_string(yaml_str)
     result = run_pipeline(cfg; verbose=false)
     @test haskey(result, :vortex_detect)

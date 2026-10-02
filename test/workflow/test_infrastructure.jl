@@ -419,16 +419,28 @@ const _SKIP_HEAVY_YAML_INFRA =
     @testset "YAML integration: init_state_params round-trip" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      initial_state: spin_coherent
-      init_state_params: {init_theta: 1.57}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "init_state_params" => Dict{String, Any}(
+                "init_theta" => 1.57,
+            ),
+            "initial_state" => "spin_coherent",
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test isfinite(result.ground_state_energy)
@@ -437,20 +449,36 @@ pipeline:
     @testset "YAML integration: dynamics with time-dep interactions" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
-      interactions:
-        c0: {from: 100.0, to: 200.0}
-        c1: -0.5
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.01,
+            "interactions" => Dict{String, Any}(
+                "c0" => Dict{String, Any}(
+                    "from" => 100.0,
+                    "to" => 200.0,
+                ),
+                "c1" => -0.5,
+            ),
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
@@ -459,21 +487,34 @@ pipeline:
     @testset "YAML integration: dynamics with magnetic gradient" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
-      magnetic_gradient:
-        gradient: 0.5
-        axis: 1
-        g_F: 1.0
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.01,
+            "magnetic_gradient" => Dict{String, Any}(
+                "axis" => 1,
+                "g_F" => 1.0,
+                "gradient" => 0.5,
+            ),
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_workspace.magnetic_gradient !== nothing
@@ -483,21 +524,37 @@ pipeline:
     @testset "YAML integration: dynamics with time-dep magnetic gradient" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
-      magnetic_gradient:
-        gradient: {from: 0.0, to: 1.0}
-        axis: 1
-        g_F: 1.0
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.01,
+            "magnetic_gradient" => Dict{String, Any}(
+                "axis" => 1,
+                "g_F" => 1.0,
+                "gradient" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "to" => 1.0,
+                ),
+            ),
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_workspace.magnetic_gradient isa TimeDependentMagneticGradient{1}
@@ -506,21 +563,39 @@ pipeline:
     @testset "YAML integration: dynamics with transverse Zeeman" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
-      B:
-        p: 10.0
-        q: 0.5
-        bx: {sinusoidal: {amplitude: 1.0, frequency: 10.0}}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "bx" => Dict{String, Any}(
+                    "sinusoidal" => Dict{String, Any}(
+                        "amplitude" => 1.0,
+                        "frequency" => 10.0,
+                    ),
+                ),
+                "p" => 10.0,
+                "q" => 0.5,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.01,
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
@@ -671,24 +746,45 @@ pipeline:
     @testset "P1.4: Pulse sequence YAML round-trip" begin
         _SKIP_HEAVY_YAML_INFRA && (@test_skip false; return nothing)
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 32, box: 10.0}
-      interactions: {c0: 100.0, c1: -0.5}
-      dt: 0.005
-      n_steps: 50
-      tol: 1e-4
-  - dynamics:
-      duration: 0.02
-      dt: 0.001
-      pulse_sequence:
-        # `apply: B`, not `zeeman`: the unified B block renamed the target and
-        # `parse_pulse_sequence` now rejects the old name outright. #198 fixed
-        # the dict-form occurrence a few testsets up; this YAML one is the same
-        # rename, and it was the last red left in the `full` tier.
-        - {t: 0.0, apply: B, duration: 0.01, p: {from: 0.0, to: 10.0}, q: 0.5}
-        - {t: 0.01, apply: B, duration: 0.01, p: 10.0, q: 0.5}
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => 10.0,
+                "n" => 32,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 100.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 50,
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.02,
+            "pulse_sequence" => [Dict{String, Any}(
+                "apply" => "B",
+                "duration" => 0.01,
+                "p" => Dict{String, Any}(
+                    "from" => 0.0,
+                    "to" => 10.0,
+                ),
+                "q" => 0.5,
+                "t" => 0.0,
+            ), Dict{String, Any}(
+                "apply" => "B",
+                "duration" => 0.01,
+                "p" => 10.0,
+                "q" => 0.5,
+                "t" => 0.01,
+            )],
+        ),
+    )],
+)
 """)
         result = SpinorBEC.run_pipeline(cfg)
         @test result.dynamics_result !== nothing
@@ -708,17 +804,29 @@ pipeline:
         # widening `zeeman = dict[:zeeman]` to `Any` caused a 30+ min JIT hang.
         # Healthy baseline: ~250s for first call including JIT.
         cfg = SpinorBEC.load_config_from_string("""
-pipeline:
-  - ground_state:
-      atom: Rb87
-      grid: {n: 16, box: 8.0}
-      interactions: {c0: 50.0, c1: -0.2}
-      dt: 0.01
-      n_steps: 5
-      tol: 1e-3
-  - dynamics:
-      duration: 0.01
-      dt: 0.001
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 8.0,
+                "n" => 16,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 50.0,
+                "c1" => -0.2,
+            ),
+            "n_steps" => 5,
+            "tol" => 0.001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.01,
+        ),
+    )],
+)
 """)
         t = @elapsed SpinorBEC.run_pipeline(cfg; verbose=false)
         @test t < 600.0   # 10 min ceiling — anything over means JIT is pathological

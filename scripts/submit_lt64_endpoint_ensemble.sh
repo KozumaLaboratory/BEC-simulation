@@ -32,7 +32,7 @@
 # reason. Check `t4-user-info group point` before submitting.
 #
 # ONE ARM PER TASK. A shard that dies on walltime must not take completed
-# neighbours with it, and `run_yaml` already skips finished points on re-run, so
+# neighbours with it, and `run_experiment` already skips finished points on re-run, so
 # a resubmit costs only what actually failed.
 #
 # Submit (from the TSUBAME worktree root):
@@ -41,7 +41,7 @@
 #   qsub -g tga-kozuma-kouhi -t 1-1 -l h_rt=0:20:00 \
 #        scripts/submit_lt64_endpoint_ensemble.sh
 #   There is no --smoke flag. `cli.jl launch` takes [<batch>] <run_name> and
-#   `run_yaml` takes no point selection; a first draft of this script invoked
+#   `run_experiment` takes no point selection; a first draft of this script invoked
 #   both with flags that do not exist. A short-wall kill is the smoke: it proves
 #   the config compiles, the 64^3 grid allocates and the first snapshots land. It
 #   does NOT prove an arm finishes — the local 64^3 arms ran 3.8-4.9 h.
@@ -65,7 +65,7 @@ export JULIA_DEPOT_PATH="${SPINORBEC_TSUBAME_DEPOT:-/gs/fs/tga-kozuma-kouhi/shar
 cd "$REPO"
 
 # TASK_ID -> ONE config. 8 baseline + 8 static + 4 rotating = 20.
-# One arm per file because `run_yaml` has no point selection: it runs a whole
+# One arm per file because `run_experiment` has no point selection: it runs a whole
 # `scan:` and skips points already on disk, so a seed scan cannot be split
 # across array tasks.
 T="${SGE_TASK_ID:-1}"
@@ -77,7 +77,7 @@ DIR=runs/klaus_quench_long_time_ensemble
 # wrong one.
 CFGS=()
 for arm in baseline static rotating; do
-    for f in "$DIR"/lt64_ens_${arm}_s*.yaml; do CFGS+=("$f"); done
+    for f in "$DIR"/lt64_ens_${arm}_s*.experiment.jl; do CFGS+=("$f"); done
 done
 
 # The count is asserted, not assumed. A glob that matched 19 files would run a
@@ -89,11 +89,11 @@ CFG_PATH="${CFGS[$((T - 1))]}"
 echo "task $T -> $CFG_PATH   ($(date -Is))"
 mkdir -p logs/tsubame
 
-# `run_yaml` is resumable: it skips any point already on disk, so resubmitting
+# `run_experiment` is resumable: it skips any point already on disk, so resubmitting
 # after a walltime kill re-runs only what did not finish. There is no --smoke and
 # no --only-point; see README.md in the config directory.
 set +e
-"$JULIA" --project=. -e 'using SpinorBEC; run_yaml(ARGS[1])' "$CFG_PATH"
+"$JULIA" --project=. -e 'using SpinorBEC; run_experiment(ARGS[1])' "$CFG_PATH"
 RC=$?
 set -e
 echo "task $T rc=$RC   ($(date -Is))"

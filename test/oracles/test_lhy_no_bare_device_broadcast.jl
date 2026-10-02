@@ -18,7 +18,7 @@ using Test
 # THREE things at once (`method: lbfgs` + a tabulated `lhy:` kind +
 # `backend: gpu`), and until #179 the L-BFGS path never built a table at all, so
 # no kernel was ever asked to carry one. #179 fixing that exposed the latent gap:
-# `config_texture_bscan_lhy_full_bdg.yaml` needs BOTH fixes to run.
+# `config_texture_bscan_lhy_full_bdg.experiment.jl` needs BOTH fixes to run.
 #
 # This gate is structural because the behavioural one only fires on a machine
 # with a GPU. It runs everywhere and is cheap.

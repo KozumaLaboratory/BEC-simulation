@@ -19,7 +19,7 @@
 #    and must not be wrong.
 #
 #    THE WINDOW CONSTANTS ARE THIS SUITE'S, AND GETTING THEM WRONG IS SILENT.
-#    The hold step of `lt64_ens_*.yaml` is `duration: 100.0, dt: 0.005,
+#    The hold step of `lt64_ens_*.experiment.jl` is `duration: 100.0, dt: 0.005,
 #    save.every: 1000`, so nhold = 100.0/(0.005*1000) = 20 frames. The first run
 #    of this script used `save_every = 100`, which gives nhold = 200 — longer
 #    than the array — so `lo` clamped to 1 and every "hold-peak" was really a
@@ -112,7 +112,7 @@ group_of(name) = occursin("baseline", name) ? "baseline" :
                  occursin("rotating", name) ? "rotating" : "?"
 
 """
-The hold window in FRAMES for THIS suite. `lt64_ens_*.yaml` holds for
+The hold window in FRAMES for THIS suite. `lt64_ens_*.experiment.jl` holds for
 `duration: 100.0` at `dt: 0.005` saving every `1000`, so 100.0/(0.005·1000) = 20.
 
 Derived by `SpinorBEC.hold_window_frames` rather than spelled out, because this

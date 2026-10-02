@@ -64,98 +64,163 @@ function config_text(; weff::Float64, field_nt::Float64, n::Int, hold_scale::Flo
     box = 12.0
     hold = 5.5292 * hold_scale
     """
-    # Static-trap ω_eff scan @ canonical EdH protocol (hold_only, delay=2 ms,
-    # B_hold = $(field_nt) nT, m=+F).  ω_⊥,eff / ω_⊥ = $(@sprintf("%.3f", weff))
-    # Source: scripts/validation/klaus_weff_scan_gen.jl
-    #
-    # anti-aligned-seed: the EdH cascade only runs from the Zeeman-HIGHEST stretched
-    #   state. Measured 2026-08-19 (#343): rotation contrast +16.5 % anti-aligned
-    #   against -0.45 % aligned. Authority:
-    #   docs/campaign/edh_quench_polarisation_decision.md
-    #
-    # NO ROTATION ANYWHERE. The enhancement is centrifugal, not Coriolis (§9.3): a
-    #   static radial trap at ω_eff reproduces the rotating result to 0.06 % across
-    #   the range. `rotating_frame_omega` is 0.0 in every step; the hold step
-    #   overrides `potential:` instead.
-    #
-    # Built-in control: at ω_eff = 1.000 this must return the unweakened baseline.
-    #   If the per-step `potential:` override were silently ignored, EVERY arm would
-    #   return that same value — so a flat scan is a plumbing failure, not a null.
-    #
-    # hold_scale = $(hold_scale). At 1.0 the peak of peak-P_adj lands on the LAST
-    #   streamed frame for much of the scan, which is a truncation and not a peak:
-    #   the published 5.2 nT dip compares a resolved maximum (frame 38/42) against
-    #   boundary values (42/42). Arms with hold_scale > 1 exist to show whether the
-    #   structure survives once both sides peak inside the window.
-
-    defaults:
-      kind: spinor
-      backend: cpu
-      interactions: {N_atoms: 10000, omega_ref: $(OMEGA_REF)}
-
-    pipeline:
-      - ground_state:
-          atom: Eu151
-          grid: {n: [$n, $n, $n], box: [$box, $box, $box]}
-          potential: {type: harmonic, omega: [1.0, 1.0, $(OMEGA_Z)]}
-          interactions:
-            N_atoms: 10000
-            omega_ref: $(OMEGA_REF)
-            c1_ratio: 0.02778
-          ddi: {enabled: true, secular: true}
-          lhy: {kind: none}
-          B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
-          gauge_fix: false
-          initial_state: m_plus_F
-          init_sigma: 1.5
-          dt: 0.005
-          n_steps: 3000
-          tol: 1.0e-9
-
-      - dynamics:   # rotation_prep (hold-only: no rotation)
-          duration: 6.9115
-          dt: 0.005
-          rotating_frame_omega: 0.0
-          B: {Bz: "0.01 Gauss", theta: 0.0, phi: 0.0}
-          ddi: {enabled: true, secular: false}
-          lhy: {kind: none}
-          seed_amplitude: 1.0e-6
-          seed_k_cut: 2.5
-          save: {every: 100, psi: true, precision: f64}
-
-      - dynamics:   # B_quench
-          duration: 0.69115
-          dt: 0.001
-          rotating_frame_omega: 0.0
-          B: {Bz: {from: 0.01, to: $(bhold), duration: 0.6911504}, theta: 0.0, phi: 0.0}
-          ddi: {enabled: true, secular: false}
-          lhy: {kind: none}
-          save: {every: 50, psi: true, precision: f64}
-
-      - dynamics:   # hold pre-delay (unweakened trap, 2 ms)
-          duration: 1.3823
-          dt: 0.005
-          rotating_frame_omega: 0.0
-          B: {Bz: "$(bhold) Gauss", theta: 0.0, phi: 0.0}
-          ddi: {enabled: true, secular: false}
-          lhy: {kind: none}
-          save: {every: 50, psi: true, precision: f64}
-
-      - dynamics:   # hold with the RADIALLY WEAKENED static trap ($(round(8 * hold_scale; digits=1)) ms)
-          duration: $(hold)
-          dt: 0.005
-          rotating_frame_omega: 0.0
-          potential: {type: harmonic, omega: [$(@sprintf("%.4f", weff)), $(@sprintf("%.4f", weff)), $(OMEGA_Z)]}
-          B: {Bz: "$(bhold) Gauss", theta: 0.0, phi: 0.0}
-          ddi: {enabled: true, secular: false}
-          lhy: {kind: none}
-          save: {every: 100, psi: true, precision: f64}
-
-      - analyze:
-          - phase_classify: {}
-          - winding_map: {}
-          - energy_decomposition: {}
-    """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "interactions" => Dict{String, Any}(
+            "N_atoms" => 10000,
+            "omega_ref" => $(repr(OMEGA_REF)),
+        ),
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => true,
+            ),
+            "dt" => 0.005,
+            "gauge_fix" => false,
+            "grid" => Dict{String, Any}(
+                "box" => [$(repr(box)), $(repr(box)), $(repr(box))],
+                "n" => [$(repr(n)), $(repr(n)), $(repr(n))],
+            ),
+            "init_sigma" => 1.5,
+            "initial_state" => "m_plus_F",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 10000,
+                "c1_ratio" => 0.02778,
+                "omega_ref" => "$(@sprintf("%.3f", weff))1",
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "n_steps" => 3000,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, "$(@sprintf("%.3f", weff))0"],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-9,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "0.01 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => false,
+            ),
+            "dt" => 0.005,
+            "duration" => 6.9115,
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "rotating_frame_omega" => 0.0,
+            "save" => Dict{String, Any}(
+                "every" => 100,
+                "precision" => "f64",
+                "psi" => true,
+            ),
+            "seed_amplitude" => 1.0e-6,
+            "seed_k_cut" => 2.5,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => Dict{String, Any}(
+                    "duration" => 0.6911504,
+                    "from" => 0.01,
+                    "to" => "$(@sprintf("%.3f", weff))2",
+                ),
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => false,
+            ),
+            "dt" => 0.001,
+            "duration" => 0.69115,
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "rotating_frame_omega" => 0.0,
+            "save" => Dict{String, Any}(
+                "every" => 50,
+                "precision" => "f64",
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "$(@sprintf("%.3f", weff))3 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => false,
+            ),
+            "dt" => 0.005,
+            "duration" => 1.3823,
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "rotating_frame_omega" => 0.0,
+            "save" => Dict{String, Any}(
+                "every" => 50,
+                "precision" => "f64",
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "$(@sprintf("%.3f", weff))9 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => false,
+            ),
+            "dt" => 0.005,
+            "duration" => "$(@sprintf("%.3f", weff))5",
+            "lhy" => Dict{String, Any}(
+                "kind" => "none",
+            ),
+            "potential" => Dict{String, Any}(
+                "omega" => ["$(@sprintf("%.3f", weff))6", "$(@sprintf("%.3f", weff))7", "$(@sprintf("%.3f", weff))8"],
+                "type" => "harmonic",
+            ),
+            "rotating_frame_omega" => 0.0,
+            "save" => Dict{String, Any}(
+                "every" => 100,
+                "precision" => "f64",
+                "psi" => true,
+            ),
+        ),
+    ), Dict{String, Any}(
+        "analyze" => [Dict{String, Any}(
+            "phase_classify" => Dict{String, Any}(),
+        ), Dict{String, Any}(
+            "winding_map" => Dict{String, Any}(),
+        ), Dict{String, Any}(
+            "energy_decomposition" => Dict{String, Any}(),
+        )],
+    )],
+)
+"""
 end
 
 function main(args)
@@ -190,7 +255,7 @@ function main(args)
         name = "klaus_weff$(_tag(w))_B$(replace(string(field_nt), "." => "p"))nT" *
                (n == 32 ? "" : "_n$(n)") *
                (hold_scale == 1.0 ? "" : "_hold$(replace(string(hold_scale), "." => "p"))x") *
-               ".yaml"
+               ".experiment.jl"
         path = joinpath(out, name)
         write(path, config_text(; weff=w, field_nt, n, hold_scale))
         push!(written, path)

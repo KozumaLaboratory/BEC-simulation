@@ -9,7 +9,7 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOOK="$ROOT/scripts/loop/loop_gate.sh"
-CAND="$ROOT/runs/directions/rb87_stable_polar.toml"
+CAND="$ROOT/runs/directions/rb87_stable_polar.jl"
 NAME="rb87_stable_polar"
 fails=0
 ok() { echo "ok: $1"; }

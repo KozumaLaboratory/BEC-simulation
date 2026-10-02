@@ -5,14 +5,14 @@
 # layering is SHALLOW (`templates_block.jl:_apply_step_mixins`) — a step-level
 # `interactions:` REPLACES the mixin's wholesale rather than merging into it.
 #
-# Usage: julia --project=. runs/saito_li_torus/g2_resolved_coefficients.jl [config.yaml ...]
+# Usage: julia --project=. runs/saito_li_torus/g2_resolved_coefficients.jl [config.experiment.jl ...]
 
 using SpinorBEC
 using Printf
 
 const A0 = 5.29177210903e-11
 
-paths = isempty(ARGS) ? ["runs/saito_li_torus/config.yaml"] : ARGS
+paths = isempty(ARGS) ? ["runs/saito_li_torus/config.experiment.jl"] : ARGS
 
 for path in paths
     println("="^72)

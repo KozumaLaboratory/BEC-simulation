@@ -178,7 +178,7 @@ Applied **once** at the start of the dynamics phase, after ψ is copied from the
 | `seed_amplitude`     | Float  | symmetry-breaking seed on the dominant ±1 component      |
 | `seed_k_cut`         | Float  | optional k-space lowpass on the seed (`grid` auto-fed)   |
 
-`seed_k_cut` zeroes FFT modes above `|k| = seed_k_cut`, concentrating noise in long-wavelength unstable bands (e.g. EdH spin-wave manifold below `1/ξ_h`). Without it the seed is unfiltered white noise. Used in `runs/eu151_edh/config.yaml`.
+`seed_k_cut` zeroes FFT modes above `|k| = seed_k_cut`, concentrating noise in long-wavelength unstable bands (e.g. EdH spin-wave manifold below `1/ξ_h`). Without it the seed is unfiltered white noise. Used in `runs/eu151_edh/config.experiment.jl`.
 
 ## Worked example — multi-knob composition
 
@@ -216,7 +216,7 @@ The runner builds `cb_sgpe`, `cb_pgp`, `cb_photon`, `cb_live` and pipes them thr
 > `step has step-level \`zeeman:\` key — not a valid user-facing field. Magnetic
 > field belongs in the unified \`B:\` block` — so anyone who copied this block
 > into a config got an error at load. The form above is taken from a config that
-> runs (`runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.yaml:115-122`), and it ramps
+> runs (`runs/matsui_fig4b/fig4b_gsddioff_n35k_n32.experiment.jl:115-122`), and it ramps
 > the FIELD rather than `p`: magnitude (`Bz` / `B_mag` / `p_mv`) plus direction
 > (`theta` / `phi`), with `q` auto-derived from |B|² unless given. The `p ≡ -g_F
 > μ_B B` conversion lives once in `Units.bfield_to_p`.

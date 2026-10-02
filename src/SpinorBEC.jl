@@ -6,7 +6,6 @@ using FFTW
 using JLD2
 using CodecZlib: ZlibCompressor
 using CodecZstd: ZstdCompressor
-using YAML
 using Unitful
 using TimerOutputs
 using Random
@@ -69,16 +68,16 @@ include("workflow/experiments/inspect_batch.jl")
 include("workflow/experiments/calibration.jl")  # `module Calibration`
 using .Calibration:
     CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration,
-    DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated,
+    DEFAULT_CALIBRATION, load_calibration, apply_calibration!,
     coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s,
     CalibrationHistory, load_calibration_history, load_calibration_csv,
     interpolate_calibration,
     sample_trap_drift_omegas, trap_drift_waveforms, apply_trap_drift
-# Internal: pulled in for `run_yaml`'s pre-schema calibration block parser
+# Internal: pulled in for `run_experiment`'s pre-schema calibration block parser
 # (run_registry.jl). Not exported.
 using .Calibration: _calibration_from_dict
 export CalibrationSet, CoilCalibration, FORTCalibration, RabiCalibration
-export DEFAULT_CALIBRATION, load_calibration, apply_calibration!, run_yaml_calibrated
+export DEFAULT_CALIBRATION, load_calibration, apply_calibration!
 export coil_mv_to_gauss, fort_mw_to_trap_hz, rabi_mw_to_rad_s
 export CalibrationHistory, load_calibration_history, load_calibration_csv
 export interpolate_calibration
@@ -104,8 +103,8 @@ include("validation.jl")
 # EXPERIMENT / BATCH: unified workflow model
 # ========================================
 # Cheap lifecycle object: (spec, outdir, lazy obs cache). Subsumes
-# scattered run_yaml / open_result / classify_collapse / sweep patterns.
-# Depends on: open_result, run_yaml, walk_dicts!, total_density,
+# scattered run_experiment / open_result / classify_collapse / sweep patterns.
+# Depends on: open_result, run_experiment, walk_dicts!, total_density,
 #             run_observables (find_run_dir, peak_density_trajectory,
 #             spin_populations_trajectory, classify_collapse), and
 #             runfactory's internal _set_path!.
@@ -113,7 +112,6 @@ include("workflow/experiment.jl")               # CAS + Experiment type + lifecy
 include("workflow/experiment_observables.jl")   # observables (plain functions on Experiment)
 include("workflow/experiment_collections.jl")   # spec_diff / sweep / twin / tabulate
 include("workflow/io/cluster.jl")  # cluster helpers (needs Experiment)
-include("workflow/autopilot.jl")   # queue + tick + on_complete + retry
 include("workflow/cli.jl")         # cli_main — body behind scripts/cli.jl
 
 # ========================================
@@ -130,16 +128,16 @@ using .Optimization:
     fit_faraday_param, load_target_faraday,
     bayesian_optimize, gp_predict, expected_improvement,
     multi_fidelity_optimize_2tier, MultiFidelityBOResult,
-    bayesian_optimize_yaml, multi_fidelity_optimize_yaml,
+    bayesian_optimize_config, multi_fidelity_optimize_config,
     bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy,
-    active_learn_phase_scan, active_learn_phase_scan_yaml,
+    active_learn_phase_scan, active_learn_phase_scan_config,
     phase_entropy_uncertainty, default_phase_classifier_extractor
 export fit_faraday_param, load_target_faraday
 export bayesian_optimize, gp_predict, expected_improvement
 export multi_fidelity_optimize_2tier, MultiFidelityBOResult
-export bayesian_optimize_yaml, multi_fidelity_optimize_yaml
+export bayesian_optimize_config, multi_fidelity_optimize_config
 export bo_objective_max_m_transfer, bo_objective_max_lz, bo_objective_min_energy
-export active_learn_phase_scan, active_learn_phase_scan_yaml
+export active_learn_phase_scan, active_learn_phase_scan_config
 export phase_entropy_uncertainty, default_phase_classifier_extractor
 
 # All public symbols are now `export`ed at their definition sites under

@@ -31,7 +31,7 @@ export with_cacheable_tree
 
 Run `f` with `SPINORBEC_ALLOW_STALE_POINTS=1`.
 
-For a test that needs a second `run_yaml` to hit the cache and is NOT about the
+For a test that needs a second `run_experiment` to hit the cache and is NOT about the
 provenance gate. Do not reach for this to silence a refusal you have not
 explained: the override is right here because the point was written by the same
 process, and that reasoning has to hold at every new call site.

@@ -5,7 +5,7 @@
 # atom's own tabulated pair when nothing is overridden.
 #
 # Why this gate exists: until 2026-08-19 the scalar-LHY auto-derivation read
-# `atom.a_s` regardless of a c_total override, so `runs/saito_li_torus/config.yaml`
+# `atom.a_s` regardless of a c_total override, so `runs/saito_li_torus/config.experiment.jl`
 # (a_s lowered 110 a₀ → 45.7 a₀ to reach ε_dd = 1.3) got an LHY coefficient
 # 3.52× too large — on the single term a quantum droplet's existence depends on.
 

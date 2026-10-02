@@ -4,7 +4,7 @@
     "L5_operator_rhs_compare_ueda": {
       "status": "BLOCKED",
       "reason": "awaiting Ueda code access / published RHS values",
-      "path": "runs/verification_suite/yamls/L5_operator_rhs_compare_ueda.yaml"
+      "path": "runs/verification_suite/yamls/L5_operator_rhs_compare_ueda.experiment.jl"
     }
   }
 }

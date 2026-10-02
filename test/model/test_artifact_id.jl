@@ -7,8 +7,8 @@
 # moves.
 #
 # Invariant 3: code identity is one tree hash of `src/` and `ext/`. It is a
-# CONTENT hash, not a git revision — the autopilot rsyncs code to TSUBAME with
-# `--exclude=.git/` (`workflow/autopilot/ssh_transport.jl:72`), so on the compute
+# CONTENT hash, not a git revision — a deployment can copy code to TSUBAME with
+# `--exclude=.git/`, so on the compute
 # node there is no repository to ask, and `git rev-parse HEAD:src` does not move
 # for the uncommitted edits and untracked-but-loaded files that a live research
 # tree is full of.
@@ -21,7 +21,7 @@ using SpinorBEC: Model, Stage, stage, artifact_id, code_tree_hash, content_id,
     ZeemanSpec, RamanSpec, LightShiftSpec, GradientSpec, FrameSpec, GeometrySpec,
     ReservoirSpec, LossParams, AbsorbingBoundary, AtomSpecies,
     PiecewiseLinearWaveform, resolve_atom, with, _speceq,
-    model_toml_dict, _enc, _package_root, _code_tree_paths, _CODE_TREE_HASH_MEMO,
+    model_data, _enc, _package_root, _code_tree_paths, _CODE_TREE_HASH_MEMO,
     STAGE_KINDS
 
 probe_model() = Model(;
@@ -47,7 +47,7 @@ heavier(a::AtomSpecies) = AtomSpecies(a.name, a.mass * 1.01, a.F, a.a0, a.a2,
 #
 # What this replaces: a single nudge of `interactions.c1`, which put all fourteen
 # slots on one assertion. Adding `f === :light_shift && continue` to
-# `model_toml_dict` — i.e. removing that slot from the digest ENTIRELY — left
+# `model_data` — i.e. removing that slot from the digest ENTIRELY — left
 # this file 57/57 green. `light_shift` is one of exactly two slots the cutover
 # exists to stop losing: `_gs_cache_key` (deleted in step 3) omitted
 # `light_shift` and `rotating_frame_omega` while passing both to the solver.
@@ -298,7 +298,7 @@ end
         # added to `Stage` but not to `artifact_id` reddens here.
         expected = content_id(
             Dict{String, Any}(
-                "model" => model_toml_dict(s.model),
+                "model" => model_data(s.model),
                 "kind" => String(s.kind),
                 "method" => String(s.method),
                 "backend" => String(s.backend),

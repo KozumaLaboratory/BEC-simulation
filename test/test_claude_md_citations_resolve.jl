@@ -54,7 +54,9 @@ function _agent_role_problems(config, stem)
     instructions = get(config, "developer_instructions", "")
     if instructions isa AbstractString
         occursin("CLAUDE.md", instructions) || push!(problems, "missing shared authority")
-        occursin(r"runs/_loop/|\.Codex/agents|loop\.sh|judge\.py|full_bdg_F6_polar_broken", instructions) &&
+        occursin(
+            r"runs/_loop/|\.Codex/agents|loop\.sh|judge\.py|full_bdg_F6_polar_broken", instructions
+        ) &&
             push!(problems, "retired loop or physics instruction")
     end
     problems
@@ -64,13 +66,16 @@ end
     role_dir = joinpath(REPO, ".codex", "agents")
     files = filter(f -> endswith(f, ".toml"), readdir(role_dir; join=true))
     stems = Set(first(splitext(basename(f))) for f in files)
-    @test Set(["director", "implementer", "theorist", "researcher", "critic", "critic_lite"]) ⊆ stems
+    @test Set(["director", "implementer", "theorist", "researcher", "critic", "critic_lite"]) ⊆
+        stems
     roles = [(config=TOML.parsefile(f), stem=first(splitext(basename(f)))) for f in files]
     @test length(roles) == length(files) >= 6
 
     valid = Dict("name" => "probe", "description" => "Test role",
         "developer_instructions" => "Read CLAUDE.md. Return evidence to the caller.")
-    old = merge(valid, Dict("developer_instructions" => "Read runs/_loop/state.json and CLAUDE.md."))
+    old = merge(
+        valid, Dict("developer_instructions" => "Read runs/_loop/state.json and CLAUDE.md.")
+    )
     bad = calibrated_scan(roles;
         match=x -> !isempty(_agent_role_problems(x.config, x.stem)),
         present=(config=old, stem="probe"),
@@ -82,14 +87,17 @@ end
         @test !isempty(_agent_role_problems(missing, "probe"))
     end
     @test !isempty(_agent_role_problems(valid, "different_name"))
-    @test !isempty(_agent_role_problems(merge(valid,
-        Dict("developer_instructions" => "Use a private copy of conventions.")), "probe"))
+    @test !isempty(
+        _agent_role_problems(
+            merge(valid,
+                Dict("developer_instructions" => "Use a private copy of conventions.")), "probe"),
+    )
 end
 
 @testset "CI detects root documentation inputs" begin
     workflow = read(joinpath(REPO, ".github", "workflows", "ci.yml"), String)
     # Read the actual filter rather than restating its pattern in this test.
-    filter_match = match(r"grep -Eq '([^']+)'", workflow)
+    filter_match = match(r"grep -E '([^']+)'", workflow)
     @test filter_match !== nothing
     if filter_match !== nothing
         detector = Regex(filter_match.captures[1])

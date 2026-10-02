@@ -416,7 +416,7 @@ const _HOLD_FRAMES = 11      # floor(5.5292 / (0.005 * 100))
 
     @testset "hold_window_frames: one statement of a silent derivation" begin
         # The three drivers each had a copy of `floor(hold / (dt * save_every))`.
-        # lt64_ens_*.yaml: duration 100.0, dt 0.005, save.every 1000.
+        # lt64_ens_*.experiment.jl: duration 100.0, dt 0.005, save.every 1000.
         @test hold_window_frames(100.0; dt=0.005, save_every=1000) == 20
         # The 8 ms EdH arms: 5.5292 / (0.005 * 100) = 11.06 -> 11, the number
         # §12.1 states independently.

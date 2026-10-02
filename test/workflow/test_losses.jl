@@ -271,26 +271,38 @@ using SpinorBEC
         # `loss:` block lives on dynamics steps — ITP skips loss by design,
         # so the schema accepts it only on `dynamics:`.
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 0.05
-              dt: 0.001
-              loss:
-                gamma_dr: 1.0e-3
-                L3: 2.0e-5
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.001,
+            "duration" => 0.05,
+            "loss" => Dict{String, Any}(
+                "L3" => 2.0e-5,
+                "gamma_dr" => 0.001,
+            ),
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         @test cfg isa PipelineConfig
         p = cfg.steps[2].params
@@ -300,20 +312,29 @@ using SpinorBEC
 
     @testset "YAML without losses" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         p = cfg.steps[1].params
         @test !haskey(p, "losses")
@@ -321,27 +342,40 @@ using SpinorBEC
 
     @testset "YAML parsing of phase temperature_ratio" begin
         yaml = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: 64
-                box: 20.0
-              interactions:
-                c0: 1.0
-                c1: 0.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-              temperature_ratio: 0.1
-          - dynamics:
-              duration: 1.0
-              dt: 0.01
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => 20.0,
+                "n" => 64,
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 1.0,
+                "c1" => 0.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+            "temperature_ratio" => 0.1,
+        ),
+    ), Dict{String, Any}(
+        "dynamics" => Dict{String, Any}(
+            "dt" => 0.01,
+            "duration" => 1.0,
+        ),
+    )],
+)
+"""
         cfg = load_config_from_string(yaml)
         @test cfg.steps[2].params["temperature_ratio"] == 0.1
         @test get(cfg.steps[3].params, "temperature_ratio", nothing) === nothing

@@ -154,30 +154,58 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         # green throughout. The gate has to use a mode that needs a TABLE.
         mktempdir() do dir
             function run_kind(kind)
-                yaml = joinpath(dir, "gs_$kind.yaml")
+                yaml = joinpath(dir, "gs_$kind.experiment.jl")
                 write(
                     yaml,
                     """
-        units: {B: Gauss}
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              interactions: {N_atoms: 50000, omega_ref: 691.1504, c1_ratio: 0.0}
-              grid: {n: [12, 12, 12], box: [12.0, 12.0, 12.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              method: lbfgs
-              m_lbfgs: 6
-              ddi: {enabled: true, secular: false}
-              lhy: {kind: $kind}
-              B: {Bz: "6.0e-5 Gauss", theta: 0.0, phi: 0.0}
-              initial_state: flower
-              n_steps: 12
-              tol: 1.0e-8
-        """,
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => "6.0e-5 Gauss",
+                "phi" => 0.0,
+                "theta" => 0.0,
+            ),
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+                "secular" => false,
+            ),
+            "grid" => Dict{String, Any}(
+                "box" => [12.0, 12.0, 12.0],
+                "n" => [12, 12, 12],
+            ),
+            "initial_state" => "flower",
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 50000,
+                "c1_ratio" => 0.0,
+                "omega_ref" => 691.1504,
+            ),
+            "lhy" => Dict{String, Any}(
+                "kind" => $(repr(kind)),
+            ),
+            "m_lbfgs" => 6,
+            "method" => "lbfgs",
+            "n_steps" => 12,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 1.0e-8,
+        ),
+    )],
+    "units" => Dict{String, Any}(
+        "B" => "Gauss",
+    ),
+)
+""",
                 )
                 out = joinpath(dir, "out_$kind")
-                run_yaml(yaml; base_dir=out, verbose=false)
+                run_experiment(yaml; base_dir=out, verbose=false)
                 d = first(filter(isdir, joinpath.(out, readdir(out))))
                 f = first(filter(x -> endswith(x, ".jld2"), readdir(d)))
                 jldopen(joinpath(d, f), "r") do j
@@ -205,19 +233,36 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
     # exactly why it needs a gate rather than a memory.
     @testset "lhy: survives the {c0, c1} interactions form" begin
         mk(inter, kind) = """
-        defaults: {kind: spinor, backend: cpu}
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid: {n: [8, 8, 8], box: [4.0, 4.0, 4.0]}
-              potential: {type: harmonic, omega: [1.0, 1.0, 1.0]}
-              interactions: $inter
-              ddi: {enabled: false}
-              lhy: {kind: $kind}
-              initial_state: polar
-              dt: 0.01
-              n_steps: 5
-        """
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "cpu",
+        "kind" => "spinor",
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "enabled" => false,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [4.0, 4.0, 4.0],
+                "n" => [8, 8, 8],
+            ),
+            "initial_state" => "polar",
+            "interactions" => $(repr(inter)),
+            "lhy" => Dict{String, Any}(
+                "kind" => $(repr(kind)),
+            ),
+            "n_steps" => 5,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0, 1.0],
+                "type" => "harmonic",
+            ),
+        ),
+    )],
+)
+"""
         resolved(inter, kind) = begin
             p = load_config_from_string(mk(inter, kind)).steps[1].params
             SpinorBEC._resolve_gs_atom(p, nothing; verbose=false)
@@ -226,10 +271,10 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
 
         # The regression: a tabulated kind needs only `kind`, so it must
         # resolve under BOTH interactions forms.
-        @test resolved("{c0: 1.0, c1: 0.01}", "polar_contact") == "polar_contact"
+        @test resolved(Dict("c0" => 1.0, "c1" => 0.01), "polar_contact") == "polar_contact"
         # Positive control — the supported form was never broken, so a gate
         # that only checked this one would have passed against the defect.
-        @test resolved("{N_atoms: 1000, omega_ref: 100.0}", "polar_contact") ==
+        @test resolved(Dict("N_atoms" => 1000, "omega_ref" => 100.0), "polar_contact") ==
             "polar_contact"
 
         # `scalar` derives c_lhy FROM (N_atoms, omega_ref), so under {c0, c1}
@@ -238,7 +283,7 @@ _uniform(n=6) = (p=zeros(ComplexF64, n, n, n, _D1); p[:, :, :, 1].=0.4; p)
         # the energy decomposition. The wording is #198's — this branch now
         # reaches the same `else` that guards the missing-N case generally.
         @test_logs (:warn, r"LHY term is OFF") match_mode = :any begin
-            @test resolved("{c0: 1.0, c1: 0.01}", "scalar") == "scalar"
+            @test resolved(Dict("c0" => 1.0, "c1" => 0.01), "scalar") == "scalar"
         end
     end
 

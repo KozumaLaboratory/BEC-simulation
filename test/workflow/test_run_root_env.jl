@@ -1,9 +1,9 @@
 # `SPINORBEC_STORE` must move the WHOLE output tree, not half of it.
 #
-# Three things decide where output lands: `run_yaml`'s run directory, the GS
+# Three things decide where output lands: `run_experiment`'s run directory, the GS
 # stage cache (`_stage/gs`, which holds the ψ and is the bulk), and the CAS
 # store behind `Experiment`. They used to disagree — `_gs_stage_dir()` and
-# `default_store()` read `SPINORBEC_STORE` while `run_yaml` hardcoded `"runs"`.
+# `default_store()` read `SPINORBEC_STORE` while `run_experiment` hardcoded `"runs"`.
 # Setting the variable therefore moved the ψ store and left the run dirs on the
 # project filesystem, which is the wrong half to move.
 #
@@ -32,8 +32,8 @@ using SpinorBEC
         # …and the run dir a YAML maps to follows, which is the half that used
         # to stay behind.
         mktempdir() do d
-            y = joinpath(d, "probe.yaml")
-            write(y, "pipeline: []\n")
+            y = joinpath(d, "probe.experiment.jl")
+            write(y, "Dict(\"pipeline\" => [])\n")
             @test startswith(compute_run_dir(y), root)
             # explicit base_dir still wins over the environment
             @test startswith(compute_run_dir(y; base_dir="elsewhere"), "elsewhere")

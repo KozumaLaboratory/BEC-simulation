@@ -50,7 +50,7 @@ using JSON
         @test run_layer("eu_k3_sweep") == "K-sweep"
         @test run_layer("F6_phase_diagram") == "F6"
         @test run_layer("jit_probe") == "jit"
-        @test run_layer("a1a20f308b886fce") == "autopilot"  # pure-hash, not "bench"
+        @test run_layer("a1a20f308b886fce") == "experiment"  # pure-hash CAS directory
         @test run_layer("something_unrecognised") == "other"
     end
 
@@ -59,7 +59,7 @@ using JSON
             # Run A: has a summary.json (full row).
             a = joinpath(runs, "runA_aaaaaaaaaaaaaaaa")
             mkpath(a)
-            touch(joinpath(a, "config.yaml"))
+            touch(joinpath(a, "config.experiment.jl"))
             open(joinpath(a, RUN_SUMMARY_FILENAME), "w") do io
                 JSON.print(io, Dict("energy" => -6.0, "F" => 1,
                     "extraction_error" => String[]))

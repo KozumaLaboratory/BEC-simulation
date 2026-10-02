@@ -1,3 +1,8 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 # Calibration parsing edge cases — pin user-input validation guards
 # that production lab-units configs depend on. Each probe designed so
 # that a regression flips the validation from throwing/clamping to
@@ -8,7 +13,6 @@ using Dates
 using SpinorBEC
 using SpinorBEC: _calibration_from_dict, load_calibration_history,
     interpolate_calibration
-using YAML
 using JSON
 
 @testset "Calibrated conditions agree across entry paths" begin
@@ -43,10 +47,10 @@ using JSON
                 input["target_date"] = "2026-01-02"
             end
             original = deepcopy(input)
-            path = joinpath(dir, "calibrated.yaml")
-            YAML.write_file(path, input)
+            path = joinpath(dir, "calibrated.experiment.jl")
+            _write_julia_fixture(path, input)
             loaded = load_config(path)
-            literal = load_config_from_string(YAML.write(input))
+            literal = load_config_from_string(repr(input))
             inspected = inspect_config(input)
             # Independent expected physical frequencies: coeff * sqrt(power).
             expected = ["100.0 Hz", "400.0 Hz", "900.0 Hz"]
@@ -154,41 +158,49 @@ end
     @testset "load_calibration_history rejects malformed YAML" begin
         # Non-list root.
         mktempdir() do tmp
-            path = joinpath(tmp, "bad.yaml")
+            path = joinpath(tmp, "bad.experiment.jl")
             write(
                 path,
                 """
-    calibration_history:
-      not: a_list
-    """,
+Dict{String, Any}(
+    "calibration_history" => Dict{String, Any}(
+        "not" => "a_list",
+    ),
+)
+""",
             )
             @test_throws ArgumentError load_calibration_history(path)
         end
 
         # Entry missing `date` key.
         mktempdir() do tmp
-            path = joinpath(tmp, "missing_date.yaml")
+            path = joinpath(tmp, "missing_date.experiment.jl")
             write(
                 path,
                 """
-    calibration_history:
-      - epoch: "no_date_entry"
-        coil_strong:
-          gauss_per_mv: 0.4
-    """,
+Dict{String, Any}(
+    "calibration_history" => [Dict{String, Any}(
+        "coil_strong" => Dict{String, Any}(
+            "gauss_per_mv" => 0.4,
+        ),
+        "epoch" => "no_date_entry",
+    )],
+)
+""",
             )
             @test_throws ArgumentError load_calibration_history(path)
         end
 
         # Entry not a Dict (raw scalar in list).
         mktempdir() do tmp
-            path = joinpath(tmp, "scalar.yaml")
+            path = joinpath(tmp, "scalar.experiment.jl")
             write(
                 path,
                 """
-    calibration_history:
-      - 42
-    """,
+Dict{String, Any}(
+    "calibration_history" => [42],
+)
+""",
             )
             @test_throws ArgumentError load_calibration_history(path)
         end
@@ -197,16 +209,24 @@ end
     @testset "load_calibration_history sorts dates ascending" begin
         # Input dates out of order — loader sorts.
         mktempdir() do tmp
-            path = joinpath(tmp, "unsorted.yaml")
+            path = joinpath(tmp, "unsorted.experiment.jl")
             write(
                 path,
                 """
-    calibration_history:
-      - date: "2026-02-01"
-        coil_strong: {gauss_per_mv: 0.5}
-      - date: "2026-01-01"
-        coil_strong: {gauss_per_mv: 0.3}
-    """,
+Dict{String, Any}(
+    "calibration_history" => [Dict{String, Any}(
+        "coil_strong" => Dict{String, Any}(
+            "gauss_per_mv" => 0.5,
+        ),
+        "date" => "2026-02-01",
+    ), Dict{String, Any}(
+        "coil_strong" => Dict{String, Any}(
+            "gauss_per_mv" => 0.3,
+        ),
+        "date" => "2026-01-01",
+    )],
+)
+""",
             )
             hist = load_calibration_history(path)
             @test hist.dates[1] == Date("2026-01-01")

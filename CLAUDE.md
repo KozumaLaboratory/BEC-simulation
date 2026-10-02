@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Arbitrary-F spinor Gross–Pitaevskii simulator (split-step Fourier, 1D/2D/3D, CPU + CUDA, Julia-defined experiments with legacy YAML input). Primary production target: ¹⁵¹Eu at F=6 (13 components). Internal units: ℏ = m = ω_ref = 1.
+Arbitrary-F spinor Gross–Pitaevskii simulator (split-step Fourier, 1D/2D/3D, CPU + CUDA, Julia-defined experiments). Primary production target: ¹⁵¹Eu at F=6 (13 components). Internal units: ℏ = m = ω_ref = 1.
 
 This file is the **structural fixed-point** — design rules that survive across incidents. Per-incident lessons live in memory.
 
@@ -113,20 +113,19 @@ those respective layers. The rotating-basis implementation is the worked example
    directional physics anchors and a mutation proving the gate can fail. Ungated
    duplication is forbidden. Design authority:
    `docs/design/hamiltonian_layered_architecture.md`.
-4. **Content-addressed computation with provenance.** `Experiment(spec)` hashes
-   canonical spec bytes; legacy `compute_run_dir` hashes raw YAML bytes and keeps
-   its basename. Both use 16 hex digits; do not conflate the keys. Reusing a point
-   requires matching recorded code provenance and clean trees. Do not implicitly
-   enable `SPINORBEC_ALLOW_STALE_POINTS`; report any deliberate override.
+4. **Content-addressed computation with provenance.** `Experiment(spec)` and
+   `run_experiment` use `content_id(spec)`. Julia definitions are evaluated
+   before keying; source comments and filenames do not change conditions.
+   Reusing a point requires matching recorded code provenance and clean trees.
+   Do not implicitly enable `SPINORBEC_ALLOW_STALE_POINTS`; report any override.
 5. **Julia experiment definitions, persistent snapshots.** Use `PipelineConfig`
    and typed steps; share protocols as Julia functions. `run_experiment` persists
-   input and resolved conditions. YAML remains a compatibility input through the
-   same executor, not a second implementation or template registry.
+   input and resolved conditions as JSON. Do not add YAML or TOML input compatibility.
 6. **Separate validation claims.** Code correctness, agreement with analytic
    physics, and agreement with experiments are different claims (A/B/C below).
 7. **Explicit test tiers.** Register every new test in `test/_tiers.jl`.
    Each file must run independently, with its own imports and helpers, and without
-   shared fixed temporary paths. Keep heavy YAML tests behind their existing guard.
+   shared fixed temporary paths. Keep heavy solver tests behind their existing guard.
 8. **Protect type stability.** No `Any`-typed local or stored closure may flow
    into `make_workspace`. Retain dispatch annotations as a precaution; the
    2026-08-04 measurements did not reproduce the historical hang by removing
@@ -154,8 +153,8 @@ storage plus lazy observations. `run!(exp)` executes; `Fz_t(exp)`, `Lz_t(exp)`,
 `src/workflow/experiment.jl`.
 
 `run_experiment(config_or_snapshot)` persists `config.json`, resolved conditions,
-per-point JLD2, progress, and exit summaries. `run_yaml(path)` imports legacy YAML
-into that executor. `load_config(path)` and `run_pipeline(config)` provide the
+per-point JLD2, progress, and exit summaries. `run_experiment(path)` evaluates
+Julia definitions or resumes generated JSON snapshots. `load_config(path)` and `run_pipeline(config)` provide the
 in-memory path. Check `src/workflow/experiments/pipeline/run_registry.jl` and
 `src/workflow/experiments/runtime/config_artifacts.jl` when changing persistence.
 
@@ -163,7 +162,7 @@ Collections are `Vector{Experiment}`, not a new batch abstraction. Use Julia
 comprehensions for typed definitions; existing Dict helpers `sweep(base; over=...)`,
 `twin(exp)`, `tabulate(exps, observables)`, and `spec_diff(a, b)` are in
 `src/workflow/experiment_collections.jl`. Keep override syntax specific to the
-entry point; YAML dotted paths and the single-axis `sweep` symbol are not identical.
+entry point; dotted parameter paths and the single-axis `sweep` symbol are not identical.
 
 Validation uses `ConservationSpec(; norm_drift=..., energy_rel_drift=..., Jz_drift=...)`,
 `OperatorRHSSpec(; tol_hpsi=..., tol_per_term_E=...)`, and `check(spec, result)`.
@@ -188,14 +187,13 @@ classified by `test/test_reanalysis_driver_coverage.jl`. Evidence and limitation
 | `src/foundation/types/` | Cross-cutting structs; subsystem-local types stay with their machinery. Never spell out Workspace type parameters. |
 | `src/hamiltonian/terms/` | Term faces and kernels. Shared channel conversion is `src/hamiltonian/coefficients.jl`; shared spin rotation is `src/foundation/spinor_utils/uniform_rotation.jl`. Follow the HamTerm protocol below. |
 | `src/hamiltonian/integrator/` | Split-step composition and rotating basis. `spin_chain` is fusion, not another splitting: adding an outer operator also requires updating `_spin_chain_reason`. |
-| `src/hamiltonian/tdhfb/` | Parallel engine to GP; no YAML pipeline integration without an explicit request. |
+| `src/hamiltonian/tdhfb/` | Parallel engine to GP; no pipeline integration without an explicit request. |
 | `src/analysis/` | Observables, energy, imaging, spectra, and phases. `_get_spinor(psi, I, Val(D))` needs D from a type parameter; benchmark the relevant overload. Bogoliubov k-mode 1 is `omega[:, 1]`. |
 | `src/solvers/` | Ground state, dynamics, continuation, and stochastic solvers. `find_ground_state_lbfgs` returns `grad_norm` recomputed at the returned state. Continuation's caller-supplied `make_params(val)` returns a NamedTuple or `InteractionParams`. Draw stochastic noise on-device with `_randn_fill!`; TWA spread is not proof of thermalization. |
 | `src/workflow/experiments/` | Typed steps, config parsing, runtime conversion, analyzers, and execution. Check schema and sibling configs; do not infer accepted keys from a historical guide. |
 | `src/workflow/initialization/` | Species and state builders. Named states wrap `init_psi(state=..., init_state_params=...)`; do not fork its physics. For transverse x, use `init_psi_spin_coherent(grid, sys; theta=π/2, phi=0)`. |
 | `src/workflow/experiments/calibration.jl` | Lab-field calibration precedes unit parsing; drift and history are part of the calibration module. |
 | `src/workflow/experiments/optimization.jl` | Optimization module and objectives. Expensive GP fitting belongs in heavy tests. |
-| `src/workflow/autopilot/` | Queue, dispatch, budget, retries, and liveness. TSUBAME uses UGE; consult `docs/guides/tsubame.md`. |
 | `src/model/` | Model, identity, admission, and claim contracts. Inspect actual consumers before assuming an architectural migration is complete. |
 | `src/validation/` | Independent RHS and dumb-reference physics statements. External-comparison status lives in `docs/validation/ueda_status.md`. |
 | `src/manuscript/` | Figure registry and CSV/Python/TikZ emitters; CLI via `scripts/cli.jl figure`. |
@@ -280,8 +278,10 @@ is a pointer; the frozen sign audit provides historical context.
 ## Test taxonomy + oracle gates
 
 Register tests in `test/_tiers.jl`; discovery does not add them automatically.
-The CI workflow's fast/oracles/integration jobs together cover the ci tier.
-Heavy YAML blocks require `SPINORBEC_RUN_HEAVY_YAML=true`.
+Per-PR CI uses explicit smoke views in `test/_smoke.jl`; nightly runs `full`,
+including the deferred tests. `test_tier_membership.jl` gates those separately.
+CI uses the Julia version in `Manifest.toml` and a portable smoke cache.
+Heavy solver blocks retain the legacy guard `SPINORBEC_RUN_HEAVY_YAML=true`.
 
 Select gates by the changed contract; these are entry points, not an exhaustive
 test inventory:
@@ -315,24 +315,6 @@ Reports state which type the evidence supports. Read
 coverage. `test/_inventory.jl` and `test/mutation/` expose coverage and sensitivity.
 A variational bound can refute an extremum on the wrong side of a trial value
 without trusting either solver; see `variational_bound`.
-
-## Autopilot pattern
-
-Stateless meta-loop over the queue. Permanent invariants:
-
-- **Two-stage submit**: mark `:running` + `job_id=nothing` + fsync; backend dispatch sets `job_id`; save_entry with real `job_id`. Crash between stages recoverable via `find_job_by_name`.
-- **Backends**: `LocalBackend` (subprocess) + `UGEBackend` (TSUBAME ssh + rsync), auto-registered from env triple.
-- **Pre-flight inspector**: 4-severity (`:block` → killed_bug, `:error` → recorded, `:warn` → Slack, `:info` → silent).
-- **Budget gate**: quarter + daily GPU·h caps, refreshed from realized hours, checked once per tick.
-- **Circuit breakers**: recipe / lineage / rate / kill — trip auto-pauses + Slack-alerts.
-- **Persisted sentinels**: `.autopilot.dry_run` and `.autopilot.paused` — toggle via CLI without restart. Dry-run still fires on_complete recipes (exercises lineage end-to-end).
-- **On_complete recipes**: bounded recipe lineage (default `on_complete_max_descendants=64`). Day-1 set: `:next_random_in_bounds` / `:refine_around_best` / `:analyze_majorana` (selected by symbol — the short forms are not valid).
-- **Divergence kill**: reap loop watches `_live_status.json`, cancels divergent runs, classifies `:killed_data`. **All three dynamics paths report** — standard, `rotating_basis` and `binary` — through one writer (`_emit_live_status`), so the keys the reaper reads are defined once and cannot drift apart per path. Gated by `test/workflow/test_every_dynamics_path_reports_liveness.jl`, which fails if a new step kind dispatches without it. Two things had to be fixed to make the sentence true: the writer and the reader shared no keys at all until 2026-08-04, and only the standard path was wired until 2026-08-07. Binary liveness is deliberately NOT conditional on `save.psi` — turning snapshots off must not turn the safety off with them.
-- **Failure classification**: `outcome.toml` → `:killed_data` (NaN divergence) or `:killed_bug` (OOM / TIMEOUT / NODE_FAIL). OOM is resource-permanent — retry escalates resource class, not the recipe.
-
-The former autonomous research loop is retired. The queue above is application
-code, not an instruction to start agent orchestration. Optional Codex roles live in
-`.codex/agents/`; invoke them only for a scoped assignment when delegation is authorized.
 
 ## Conventions (do NOT "fix")
 
@@ -387,7 +369,7 @@ Changing these requires evidence about the guarded behavior, not intuition.
   assessing this approximation, not hiding the warning.
 - Tensor channels participate in registry-driven `energy_gradient!`; the old
   "tensor forces an ITP fallback" limitation is retired.
-- TDHFB is a parallel engine with no YAML pipeline integration. Add that integration
+- TDHFB is a parallel engine with no pipeline integration. Add that integration
   only on an explicit request; do not invent a `dynamics.tdhfb` key.
 
 ## Adding common artifacts
@@ -395,12 +377,11 @@ Changing these requires evidence about the guarded behavior, not intuition.
 | Adding… | Where | Enforced by |
 |---|---|---|
 | Hamiltonian term | `src/hamiltonian/terms/<name>/` (faces in `<name>_term.jl`, engine kernels alongside; single-file terms stay `terms/<name>.jl`) + register in `build_h_terms_registry` + `H_TERMS_CANONICAL_ORDER` + a dumb statement slot in `validation/dumb_reference.jl` (set-equivalence meta-test enforces) | Oracle suite (above) + master oracle. |
-| YAML analyzer | `src/workflow/experiments/analyzers/<name>.jl` + dispatch in `_run_analyzer` | Analyzer name = real function, not stub alias. Round-trip `analyze: [{<name>: {}}]` should produce data labelled `<name>` literally. |
+| Pipeline analyzer | `src/workflow/experiments/analyzers/<name>.jl` + dispatch in `_run_analyzer` | Analyzer name = real function, not stub alias. Round-trip `analyze: [{<name>: {}}]` should produce data labelled `<name>` literally. |
 | State init | `src/workflow/initialization/state_zoo.jl` wrapper around `init_psi(state=:..., init_state_params=...)` | Same physics, named API. Don't fork `init_psi`; wrap. |
 | Pipeline step kind | `pipeline/pipeline_types.jl` (struct) + `pipeline/run_step_<kind>.jl` (handler) + branch in `_step_dispatch!` | `_step_dispatch!` branch is the inference firewall — keep `@nospecialize(step)`. |
 | Validation spec | `src/workflow/validation/specs.jl` (struct + `check` method) | Per-observable bounds + `CheckResult`; failed checks must not throw. |
-| BO objective | Closure to `bayesian_optimize_yaml(...; objective=...)` or new `bo_objective_<name>` in `optimization/bayesian_opt_yaml.jl` | Signature: `(result) → Float64`. Keep closures monomorphic in hot loops. |
-| Autopilot recipe | `src/workflow/autopilot/recipes.jl` (on_complete callback) | Bounded by `on_complete_max_descendants`; outcome.toml classification; trust-store records per recipe. |
+| BO objective | Closure to `bayesian_optimize_config(...; objective=...)` or new `bo_objective_<name>` in `optimization/bayesian_opt_config.jl` | Signature: `(result) → Float64`. Keep closures monomorphic in hot loops. |
 | Manuscript figure | `src/manuscript/figures/<paper>_FIG<N>.jl` + register | CLI: `scripts/cli.jl figure --paper <p> --fig <n>`. Emitters: CSV / Python / TikZ. |
 | Atom species | `src/workflow/initialization/atoms.jl` + entry in `ATOM_REGISTRY` | Constraint `c₀ + 36 c₁ = 4π(a_s/a_ho)N` for F=6 — see "¹⁵¹Eu". |
 | Schema key | `src/workflow/experiments/schema/<block>.jl` + `auto_defaults.jl` if it has a sensible default | `inspect_config` should classify malformed values as `:error`/`:warn`, not silently accept. |
@@ -429,7 +410,7 @@ Semantic mismatch is not type-visible — static analysis cannot catch file/func
 
 - **File name = primary export.** `src/foo/bar.jl` defines `bar`, `apply_bar_step!`, `BarLHY`. Rename file in same commit as its primary symbol.
 - **Function name = what the body actually computes.** Renames delete the old name; no `const Old = New` aliases by default; migrate callers in same commit.
-- **YAML analyzer names = real implementations**, not stub aliases. Aliased dispatch through unrelated functions is a silent-bug factory.
+- **Pipeline analyzer names = real implementations**, not stub aliases. Aliased dispatch through unrelated functions is a silent-bug factory.
 - **Backward-compat aliases default to "delete".** Keep one only with load-bearing documented external consumer.
 - **No version suffixes** (`eu_ham_only_24_nonsec`, not `step5_v2`). Name by content.
 
@@ -523,7 +504,7 @@ A sum closing by identity is not an independent budget; show its components.
 ## Cost model + execution discipline
 
 Workspace specialization makes first-call compilation significant. Separate JIT
-from steady-state timing; small YAML runs can spend minutes compiling and F32
+from steady-state timing; small experiment runs can spend minutes compiling and F32
 rotating-basis compilation has historically taken about ten minutes. Investigate
 `Any` or closure escape when inference stalls (see Type stability boundaries).
 

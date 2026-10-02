@@ -1,0 +1,69 @@
+# ─────────────────────────────────────────────────────────────────────
+#  Yan-Li-Saito 2026 PRL Barnett-droplet reproduction — F1 falsifier
+#  Torus magnetic-vortex GS at B=0, free space, F=1 Eu-151 effective.
+#  Target: n_max ≈ 13000 D₀ ±10% (paper Fig 1c).
+#
+#  Reference: arXiv:2605.11670, PRL 136 186502 (Yan-Li-Saito 2026).
+#  Investigation: yan-li-saito-2026-reproduction (priority 1, tier 0.7 → 3).
+#  Design turn: T32 (REDO after T31 phantom-PASS / 1Password signing block).
+#
+#  Atom: Eu151_f1_effective (F=1, a_s=21 a₀, μ=4.5 μ_B, g_F=4.5).
+#    Paper convention: g_F·F = 9/2, effective spin-1 model of Eu-151.
+#    a_dd = μ₀μ²M/(12πħ²) ≈ 25.2 a₀ → ε_dd = a_dd/a_s = 1.2 ✓
+#
+#  Grid: 64³, box 28.0 a_ho per side.
+#    a_ho = √(ħ/(m·ω_ref)) at m=Eu-151 mass, ω_ref=2π·50 rad/s ≈ 1.158 μm.
+#    L₀ = a_s·N ≈ 21·a_0·15000 ≈ 16.67 μm ≈ 14.4 a_ho.
+#    Box 28 a_ho ≈ 2×L₀ — conservative first cut (T33 may expand to 96³/box=40).
+#    dx ≈ 0.44 a_ho (coarser than paper; T33 director decides if ≥10% n_max error seen).
+#
+#  Free space (potential: none) per Q3 CLEAR (T30 §2 Q3).
+#  DDI: full tensor (non-secular) per paper's pseudospectral method.
+#  LHY: scalar mode; auto-derives c_lhy=(128/3√π)(a_s/a_ho)^(3/2)·N·Q5(ε_dd=1.2).
+#  Initial state: fl_vortex (winding=1, θ=π/2) — flux-closure topology per Q5 CLEAR.
+# ─────────────────────────────────────────────────────────────────────
+# lhy: auto-derived via atom_obj + auto_path branch (ε_dd=1.2 > 0.5)
+# initial_state: Gaussian seed (rotating_basis only supports `from_jld2`;
+# fl_vortex topology deferred — see sim/turn_34.md §9 for follow-up work item).
+
+Dict{String, Any}(
+    "defaults" => Dict{String, Any}(
+        "backend" => "gpu",
+        "kind" => "rotating_basis",
+    ),
+    "mixins" => Dict{String, Any}(
+        "yan_li_saito_f1" => Dict{String, Any}(
+            "atom" => "Eu151_f1_effective",
+            "gauge_fix" => false,
+            "grid" => Dict{String, Any}(
+                "box" => [28.0, 28.0, 28.0],
+                "n" => [64, 64, 64],
+            ),
+            "interactions" => Dict{String, Any}(
+                "N_atoms" => 15000,
+                "c1" => 0.0,
+                "omega_ref" => 314.159,
+            ),
+            "potential" => Dict{String, Any}(
+                "omega" => [0.0, 0.0, 0.0],
+                "type" => "harmonic",
+            ),
+        ),
+    ),
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "Bz" => 0.0,
+            ),
+            "ddi" => Dict{String, Any}(
+                "enabled" => true,
+            ),
+            "dt" => 0.005,
+            "init_m_idx" => 1,
+            "init_sigma" => 2.0,
+            "n_steps" => 5000,
+            "tol" => 1.0e-9,
+            "use" => ["yan_li_saito_f1"],
+        ),
+    )],
+)

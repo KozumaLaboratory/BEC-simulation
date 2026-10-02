@@ -5,7 +5,7 @@
 # copy-pasteable command sequence. Pass `--run` to actually execute the
 # stages (rsync up, instantiate, submit, poll, rsync back).
 #
-# All values below are resolved from scripts/spinorbec.env.
+# Cluster paths and runtime settings are declared below.
 
 set -euo pipefail
 

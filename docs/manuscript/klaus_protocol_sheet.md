@@ -329,7 +329,7 @@ that orbital mode by ΔE = −Ω · ℓ; matched chirality (Ω · sign(m_init)
 - spec: `docs/manuscript/klaus_quench_protocol_spec_2026_05_26.md`
 - figures: `docs/manuscript/figures/klaus_quench_fig_k{1..10}.png`
 - data: `runs/klaus_quench/summary.json`
-- run YAMLs: `runs/klaus_quench/*.yaml`  (27 cells across 4 batches)
+- run YAMLs: `runs/klaus_quench/*.experiment.jl`  (27 cells across 4 batches)
 - analysis scripts: `scripts/validation/klaus_quench_{summary,density_slices,mode_extract}.jl`
 - plotters: `scripts/validation/make_klaus_quench_figures.py`,
   `scripts/validation/make_klaus_quench_fig_k10.py`

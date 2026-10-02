@@ -1,8 +1,12 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 using Test
 using SpinorBEC
 using JSON
 using JLD2
-using YAML
 using SpinorBEC: _load_config_data, _config_snapshot_path, write_complete_marker,
     DEALIAS_2_3_ENABLED, DEALIAS_K_CUTOFF
 
@@ -34,7 +38,7 @@ native_probe(; n_steps=3) = PipelineConfig([
         exp = Experiment(cfg; store=CASStore(root))
         path = write_run!(exp)
         @test basename(path) == "config.json"
-        @test !isfile(joinpath(outdir(exp), "config.yaml"))
+        @test !isfile(joinpath(outdir(exp), "config.experiment.jl"))
         @test content_id(_load_config_data(path)) == content_id(cfg.raw_data)
         @test Experiment(path; store=CASStore(root)).outdir == exp.outdir
         @test load_config(path).steps[1] isa GroundStateStep
@@ -55,12 +59,12 @@ native_probe(; n_steps=3) = PipelineConfig([
             @test isfile(joinpath(exp.outdir, "_exit_summary.json"))
             @test basename(exp.outdir) in list_runs(root)
             @test run_status(exp.outdir).completed == 1
-            # Differential oracle: the compatibility reader must reach the
+            # Differential oracle: the Julia file must reach the
             # identical solver with identical inputs, without a second engine.
             legacy_dir = mkpath(joinpath(root, "legacy"))
-            legacy_path = joinpath(legacy_dir, "config.yaml")
-            YAML.write_file(legacy_path, before)
-            run_yaml(legacy_path; verbose=false, audit=false)
+            legacy_path = joinpath(legacy_dir, "config.experiment.jl")
+            _write_julia_fixture(legacy_path, before)
+            run_experiment(legacy_path; run_dir=legacy_dir, verbose=false, audit=false)
             @test JLD2.load(point, "psi") ==
                 JLD2.load(joinpath(legacy_dir, "point_001.jld2"), "psi")
 
@@ -81,10 +85,6 @@ native_probe(; n_steps=3) = PipelineConfig([
             run!(exp; force=true, verbose=false, audit=false)
             @test !haskey(JLD2.load(point), "force_canary")
 
-            qr = QueueRoot(joinpath(root, "queue"))
-            entry = enqueue!(exp; qr, kick_tick=false)
-            @test entry.spec_path == path
-            @test _load_config_data(entry.spec_path) == exp.spec
             @test isempty(store_census(root).stale_key)
             changed = JSON.parsefile(path; use_mmap=false)
             changed["spec"]["pipeline"][1]["ground_state"]["n_steps"] += 1
@@ -109,5 +109,40 @@ native_probe(; n_steps=3) = PipelineConfig([
             @test (DEALIAS_2_3_ENABLED[], DEALIAS_K_CUTOFF[]) == old
             @test ENV["SPINORBEC_CONFIG_DIR"] == "native-scope-canary"
         end
+    end
+end
+
+@testset "Julia-only experiment definitions" begin
+    @test !isdefined(SpinorBEC, :run_yaml)
+    @test !isdefined(SpinorBEC, :run_yaml_calibrated)
+    @test !isdefined(SpinorBEC, :read_model_toml)
+    @test !isdefined(SpinorBEC, :model_from_toml)
+    @test !isdefined(SpinorBEC, :YAML)
+    mktempdir() do dir
+        for extension in ("yaml", "yml", "toml")
+            path = joinpath(dir, "experiment.$extension")
+            write(path, "error(\"must not execute\")")
+            @test_throws ArgumentError load_config(path)
+            @test_throws ArgumentError run_experiment(path; dry_run=true, verbose=false)
+            @test_throws ArgumentError Experiment(path)
+            @test_throws ArgumentError inspect_config(path)
+        end
+        # Relative includes and ordinary Julia functions are the sharing mechanism.
+        write(joinpath(dir, "parameters.jl"), "grid_size() = 8")
+        path = joinpath(dir, "probe.experiment.jl")
+        write(
+            path,
+            """
+include("parameters.jl")
+PipelineConfig([GroundStateStep(atom=:Rb87,
+    grid=(n=[grid_size()], box=[8.0]), n_steps=3)])
+""",
+        )
+        @test load_config(path).steps[1].params["grid"]["n"] == [8]
+        @test compute_run_dir(path; base_dir=dir) ==
+            joinpath(dir, content_id(SpinorBEC._load_config_data(path)))
+        # An unsupported extension must not revive through snapshot discovery.
+        write(joinpath(dir, "config.yaml"), "pipeline: []")
+        @test SpinorBEC._config_snapshot_path(dir) == joinpath(dir, "config.json")
     end
 end

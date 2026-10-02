@@ -153,9 +153,9 @@ Quantum noise partially smears the **angular** structure (on-axis hole becomes f
 # All five mode results auto-saved into the same `point_001.jld2`
 # layout; swap `spinor_lhy:` value in the config and re-run.
 cd runs/eu151_edh_postfix_local
-sed -i 's/^      spinor_lhy:.*/      spinor_lhy:    polar_contact/' config.yaml
+sed -i 's/^      spinor_lhy:.*/      spinor_lhy:    polar_contact/' config.experiment.jl
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=. -e \
-    'using SpinorBEC, CUDA; run_yaml("runs/eu151_edh_postfix_local/config.yaml")'
+    'using SpinorBEC, CUDA; run_experiment("runs/eu151_edh_postfix_local/config.experiment.jl")'
 ```
 
 ## See also

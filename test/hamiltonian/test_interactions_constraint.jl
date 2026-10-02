@@ -81,23 +81,33 @@ using SpinorBEC
 
     @testset "YAML c_total/c1_ratio parsing" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c_total: 4689.0
-                c1_ratio: 0.02778
-              ddi:
-                enabled: true
-                c_dd: 211.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "ddi" => Dict{String, Any}(
+                "c_dd" => 211.0,
+                "enabled" => true,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c1_ratio" => 0.02778,
+                "c_total" => 4689.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         p = config.steps[1].params
         @test p["interactions"]["c_total"] == 4689.0
@@ -107,19 +117,28 @@ using SpinorBEC
 
     @testset "YAML c_total with c1_ratio=0" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c_total: 4689.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c_total" => 4689.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         p = config.steps[1].params
         @test p["interactions"]["c_total"] == 4689.0
@@ -217,22 +236,31 @@ using SpinorBEC
 
     @testset "YAML c_total with c_extra" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Eu151
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c_total: 4689.0
-                c1_ratio: 0.02778
-                c4: 50.0
-                c6: -20.0
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Eu151",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c1_ratio" => 0.02778,
+                "c4" => 50.0,
+                "c6" => -20.0,
+                "c_total" => 4689.0,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         p = config.steps[1].params
         @test p["interactions"]["c_total"] == 4689.0
@@ -249,20 +277,29 @@ using SpinorBEC
 
     @testset "YAML explicit c0/c1 still works" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [32]
-                box: [10.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0],
+                "n" => [32],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
         config = load_config_from_string(yaml_str)
         p = config.steps[1].params
         @test p["interactions"]["c0"] == 10.0

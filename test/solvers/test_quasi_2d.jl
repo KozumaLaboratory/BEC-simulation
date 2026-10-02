@@ -4,27 +4,37 @@ using SpinorBEC
 @testset "Quasi-2D dimensional reduction" begin
     @testset "parsing quasi_2d + l_z in pipeline" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              quasi_2d: true
-              l_z: 1.5
-              grid:
-                n: [16, 16]
-                box: [10.0, 10.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              ddi:
-                enabled: true
-                c_dd: 1.0
-                quasi_2d: true
-                l_z: 1.5
-              dt: 0.01
-              n_steps: 10
-              tol: 1e-4
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "atom" => "Rb87",
+            "ddi" => Dict{String, Any}(
+                "c_dd" => 1.0,
+                "enabled" => true,
+                "l_z" => 1.5,
+                "quasi_2d" => true,
+            ),
+            "dt" => 0.01,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0, 10.0],
+                "n" => [16, 16],
+            ),
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "l_z" => 1.5,
+            "n_steps" => 10,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "quasi_2d" => true,
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         @test config isa PipelineConfig
@@ -37,24 +47,34 @@ using SpinorBEC
 
     @testset "end-to-end: run_pipeline ground_state 2D" begin
         yaml_str = """
-        pipeline:
-          - ground_state:
-              atom: Rb87
-              grid:
-                n: [16, 16]
-                box: [10.0, 10.0]
-              interactions:
-                c0: 10.0
-                c1: -0.5
-              dt: 0.005
-              n_steps: 100
-              tol: 1.0e-4
-              initial_state: polar
-              B:
-                p: 0.0
-                q: 0.0
-              potential: {type: harmonic, omega: [1.0, 1.0]}
-        """
+Dict{String, Any}(
+    "pipeline" => [Dict{String, Any}(
+        "ground_state" => Dict{String, Any}(
+            "B" => Dict{String, Any}(
+                "p" => 0.0,
+                "q" => 0.0,
+            ),
+            "atom" => "Rb87",
+            "dt" => 0.005,
+            "grid" => Dict{String, Any}(
+                "box" => [10.0, 10.0],
+                "n" => [16, 16],
+            ),
+            "initial_state" => "polar",
+            "interactions" => Dict{String, Any}(
+                "c0" => 10.0,
+                "c1" => -0.5,
+            ),
+            "n_steps" => 100,
+            "potential" => Dict{String, Any}(
+                "omega" => [1.0, 1.0],
+                "type" => "harmonic",
+            ),
+            "tol" => 0.0001,
+        ),
+    )],
+)
+"""
 
         config = load_config_from_string(yaml_str)
         result = run_pipeline(config; verbose=false)

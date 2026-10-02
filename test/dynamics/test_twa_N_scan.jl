@@ -8,10 +8,10 @@ using JLD2
 # *analysis pipeline* against pre-computed `runs/twa_N_scan/N{N}/result.jld2`
 # ensembles when they exist, and skips otherwise. The expensive runs are
 # kicked off by REPL composition outside the test suite:
-#   for cfg in ("runs/twa_N_scan/N1000.yaml",
-#               "runs/twa_N_scan/N10000.yaml",
-#               "runs/twa_N_scan/N100000.yaml")
-#       isfile(replace(cfg, ".yaml" => "/result.jld2")) || run_yaml(cfg)
+#   for cfg in ("runs/twa_N_scan/N1000.experiment.jl",
+#               "runs/twa_N_scan/N10000.experiment.jl",
+#               "runs/twa_N_scan/N100000.experiment.jl")
+#       isfile(replace(cfg, ".experiment.jl" => "/result.jld2")) || run_experiment(cfg)
 #   end
 #
 # What is tested when results are present:
@@ -27,8 +27,8 @@ const _DETERMINISTIC = joinpath(@__DIR__, "..", "..", "runs", "eu151_edh_postfix
     ".archive_baseline", "point_001.jld2")
 const _N_VALUES = (1000, 10000, 100000)
 
-# `run_yaml` resolves outputs to `runs/<basename>_<hash>/result.jld2`. The
-# N-scan configs live at `runs/twa_N_scan/N{N}.yaml`, so results land at
+# `run_experiment` resolves outputs to `runs/<basename>_<hash>/result.jld2`. The
+# N-scan configs live at `runs/twa_N_scan/N{N}.experiment.jl`, so results land at
 # `runs/N{N}_<hash>/`. Discover the freshest match per N.
 function _resolve_result(N::Integer)
     isdir(_RUNS_ROOT) || return nothing
@@ -86,7 +86,7 @@ end
     if isempty(available) || !isfile(_DETERMINISTIC)
         @info("Skipping TWA N scan tests: no ensemble JLD2 available yet",
             runs_root=_RUNS_ROOT, deterministic=_DETERMINISTIC)
-        @test_skip "ensemble outputs not present (REPL: `run_yaml(\"runs/twa_N_scan/N1000.yaml\")` etc.)"
+        @test_skip "ensemble outputs not present (REPL: `run_experiment(\"runs/twa_N_scan/N1000.experiment.jl\")` etc.)"
         return nothing
     end
 

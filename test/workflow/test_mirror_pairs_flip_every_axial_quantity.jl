@@ -25,7 +25,7 @@
 # every file and still break a relationship spanning two of them. The fix is to
 # make the relationship a declaration the machine can read:
 #
-#     # mirror-pair: <other-file>.yaml
+#     # mirror-pair: <other-file>.experiment.jl
 #
 # in the header of BOTH files. This test then checks the physics of the mirror.
 #
@@ -39,16 +39,15 @@
 
 using SpinorBEC
 using Test
-using YAML
 
 const _RUNS = normpath(joinpath(@__DIR__, "..", "..", "runs"))
-const _DECL = r"^#\s*mirror-pair:\s*(\S+\.yaml)\s*$"m
+const _DECL = r"^#\s*mirror-pair:\s*(\S+\.experiment.jl)\s*$"m
 
 """Every `(file, partner)` declared by a `# mirror-pair:` header line."""
 function _declared_pairs(root)
     out = Tuple{String, String}[]
     for (dir, _, files) in walkdir(root), f in files
-        endswith(f, ".yaml") || continue
+        endswith(f, ".experiment.jl") || continue
         path = joinpath(dir, f)
         for m in eachmatch(_DECL, read(path, String))
             push!(out, (path, joinpath(dir, m.captures[1])))
@@ -59,7 +58,7 @@ end
 
 """`(seed, omega, bz)` of the ground_state step and the LAST dynamics step."""
 function _axial_signature(path)
-    data = YAML.load_file(path)
+    data = SpinorBEC._load_config_data(path)
     gs = nothing
     omega = nothing
     for step in data["pipeline"]

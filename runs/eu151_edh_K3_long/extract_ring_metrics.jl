@@ -31,7 +31,7 @@ const RESULT = joinpath(RUN_DIR, "result.jld2")
 const CSV_OUT = joinpath(RUN_DIR, "spatial_profiles.csv")
 const JSON_OUT = joinpath(RUN_DIR, "ring_summary.json")
 
-# Physical constants from config.yaml
+# Physical constants from config.experiment.jl
 const OMEGA_REF_HZ = 691.15           # rad/s, = 2*pi*110 Hz
 const BOX = 20.0                       # a_ho
 const NX = 32

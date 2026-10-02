@@ -137,7 +137,7 @@ type = "A"
 scope = "General. Instantiated here for the klaus_quench pair; the same rule caught #338 (Barnett), where the missing partner was B_y rather than B_z."
 uncertainty = "Not a measured quantity. The measured consequence — the repaired pair agrees to < 1e-5 — is claim `edh-mirror-pair-repaired`."
 uncertainty_basis = "none"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.experiment.jl", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -153,7 +153,7 @@ type = "A"
 scope = "32³, CPU, one seed, `lhy: none`, the two `*_keeprot*` arms only."
 uncertainty = "< 1e-5 relative between the two arms (G4). Bounded by the comparison itself, not by a fit."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.experiment.jl", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -170,7 +170,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, one hold duration, ¹⁵¹Eu F=6 klaus_quench protocol. Stated as a relative orientation, never as an m label — `m = +F` means the opposite thing at the opposite field sign, which is the error that produced #343."
 uncertainty = "The DIRECTION is far outside any plausible scatter: ×2.2 in peak P_adj and +16.5 % vs -0.45 % in rotation contrast, against a seed floor of 0.000 % over 5 live seeds. The VALUES are not converged — grid systematic +2.47 % (G3), one seed, one duration."
 uncertainty_basis = "control"
-evidence = ["§3.2 four arms (klaus_quench_om0p0.yaml, klaus_quench_omm0p5_keeprot.yaml)", "§3.6 three arms E/F/G"]
+evidence = ["§3.2 four arms (klaus_quench_om0p0.experiment.jl, klaus_quench_omm0p5_keeprot.experiment.jl)", "§3.6 three arms E/F/G"]
 evidence_status = "partial"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -189,7 +189,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, B_z = +0.01 G, m = -F, Ω ∈ {0, -0.5}."
 uncertainty = "-0.45 % against a dt/2 reproducibility floor of 0.029 % and a seed floor of 0.000 %; the sign is resolved, the magnitude is at the level of the grid systematic (2.5 %) and should not be quoted as a number."
 uncertainty_basis = "dt"
-evidence = ["runs/klaus_quench/klaus_quench_om0p0.yaml", "runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_om0p0.experiment.jl", "runs/klaus_quench/klaus_quench_omm0p5_keeprot.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -228,7 +228,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, hold-only + 2 ms delay, ANTI-ALIGNED preparation, 20 Ω cells."
 uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = -2.70, fit rms 4.7e-3. Separately, the OBSERVABLE carries a +2.47 % one-signed grid systematic (32³→64³); that does not move the vertex but does bound any absolute P_adj quoted with it."
 uncertainty_basis = "fit"
-evidence = ["runs/klaus_quench/klaus_quench_om*_holdonly_delay2ms_refine.yaml (20 cells)"]
+evidence = ["runs/klaus_quench/klaus_quench_om*_holdonly_delay2ms_refine.experiment.jl (20 cells)"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -272,12 +272,12 @@ scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, |Ω| ∈ {0.1, 
 uncertainty = "0.071 / 0.113 / 0.124 % at |Ω| = 0.1 / 0.3 / 0.5, against a dt/2 reproducibility floor of 0.029 %. The residual asymmetry is ~4× the floor, i.e. small but resolved — it is not exactly zero."
 uncertainty_basis = "dt"
 evidence = [
-    "runs/klaus_quench/klaus_quench_omm0p1_holdonly_delay2ms_refine.yaml",
-    "runs/klaus_quench/klaus_quench_omm0p3_holdonly_delay2ms_refine.yaml",
-    "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay2ms_refine.yaml",
-    "runs/klaus_quench/klaus_quench_omp0p1_holdonly_delay2ms_refine.yaml",
-    "runs/klaus_quench/klaus_quench_omp0p3_holdonly_delay2ms_refine.yaml",
-    "runs/klaus_quench/klaus_quench_omp0p5_holdonly_delay2ms_refine.yaml",
+    "runs/klaus_quench/klaus_quench_omm0p1_holdonly_delay2ms_refine.experiment.jl",
+    "runs/klaus_quench/klaus_quench_omm0p3_holdonly_delay2ms_refine.experiment.jl",
+    "runs/klaus_quench/klaus_quench_omm0p5_holdonly_delay2ms_refine.experiment.jl",
+    "runs/klaus_quench/klaus_quench_omp0p1_holdonly_delay2ms_refine.experiment.jl",
+    "runs/klaus_quench/klaus_quench_omp0p3_holdonly_delay2ms_refine.experiment.jl",
+    "runs/klaus_quench/klaus_quench_omp0p5_holdonly_delay2ms_refine.experiment.jl",
 ]
 evidence_status = "in_tree"
 commit = "b2d746cc"
@@ -440,7 +440,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 5.2 nT, four ω_eff points (0.550 / 0.650 / 0.770 / 1.000) at each of two hold durations."
 uncertainty = "The INVERSION is far outside any floor: 0.48791 → 0.62804 at ω_eff = 0.650 while 0.51387 → 0.59152 at 0.550, against a dt/2 floor of 0.029 % and a seed floor of 0.000 %. The 16 ms VALUES are not converged either — three of the four still peak at the last streamed frame (53/53), only ω_eff = 1.000 resolves (50/53). So this row bounds what is NOT true and deliberately quotes no optimum."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/manifest_hold2x.txt", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff0p550_B5p2nT_hold2p0x.yaml"]
+evidence = ["runs/klaus_quench_weff/manifest_hold2x.txt", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p550_B5p2nT_hold2p0x.experiment.jl"]
 evidence_status = "in_tree"
 commit = "c5ac5e67"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -473,7 +473,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 10.4 nT. 20 points at 8 ms, two of them repeated at 16 ms."
 uncertainty = "WRONG OBSERVABLE. The peak was taken over the WHOLE trajectory; at 10.4 nT that reads the pre-hold transient, which §12.1 had established a day earlier. The `flat baseline at 0.27574` is the transient, not a saturated cascade. Read in the hold the baseline is 0.20139 and the enhancement is +49.5 %."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_hold2p0x.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.experiment.jl", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT_hold2p0x.experiment.jl"]
 evidence_status = "in_tree"
 commit = "c5ac5e67"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -551,7 +551,7 @@ type = "A"
 scope = "klaus_quench protocol, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT. Confirmed one-signed at 5.2 nT too (+2.15 %, +2.54 %)."
 uncertainty = "The residual is the uncertainty: ±2.5 % is the floor on any absolute observable quoted from a 32³ arm in this family. It dwarfs the seed (0.000 %) and dt/2 (0.029 %) floors."
 uncertainty_basis = "grid"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml", "runs/klaus_quench/klaus_quench_om0p0_n64.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.experiment.jl", "runs/klaus_quench/klaus_quench_om0p0_n64.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -588,7 +588,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, 2.6 nT, N = 5×10⁴."
 uncertainty = "P_exc measured at 0.81531 vs 0.81613, i.e. -0.10 % — resolved against the 0.029 % dt/2 floor and therefore a genuine null rather than an unresolved one. P_adj +6.4 % (0.36119 vs 0.33956) carries the 2.5 % grid systematic."
 uncertainty_basis = "dt"
-evidence = ["runs/klaus_quench/klaus_quench_om0p0_N50k.yaml", "runs/klaus_quench/klaus_quench_omm0p5_keeprot_N50k.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_om0p0_N50k.experiment.jl", "runs/klaus_quench/klaus_quench_omm0p5_keeprot_N50k.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -652,13 +652,13 @@ note = """CLOSED 2026-08-20 by annotation, not by moving the file. The archive r
 
 [[claim]]
 id = "edh-phi-phys-config-anti-alignment"
-claim = "`runs/eu151_klaus_phi_phys/config.yaml` needed `init_m_idx: 13` at p > 0 to be anti-aligned. It has it."
+claim = "`runs/eu151_klaus_phi_phys/config.experiment.jl` needed `init_m_idx: 13` at p > 0 to be anti-aligned. It has it."
 status = "closed"
 type = "A"
 scope = "One config. `init_m_idx: 1` there is the schema default at p > 0 (`run_step_rotating/ground_state.jl:162`), so nothing was ever chosen."
 uncertainty = "unbounded: not measured. The sign bookkeeping is determinate; the consequence for that scan's results is not, because it has no quoted result."
 uncertainty_basis = "none"
-evidence = ["runs/eu151_klaus_phi_phys/config.yaml"]
+evidence = ["runs/eu151_klaus_phi_phys/config.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -740,17 +740,17 @@ THE PEAK COLUMN OF THAT RUN IS NOT QUOTABLE AND THE ARGMAX SAYS WHY. With the wi
 
 NOT LAUNCHED because it is ~5.2 points of a 19.24 group balance (~27 %) with another session spending concurrently, and this is a secondary row — the peak ordering it might be confused with is already established and unaffected. anko made that call; the numbers are in the README so the next person does not re-derive the decision.
 
-Two API facts were established the expensive way and are recorded so the next author does not invent them again: `cli.jl launch` takes `[<batch>] <run_name>` and has NO `--smoke`, and `run_yaml` has NO point selection. The second is why this is 20 single-arm configs rather than 3 seed-scans — a `scan:` cannot be split across array tasks."""
+Two API facts were established the expensive way and are recorded so the next author does not invent them again: `cli.jl launch` takes `[<batch>] <run_name>` and has NO `--smoke`, and `run_experiment` has NO point selection. The second is why this is 20 single-arm configs rather than 3 seed-scans — a `scan:` cannot be split across array tasks."""
 
 [[claim]]
 id = "edh-phi-phys-anti-aligned-needs-field-reversal"
 claim = "The anti-aligned preparation cannot be produced by ITP on the fast-Larmor rotating-basis path: at p = 26700 the Zeeman-shifted factor for the highest m is exp(-12·p·dt) = exp(-1602), which underflows in ONE step and returns ψ identically zero. It needs the state relaxed at the OPPOSITE field sign and the field reversed for the dynamics — a pipeline change, not a config key."
 status = "live"
 type = "A"
-scope = "`runs/eu151_klaus_phi_phys/config.yaml`, p = 26700, dt = 0.005, F = 6. Quantitative, so it does NOT generalise: the klaus_quench spinor corpus has p ≈ 148, per-step factor exp(-8.9), renormalised every step and never underflowing."
+scope = "`runs/eu151_klaus_phi_phys/config.experiment.jl`, p = 26700, dt = 0.005, F = 6. Quantitative, so it does NOT generalise: the klaus_quench spinor corpus has p ≈ 148, per-step factor exp(-8.9), renormalised every step and never underflowing."
 uncertainty = "Four control arms — init_m_idx in {1, 13} x ITP in {100, 1500} — separate the candidate causes: both init_m_idx=13 arms give 0 of 212992 non-zero entries and ‖ψ‖² = 0.0, both init_m_idx=1 arms give ‖ψ‖² = 4.096 and E = -160177.6. The seed, not the ITP length, is what decides it."
 uncertainty_basis = "control"
-evidence = ["runs/eu151_klaus_phi_phys/config.yaml", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl"]
+evidence = ["runs/eu151_klaus_phi_phys/config.experiment.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl"]
 evidence_status = "in_tree"
 commit = "e11b0291"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -768,7 +768,7 @@ type = "A"
 scope = "The `rotating_basis` ground_state step. Gated at F=1 on an 8³ grid; the mechanism is the sign of one Zeeman coefficient and does not depend on F. RUN AT PRODUCTION SCALE 2026-08-22 (#423): all 8 `phi.rate` points of `runs/eu151_klaus_phi_phys` at 32×32×16, F=6, D=13, DDI + LHY scalar, TSUBAME job 8461716, 82 min, rc=0 — every point `converged = true`, `energy = −160177.72` finite, and `mz_actual = −6.0000` on all eight, i.e. the runtime anti-aligned assertion held across the whole scan."
 uncertainty = "Directional, not numeric: an ALIGNED control arm in the same field comes out with sign(⟨F_z⟩) = +sign(p) and the anti-aligned arm with -sign(p), at both signs of p, each stretched to |⟨F_z⟩| = F within 0.05. A single arm could not tell the preparation from the sign convention assumed while reading it."
 uncertainty_basis = "control"
-evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.yaml"]
+evidence = ["test/rotating_basis/test_anti_aligned_preparation.jl", "src/workflow/experiments/pipeline/run_step_rotating/ground_state.jl", "runs/eu151_klaus_phi_phys/config.experiment.jl"]
 evidence_status = "in_tree"
 commit = "0"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1073,7 +1073,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, B = 10.4 nT, 10 arms. **Peak over hold frames 34-42**, and the row is scoped to that window because the number depends on it — see `edh-104nt-observable-not-window-robust`."
 uncertainty = "WINDOW-DEPENDENT, and that dominates everything else: the same arms give a baseline of 0.27574 over hold frames 32-42 and 0.20139 over 34-42, a 37 % difference, both being `the peak in the hold`. 0.30101 at ω_eff = 0.650 against 0.20139 at 1.000 on the 34-42 window. Absolute transfer is roughly half the 2.6 nT value (0.66), which is Zeeman re-pinning costing a factor 2 — real, but it does not close the channel. Grid unbounded: no 64³ arm at this field. Hold duration also unbounded at the corrected observable."
 uncertainty_basis = "grid"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "97ec124e"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1299,7 +1299,7 @@ REFUTED 2026-08-26, next sentence only - see `store-byte-only-duplicate-pair-on-
 566-config count stands; the ON-DISK example does not, and the two are different corpora.
 One pair has materialised on disk as two run directories -
 `matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529e3a77/`. Those two RAN different
-physics (`B.Bz` = -0.01 vs +0.01 Gauss in each directory's own config.yaml, each of which still
+physics (`B.Bz` = -0.01 vs +0.01 Gauss in each directory's own config.experiment.jl, each of which still
 hashes to its own directory name); the committed copies agree only because `bce2068f` edited one
 of them afterwards. So unifying on the
 `Experiment` (canonical-spec) path is a real but small win, and was NOT the dominant term."""
@@ -1439,7 +1439,7 @@ lifecycle = "registered"
 ladder = "exact: a census of every run directory under the store, not a limit. Positive control: `defaults.backend` must classify as execution and `pipeline[1].ground_state.B.Bz` as physics, both asserted in test/workflow/test_store_census.jl; a classifier collapsing them would reproduce the estimate this replaces."
 type = "A"
 scope = "The 240 run directories under the main checkout's `runs/` as of 2026-08-26 (a git worktree does not share them). About DIRECTORIES on disk. The 566 committed YAML configs are a different corpus and the 3.2 % byte-only figure measured over THEM is untouched."
-uncertainty = "Exact counts. Each duplicate group is diffed by `diff_dicts` on the two directories' own config.yaml and reported as the SET OF DOTTED PATHS that differ, so the classification is auditable path by path rather than being a bucket total. The one soft edge is the knob taxonomy: an unrecognised key falls to `physics`, which can only OVERSTATE cause (a), and every path is printed."
+uncertainty = "Exact counts. Each duplicate group is diffed by `diff_dicts` on the two directories' own config.experiment.jl and reported as the SET OF DOTTED PATHS that differ, so the classification is auditable path by path rather than being a bucket total. The one soft edge is the knob taxonomy: an unrecognised key falls to `physics`, which can only OVERSTATE cause (a), and every path is printed."
 uncertainty_basis = "control"
 evidence = ["src/workflow/io/store_census.jl", "test/workflow/test_store_census.jl"]
 evidence_status = "in_tree"
@@ -1450,7 +1450,7 @@ pr = 0
 note = """THIS IS THE QUESTION #478 PRE-REGISTERED AND #482 COULD NOT REACH. #482 said so: the store
 predates the current 16-hex naming, so a directory cannot be reverse-mapped to its source YAML,
 and it reported the CEILING (34 basenames / 77 dirs, 35 %) with an estimate that most of it was
-cause (a). The reverse map is not needed - every run directory carries its own config.yaml, so
+cause (a). The reverse map is not needed - every run directory carries its own config.experiment.jl, so
 two directories sharing a basename can be diffed directly.
 
 A FOURTH CAUSE, which the pre-registration did not have and which is 42 % of the tail. The ten
@@ -1472,10 +1472,10 @@ claim = "RETRACTED: `matsui_edh_baseline_9ca97308/` and `matsui_edh_baseline_529
 status = "refuted"
 retired_literal = ["One pair has materialised on disk as two run directories"]
 replacement_literal = ["-0.01 vs +0.01 Gauss", "bce2068f"]
-retraction_evidence = """artifact, committed config -> the config in the run directory. Each directory's own config.yaml still hashes to its own name (9ca973088b1743d9, 529e3a77181ea7ae), and those two files carry Bz = -0.01 Gauss and Bz = +0.01 Gauss - a sign flip on the field, i.e. cause (a). The committed copies agree because `bce2068f` ("211 Eu configs pinned m=-F under a field that prefers m=+F") edited one of them afterwards, and the edited copy now hashes to 89b5ed0b rather than 9ca97308. The original measurement grouped COMMITTED configs and the conclusion was stated about RUN DIRECTORIES."""
+retraction_evidence = """artifact, committed config -> the config in the run directory. Each directory's own config.experiment.jl still hashes to its own name (9ca973088b1743d9, 529e3a77181ea7ae), and those two files carry Bz = -0.01 Gauss and Bz = +0.01 Gauss - a sign flip on the field, i.e. cause (a). The committed copies agree because `bce2068f` ("211 Eu configs pinned m=-F under a field that prefers m=+F") edited one of them afterwards, and the edited copy now hashes to 89b5ed0b rather than 9ca97308. The original measurement grouped COMMITTED configs and the conclusion was stated about RUN DIRECTORIES."""
 type = "A"
 scope = "This one pair, and with it the inference from committed-config canonical identity to on-disk duplication. Binds the note of `stored-runs-corpus-is-written-off` and PR #482's reflection table. It does NOT bind the 3.2 % figure over the 566 committed configs, which is a statement about that corpus and stands."
-uncertainty = "The refutation is exact and reproducible in two lines: `diff` the two directories' config.yaml, and sha256 each against its own directory suffix. Both are shown by `store_census`'s `stale_key` field. What is NOT bounded is how much of the 3.2 % is manufactured the same way - a post-hoc edit can create canonical identity between configs that ran different physics, and only 2 of the store's 219 keyed directories have a committed config at all, so the question cannot be answered from the tree."
+uncertainty = "The refutation is exact and reproducible in two lines: `diff` the two directories' config.experiment.jl, and sha256 each against its own directory suffix. Both are shown by `store_census`'s `stale_key` field. What is NOT bounded is how much of the 3.2 % is manufactured the same way - a post-hoc edit can create canonical identity between configs that ran different physics, and only 2 of the store's 219 keyed directories have a committed config at all, so the question cannot be answered from the tree."
 uncertainty_basis = "control"
 evidence = ["src/workflow/io/store_census.jl", "test/workflow/test_store_census.jl"]
 evidence_status = "in_tree"
@@ -1495,7 +1495,7 @@ the store pass it; the one committed copy that fails is the one this row is abou
 
 [[claim]]
 id = "store-configs-still-hash-to-their-own-directories"
-claim = "Every keyed run directory in the store still holds the config that produced it: 219 of 219 config.yaml files hash to their own directory suffix, 0 mismatches."
+claim = "Every keyed run directory in the store still holds the config that produced it: 219 of 219 config.experiment.jl files hash to their own directory suffix, 0 mismatches."
 status = "live"
 lifecycle = "registered"
 ladder = "exact: an equality check on 219 files, not a limit. The check carries its own two-sided control in one pass - the 219 passes are the negative control and the one failing committed copy (matsui_edh_baseline_9ca97308 -> 89b5ed0b) is the positive control, so a scan that could not look is not able to report 0."
@@ -1530,7 +1530,7 @@ type = "A"
 scope = "Wall-time artifacts anywhere under /home/suzume/workspace on 2026-08-26 (four roots: tsubame_pull, BEC-simulation-campaign/runs, runs_archive, one worktree), the 240 run directories under the main checkout's `runs/`, and the 41 commits touching `docs/campaign/claims.toml` (19 on first-parent). About RECORDABILITY, not about efficiency: it says over which period the ratio can be computed, not that compute was well or badly spent. TSUBAME-side files not pulled back are outside it."
 uncertainty = "The denominator is exact given its own definition, and the definition is the soft edge: `advanced` = entering `live`/`scoped`/`refuted`/`superseded`/`closed` either new or from `open`/`suggested`, excluding restatements within the advanced set. The numerator is exact where it exists (11 of 11 files carry a value) and `unbounded: not recorded` for everything before 2026-05-28, which must not be read as small - it is absent. 1.20 h is a floor on this host, not a total: files never rsynced off the cluster are not counted, and `qacct` is authoritative for the UGE half and lives outside the tree."
 uncertainty_basis = "control"
-evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl", "src/workflow/autopilot/budget.jl"]
+evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/fix_list.toml"
@@ -1546,7 +1546,7 @@ the fix. The per-row `commit` field is not an alternative route: it is `"unknown
 AND ONE ON THE NUMERATOR, WHICH THIS ROW MADE AND CAUGHT BEFORE MERGING. The first version said "no
 artifact in the tree records wall time" on the strength of 0 `_exit_summary.json` under `runs/`, and
 explained it with a mechanism - "written only on the autopilot path" - that is not what the code does:
-`run_yaml` passes `live_status_path` at run_registry.jl:663 and :923, so every `run_yaml` run should
+`run_experiment` passes `live_status_path` at run_registry.jl:663 and :923, so every `run_experiment` run should
 write one. The contradiction was visible in the same scan and was not looked at: 194 `_live_status.json`
 in `runs/` beside 0 exit summaries. A host-wide search found 11 exit summaries in four OTHER roots,
 all with numeric values. The real mechanism is vintage - `_write_exit_summary` landed in `0d640402`
@@ -1660,7 +1660,7 @@ type = "A"
 scope = "B = 10.4 nT only. At 1.3 / 2.6 / 5.2 nT the whole-trajectory and in-hold peaks are identical on all 43 arms (§12.1), so the observable is well-posed there and every claim at those fields stands."
 uncertainty = "MEASURED, not argued. The hold boundary is frames 32-42: prep 13 + quench 13 + pre-delay 5 = 31 frames by construction, and the spread across 20 arms differing ONLY in the hold trap is exactly 0.000000 at frames 30-31 and 0.000213 at frame 32 — a zero-to-nonzero transition at the predicted boundary, which fixes the geometry independently. But 0.000213 across a 3× change in radial trap frequency means the trap has not yet acted at frame 32, so the maximum there is the transient's tail. Baseline: 0.27574 over 32-42, 0.20139 over 34-42."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1684,7 +1684,7 @@ type = "A"
 scope = "B = 10.4 nT, 20 arms at the 8 ms hold. Not a statement about 1.3 / 2.6 / 5.2 nT, where §12.1 measured the whole-trajectory and in-hold peaks identical on all 43 arms."
 uncertainty = "Counts, not estimates: 16 arms with argmax at frame 32 (the set of argmax frames over those 16 is exactly {32}), 4 with argmax at 42. Rank correlation between `peak` and `mean` is -0.507 over all 20, -0.797 over the 16 edge arms, and -0.400 over the 4 interior ones — the last on n = 4, which is one rank swap and decides nothing."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1717,7 +1717,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned. Readings: peak-in-hold, mean-over-hold, hold endpoint. All from cache, no recompute."
 uncertainty = "argmax by reading — 5.2 nT: 0.550 (peak at the 8 ms hold), 0.650 (peak over all arms), 0.750 (mean); 10.4 nT: 0.650 (peak, mean, final agree) against 0.350 for the mean over the 20-arm scan, which is the LOWER EDGE of the sampled range. A boundary argmax is not an optimum — it says the range does not contain one."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p750_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p750_B5p2nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1740,7 +1740,7 @@ type = "A"
 scope = "The 20-arm 8 ms scan over ω_eff ∈ [0.350, 1.000] at 10.4 nT."
 uncertainty = "A boundary argmax carries no interval — the optimum is somewhere below 0.350 or there is none. The shape between 0.500 and 0.650 is nearly flat (+1.97 % to +2.78 %), so the rise toward the edge is the only structure with any amplitude."
 uncertainty_basis = "grid"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p350_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1770,7 +1770,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, hold-only + 2 ms delay, 20 Ω cells. Whole-trajectory and in-hold peaks are IDENTICAL at this field (§12.1, measured on all 16 arms), so the reading is not in question here as it is at 10.4 nT."
 uncertainty = "±0.04 on the vertex from a 5-point parabolic fit over |Ω| ∈ [0.58, 0.80], c₂ = −2.70, fit rms 4.7e-3. Criteria C1-C4 fixed before launch: interior maximum required, > 5 % enhancement, ≥5-point fit with negative curvature and interior vertex, digits limited by the fit."
 uncertainty_basis = "fit"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p7_holdonly_delay2ms_refine.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p7_holdonly_delay2ms_refine.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1870,7 +1870,7 @@ type = "A"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, the two `*_keeprot*` arms. Acceptance gate G4."
 uncertainty = "< 1e-5 relative, i.e. below the dt/2 reproducibility floor of 0.029 % by three orders. Bounded by the comparison itself; there is no fit."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.yaml", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot.experiment.jl", "runs/klaus_quench/klaus_quench_omp0p5_keeprot_mirror.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1887,7 +1887,7 @@ type = "A"
 scope = "klaus_quench protocol, CPU, 8 ms hold. A cost model, not physics."
 uncertainty = "unbounded: two timings, one core, no repetition — nothing here bounds the ratio. It is an order-of-magnitude planning number, and the gate refusing the first wording is the point: `two timings and no repetition` reads like a bound and is not one."
 uncertainty_basis = "none"
-evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.yaml"]
+evidence = ["runs/klaus_quench/klaus_quench_omm0p5_keeprot_n64.experiment.jl"]
 evidence_status = "in_tree"
 commit = "b2d746cc"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1906,7 +1906,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, radial RMS radius over the hold, read from cached snapshots. Seen at both hold lengths."
 uncertainty = "unbounded: the periods were read off by eye from 11 and 22 samples with no fit, so `~5` and `~11` frames carry no interval. What IS bounded is the EXISTENCE of the oscillation — the ω_eff = 1.000 trace runs 2.885 → 1.999 → 2.693 → 1.984 → 3.163, swings of 30-40 % against a dt/2 reproducibility floor of 0.029 %."
 uncertainty_basis = "none"
-evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff1p000_B10p4nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1923,7 +1923,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 10.4 nT, 26 arms over ω_eff ∈ [0.15, 1.00] at the 8 ms hold plus two at 16 ms."
 uncertainty = "The ratio r(end)/r(hold start) runs 1.571 (ω_eff = 0.200) → 0.949 (0.590, the minimum) → 1.140 (0.830) → 1.097 (1.000). Doubling the hold moves it from 0.989 to 1.006 at ω_eff = 0.650 and from 1.096 to 1.033 at 1.000 — a resonance would not move. The first 11 frames of the 8 ms and 16 ms holds agree exactly, which is the check that the window extraction is right."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p590_B10p4nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.yaml"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p590_B10p4nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p650_B10p4nT_hold2p0x.experiment.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -1961,7 +1961,7 @@ type = "B"
 scope = "32³, CPU, one seed, `lhy: none`, anti-aligned, B = 5.2 nT, 20 arms over ω_eff ∈ [0.42, 1.00] at the 8 ms hold plus 4 at 16 ms. Read from cached snapshots — no new runs."
 uncertainty = "The EXISTENCE of the structure is bounded well clear of any floor: expansion swings 0.9868 → 1.3587 (38 %) against a dt/2 reproducibility floor of 0.029 %, and the hold-doubling ratios run 1.024 → 1.287. The POSITIONS are quantised by the ω_eff grid — 0.02–0.05 wide near the extrema — so 'minimum at 0.600' means 'at the sampled point 0.600', with no fit and no interval. The 16 ms arms are themselves truncated (3 of 4 peak at frame 53/53), so their VALUES bound the inversion but are not converged."
 uncertainty_basis = "control"
-evidence = ["runs/klaus_quench_weff/klaus_weff0p600_B5p2nT.yaml", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.yaml", "scripts/validation/klaus_weff_cloud_size.jl"]
+evidence = ["runs/klaus_quench_weff/klaus_weff0p600_B5p2nT.experiment.jl", "runs/klaus_quench_weff/klaus_weff0p650_B5p2nT_hold2p0x.experiment.jl", "scripts/validation/klaus_weff_cloud_size.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/edh_quench_polarisation_decision.md"
@@ -2235,7 +2235,7 @@ type = "C"
 scope = "runs/saito_li_torus, the EdH quench arm at B_z = 0.05 mG, 14.5 ms window, mean |f_z| over t > 3 ms. Binds README 'continued 6' and h16_digitise_fig4b.py's OURS dict."
 uncertainty = "The NON-REPRODUCTION is bounded well clear of any floor: re-run at the recorded settings (box 8 / n 80 / dt 2e-4 / orient=rotate / t_end 10) gives 0.2778 +/- 0.0185, a factor 7.4, against a per-sample scatter of 6.7 %. Four independent routes agree within 27 % on 0.22-0.28 — static response 0.2214 (no dynamics at all), the 0.025 mG dynamic arm doubled 0.2627 (that arm PASSES every gate, edge 3.6e-4), box-10 dynamic 0.2805, box-8 dynamic 0.2778. What is NOT bounded is the replacement value itself: three of those four are box-gate-marginal (edge 1.3-1.5e-3), and only the 0.025 mG arm is clean."
 uncertainty_basis = "control"
-evidence = ["runs/saito_li_torus/cells/stiff_n64_Bz0p025.yaml", "runs/saito_li_torus/cells/stiff_n64_Bz0p050.yaml", "runs/saito_li_torus/h6_edh.jl"]
+evidence = ["runs/saito_li_torus/cells/stiff_n64_Bz0p025.experiment.jl", "runs/saito_li_torus/cells/stiff_n64_Bz0p050.experiment.jl", "runs/saito_li_torus/h6_edh.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "runs/saito_li_torus/README.md"

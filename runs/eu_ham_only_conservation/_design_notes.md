@@ -21,7 +21,7 @@ entire dynamics window. ΔE_observed in v1 = +978 traces exactly to
 p_dimless = g_F μ_B Bz / (ℏ ω_ref) ≈ 1.626e4·Bz[G] for Eu151
 (ω_ref = 628.3 rad/s).
 
-The same gotcha is present in `runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_*.yaml`
+The same gotcha is present in `runs/verification_suite/yamls/L4_eu_matsui_hamiltonian_only_*.experiment.jl`
 — their `duration: 0.0` does not produce a quench either.
 
 ## Sweep grid

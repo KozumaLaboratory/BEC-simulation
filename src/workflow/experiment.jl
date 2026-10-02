@@ -174,16 +174,12 @@ function Experiment(yaml_path::AbstractString; store::CASStore=default_store())
     _has_result(cas_dir) && return Experiment(
         spec_dict, store, nothing, Dict{Symbol, Any}()
     )
-    if basename(yaml_path) in ("config.yaml", "config.json")
+    if basename(yaml_path) == "config.json"
         same_dir = dirname(abspath(yaml_path))
         _has_result(same_dir) && return Experiment(
             spec_dict, store, same_dir, Dict{Symbol, Any}()
         )
     end
-    legacy = find_run_dir(yaml_path)
-    legacy !== nothing && return Experiment(
-        spec_dict, store, String(legacy), Dict{Symbol, Any}()
-    )
     Experiment(spec_dict, store, nothing, Dict{Symbol, Any}())
 end
 

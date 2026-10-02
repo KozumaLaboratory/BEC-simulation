@@ -1,7 +1,12 @@
+function _write_julia_fixture(path, data)
+    open(io -> show(io, data), path, "w")
+    path
+end
+
 #!/usr/bin/env julia
 # Where does a scan JOB's wall-clock go? Not where the integrator work is.
 #
-#     julia --project=. scripts/validation/scan_job_cost_breakdown.jl <config.yaml> [npoints]
+#     julia --project=. scripts/validation/scan_job_cost_breakdown.jl <config.experiment.jl> [npoints]
 #
 # The Matsui Fig. 4B campaign job ran 600 s for 45 points. Reading the points'
 # own `started_at` / `finished_at` / `duration_seconds`, the scan span was 245 s
@@ -26,9 +31,8 @@
 import CUDA
 using SpinorBEC
 using Printf
-using YAML
 
-const CFG = length(ARGS) >= 1 ? ARGS[1] : error("usage: scan_job_cost_breakdown.jl <config.yaml>")
+const CFG = length(ARGS) >= 1 ? ARGS[1] : error("usage: scan_job_cost_breakdown.jl <config.experiment.jl>")
 const NPTS = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
 
 """
@@ -41,7 +45,7 @@ four full 45-point scans while reporting them as 1- and 3-point timings. Hence
 `_count_points` and the assertion: a trim that does not trim must be loud.
 """
 function trimmed(cfg::String, n::Int, tag::String)
-    d = YAML.load_file(cfg)
+    d = SpinorBEC._load_config_data(cfg)
     sc = get(d, "scan", nothing)
     sc === nothing && error("config has no scan block")
     for axes in values(sc)
@@ -56,13 +60,13 @@ function trimmed(cfg::String, n::Int, tag::String)
     end
     got = _count_points(sc)
     got == n || error("trim asked for $n points, config yields $got — see the docstring")
-    # Under the store, not mktempdir(): run_yaml derives its output directory
+    # Under the store, not mktempdir(): run_experiment derives its output directory
     # from the config's path, and a config in a compute node's /tmp puts the run
     # somewhere no other machine can watch.
     dir = joinpath(get(ENV, "SPINORBEC_STORE", "runs"), "_probe")
     mkpath(dir)
-    out = joinpath(dir, "trim_$(tag).yaml")
-    YAML.write_file(out, d)
+    out = joinpath(dir, "trim_$(tag).experiment.jl")
+    _write_julia_fixture(out, d)
     out
 end
 
@@ -87,7 +91,7 @@ function _count_points(sc::AbstractDict)
 end
 
 function dyn_steps_and_dt(cfg::String)
-    d = YAML.load_file(cfg)
+    d = SpinorBEC._load_config_data(cfg)
     for st in d["pipeline"]
         haskey(st, "dynamics") || continue
         p = st["dynamics"]
@@ -103,13 +107,13 @@ function main()
     @printf("config %s\n  dynamics: %d steps at dt = %.1e\n\n", basename(CFG), nsteps, dt)
     flush(stdout)
 
-    # Announce BEFORE each phase and flush: with verbose=false a run_yaml prints
+    # Announce BEFORE each phase and flush: with verbose=false a run_experiment prints
     # nothing, so a probe that only reports afterwards is indistinguishable from
     # a hung one. The first pass at this sat 19 minutes with no way to tell.
     function timed(label, path; verbose=false)
         @printf("  ... %s\n", label)
         flush(stdout)
-        t = @elapsed run_yaml(path; verbose=verbose)
+        t = @elapsed run_experiment(path; verbose=verbose)
         @printf("  %-38s %8.2f s\n", label, t)
         flush(stdout)
         t

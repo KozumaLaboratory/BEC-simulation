@@ -8,7 +8,7 @@
 # reversing the key sort inside `_canonical_bytes!` — which changes the canonical
 # bytes of every spec and therefore every outdir — was caught by nothing in
 # `test/workflow/`. `content_id` appears in two other test files only as an opaque
-# string passed between autopilot and catalog records, never computed from a spec.
+# string passed between run and catalog records, never computed from a spec.
 #
 # What is load-bearing and what is not, stated honestly:
 #
@@ -68,11 +68,11 @@ const _REF_ID = "d6c4ff5a501e607d"
         @test content_id(rebuild_reversed(a)) == content_id(a)
     end
 
-    @testset "invariant under a YAML round-trip" begin
+    @testset "invariant under a Julia definition round-trip" begin
         a = _ref_spec()
         io = IOBuffer()
-        SpinorBEC.YAML.write(io, a)
-        b = SpinorBEC.YAML.load(String(take!(io)))
+        show(io, a)
+        b = SpinorBEC._julia_config_string(String(take!(io)))
         @test content_id(b) == content_id(a)
     end
 

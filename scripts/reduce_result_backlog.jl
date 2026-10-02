@@ -21,7 +21,7 @@
 #   - ANY file in the directory touched within QUIET_S        -> skip
 #
 # The second one is the load-bearing one. `_live_status.json` is written by
-# `run_yaml`; a campaign script or a hand-run job has none, and skipping only on
+# `run_experiment`; a campaign script or a hand-run job has none, and skipping only on
 # the status file would sweep exactly those.
 #
 # DRY RUN IS THE DEFAULT and prints what each directory would do, because the

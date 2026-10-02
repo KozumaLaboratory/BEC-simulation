@@ -1,6 +1,6 @@
 # --- Run Registry: persistent execution shared by Julia definitions and imported configs ---
 
-export run_experiment, run_yaml, run_status, list_runs, compute_run_dir, run_provenance
+export run_experiment, run_status, list_runs, compute_run_dir, run_provenance
 
 # Directory-per-run design: 1 configuration snapshot ↔ 1 directory containing one
 # self-contained JLD2 per scan point. Re-running the same YAML skips files
@@ -17,29 +17,19 @@ Where run directories are written. `SPINORBEC_STORE` if set, else `"runs"`.
 
 This is the SAME variable `default_store()` and the GS stage cache already read,
 so one setting moves the whole output tree — run dirs, `_stage/gs`, and the CAS
-store — off the project root. Before this, `run_yaml` hardcoded `"runs"` while
+store — off the project root. Before this, `run_experiment` hardcoded `"runs"` while
 `_gs_stage_dir()` honoured `SPINORBEC_STORE`, so setting it moved the ψ store and
 left the run dirs behind, which is the wrong half to move: the ψ is the bulk.
 """
 default_run_root() = get(ENV, "SPINORBEC_STORE", "runs")
 
 """
-    compute_run_dir(yaml_path; base_dir=default_run_root()) → String
+    compute_run_dir(config_path; base_dir=default_run_root())
 
-Map a YAML file to its run directory. Identical YAML content → identical
-directory, enabling transparent resume.
+Directory keyed by the evaluated conditions, independent of source formatting.
 """
-function compute_run_dir(yaml_path::String; base_dir::String=default_run_root())
-    isfile(yaml_path) || throw(ArgumentError("YAML file not found: $yaml_path"))
-    content = read(yaml_path, String)
-    # 16 hex, matching CLAUDE.md commitment #4. It was 8 (32 bits), which reaches
-    # a 1 % collision probability at ~9e3 files sharing a basename — thin for a
-    # sweep generator emitting thousands of configs under one name. Widening
-    # renames every future directory, so runs cached under the old 8-hex name are
-    # recomputed once.
-    hash16 = bytes2hex(sha256(content))[1:16]
-    basename_no_ext = splitext(basename(yaml_path))[1]
-    joinpath(base_dir, "$(basename_no_ext)_$(hash16)")
+function compute_run_dir(config_path::String; base_dir::String=default_run_root())
+    joinpath(base_dir, content_id(_load_config_data(config_path)))
 end
 
 """
@@ -48,7 +38,7 @@ end
 Which code produced a file: git hash, whether the tree was dirty, Julia version
 and threads, host, platform.
 
-PUBLIC because the pipeline is not the only writer. `run_yaml` outputs carry this
+PUBLIC because the pipeline is not the only writer. `run_experiment` outputs carry this
 under `env/`, but campaign scripts write their own JLD2 and carried NONE of it —
 measured 2026-08-21 on `scripts/eu334/nucleate.jl` output, which holds every
 physics parameter and the seed (`B_uG`, `kappa`, `mu0`, `mu1`, `tau_ms`, `seed`,
@@ -93,7 +83,7 @@ _now_iso() = Dates.format(now(), "yyyy-mm-ddTHH:MM:SS")
 
 function _experiment_status(verbose::Bool, msg::AbstractString; comment::Bool=false)
     verbose || return nothing
-    prefix = comment ? "# [run_yaml] " : "[run_yaml] "
+    prefix = comment ? "# [run_experiment] " : "[run_experiment] "
     println(prefix, msg)
     flush(stdout)
     ccall(:fflush, Cint, (Ptr{Cvoid},), C_NULL)
@@ -277,28 +267,6 @@ function _point_filename(i::Int, run_name::String="")
 end
 
 """
-    run_yaml(yaml_path; base_dir=default_run_root(), verbose=true) → String
-
-Run or resume the experiment defined by `yaml_path`. Returns the run dir.
-
-The YAML must have a `pipeline:` key. If a `scan:` key is present,
-each scan point × comparison run is executed independently via
-`run_pipeline` with the corresponding overrides applied to the raw dict.
-"""
-function run_yaml(yaml_path::String; base_dir::String=default_run_root(), verbose::Bool=true,
-    dry_run::Bool=false, audit::Bool=true, force::Bool=false)
-    isfile(yaml_path) || throw(ArgumentError("configuration not found: $yaml_path"))
-    run_dir = if basename(yaml_path) == "config.yaml"
-        dirname(yaml_path)
-    else
-        compute_run_dir(yaml_path; base_dir)
-    end
-    run_experiment(_load_config_data(yaml_path); run_dir,
-        source_dir=dirname(abspath(yaml_path)), verbose, dry_run, audit, force,
-        legacy_config_path=yaml_path)
-end
-
-"""
     run_experiment(config; base_dir=default_run_root(), run_dir=nothing,
                    source_dir=pwd(), verbose=true, dry_run=false, audit=true)
 
@@ -310,23 +278,16 @@ directly, including from a local or cluster worker.
 run_experiment(config::PipelineConfig; kwargs...) = run_experiment(config.raw_data; kwargs...)
 
 function run_experiment(path::AbstractString; run_dir=nothing, source_dir=nothing, kwargs...)
-    if lowercase(splitext(path)[2]) != ".json"
-        if run_dir === nothing && source_dir === nothing
-            return run_yaml(String(path); kwargs...)
-        end
-        return run_experiment(_load_config_data(path); run_dir,
-            source_dir=source_dir === nothing ? dirname(abspath(path)) : source_dir,
-            legacy_config_path=path, kwargs...)
-    end
-    run_experiment(_load_config_data(path);
-        run_dir=run_dir === nothing ? dirname(abspath(path)) : run_dir,
+    spec = _load_config_data(path)
+    snapshot = lowercase(splitext(path)[2]) == ".json"
+    run_experiment(spec;
+        run_dir=run_dir === nothing && snapshot ? dirname(abspath(path)) : run_dir,
         source_dir=source_dir === nothing ? _config_source_dir(path) : source_dir, kwargs...)
 end
 
 function run_experiment(spec::AbstractDict; base_dir::String=default_run_root(),
     run_dir::Union{Nothing, AbstractString}=nothing, source_dir::AbstractString=pwd(),
-    verbose::Bool=true, dry_run::Bool=false, audit::Bool=true, force::Bool=false,
-    legacy_config_path::Union{Nothing, AbstractString}=nothing)
+    verbose::Bool=true, dry_run::Bool=false, audit::Bool=true, force::Bool=false)
     _experiment_status(verbose, "starting experiment"; comment=dry_run)
     raw = deepcopy(_native_config_data(spec))
     dir = run_dir === nothing ? joinpath(base_dir, content_id(raw)) : String(run_dir)
@@ -338,7 +299,7 @@ function run_experiment(spec::AbstractDict; base_dir::String=default_run_root(),
     try
         data = Base.invokelatest(_prepare_experiment_data, deepcopy(raw), verbose, dry_run)::Dict
         return Base.invokelatest(_run_experiment_impl, data, raw, dir,
-            String(source_dir), verbose, dry_run, audit, legacy_config_path, force)
+            String(source_dir), verbose, dry_run, audit, force)
     finally
         if previous === nothing
             delete!(ENV, "SPINORBEC_CONFIG_DIR")
@@ -350,7 +311,7 @@ function run_experiment(spec::AbstractDict; base_dir::String=default_run_root(),
 end
 
 @noinline function _run_experiment_impl(data::Dict, raw::Dict, run_dir::String,
-    source_dir::String, verbose::Bool, dry_run::Bool, audit::Bool, legacy_config_path, force::Bool)
+    source_dir::String, verbose::Bool, dry_run::Bool, audit::Bool, force::Bool)
     # Audit hook: run inspector on normalised data; abort on :error severity
     # before any sim work hits the cluster. SPINORBEC_AUDIT=0 disables;
     # callers can also pass audit=false.
@@ -358,17 +319,13 @@ end
         Base.invokelatest(_audit_experiment, data, verbose)
     end
     if dry_run
-        if legacy_config_path !== nothing
-            return Base.invokelatest(
-                _legacy_dry_run_output, data, String(legacy_config_path), verbose
-            )
-        end
+        _experiment_status(verbose, "dry-run complete; printing resolved conditions"; comment=true)
         out = JSON.json(data, 2)
         println(out)
         return out
     end
     return Base.invokelatest(_execute_experiment, data, raw, run_dir,
-        source_dir, verbose, legacy_config_path, force)
+        source_dir, verbose, force)
 end
 
 @noinline function _audit_experiment(data::Dict, verbose::Bool)
@@ -443,37 +400,8 @@ end
     return data
 end
 
-@noinline function _legacy_dry_run_output(data::Dict, yaml_path::String, verbose::Bool)
-    # Dry-run: print the calibration-applied + units-applied + validated
-    # YAML and exit without touching the GPU / building any workspace.
-    # Useful for checking that lab-unit YAML expanded as expected before
-    # committing to a long compute.
-    _experiment_status(verbose, "dry-run complete; printing normalized YAML"; comment=true)
-    buf = IOBuffer()
-    println(buf, "# === run_yaml dry-run (post calibration + units + validation) ===")
-    println(buf, "# original: $yaml_path")
-    println(buf, "#")
-    println(buf, "# Stages applied:")
-    println(buf, "#   1. calibration:  lab-control values → physical units")
-    println(buf, "#   2. units:        bare Reals → unit-bearing strings")
-    println(buf, "#   3. schema:       unknown-key + range + enum validation")
-    println(buf, "#")
-    println(buf, "# Numerics defaults (dt, save_every, n_steps) are still expressed")
-    println(buf, "# in their YAML form here; final resolved values are logged when")
-    println(buf, "# the actual run starts. To inspect resolved values without running,")
-    println(buf, "# use a 1-step ground_state with verbose=true.")
-    println(buf, "#")
-    for line in _scan_preview_lines(data)
-        println(buf, line)
-    end
-    YAML.write(buf, data)
-    out = String(take!(buf))
-    print(out)
-    return out
-end
-
 @noinline function _execute_experiment(data::Dict, raw::Dict, run_dir::String,
-    source_dir::String, verbose::Bool, legacy_config_path, force::Bool)
+    source_dir::String, verbose::Bool, force::Bool)
     recorded = joinpath(run_dir, "config.json")
     if isfile(recorded) && content_id(_load_config_data(recorded)) != content_id(raw) &&
         any(f -> startswith(f, "point_") && endswith(f, ".jld2"), readdir(run_dir))
@@ -487,11 +415,6 @@ end
     _experiment_status(verbose, "using run directory: $run_dir")
     mkpath(run_dir)
 
-    config_snapshot = joinpath(run_dir, "config.yaml")
-    if legacy_config_path !== nothing && abspath(legacy_config_path) != abspath(config_snapshot)
-        _experiment_status(verbose, "snapshotting config: $config_snapshot")
-        isfile(config_snapshot) || cp(legacy_config_path, config_snapshot)
-    end
     _write_config_snapshot(joinpath(run_dir, "config.json"), raw; source_dir, resolved=data)
 
     _experiment_status(verbose, "collecting environment metadata")
@@ -511,7 +434,7 @@ end
     # W4. `_exit_summary.json` is written by `run_pipeline`, and a run whose
     # every point is a cache HIT never enters it — so the run that exercised the
     # cache HARDEST was the one that reported nothing about it. Stamped here, at
-    # the end of `run_yaml`, so the counts exist whether zero points ran or all
+    # the end of `run_experiment`, so the counts exist whether zero points ran or all
     # of them did. Merged rather than overwritten: the last point's `completed` /
     # `runtime_seconds` / `exception_type` are `run_pipeline`'s to state.
     _stamp_cache_stats(joinpath(run_dir, "_exit_summary.json"))
@@ -550,7 +473,7 @@ function _run_experiment_scan(
     pause_file = joinpath(run_dir, ".pause")
 
     # Array-job hook: if SPINORBEC_SCAN_ONLY_INDEX is set (e.g. by an
-    # autopilot backend's array dispatch), compute only that single
+    # UGE batch wrapper's array dispatch), compute only that single
     # point and exit. Indices are 1-based and clamped silently.
     only_idx = let v = get(ENV, "SPINORBEC_SCAN_ONLY_INDEX", nothing)
         v === nothing ? nothing : parse(Int, v)
@@ -589,7 +512,7 @@ function _run_experiment_scan(
             # They do overlap — `_assert_point_provenance` compares `git_hash`
             # while the marker records `code_rev` (`code_tree_hash` over src/ +
             # ext/), and the design doc argues the latter is the sounder of the
-            # two because the autopilot rsyncs to TSUBAME with `--exclude=.git/`
+            # two because a deployment can rsync to TSUBAME with `--exclude=.git/`
             # so no repository exists on the compute node. Collapsing them into
             # one is a design decision, not a merge resolution; left for a
             # follow-up rather than settled here by deleting one side.
@@ -1033,7 +956,7 @@ only the first is visible in the payload itself:
      `InterruptException` and return normally, so the pipeline runs on and
      `_exit_summary.json` records `completed = true`. Measured before this
      cutover: a 32³ ITP killed at step 5323/100000 wrote a full 1.58 MB point
-     file whose energy was 0.64 % off, and the next `run_yaml` served it in
+     file whose energy was 0.64 % off, and the next `run_experiment` served it in
      0.01 s. `:interrupted` is accumulated across steps in `_step_dispatch!`.
   2. **Diverged.** A non-finite ψ is a completed run whose answer is NaN.
      Nothing else in the pipeline stops it from being cached.

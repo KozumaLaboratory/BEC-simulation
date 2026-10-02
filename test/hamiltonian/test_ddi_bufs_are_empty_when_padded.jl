@@ -11,7 +11,7 @@ using SpinorBEC
 #                         max|grad| = 3.9e-4 in BOTH cases
 #
 # The padded path writes `ddi_padded.*_pad` and never touches `ddi_bufs`, and
-# `DDI_PADDED_DEFAULT = true`, so this is the default for every `run_yaml`.
+# `DDI_PADDED_DEFAULT = true`, so this is the default for every `run_experiment`.
 #
 # Two readers were relying on those buffers:
 #   * `_check_itp_overflow` (`solvers/ground_state.jl`) takes `phi_max` from

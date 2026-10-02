@@ -155,7 +155,7 @@ optimum within ~6%.  See `docs/manuscript/figures/klaus_quench_fig_k14_omega_ref
 ## field-rotation branch adiabatic result (2026-05-27): still null
 
 A 7-stage adiabatic field-rotation branch prototype
-(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.yaml`) was
+(`runs/magnetic_stirrer/magnetic_stirrer_adiabatic_omega_p0p5.experiment.jl`) was
 dispatched to test whether the sudden-tilt null result was just
 an adiabaticity artifact.  Result:
 
@@ -209,7 +209,7 @@ universal constant.
 
 A 7-point refinement scan |Ω|/ω_⊥ ∈ {0.34, 0.38, 0.42, 0.46, 0.50,
 0.54, 0.58} at the protocol-optimal delay = 2 ms is dispatched
-(`runs/klaus_quench/klaus_quench_omm0p**_holdonly_delay2ms_refine.yaml`).
+(`runs/klaus_quench/klaus_quench_omm0p**_holdonly_delay2ms_refine.experiment.jl`).
 Once complete, a quadratic fit through the top 5 points will give
 Ω* with parabolic-fit uncertainty σ_Ω*.  Until then, the honest
 operating-window recommendation is:

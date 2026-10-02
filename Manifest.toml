@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "764fea1f71fea1c05633ace251f190fc5db2a73b"
+project_hash = "c3b7d576fff41e48df10996faa74ae6871446ae2"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -384,12 +384,6 @@ version = "0.13.1+0"
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
 
-[[deps.Libiconv_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "be484f5c92fad0bd8acfef35fe017900b0b73809"
-uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.18.0+0"
-
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -623,7 +617,7 @@ version = "2.7.2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 
 [[deps.SpinorBEC]]
-deps = ["BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "Test", "TimerOutputs", "Unitful", "YAML"]
+deps = ["BenchmarkTools", "CUDA", "CodecZlib", "CodecZstd", "Dates", "FFTW", "JLD2", "JSON", "LinearAlgebra", "PackageCompiler", "PrecompileTools", "Printf", "Random", "SHA", "Sockets", "SpecialFunctions", "StaticArrays", "TOML", "Test", "TimerOutputs", "Unitful"]
 path = "."
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "1.0.0"
@@ -667,12 +661,6 @@ weakdeps = ["SparseArrays"]
 
     [deps.Statistics.extensions]
     SparseArraysExt = ["SparseArrays"]
-
-[[deps.StringEncodings]]
-deps = ["Libiconv_jll"]
-git-tree-sha1 = "b765e46ba27ecf6b44faf70df40c57aa3a547dcb"
-uuid = "69024149-9ee7-55f6-a4c4-859efe599b68"
-version = "0.3.7"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
@@ -785,12 +773,6 @@ weakdeps = ["LLVM"]
 
     [deps.UnsafeAtomics.extensions]
     UnsafeAtomicsLLVM = ["LLVM"]
-
-[[deps.YAML]]
-deps = ["Base64", "Dates", "Printf", "StringEncodings"]
-git-tree-sha1 = "a1c0c7585346251353cddede21f180b96388c403"
-uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
-version = "0.4.16"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]

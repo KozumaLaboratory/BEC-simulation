@@ -358,7 +358,7 @@ end
         with_canary_source(
             :matsui2025,
             s -> replace(s,
-                "window = [-13.0, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted" => "window = [-12.5, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.yaml, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted",
+                "window = [-13.0, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.experiment.jl, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted" => "window = [-12.5, 9.0]\nwindow_from = \"our scan: runs/matsui_fig4b/fig4b_scan_n32.experiment.jl, 45 fields from -13 to +9 nT at 0.5 nT\"\ndisqualified_by = []\nquotable_digits = 2\nnote = \"\"\"\nTheir simulation restricted",
             ),
         ) do src
             # The stored value no longer matches, so `ref` refuses …
@@ -586,8 +586,8 @@ end
         # construct too. Our measured −2.5099 / 12.740 against their
         # −2.5 / 12.84 lives in `docs/validation/matsui_campaign_report.md`.
         cfg = joinpath(dirname(dirname(@__DIR__)), "runs", "matsui_fig4b",
-            "fig4b_scan_n32.yaml")
-        m = yaml_to_model(cfg)
+            "fig4b_scan_n32.experiment.jl")
+        m = config_to_model(cfg)
         gs = stage(:relax; model=m, method=:itp, dt=0.005, n_steps=20_000)
         ev = evolve_stage(gs, Dict{String, Any}("duration" => 5.0, "dt" => 0.001))
         @test ev isa Stage
@@ -656,13 +656,13 @@ end
     # constructor agrees.
     @testset "type-A: the config carries the registered parameters" begin
         cfg = joinpath(dirname(dirname(@__DIR__)), "runs", "matsui_fig4b",
-            "fig4b_scan_n32.yaml")
+            "fig4b_scan_n32.experiment.jl")
         @test isfile(cfg)
-        m = yaml_to_model(cfg)
+        m = config_to_model(cfg)
         gs = stage(:relax; model=m, method=:itp, dt=0.005, n_steps=20_000)
 
         c = claim(
-            "runs/matsui_fig4b/fig4b_scan_n32.yaml resolves to the Matsui et al. " *
+            "runs/matsui_fig4b/fig4b_scan_n32.experiment.jl resolves to the Matsui et al. " *
             "parameters registered in refs/matsui2025.toml";
             kind=:A, evidence=[gs])
         @test c.kind === :A

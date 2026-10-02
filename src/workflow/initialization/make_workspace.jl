@@ -859,7 +859,7 @@ _build_spinor_lhy(::Val, atom, ws, psi_init, c_dd, enable_ddi, opts, zfield) = n
 # zero field**, whatever the run's B was. Two consequences:
 #
 #   * a B-scan comparing LHY closures got a functional identical at every Bz —
-#     measured on runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.yaml,
+#     measured on runs/eu_gs_phase_c1_B_kappa/config_texture_bscan_lhy_full_bdg.experiment.jl,
 #     where `max Im ω` was bit-identical across 50/60/70/80 µG;
 #   * the instability warning's own advice, "pick a mean-field-stable
 #     (F, c₀, c₁, q) point", was unreachable through `q`, because q never

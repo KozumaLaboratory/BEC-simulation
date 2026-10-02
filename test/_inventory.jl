@@ -171,8 +171,8 @@ const _PIN_MARKERS = [
 # Higher layers test composition and wiring, never the physics again.
 const _LAYERS = [
     :L4_workflow => [
-        r"\brun_yaml\b", r"\brun_pipeline\b", r"\bExperiment\(",
-        r"load_config", r"autopilot"i, r"\bsweep\(", r"\brun!\(",
+        r"\brun_experiment\b", r"\brun_pipeline\b", r"\bExperiment\(",
+        r"load_config", r"\bsweep\(", r"\brun!\(",
     ],
     :L3_solver => [
         r"find_ground_state", r"run_simulation!", r"\bsimulate\b",

@@ -7,7 +7,7 @@ Generated: 2026-05-26T02:42:10.753
 Wall-time: 180.89 s
 
 ## Inputs
-- YAML: `reference_state.yaml`
+- YAML: `reference_state.experiment.jl`
 - YAML sha256: 16419ba22b6b8b13e2564d279f85b134b79363a466a0cb6711c9f1198a24cb3e
 
 ## Outputs

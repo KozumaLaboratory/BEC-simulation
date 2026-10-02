@@ -22,33 +22,15 @@ export find_run_dir, psi_snapshots,
     classify_collapse, density_stats
 
 """
-    find_run_dir(yaml_path; runs_root=nothing) -> Union{String, Nothing}
+    find_run_dir(config_path; runs_root=default_run_root())
 
-For a YAML produced by `sweep(...)` (or any older generator), locate the
-matching `runs/<base>_<hash>/` output directory. Selects the most
-recent matching dir whose mtime exceeds the YAML's — so stale runs from
-sibling factorials with the same basename don't masquerade as the result.
-
-`runs_root` defaults to the directory two levels above the YAML
-(`runs/<batch>/foo.yaml` → `runs/`).
+Find admitted results for the exact conditions in a Julia definition or snapshot.
 """
-function find_run_dir(yaml_path::AbstractString; runs_root::Union{Nothing, AbstractString}=nothing)
-    runs_root === nothing && (runs_root = dirname(dirname(yaml_path)))
-    isdir(runs_root) || return nothing
-    base = splitext(basename(yaml_path))[1]
-    ymtime = mtime(yaml_path)
-    re = Regex("^" * base * "_[0-9a-f]+\$")
-    candidates = String[]
-    for d in readdir(runs_root; join=true)
-        isdir(d) || continue
-        occursin(re, basename(d)) || continue
-        isfile(joinpath(d, "result.jld2")) || continue
-        mtime(d) > ymtime || continue
-        push!(candidates, d)
-    end
-    isempty(candidates) && return nothing
-    sort!(candidates; by=d -> mtime(d))
-    last(candidates)
+function find_run_dir(config_path::AbstractString;
+    runs_root::Union{Nothing, AbstractString}=nothing)
+    root = runs_root === nothing ? default_run_root() : runs_root
+    dir = joinpath(root, content_id(_load_config_data(config_path)))
+    _has_result(dir) ? dir : nothing
 end
 
 """

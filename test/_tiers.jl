@@ -147,11 +147,6 @@ const FAST_TESTS = [
     "workflow/test_thermal_seed_amplitude.jl",
     # auto_grid, the spherical B angles and the error budget's positive-control
     # guard were each invisible to all 59 workflow files (mutation, 2026-07-31).
-    # Four autopilot invariants that 63 workflow files did not cover
-    # (mutation, 2026-08-01): the budget gate's queued work, the daily cap,
-    # OOM-is-permanent, and the on_complete lineage bound.
-    "workflow/test_autopilot_invariants.jl",
-    "workflow/test_profile_vram_uses_the_registry.jl",
     "workflow/test_docs_teach_real_analyzers.jl",
     "workflow/test_full_bdg_advisory_fires.jl",
     "workflow/test_no_second_atom_F_table.jl",
@@ -165,7 +160,6 @@ const FAST_TESTS = [
     "hamiltonian/test_two_spin_step_guards_agree.jl",
     "workflow/test_absence_is_not_reported_as_health.jl",
     "hamiltonian/test_kinetic_phase_uploads_k2_once.jl",
-    "workflow/test_failure_evidence_reaches_the_reader.jl",
     "workflow/test_native_experiment.jl",
     # Analyzer-name routing and the ground-state interactions precedence —
     # 64 workflow files covered neither (mutation, 2026-08-01).
@@ -193,12 +187,6 @@ const FAST_TESTS = [
     "workflow/test_checkpoint.jl",
     "workflow/test_checkpointed_sweep.jl",
     "workflow/test_gs_stage_cache.jl",
-    # Does what a run WRITES reach what the reaper READS? The autopilot suite
-    # drives `is_divergent_status` with dicts it builds itself, so it passed
-    # while the writer and the reader shared no keys at all.
-    "workflow/test_live_status_reaches_the_detector.jl",
-    # A name the autopilot reads must be a name something writes.
-    "workflow/test_terminal_record_has_a_producer.jl",
     # The budget read the pre-2026 flat save_* keys the schema now rejects.
     "workflow/test_budget_reads_the_save_block.jl",
     # A YAML key a maintained doc teaches must be one the schema accepts.
@@ -209,18 +197,18 @@ const FAST_TESTS = [
     "solvers/test_twa_rejects_diverged_members.jl",
     # Model / Stage layer + the provenance cutover's steps 1, 1b and 2.
     "model/test_model_shape.jl",
-    "model/test_model_toml_roundtrip.jl",
+    "model/test_model_data_roundtrip.jl",
     "model/test_artifact_id.jl",
     # A revision naming bytes the process is not running is worse than none.
     "model/test_code_rev_refuses_under_sysimage.jl",
     # Why `artifact_id` had to stop being `content_id(spec)`: prose participates
     # in the latter, so harvesting 302 `metadata:` blocks moved 302 names.
     "model/test_prose_does_not_move_identity.jl",
-    # Step 1b. `yaml_to_model` is the resolver from raw YAML to a `Model`;
+    # Step 1b. `config_to_model` is the resolver from raw YAML to a `Model`;
     # `test_resolve_gs_is_shared.jl` is what keeps it and `_run_step` from
     # becoming two parsers of the same physics; `test_ddi_trunc_radius…` gates
     # the three-state union that unblocks the corpus.
-    "model/test_yaml_to_model.jl",
+    "model/test_config_to_model.jl",
     "model/test_resolve_gs_is_shared.jl",
     "model/test_ddi_trunc_radius_three_states.jl",
     # The Model migration's ratchet: the count of call sites still transcribing
@@ -242,7 +230,7 @@ const FAST_TESTS = [
     # clean result is not the four inert-field false positives the first
     # measurement produced.
     "model/test_realise_agrees_over_corpus.jl",
-    # Step 1b's acceptance criterion, and step 3's scope: `yaml_to_model` over
+    # Step 1b's acceptance criterion, and step 3's scope: `config_to_model` over
     # EVERY config under `runs/`, with the ones it cannot resolve listed by name
     # and reason so the list only shrinks deliberately.
     "model/test_corpus_resolves.jl",
@@ -510,7 +498,7 @@ const FAST_TESTS = [
     "hamiltonian/test_tdhfb_pair_potential.jl",
     "hamiltonian/test_tdhfb_conservation.jl",
     # Orphan-test audit 2026-05-25: promoted from unregistered → FAST_TESTS.
-    # All are pure unit tests (no ITP / RTP / find_ground_state / run_yaml).
+    # All are pure unit tests (no ITP / RTP / find_ground_state / run_experiment).
     "analysis/test_imaging.jl",
     "analysis/test_paper3_validation.jl",
     "hamiltonian/test_lhy_factory.jl",
@@ -523,7 +511,6 @@ const FAST_TESTS = [
     "workflow/test_vortex_density_movie.jl",
     "workflow/test_diff_dicts.jl",
     "workflow/test_inspect_batch.jl",
-    "workflow/test_autopilot.jl",
     "workflow/test_catalog.jl",
     "workflow/test_catalog_index.jl",
     # Evaporation model + euv3 calibration units (pure 0-D kinetics / table
@@ -635,7 +622,7 @@ const CI_EXTRA = [
     # per-push fast tier. Merged from main's evaporation-ramp-optimizer.
     "solvers/test_evaporation_tools.jl",
     # Demoted from FAST 2026-06-15 (#15): run find_ground_state / run_simulation!
-    # / run_yaml-scan / full pipeline (ITP/RTP), violating the fast-tier "no
+    # / run_experiment-scan / full pipeline (ITP/RTP), violating the fast-tier "no
     # ITP/RTP" contract. Validation-ladder anchors (Level 4/11) still gate here
     # + nightly full.
     "test_level4_f1_phase_emergence.jl",
@@ -1247,7 +1234,6 @@ const _COST = Dict{String, Float64}(
     "test_reference_rhs.jl" => 59.4,
     "oracles/test_hamiltonian_sign_oracles.jl" => 52.0,
     "oracles/test_lhy_full_bdg_closed_form_parity.jl" => 51.8,
-    "workflow/test_autopilot.jl" => 49.1,
     "workflow/test_native_experiment.jl" => 65.7,
     "test_level10_hpsi_self_consistency.jl" => 47.7,
     "test_quality.jl" => 45.7,
@@ -1259,7 +1245,7 @@ const _COST = Dict{String, Float64}(
     # MISS arms have to actually solve, or the positive controls that arm the
     # whole gate are not there.
     "model/test_admission_requires_marker.jl" => 29.0,
-    # One `run_yaml` interrupted mid-ITP + one full recomputation of the same
+    # One `run_experiment` interrupted mid-ITP + one full recomputation of the same
     # cell (2e6-step budget, 64 points, 1-D, CPU).
     #
     # These five, like every other entry here, are SERIAL measurements. Under
@@ -1275,26 +1261,26 @@ const _COST = Dict{String, Float64}(
     # Filesystem-only arms are ~2 s; the end-to-end arm runs the same two-point
     # scan twice (once cold, once fully cached) and is the other 33 s.
     "model/test_cache_stats_reported.jl" => 35.0,
-    # Two RTP loops driven directly (5.9 s) + one `run_yaml` interrupted
+    # Two RTP loops driven directly (5.9 s) + one `run_experiment` interrupted
     # mid-dynamics and recomputed in full, 1e6 steps (48.8 s).
     "model/test_interrupted_dynamics_recomputes.jl" => 55.0,
-    # Six 2-point `run_yaml` scans (47.8 s) + a scan with a dynamics step
+    # Six 2-point `run_experiment` scans (47.8 s) + a scan with a dynamics step
     # (4.7 s) + filesystem-only `Experiment` admission arms (0.6 s).
     "model/test_scan_path_admission.jl" => 53.0,
-    # Two real `run_yaml` round trips (1-D, 16 points, 20 ITP steps) — the
+    # Two real `run_experiment` round trips (1-D, 16 points, 20 ITP steps) — the
     # two `run_registry.jl` writer sites cannot be reached any other way.
     "model/test_record_provenance.jl" => 46.0,
-    "model/test_model_toml_roundtrip.jl" => 9.0,
+    "model/test_model_data_roundtrip.jl" => 9.0,
     # 380 assertions. ~3 s of TOML + fixture measurement (the whole reference
     # file is re-measured several times over, including four break-and-restore
-    # canaries), ~10 s for the one `yaml_to_model` on the production Fig. 4B
+    # canaries), ~10 s for the one `config_to_model` on the production Fig. 4B
     # config that makes the type-A claim's evidence a real Stage.
     "validation/test_matsui2025_ref.jl" => 24.0,
     # Two TOML parses (~5 MB total) plus one `walkdir` over the 429 configs
     # under `runs/` reading each first line-block. No SpinorBEC call at all.
     "validation/test_config_prose_harvest.jl" => 5.0,
     # ~12 `_prepare_config_file` + resolve passes over throwaway configs, no solve.
-    "model/test_yaml_to_model.jl" => 12.0,
+    "model/test_config_to_model.jl" => 12.0,
     # One real (1-step, 8³, Eu F=6) ITP solve — the `_run_step` consumer has to
     # actually run, or arm C observes only one of the two consumers.
     "model/test_resolve_gs_is_shared.jl" => 20.0,
@@ -1426,7 +1412,7 @@ const _COST = Dict{String, Float64}(
     "solvers/test_continuation.jl" => 58.0,
     "workflow/test_pipeline.jl" => 199.0,
     "workflow/test_infrastructure.jl" => 15.0,
-    # Was 13.0 when it only built tables; #179 added a run_yaml A/B
+    # Was 13.0 when it only built tables; #179 added a run_experiment A/B
     # (`method: lbfgs` reaches the tabulated LHY), which dominates. Now the
     # heaviest single file in the fast tier — measured 255.9 s.
     "workflow/test_lhy_block_wiring.jl" => 255.9,
@@ -1531,7 +1517,12 @@ function warn_cost_drift(
     return stale
 end
 
+# The state generator evaluates this file in a dynamically constructed Module,
+# which has no module-local include function.
+Base.include(@__MODULE__, joinpath(@__DIR__, "_smoke.jl"))
+
 function select_tests(tier::String)
+    haskey(SMOKE_TESTS, tier) && return SMOKE_TESTS[tier]
     if tier == "fast"
         return FAST_TESTS
     elseif tier == "ci"

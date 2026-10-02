@@ -15,14 +15,14 @@ physics gate as the reward signal — not "tests pass," not an LLM judge.
 |---|---|
 | `scripts/loop/verify.jl <candidate.toml>` | the ISOLATED 3-valued gate: builds the cell, solves to a tight stationary point (LBFGS → Newton-CG), runs norm-conservation AND `StabilitySpec`, emits one token `VERIFY: ACCEPT\|REJECT\|ABSTAIN <content_id> <verify_sha>` + exit code 0/2/3 |
 | `scripts/loop/loop_gate.sh` | Stop/SubagentStop hook — the INTEGRITY FLOOR: on a stop attempt it FRESH-RERUNS `verify.jl` and decides from its own subprocess run, never the transcript; budgeted; seals a `.loop/<name>.done` sentinel |
-| `runs/directions/<name>.toml` | a pre-registered direction = the cell + the gate budget, as DATA (the agent cannot inject code) |
+| `runs/directions/<name>.experiment.jl` | a pre-registered direction = the cell + the gate budget, as a Julia definition |
 | `/goal` | the sequencer — Haiku pattern-matches the `VERIFY: ACCEPT` token to drive turns; it never judges physics |
 
 ## Run a campaign
 
-1. **Write the direction** (`runs/directions/<name>.toml`) — physics cell + gate
-   budget. See `rb87_stable_polar.toml` (a stable minimum ⇒ ACCEPT) and
-   `rb87_polar_saddle.toml` (a saddle ⇒ REJECT) for the schema.
+1. **Write the direction** (`runs/directions/<name>.experiment.jl`) — physics cell + gate
+   budget. See `rb87_stable_polar.jl` (a stable minimum ⇒ ACCEPT) and
+   `rb87_polar_saddle.jl` (a saddle ⇒ REJECT) for the schema.
 
 2. **Launch** — the Stop hook is injected ONLY into the campaign sub-session via
    `--settings`, so it is **campaign-scoped**: it never touches the shared
@@ -34,13 +34,13 @@ physics gate as the reward signal — not "tests pass," not an LLM judge.
      "command":"bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\""}]}],
      "SubagentStop":[{"matcher":"*","hooks":[{"type":"command",
      "command":"bash \"$CLAUDE_PROJECT_DIR/scripts/loop/loop_gate.sh\""}]}]}}'
-   printf '%s' 'Run `julia --project=. scripts/loop/verify.jl runs/directions/<name>.toml`
+   printf '%s' 'Run `julia --project=. scripts/loop/verify.jl runs/directions/<name>.experiment.jl`
    and report its full VERIFY line verbatim.
    /goal The latest turn contains a line matching ^VERIFY: ACCEPT produced by running
-   verify.jl on runs/directions/<name>.toml THIS turn (not echoed). On ABSTAIN, read
-   the StabilitySpec reason and ESCALATE the gate budget (raise `niter` in the TOML)
+   verify.jl on runs/directions/<name>.experiment.jl THIS turn (not echoed). On ABSTAIN, read
+   the StabilitySpec reason and ESCALATE the gate budget (raise `niter` in the Julia definition)
    then re-run. On REJECT, the physics is wrong: stop and report. Stop after 12 turns.' \
-   | BEC_LOOP_DIRECTION=runs/directions/<name>.toml \
+   | BEC_LOOP_DIRECTION=runs/directions/<name>.experiment.jl \
      claude --print --max-turns 15 --settings "$HOOK" \
        --allowedTools "Bash(julia *),Read(./**),Edit(runs/directions/**)"
    ```
