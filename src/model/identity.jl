@@ -78,9 +78,8 @@ root-relative path. 64 hex chars.
 
 **A content hash, not a git revision.** `git rev-parse HEAD:src` does not move
 for uncommitted edits or for untracked files the package actually loads, and —
-decisively — the autopilot ships code to TSUBAME with `rsync --exclude=.git/`
-(`workflow/autopilot/ssh_transport.jl:72`), so on the compute node there is no
-repository to ask. Worse than absent: inside an unrelated enclosing repo
+a deployment copied with `rsync --exclude=.git/` has no repository to ask
+on the compute node. Worse than absent: inside an unrelated enclosing repo
 `git rev-parse` would succeed and describe the wrong project. Invariant 3's
 point is that a stale checkout becomes VISIBLE, which requires the hash to be
 computed on the node from the actual bytes.
@@ -91,16 +90,15 @@ bytes and file bytes, and `sort!` on `String` is `memcmp`, so no locale enters.
 Known limits, in the order they are likely to bite:
 
 1. **Loaded code need not be hashed code.** This reads the disk when called.
-   Under `-J <sysimage>` (`autopilot/backends_uge.jl:184`) or a stale precompile
+   Under `-J <sysimage>` or a stale precompile
    cache the process can be running different bytes.
 2. `Project.toml` / `Manifest.toml` are out of scope, so `Pkg.up` moves no id.
 3. Symlinks are followed for content but not recorded as links.
 4. Hashing during an in-flight `rsync` or `git checkout` digests a state that
    never existed.
 
-The value does not resolve back to a commit. Record `_capture_code_sha()`
-(`autopilot/queue.jl:504`) beside it when that matters — as archeology, not as
-identity.
+The value does not resolve back to a commit. Record the producing git revision
+beside it when available — as provenance, not as identity.
 """
 function code_tree_hash(root::AbstractString=_package_root(); refresh::Bool=false)
     key = abspath(root)
@@ -111,7 +109,7 @@ end
 
 # For record writers only. `code_tree_hash` reads the disk, and a record writer
 # is the one caller that must not acquire a new way to fail — TSUBAME re-syncs
-# `src/` under running jobs (`autopilot/ssh_transport.jl:72`), so a transient
+# `src/` under running jobs, so a transient
 # read error is reachable. It warns rather than returning a placeholder: a
 # plausible-looking wrong revision is worse than an absent one.
 function _code_rev_or_nothing()

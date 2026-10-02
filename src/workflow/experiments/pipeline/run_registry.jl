@@ -550,7 +550,7 @@ function _run_experiment_scan(
     pause_file = joinpath(run_dir, ".pause")
 
     # Array-job hook: if SPINORBEC_SCAN_ONLY_INDEX is set (e.g. by an
-    # autopilot backend's array dispatch), compute only that single
+    # UGE batch wrapper's array dispatch), compute only that single
     # point and exit. Indices are 1-based and clamped silently.
     only_idx = let v = get(ENV, "SPINORBEC_SCAN_ONLY_INDEX", nothing)
         v === nothing ? nothing : parse(Int, v)
@@ -589,7 +589,7 @@ function _run_experiment_scan(
             # They do overlap — `_assert_point_provenance` compares `git_hash`
             # while the marker records `code_rev` (`code_tree_hash` over src/ +
             # ext/), and the design doc argues the latter is the sounder of the
-            # two because the autopilot rsyncs to TSUBAME with `--exclude=.git/`
+            # two because a deployment can rsync to TSUBAME with `--exclude=.git/`
             # so no repository exists on the compute node. Collapsing them into
             # one is a design decision, not a merge resolution; left for a
             # follow-up rather than settled here by deleting one side.

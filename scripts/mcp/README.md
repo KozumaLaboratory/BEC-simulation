@@ -1,132 +1,52 @@
-# TSUBAME MCP server (Claude Desktop → TSUBAME 4)
+# TSUBAME MCP tools
 
-Drive TSUBAME 4 (UGE) from the **Claude Desktop** app. The server is a thin
-wrapper over the SSH alias `tsubame` and the project autopilot CLI
-(`scripts/cli.jl autopilot ...`).
+An MCP server for scheduler status, logs, point balance and result transfer.
+It uses the `tsubame` SSH alias and launches no Julia processes.
 
-It runs **inside WSL** (where `~/.ssh`, the Julia project, `runs/`, and `rsync`
-live); Claude Desktop on Windows launches it via `wsl.exe`. Transport: stdio.
+| Tool | Operation |
+|---|---|
+| `tsubame_qstat` | List scheduler jobs |
+| `tsubame_job_detail` | Read job details |
+| `tsubame_points` | Read group point balance |
+| `tsubame_list_runs` | List local run directories |
+| `tsubame_tail_log` | Read a remote log tail |
+| `tsubame_pull_results` | Transfer remote results with rsync |
+| `tsubame_cancel` | Cancel a job with qdel |
 
-```
-Claude Desktop (Windows) ──stdio──▶ wsl.exe ──▶ tsubame_server.py (WSL)
-                                                   │ ssh tsubame / rsync
-                                                   │ cli.jl autopilot enqueue|tick
-                                                   ▼
-                                              TSUBAME 4 (UGE)
-```
+Submit runs with the batch wrappers documented in
+[`docs/guides/tsubame.md`](../../docs/guides/tsubame.md).
 
-## Tools
+## Setup
 
-| Tool | Kind | Wraps |
-|---|---|---|
-| `tsubame_qstat` | read | `ssh tsubame qstat` |
-| `tsubame_job_detail` | read | `ssh tsubame qstat -j <id>` |
-| `tsubame_points` | read | `ssh tsubame 't4-user-info group point'` |
-| `tsubame_autopilot_status` | read | `cli.jl autopilot status` |
-| `tsubame_budget` | read | `cli.jl autopilot budget` |
-| `tsubame_list_runs` | read | local `runs/` listing |
-| `tsubame_tail_log` | read | tail newest `logs/` file |
-| `tsubame_pull_results` | write (local fs) | `rsync` remote runs → local `runs/` |
-| `tsubame_enqueue` | write | `cli.jl autopilot enqueue <yaml>` |
-| `tsubame_tick` | write | `cli.jl autopilot tick` (qsub dispatch — **spends points**) |
-| `tsubame_cancel` | destructive | `ssh tsubame qdel <id>` |
+Use an existing Python environment with `mcp` and `pydantic` installed.
+Configure the MCP client to launch that Python executable with
+`scripts/mcp/tsubame_server.py` as its argument. Set the environment variables
+below in the client configuration.
 
-`tsubame_tick` dispatch is gated server-side by the autopilot's budget caps +
-circuit breakers; this server does not bypass them.
+The SSH alias must authenticate non-interactively. Establish the connection
+in a terminal with `ssh tsubame true` before using the tools if your SSH
+configuration requires an interactive authentication step. Credentials stay
+in the SSH configuration; the server passes no credentials.
 
-## One-time setup
-
-### 1. Non-interactive SSH (required)
-
-The server runs non-interactively — if the `tsubame` key has a passphrase or
-2FA, every `ssh`/`rsync` call **hangs** unless a ControlMaster master
-connection is already open. Add to the `Host tsubame` block in `~/.ssh/config`:
-
-```sshconfig
-Host tsubame
-  # ... existing HostName / User / IdentityFile ...
-  ControlMaster auto
-  ControlPath ~/.ssh/controlmasters/%r@%h:%p
-  ControlPersist 8h
-  ServerAliveInterval 60
-```
-
-Then authenticate **once** per ~8h window (in a WSL terminal):
-
-```bash
-mkdir -p ~/.ssh/controlmasters && chmod 700 ~/.ssh/controlmasters   # once
-ssh tsubame true      # type passphrase / 2FA here; opens the persistent master
-```
-
-All subsequent server `ssh tsubame …` / `rsync … tsubame:…` calls reuse this
-socket with no prompt. (Alternative: a dedicated passphraseless key scoped to
-this use — less secure, but enables fully unattended operation.)
-
-### 2. Python env
-
-```bash
-cd /home/suzume/workspace/BEC-simulation
-uv venv scripts/mcp/.venv --python 3.14
-uv pip install --python scripts/mcp/.venv/bin/python mcp
-```
-
-### 3. Register with Claude Desktop
-
-Settings → Developer → Edit Config (or edit
-`%APPDATA%\Claude\claude_desktop_config.json` on Windows). Add:
-
-```json
-{
-  "mcpServers": {
-    "tsubame": {
-      "command": "wsl.exe",
-      "args": [
-        "-d", "Ubuntu",
-        "--", "bash", "-lc",
-        "cd /home/suzume/workspace/BEC-simulation && set -a && source scripts/spinorbec.env && set +a && exec scripts/mcp/.venv/bin/python scripts/mcp/tsubame_server.py"
-      ]
-    }
-  }
-}
-```
-
-- Replace `Ubuntu` with your distro's registered name — check in PowerShell:
-  `wsl -l -v`.
-- `source scripts/spinorbec.env` injects `SPINORBEC_TSUBAME_*` so the autopilot
-  UGE backend and `tsubame_pull_results` know the host / group / runs root.
-
-Restart Claude Desktop. The 11 `tsubame_*` tools appear in the tools list.
-
-## Configuration (env overrides)
-
-Read from the process environment (set via `scripts/spinorbec.env` + the launch
-command):
-
-| Var | Default | Meaning |
+| Variable | Default | Meaning |
 |---|---|---|
 | `SPINORBEC_TSUBAME_HOST` | `tsubame` | SSH alias |
-| `SPINORBEC_TSUBAME_RUNS_ROOT` | (from env file) | remote runs root for pull |
-| `SPINORBEC_PROJECT_DIR` | `…/BEC-simulation` | local project root |
-| `SPINORBEC_LOCAL_JULIA` | juliaup 1.12.6 path | local Julia for `cli.jl` |
-| `SPINORBEC_MCP_JULIA_TIMEOUT` | `900` | s; Julia pays a multi-minute JIT cascade |
-| `SPINORBEC_MCP_SSH_TIMEOUT` | `30` | s |
-| `SPINORBEC_MCP_RSYNC_TIMEOUT` | `600` | s |
+| `SPINORBEC_TSUBAME_GROUP` | empty | Group name for remote log paths |
+| `SPINORBEC_TSUBAME_RUNS_ROOT` | empty | Remote runs root; required for result transfer |
+| `SPINORBEC_PROJECT_DIR` | `/home/suzume/workspace/BEC-simulation` | Local checkout containing runs/ |
+| `SPINORBEC_MCP_SSH_TIMEOUT` | `30` | SSH timeout in seconds |
+| `SPINORBEC_MCP_RSYNC_TIMEOUT` | `600` | Result-transfer timeout in seconds |
 
-## Notes
+## Registration check
 
-- **Julia tools are slow on cold start** (`autopilot_status` / `budget` /
-  `enqueue` / `tick`) — the local Julia process pays a JIT cascade on first
-  call. SSH tools (`qstat` / `points` / `cancel`) are fast.
-- **Stop the autopilot systemd timer** before heavy concurrent local Julia work
-  — `spinor-autopilot.timer` + concurrent JIT can crash WSL.
-- Secrets never leave `~/.ssh`. The server passes no credentials.
+Run in the configured Python environment from the checkout root:
 
-## Smoke test (WSL, without Desktop)
+```python
+import asyncio
+from scripts.mcp import tsubame_server
 
-```bash
-cd /home/suzume/workspace/BEC-simulation
-scripts/mcp/.venv/bin/python - <<'PY'
-import asyncio, scripts.mcp.tsubame_server as s
-print(s.mcp.name, len(asyncio.run(s.mcp.list_tools())), "tools")
-PY
+print(tsubame_server.mcp.name)
+print([tool.name for tool in asyncio.run(tsubame_server.mcp.list_tools())])
 ```
+
+This checks tool registration without accessing the cluster.

@@ -15,7 +15,7 @@
 # (This paragraph first said the check had to be done by eye. That was pessimism:
 # all twelve types turned out to be co-located in the text layer.)
 #
-# WHY A FILE AND NOT A PARAGRAPH. `observability/job_cost.sh` used to take the
+# WHY A FILE AND NOT A PARAGRAPH. `scripts/tsubame/job_cost.sh` used to take the
 # coefficient as a command-line argument with a default of 0.200, so computing a
 # cpu_4 job's cost required the operator to already know 0.015 and to type it
 # correctly. The number lived nowhere. It lives here now, and the script reads
@@ -161,7 +161,7 @@ rule = "ポイントは，購入した年度に限り有効"   # 第7条 — poi
 # --- worked examples, each checked against a REAL job ----------------------------
 #
 # These exist so the file can be wrong loudly. Each row is reproducible with
-# `bash observability/job_cost.sh <jobid>`; the expected value is what the
+# `bash scripts/tsubame/job_cost.sh <jobid>`; the expected value is what the
 # formula above gives, and a mismatch means this transcription drifted.
 
 [[example]]
@@ -202,7 +202,7 @@ expected_points = 0.0270
 note = "kept as the case where truncation and rounding disagree"
 
 [usage]
-compute = "bash observability/job_cost.sh <jobid>"
+compute = "bash scripts/tsubame/job_cost.sh <jobid>"
 # The script reads [resource_type] here and reads the type, node count, h_rt and
 # ru_wallclock out of `qacct -j <jobid>`, so no coefficient is ever typed by
 # hand. It REFUSES rather than assuming a default when the type is not in the

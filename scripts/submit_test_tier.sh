@@ -17,7 +17,7 @@
 #
 # NB: the `-o` log only ever holds this wrapper's own echo lines. The suite's
 # output goes to $OUT_DIR/tier_<tier>.out, and OUT_DIR follows
-# SPINORBEC_TSUBAME_RUNS_ROOT, which scripts/spinorbec.env sets to
+# SPINORBEC_TSUBAME_RUNS_ROOT, which defaults to
 # /gs/fs/tga-kozuma-kouhi/uk07267/runs — NOT $HOME. Watching the -o log alone
 # looks exactly like a job that has produced nothing for half an hour.
 #

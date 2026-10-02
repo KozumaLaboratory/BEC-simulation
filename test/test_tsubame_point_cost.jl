@@ -48,7 +48,7 @@ const _PTS_TOML = joinpath(_PTS_ROOT, "refs", "tsubame4_points.toml")
 
 Truncation is done on the decimal string rather than as `floor(raw / unit)`:
 `0.001 / 0.0001` is 9.999999... in binary, and the first implementation of this
-in `observability/job_cost.sh` turned an exact 0.0010 pt into 0.0009.
+in `scripts/tsubame/job_cost.sh` turned an exact 0.0010 pt into 0.0009.
 """
 function _charge(; nodes, type_coef, prio_coef, actual_s, h_rt_s, places)
     raw = nodes * type_coef * prio_coef * (0.7 * max(actual_s, 300) + 0.1 * h_rt_s) / 3600

@@ -1,7 +1,7 @@
 #!/bin/bash
 # UMS feasibility + POLICY-CONSTANT probe.
 #
-# Run ON the TSUBAME login node (not via the autopilot). It does two jobs:
+# Run ON the TSUBAME login node. It does two jobs:
 #
 #   (1) clears the gating yes/no questions for the UMS backend
 #       (docs/design/ums_lease_backend_design.md):

@@ -1,4 +1,0 @@
-# transient per-run artifacts (regenerated each round)
-round_verdict.json
-gates_status.json
-.points_spent

@@ -83,20 +83,7 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
     every >= 1 || throw(ArgumentError("live_monitor.every must be >= 1"))
     status_dir = dirname(status_path)
     isempty(status_dir) || mkpath(status_dir)
-    # The two quantities the DIVERGENCE KILL reads, held across calls because
-    # both are differences. Until 2026-08-04 this callback wrote none of them,
-    # and `is_divergent_status` (`autopilot/monitor.jl:56-68`) defaults every one
-    # of its three inputs to a healthy value when the key is absent — `0.0` for
-    # `norm_drift`, `nothing` for `classify`, `0.0` for `fz_jump`. The writer's
-    # keys and the reader's keys had an EMPTY intersection, so the predicate
-    # returned `false` for every run that has ever been monitored, however far
-    # it had diverged.
-    #
-    # Both suites were green throughout, because each drives its own side with
-    # synthetic input: `test_autopilot.jl:75-79` hands the reader a dict
-    # containing the reader's own keys. A gate that builds its input from the
-    # thing under test never crosses the producer/consumer boundary, which is
-    # the only place this defect lives.
+    # Drift and spin-population changes need a baseline across callbacks.
     norm_0 = Ref(NaN)
     fz_prev = Ref(NaN)
     function (ws, step, times, energies)
@@ -114,7 +101,7 @@ function _build_live_callback(node, status_path::Union{Nothing, String})
         norm_now = Float64(n_total) * Float64(cell_volume(ws.grid))
         isnan(norm_0[]) && (norm_0[] = norm_now)
         # Relative to this run's FIRST observed norm, not to 1.0: a run may be
-        # normalised to something else, and the kill is about drift, not about
+        # normalised to something else, and the diagnostic measures drift rather than
         # the absolute value.
         norm_drift = norm_0[] == 0 ? 0.0 : abs(norm_now / norm_0[] - 1)
         # <F_z> from the populations already computed above — m runs F, F-1, …,
@@ -132,20 +119,11 @@ end
 """
     _emit_live_status(status_path; step, t, norm, norm_drift, energy, populations, fz_jump)
 
-Write the run's live status. **The single writer** — every dynamics path emits
-through here, so the keys the reaper reads are defined once.
+Write the run's live status through one writer shared by all dynamics paths.
 
-`norm_drift` is the universal divergence signal and is required. `fz_jump` is
-spinor-specific and omitted where it has no meaning (the binary path has two
-scalar fields, not a spinor); `is_divergent_status` skips an absent key, so the
-norm arm still fires. `classify` is deliberately never written — the predicate
-skips a `nothing` classification, and inventing one here would be a second
-classifier competing with `analysis/phases/`.
-
-Until 2026-08-04 the writer and `is_divergent_status` had an EMPTY key
-intersection and the kill had never fired for any run. Until 2026-08-07 only the
-standard `dynamics:` path called a writer at all, so the other two could not
-fire either. Both are why this is one function and not three.
+`norm_drift` measures change from the first observed norm and is required.
+`fz_jump` is spinor-specific and omitted for binary scalar fields. Phase
+classification is left to the analysis layer.
 """
 function _emit_live_status(status_path::AbstractString; step::Integer,
     t::Real, norm::Real, norm_drift::Real,

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Exact on-demand point charge for a finished TSUBAME job — from the job id alone.
 #
-#   bash observability/job_cost.sh <jobid>
+#   bash scripts/tsubame/job_cost.sh <jobid>
 #   (run on the login node, or it will ssh tsubame for qacct)
 #
 # Everything the formula needs is already in the job record, so nothing is typed
@@ -31,7 +31,7 @@
 set -uo pipefail
 
 JID=${1:?usage: job_cost.sh <jobid>}
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TOML="$ROOT/refs/tsubame4_points.toml"
 [ -r "$TOML" ] || { echo "job_cost.sh: cannot read $TOML" >&2; exit 1; }
 
