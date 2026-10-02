@@ -125,9 +125,6 @@ const ALLOWED = Dict{Tuple{String, String}, String}(
     ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_reclaim_callback") => "weak-extension callback slot: the CUDA ext installs it at load",
     ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_functional_callback") => "weak-extension callback slot: answers whether CUDA is usable, for logging",
     ("src/workflow/experiments/pipeline/run_registry.jl", "_cuda_state_lines_callback") => "weak-extension callback slot: device state lines for the run banner",
-    ("src/workflow/autopilot/queue.jl", "_DEFAULT_QUEUE_ROOT") => "process-wide default queue location; scheduler state, no physics",
-    ("src/workflow/autopilot/breakers.jl", "_DEFAULT_BREAKER_THRESHOLDS") => "circuit-breaker thresholds; scheduler policy, no physics",
-    ("src/workflow/autopilot/monitor.jl", "_DIVERGENCE_THRESHOLDS") => "divergence-reap thresholds; decides whether a run is KILLED, not what it computes",
     ("src/workflow/monitoring/notifications.jl", "_SLACK_HTTP_HINT_SHOWN") => "print-once latch for a Slack hint",
     ("src/workflow/io/measurement_provenance.jl", "_SRC_FINGERPRINT") => "SHA-1 of src/ captured in __init__ so a measurement file records what the PROCESS is \
                                                                  running, not what is on disk when it writes. It cannot be a const: precompile time is \

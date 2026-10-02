@@ -82,8 +82,7 @@ function notify_slack(
     # An UNDELIVERED alert about something that needs attention must itself be
     # visible. `:info`/`:success` stay quiet — that is chatter — but a
     # warning/error that could not be sent is exactly the case where silence is
-    # the failure. `docs/guides/autopilot.md` documents this as the alerting
-    # mechanism for a breaker trip.
+    # the failure. Failed delivery must remain visible in the run log.
     if !delivered && !_slack_is_quiet(status)
         @warn "Slack alert NOT delivered (no HTTP extension loaded, or POST " *
             "failed); this message exists only in the log" status title msg

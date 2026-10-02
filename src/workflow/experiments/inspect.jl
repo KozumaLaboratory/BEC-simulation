@@ -236,7 +236,7 @@ function _inspect_loaded(raw::AbstractDict, path::String;
     # inspecting a config without popping it first reported a schema ERROR for
     # a config that runs fine — on ~20 of them, including ones already run on
     # TSUBAME. A preflight that fails valid configs is worse than none: this
-    # severity feeds the autopilot gate.
+    # severity feeds the pre-flight verdict.
     #
     # Applied rather than merely popped, because `auto_dt` tightens `dt` in the
     # pipeline and inspect should report the dt the run will actually use. The

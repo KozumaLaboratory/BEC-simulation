@@ -6,7 +6,7 @@ include(joinpath(@__DIR__, "..", "helpers", "calibrated_scan.jl"))
 # Which dynamics paths report liveness, and which do not — declared, not
 # discovered.
 #
-# The autopilot's divergence kill reads `_live_status.json`: the reaper watches
+# Operators can read `_live_status.json` during a run: the file carries
 # it, cancels a diverging run and files it `:killed_data`. On 2026-08-04 that
 # mechanism was found never to have fired at all, because the writer and the
 # reader shared no keys. That was fixed — **for one of three dynamics paths.**
@@ -114,7 +114,7 @@ end
             println("\nDynamics step kinds that write no `_live_status.json` and are")
             println("not declared in `_NO_LIVENESS`:")
             foreach(k -> println("  ", k), undeclared)
-            println("\nThe autopilot's divergence kill reads that file. A path without")
+            println("\nLive diagnostics read that file. A path without")
             println("it runs a diverging job to completion and bills for it. Wire the")
             println("callback, or add the kind to `_NO_LIVENESS` with a reason.")
         end

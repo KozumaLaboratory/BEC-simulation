@@ -1530,7 +1530,7 @@ type = "A"
 scope = "Wall-time artifacts anywhere under /home/suzume/workspace on 2026-08-26 (four roots: tsubame_pull, BEC-simulation-campaign/runs, runs_archive, one worktree), the 240 run directories under the main checkout's `runs/`, and the 41 commits touching `docs/campaign/claims.toml` (19 on first-parent). About RECORDABILITY, not about efficiency: it says over which period the ratio can be computed, not that compute was well or badly spent. TSUBAME-side files not pulled back are outside it."
 uncertainty = "The denominator is exact given its own definition, and the definition is the soft edge: `advanced` = entering `live`/`scoped`/`refuted`/`superseded`/`closed` either new or from `open`/`suggested`, excluding restatements within the advanced set. The numerator is exact where it exists (11 of 11 files carry a value) and `unbounded: not recorded` for everything before 2026-05-28, which must not be read as small - it is absent. 1.20 h is a floor on this host, not a total: files never rsynced off the cluster are not counted, and `qacct` is authoritative for the UGE half and lives outside the tree."
 uncertainty_basis = "control"
-evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl", "src/workflow/autopilot/budget.jl"]
+evidence = ["docs/campaign/CAMPAIGN.md", "src/workflow/experiments/pipeline/runner.jl"]
 evidence_status = "in_tree"
 commit = "unknown"
 doc = "docs/campaign/fix_list.toml"

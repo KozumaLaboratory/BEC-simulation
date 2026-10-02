@@ -39,7 +39,7 @@ function estimate_run_budget(yaml_path::AbstractString; io::IO=stdout)
     # and was wrong for 15 of the registry's 23 atoms: Ca40 / Sr / Yb (F=0) were
     # sized 13x too large, Rb85 2.6x too large, and `Dy162` (F=8) 1.31x too
     # SMALL. This is the second copy of the same table found today — the first
-    # was in `autopilot/profile_recommend.jl`.
+    # was in the retired scheduler profile recommender.
     atom_name = get(gs, "atom", "Eu151")
     F = haskey(ATOM_REGISTRY, Symbol(atom_name)) ? ATOM_REGISTRY[Symbol(atom_name)].F : 6
     D = 2F + 1

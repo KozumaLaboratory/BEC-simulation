@@ -41,7 +41,7 @@ function run_layer(name::AbstractString)
     s = String(name)
     lv = run_level(s)
     lv === nothing || return lv
-    occursin(r"^[0-9a-f]{16}$", s) && return "autopilot"   # pure-hash CAS dir
+    occursin(r"^[0-9a-f]{16}$", s) && return "experiment"   # pure-hash CAS dir
     occursin(r"^\d\d?_", s) && return "bench"               # 00_…09_ suite
     startswith(s, "klaus") && return "klaus"
     startswith(s, "matsui") && return "matsui"
@@ -89,8 +89,7 @@ _has_run_jld2(dir::AbstractString) = _find_run_jld2(dir) !== nothing
     run_catalog_index(; runs_root=default_store().root) -> Vector{Dict{String,Any}}
 
 One flat, sparse row per run, most-recently-touched first. Reads
-summary.json (observables) + state.toml (autopilot status/provenance) +
-mtime only — no jld2. A dir is a "run" if it has config.yaml, a jld2, or
+summary.json (observables) + mtime only — no jld2. A dir is a "run" if it has config.yaml, a jld2, or
 a summary. Cheap enough to recompute per request.
 """
 function run_catalog_index(; runs_root::AbstractString=default_store().root)
@@ -125,21 +124,6 @@ function run_catalog_index(; runs_root::AbstractString=default_store().root)
                 row["has_summary"] = false
                 row["index_error"] = "summary parse: $(sprint(showerror, e))"
             end
-        end
-
-        # Autopilot status/provenance, when this run is queue-tracked.
-        entry = try
-            get_entry(d)
-        catch
-            nothing
-        end
-        if entry !== nothing
-            row["status"] = String(entry.status)
-            row["recipe"] =
-                entry.recipe_name === nothing ? nothing : String(entry.recipe_name)
-            row["group_id"] = entry.group_id
-            row["enqueued_by"] = entry.enqueued_by
-            isempty(entry.kill_reason) || (row["kill_reason"] = entry.kill_reason)
         end
 
         push!(rows, row)

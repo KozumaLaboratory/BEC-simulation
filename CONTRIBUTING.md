@@ -23,8 +23,7 @@ A new file is allowed only if it falls into one of four categories:
 1. **Pure dispatch / arg-parse entry point.** Body contains nothing
    but argument parsing, calling library functions, and `exit(code)`.
    All compute lives in `src/`. The canonical Julia CLI is
-   `scripts/cli.jl` (single entry; subcommands include autopilot
-   operator ops). Each subcommand handler stays ≤20 LOC and contains
+   `scripts/cli.jl` (single entry). Each subcommand handler stays ≤20 LOC and contains
    no compute. No per-subsystem sibling CLIs — they fragment operator
    memory and duplicate flag-parse code. Bash entries that orchestrate
    non-Julia tools (LaTeX, deploy, install) are fine alongside.
@@ -33,8 +32,7 @@ A new file is allowed only if it falls into one of four categories:
    `scripts/build_sysimage.jl` (PackageCompiler invocation).
 
 3. **Declarative ops specs** for tools whose configuration lives in
-   their own format. Currently: `scripts/spinor-autopilot.{service,timer}`
-   (systemd-user units), `scripts/spinorbec.def` (Singularity image),
+   their own format. Currently: `scripts/spinorbec.def` (Singularity image),
    `scripts/tsubame_setup.sh` (cluster env bootstrap sourced by
    operators), the UGE submit wrappers.
 
@@ -82,7 +80,6 @@ follow the same rule (the heredoc body should be a single library call).
 | `launch [<batch>] <name>` | `launch_experiment()` |
 | `figure --paper P --fig N` | `render_manuscript_figure()` |
 | `preflight [<smoke_yaml>]` | `cuda_preflight_check()` |
-| `autopilot <sub>` | `autopilot_tick!()` and friends |
 | `tag` / `catalog` | `tag_run!()` / `run_catalog_index()` |
 | `gs-library {index\|merge}` | `gs_library()` / `merge_gs_library()` |
 | `validation-matrix [dir]` | `run_validation_matrix()` |

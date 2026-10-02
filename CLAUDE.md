@@ -66,7 +66,7 @@ SPINORBEC_TEST_WORKERS=auto julia --project=. -e 'using Pkg; Pkg.test()'  # para
 julia --project=. -e 'using SpinorBEC; include("test/test_X.jl")' # single test
 julia --project=. -e 'using Pkg; Pkg.instantiate()'               # install deps
 LD_LIBRARY_PATH=/usr/lib/wsl/lib julia --project=.                # GPU REPL on WSL2
-julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / autopilot / tag / catalog / gs-library / validation-matrix / tsubame); body = SpinorBEC.cli_main
+julia --project=. scripts/cli.jl <subcmd> [args]                  # unified CLI (inspect / launch / figure / preflight / tag / catalog / gs-library / validation-matrix / tsubame); body = SpinorBEC.cli_main
 ```
 
 `SPINORBEC_TEST_TIER` supports `{fast, ci, full, physics}` and the derived `oracles` / `integration` views. Per-PR checks run `smoke_fast`, `smoke_oracles`, and `smoke_integration` (explicit subsets in `test/_smoke.jl`) to target 2-3 minute feedback. Required-check names are preserved. CI selects the exact Julia version from `Manifest.toml`, uses `JULIA_CPU_TARGET=generic`, and isolates the smoke depot from nightly test compiler flags; the formatter has its own cache. `nightly.yml` runs `full`, including every deferred ci-tier test, and supports manual dispatch; benchmarks and STATE.md repair also run there. `test_tier_membership.jl` verifies smoke and nightly coverage separately. Tier membership is **explicit in `test/_tiers.jl`** — every test belongs to exactly one list. (`runtests.jl` is the runner; it `include`s `_tiers.jl`, which is where a new test is added. This said `runtests.jl` until 2026-08-04.) New tests get added to a list, not auto-discovered. The runner also honours `SPINORBEC_TEST_WORKERS` (`1` default = serial in-process / `N` / `auto` = N **independent julia processes** taking files **on demand** from a shared O_EXCL claim queue, heaviest first — separate processes, not Distributed workers, so each loads SpinorBEC once in a clean session; a shared worker pool reloads the package mid-run and `x isa T` flakes false. `_COST` is only the hand-out order: per-file times swing ±30 % run to run, so static bin-packing left the makespan 8-21 % above the floor no matter how well it was fitted), `SPINORBEC_TEST_SKIP` (comma-separated paths to omit), and `SPINORBEC_TEST_TIMING=quiet`. Parallel mode requires each test file to stay a dependency-free unit (own `using` / `@testset` / `@__DIR__` helpers, no cross-file fixed `/tmp` paths) — preserve that when adding tests.
@@ -92,7 +92,6 @@ src/
     ├── experiments/{inspect,inspect_batch,diff_dicts}.jl  # config introspection + structural diff + 4-severity warnings
     ├── experiment.jl          # Experiment lifecycle (spec + CAS outdir + lazy obs memo)
     ├── validation.jl          # RunResult + ConservationSpec / OperatorRHSSpec + CheckResult + twin_audit + scalar_summary
-    └── autopilot.jl           # queue + tick + on_complete + retry + budget + breakers + UGE backend + observability + Day-1 recipes + trust gradient
 
 ext/        SpinorBEC{CUDA, Makie, HTTP, VTK}Ext (lazily loaded; CUDA is NOT a weakdep — see docs/STATE.md)
 test/       subdirs mirror src/ + test/oracles/ (sign-bug-proof gates) + test/helpers/
@@ -156,7 +155,7 @@ Four primitives:
    - `tabulate(exps, [Fz_t, classify, norm_drift])` → per-cell column NamedTuple; failed cells slot the Exception so the table assembles.
    - `spec_diff(a, b)` → dotted-path diff. Powers twin verification, sweep-axis discovery, compare provenance.
 
-`run_experiment(config_or_snapshot)` = persistent form: resumable, directory-per-config, one jld2 per scan point, skips cached files on re-run, auto-applies `calibration:`, writes `_live_status.json` + `_exit_summary.json` for autopilot. `config.json` carries input and resolved conditions; `run_yaml(path)` imports existing YAML into this same executor. `load_config(path) |> run_config` remains the in-memory form.
+`run_experiment(config_or_snapshot)` = persistent form: resumable, directory-per-config, one jld2 per scan point, skips cached files on re-run, auto-applies `calibration:`, writes `_live_status.json` + `_exit_summary.json` for run diagnostics. `config.json` carries input and resolved conditions; `run_yaml(path)` imports existing YAML into this same executor. `load_config(path) |> run_config` remains the in-memory form.
 
 **Spec-driven validation** (`workflow/validation/`):
 - `RunResult` = typed view over jld2; fields listed in `docs/STATE.md` (this line omitted `path` until 2026-08-05).
@@ -181,7 +180,6 @@ Four primitives:
 | **solvers/continuation** | scan_1d + scan_2d + boundary tracing + pseudo_arclength + triple_point. | `make_params(val)` returns kwarg NamedTuple or `InteractionParams`. Legacy `make_interactions` removed. |
 | **solvers/** (dynamics + stochastic family — contents derived in `docs/STATE.md`) | RTP (`run_simulation!`) + adaptive + embedded-adaptive (**file deleted in `e037867c`**; the only surviving reference is a git-history pointer in an error message at `src/solvers/ground_state.jl`) + Truncated Wigner + SGPE callback (true thermal init) + **full SPGPE** (growth + energy-damping reservoirs, rates from (μ,T,ε_cut); ramped reservoir drives s-scale evaporation) + projected GP + photon scattering + two-component GP. | TWA σ/μ is chaotic-dipolar divergence, NOT classical thermalization. Stoof-form SGPE **is** the SPGPE growth term — don't restate it. Stochastic noise must be drawn on-device (`_randn_fill!`); host draws were 88 % of the step. |
 | **workflow/experiments/{schema,runtime,analyzers,pipeline}** | YAML compile (units + templates + mixins + defaults + B-block + noise-block + auto-defaults + ε hardening) + runtime helpers (b_block_builders, pulse_sequence, STA counter-diabatic, Feshbach ramp) + analyzers + pipeline runner. | `_step_dispatch!` has `@nospecialize(step)` + `@noinline`; measured 2026-08-04 as below the noise floor (see §"Type stability firewalls"). The measured rule is: no `Any`-typed local into `make_workspace`. |
-| **workflow/autopilot/** | Queue + tick + 2-stage submit + LocalBackend + UGEBackend (TSUBAME) + budget cap + circuit breakers (recipe / lineage / rate / kill) + on_complete recipe lineage + retry + qw_history + trust gradient + Day-1 recipes (`:next_random_in_bounds` / `:refine_around_best` / `:analyze_majorana` — a recipe is selected BY SYMBOL, so the abbreviated names this line carried until 2026-08-05 do not work if typed) + failure_analysis + profile_recommend + observability. | TSUBAME uses UGE not Slurm; `qsub -g <group>` is CLI flag not directive. `.autopilot.{dry_run,paused}` persisted file sentinels. UGE auto-registers from `SPINORBEC_TSUBAME_{HOST,PROJECT_ROOT,RUNS_ROOT,…}` env. |
 | **workflow/experiments/optimization.jl** | `module Optimization`. `bayesian_optimize` + `multi_fidelity_optimize_2tier` + `active_learn_phase_scan` + GP/EI + Faraday fit. YAML and direct-Julia entry points; built-in objectives `bo_objective_{max_m_transfer,max_lz,min_energy}` + custom via closure. | GP fitting > 100 s wall ⇒ heavy-tier only. |
 | **workflow/experiments/calibration.jl** | `module Calibration`. CoilCalibration + FORTCalibration + RabiCalibration + CalibrationHistory (CSV + week-to-week interpolate) + drift sampling. | Lab fields like `B: {p_mv: 2.5, coil_mode: strong}` resolve via calibration table to Gauss **before** downstream parsing. |
 | **workflow/initialization + state_zoo** | atoms + `init_psi` dispatch + named `init_psi_<name>` wrappers (count in `docs/STATE.md`) + Thomas-Fermi + heuristic thermal seed + TWA vacuum noise. | Wrap, don't fork: every named state is `init_psi(state=:..., init_state_params=...)` under the hood. For `:transverse_x` use `init_psi_spin_coherent(grid, sys; theta=π/2, phi=0)`. True thermal init uses SGPE callback. |
@@ -286,20 +284,6 @@ The ladder is numbered to 12 and the rows below are the levels that HAVE an inst
 
 Reports must say which type a claim falls under. "Tests pass" is A; "matches Klaus et al. 2022" is C. Do not conflate.
 
-## Autopilot pattern
-
-Stateless meta-loop over the queue. Permanent invariants:
-
-- **Two-stage submit**: mark `:running` + `job_id=nothing` + fsync; backend dispatch sets `job_id`; save_entry with real `job_id`. Crash between stages recoverable via `find_job_by_name`.
-- **Backends**: `LocalBackend` (subprocess) + `UGEBackend` (TSUBAME ssh + rsync), auto-registered from env triple.
-- **Pre-flight inspector**: 4-severity (`:block` → killed_bug, `:error` → recorded, `:warn` → Slack, `:info` → silent).
-- **Budget gate**: quarter + daily GPU·h caps, refreshed from realized hours, checked once per tick.
-- **Circuit breakers**: recipe / lineage / rate / kill — trip auto-pauses + Slack-alerts.
-- **Persisted sentinels**: `.autopilot.dry_run` and `.autopilot.paused` — toggle via CLI without restart. Dry-run still fires on_complete recipes (exercises lineage end-to-end).
-- **On_complete recipes**: bounded recipe lineage (default `on_complete_max_descendants=64`). Day-1 set: `:next_random_in_bounds` / `:refine_around_best` / `:analyze_majorana` (selected by symbol — the short forms are not valid).
-- **Divergence kill**: reap loop watches `_live_status.json`, cancels divergent runs, classifies `:killed_data`. **All three dynamics paths report** — standard, `rotating_basis` and `binary` — through one writer (`_emit_live_status`), so the keys the reaper reads are defined once and cannot drift apart per path. Gated by `test/workflow/test_every_dynamics_path_reports_liveness.jl`, which fails if a new step kind dispatches without it. Two things had to be fixed to make the sentence true: the writer and the reader shared no keys at all until 2026-08-04, and only the standard path was wired until 2026-08-07. Binary liveness is deliberately NOT conditional on `save.psi` — turning snapshots off must not turn the safety off with them.
-- **Failure classification**: `outcome.toml` → `:killed_data` (NaN divergence) or `:killed_bug` (OOM / TIMEOUT / NODE_FAIL). OOM is resource-permanent — retry escalates resource class, not the recipe.
-
 **Autonomous research loop** (RETIRED 2026-06-08): the first loop (`.claude/scripts/loop.sh`, dispatching director / theorist / implementer / researcher / critic) is superseded by the gated harness at `/home/suzume/workspace/spinorbec-autoresearch/` (OUTER project; this repo is its inner `repo/` worktree). `loop.sh` is guarded (exits RETIRED; `LOOP_FORCE_RETIRED_RUN=1` for forensics) and the loop machinery was moved to `/home/suzume/workspace/BEC-simulation-archive/loop_machinery_2026_06_08/`; the record to `…/loop_record_2026_06_08/`. Active successor: `/home/suzume/workspace/spinorbec-autoresearch/CLAUDE.md`.
 
 ## Conventions (do NOT "fix")
@@ -341,7 +325,6 @@ NOT bugs — don't "fix".
 | Pipeline step kind | `pipeline/pipeline_types.jl` (struct) + `pipeline/run_step_<kind>.jl` (handler) + branch in `_step_dispatch!` | `_step_dispatch!` branch is the inference firewall — keep `@nospecialize(step)`. |
 | Validation spec | `src/workflow/validation/specs.jl` (struct + `check` method) | Per-observable bounds + `CheckResult`; failed checks must not throw. |
 | BO objective | Closure to `bayesian_optimize_yaml(...; objective=...)` or new `bo_objective_<name>` in `optimization/bayesian_opt_yaml.jl` | Signature: `(result) → Float64`. Keep closures monomorphic in hot loops. |
-| Autopilot recipe | `src/workflow/autopilot/recipes.jl` (on_complete callback) | Bounded by `on_complete_max_descendants`; outcome.toml classification; trust-store records per recipe. |
 | Manuscript figure | `src/manuscript/figures/<paper>_FIG<N>.jl` + register | CLI: `scripts/cli.jl figure --paper <p> --fig <n>`. Emitters: CSV / Python / TikZ. |
 | Atom species | `src/workflow/initialization/atoms.jl` + entry in `ATOM_REGISTRY` | Constraint `c₀ + 36 c₁ = 4π(a_s/a_ho)N` for F=6 — see "¹⁵¹Eu". |
 | Schema key | `src/workflow/experiments/schema/<block>.jl` + `auto_defaults.jl` if it has a sensible default | `inspect_config` should classify malformed values as `:error`/`:warn`, not silently accept. |
@@ -552,7 +535,7 @@ Cost regime is permanent: this codebase pays a JIT cascade because Workspace is 
 - **F32 first-JIT** (rotating_basis): ~10 min, then cached.
 - **30-min hang regime**: `Dict{Symbol,Any}` or closure escape into Workspace path. Silent inference explosion.
 - **The FFTW planner's memory blows up on a MIXED-RADIX grid with real Julia threads, and this is a GRID-SIZE decision, not a thread-count one.** Measured 2026-08-21 (#407), `julia -t 16` + FFTW 16 threads + `MEASURE`, one process per point: **48³ → 1.66 GB, 50³ → 2.40, 54³ → 3.01, 80³ → 4.26, 96³ → 6.73, 98³ → 11.97 — against 64³ → 0.35 and 128³ → 0.38.** The only cheap sizes are the powers of two, which is why the original observation ("a 19× larger problem using 32× less memory at the same thread count") looked paradoxical: 128 is 2⁷ and 48 is not. Three conditions are required and removing any one removes it — `MEASURE`/`PATIENT`, `julia -t > 1` (at `-t 1` every size is 0.26–0.30 GB **even with FFTW reporting 16 threads**, because FFTW.jl runs its parallel loop through Julia's threadpool), and a non-power-of-two length. **REFUTED** on the way: the hypothesis that a library reads `/proc/cpuinfo` (384) rather than the cgroup (16) — a `taskset` arm at 16 visible CPUs still takes 2.26 GB at 48³. `make_fft_plans` / `make_rfft_plans` warn on the combination (they default to `MEASURE`, and `src/analysis/dipole_field.jl` plans the DDI work shape that way — the path every eGPE ground state runs); `SPINORBEC_FFT_PLAN=estimate` is the deliberate opt-out. **Prefer power-of-two grid edges when a run is threaded**, and remember that the smoke grid is where this bites: 128³ production is safe and `48³ --smoke` is not, which is the same shape as "a resource knob measured on the smoke grid does not transfer" one layer down.
-- **GPU split**: WSL2 consumer card for audits / smoke (< 2 h). TSUBAME (`UGEBackend`) for multi-cell sweeps, dynamics 128³+, seed × cell arrays (`docs/guides/tsubame.md`).
+- **GPU split**: WSL2 consumer card for audits / smoke (< 2 h). TSUBAME batch jobs for multi-cell sweeps, dynamics 128³+, seed × cell arrays (`docs/guides/tsubame.md`).
 - **Smoke-test discipline**: before any > 10 min launch, render with `--smoke` (low ITP step count, every code path, ≤ 2 min on GPU). CPU success ⇏ GPU works. Verify state symbols + kwargs by grep first.
 - **Background long jobs**, and make them record their own exit status — a PID
   disappearing says nothing about success, and that is the shape of an OOM kill:
@@ -578,7 +561,7 @@ Cost regime is permanent: this codebase pays a JIT cascade because Workspace is 
 - **Memory** = *per-incident layer*:
   - `feedback_*.md` — user norms (smoke-test discipline, never delete memory before verifying, never patch when root fix available, …).
   - `mistake_*.md` — errors with structural prevention.
-  - `gotcha_*.md` — sharp edges (B_mag spherical form, `ip[n] ≠ g_S`, FG Wick rotation sign, TWA chaos, autopilot timer + JIT WSL crash, …).
+  - `gotcha_*.md` — sharp edges (B_mag spherical form, `ip[n] ≠ g_S`, FG Wick rotation sign, TWA chaos, …).
   - `project_*.md` — active arc context (Eu phase diagram North Star, validation pivot, …). Decay fast.
   - `reference_*.md` — external systems pointers (TSUBAME 4, WSL2 networking, …).
 - **`MEMORY.md` index** is the always-loaded TOC, and it has a load limit that

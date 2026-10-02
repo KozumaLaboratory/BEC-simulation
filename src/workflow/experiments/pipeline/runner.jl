@@ -169,7 +169,7 @@ _is_oom_error(err) =
 # failure — workspaces that stopped caching entirely because `CARGO_INCREMENTAL`
 # was set, discoverable only through `--show-stats`. ccache's answer is a
 # persisted per-reason counter (28 named uncacheable reasons behind
-# `--show-stats -v`), and this is that, in the file the autopilot already reads.
+# `--show-stats -v`), and this is that, in the persisted exit summary.
 #
 # Two things a person reading a finished run needs and could not get:
 #
@@ -239,8 +239,7 @@ function run_pipeline(config::PipelineConfig; verbose::Bool=_default_solver_verb
     end
 
     # Exit summary — derive path from live_status_path (same dir) so the
-    # autopilot can classify transient vs permanent failures without log
-    # scraping. See docs/guides/autopilot.md.
+    # operator can inspect terminal failures without scraping logs.
     exit_summary_path = if live_status_path === nothing
         nothing
     else

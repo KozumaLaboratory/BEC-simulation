@@ -1,24 +1,9 @@
 #!/usr/bin/env python3
-"""MCP server for driving TSUBAME 4 (UGE) from the Claude Desktop app.
+"""MCP tools for TSUBAME scheduler status, logs, accounting and result transfer.
 
-Thin wrapper over the SSH alias `tsubame` and the project's autopilot CLI
-(`scripts/cli.jl autopilot ...`). Runs inside WSL so it reuses the local
-`~/.ssh` setup; the Desktop app launches it via `wsl.exe`.
-
-Tool families:
-  read-only   : qstat, job_detail, points, autopilot_status, budget, list_runs
-  collect     : pull_results (rsync remote runs -> local runs/)
-  submit      : enqueue (queue a config), tick (dispatch via qsub), cancel (qdel)
-
-Submission is gated server-side by the autopilot's own budget caps and circuit
-breakers — this server does not re-implement those guards.
-
-Prerequisites (see scripts/mcp/README.md):
-  * SSH alias `tsubame` resolves and authenticates NON-INTERACTIVELY
-    (ControlMaster master connection established once, or a passphraseless key).
-    Otherwise every ssh/rsync call hangs on a passphrase/2FA prompt.
-  * `scripts/spinorbec.env` sourced into this process's environment
-    (the Desktop launch command does `set -a; source scripts/spinorbec.env`).
+Uses the non-interactive SSH alias `tsubame`. Configure the remote runs root
+through SPINORBEC_TSUBAME_RUNS_ROOT and the local checkout through
+SPINORBEC_PROJECT_DIR. See scripts/mcp/README.md.
 """
 
 import asyncio
@@ -39,15 +24,10 @@ RUNS_ROOT = os.environ.get("SPINORBEC_TSUBAME_RUNS_ROOT", "")
 PROJECT_DIR = os.environ.get(
     "SPINORBEC_PROJECT_DIR", "/home/suzume/workspace/BEC-simulation"
 )
-LOCAL_JULIA = os.environ.get(
-    "SPINORBEC_LOCAL_JULIA",
-    "/home/suzume/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/bin/julia",
-)
 LOCAL_RUNS = os.path.join(PROJECT_DIR, "runs")
 
-# Julia commands pay a multi-minute JIT cascade; SSH calls are fast.
+# SSH calls and result transfers have separate timeouts.
 SSH_TIMEOUT = float(os.environ.get("SPINORBEC_MCP_SSH_TIMEOUT", "30"))
-JULIA_TIMEOUT = float(os.environ.get("SPINORBEC_MCP_JULIA_TIMEOUT", "900"))
 RSYNC_TIMEOUT = float(os.environ.get("SPINORBEC_MCP_RSYNC_TIMEOUT", "600"))
 
 _AUTH_HINT = (
@@ -101,12 +81,6 @@ async def _ssh(remote_cmd: str, timeout: float = SSH_TIMEOUT) -> dict:
     return await _run(argv, timeout=timeout)
 
 
-async def _julia_autopilot(sub_args: list[str], timeout: float = JULIA_TIMEOUT) -> dict:
-    """Run `cli.jl autopilot <sub_args>` locally (drives the UGE backend)."""
-    argv = [LOCAL_JULIA, "--project=.", "scripts/cli.jl", "autopilot", *sub_args]
-    return await _run(argv, timeout=timeout, cwd=PROJECT_DIR)
-
-
 def _fmt(res: dict, action: str) -> str:
     """Render a subprocess result as an actionable string."""
     if res["timed_out"]:
@@ -134,28 +108,6 @@ class JobIdInput(BaseModel):
 
 class JobDetailInput(JobIdInput):
     pass
-
-
-class EnqueueInput(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    config_path: str = Field(
-        ...,
-        description="Path to a run config YAML, relative to the project root "
-                    "(e.g. 'runs/eu151_edh_ext/config.yaml').",
-        min_length=1, max_length=400,
-    )
-    priority: Optional[int] = Field(
-        default=None, description="Optional queue priority (higher runs first).", ge=0, le=100
-    )
-
-    @field_validator("config_path")
-    @classmethod
-    def _no_escape(cls, v: str) -> str:
-        if v.startswith("/") or ".." in v.split("/"):
-            raise ValueError("config_path must be a project-relative path without '..'")
-        if not v.endswith((".yaml", ".yml")):
-            raise ValueError("config_path must point to a .yaml/.yml file")
-        return v
 
 
 class TailLogInput(BaseModel):
@@ -254,46 +206,6 @@ async def tsubame_points(params: Empty) -> str:
 
 
 @mcp.tool(
-    name="tsubame_autopilot_status",
-    annotations={"title": "Autopilot queue status", "readOnlyHint": True,
-                 "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-)
-async def tsubame_autopilot_status(params: Empty) -> str:
-    """Show the local autopilot queue + dispatch state (`cli.jl autopilot status`).
-
-    Reflects what the autopilot has queued / dispatched / completed. Slow on a
-    cold start: the local Julia process pays a multi-minute JIT cascade.
-
-    Args:
-        params (Empty): no parameters.
-
-    Returns:
-        str: the autopilot status report, or an "Error: ..." string.
-    """
-    return _fmt(await _julia_autopilot(["status"]), "autopilot status")
-
-
-@mcp.tool(
-    name="tsubame_budget",
-    annotations={"title": "Autopilot GPU-hour budget", "readOnlyHint": True,
-                 "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-)
-async def tsubame_budget(params: Empty) -> str:
-    """Show the autopilot's GPU-hour budget gate (`cli.jl autopilot budget`).
-
-    Reports quarter + daily caps and realized usage. Submissions are blocked
-    by this gate when caps are hit. Slow on cold start (Julia JIT).
-
-    Args:
-        params (Empty): no parameters.
-
-    Returns:
-        str: the budget report, or an "Error: ..." string.
-    """
-    return _fmt(await _julia_autopilot(["budget"]), "autopilot budget")
-
-
-@mcp.tool(
     name="tsubame_list_runs",
     annotations={"title": "List local run directories", "readOnlyHint": True,
                  "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
@@ -302,7 +214,7 @@ async def tsubame_list_runs(params: ListRunsInput) -> str:
     """List run directories under the local `runs/` tree (most-recent first).
 
     These are the local mirrors that tsubame_pull_results syncs into. Use to
-    find a run_name to pull or a config_path to enqueue.
+    find a run_name to pull.
 
     Args:
         params (ListRunsInput): limit (max entries).
@@ -390,8 +302,8 @@ async def tsubame_pull_results(params: PullInput) -> str:
     """
     if not RUNS_ROOT:
         return ("Error: SPINORBEC_TSUBAME_RUNS_ROOT is not set in the environment. "
-                "Ensure scripts/spinorbec.env is sourced into this server's process "
-                "(see the Desktop launch command in scripts/mcp/README.md).")
+                "Set SPINORBEC_TSUBAME_RUNS_ROOT in the server environment "
+                "(see scripts/mcp/README.md).")
     sub = (params.run_name + "/") if params.run_name else ""
     remote = f"{HOST}:{RUNS_ROOT.rstrip('/')}/{sub}"
     local = os.path.join(LOCAL_RUNS, params.run_name or "") + "/"
@@ -413,59 +325,7 @@ async def tsubame_pull_results(params: PullInput) -> str:
     return _fmt(res, label)
 
 
-# ── Submit tools ─────────────────────────────────────────────────────
-@mcp.tool(
-    name="tsubame_enqueue",
-    annotations={"title": "Queue a config for TSUBAME", "readOnlyHint": False,
-                 "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-)
-async def tsubame_enqueue(params: EnqueueInput) -> str:
-    """Add a run config to the autopilot queue (`cli.jl autopilot enqueue <yaml>`).
-
-    Queues only — does NOT dispatch. Call tsubame_tick afterward to submit
-    queued jobs to TSUBAME via qsub. Re-enqueuing the same config is idempotent
-    at the queue level. Slow on cold start (Julia JIT).
-
-    Args:
-        params (EnqueueInput): config_path (project-relative .yaml),
-            priority (optional 0-100).
-
-    Returns:
-        str: the enqueue confirmation (content id / queue position), or an
-        "Error: ..." string. A missing-file error means config_path is wrong
-        relative to the project root.
-    """
-    full = os.path.join(PROJECT_DIR, params.config_path)
-    if not os.path.isfile(full):
-        return (f"Error: config not found at {params.config_path} (resolved {full}). "
-                "Use tsubame_list_runs to find valid configs.")
-    args = ["enqueue", params.config_path]
-    if params.priority is not None:
-        args += ["--priority", str(params.priority)]
-    return _fmt(await _julia_autopilot(args), f"autopilot enqueue {params.config_path}")
-
-
-@mcp.tool(
-    name="tsubame_tick",
-    annotations={"title": "Dispatch queued jobs to TSUBAME", "readOnlyHint": False,
-                 "destructiveHint": False, "idempotentHint": False, "openWorldHint": True},
-)
-async def tsubame_tick(params: Empty) -> str:
-    """Run one autopilot tick: dispatch queued jobs to TSUBAME via qsub (`cli.jl autopilot tick`).
-
-    This SUBMITS jobs and SPENDS compute points. Dispatch is gated server-side
-    by the autopilot's budget caps + circuit breakers; this tool does not
-    bypass them. A tick also collects finished remote runs back to local runs/.
-    Slow on cold start (Julia JIT).
-
-    Args:
-        params (Empty): no parameters.
-
-    Returns:
-        str: the tick summary (dispatched / collected / skipped counts), or an
-        "Error: ..." string.
-    """
-    return _fmt(await _julia_autopilot(["tick"]), "autopilot tick")
+# ── Job cancellation ─────────────────────────────────────────────────────
 
 
 @mcp.tool(

@@ -1,5 +1,9 @@
 # Multi-user Gateway — identity, quota, authorization over a shared CAS
 
+> **RETIRED 2026-10-02.** The Autopilot backend and queue described here were
+> removed. This document records the earlier design; use
+> [the TSUBAME guide](../guides/tsubame.md) for batch operations.
+
 > **FROZEN 2026-06-21.** Describes the tree as of that date and is **not maintained** against the code — do not cite it as current.
 > Live sources: `CLAUDE.md`, `docs/index.md`, and the code itself. Audit: `docs/audit/docs_inventory_2026-08-04.md`.
 

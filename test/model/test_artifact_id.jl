@@ -7,8 +7,8 @@
 # moves.
 #
 # Invariant 3: code identity is one tree hash of `src/` and `ext/`. It is a
-# CONTENT hash, not a git revision — the autopilot rsyncs code to TSUBAME with
-# `--exclude=.git/` (`workflow/autopilot/ssh_transport.jl:72`), so on the compute
+# CONTENT hash, not a git revision — a deployment can copy code to TSUBAME with
+# `--exclude=.git/`, so on the compute
 # node there is no repository to ask, and `git rev-parse HEAD:src` does not move
 # for the uncommitted edits and untracked-but-loaded files that a live research
 # tree is full of.

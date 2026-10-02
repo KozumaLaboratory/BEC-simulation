@@ -93,7 +93,7 @@ timeout --signal=INT --kill-after=120 "$BUDGET_S" \
     using SpinorBEC
     cfg = ARGS[1]
     # Pre-flight before the expensive part. Read the FIELD, not the printed
-    # struct: `:block` is an autopilot registration level and is not a
+    # struct: `:block` is a retired scheduler registration level and is not a
     # ConfigWarning severity at all, and substring-matching "block" against the
     # struct killed every arm of a sibling scan on the q-auto-derive INFO
     # message, whose text contains "B BLOCK".

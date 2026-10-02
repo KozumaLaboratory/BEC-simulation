@@ -8,7 +8,7 @@
 # reversing the key sort inside `_canonical_bytes!` — which changes the canonical
 # bytes of every spec and therefore every outdir — was caught by nothing in
 # `test/workflow/`. `content_id` appears in two other test files only as an opaque
-# string passed between autopilot and catalog records, never computed from a spec.
+# string passed between run and catalog records, never computed from a spec.
 #
 # What is load-bearing and what is not, stated honestly:
 #

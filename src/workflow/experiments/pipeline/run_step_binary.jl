@@ -147,10 +147,7 @@ end
     times = Float64[]
     psi_A_snaps = Vector{Array{ComplexF64, ndims(sim.psi_A)}}()
     psi_B_snaps = Vector{Array{ComplexF64, ndims(sim.psi_B)}}()
-    # Liveness for the autopilot's divergence kill. Until 2026-08-07 this path
-    # wrote no `_live_status.json`, so a diverging binary run finished and
-    # billed. Note the hook was ALSO conditional on `save_psi` — liveness must
-    # not be, or turning snapshots off turns the safety off with them.
+    # Emit live diagnostics independently of saved wavefunction snapshots.
     dV_bin = prod(grid.dx)
     cb_live = _build_binary_live_callback(get(p, "live_monitor", true),
         live_status_path, dV_bin)
